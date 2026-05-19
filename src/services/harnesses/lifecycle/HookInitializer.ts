@@ -15,17 +15,16 @@ import MemoryExtractor from "../../MemoryExtractor.ts";
  * don't duplicate the registration boilerplate.
  */
 
-/**
- * Create a fully wired AgentHooks instance with standard lifecycle hooks.
- *
- * @param options.workspaceRoot — Workspace root for SystemPromptAssembler
- * @param options.autoApprove   — Whether to skip approval gating (full auto mode)
- * @returns {{ hooks, approvalEngine, assembler }}
- */
+interface HookInitOptions {
+  workspaceRoot?: string;
+  autoApprove?: boolean;
+}
+
+/** Create a fully wired AgentHooks instance with standard lifecycle hooks. */
 export function createStandardHooks({
   workspaceRoot,
   autoApprove = false,
-}: any = {}) {
+}: HookInitOptions = {}) {
   const hooks = new AgentHooks();
 
   const approvalEngine = new AutoApprovalEngine({

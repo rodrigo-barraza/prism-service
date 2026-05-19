@@ -1,6 +1,9 @@
-import { mergeUsage } from "../../../utils/CostCalculator.ts";
 import { expandMessagesForFC } from "../../../utils/FunctionCallingUtilities.ts";
 import SessionGenerationTracker from "../../SessionGenerationTracker.ts";
+
+import type BaseAgenticHarness from "../BaseAgenticHarness.ts";
+import type AgenticLoopState from "../../AgenticLoopState.ts";
+import type { AgenticContext, ConversationMessage } from "../types.ts";
 
 /**
  * ExhaustionRecovery — handles the iteration-limit summary pass.
@@ -16,18 +19,13 @@ import SessionGenerationTracker from "../../SessionGenerationTracker.ts";
  * Run a tool-free exhaustion recovery pass.
  *
  * Appends a system instruction asking for a progress summary, streams the
- * response, and updates state with the generated text.
- *
- * @param harness          — BaseAgenticHarness instance (for stream helpers)
- * @param context          — Generation context
- * @param state            — AgenticLoopState
- * @param currentMessages  — Current conversation messages (mutated in-place)
+ * response through the harness's `consumeStream`, and updates state.
  */
 export async function runExhaustionRecoveryPass(
-  harness: any,
-  context: any,
-  state: any,
-  currentMessages: any[],
+  harness: BaseAgenticHarness,
+  context: AgenticContext,
+  state: AgenticLoopState,
+  currentMessages: ConversationMessage[],
 ): Promise<void> {
   const { emit, signal, options, resolvedModel, modelDef, provider } = context;
 
@@ -42,7 +40,7 @@ export async function runExhaustionRecoveryPass(
     ].join(" "),
   });
 
-  const exhaustionOptions = { ...options, tools: undefined };
+  const exhaustionOptions: Record<string, unknown> = { ...options };
   delete exhaustionOptions.tools;
 
   const enforcedMessages = harness.enforceContextWindow(currentMessages, 0);
@@ -71,52 +69,16 @@ export async function runExhaustionRecoveryPass(
           signal,
         });
 
-  for await (const chunk of exhaustionStream) {
-    if (signal?.aborted) break;
+  // Create a pass state for chunk routing through the shared processStreamChunk
+  const exhaustionPass = harness.createPassState(augmentedOptions);
+  exhaustionPass.requestId = exhaustionRequestId;
 
-    if (chunk?.type === "usage") {
-      mergeUsage(state.overallUsage, chunk.usage);
-      if (chunk.usage?.outputTokens > 0) {
-        SessionGenerationTracker.update(exhaustionRequestId, {
-          outputTokens: chunk.usage.outputTokens,
-        });
-      }
-      continue;
-    }
-    if (chunk?.type === "thinking") {
-      state.streamedThinking += chunk.content;
-      state.overallOutputCharacters += chunk.content.length;
-      SessionGenerationTracker.recordChunkTiming(
-        exhaustionRequestId,
-        chunk.content.length,
-      );
-      emit({
-        type: "thinking",
-        content: chunk.content,
-        outputCharacters: state.overallOutputCharacters,
-      });
-      harness.maybeEmitProgress();
-      continue;
-    }
-    if (chunk && typeof chunk === "object") continue;
+  // No tools in the exhaustion pass
+  const emptyToolNames = new Set<string>();
 
-    if (!state.overallFirstTokenTime)
-      state.overallFirstTokenTime = performance.now();
-    state.overallGenerationEnd = performance.now();
-    const chunkText = typeof chunk === "string" ? chunk : "";
-    state.overallOutputCharacters += chunkText.length;
-    state.finalStreamedText += chunkText;
-    SessionGenerationTracker.recordChunkTiming(
-      exhaustionRequestId,
-      chunkText.length,
-    );
-    emit({
-      type: "chunk",
-      content: chunkText,
-      outputCharacters: state.overallOutputCharacters,
-    });
-    harness.maybeEmitProgress();
-  }
+  // Use the shared consumeStream — all chunk routing goes through processStreamChunk,
+  // so new chunk types added to the base dispatcher are automatically handled.
+  await (harness as any).consumeStream(exhaustionStream, exhaustionPass, emptyToolNames);
 
   harness.emitGenerationProgress();
   SessionGenerationTracker.complete(exhaustionRequestId);

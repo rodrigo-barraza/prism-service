@@ -1,5 +1,14 @@
 import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
 
+import type AgenticLoopState from "../../AgenticLoopState.ts";
+import type AgentHooks from "../../AgentHooks.ts";
+import type {
+  ToolCall,
+  ToolResult,
+  AgenticContext,
+  ResolvedTools,
+} from "../types.ts";
+
 /**
  * ToolExecutor — parallel and single tool execution extracted from
  * ReActHarness. Handles custom tools, streaming tools,
@@ -8,23 +17,14 @@ import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
  * Reusable by any harness implementation.
  */
 
-/**
- * Execute a batch of tool calls in parallel.
- *
- * @param toolCalls  — Array of { id, name, args, responsesItemId? }
- * @param context    — Generation context (project, username, agent, etc.)
- * @param tools      — { customToolMap, finalTools }
- * @param hooks      — AgentHooks instance for before/afterToolCall
- * @param state      — AgenticLoopState (for iteration count)
- * @returns Array of { name, id, result }
- */
+/** Execute a batch of tool calls in parallel. */
 export async function executeToolBatch(
-  toolCalls: any[],
-  context: any,
-  tools: any,
-  hooks: any,
-  state: any,
-): Promise<any[]> {
+  toolCalls: ToolCall[],
+  context: AgenticContext,
+  tools: ResolvedTools,
+  hooks: AgentHooks,
+  state: AgenticLoopState,
+): Promise<ToolResult[]> {
   const {
     project,
     username,
@@ -38,7 +38,7 @@ export async function executeToolBatch(
   } = context;
 
   const results = await Promise.all(
-    toolCalls.map(async (toolCall: any) => {
+    toolCalls.map(async (toolCall) => {
       await hooks.run("beforeToolCall", toolCall, context);
 
       const customDefinition = tools.customToolMap.get(toolCall.name);
@@ -55,7 +55,7 @@ export async function executeToolBatch(
         const result = await ToolOrchestratorService.executeToolStreaming(
           toolCall.name,
           toolCall.args,
-          (event: any, data: any, meta: any) => {
+          (event: string, data: unknown, meta: unknown) => {
             emit({
               type: "tool_output",
               toolCallId: toolCall.id,
@@ -109,23 +109,20 @@ export async function executeToolBatch(
   return results;
 }
 
-/**
- * Execute a single tool call (for ReAct-style one-at-a-time execution).
- *
- * @param toolCall — { id, name, args }
- * @param context  — Generation context
- * @param tools    — { customToolMap }
- * @param hooks    — AgentHooks instance
- * @param state    — AgenticLoopState
- * @returns { name, id, result }
- */
+/** Execute a single tool call (for one-at-a-time execution). */
 export async function executeToolSingle(
-  toolCall: any,
-  context: any,
-  tools: any,
-  hooks: any,
-  state: any,
-): Promise<any> {
-  const [result] = await executeToolBatch([toolCall], context, tools, hooks, state);
+  toolCall: ToolCall,
+  context: AgenticContext,
+  tools: ResolvedTools,
+  hooks: AgentHooks,
+  state: AgenticLoopState,
+): Promise<ToolResult> {
+  const [result] = await executeToolBatch(
+    [toolCall],
+    context,
+    tools,
+    hooks,
+    state,
+  );
   return result;
 }

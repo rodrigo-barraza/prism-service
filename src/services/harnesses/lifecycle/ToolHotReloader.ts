@@ -1,7 +1,9 @@
 import MongoWrapper from "../../../wrappers/MongoWrapper.ts";
-// @ts-ignore
+// @ts-ignore — root-level config export
 import { MONGO_DB_NAME } from "../../../../config.ts";
 import logger from "../../../utils/logger.ts";
+
+import type { ToolCall, ResolvedTools, EmitFn } from "../types.ts";
 
 /**
  * ToolHotReloader — refreshes custom tools mid-session without restart.
@@ -24,22 +26,16 @@ const CUSTOM_TOOL_MUTATION_NAMES = new Set([
 /**
  * Check whether any tool calls in this batch mutated custom tools,
  * and if so, reload the custom tool definitions from MongoDB.
- *
- * @param executedToolCalls — Array of { name, id, args }
- * @param tools             — Live tools object { customToolMap, finalTools }
- * @param project           — Project identifier
- * @param username          — Username
- * @param emit              — SSE event emitter
- * @returns true if tools were reloaded
+ * Returns true if tools were reloaded.
  */
 export async function reloadIfCustomToolsMutated(
-  executedToolCalls: any[],
-  tools: any,
+  executedToolCalls: ToolCall[],
+  tools: ResolvedTools,
   project: string,
   username: string,
-  emit: any,
+  emit: EmitFn,
 ): Promise<boolean> {
-  const hasMutations = executedToolCalls.some((toolCall: any) =>
+  const hasMutations = executedToolCalls.some((toolCall) =>
     CUSTOM_TOOL_MUTATION_NAMES.has(toolCall.name),
   );
 
@@ -62,16 +58,16 @@ export async function reloadIfCustomToolsMutated(
 
     // Rebuild finalTools: remove old custom tools, add fresh ones
     const builtInTools = tools.finalTools.filter(
-      (tool: any) => !tool._isCustom,
+      (tool) => !tool._isCustom,
     );
-    const freshSchemas = freshCustomTools.map((customTool: any) => ({
+    const freshSchemas = freshCustomTools.map((customTool: Record<string, any>) => ({
       name: customTool.name,
       description: customTool.description,
-      _isCustom: true,
+      _isCustom: true as const,
       parameters: {
-        type: "object",
+        type: "object" as const,
         properties: Object.fromEntries(
-          (customTool.parameters || []).map((param: any) => [
+          (customTool.parameters || []).map((param: Record<string, any>) => [
             param.name,
             {
               type: param.type || "string",
@@ -81,8 +77,8 @@ export async function reloadIfCustomToolsMutated(
           ]),
         ),
         required: (customTool.parameters || [])
-          .filter((param: any) => param.required)
-          .map((param: any) => param.name),
+          .filter((param: Record<string, any>) => param.required)
+          .map((param: Record<string, any>) => param.name),
       },
     }));
 
@@ -94,10 +90,9 @@ export async function reloadIfCustomToolsMutated(
 
     emit({ type: "status", message: "custom_tools_updated" });
     return true;
-  } catch (error: any) {
-    logger.warn(
-      `[ToolHotReloader] Failed to reload custom tools: ${error.message}`,
-    );
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.warn(`[ToolHotReloader] Failed to reload custom tools: ${msg}`);
     return false;
   }
 }

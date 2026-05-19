@@ -5,6 +5,8 @@ import { pendingApprovals, pendingQuestions } from "./ApprovalRegistry.ts";
 import SessionGenerationTracker from "./SessionGenerationTracker.ts";
 import logger from "../utils/logger.ts";
 
+import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
+
 /**
  * AgenticLoopService — public façade for agentic loop execution.
  *
@@ -17,12 +19,10 @@ import logger from "../utils/logger.ts";
  * Also exposes approval/question resolution APIs used by AgentRoutes.
  */
 export default class AgenticLoopService {
-  /**
-   * Run an agentic loop using the specified (or default) harness.
-   * @param {object} context — generation context from ChatRoutes.prepareGenerationContext
-   * @returns {Promise<{ messages: object[] }>}
-   */
-  static async runAgenticLoop(context: any) {
+  /** Run an agentic loop using the specified (or default) harness. */
+  static async runAgenticLoop(
+    context: AgenticContext,
+  ): Promise<{ messages: ConversationMessage[] }> {
     const {
       options,
       agent,
@@ -90,17 +90,12 @@ export default class AgenticLoopService {
 
   // ── Approval Resolution API ─────────────────────────────
 
-  /**
-   * Resolve a pending approval for an agent session.
-
-
-   * @returns {boolean} true if resolved
-   */
+  /** Resolve a pending approval for an agent session. */
   static resolveApproval(
-    agentSessionId: any,
-    approved: any,
-    { approveAll = false }: any = {},
-  ) {
+    agentSessionId: string,
+    approved: boolean,
+    { approveAll = false }: { approveAll?: boolean } = {},
+  ): boolean {
     const entry = pendingApprovals.get(agentSessionId);
     if (!entry) return false;
 
@@ -116,12 +111,12 @@ export default class AgenticLoopService {
     return true;
   }
 
-  /**
-   * Check if an agent session has a pending approval.
-
-   * @returns {{ pending: boolean, type?: string, tools?: string[] }}
-   */
-  static getPendingApproval(agentSessionId: any) {
+  /** Check if an agent session has a pending approval. */
+  static getPendingApproval(agentSessionId: string): {
+    pending: boolean;
+    type?: string;
+    tools?: string[];
+  } {
     const entry = pendingApprovals.get(agentSessionId);
     if (!entry) return { pending: false };
     return { pending: true, type: entry.type, tools: entry.tools };
@@ -129,20 +124,24 @@ export default class AgenticLoopService {
 
   // ── Ask User Question — Resolution API ─────────────────
 
-  /**
-   * Store a pending question resolver (called by ToolOrchestratorService).
-   */
-  static _setPendingQuestion(agentSessionId: any, entry: any) {
+  /** Store a pending question resolver (called by ToolOrchestratorService). */
+  static _setPendingQuestion(
+    agentSessionId: string,
+    entry: {
+      resolve: (value: unknown) => void;
+      question?: string;
+      questions?: unknown[];
+      choices?: string[];
+    },
+  ): void {
     pendingQuestions.set(agentSessionId, entry);
   }
 
-  /**
-   * Resolve a pending question for an agent session.
-
-   * @param {Array<{ answer: string|string[], annotations?: string }>} answers
-   * @returns {boolean} true if resolved
-   */
-  static resolveUserQuestion(agentSessionId: any, answers: any) {
+  /** Resolve a pending question for an agent session. */
+  static resolveUserQuestion(
+    agentSessionId: string,
+    answers: Array<{ answer: string | string[]; annotations?: string }>,
+  ): boolean {
     const entry = pendingQuestions.get(agentSessionId);
     if (!entry) return false;
     pendingQuestions.delete(agentSessionId);
@@ -150,12 +149,12 @@ export default class AgenticLoopService {
     return true;
   }
 
-  /**
-   * Check if an agent session has a pending question.
-
-   * @returns {{ pending: boolean, question?: string, choices?: string[] }}
-   */
-  static getPendingQuestion(agentSessionId: any) {
+  /** Check if an agent session has a pending question. */
+  static getPendingQuestion(agentSessionId: string): {
+    pending: boolean;
+    question?: string;
+    choices?: string[];
+  } {
     const entry = pendingQuestions.get(agentSessionId);
     if (!entry) return { pending: false };
     return { pending: true, question: entry.question, choices: entry.choices };
@@ -163,11 +162,12 @@ export default class AgenticLoopService {
 
   // ── Harness Discovery API ──────────────────────────────
 
-  /**
-   * List available harnesses for the settings UI.
-   * @returns {Array<{ id: string, label: string, description: string }>}
-   */
-  static listHarnesses() {
+  /** List available harnesses for the settings UI. */
+  static listHarnesses(): Array<{
+    id: string;
+    label: string;
+    description: string;
+  }> {
     return HarnessRegistry.list();
   }
 }

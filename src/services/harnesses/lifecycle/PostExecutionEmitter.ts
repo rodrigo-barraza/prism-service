@@ -1,5 +1,8 @@
 import logger from "../../../utils/logger.ts";
 
+import type AgenticLoopState from "../../AgenticLoopState.ts";
+import type { ToolCall, ToolResult, PassState, EmitFn } from "../types.ts";
+
 /**
  * PostExecutionEmitter — status notifications emitted after tool execution.
  *
@@ -10,54 +13,42 @@ import logger from "../../../utils/logger.ts";
  * Extracted from ReActHarness to be reusable across harnesses.
  */
 
-/**
- * Emit status notifications based on which tools were executed.
- *
- * @param toolCalls — Array of executed tool calls
- * @param emit      — SSE event emitter
- */
-export function emitPostExecutionStatus(toolCalls: any[], emit: any): void {
-  if (toolCalls.some((tc: any) => tc.name.startsWith("task_"))) {
+/** Emit status notifications based on which tools were executed. */
+export function emitPostExecutionStatus(
+  toolCalls: ToolCall[],
+  emit: EmitFn,
+): void {
+  if (toolCalls.some((tc) => tc.name.startsWith("task_"))) {
     emit({ type: "status", message: "tasks_updated" });
   }
 
   if (
     toolCalls.some(
-      (tc: any) => tc.name === "team_create" || tc.name === "stop_agent",
+      (tc) => tc.name === "team_create" || tc.name === "stop_agent",
     )
   ) {
     emit({ type: "status", message: "workers_updated" });
   }
 
-  if (toolCalls.some((tc: any) => tc.name === "upsert_memory")) {
+  if (toolCalls.some((tc) => tc.name === "upsert_memory")) {
     emit({ type: "status", message: "memories_updated" });
   }
 }
 
-/**
- * Process tool results for image/screenshot side-effects.
- *
- * Extracts image data from tool results, pushes refs to state, and
- * emits image events to the SSE stream.
- *
- * @param toolCalls — Array of { id, name, args }
- * @param results   — Array of { name, id, result }
- * @param state     — AgenticLoopState
- * @param pass      — Per-iteration pass state
- * @param emit      — SSE event emitter
- */
+/** Process tool results for image/screenshot side-effects. */
 export function processToolResultMedia(
-  toolCalls: any[],
-  results: any[],
-  state: any,
-  pass: any,
-  emit: any,
+  toolCalls: ToolCall[],
+  results: ToolResult[],
+  state: AgenticLoopState,
+  pass: PassState,
+  emit: EmitFn,
 ): void {
   for (const tc of toolCalls) {
     const res = results.find(
-      (r: any) => r.id === tc.id || (!r.id && r.name === tc.name),
+      (r) => r.id === tc.id || (!r.id && r.name === tc.name),
     );
-    const hasError = !!res?.result?.error;
+    const resultObj = res?.result as Record<string, any> | null;
+    const hasError = !!resultObj?.error;
 
     emit({
       type: "tool_execution",
@@ -66,18 +57,18 @@ export function processToolResultMedia(
         args: tc.args || {},
         id: tc.id,
         responsesItemId: tc.responsesItemId,
-        result: res?.result,
+        result: resultObj,
       },
       status: hasError ? "error" : "done",
     });
 
-    if (res?.result?.screenshotRef) {
-      state.streamedImages.push(res.result.screenshotRef);
-      pass.streamedImages.push(res.result.screenshotRef);
+    if (resultObj?.screenshotRef) {
+      state.streamedImages.push(resultObj.screenshotRef);
+      pass.streamedImages.push(resultObj.screenshotRef);
     }
 
-    if (res?.result?.image?.data) {
-      const image = res.result.image;
+    if (resultObj?.image?.data) {
+      const image = resultObj.image;
       const toolImgRef =
         image.minioRef || `data:${image.mimeType};base64,${image.data}`;
       state.streamedImages.push(toolImgRef);
@@ -88,32 +79,24 @@ export function processToolResultMedia(
         mimeType: image.mimeType,
         minioRef: image.minioRef,
       });
-      delete res.result.image;
+      delete resultObj.image;
     }
   }
 }
 
-/**
- * Track consecutive tool errors and log/emit when a tool hits the limit.
- *
- * @param toolCalls           — Array of executed tool calls
- * @param results             — Array of { name, id, result }
- * @param state               — AgenticLoopState (owns toolErrorCounts)
- * @param maxConsecutiveErrors — Error budget per tool
- * @param emit                — SSE event emitter
- */
+/** Track consecutive tool errors and log/emit when a tool hits the limit. */
 export function trackToolErrors(
-  toolCalls: any[],
-  results: any[],
-  state: any,
+  toolCalls: ToolCall[],
+  results: ToolResult[],
+  state: AgenticLoopState,
   maxConsecutiveErrors: number,
-  emit: any,
+  emit: EmitFn,
 ): void {
   for (const tc of toolCalls) {
     const res = results.find(
-      (r: any) => r.id === tc.id || (!r.id && r.name === tc.name),
+      (r) => r.id === tc.id || (!r.id && r.name === tc.name),
     );
-    const hasError = !!res?.result?.error;
+    const hasError = !!(res?.result as Record<string, any>)?.error;
 
     if (hasError) {
       const count = (state.toolErrorCounts.get(tc.name) || 0) + 1;

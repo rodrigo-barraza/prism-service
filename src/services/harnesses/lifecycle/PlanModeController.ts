@@ -2,6 +2,16 @@ import PlanningModeService from "../../PlanningModeService.ts";
 import { pendingApprovals } from "../../ApprovalRegistry.ts";
 import logger from "../../../utils/logger.ts";
 
+import type AgenticLoopState from "../../AgenticLoopState.ts";
+import type {
+  ToolCall,
+  ToolResult,
+  PassState,
+  ConversationMessage,
+  AgenticContext,
+  EmitFn,
+} from "../types.ts";
+
 /**
  * PlanModeController — manages plan mode state transitions during the agentic loop.
  *
@@ -19,21 +29,15 @@ const PLAN_APPROVAL_TIMEOUT_MS = 120_000;
 /**
  * Filter out unauthorized tool calls during plan mode.
  * Only exit_plan_mode is allowed; all others are blocked and logged.
- *
- * @param pendingToolCalls — Array of tool calls from this pass (mutated in-place)
- * @param currentMessages  — Conversation messages (system message appended if blocked)
- * @param pass             — Per-iteration pass state
- * @param state            — AgenticLoopState
- * @returns {{ allBlocked: boolean }} — true if ALL tool calls were blocked
  */
 export function blockUnauthorizedToolCalls(
-  pendingToolCalls: any[],
-  currentMessages: any[],
-  pass: any,
-  _state: any,
+  pendingToolCalls: ToolCall[],
+  currentMessages: ConversationMessage[],
+  pass: PassState,
+  _state: AgenticLoopState,
 ): { allBlocked: boolean } {
   const blockedToolCalls = pendingToolCalls.filter(
-    (toolCall: any) => toolCall.name !== "exit_plan_mode",
+    (toolCall) => toolCall.name !== "exit_plan_mode",
   );
 
   if (blockedToolCalls.length === 0) {
@@ -41,7 +45,7 @@ export function blockUnauthorizedToolCalls(
   }
 
   const blockedToolNames = blockedToolCalls
-    .map((toolCall: any) => toolCall.name)
+    .map((toolCall) => toolCall.name)
     .join(", ");
 
   logger.warn(
@@ -83,22 +87,14 @@ export function blockUnauthorizedToolCalls(
 /**
  * Handle the exit_plan_mode tool call: emit the plan proposal,
  * wait for user approval, and transition out of plan mode.
- *
- * @param exitPlanToolCall — The exit_plan_mode tool call
- * @param pass             — Per-iteration pass state
- * @param toolResults      — Results from tool execution
- * @param currentMessages  — Conversation messages (mutated for plan mode strip)
- * @param context          — Generation context (options, emit, signal, agentSessionId)
- * @param state            — AgenticLoopState
- * @returns {{ shouldContinueLoop: boolean }} — false means the loop should exit
  */
 export async function handleExitPlanMode(
-  exitPlanToolCall: any,
-  pass: any,
-  toolResults: any[],
-  currentMessages: any[],
-  context: any,
-  state: any,
+  exitPlanToolCall: ToolCall,
+  pass: PassState,
+  toolResults: ToolResult[],
+  currentMessages: ConversationMessage[],
+  context: AgenticContext,
+  state: AgenticLoopState,
 ): Promise<{ shouldContinueLoop: boolean }> {
   const { options, emit, signal, agentSessionId } = context;
 
@@ -116,19 +112,19 @@ export async function handleExitPlanMode(
     autoApproved: !!options.autoApprove,
   });
 
-  let planApproved: any;
+  let planApproved: boolean;
   if (options.autoApprove) {
     planApproved = true;
     logger.info("[PlanningMode] Auto-approved plan (autoApprove=true)");
   } else {
-    planApproved = await new Promise((resolve: any) => {
+    planApproved = await new Promise<boolean>((resolve) => {
       const timeoutId = setTimeout(() => {
         pendingApprovals.delete(agentSessionId);
         resolve(false);
       }, PLAN_APPROVAL_TIMEOUT_MS);
 
       pendingApprovals.set(agentSessionId, {
-        resolve: (value: any) => {
+        resolve: (value: boolean) => {
           clearTimeout(timeoutId);
           pendingApprovals.delete(agentSessionId);
           resolve(value);
@@ -146,14 +142,14 @@ export async function handleExitPlanMode(
     emit({
       type: "done",
       usage: state.overallUsage,
-      totalTime: (performance.now() - context.requestStart) / 1000,
+      totalTime: (performance.now() - (context.requestStart ?? performance.now())) / 1000,
     });
     return { shouldContinueLoop: false };
   }
 
   // Inject approved plan text into the exit_plan_mode result
   const exitResult = toolResults.find(
-    (result: any) =>
+    (result) =>
       result.id === exitPlanToolCall.id || result.name === "exit_plan_mode",
   );
   if (exitResult) {
@@ -171,22 +167,15 @@ export async function handleExitPlanMode(
   return { shouldContinueLoop: true };
 }
 
-/**
- * Check if any tool calls enter plan mode and apply the transition.
- *
- * @param executedToolCalls — Array of tool calls from this pass
- * @param currentMessages   — Conversation messages
- * @param state             — AgenticLoopState
- * @param emit              — SSE event emitter
- */
+/** Check if any tool calls enter plan mode and apply the transition. */
 export function checkForPlanModeEntry(
-  executedToolCalls: any[],
-  currentMessages: any[],
-  state: any,
-  emit: any,
+  executedToolCalls: ToolCall[],
+  currentMessages: ConversationMessage[],
+  state: AgenticLoopState,
+  emit: EmitFn,
 ): void {
   const hasEnterPlanMode = executedToolCalls.some(
-    (toolCall: any) => toolCall.name === "enter_plan_mode",
+    (toolCall) => toolCall.name === "enter_plan_mode",
   );
 
   if (hasEnterPlanMode) {

@@ -2,8 +2,8 @@ import { expandMessagesForFC } from "../../utils/FunctionCallingUtilities.ts";
 import {
   mergeUsage,
   createUsageAccumulator,
+  calculateTextCost,
 } from "../../utils/CostCalculator.ts";
-import { calculateTextCost } from "../../utils/CostCalculator.ts";
 import { calculateTokensPerSec } from "../../utils/math.ts";
 import { getPricing, TYPES } from "../../config.ts";
 import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.ts";
@@ -11,7 +11,22 @@ import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
 import RequestLogger from "../RequestLogger.ts";
 import FileService from "../FileService.ts";
+import MongoWrapper from "../../wrappers/MongoWrapper.ts";
+// @ts-ignore — root-level config export
+import { MONGO_DB_NAME } from "../../../config.ts";
+import { COLLECTIONS } from "../../constants.ts";
+import { finalizeTextGeneration } from "./lifecycle/Finalizer.ts";
 import logger from "../../utils/logger.ts";
+
+import type AgenticLoopState from "../AgenticLoopState.ts";
+import type AgentHooks from "../AgentHooks.ts";
+import type {
+  AgenticContext,
+  ResolvedTools,
+  PassState,
+  ChunkAction,
+  ConversationMessage,
+} from "./types.ts";
 
 /**
  * BaseAgenticHarness — abstract base class that defines the contract
@@ -22,11 +37,12 @@ import logger from "../../utils/logger.ts";
  * inheriting shared infrastructure:
  *
  *   - Stream chunk routing (`processStreamChunk`)
+ *   - Stream consumption (`consumeStream` — full pass with chunk routing)
  *   - Progress emission (`emitGenerationProgress`, `maybeEmitProgress`)
  *   - Iteration logging (`logIteration`)
  *   - Context window enforcement (`enforceContextWindow`)
  *   - LLM stream creation (`createProviderStream`)
- *   - Stream consumption (`consumeStream` — full pass with chunk routing)
+ *   - Finalization (`finalize` — cost, persistence, done event)
  */
 export default class BaseAgenticHarness {
   /** Harness identifier — subclasses MUST override. */
@@ -34,29 +50,25 @@ export default class BaseAgenticHarness {
   static label = "Base (abstract)";
   static description = "Abstract base harness — do not use directly.";
 
-  /**
-   * @param {object}              context    — generation context from ChatRoutes
-   * @param {AgenticLoopState}    state  — shared mutable state accumulator
-   * @param {object}              tools  — { finalTools, customToolMap, resolvedEnabledTools }
-   */
-  constructor(context: any, state: any, tools: any) {
-    // @ts-ignore
-    this.ctx = context;
-    // @ts-ignore
-    this.state = state;
-    // @ts-ignore
-    this.tools = tools;
+  protected ctx: AgenticContext;
+  protected state: AgenticLoopState;
+  protected tools: ResolvedTools;
+  protected trackerSessionId: string;
 
-    const { parentAgentSessionId, agentSessionId } = context;
-    // @ts-ignore
-    this.trackerSessionId = parentAgentSessionId || agentSessionId;
+  constructor(
+    context: AgenticContext,
+    state: AgenticLoopState,
+    tools: ResolvedTools,
+  ) {
+    this.ctx = context;
+    this.state = state;
+    this.tools = tools;
+    this.trackerSessionId =
+      context.parentAgentSessionId || context.agentSessionId;
   }
 
-  /**
-   * Execute the agentic loop. Subclasses MUST override.
-   * @returns {Promise<{ messages: object[] }>}
-   */
-  async run() {
+  /** Execute the agentic loop. Subclasses MUST override. */
+  async run(): Promise<{ messages: ConversationMessage[] }> {
     throw new Error(
       `${this.constructor.name}.run() is abstract — subclasses must override.`,
     );
@@ -69,14 +81,10 @@ export default class BaseAgenticHarness {
   // ── Progress emission ────────────────────────────────────
 
   /** Emit a generation_progress status event with current session stats. */
-  emitGenerationProgress() {
-    // @ts-ignore
+  emitGenerationProgress(): void {
     const { emit } = this.ctx;
-    // @ts-ignore
     const state = this.state;
-    // @ts-ignore
     const stats = SessionGenerationTracker.getSessionStats(
-      // @ts-ignore
       this.trackerSessionId,
     );
     if (stats.activeRequests > 0 || stats.totalOutputTokens > 0) {
@@ -110,8 +118,7 @@ export default class BaseAgenticHarness {
   }
 
   /** Check if it's time to emit a progress event. */
-  maybeEmitProgress() {
-    // @ts-ignore
+  maybeEmitProgress(): void {
     const state = this.state;
     state.chunksSinceLastProgress++;
     const timeSinceLast = performance.now() - state.lastProgressEmitTime;
@@ -125,14 +132,11 @@ export default class BaseAgenticHarness {
 
   // ── Context window enforcement ───────────────────────────
 
-  /**
-   * Enforce token budget on messages before sending to provider.
-
-
-   * @returns {object[]} — possibly truncated messages
-   */
-  enforceContextWindow(messages: any, toolCount: any) {
-    // @ts-ignore
+  /** Enforce token budget on messages before sending to provider. */
+  enforceContextWindow(
+    messages: ConversationMessage[],
+    toolCount: number,
+  ): ConversationMessage[] {
     const { modelDef, options, emit } = this.ctx;
     const contextResult = ContextWindowManager.enforce(messages, {
       maxInputTokens: modelDef?.maxInputTokens || 128_000,
@@ -157,8 +161,10 @@ export default class BaseAgenticHarness {
    * Create an LLM text stream from the provider.
    * Handles liveAPI fallback and message expansion.
    */
-  createProviderStream(messages: any, passOptions: any) {
-    // @ts-ignore
+  createProviderStream(
+    messages: ConversationMessage[],
+    passOptions: Record<string, unknown>,
+  ): AsyncIterable<unknown> {
     const { provider, resolvedModel, modelDef, signal } = this.ctx;
     const expandedMessages = expandMessagesForFC(messages, {
       filterDeleted: false,
@@ -174,21 +180,34 @@ export default class BaseAgenticHarness {
         });
   }
 
+  // ── Stream consumption ────────────────────────────────────
+
+  /**
+   * Consume an LLM stream, routing each chunk through `processStreamChunk`.
+   * Handles abort signals and stream teardown.
+   */
+  protected async consumeStream(
+    stream: AsyncIterable<unknown>,
+    pass: PassState,
+    allowedToolNames: Set<string>,
+  ): Promise<void> {
+    for await (const chunk of stream) {
+      const result = await this.processStreamChunk(chunk, pass, allowedToolNames);
+      if (result.action === "break") {
+        const returnable = stream as AsyncGenerator<unknown>;
+        if (typeof returnable.return === "function") returnable.return(undefined);
+        break;
+      }
+    }
+  }
+
   // ── Session tracking helpers ──────────────────────────────
 
   /** Register a request with SessionGenerationTracker. */
-  registerTrackerRequest(passRequestId: any) {
-    // @ts-ignore
-    const {
-      providerName,
-      resolvedModel,
-      parentAgentSessionId,
-      agentSessionId,
-    // @ts-ignore
-    } = this.ctx;
-    // @ts-ignore
+  registerTrackerRequest(passRequestId: string): void {
+    const { providerName, resolvedModel, parentAgentSessionId, agentSessionId } =
+      this.ctx;
     SessionGenerationTracker.register(this.trackerSessionId, passRequestId, {
-      // @ts-ignore
       provider: providerName,
       model: resolvedModel,
       source: parentAgentSessionId ? "worker" : "orchestrator",
@@ -201,30 +220,29 @@ export default class BaseAgenticHarness {
   /**
    * Process a single stream chunk — routes to the appropriate handler.
    * Returns an action descriptor for the caller:
-   *   { action: "continue" }     — chunk was consumed, keep iterating
-   *   { action: "toolCall", tc }  — a tool call was detected
-   *   { action: "skip" }         — chunk was filtered/dropped
-   *
-   * @param {*}      chunk            — raw chunk from provider stream
-   * @param {object} pass             — per-iteration pass state
-   * @param {Set}    allowedToolNames — tool names in the current schema
-
+   *   `continue` — chunk was consumed, keep iterating
+   *   `toolCall` — a tool call was detected
+   *   `skip`     — chunk was filtered/dropped
+   *   `break`    — abort signal received
    */
-  processStreamChunk(chunk: any, pass: any, allowedToolNames: any) {
-    // @ts-ignore
+  processStreamChunk(
+    chunk: unknown,
+    pass: PassState,
+    allowedToolNames: Set<string>,
+  ): ChunkAction | Promise<ChunkAction> {
     const { emit, signal } = this.ctx;
-    // @ts-ignore
     const state = this.state;
+    const c = chunk as Record<string, any>;
 
     // Abort check
     if (signal?.aborted) return { action: "break" };
 
     // ── Usage event ──────────────────────────────────────
-    if (chunk?.type === "usage") {
-      mergeUsage(state.overallUsage, chunk.usage);
-      mergeUsage(pass.usage, chunk.usage);
+    if (c?.type === "usage") {
+      mergeUsage(state.overallUsage, c.usage);
+      mergeUsage(pass.usage, c.usage);
       const reportedInput =
-        chunk.usage?.inputTokens || chunk.usage?.promptTokens || 0;
+        c.usage?.inputTokens || c.usage?.promptTokens || 0;
       if (reportedInput > 0) {
         SessionGenerationTracker.update(pass.requestId, {
           inputTokens: reportedInput,
@@ -234,17 +252,17 @@ export default class BaseAgenticHarness {
     }
 
     // ── Rate limits ──────────────────────────────────────
-    if (chunk?.type === "rateLimits") {
-      state.lastRateLimits = chunk.rateLimits;
+    if (c?.type === "rateLimits") {
+      state.lastRateLimits = c.rateLimits;
       return { action: "continue" };
     }
 
     // ── Thinking ─────────────────────────────────────────
-    if (chunk?.type === "thinking") {
+    if (c?.type === "thinking") {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
-      state.streamedThinking += chunk.content;
-      pass.streamedThinking += chunk.content;
+      state.streamedThinking += c.content;
+      pass.streamedThinking += c.content;
       // Display segment tracking
       if (state.lastDisplaySegType !== "thinking") {
         state.displaySegments.push({
@@ -256,15 +274,15 @@ export default class BaseAgenticHarness {
       }
       state.displayThinkingFragments[
         state.displayThinkingFragments.length - 1
-      ] += chunk.content;
-      state.overallOutputCharacters += chunk.content.length;
+      ] += c.content;
+      state.overallOutputCharacters += c.content.length;
       SessionGenerationTracker.recordChunkTiming(
         pass.requestId,
-        chunk.content.length,
+        c.content.length,
       );
       emit({
         type: "thinking",
-        content: chunk.content,
+        content: c.content,
         outputCharacters: state.overallOutputCharacters,
       });
       this.maybeEmitProgress();
@@ -272,132 +290,132 @@ export default class BaseAgenticHarness {
     }
 
     // ── Thinking signature (Anthropic) ───────────────────
-    if (chunk?.type === "thinking_signature") {
-      pass.thinkingSignature = chunk.signature;
+    if (c?.type === "thinking_signature") {
+      pass.thinkingSignature = c.signature;
       return { action: "continue" };
     }
 
     // ── Tool call argument delta ─────────────────────────
-    if (chunk?.type === "toolCallDelta") {
+    if (c?.type === "toolCallDelta") {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
-      state.overallOutputCharacters += chunk.characters;
+      state.overallOutputCharacters += c.characters;
       SessionGenerationTracker.recordChunkTiming(
         pass.requestId,
-        chunk.characters,
+        c.characters,
       );
       this.maybeEmitProgress();
       return { action: "continue" };
     }
 
     // ── Tool call ────────────────────────────────────────
-    if (chunk?.type === "toolCall") {
+    if (c?.type === "toolCall") {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
       SessionGenerationTracker.recordChunkTiming(
         pass.requestId,
-        JSON.stringify(chunk.args || {}).length,
+        JSON.stringify(c.args || {}).length,
       );
       this.maybeEmitProgress();
 
       // Native MCP tool calls: pass through directly
-      if (chunk.native) {
-        if (chunk.status === "calling") {
-          const tcId = chunk.id || `ntc-${state.streamedToolCalls.length}`;
+      if (c.native) {
+        if (c.status === "calling") {
+          const tcId = c.id || `ntc-${state.streamedToolCalls.length}`;
           state.streamedToolCalls.push({
             id: tcId,
-            name: chunk.name,
-            args: chunk.args || {},
+            name: c.name,
+            args: c.args || {},
           });
           this._trackToolDisplaySegment(tcId);
-        } else if (chunk.status === "done" || chunk.status === "error") {
+        } else if (c.status === "done" || c.status === "error") {
           const existing = state.streamedToolCalls.find(
-            (tc: any) =>
-              (chunk.id && tc.id === chunk.id) ||
-              (!chunk.id && tc.name === chunk.name),
+            (tc) =>
+              (c.id && tc.id === c.id) ||
+              (!c.id && tc.name === c.name),
           );
           if (existing) {
-            existing.result = chunk.result;
-            existing.status = chunk.status;
-            if (chunk.args && Object.keys(chunk.args).length > 0)
-              existing.args = chunk.args;
+            existing.result = c.result;
+            existing.status = c.status;
+            if (c.args && Object.keys(c.args).length > 0)
+              existing.args = c.args;
           }
         }
         emit({
           type: "toolCall",
-          id: chunk.id || null,
-          name: chunk.name,
-          args: chunk.args || {},
-          result: chunk.result || undefined,
-          status: chunk.status || "calling",
+          id: c.id || null,
+          name: c.name,
+          args: c.args || {},
+          result: c.result || undefined,
+          status: c.status || "calling",
         });
         return { action: "continue" };
       }
 
       // Schema enforcement
-      if (!allowedToolNames.has(chunk.name)) {
+      if (!allowedToolNames.has(c.name)) {
         logger.warn(
-          `[AgenticLoop] Dropped tool call "${chunk.name}" — not in schema: [${[...allowedToolNames].join(", ")}]`,
+          `[AgenticLoop] Dropped tool call "${c.name}" — not in schema: [${[...allowedToolNames].join(", ")}]`,
         );
         return { action: "skip" };
       }
 
-      const stdTcId = chunk.id || `tc-${state.streamedToolCalls.length}`;
+      const stdTcId = c.id || `tc-${state.streamedToolCalls.length}`;
       const tc = {
         id: stdTcId,
-        responsesItemId: chunk.responsesItemId || undefined,
-        name: chunk.name,
-        args: chunk.args || {},
-        thoughtSignature: chunk.thoughtSignature || undefined,
+        responsesItemId: c.responsesItemId || undefined,
+        name: c.name,
+        args: c.args || {},
+        thoughtSignature: c.thoughtSignature || undefined,
       };
       pass.pendingToolCalls.push(tc);
       state.streamedToolCalls.push({ ...tc });
       this._trackToolDisplaySegment(stdTcId);
       emit({
         type: "tool_execution",
-        tool: { name: chunk.name, args: chunk.args || {}, id: stdTcId },
+        tool: { name: c.name, args: c.args || {}, id: stdTcId },
         status: "calling",
       });
       return { action: "toolCall", tc };
     }
 
     // ── Image ────────────────────────────────────────────
-    if (chunk?.type === "image") {
-      return this._handleImageChunk(chunk, pass);
+    if (c?.type === "image") {
+      return this._handleImageChunk(c, pass);
     }
 
     // ── Pass-through events ──────────────────────────────
-    if (chunk?.type === "executableCode") {
+    if (c?.type === "executableCode") {
       emit({
         type: "executableCode",
-        code: chunk.code,
-        language: chunk.language,
+        code: c.code,
+        language: c.language,
       });
       return { action: "continue" };
     }
-    if (chunk?.type === "codeExecutionResult") {
+    if (c?.type === "codeExecutionResult") {
       emit({
         type: "codeExecutionResult",
-        output: chunk.output,
-        outcome: chunk.outcome,
+        output: c.output,
+        outcome: c.outcome,
       });
       return { action: "continue" };
     }
-    if (chunk?.type === "webSearchResult") {
-      emit({ type: "webSearchResult", results: chunk.results });
+    if (c?.type === "webSearchResult") {
+      emit({ type: "webSearchResult", results: c.results });
       return { action: "continue" };
     }
-    if (chunk?.type === "audio") {
-      emit({ type: "audio", data: chunk.data, mimeType: chunk.mimeType });
-      if (chunk.data) state.streamedAudioChunks.push(chunk.data);
-      if (chunk.mimeType) {
-        const rateMatch = chunk.mimeType.match(/rate=(\d+)/);
+    if (c?.type === "audio") {
+      emit({ type: "audio", data: c.data, mimeType: c.mimeType });
+      if (c.data) state.streamedAudioChunks.push(c.data);
+      if (c.mimeType) {
+        const rateMatch = c.mimeType.match(/rate=(\d+)/);
         if (rateMatch) state.audioSampleRate = parseInt(rateMatch[1], 10);
       }
       return { action: "continue" };
     }
-    if (chunk?.type === "status") {
-      const { type: _t, ...statusRest } = chunk;
+    if (c?.type === "status") {
+      const { type: _t, ...statusRest } = c;
       emit({ type: "status", ...statusRest });
       return { action: "continue" };
     }
@@ -441,11 +459,8 @@ export default class BaseAgenticHarness {
 
   // ── Iteration logging ─────────────────────────────────────
 
-  /**
-   * Log a single iteration to the request log.
-   */
-  logIteration(pass: any, currentMessages: any) {
-    // @ts-ignore
+  /** Log a single iteration to the request log. */
+  logIteration(pass: PassState, currentMessages: ConversationMessage[]): void {
     const {
       resolvedModel,
       providerName,
@@ -455,12 +470,9 @@ export default class BaseAgenticHarness {
       agentSessionId,
       parentAgentSessionId,
       traceId,
-    // @ts-ignore
     } = this.ctx;
-    // @ts-ignore
     const state = this.state;
-    // @ts-ignore
-    const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
+    const pricing = (getPricing as (...args: string[]) => Record<string, Record<string, number>>)(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
 
     const passTotalSec = (performance.now() - pass.start) / 1000;
     const passGenerationSec =
@@ -474,13 +486,11 @@ export default class BaseAgenticHarness {
     const passEstimatedCost = calculateTextCost(pass.usage, pricing);
 
     RequestLogger.logChatGeneration({
-      // @ts-ignore
       requestId: `${this.ctx.requestId}-${state.iterations}`,
       endpoint: "/agent",
       operation: "agent:iteration",
       project,
       username,
-      // @ts-ignore
       clientIp: this.ctx.clientIp,
       agent: agent || null,
       provider: providerName,
@@ -505,7 +515,7 @@ export default class BaseAgenticHarness {
       toolCalls: pass.pendingToolCalls,
       outputCharacters: pass.outputCharacters,
       agenticIteration: state.iterations,
-    }).catch((error: any) =>
+    }).catch((error: Error) =>
       logger.error(
         `[AgenticLoopService] Failed to log intermediate request: ${error.message}`,
       ),
@@ -514,10 +524,8 @@ export default class BaseAgenticHarness {
 
   // ── Per-iteration pass state factory ──────────────────────
 
-  /**
-   * Create a fresh per-iteration pass state object.
-   */
-  createPassState(passOptions: any) {
+  /** Create a fresh per-iteration pass state object. */
+  createPassState(passOptions: Record<string, unknown>): PassState {
     return {
       streamedText: "",
       streamedThinking: "",
@@ -534,10 +542,122 @@ export default class BaseAgenticHarness {
     };
   }
 
+  // ── Finalization ──────────────────────────────────────────
+
+  /**
+   * Shared finalization logic — cost calculation, persistence,
+   * done event, worker snapshot persistence, and afterResponse hooks.
+   *
+   * Lifted from ReActHarness so all harnesses share the same
+   * finalization path without copy-paste.
+   */
+  protected async finalize(
+    currentMessages: ConversationMessage[],
+    hooks: AgentHooks,
+  ): Promise<void> {
+    const context = this.ctx;
+    const state = this.state;
+    const { agentSessionId, project, username } = context;
+    const requestStart = context.requestStart ?? performance.now();
+
+    const now = performance.now();
+    state.overallUsage.requests = state.iterations;
+
+    const { cleanSegments, cleanTextFragments, cleanThinkingFragments } =
+      state.getCleanDisplayData();
+
+    const newTurnMessages = currentMessages.slice(
+      Math.max(0, state.originalMessageCount - 1),
+    );
+
+    logger.info(
+      `[AgenticLoop] finalize: session=${agentSessionId} project=${project} ` +
+        `originalMsgCount=${state.originalMessageCount} currentMsgs=${currentMessages.length} ` +
+        `newTurnMsgs=${newTurnMessages.length} ` +
+        `roles=[${newTurnMessages.map((message) => message.role).join(",")}] ` +
+        `text=${(state.finalStreamedText || "").length}chars`,
+    );
+
+    await finalizeTextGeneration(
+      context,
+      {
+        text: state.finalStreamedText.trim(),
+        thinking: state.streamedThinking.trim() || "",
+        images: state.streamedImages,
+        toolCalls: state.streamedToolCalls,
+        audioChunks: state.streamedAudioChunks,
+        audioSampleRate: state.audioSampleRate,
+        usage: state.overallUsage,
+        outputCharacters: state.overallOutputCharacters,
+        timeToGenerationSec: state.overallFirstTokenTime
+          ? (state.overallFirstTokenTime - requestStart) / 1000
+          : null,
+        generationSec:
+          state.overallFirstTokenTime && state.overallGenerationEnd
+            ? (state.overallGenerationEnd - state.overallFirstTokenTime) / 1000
+            : null,
+        totalSec: (now - requestStart) / 1000,
+        rateLimits: state.lastRateLimits,
+        contentSegments: cleanSegments,
+        textFragments: cleanTextFragments,
+        thinkingFragments: cleanThinkingFragments,
+      },
+      newTurnMessages,
+    );
+
+    // Persist worker snapshots for coordinator sessions
+    if (
+      state.streamedToolCalls.some((tc) => tc.name === "team_create") &&
+      agentSessionId
+    ) {
+      try {
+        const { default: CoordinatorService } =
+          await import("../CoordinatorService.js");
+        const workers = CoordinatorService.listWorkers({
+          parentAgentSessionId: agentSessionId,
+        });
+        if (workers.length > 0) {
+          const collection = MongoWrapper.getCollection(
+            MONGO_DB_NAME,
+            COLLECTIONS.AGENT_SESSIONS,
+          );
+          await collection.updateOne(
+            { id: agentSessionId, project, username },
+            {
+              $set: {
+                workers,
+                workersUpdatedAt: new Date().toISOString(),
+              },
+            },
+          );
+          logger.info(
+            `[AgenticLoop] Persisted ${workers.length} worker(s) to session ${agentSessionId}`,
+          );
+        }
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error(`[AgenticLoop] Failed to persist workers: ${msg}`);
+      }
+    }
+
+    // afterResponse hook (fire-and-forget)
+    hooks
+      .run("afterResponse", context, {
+        text: state.finalStreamedText,
+        thinking: state.streamedThinking,
+        toolCalls: state.streamedToolCalls,
+        messages: currentMessages,
+      })
+      .catch((error: Error) =>
+        logger.error(
+          `[AgenticLoopService] afterResponse hooks failed: ${error.message}`,
+        ),
+      );
+  }
+
   // ── Private helpers ───────────────────────────────────────
 
-  _recordFirstToken(pass: any) {
-    // @ts-ignore
+  private _recordFirstToken(pass: PassState): void {
     const state = this.state;
     if (!state.overallFirstTokenTime)
       state.overallFirstTokenTime = performance.now();
@@ -545,7 +665,6 @@ export default class BaseAgenticHarness {
       pass.firstTokenTime = performance.now();
       const ttftSec = (pass.firstTokenTime - pass.start) / 1000;
       SessionGenerationTracker.update(pass.requestId, { ttft: ttftSec });
-      // @ts-ignore
       this.ctx.emit({
         type: "status",
         message: "generation_started",
@@ -554,29 +673,27 @@ export default class BaseAgenticHarness {
     }
   }
 
-  _recordTiming(pass: any) {
-    // @ts-ignore
+  private _recordTiming(pass: PassState): void {
     this.state.overallGenerationEnd = performance.now();
     pass.generationEnd = performance.now();
   }
 
-  _trackToolDisplaySegment(tcId: any) {
-    // @ts-ignore
+  private _trackToolDisplaySegment(tcId: string): void {
     const state = this.state;
-    if (state.lastDisplaySegType === "tools") {
-      state.displaySegments[state.displaySegments.length - 1].toolIds.push(
-        tcId,
-      );
+    const lastSeg = state.displaySegments[state.displaySegments.length - 1];
+    if (state.lastDisplaySegType === "tools" && lastSeg?.type === "tools") {
+      lastSeg.toolIds.push(tcId);
     } else {
       state.displaySegments.push({ type: "tools", toolIds: [tcId] });
       state.lastDisplaySegType = "tools";
     }
   }
 
-  async _handleImageChunk(chunk: any, pass: any) {
-    // @ts-ignore
+  private async _handleImageChunk(
+    chunk: Record<string, any>,
+    pass: PassState,
+  ): Promise<ChunkAction> {
     const { emit, project, username } = this.ctx;
-    // @ts-ignore
     const state = this.state;
     let minioRef = null;
     if (chunk.data) {
@@ -590,8 +707,9 @@ export default class BaseAgenticHarness {
           username,
         );
         minioRef = ref;
-      } catch (error: any) {
-        logger.error(`MinIO upload failed: ${error.message}`);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error(`MinIO upload failed: ${msg}`);
       }
       const imgRef =
         minioRef ||

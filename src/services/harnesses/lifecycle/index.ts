@@ -3,12 +3,6 @@
  *
  * Each module encapsulates a distinct lifecycle concern that harness
  * implementations can import and compose as needed.
- *
- * Usage:
- *   import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
- *   import { executeToolBatch } from "./lifecycle/ToolExecutor.ts";
- *   import { checkAndWaitForApproval } from "./lifecycle/ApprovalGate.ts";
- *   import { finalizeTextGeneration } from "./lifecycle/Finalizer.ts";
  */
 
 export { createStandardHooks } from "./HookInitializer.ts";
