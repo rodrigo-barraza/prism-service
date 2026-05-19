@@ -356,7 +356,8 @@ export default class ReActHarness extends BaseAgenticHarness {
     // ── Exhaustion Recovery Pass ─────────────────────────────
     if (
       state.iterations >= resolvedMaxIterations &&
-      !state.finalStreamedText?.trim()
+      !state.finalStreamedText?.trim() &&
+      state.streamedToolCalls.length === 0
     ) {
       await runExhaustionRecoveryPass(this, context, state, currentMessages);
     }
