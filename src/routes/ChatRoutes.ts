@@ -18,9 +18,7 @@ import {
 } from "../config.ts";
 import {
   estimateTokens,
-  calculateTextCost,
   calculateImageCost,
-  getTotalInputTokens,
   mergeUsage,
 } from "../utils/CostCalculator.ts";
 import logger from "../utils/logger.ts";
@@ -30,7 +28,6 @@ import {
   createStreamState,
   dispatchChunk,
 } from "../utils/StreamChunkDispatcher.ts";
-import { calculateTokensPerSec } from "../utils/math.ts";
 import {
   compressImageForSizeLimit,
   constrainImageDimensions,
@@ -704,7 +701,7 @@ export async function handleAgent(params: any, emit: any, { signal }: any = {}) 
     project,
     username,
     true,
-    getCollectionOpts(project),
+    { ...getCollectionOpts(project), agent },
   );
   try {
     try {

@@ -293,7 +293,7 @@ PERSONAS.set("CODING", {
   id: "CODING",
   name: "Coding Agent",
   type: "coding",
-  project: "coding",
+  project: "prism-chat",
   displayOrder: 2,
   identity: () =>
     `You are a highly capable coding agent with access to file system, git, command execution, and web tools.`,
@@ -555,7 +555,7 @@ PERSONAS.set("STICKERS", {
   id: "STICKERS",
   name: "Clankerbox",
   type: "",
-  project: "stickers",
+  project: "prism-chat",
   identity: (_ctx: any) => {
     const sections = [
       STICKERS_CORE_PERSONALITY,
@@ -662,7 +662,7 @@ PERSONAS.set("LIGHTS", {
   id: "LIGHTS",
   name: "Lights",
   type: "",
-  project: "lights",
+  project: "prism-chat",
   identity: (_ctx: any) => {
     const sections = [
       LIGHTS_CORE_IDENTITY,
@@ -752,7 +752,7 @@ PERSONAS.set("OOG", {
   id: "OOG",
   name: "Oog Caveman Agent",
   type: "coding",
-  project: "coding",
+  project: "prism-chat",
   identity: () => {
     const sections = [
       OOG_CORE_IDENTITY,
@@ -910,7 +910,7 @@ PERSONAS.set("DIGEST", {
   id: "DIGEST",
   name: "Digest",
   type: "",
-  project: "digest",
+  project: "prism-chat",
   identity: (_ctx: any) => {
     const sections = [
       DIGEST_CORE_PERSONALITY,
@@ -1006,7 +1006,7 @@ PERSONAS.set("AGENT_CREATOR", {
   id: "AGENT_CREATOR",
   name: "Agent Creator",
   type: "",
-  project: "coding",
+  project: "prism-chat",
   identity: (_ctx: any) => {
     const sections = [
       AGENT_CREATOR_CORE_IDENTITY,
@@ -1090,7 +1090,7 @@ PERSONAS.set("OMNI", {
   id: "OMNI",
   name: "Omni Agent",
   type: "coding",
-  project: "coding",
+  project: "prism-chat",
   displayOrder: 1,
   identity: () => {
     const sections = [
@@ -1189,7 +1189,7 @@ PERSONAS.set("MEEPO", {
   id: "MEEPO",
   name: "Meepo",
   type: "conversational",
-  project: "chat",
+  project: "prism-chat",
   identity: (_ctx: any) => {
     const sections = [
       MEEPO_CORE_PERSONALITY,
@@ -1279,7 +1279,7 @@ const AgentPersonaRegistry = {
       name: document.name,
       type: document.type || "",
       description: document.description || "",
-      project: document.project || "coding",
+      project: document.project || "prism-chat",
       custom: true,
       icon: document.icon || "",
       color: document.color || "",

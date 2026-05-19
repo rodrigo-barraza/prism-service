@@ -32,12 +32,13 @@ router.get(
         200,
       );
       const cursor = req.query.cursor || null;
+      const agent = req.query.agent || null;
 
-      const filter = { project, username };
+      const filter: any = { project, username };
+      if (agent) filter.agent = agent;
       if (cursor) {
         // updatedAt is stored as ISO-8601 strings — compare string-to-string
         // to match BSON type and allow index range scan
-        // @ts-ignore
         filter.updatedAt = { $lt: cursor };
       }
 
@@ -49,6 +50,7 @@ router.get(
           id: 1,
           project: 1,
           username: 1,
+          agent: 1,
           title: 1,
           createdAt: 1,
           updatedAt: 1,

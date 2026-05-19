@@ -359,13 +359,16 @@ export async function finalizeTextGeneration(
           settings: { provider: providerName, model: resolvedModel },
         }
       : undefined;
-    // Merge parentAgentSessionId and workspaceRoot into meta for persistence
+    // Merge parentAgentSessionId, workspaceRoot, and agent into meta for persistence
     let finalMeta = meta;
     if (parentAgentSessionId) {
       finalMeta = { ...(finalMeta || {}), parentAgentSessionId };
     }
     if (workspaceRoot) {
       finalMeta = { ...(finalMeta || {}), workspaceRoot };
+    }
+    if (agent) {
+      finalMeta = { ...(finalMeta || {}), agent };
     }
     appendAndFinalize(
       conversationId,

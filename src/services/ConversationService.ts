@@ -357,6 +357,12 @@ const ConversationService = {
         // @ts-ignore
         workspaceRoot: conversationMeta.workspaceRoot,
       }),
+      // Agent identity — stored on agent sessions for per-agent filtering
+      // @ts-ignore
+      ...(isAgentSession && conversationMeta?.agent && {
+        // @ts-ignore
+        agent: conversationMeta.agent,
+      }),
       createdAt: now,
     };
 
@@ -418,7 +424,7 @@ const ConversationService = {
     project: any,
     username: any,
     generating: any,
-    { collection = DEFAULT_COLLECTION }: any = {},
+    { collection = DEFAULT_COLLECTION, agent }: any = {},
   ) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return;
@@ -439,6 +445,8 @@ const ConversationService = {
             modalities: computeModalities([]),
             providers: [],
             totalCost: 0,
+            // Agent identity — stored on agent sessions for per-agent filtering
+            ...(isAgentSession && agent && { agent }),
             createdAt: now,
           },
         },
