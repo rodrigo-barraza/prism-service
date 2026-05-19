@@ -294,6 +294,7 @@ PERSONAS.set("CODING", {
   name: "Coding Agent",
   type: "coding",
   project: "coding",
+  displayOrder: 2,
   identity: () =>
     `You are a highly capable coding agent with access to file system, git, command execution, and web tools.`,
   guidelines: `## Coding Guidelines
@@ -1090,6 +1091,7 @@ PERSONAS.set("OMNI", {
   name: "Omni Agent",
   type: "coding",
   project: "coding",
+  displayOrder: 1,
   identity: () => {
     const sections = [
       OMNI_CORE_IDENTITY,
@@ -1229,12 +1231,14 @@ const AgentPersonaRegistry = {
    * @returns {Array<{ id: string, name: string, custom?: boolean }>}
    */
   list() {
-    return [...PERSONAS.values()].map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      type: p.type || "",
-      ...(p.custom ? { custom: true } : {}),
-    }));
+    return [...PERSONAS.values()]
+      .sort((a: any, b: any) => (a.displayOrder ?? 100) - (b.displayOrder ?? 100))
+      .map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        type: p.type || "",
+        ...(p.custom ? { custom: true } : {}),
+      }));
   },
 
   /**
