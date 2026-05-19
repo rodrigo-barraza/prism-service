@@ -35,7 +35,15 @@ router.get(
       const agent = req.query.agent || null;
 
       const filter: any = { project, username };
-      if (agent) filter.agent = agent;
+      // Match sessions belonging to this agent OR legacy sessions that
+      // predate the agent field (backward compat for unique-project agents
+      // like Lupos where all sessions belong to the same agent).
+      if (agent) {
+        filter.$or = [
+          { agent },
+          { agent: { $exists: false } },
+        ];
+      }
       if (cursor) {
         // updatedAt is stored as ISO-8601 strings — compare string-to-string
         // to match BSON type and allow index range scan
