@@ -37,9 +37,9 @@ export function requestLoggerMiddleware(req: Request, res: Response, next: NextF
   res.on("finish", () => {
     // Skip SSE streaming requests — those are logged in detail by the route handlers
     const contentType = res.getHeader("content-type") || "";
-        if ((contentType as any).includes("text/event-stream")) return;
+        if ((contentType as string).includes("text/event-stream")) return;
     // Skip binary audio streams — logged by route handler
-        if ((contentType as any).includes("audio/")) return;
+        if ((contentType as string).includes("audio/")) return;
 
     const elapsed = performance.now() - start;
     // Re-read project/username in case authMiddleware set them after us
