@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import SettingsService from "../services/SettingsService.js";
@@ -14,7 +13,6 @@ router.get("/", asyncHandler(async (_req, res, next) => {
         res.json(settings);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /settings error: ${error.message}`);
         next(error);
     }
@@ -35,7 +33,6 @@ router.put("/", asyncHandler(async (req, res, next) => {
         res.json(updated);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`PUT /settings error: ${error.message}`);
         next(error);
     }

@@ -35,7 +35,6 @@ const enterWorktree = {
                 error: "No agent session — worktree isolation requires an active session",
             };
         }
-        // @ts-ignore - TODO: strict typing
         const worktreeState = ToolOrchestratorService.getWorktreeState(sessionId);
         if (worktreeState) {
             return {
@@ -46,49 +45,36 @@ const enterWorktree = {
         if (!workspaceRoot) {
             return { error: "No workspace root configured" };
         }
-        // @ts-ignore - TODO: strict typing
         const repoPath = existsSync(resolve(workspaceRoot, ".git"))
             ? workspaceRoot
             : workspaceRoot;
-        // @ts-ignore - TODO: strict typing
         const branchName = `worktree/${sessionId.slice(0, 8)}-${Date.now().toString(36)}`;
         // Create worktree via tools-api
         const createResult = await ToolOrchestratorService._proxyPost("/agentic/git/worktree/create", { path: repoPath, branch: branchName }, context);
-        // @ts-ignore
         if (createResult.error) {
-            // @ts-ignore
             return { error: `Failed to create worktree: ${createResult.error}` };
         }
         // Store the worktree state
-        // @ts-ignore - TODO: strict typing
         ToolOrchestratorService._setWorktree(sessionId, {
             originalRoot: workspaceRoot,
-            // @ts-ignore
             worktreePath: createResult.worktreePath,
             branchName,
             repoPath,
         });
-        // @ts-ignore
-        logger.info(
-        // @ts-ignore
-        `[Worktree] enter: ${branchName} → ${createResult.worktreePath}`);
+        logger.info(`[Worktree] enter: ${branchName} → ${createResult.worktreePath}`);
         if (context._emit) {
-            // @ts-ignore
             context._emit({
                 type: "status",
                 message: "worktree_entered",
                 branch: branchName,
-                // @ts-ignore
                 path: createResult.worktreePath,
             });
         }
         return {
             acknowledged: true,
             branch: branchName,
-            // @ts-ignore
             worktreePath: createResult.worktreePath,
             reason: args.reason || null,
-            // @ts-ignore
             message: `Now working in isolated worktree. All file operations are redirected to ${createResult.worktreePath}. Call exit_worktree with action 'merge' or 'discard' when done.`,
         };
     },
@@ -121,7 +107,6 @@ const exitWorktree = {
     async execute(args, context) {
         const { default: ToolOrchestratorService } = await import("../ToolOrchestratorService.js");
         const sessionId = context.agentSessionId;
-        // @ts-ignore - TODO: strict typing
         const wt = ToolOrchestratorService.getWorktreeState(sessionId);
         if (!sessionId || !wt) {
             return {
@@ -137,24 +122,18 @@ const exitWorktree = {
                 branch: wt.branchName,
                 message: commitMessage || `Merge worktree: ${wt.branchName}`,
             }, context);
-            // @ts-ignore
             if (mergeResult.error) {
-                // @ts-ignore
                 return {
-                    // @ts-ignore
                     error: `Merge failed: ${mergeResult.error}. Worktree preserved at ${wt.worktreePath}. Resolve conflicts and try again, or exit_worktree with action 'discard'.`,
                 };
             }
-            // @ts-ignore
             mergeResult.diff = diffResult.error ? null : diffResult;
         }
         // Remove the worktree (both merge and discard)
         await ToolOrchestratorService._proxyPost("/agentic/git/worktree/remove", { path: wt.repoPath, worktreePath: wt.worktreePath, deleteBranch: true }, context);
-        // @ts-ignore - TODO: strict typing
         ToolOrchestratorService._clearWorktree(sessionId);
         logger.info(`[Worktree] exit: ${action} — ${wt.branchName}`);
         if (context._emit) {
-            // @ts-ignore - TODO: strict typing
             context._emit({
                 type: "status",
                 message: "worktree_exited",

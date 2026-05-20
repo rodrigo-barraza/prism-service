@@ -6,5 +6,5 @@
 
 
  */
-export declare function createAbortController(maxListeners?: Record<string, unknown>): AbortController;
+export declare function createAbortController(maxListeners?: any): AbortController;
 //# sourceMappingURL=AbortController.d.ts.map

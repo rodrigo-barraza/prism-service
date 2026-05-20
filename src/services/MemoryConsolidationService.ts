@@ -65,7 +65,9 @@ function findClusters(memories: any, threshold: any = CLUSTER_THRESHOLD) {
     const parent = Array.from({ length: n }, (_: any, i: any) => i);
   const rank = new Array(n).fill(0);
   function find(x: any) {
+        // @ts-ignore - TODO: strict typing
         if (parent[(x as string)] !== x) parent[(x as string)] = (find as string)(parent[(x as string)]);
+        // @ts-ignore - TODO: strict typing
         return parent[(x as string)];
   }
   function union(x: any, y: any) {

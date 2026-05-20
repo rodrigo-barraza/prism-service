@@ -5,13 +5,15 @@ declare const router: import("express-serve-static-core").Router;
  *
  * Used by the /chat route and any non-agent callers.
  */
-export declare function handleConversation(params: Record<string, unknown>, emit: Record<string, unknown>, { signal }?: Record<string, unknown>): Promise<void>;
+export declare function handleConversation(params: any, emit: any, { signal }?: any): Promise<void>;
 /**
  * Handle an agent request: always dispatches to AgenticLoopService.
  * Persistence uses agentSessionId (not conversationId).
  *
  * Used exclusively by the /agent route.
  */
-export declare function handleAgent(params: Record<string, unknown>, emit: Record<string, unknown>, { signal }?: Record<string, unknown>): Promise<void>;
+export declare function handleAgent(params: any, emit: (event: import("../utils/SseUtilities.ts").SseEvent) => void, { signal }?: {
+    signal?: AbortSignal;
+}): Promise<void>;
 export default router;
 //# sourceMappingURL=ChatRoutes.d.ts.map

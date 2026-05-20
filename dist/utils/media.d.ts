@@ -39,13 +39,13 @@ export declare function getDataUrlMimeType(dataUrl: string): string | null;
 
 
  */
-export declare function getUrlType(url: string): "unknown" | "data" | "http";
+export declare function getUrlType(url: string): "any" | "data" | "http";
 /**
  * Infer MIME category from a URL's file extension.
 
 
  */
-export declare function inferMimeFromUrl(url: string): "unknown" | "text" | "image" | "pdf";
+export declare function inferMimeFromUrl(url: string): "any" | "text" | "image" | "pdf";
 /**
  * Extract frames from a video data URL using ffmpeg.
  * Returns an array of JPEG image data URLs (one per frame at 1fps).

@@ -17,7 +17,7 @@ declare class RateLimitStore {
   
   
      */
-    update(providerName: Record<string, unknown>, model: Record<string, unknown>, rateLimits: Record<string, unknown>): void;
+    update(providerName: any, model: any, rateLimits: any): void;
     /**
      * Get a snapshot of all provider rate limits, grouped by provider.
      *
@@ -28,7 +28,7 @@ declare class RateLimitStore {
      *   google: { dynamic: false, note: "...", models: { "gemini-3-flash": { rpm, tpm, rpd }, ... } },
      * }
      */
-    getAll(): {};
+    getAll(): any;
 }
 declare const rateLimitStore: RateLimitStore;
 export default rateLimitStore;

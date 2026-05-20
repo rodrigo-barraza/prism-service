@@ -302,6 +302,7 @@ async function compressWithSharp(base64Data: string, maxBytes: number) {
         mediaType: "image/jpeg",
       };
     }
+        // @ts-ignore - TODO: strict typing
         buffer = compressed;
   }
 

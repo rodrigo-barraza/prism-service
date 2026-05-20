@@ -26,6 +26,7 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { project, username, db } = req;
       const limit = Math.min(
                 Math.max(parseInt((req.query.limit as any), 10) || 50, 1),
@@ -82,6 +83,7 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { project, username, db } = req;
       const conversation = await db
         .collection(COLLECTION)
@@ -107,6 +109,7 @@ router.get(
   "/:id/workflows",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { db } = req;
 
       const workflows = await db
@@ -165,6 +168,7 @@ router.patch(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { project, username, db } = req;
       const setFields = buildConversationPatchFields(req.body);
 
@@ -199,6 +203,7 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { project, username, db } = req;
       const result = await db
         .collection(COLLECTION)

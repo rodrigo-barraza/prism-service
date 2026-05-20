@@ -10,9 +10,7 @@ import { setupWebSocket } from "./websocket/index.js";
 import { authMiddleware } from "./middleware/AuthMiddleware.js";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.js";
 import { CORS_MAX_AGE_SECONDS } from "./constants.js";
-import { PRISM_SERVICE_PORT as PORT, MONGO_URI, MONGO_DB_NAME, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET_NAME,
-// @ts-ignore
- } from "../config.js";
+import { PRISM_SERVICE_PORT as PORT, MONGO_URI, MONGO_DB_NAME, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET_NAME, } from "../config.js";
 import MongoWrapper from "./wrappers/MongoWrapper.js";
 import MinioWrapper from "./wrappers/MinioWrapper.js";
 import ChangeStreamService from "./services/ChangeStreamService.js";
@@ -155,11 +153,9 @@ app.use("/workspaces", workspacesRouter);
 app.use(errorHandler);
 // WebSocket server
 const wss = new WebSocketServer({ server });
-// @ts-ignore - TODO: strict typing
 setupWebSocket(wss);
 // Start
 (async () => {
-    // @ts-ignore - TODO: strict typing
     await MongoWrapper.createClient(MONGO_DB_NAME, MONGO_URI);
     await MemoryService.ensureIndexes();
     // ── Ensure collection indexes ──────────────────────────────────
@@ -239,7 +235,6 @@ setupWebSocket(wss);
         }
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Failed to ensure indexes: ${error.message}`);
     }
     // Clear any stale isGenerating flags left over from a previous crash/restart
@@ -262,7 +257,6 @@ setupWebSocket(wss);
         }
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Failed to clear stale isGenerating flags: ${error.message}`);
     }
     // ── One-time migration: conversations → agent_sessions ──────────
@@ -271,7 +265,6 @@ setupWebSocket(wss);
         const { default: AgentPersonaRegistry } = await import("./services/AgentPersonaRegistry.js");
         const agentProjects = AgentPersonaRegistry.list()
             .map((p) => {
-            // @ts-ignore - TODO: strict typing
             const persona = AgentPersonaRegistry.get(p.id);
             return persona?.project;
         })
@@ -297,7 +290,6 @@ setupWebSocket(wss);
         }
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Agent session migration failed: ${error.message}`);
     }
     // Load custom agents from database into the persona registry
@@ -306,7 +298,6 @@ setupWebSocket(wss);
         await AgentPersonaRegistryCustom.loadCustomAgents();
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.warn(`Custom agent loading failed: ${error.message}`);
     }
     // Initialize Change Streams (requires replica set — graceful fallback)
@@ -316,21 +307,16 @@ setupWebSocket(wss);
         const { default: MCPClientService } = await import("./services/MCPClientService.js");
         const { default: AgentPersonaRegistryMCP } = await import("./services/AgentPersonaRegistry.js");
         const mcpDb = MongoWrapper.getDb(MONGO_DB_NAME);
-        const codingProject = 
-        // @ts-ignore - TODO: strict typing
-        AgentPersonaRegistryMCP.get("CODING")?.project || "coding";
+        const codingProject = AgentPersonaRegistryMCP.get("CODING")?.project || "coding";
         if (mcpDb) {
-            // @ts-ignore - TODO: strict typing
             await MCPClientService.connectAllFromDB(mcpDb, codingProject, "admin");
         }
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.warn(`MCP auto-connect failed: ${error.message}`);
     }
     // ── Scheduled Memory Consolidation ─────────────────
     // Runs every 24 hours, consolidates memories for all active projects and agents.
-    // @ts-ignore
     const { hours } = await import("@rodrigo-barraza/utilities-library");
     const CONSOLIDATION_INTERVAL_MS = hours(24);
     const consolidationInterval = setInterval(async () => {
@@ -343,7 +329,6 @@ setupWebSocket(wss);
             // Process projects sequentially — each consolidation loads the full
             // memory corpus with embeddings (~12KB/memory). Running them concurrently
             // compounds heap usage and can cause OOM on large collections.
-            // @ts-ignore
             for (const project of projects) {
                 // Find all distinct agents within this project
                 const agents = await db
@@ -351,7 +336,6 @@ setupWebSocket(wss);
                     .distinct("agent", { project });
                 if (!agents.length)
                     continue;
-                // @ts-ignore
                 for (const agent of agents) {
                     const count = await db
                         .collection("memories")
@@ -368,17 +352,13 @@ setupWebSocket(wss);
                         });
                     }
                     catch (error) {
-                        logger.error(
-                        // @ts-ignore - TODO: strict typing
-                        `[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${error.message}`);
+                        logger.error(`[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${error.message}`);
                     }
                 }
             }
         }
         catch (error) {
-            logger.error(
-            // @ts-ignore - TODO: strict typing
-            `[AutoDream] Scheduled consolidation sweep failed: ${error.message}`);
+            logger.error(`[AutoDream] Scheduled consolidation sweep failed: ${error.message}`);
         }
     }, CONSOLIDATION_INTERVAL_MS);
     registerCleanup(async () => clearInterval(consolidationInterval));
@@ -416,18 +396,14 @@ setupWebSocket(wss);
             embedding: [6, 182, 212], // #06b6d4 — cyan
         };
         const coloredModalities = Object.values(TYPES)
-            // @ts-ignore - TODO: strict typing
             .map((t) => {
-            // @ts-ignore
             const [r, g, b] = MODALITY_COLORS[t] || [255, 255, 255];
             return `\x1b[38;2;${r};${g};${b}m${t}\x1b[0m`;
         })
             .join(", ");
         logger.info("Available modalities:", coloredModalities);
-        // @ts-ignore - TODO: strict typing
-        ENDPOINTS.rest.forEach((ep) => logger.info(`  REST  →  http://localhost:${PORT}${ep}`));
-        // @ts-ignore - TODO: strict typing
-        ENDPOINTS.websocket.forEach((ep) => logger.info(`  WS    →  ws://localhost:${PORT}${ep}`));
+        ENDPOINTS.rest.forEach(((ep) => logger.info(`  REST  →  http://localhost:${PORT}${ep}`)));
+        ENDPOINTS.websocket.forEach(((ep) => logger.info(`  WS    →  ws://localhost:${PORT}${ep}`)));
     });
 })();
 //# sourceMappingURL=index.js.map

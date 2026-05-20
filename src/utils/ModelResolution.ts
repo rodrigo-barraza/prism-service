@@ -134,6 +134,7 @@ export async function resolveModelForInstances(modelKey: any, siblings: any) {
     const usable: any[] = [];
         for (let i = 0; i < (siblings as any).length; i++) {
       if (checks[i].status !== "fulfilled") continue;
+            // @ts-ignore - TODO: strict typing
             const { exact, fallback } = checks[i].value;
 
       if (exact) {

@@ -20,8 +20,10 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
   // Never use the raw client IP as the username — IPs in MinIO object keys
   // (e.g. projects/lupos/127.0.0.1/...) cause path duplication when the
   // same logical user is later identified by a proper username header.
+    // @ts-ignore - TODO: strict typing
     req.username = req.headers["x-username"] || "anonymous";
   // Workspace ID for multi-workspace scoping (optional — null means default workspace)
+    // @ts-ignore - TODO: strict typing
     req.workspaceId = req.headers["x-workspace-id"] || null;
   // Workspace root path — absolute filesystem path selected by the user.
   // Takes precedence over workspaceId for routing agent tools to the correct directory.

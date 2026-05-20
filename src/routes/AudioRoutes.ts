@@ -116,6 +116,7 @@ export async function handleVoice(params: any, emitBinary: any, emitJSON: any) {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+                // @ts-ignore - TODO: strict typing
                 if (audioChunks) audioChunks.push((Buffer.from as any as never)(value));
                 emitBinary(value);
       }

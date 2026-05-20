@@ -10,7 +10,6 @@ function prepareOllamaMessages(messages) {
         const message = { role: m.role, content: m.content || "" };
         if (m.images && m.images.length > 0) {
             // Ollama's native API expects images as raw base64 strings
-            // @ts-ignore
             message.images = m.images.map((dataUrl) => {
                 if (dataUrl.startsWith("data:")) {
                     return dataUrl.split(",")[1]; // strip data:image/...;base64, prefix
@@ -32,20 +31,15 @@ export function createOllamaProvider(baseUrl, instanceId = "ollama") {
     return {
         name: instanceId,
         // ── Non-Streaming Text Generation ──────────────────────
-        async generateText(messages, 
-        // @ts-ignore
-        model = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["ollama"], options = {}) {
+        async generateText(messages, model = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["ollama"], options = {}) {
             const baseUrl = getBaseUrl();
-            logger.provider(
-            // @ts-ignore - TODO: strict typing
-            "Ollama", `generateText model=${model} baseUrl=${baseUrl}`);
+            logger.provider("Ollama", `generateText model=${model} baseUrl=${baseUrl}`);
             try {
                 const prepared = prepareOllamaMessages(messages);
                 const body = {
                     model,
                     messages: prepared,
                     stream: false,
-                    // @ts-ignore
                     ...(options.thinkingEnabled ? { think: true } : {}),
                 };
                 const response = await fetch(`${baseUrl}/api/chat`, {
@@ -59,14 +53,10 @@ export function createOllamaProvider(baseUrl, instanceId = "ollama") {
                 }
                 const data = await response.json();
                 return {
-                    // @ts-ignore
                     text: data.message?.content || "",
-                    // @ts-ignore
                     thinking: data.message?.thinking || null,
                     usage: {
-                        // @ts-ignore
                         inputTokens: data.prompt_eval_count ?? 0,
-                        // @ts-ignore
                         outputTokens: data.eval_count ?? 0,
                     },
                 };
@@ -74,27 +64,20 @@ export function createOllamaProvider(baseUrl, instanceId = "ollama") {
             catch (error) {
                 if (error instanceof ProviderError)
                     throw error;
-                // @ts-ignore - TODO: strict typing
                 throw new ProviderError("ollama", error.message, 500, error);
             }
         },
         // ── Streaming Text Generation ──────────────────────
-        async *generateTextStream(messages, 
-        // @ts-ignore
-        model = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["ollama"], options = {}) {
+        async *generateTextStream(messages, model = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["ollama"], options = {}) {
             const baseUrl = getBaseUrl();
-            logger.provider(
-            // @ts-ignore - TODO: strict typing
-            "Ollama", `generateTextStream model=${model} baseUrl=${baseUrl}`);
+            logger.provider("Ollama", `generateTextStream model=${model} baseUrl=${baseUrl}`);
             try {
                 // Single-model enforcement: unload any other loaded models
                 try {
                     const psRes = await fetch(`${baseUrl}/api/ps`);
                     if (psRes.ok) {
                         const psData = await psRes.json();
-                        // @ts-ignore
                         const running = psData.models || [];
-                        // @ts-ignore
                         for (const m of running) {
                             const runningName = m.model || m.name;
                             if (runningName && runningName !== model) {
@@ -110,23 +93,19 @@ export function createOllamaProvider(baseUrl, instanceId = "ollama") {
                     }
                 }
                 catch (unloadErr) {
-                    logger.warn(
-                    // @ts-ignore - TODO: strict typing
-                    `Ollama: could not check/unload models: ${unloadErr.message}`);
+                    logger.warn(`Ollama: could not check/unload models: ${unloadErr.message}`);
                 }
                 const prepared = prepareOllamaMessages(messages);
                 const body = {
                     model,
                     messages: prepared,
                     stream: true,
-                    // @ts-ignore
                     ...(options.thinkingEnabled ? { think: true } : {}),
                 };
                 const response = await fetch(`${baseUrl}/api/chat`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(body),
-                    // @ts-ignore
                     ...(options.signal && { signal: options.signal }),
                 });
                 if (!response.ok) {
@@ -134,13 +113,11 @@ export function createOllamaProvider(baseUrl, instanceId = "ollama") {
                     throw new Error(`API error: ${response.status} ${errorText}`);
                 }
                 // Ollama streams NDJSON (one JSON object per line)
-                // @ts-ignore
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = "";
                 let usage = null;
                 while (true) {
-                    // @ts-ignore
                     if (options.signal?.aborted) {
                         reader.cancel();
                         break;
@@ -150,9 +127,7 @@ export function createOllamaProvider(baseUrl, instanceId = "ollama") {
                         break;
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split("\n");
-                    // @ts-ignore
                     buffer = lines.pop(); // keep incomplete line in buffer
-                    // @ts-ignore
                     for (const line of lines) {
                         const trimmed = line.trim();
                         if (!trimmed)
@@ -180,7 +155,6 @@ export function createOllamaProvider(baseUrl, instanceId = "ollama") {
                                 if (evalDurationSec &&
                                     evalDurationSec > 0 &&
                                     usage.outputTokens > 0) {
-                                    // @ts-ignore
                                     usage.tokensPerSec = parseFloat((usage.outputTokens / evalDurationSec).toFixed(1));
                                 }
                             }
@@ -198,23 +172,17 @@ export function createOllamaProvider(baseUrl, instanceId = "ollama") {
                 }
             }
             catch (error) {
-                // @ts-ignore - TODO: strict typing
                 if (error.name === "AbortError")
                     return; // Client disconnected
                 if (error instanceof ProviderError)
                     throw error;
-                // @ts-ignore - TODO: strict typing
                 throw new ProviderError("ollama", error.message, 500, error);
             }
         },
         // ── Image Captioning ──────────────────────
-        async captionImage(images, prompt = "Describe this image.", 
-        // @ts-ignore
-        model = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["ollama"], systemPrompt) {
+        async captionImage(images, prompt = "Describe this image.", model = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["ollama"], systemPrompt) {
             const baseUrl = getBaseUrl();
-            logger.provider(
-            // @ts-ignore - TODO: strict typing
-            "Ollama", `captionImage model=${model} baseUrl=${baseUrl}`);
+            logger.provider("Ollama", `captionImage model=${model} baseUrl=${baseUrl}`);
             try {
                 // Extract raw base64 from data URLs
                 const imageBase64List = images.map((image) => {
@@ -246,12 +214,9 @@ export function createOllamaProvider(baseUrl, instanceId = "ollama") {
                     throw new Error(`API error: ${response.status} ${errorText}`);
                 }
                 const data = await response.json();
-                // @ts-ignore
                 const text = data.message?.content || "";
                 const usage = {
-                    // @ts-ignore
                     inputTokens: data.prompt_eval_count || 0,
-                    // @ts-ignore
                     outputTokens: data.eval_count || 0,
                 };
                 return { text, usage };
@@ -259,7 +224,6 @@ export function createOllamaProvider(baseUrl, instanceId = "ollama") {
             catch (error) {
                 if (error instanceof ProviderError)
                     throw error;
-                // @ts-ignore - TODO: strict typing
                 throw new ProviderError("ollama", error.message, 500, error);
             }
         },
@@ -270,7 +234,6 @@ export function createOllamaProvider(baseUrl, instanceId = "ollama") {
          */
         async listModels() {
             const baseUrl = getBaseUrl();
-            // @ts-ignore - TODO: strict typing
             logger.provider("Ollama", "listModels");
             try {
                 const response = await fetch(`${baseUrl}/api/tags`, {
@@ -283,13 +246,11 @@ export function createOllamaProvider(baseUrl, instanceId = "ollama") {
                 }
                 const data = await response.json();
                 // Ollama returns { models: [{ name, model, size, ... }] }
-                // @ts-ignore
                 return { models: data.models || [] };
             }
             catch (error) {
                 if (error instanceof ProviderError)
                     throw error;
-                // @ts-ignore - TODO: strict typing
                 throw new ProviderError("ollama", error.message, 500, error);
             }
         },

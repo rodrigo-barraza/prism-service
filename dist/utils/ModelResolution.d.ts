@@ -10,7 +10,7 @@
 
  * @returns {{ base: string, quant: string|null }}
  */
-export declare function parseModelQuant(modelKey: Record<string, unknown>): {
+export declare function parseModelQuant(modelKey: any): {
     base: any;
     quant: any;
 };
@@ -23,7 +23,7 @@ export declare function parseModelQuant(modelKey: Record<string, unknown>): {
  * @param {Array<{key?: string, id?: string, size_bytes?: number}>} availableModels - Models on the instance
  * @returns {string|null} The best available model key (by file size), or null
  */
-export declare function findBestQuantFallback(targetModel: Record<string, unknown>, availableModels: Record<string, unknown>): unknown;
+export declare function findBestQuantFallback(targetModel: any, availableModels: any): any;
 /**
  * Resolve model availability across multiple provider instances.
  * Returns only the instances where the model (or a quant variant) exists,
@@ -35,11 +35,8 @@ export declare function findBestQuantFallback(targetModel: Record<string, unknow
  * @param {Array<{id: string, concurrency: number}>} siblings - All instances of this provider type
  * @returns {Promise<{ usable: Array<{id: string, concurrency: number}>, modelOverrides: Map<string, string> }>}
  */
-export declare function resolveModelForInstances(modelKey: Record<string, unknown>, siblings: Record<string, unknown>): Promise<{
-    usable: Record<string, unknown>[];
-    modelOverrides: Map<any, any>;
-} | {
-    usable: Record<string, unknown>;
+export declare function resolveModelForInstances(modelKey: any, siblings: any): Promise<{
+    usable: any;
     modelOverrides: Map<any, any>;
 }>;
 //# sourceMappingURL=ModelResolution.d.ts.map

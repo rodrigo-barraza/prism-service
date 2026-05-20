@@ -8,7 +8,6 @@ import SessionGenerationTracker from "../SessionGenerationTracker.js";
 import RequestLogger from "../RequestLogger.js";
 import FileService from "../FileService.js";
 import MongoWrapper from "../../wrappers/MongoWrapper.js";
-// @ts-ignore — root-level config export
 import { MONGO_DB_NAME } from "../../../config.js";
 import { COLLECTIONS } from "../../constants.js";
 import { finalizeTextGeneration } from "./lifecycle/Finalizer.js";
@@ -57,9 +56,7 @@ export default class BaseAgenticHarness {
     emitGenerationProgress() {
         const { emit } = this.ctx;
         const state = this.state;
-        const stats = SessionGenerationTracker.getSessionStats(
-        // @ts-ignore - TODO: strict typing
-        this.trackerSessionId);
+        const stats = SessionGenerationTracker.getSessionStats(this.trackerSessionId);
         if (stats.activeRequests > 0 || stats.totalOutputTokens > 0) {
             state.hwmOutputTokens = Math.max(state.hwmOutputTokens, stats.totalOutputTokens);
             state.hwmInputTokens = Math.max(state.hwmInputTokens, stats.totalInputTokens);
@@ -94,7 +91,6 @@ export default class BaseAgenticHarness {
     /** Enforce token budget on messages before sending to provider. */
     enforceContextWindow(messages, toolCount) {
         const { modelDef, options, emit } = this.ctx;
-        // @ts-ignore - TODO: strict typing
         const contextResult = ContextWindowManager.enforce(messages, {
             maxInputTokens: modelDef?.maxInputTokens || 128_000,
             maxOutputTokens: options.maxTokens || 8192,
@@ -118,7 +114,6 @@ export default class BaseAgenticHarness {
      */
     createProviderStream(messages, passOptions) {
         const { provider, resolvedModel, modelDef, signal } = this.ctx;
-        // @ts-ignore - TODO: strict typing
         const expandedMessages = expandMessagesForFC(messages, {
             filterDeleted: false,
         });
@@ -152,7 +147,6 @@ export default class BaseAgenticHarness {
     /** Register a request with SessionGenerationTracker. */
     registerTrackerRequest(passRequestId) {
         const { providerName, resolvedModel, parentAgentSessionId, agentSessionId } = this.ctx;
-        // @ts-ignore - TODO: strict typing
         SessionGenerationTracker.register(this.trackerSessionId, passRequestId, {
             provider: providerName,
             model: resolvedModel,
@@ -178,13 +172,10 @@ export default class BaseAgenticHarness {
             return { action: "break" };
         // ── Usage event ──────────────────────────────────────
         if (c?.type === "usage") {
-            // @ts-ignore - TODO: strict typing
             mergeUsage(state.overallUsage, c.usage);
-            // @ts-ignore - TODO: strict typing
             mergeUsage(pass.usage, c.usage);
             const reportedInput = c.usage?.inputTokens || c.usage?.promptTokens || 0;
             if (reportedInput > 0) {
-                // @ts-ignore - TODO: strict typing
                 SessionGenerationTracker.update(pass.requestId, {
                     inputTokens: reportedInput,
                 });
@@ -213,9 +204,7 @@ export default class BaseAgenticHarness {
             }
             state.displayThinkingFragments[state.displayThinkingFragments.length - 1] += c.content;
             state.overallOutputCharacters += c.content.length;
-            SessionGenerationTracker.recordChunkTiming(
-            // @ts-ignore - TODO: strict typing
-            pass.requestId, c.content.length);
+            SessionGenerationTracker.recordChunkTiming(pass.requestId, c.content.length);
             emit({
                 type: "thinking",
                 content: c.content,
@@ -234,9 +223,7 @@ export default class BaseAgenticHarness {
             this._recordFirstToken(pass);
             this._recordTiming(pass);
             state.overallOutputCharacters += c.characters;
-            SessionGenerationTracker.recordChunkTiming(
-            // @ts-ignore - TODO: strict typing
-            pass.requestId, c.characters);
+            SessionGenerationTracker.recordChunkTiming(pass.requestId, c.characters);
             this.maybeEmitProgress();
             return { action: "continue" };
         }
@@ -244,9 +231,7 @@ export default class BaseAgenticHarness {
         if (c?.type === "toolCall") {
             this._recordFirstToken(pass);
             this._recordTiming(pass);
-            SessionGenerationTracker.recordChunkTiming(
-            // @ts-ignore - TODO: strict typing
-            pass.requestId, JSON.stringify(c.args || {}).length);
+            SessionGenerationTracker.recordChunkTiming(pass.requestId, JSON.stringify(c.args || {}).length);
             this.maybeEmitProgress();
             // Native MCP tool calls: pass through directly
             if (c.native) {
@@ -351,7 +336,6 @@ export default class BaseAgenticHarness {
         pass.outputCharacters += rawChunkStr.length;
         pass.streamedText += rawChunkStr;
         // Strip tool call XML markup leaked by some local models
-        // @ts-ignore - TODO: strict typing
         const cleanedPassText = stripToolCallMarkup(pass.streamedText);
         const chunkStr = cleanedPassText.slice(state.finalStreamedText.length);
         state.finalStreamedText = cleanedPassText;
@@ -368,9 +352,7 @@ export default class BaseAgenticHarness {
         }
         state.displayTextFragments[state.displayTextFragments.length - 1] +=
             chunkStr;
-        SessionGenerationTracker.recordChunkTiming(
-        // @ts-ignore - TODO: strict typing
-        pass.requestId, rawChunkStr.length);
+        SessionGenerationTracker.recordChunkTiming(pass.requestId, rawChunkStr.length);
         if (chunkStr)
             emit({
                 type: "chunk",
@@ -390,10 +372,7 @@ export default class BaseAgenticHarness {
         const passGenerationSec = pass.firstTokenTime && pass.generationEnd
             ? (pass.generationEnd - pass.firstTokenTime) / 1000
             : null;
-        const passTokensPerSec = calculateTokensPerSec(
-        // @ts-ignore - TODO: strict typing
-        pass.usage.outputTokens, passGenerationSec);
-        // @ts-ignore - TODO: strict typing
+        const passTokensPerSec = calculateTokensPerSec(pass.usage.outputTokens, passGenerationSec);
         const passEstimatedCost = calculateTextCost(pass.usage, pricing);
         RequestLogger.logChatGeneration({
             requestId: `${this.ctx.requestId}-${state.iterations}`,
@@ -487,9 +466,7 @@ export default class BaseAgenticHarness {
             contentSegments: cleanSegments,
             textFragments: cleanTextFragments,
             thinkingFragments: cleanThinkingFragments,
-        }, 
-        // @ts-ignore - TODO: strict typing
-        newTurnMessages);
+        }, newTurnMessages);
         // Persist worker snapshots for coordinator sessions
         if (state.streamedToolCalls.some((tc) => tc.name === "team_create") &&
             agentSessionId) {
@@ -516,7 +493,6 @@ export default class BaseAgenticHarness {
         }
         // afterResponse hook (fire-and-forget)
         hooks
-            // @ts-ignore - TODO: strict typing
             .run("afterResponse", context, {
             text: state.finalStreamedText,
             thinking: state.streamedThinking,
@@ -533,7 +509,6 @@ export default class BaseAgenticHarness {
         if (!pass.firstTokenTime) {
             pass.firstTokenTime = performance.now();
             const ttftSec = (pass.firstTokenTime - pass.start) / 1000;
-            // @ts-ignore - TODO: strict typing
             SessionGenerationTracker.update(pass.requestId, { ttft: ttftSec });
             this.ctx.emit({
                 type: "status",

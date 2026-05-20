@@ -11,8 +11,8 @@ export declare function createVllmProvider(baseUrl: string, instanceId?: string)
         text: any;
         thinking: any;
         usage: {
-            inputTokens: {};
-            outputTokens: {};
+            inputTokens: any;
+            outputTokens: any;
         };
     }>;
     generateTextStream(messages: ChatMessage[], model?: string, options?: ProviderOptions): AsyncGenerator<any, void, unknown>;
@@ -32,7 +32,7 @@ export declare function createVllmProvider(baseUrl: string, instanceId?: string)
 
      * @returns {Promise<{ embedding: number[], dimensions: number }>}
      */
-    generateEmbedding(content: Record<string, unknown>, model: Record<string, unknown>, options?: ProviderOptions): Promise<{
+    generateEmbedding(content: any, model: any, options?: ProviderOptions): Promise<{
         embedding: any;
         dimensions: any;
     }>;

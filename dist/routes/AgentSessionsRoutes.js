@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import requireDb from "../middleware/RequireDbMiddleware.js";
@@ -21,11 +20,8 @@ const COLLECTION = COLLECTIONS.AGENT_SESSIONS;
  */
 router.get("/", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
-        const limit = Math.min(
-        // @ts-ignore - TODO: strict typing
-        Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
         const cursor = req.query.cursor || null;
         const agent = req.query.agent || null;
         const filter = { project, username };
@@ -114,26 +110,20 @@ router.get("/", asyncHandler(async (req, res, next) => {
             : [];
         // Build sessionId → enrichment map
         const enrichMap = new Map();
-        // @ts-ignore
         for (const document of enrichDocs) {
             // Unique non-null models and providers
             const models = document.models.filter(Boolean);
             const providers = document.providers.filter(Boolean);
             // Merge modality keys from all requests into a single flags object
             const mergedModalities = {};
-            // @ts-ignore
             for (const keySet of document.modalityKeys) {
-                // @ts-ignore
                 for (const k of keySet)
                     mergedModalities[k] = true;
             }
             // Count per-tool occurrences
             const toolCounts = {};
-            // @ts-ignore
             for (const array of document.allToolApiNames) {
-                // @ts-ignore
                 for (const name of array) {
-                    // @ts-ignore
                     toolCounts[name] = (toolCounts[name] || 0) + 1;
                 }
             }
@@ -146,7 +136,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
             });
         }
         // Merge enriched data into each session
-        // @ts-ignore
         for (const session of items) {
             const enrichment = enrichMap.get(session.id);
             if (!enrichment)
@@ -178,7 +167,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
         res.json({ items, nextCursor, hasMore });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Error fetching agent sessions: ${error.message}`);
         next(error);
     }
@@ -189,7 +177,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
  */
 router.get("/:id", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const session = await db
             .collection(COLLECTION)
@@ -212,7 +199,6 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
             if (childIds.length === 0)
                 break;
             const newIds = childIds.filter(Boolean);
-            // @ts-ignore
             for (const id of newIds)
                 allSessionIds.add(id);
             frontier = newIds;
@@ -259,7 +245,6 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
             // Collect per-request tok/s for generation-only average
             const tpsValues = [];
             const ttftValues = [];
-            // @ts-ignore
             for (const r of reqs) {
                 totalCost += r.estimatedCost || 0;
                 totalInputTokens += r.inputTokens || 0;
@@ -274,17 +259,13 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
                 if (r.operation)
                     operations.add(r.operation);
                 if (r.modalities) {
-                    // @ts-ignore
                     for (const [k, v] of Object.entries(r.modalities)) {
-                        // @ts-ignore
                         if (v)
                             mergedModalities[k] = true;
                     }
                 }
                 if (r.toolApiNames?.length > 0) {
-                    // @ts-ignore
                     for (const name of r.toolApiNames) {
-                        // @ts-ignore
                         toolCounts[name] = (toolCounts[name] || 0) + 1;
                     }
                 }
@@ -296,14 +277,8 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
                     ttftValues.push(r.timeToGeneration);
                 }
             }
-            // @ts-ignore - TODO: strict typing
-            const earliest = reqs.reduce(
-            // @ts-ignore - TODO: strict typing
-            (min, r) => (!min || r.timestamp < min ? r.timestamp : min), null);
-            // @ts-ignore - TODO: strict typing
-            const latest = reqs.reduce(
-            // @ts-ignore - TODO: strict typing
-            (max, r) => (!max || r.timestamp > max ? r.timestamp : max), null);
+            const earliest = reqs.reduce((min, r) => (!min || r.timestamp < min ? r.timestamp : min), null);
+            const latest = reqs.reduce((max, r) => (!max || r.timestamp > max ? r.timestamp : max), null);
             const totalElapsedTime = earliest && latest
                 ? Math.max(0, (new Date(latest).getTime() - new Date(earliest).getTime()) /
                     1000)
@@ -312,11 +287,9 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
             // (each request measures its own generation speed) and excludes idle
             // time (only generation phases contribute measurements).
             const avgTokensPerSec = tpsValues.length > 0
-                // @ts-ignore - TODO: strict typing
                 ? tpsValues.reduce((a, b) => a + b, 0) / tpsValues.length
                 : null;
             const avgTimeToGeneration = ttftValues.length > 0
-                // @ts-ignore - TODO: strict typing
                 ? ttftValues.reduce((a, b) => a + b, 0) /
                     ttftValues.length
                 : null;
@@ -347,15 +320,11 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
         let stats = null;
         if (requests.length > 0) {
             const allStats = aggregateRequests(requests);
-            // @ts-ignore
             allStats.workerRequestCount = workerRequests.length;
             // Guard against old sessions where per-iteration request logs under-report
             // cost due to the NaN cache token bug — prefer the higher of request-log
             // aggregate vs document-level message cost.
-            // @ts-ignore
-            allStats.totalCost = Math.max(
-            // @ts-ignore
-            allStats.totalCost, session.totalCost || 0);
+            allStats.totalCost = Math.max(allStats.totalCost, session.totalCost || 0);
             stats = {
                 ...allStats,
                 orchestrator: aggregateRequests(orchestratorRequests),
@@ -365,7 +334,6 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
         res.json({ ...session, stats });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Error fetching agent session: ${error.message}`);
         next(error);
     }
@@ -376,7 +344,6 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
  */
 router.patch("/:id", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const setFields = buildConversationPatchFields(req.body);
         const result = await db
@@ -391,7 +358,6 @@ router.patch("/:id", asyncHandler(async (req, res, next) => {
         res.json(session);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Error patching agent session: ${error.message}`);
         next(error);
     }
@@ -402,7 +368,6 @@ router.patch("/:id", asyncHandler(async (req, res, next) => {
  */
 router.delete("/:id", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const result = await db
             .collection(COLLECTION)
@@ -413,7 +378,6 @@ router.delete("/:id", asyncHandler(async (req, res, next) => {
         res.json({ success: true, id: req.params.id });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Error deleting agent session: ${error.message}`);
         next(error);
     }

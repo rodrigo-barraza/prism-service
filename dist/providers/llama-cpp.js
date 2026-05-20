@@ -44,18 +44,12 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
         name: instanceId,
         // ── Non-Streaming Text Generation ──────────────────────────
         // POST /v1/chat/completions with stream: false
-        async generateText(messages, 
-        // @ts-ignore
-        model = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["llama-cpp"], options = {}) {
+        async generateText(messages, model = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["llama-cpp"], options = {}) {
             const baseUrl = getBaseUrl();
-            logger.provider(
-            // @ts-ignore - TODO: strict typing
-            "llama.cpp", `generateText model=${model} baseUrl=${baseUrl}`);
+            logger.provider("llama.cpp", `generateText model=${model} baseUrl=${baseUrl}`);
             try {
                 // Expand video attachments to image frames (ffmpeg) before message prep
-                // @ts-ignore - TODO: strict typing
                 await expandVideoToFrames(messages);
-                // @ts-ignore - TODO: strict typing
                 const prepared = prepareOpenAICompatMessages(messages, {
                     mediaStrategy: MEDIA_STRATEGIES.TEXT_FALLBACK,
                 });
@@ -64,48 +58,32 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
                     model,
                     ...buildPayloadParams(options),
                     // llama.cpp extension: top_k
-                    // @ts-ignore
                     ...(options.topK > 0 && { top_k: options.topK }),
                     // llama.cpp extension: min_p sampling
-                    // @ts-ignore
                     ...(options.minP !== undefined && { min_p: options.minP }),
                     // llama.cpp extension: repeat_penalty
-                    // @ts-ignore
                     ...(options.repeatPenalty !== undefined &&
-                        // @ts-ignore
                         options.repeatPenalty !== 1 && {
-                        // @ts-ignore
                         repeat_penalty: options.repeatPenalty,
                     }),
                     stream: false,
                 };
                 // Function calling tools — standard OpenAI tool schema
-                // @ts-ignore
                 const tools = convertToolsToOpenAI(options.tools);
                 if (tools) {
-                    // @ts-ignore
                     payload.tools = tools;
-                    // @ts-ignore
                     payload.tool_choice = "auto";
                 }
                 const response = await fetchOpenAICompat(`${baseUrl}/v1/chat/completions`, payload);
                 const data = await response.json();
-                const { text, thinking, usage, toolCalls } = 
-                // @ts-ignore
-                processNonStreamingResponse(data, {
-                    // @ts-ignore
+                const { text, thinking, usage, toolCalls } = processNonStreamingResponse(data, {
                     thinkingEnabled: options.thinkingEnabled,
                 });
                 // Extract timings for tok/s reporting (llama.cpp extension)
-                // @ts-ignore
                 if (data.timings?.predicted_per_second) {
-                    // @ts-ignore
-                    usage.tokensPerSec = parseFloat(
-                    // @ts-ignore
-                    data.timings.predicted_per_second.toFixed(1));
+                    usage.tokensPerSec = parseFloat(data.timings.predicted_per_second.toFixed(1));
                 }
                 const result = { text, thinking, usage };
-                // @ts-ignore
                 if (toolCalls)
                     result.toolCalls = toolCalls;
                 return result;
@@ -113,23 +91,16 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
             catch (error) {
                 if (error instanceof ProviderError)
                     throw error;
-                // @ts-ignore - TODO: strict typing
                 throw new ProviderError("llama-cpp", error.message, 500, error);
             }
         },
         // ── Streaming Text Generation (SSE) ──────────────────────
-        async *generateTextStream(messages, 
-        // @ts-ignore
-        model = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["llama-cpp"], options = {}) {
+        async *generateTextStream(messages, model = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["llama-cpp"], options = {}) {
             const baseUrl = getBaseUrl();
-            logger.provider(
-            // @ts-ignore - TODO: strict typing
-            "llama.cpp", `generateTextStream model=${model} baseUrl=${baseUrl}`);
+            logger.provider("llama.cpp", `generateTextStream model=${model} baseUrl=${baseUrl}`);
             try {
                 // Expand video attachments to image frames (ffmpeg) before message prep
-                // @ts-ignore - TODO: strict typing
                 await expandVideoToFrames(messages);
-                // @ts-ignore - TODO: strict typing
                 const prepared = prepareOpenAICompatMessages(messages, {
                     mediaStrategy: MEDIA_STRATEGIES.TEXT_FALLBACK,
                 });
@@ -138,17 +109,12 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
                     model,
                     ...buildPayloadParams(options),
                     // llama.cpp extension: top_k
-                    // @ts-ignore
                     ...(options.topK > 0 && { top_k: options.topK }),
                     // llama.cpp extension: min_p sampling
-                    // @ts-ignore
                     ...(options.minP !== undefined && { min_p: options.minP }),
                     // llama.cpp extension: repeat_penalty
-                    // @ts-ignore
                     ...(options.repeatPenalty !== undefined &&
-                        // @ts-ignore
                         options.repeatPenalty !== 1 && {
-                        // @ts-ignore
                         repeat_penalty: options.repeatPenalty,
                     }),
                     stream: true,
@@ -156,56 +122,38 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
                     stream_options: { include_usage: true },
                 };
                 // Function calling tools
-                // @ts-ignore
                 const tools = convertToolsToOpenAI(options.tools);
                 if (tools) {
-                    // @ts-ignore
                     payload.tools = tools;
-                    // @ts-ignore
                     payload.tool_choice = "auto";
                 }
-                const response = await fetchOpenAICompat(`${baseUrl}/v1/chat/completions`, payload, 
-                // @ts-ignore
-                { signal: options.signal });
-                // @ts-ignore
+                const response = await fetchOpenAICompat(`${baseUrl}/v1/chat/completions`, payload, { signal: options.signal });
                 const reader = response.body.getReader();
-                // @ts-ignore - TODO: strict typing
                 yield* parseSSEStream(reader, {
-                    // @ts-ignore
                     signal: options.signal,
-                    // @ts-ignore
                     thinkingEnabled: options.thinkingEnabled,
                     // llama.cpp extension: extract timings for tok/s
                     onUsage: (json, usage) => {
-                        // @ts-ignore - TODO: strict typing
                         if (json.timings?.predicted_per_second) {
-                            usage.tokensPerSec = parseFloat(
-                            // @ts-ignore - TODO: strict typing
-                            json.timings.predicted_per_second.toFixed(1));
+                            usage.tokensPerSec = parseFloat(json.timings.predicted_per_second.toFixed(1));
                         }
                     },
                 });
             }
             catch (error) {
-                // @ts-ignore - TODO: strict typing
                 if (error.name === "AbortError")
                     return; // Client disconnected
                 if (error instanceof ProviderError)
                     throw error;
-                // @ts-ignore - TODO: strict typing
                 throw new ProviderError("llama-cpp", error.message, 500, error);
             }
         },
         // ── Image Captioning ──────────────────────────────────────
         // Uses POST /v1/chat/completions with image_url content parts.
         // Requires a vision-capable model (LLaVA, Qwen-VL, etc.)
-        async captionImage(images, prompt = "Describe this image.", 
-        // @ts-ignore
-        model = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["llama-cpp"], systemPrompt) {
+        async captionImage(images, prompt = "Describe this image.", model = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["llama-cpp"], systemPrompt) {
             const baseUrl = getBaseUrl();
-            logger.provider(
-            // @ts-ignore - TODO: strict typing
-            "llama.cpp", `captionImage model=${model} baseUrl=${baseUrl}`);
+            logger.provider("llama.cpp", `captionImage model=${model} baseUrl=${baseUrl}`);
             try {
                 const content = [
                     { type: "text", text: prompt },
@@ -227,12 +175,9 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
                     stream: false,
                 });
                 const data = await response.json();
-                // @ts-ignore
                 const text = data.choices?.[0]?.message?.content || "";
                 const usage = {
-                    // @ts-ignore
                     inputTokens: data.usage?.prompt_tokens || 0,
-                    // @ts-ignore
                     outputTokens: data.usage?.completion_tokens || 0,
                 };
                 return { text, usage };
@@ -240,7 +185,6 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
             catch (error) {
                 if (error instanceof ProviderError)
                     throw error;
-                // @ts-ignore - TODO: strict typing
                 throw new ProviderError("llama-cpp", error.message, 500, error);
             }
         },
@@ -248,7 +192,6 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
         // GET /v1/models
         async listModels() {
             const baseUrl = getBaseUrl();
-            // @ts-ignore - TODO: strict typing
             logger.provider("llama.cpp", "listModels");
             try {
                 const response = await fetch(`${baseUrl}/v1/models`, {
@@ -261,14 +204,10 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
                 }
                 const data = await response.json();
                 // Normalize to our standard { models: [...] } format
-                // @ts-ignore
                 const models = (data.data || []).map((m) => ({
-                    // @ts-ignore - TODO: strict typing
                     key: m.id,
-                    // @ts-ignore - TODO: strict typing
                     display_name: m.id,
                     type: "llm",
-                    // @ts-ignore - TODO: strict typing
                     loaded_instances: [{ id: m.id }], // llama.cpp models are always loaded
                 }));
                 return { models };
@@ -276,7 +215,6 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
             catch (error) {
                 if (error instanceof ProviderError)
                     throw error;
-                // @ts-ignore - TODO: strict typing
                 throw new ProviderError("llama-cpp", error.message, 500, error);
             }
         },
@@ -284,7 +222,6 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
         // GET /health
         async checkHealth() {
             const baseUrl = getBaseUrl();
-            // @ts-ignore - TODO: strict typing
             logger.provider("llama.cpp", "checkHealth");
             try {
                 const response = await fetch(`${baseUrl}/health`, {
@@ -295,18 +232,13 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
                 return {
                     ok: response.ok,
                     status: response.ok
-                        ? // @ts-ignore
-                            data.status || "ok"
-                        : // @ts-ignore
-                            data.status || data.error?.message || "error",
-                    // @ts-ignore
+                        ? data.status || "ok"
+                        : data.status || data.error?.message || "error",
                     slotsIdle: data.slots_idle ?? null,
-                    // @ts-ignore
                     slotsProcessing: data.slots_processing ?? null,
                 };
             }
             catch (error) {
-                // @ts-ignore - TODO: strict typing
                 return { ok: false, status: "unreachable", error: error.message };
             }
         },

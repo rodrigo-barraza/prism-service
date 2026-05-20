@@ -1,7 +1,5 @@
-// @ts-ignore
 import { roundMs } from "@rodrigo-barraza/utilities-library";
 import MongoWrapper from "../wrappers/MongoWrapper.js";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.js";
 import logger from "../utils/logger.js";
 import { getTotalInputTokens, estimateTokens, calculateTextCost, } from "../utils/CostCalculator.js";
@@ -29,9 +27,7 @@ const API_TO_CANONICAL = {
     image_generation: "Image Generation",
 };
 function sanitizeMsg(m) {
-    const sanitizeStr = (s) => 
-    // @ts-ignore - TODO: strict typing
-    typeof s === "string" && s.startsWith("data:") ? `[base64 data]` : s;
+    const sanitizeStr = (s) => typeof s === "string" && s.startsWith("data:") ? `[base64 data]` : s;
     const sanitizeMedia = (value) => {
         if (Array.isArray(value))
             return value.map(sanitizeStr);
@@ -42,13 +38,9 @@ function sanitizeMsg(m) {
     return {
         role: m.role,
         content: typeof m.content === "string" ? m.content : m.content,
-        // @ts-ignore - TODO: strict typing
         ...(m.images?.length ? { images: sanitizeMedia(m.images) } : {}),
-        // @ts-ignore - TODO: strict typing
         ...(m.audio ? { audio: sanitizeMedia(m.audio) } : {}),
-        // @ts-ignore - TODO: strict typing
         ...(m.video?.length ? { video: sanitizeMedia(m.video) } : {}),
-        // @ts-ignore - TODO: strict typing
         ...(m.pdf?.length ? { pdf: sanitizeMedia(m.pdf) } : {}),
     };
 }
@@ -80,7 +72,6 @@ const RequestLogger = {
                 conversationId,
                 traceId,
                 agentSessionId,
-                // @ts-ignore - TODO: strict typing
                 ...(parentAgentSessionId && { parentAgentSessionId }),
                 toolsUsed,
                 toolDisplayNames,
@@ -112,7 +103,6 @@ const RequestLogger = {
             await db.collection(COLLECTION).insertOne(document);
         }
         catch (error) {
-            // @ts-ignore - TODO: strict typing
             logger.error("RequestLogger: failed to save request", error.message);
         }
     },
@@ -129,32 +119,23 @@ const RequestLogger = {
     text = null, thinking = null, images = [], toolCalls = [], outputCharacters = 0, audioRef = null, 
     // Optional
     agenticIteration = null, rateLimits = null, }) {
-        // @ts-ignore - TODO: strict typing
         const inputTokens = usage ? getTotalInputTokens(usage) : 0;
-        // @ts-ignore - TODO: strict typing
         const outputTokens = usage ? usage.outputTokens || 0 : 0;
-        // @ts-ignore - TODO: strict typing
         const cacheReadInputTokens = usage?.cacheReadInputTokens || 0;
-        // @ts-ignore - TODO: strict typing
         const cacheCreationInputTokens = usage?.cacheCreationInputTokens || 0;
-        // @ts-ignore - TODO: strict typing
         const reasoningOutputTokens = usage?.reasoningOutputTokens || 0;
         // Build synthetic message array for computeModalities (same function used by conversations)
         const syntheticMessages = [
-            // @ts-ignore - TODO: strict typing
             ...messages,
             {
                 role: "assistant",
                 content: text || null,
-                // @ts-ignore - TODO: strict typing
                 ...(images && images.length > 0 ? { images } : {}),
                 ...(audioRef ? { audio: audioRef } : {}),
-                // @ts-ignore - TODO: strict typing
                 ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
                 ...(thinking ? { thinking } : {}),
             },
         ];
-        // @ts-ignore - TODO: strict typing
         const modalities = computeModalities(syntheticMessages);
         return this.log({
             requestId,
@@ -170,24 +151,13 @@ const RequestLogger = {
             traceId,
             agentSessionId,
             parentAgentSessionId,
-            // @ts-ignore - TODO: strict typing
             toolsUsed: toolCalls && toolCalls.length > 0,
-            // @ts-ignore
-            toolDisplayNames: 
-            // @ts-ignore - TODO: strict typing
-            toolCalls && toolCalls.length > 0
+            toolDisplayNames: toolCalls && toolCalls.length > 0
                 ? [
-                    ...new Set(
-                    // @ts-ignore - TODO: strict typing
-                    toolCalls.map(
-                    // @ts-ignore
-                    (tc) => API_TO_CANONICAL[tc.name] || tc.name)),
+                    ...new Set(toolCalls.map((tc) => API_TO_CANONICAL[tc.name] || tc.name)),
                 ]
                 : [],
-            toolApiNames: 
-            // @ts-ignore - TODO: strict typing
-            toolCalls && toolCalls.length > 0
-                // @ts-ignore - TODO: strict typing
+            toolApiNames: toolCalls && toolCalls.length > 0
                 ? [...new Set(toolCalls.map((tc) => tc.name))]
                 : [],
             success,
@@ -199,40 +169,22 @@ const RequestLogger = {
             ...(reasoningOutputTokens > 0 && { reasoningOutputTokens }),
             estimatedCost,
             tokensPerSec,
-            // @ts-ignore - TODO: strict typing
             temperature: options?.temperature ?? null,
-            // @ts-ignore - TODO: strict typing
             maxTokens: options?.maxTokens ?? null,
-            // @ts-ignore - TODO: strict typing
             topP: options?.topP ?? null,
-            // @ts-ignore - TODO: strict typing
             topK: options?.topK ?? null,
-            // @ts-ignore - TODO: strict typing
             frequencyPenalty: options?.frequencyPenalty ?? null,
-            // @ts-ignore - TODO: strict typing
             presencePenalty: options?.presencePenalty ?? null,
-            // @ts-ignore - TODO: strict typing
             stopSequences: options?.stopSequences ?? null,
-            // @ts-ignore - TODO: strict typing
             messageCount: messages.length,
-            // @ts-ignore - TODO: strict typing
-            inputCharacters: messages.reduce((sum, m) => 
-            // @ts-ignore - TODO: strict typing
-            sum + (typeof m.content === "string" ? m.content.length : 0), 0),
+            inputCharacters: messages.reduce((sum, m) => sum + (typeof m.content === "string" ? m.content.length : 0), 0),
             outputCharacters,
-            timeToGeneration: 
-            // @ts-ignore - TODO: strict typing
-            timeToGenerationSec !== null ? roundMs(timeToGenerationSec) : null,
-            // @ts-ignore - TODO: strict typing
+            timeToGeneration: timeToGenerationSec !== null ? roundMs(timeToGenerationSec) : null,
             generationTime: generationSec !== null ? roundMs(generationSec) : null,
-            // @ts-ignore - TODO: strict typing
             totalTime: totalSec !== null ? roundMs(totalSec) : null,
             requestPayload: {
-                // @ts-ignore - TODO: strict typing
                 messages: messages.map(sanitizeMsg),
-                // @ts-ignore - TODO: strict typing
                 ...(options?.tools
-                    // @ts-ignore - TODO: strict typing
                     ? { tools: options.tools.map((t) => t.name || t.function?.name) }
                     : {}),
                 ...(agenticIteration !== null ? { agenticIteration } : {}),
@@ -240,15 +192,9 @@ const RequestLogger = {
             responsePayload: {
                 text: text || null,
                 thinking: thinking || null,
-                // @ts-ignore - TODO: strict typing
                 ...(images && images.length > 0 ? { images } : {}),
-                // @ts-ignore
-                toolCalls: 
-                // @ts-ignore - TODO: strict typing
-                toolCalls && toolCalls.length > 0
-                    // @ts-ignore - TODO: strict typing
+                toolCalls: toolCalls && toolCalls.length > 0
                     ? toolCalls.map((tc) => ({
-                        // @ts-ignore
                         name: API_TO_CANONICAL[tc.name] || tc.name,
                         id: tc.id,
                         args: tc.args,
@@ -271,34 +217,24 @@ const RequestLogger = {
      * roundMs, and calls this.log().
      */
     async logBackgroundLlmCall({ requestId, endpoint, operation, project, username, agent, provider: providerName, model, traceId, agentSessionId, aiMessages, resultText, usage: apiUsage = null, success, errorMessage, requestStartMs, extraRequestPayload, extraResponsePayload, }) {
-        // @ts-ignore - TODO: strict typing
         const totalSec = (performance.now() - requestStartMs) / 1000;
-        // @ts-ignore - TODO: strict typing
         const inputText = aiMessages.map((m) => m.content).join("\n");
         // Prefer real API-reported usage over the ~4 chars/token heuristic.
         // The heuristic remains as fallback for callers that don't pass usage.
         const inputTokens = apiUsage
-            // @ts-ignore - TODO: strict typing
             ? getTotalInputTokens(apiUsage)
             : estimateTokens(inputText);
         const outputTokens = apiUsage
-            // @ts-ignore - TODO: strict typing
             ? apiUsage.outputTokens || 0
             : resultText
-                // @ts-ignore - TODO: strict typing
                 ? estimateTokens(resultText)
                 : 0;
-        // @ts-ignore - TODO: strict typing
         const cacheReadInputTokens = apiUsage?.cacheReadInputTokens || 0;
-        // @ts-ignore - TODO: strict typing
         const cacheCreationInputTokens = apiUsage?.cacheCreationInputTokens || 0;
-        // @ts-ignore
         const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[model];
         let estimatedCost = null;
         if (pricing) {
-            estimatedCost = calculateTextCost(
-            // @ts-ignore - TODO: strict typing
-            apiUsage || { inputTokens, outputTokens }, pricing);
+            estimatedCost = calculateTextCost((apiUsage || { inputTokens, outputTokens }), pricing);
         }
         return this.log({
             requestId,
@@ -319,21 +255,17 @@ const RequestLogger = {
             outputTokens,
             ...(cacheReadInputTokens > 0 && { cacheReadInputTokens }),
             ...(cacheCreationInputTokens > 0 && { cacheCreationInputTokens }),
-            // @ts-ignore - TODO: strict typing
             tokensPerSec: calculateTokensPerSec(outputTokens, totalSec),
             inputCharacters: inputText.length,
             totalTime: roundMs(totalSec),
             modalities: { textIn: true, textOut: true },
             requestPayload: {
                 operation,
-                // @ts-ignore - TODO: strict typing
                 ...extraRequestPayload,
             },
             responsePayload: success
                 ? {
-                    // @ts-ignore - TODO: strict typing
                     textPreview: (resultText || "").slice(0, 200),
-                    // @ts-ignore - TODO: strict typing
                     ...extraResponsePayload,
                 }
                 : { error: errorMessage },

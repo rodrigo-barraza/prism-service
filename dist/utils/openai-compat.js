@@ -61,14 +61,10 @@ export function buildPayloadParams(options, { temperature = 0.7, maxTokens = -1 
  * @returns {Array|null} Array of { id, name, args } or null if no tool calls
  */
 export function extractToolCallsFromMessage(message) {
-    // @ts-ignore - TODO: strict typing
     if (!message?.tool_calls || message.tool_calls.length === 0)
         return null;
-    // @ts-ignore - TODO: strict typing
     return message.tool_calls.map((tc) => {
-        // @ts-ignore - TODO: strict typing
         const fnName = tc.function?.name || tc.name || "";
-        // @ts-ignore - TODO: strict typing
         const fnArgs = tc.function?.arguments || tc.arguments || "{}";
         let args = {};
         try {
@@ -103,21 +99,16 @@ export function normalizeUsage(rawUsage) {
         outputTokens: rawUsage?.completion_tokens ?? 0,
     };
     // KV cache hits — reported by LM Studio and OpenAI
-    // @ts-ignore - TODO: strict typing
     const cachedTokens = rawUsage?.prompt_tokens_details?.cached_tokens;
     if (cachedTokens > 0) {
-        // @ts-ignore
         usage.cacheReadInputTokens = cachedTokens;
         // Adjust inputTokens to reflect only the non-cached portion,
         // mirroring Anthropic's convention where inputTokens excludes cache hits
-        // @ts-ignore - TODO: strict typing
         usage.inputTokens = Math.max(0, usage.inputTokens - cachedTokens);
     }
     // Reasoning token breakdown
-    // @ts-ignore - TODO: strict typing
     const reasoningTokens = rawUsage?.completion_tokens_details?.reasoning_tokens;
     if (reasoningTokens > 0) {
-        // @ts-ignore
         usage.reasoningOutputTokens = reasoningTokens;
     }
     return usage;
@@ -156,7 +147,6 @@ export const MEDIA_STRATEGIES = {
  */
 export async function expandVideoToFrames(messages, options = {}) {
     const { extractVideoFrames, getDataUrlMimeType } = await import("./media.js");
-    // @ts-ignore
     for (const message of messages) {
         // Collect video data URLs from both `video` and `images` arrays.
         // The frontend may place video files in `images` if it doesn't
@@ -170,7 +160,6 @@ export async function expandVideoToFrames(messages, options = {}) {
         }
         // Check images field for misclassified video data URLs
         if (message.images && Array.isArray(message.images)) {
-            // @ts-ignore
             for (const dataUrl of message.images) {
                 const mime = getDataUrlMimeType(dataUrl);
                 if (mime && mime.startsWith("video/")) {
@@ -185,11 +174,8 @@ export async function expandVideoToFrames(messages, options = {}) {
         if (videoUrls.length === 0)
             continue;
         const allFrames = [];
-        // @ts-ignore
         for (const videoDataUrl of videoUrls) {
-            // @ts-ignore - TODO: strict typing
             const frames = await extractVideoFrames(videoDataUrl, options);
-            // @ts-ignore - TODO: strict typing
             allFrames.push(...frames);
         }
         if (allFrames.length > 0) {
@@ -209,10 +195,8 @@ export async function expandVideoToFrames(messages, options = {}) {
  * @returns {Array} OpenAI-compatible messages
  */
 export function prepareOpenAICompatMessages(messages, { mediaStrategy = MEDIA_STRATEGIES.IMAGES_ONLY } = {}) {
-    // @ts-ignore - TODO: strict typing
     return messages.map((m) => {
         const base = { role: m.role };
-        // @ts-ignore
         if (m.name)
             base.name = m.name;
         // Tool result messages — include tool_call_id for correlation
@@ -224,14 +208,11 @@ export function prepareOpenAICompatMessages(messages, { mediaStrategy = MEDIA_ST
             };
         }
         // Assistant messages with tool calls — include tool_calls in OpenAI format
-        // @ts-ignore - TODO: strict typing
         if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
             return {
                 ...base,
                 // Per OpenAI spec, content must be null when tool_calls are present
-                // @ts-ignore - TODO: strict typing
                 content: m.content?.trim() || null,
-                // @ts-ignore - TODO: strict typing
                 tool_calls: m.toolCalls.map((tc, i) => ({
                     id: tc.id || `call_${i}`,
                     type: "function",
@@ -248,36 +229,28 @@ export function prepareOpenAICompatMessages(messages, { mediaStrategy = MEDIA_ST
         const content = [];
         if (mediaStrategy === MEDIA_STRATEGIES.IMAGES_ONLY) {
             // Simple image-only handling (lm-studio)
-            // @ts-ignore - TODO: strict typing
             if (m.images && m.images.length > 0) {
-                // @ts-ignore
                 for (const dataUrl of m.images) {
-                    // @ts-ignore - TODO: strict typing
                     content.push({ type: "image_url", image_url: { url: dataUrl } });
                 }
             }
         }
         else {
             // Full media handling (vllm, llama-cpp)
-            // @ts-ignore
             for (const field of ["images", "audio", "video", "pdf"]) {
                 const array = m[field];
                 if (!array || !Array.isArray(array) || array.length === 0)
                     continue;
-                // @ts-ignore
                 for (const dataUrl of array) {
                     const mime = getDataUrlMimeType(dataUrl);
                     if (mime && mime.startsWith("image/")) {
-                        // @ts-ignore - TODO: strict typing
                         content.push({ type: "image_url", image_url: { url: dataUrl } });
                     }
                     else if (mime && mime.startsWith("video/")) {
                         if (mediaStrategy === MEDIA_STRATEGIES.FULL_MULTIMODAL) {
-                            // @ts-ignore - TODO: strict typing
                             content.push({ type: "video_url", video_url: { url: dataUrl } });
                         }
                         else {
-                            // @ts-ignore - TODO: strict typing
                             content.push({
                                 type: "text",
                                 text: "[Attached video file — video input not supported by this model]",
@@ -288,14 +261,12 @@ export function prepareOpenAICompatMessages(messages, { mediaStrategy = MEDIA_ST
                         if (mediaStrategy === MEDIA_STRATEGIES.FULL_MULTIMODAL) {
                             const base64Data = dataUrl.split(";base64,")[1] || "";
                             const audioFormat = mime.split("/")[1] || "wav";
-                            // @ts-ignore - TODO: strict typing
                             content.push({
                                 type: "input_audio",
                                 input_audio: { data: base64Data, format: audioFormat },
                             });
                         }
                         else {
-                            // @ts-ignore - TODO: strict typing
                             content.push({
                                 type: "text",
                                 text: "[Attached audio file — audio input not supported by this model]",
@@ -303,7 +274,6 @@ export function prepareOpenAICompatMessages(messages, { mediaStrategy = MEDIA_ST
                         }
                     }
                     else if (mime === "application/pdf") {
-                        // @ts-ignore - TODO: strict typing
                         content.push({
                             type: "text",
                             text: "[Attached PDF document — PDF input not supported by this model]",
@@ -314,14 +284,12 @@ export function prepareOpenAICompatMessages(messages, { mediaStrategy = MEDIA_ST
                         try {
                             const base64 = dataUrl.split(";base64,")[1];
                             const decoded = Buffer.from(base64, "base64").toString("utf-8");
-                            // @ts-ignore - TODO: strict typing
                             content.push({
                                 type: "text",
                                 text: `[Attached file (${mime})]:\n${decoded}`,
                             });
                         }
                         catch {
-                            // @ts-ignore - TODO: strict typing
                             content.push({
                                 type: "text",
                                 text: `[Attached file (${mime}): unable to decode]`,
@@ -329,8 +297,7 @@ export function prepareOpenAICompatMessages(messages, { mediaStrategy = MEDIA_ST
                         }
                     }
                     else {
-                        // Fallback — try image_url passthrough for unknown types
-                        // @ts-ignore - TODO: strict typing
+                        // Fallback — try image_url passthrough for any types
                         content.push({ type: "image_url", image_url: { url: dataUrl } });
                     }
                 }
@@ -338,7 +305,6 @@ export function prepareOpenAICompatMessages(messages, { mediaStrategy = MEDIA_ST
         }
         if (content.length > 0) {
             if (m.content) {
-                // @ts-ignore - TODO: strict typing
                 content.push({ type: "text", text: m.content });
             }
             return { ...base, content };
@@ -359,13 +325,10 @@ export function prepareOpenAICompatMessages(messages, { mediaStrategy = MEDIA_ST
  * @returns {{ text: string, thinking: string|null, usage: object, toolCalls: Array|null }}
  */
 export function processNonStreamingResponse(data, options = {}) {
-    // @ts-ignore - TODO: strict typing
     const message = data.choices?.[0]?.message;
     const rawText = message?.content || "";
     // When thinking is disabled, return raw text without parsing <think> tags
-    // @ts-ignore
     if (options.thinkingEnabled === false) {
-        // @ts-ignore - TODO: strict typing
         const usage = normalizeUsage(data.usage);
         const toolCalls = extractToolCallsFromMessage(message);
         return { text: rawText, thinking: null, usage, toolCalls };
@@ -374,7 +337,6 @@ export function processNonStreamingResponse(data, options = {}) {
     const nativeThinking = message?.reasoning_content || message?.reasoning || null;
     const { thinking: tagThinking, text } = extractThinkTags(rawText);
     const thinking = nativeThinking || tagThinking;
-    // @ts-ignore - TODO: strict typing
     const usage = normalizeUsage(data.usage);
     const toolCalls = extractToolCallsFromMessage(message);
     return { text, thinking, usage, toolCalls };
@@ -399,28 +361,22 @@ export async function* parseSSEStream(reader, options = {}) {
     const decoder = new TextDecoder();
     let buffer = "";
     let usage = null;
-    // @ts-ignore
     const suppressThinking = options.thinkingEnabled === false;
     // Skip ThinkTagParser entirely when thinking is disabled — no overhead
     const thinkParser = suppressThinking ? null : new ThinkTagParser();
     const pendingToolCalls = {};
     try {
         while (true) {
-            // @ts-ignore
             if (options.signal?.aborted) {
-                // @ts-ignore - TODO: strict typing
                 reader.cancel();
                 break;
             }
-            // @ts-ignore - TODO: strict typing
             const { done, value } = await reader.read();
             if (done)
                 break;
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split("\n");
-            // @ts-ignore
             buffer = lines.pop(); // keep incomplete line in buffer
-            // @ts-ignore
             for (const line of lines) {
                 const trimmed = line.trim();
                 if (!trimmed || trimmed.startsWith(":"))
@@ -435,12 +391,10 @@ export async function* parseSSEStream(reader, options = {}) {
                     if (json.usage) {
                         usage = normalizeUsage(json.usage);
                         // Let provider handle extensions (e.g. llama.cpp timings)
-                        // @ts-ignore
                         if (options.onUsage)
                             options.onUsage(json, usage);
                     }
                     // Let provider handle custom fields
-                    // @ts-ignore
                     if (options.onChunkJson)
                         options.onChunkJson(json);
                     const delta = json.choices?.[0]?.delta;
@@ -462,9 +416,7 @@ export async function* parseSSEStream(reader, options = {}) {
                         }
                         else {
                             // Parse <think> tags from the streamed content
-                            // @ts-ignore
                             const parts = thinkParser.feed(content);
-                            // @ts-ignore
                             for (const part of parts) {
                                 if (part.type === "thinking") {
                                     yield { type: "thinking", content: part.content };
@@ -480,28 +432,22 @@ export async function* parseSSEStream(reader, options = {}) {
                     // during tool call argument streaming.
                     if (delta?.tool_calls) {
                         let deltaChars = 0;
-                        // @ts-ignore
                         for (const tc of delta.tool_calls) {
                             const index = tc.index;
-                            // @ts-ignore
                             if (!pendingToolCalls[index]) {
-                                // @ts-ignore
                                 pendingToolCalls[index] = {
                                     id: tc.id || "",
                                     name: tc.function?.name || tc.name || "",
                                     args: "",
                                 };
                             }
-                            // @ts-ignore
                             if (tc.id)
                                 pendingToolCalls[index].id = tc.id;
                             const chunkName = tc.function?.name || tc.name;
-                            // @ts-ignore
                             if (chunkName)
                                 pendingToolCalls[index].name = chunkName;
                             const chunkArgs = tc.function?.arguments || tc.arguments;
                             if (chunkArgs) {
-                                // @ts-ignore
                                 pendingToolCalls[index].args += chunkArgs;
                                 deltaChars += chunkArgs.length;
                             }
@@ -515,11 +461,9 @@ export async function* parseSSEStream(reader, options = {}) {
                     // If finish_reason indicates tool calls, yield accumulated tool calls
                     const finishReason = json.choices?.[0]?.finish_reason;
                     if (finishReason === "tool_calls" || finishReason === "tool") {
-                        // @ts-ignore
                         for (const tc of Object.values(pendingToolCalls)) {
                             let args = {};
                             try {
-                                // @ts-ignore
                                 args = JSON.parse(tc.args || "{}");
                             }
                             catch {
@@ -527,9 +471,7 @@ export async function* parseSSEStream(reader, options = {}) {
                             }
                             yield {
                                 type: "toolCall",
-                                // @ts-ignore
                                 id: tc.id,
-                                // @ts-ignore
                                 name: tc.name,
                                 args,
                             };
@@ -544,7 +486,6 @@ export async function* parseSSEStream(reader, options = {}) {
         // Flush any remaining buffered content from the think parser
         if (thinkParser) {
             const remaining = thinkParser.flush();
-            // @ts-ignore
             for (const part of remaining) {
                 if (part.type === "thinking") {
                     yield { type: "thinking", content: part.content };
@@ -581,7 +522,6 @@ export async function fetchOpenAICompat(url, payload, options = {}) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-        // @ts-ignore
         ...(options.signal && { signal: options.signal }),
     });
     if (!response.ok) {

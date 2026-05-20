@@ -112,9 +112,7 @@ export function buildJsonResponseFromEvents(events, reqBody) {
 
 
  */
-export async function handleSseRequest(req, res, params, 
-// @ts-ignore - TODO: strict typing
-handler = handleConversation) {
+export async function handleSseRequest(req, res, params, handler = handleConversation) {
     initSseResponse(res);
     const controller = createAbortController();
     res.on("close", () => {
@@ -134,13 +132,9 @@ handler = handleConversation) {
 
 
  */
-export async function handleJsonRequest(req, res, next, params, 
-// @ts-ignore - TODO: strict typing
-handler = handleConversation) {
-    // @ts-ignore
+export async function handleJsonRequest(req, res, next, params, handler = handleConversation) {
     const events = [];
     await handler(params, (event) => events.push(event));
-    // @ts-ignore
     const { error, response } = buildJsonResponseFromEvents(events, req.body);
     if (error)
         return next(error);

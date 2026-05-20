@@ -36,19 +36,19 @@ declare const _default: {
     };
     domain: string;
     labels: string[];
-    execute(args: Record<string, unknown>, context: Record<string, unknown>): Promise<{
+    execute(args: any, context: any): Promise<{
         error: string;
         acknowledged?: undefined;
         items?: undefined;
         stats?: undefined;
     } | {
         acknowledged: boolean;
-        items: {
+        items: ((value: any, index: number, array: any[]) => {
             id: any;
             content: {};
             status: {};
             priority: {};
-        }[];
+        })[];
         stats: {
             total: number;
             pending: number;

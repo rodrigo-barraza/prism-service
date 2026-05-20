@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import requireDb from "../middleware/RequireDbMiddleware.js";
@@ -20,17 +19,13 @@ const COLLECTION = COLLECTIONS.CONVERSATIONS;
  */
 router.get("/", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
-        const limit = Math.min(
-        // @ts-ignore - TODO: strict typing
-        Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
         const cursor = req.query.cursor || null;
         const filter = { project, username };
         if (cursor) {
             // updatedAt is stored as ISO-8601 strings — compare string-to-string
             // to match BSON type and allow index range scan
-            // @ts-ignore
             filter.updatedAt = { $lt: cursor };
         }
         // Fetch limit + 1 to detect if there's a next page
@@ -60,7 +55,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
         res.json({ items, nextCursor, hasMore });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Error fetching conversations: ${error.message}`);
         next(error);
     }
@@ -71,7 +65,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
  */
 router.get("/:id", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const conversation = await db
             .collection(COLLECTION)
@@ -82,7 +75,6 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
         res.json(conversation);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Error fetching conversation: ${error.message}`);
         next(error);
     }
@@ -93,7 +85,6 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
  */
 router.get("/:id/workflows", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const workflows = await db
             .collection("workflows")
@@ -103,7 +94,6 @@ router.get("/:id/workflows", asyncHandler(async (req, res, next) => {
         res.json(workflows);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Error fetching conversation workflows: ${error.message}`);
         next(error);
     }
@@ -121,13 +111,10 @@ router.post("/:id/messages", asyncHandler(async (req, res, next) => {
                 .status(400)
                 .json({ error: "messages must be a non-empty array" });
         }
-        const conversation = await ConversationService.appendMessages(
-        // @ts-ignore - TODO: strict typing
-        req.params.id, project, username, messages, conversationMeta || null);
+        const conversation = await ConversationService.appendMessages(req.params.id, project, username, messages, conversationMeta || null);
         res.json(conversation);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Error appending messages: ${error.message}`);
         next(error);
     }
@@ -139,7 +126,6 @@ router.post("/:id/messages", asyncHandler(async (req, res, next) => {
  */
 router.patch("/:id", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const setFields = buildConversationPatchFields(req.body);
         const result = await db
@@ -154,7 +140,6 @@ router.patch("/:id", asyncHandler(async (req, res, next) => {
         res.json(conversation);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Error patching conversation: ${error.message}`);
         next(error);
     }
@@ -165,7 +150,6 @@ router.patch("/:id", asyncHandler(async (req, res, next) => {
  */
 router.delete("/:id", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const result = await db
             .collection(COLLECTION)
@@ -176,7 +160,6 @@ router.delete("/:id", asyncHandler(async (req, res, next) => {
         res.json({ success: true, id: req.params.id });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Error deleting conversation: ${error.message}`);
         next(error);
     }

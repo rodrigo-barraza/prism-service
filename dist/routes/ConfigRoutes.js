@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import { PROVIDERS, PROVIDER_LIST, TYPES, VOICES, DEFAULT_VOICES, getModelOptions, getDefaultModels, } from "../config.js";
@@ -10,9 +9,7 @@ import rateLimitStore from "../services/RateLimitStore.js";
 import MinioWrapper from "../wrappers/MinioWrapper.js";
 import LocalProviderGateway from "../services/LocalProviderGateway.js";
 import { COORDINATOR_ONLY_TOOLS } from "../services/CoordinatorPrompt.js";
-import { OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, ELEVENLABS_API_KEY, INWORLD_BASIC,
-// @ts-ignore
- } from "../../config.js";
+import { OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, ELEVENLABS_API_KEY, INWORLD_BASIC, } from "../../config.js";
 const router = express.Router();
 // Map cloud providers to their secrets — provider is "available" when secret is truthy
 const CLOUD_PROVIDER_SECRETS = {
@@ -24,17 +21,14 @@ const CLOUD_PROVIDER_SECRETS = {
 };
 // Cloud providers available based on API keys
 const AVAILABLE_CLOUD = new Set(Object.entries(CLOUD_PROVIDER_SECRETS)
-    // @ts-ignore - TODO: strict typing
     .filter(([, secret]) => !!secret)
-    // @ts-ignore - TODO: strict typing
-    .map(([provider]) => provider));
+    .map((([provider]) => provider)));
 // Local provider instances from the instance registry
 const localInstances = listInstances();
 // Combined set: cloud providers + all local instance IDs
 const AVAILABLE_PROVIDERS = new Set([
     ...AVAILABLE_CLOUD,
-    // @ts-ignore - TODO: strict typing
-    ...localInstances.map((inst) => inst.id),
+    ...localInstances.map(((inst) => inst.id)),
 ]);
 /**
  * Resolve enabledTools entries (may contain "label:X" / "domain:X" prefixes)
@@ -46,18 +40,14 @@ function resolveEnabledToolsToSet(enabledTools) {
     // "*" wildcard means all tools — return null sentinel
     if (enabledTools.includes("*"))
         return null;
-    const hasPrefixed = enabledTools.some(
-    // @ts-ignore - TODO: strict typing
-    (e) => e.startsWith("label:") || e.startsWith("domain:"));
+    const hasPrefixed = enabledTools.some((e) => e.startsWith("label:") || e.startsWith("domain:"));
     if (!hasPrefixed)
         return new Set(enabledTools);
     const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
     const resolved = new Set();
-    // @ts-ignore
     for (const entry of enabledTools) {
         if (entry.startsWith("label:")) {
             const label = entry.slice(6);
-            // @ts-ignore
             for (const t of clientSchemas) {
                 if (t.labels?.includes(label))
                     resolved.add(t.name);
@@ -65,7 +55,6 @@ function resolveEnabledToolsToSet(enabledTools) {
         }
         else if (entry.startsWith("domain:")) {
             const domain = entry.slice(7);
-            // @ts-ignore
             for (const t of clientSchemas) {
                 if (t.domain === domain)
                     resolved.add(t.name);
@@ -80,10 +69,8 @@ function resolveEnabledToolsToSet(enabledTools) {
 /** Keep only available provider keys in a models map. */
 function filterByAvailableProviders(modelsMap) {
     const filtered = {};
-    // @ts-ignore
     for (const [provider, models] of Object.entries(modelsMap)) {
         if (AVAILABLE_PROVIDERS.has(provider)) {
-            // @ts-ignore
             filtered[provider] = models;
         }
     }
@@ -92,10 +79,8 @@ function filterByAvailableProviders(modelsMap) {
 /** Filter defaults to only include available providers. */
 function filterDefaults(defaults) {
     const filtered = {};
-    // @ts-ignore
     for (const [provider, model] of Object.entries(defaults)) {
         if (AVAILABLE_PROVIDERS.has(provider)) {
-            // @ts-ignore
             filtered[provider] = model;
         }
     }
@@ -111,19 +96,16 @@ function filterDefaults(defaults) {
  */
 function lookupArenaScores(modelName) {
     const arena = {};
-    // @ts-ignore - TODO: strict typing
     const key = modelName.toLowerCase();
     // Strip path prefix (e.g. "google/gemma-3-12b" → "gemma-3-12b")
     // and quantization suffix (e.g. "qwen3-32b@q4_k_m" → "qwen3-32b")
     const stripped = key.includes("/") ? key.split("/").pop() : key;
     const cleaned = stripped.includes("@") ? stripped.split("@")[0] : stripped;
-    // @ts-ignore
     for (const [category, scores] of Object.entries(ARENA_SCORES)) {
         if (!scores || typeof scores !== "object")
             continue;
         let bestMatch = null;
         let bestLen = 0;
-        // @ts-ignore
         for (const [arenaName, score] of Object.entries(scores)) {
             const an = arenaName.toLowerCase();
             // Exact match on raw key or cleaned key
@@ -142,7 +124,6 @@ function lookupArenaScores(modelName) {
             }
         }
         if (bestMatch !== null) {
-            // @ts-ignore
             arena[category] = bestMatch;
         }
     }
@@ -153,9 +134,7 @@ function lookupArenaScores(modelName) {
  * Merges with any existing arena data on the model (existing takes priority).
  */
 function enrichModelsWithArenaScores(modelsMap) {
-    // @ts-ignore
     for (const provider of Object.keys(modelsMap)) {
-        // @ts-ignore
         for (const model of modelsMap[provider]) {
             const scores = lookupArenaScores(model.name);
             if (scores) {
@@ -174,7 +153,6 @@ function enrichModelsWithArenaScores(modelsMap) {
 // ── Local provider instance metadata ────────────────────────────
 // Built from the instance registry. Model fetching is now delegated
 // to LocalProviderGateway.discoverModels() in GET /config-local.
-// @ts-ignore - TODO: strict typing
 const LOCAL_PROVIDERS = localInstances.map((inst) => {
     const entry = {
         key: inst.id,
@@ -182,7 +160,6 @@ const LOCAL_PROVIDERS = localInstances.map((inst) => {
         instanceNumber: inst.instanceNumber,
         concurrency: inst.concurrency,
     };
-    // @ts-ignore
     if (inst.nickname)
         entry.nickname = inst.nickname;
     return entry;
@@ -203,20 +180,16 @@ router.get("/", asyncHandler(async (_req, res) => {
     // Filter to only available providers
     textToTextModels = filterByAvailableProviders(textToTextModels);
     textToImageModels = filterByAvailableProviders(textToImageModels);
-    // @ts-ignore - TODO: strict typing
     const availableProviderList = PROVIDER_LIST.filter((p) => AVAILABLE_PROVIDERS.has(p));
     const availableProviderMap = {};
-    // @ts-ignore
     for (const [key, value] of Object.entries(PROVIDERS)) {
-        // @ts-ignore
         if (AVAILABLE_PROVIDERS.has(value))
             availableProviderMap[key] = value;
     }
     // Build the dynamic Tool Calling system prompt
     const schemas = ToolOrchestratorService.getToolSchemas() || [];
     const toolNames = schemas
-        // @ts-ignore - TODO: strict typing
-        .map((s) => s.name || s.function?.name)
+        .map(((s) => s.name || s.function?.name))
         .filter(Boolean)
         .map((name) => {
         return name.replace(/^get_/, "").replace(/_/g, " ");
@@ -238,7 +211,6 @@ Guidelines:
     // Flag which local provider instances are configured so the client knows to poll
     const localProviders = LOCAL_PROVIDERS.map(({ key, type, instanceNumber, concurrency, nickname }) => {
         const entry = { id: key, type, instanceNumber, concurrency };
-        // @ts-ignore
         if (nickname)
             entry.nickname = nickname;
         return entry;
@@ -298,12 +270,9 @@ localConfigRouter.get("/", async (_req, res) => {
         enrich: true,
     });
     // Enrich each instance's models with arena scores
-    // @ts-ignore
     for (const key of Object.keys(models)) {
-        // @ts-ignore
         const wrapped = { [key]: models[key] };
         enrichModelsWithArenaScores(wrapped);
-        // @ts-ignore
         models[key] = wrapped[key];
     }
     res.json({ models });
@@ -315,7 +284,6 @@ export { localConfigRouter };
  */
 router.get("/agents", (_req, res) => {
     const agents = AgentPersonaRegistry.list().map((a) => {
-        // @ts-ignore - TODO: strict typing
         const persona = AgentPersonaRegistry.get(a.id);
         const resolvedTools = resolveEnabledToolsToSet(persona?.enabledTools);
         // null sentinel means "*" wildcard → all tools
@@ -346,7 +314,6 @@ router.get("/tools", (_req, res) => {
     const schemas = ToolOrchestratorService.getClientToolSchemas() || [];
     const agentId = _req.query.agent;
     if (agentId) {
-        // @ts-ignore - TODO: strict typing
         const persona = AgentPersonaRegistry.get(agentId);
         if (persona?.enabledTools) {
             const enabledSet = resolveEnabledToolsToSet(persona.enabledTools);
@@ -369,7 +336,6 @@ router.post("/tools/refresh", asyncHandler(async (_req, res) => {
         res.json({ ok: true, count });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         res.status(500).json({ error: error.message });
     }
 }));

@@ -4,29 +4,29 @@ declare const AgentPersonaRegistry: {
   
   
      */
-    get(agentId: Record<string, unknown>): any;
+    get(agentId: any): any;
     /**
      * List all registered personas.
      * @returns {Array<{ id: string, name: string, custom?: boolean }>}
      */
     list(): {
         custom?: boolean | undefined;
-        id: unknown;
-        name: unknown;
-        type: {};
+        id: any;
+        name: any;
+        type: any;
     }[];
     /**
      * Check if a persona exists.
   
   
      */
-    has(agentId: Record<string, unknown>): boolean;
+    has(agentId: any): boolean;
     /**
      * Check if a project belongs to a registered agent.
   
   
      */
-    isAgentProject(project: Record<string, unknown>): boolean;
+    isAgentProject(project: any): boolean;
     /**
      * Register a custom (user-defined) agent persona at runtime.
      * Converts a MongoDB document into a persona object compatible
@@ -34,12 +34,12 @@ declare const AgentPersonaRegistry: {
      *
   
      */
-    registerCustom(document: Record<string, unknown>): void;
+    registerCustom(document: any): void;
     /**
      * Unregister a persona by agent ID (only custom agents should be removed).
   
      */
-    unregister(agentId: Record<string, unknown>): void;
+    unregister(agentId: any): void;
     /**
      * Load all custom agents from the database and register them.
      * Called at startup and can be called to refresh after mutations.

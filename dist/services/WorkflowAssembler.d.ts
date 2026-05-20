@@ -16,10 +16,10 @@
 
  * @returns {{ nodes, edges, nodeResults }}
  */
-declare function assembleGraph(steps: Record<string, unknown>): {
-    nodes: Record<string, unknown>[];
-    edges: Record<string, unknown>[];
-    nodeResults: {};
+declare function assembleGraph(steps: any): {
+    nodes: any[];
+    edges: any[];
+    nodeResults: any;
 };
 export { assembleGraph };
 //# sourceMappingURL=WorkflowAssembler.d.ts.map

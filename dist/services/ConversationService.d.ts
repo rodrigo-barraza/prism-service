@@ -5,13 +5,13 @@
 
  * @returns {Promise<Array>} messages with refs replacing inline data
  */
-export declare function extractFiles(messages: Record<string, unknown>, project?: Record<string, unknown>, username?: string): Promise<Record<string, unknown> | Record<string, unknown>[]>;
+export declare function extractFiles(messages: any, project?: any, username?: string): Promise<any>;
 /**
  * Compute input/output modalities from messages for lightweight querying.
 
  * @returns {Object} modalities flags
  */
-export declare function computeModalities(messages: Record<string, unknown>): {
+export declare function computeModalities(messages: any): {
     textIn: boolean;
     textOut: boolean;
     imageIn: boolean;
@@ -29,13 +29,13 @@ export declare function computeModalities(messages: Record<string, unknown>): {
 
 
  */
-export declare function extractProviders(messages: Record<string, unknown>, settings: Record<string, unknown>): unknown[];
+export declare function extractProviders(messages: any, settings: any): unknown[];
 /**
  * Compute total estimated cost across all messages.
 
 
  */
-export declare function computeTotalCost(messages: Record<string, unknown>): number;
+export declare function computeTotalCost(messages: any): number;
 /**
  * Build the $set fields for a conversation/agent-session PATCH request.
  * Centralises the identical logic shared by conversations.js and agent-sessions.js.
@@ -43,49 +43,13 @@ export declare function computeTotalCost(messages: Record<string, unknown>): num
 
  * @returns {object} $set fields ready for updateOne
  */
-export declare function buildConversationPatchFields({ title, messages, systemPrompt, settings, }: Record<string, unknown>): {
+export declare function buildConversationPatchFields({ title, messages, systemPrompt, settings, }: any): {
     updatedAt: string;
 };
 /**
  * ConversationService — shared logic for managing conversations in MongoDB.
  * Used by both the conversations REST API and generation routes.
  */
-declare const ConversationService: {
-    /**
-       * Append messages to a conversation, auto-creating it if it doesn't exist.
-       * Handles file extraction (MinIO upload) and recomputes derived fields.
-       * Optionally applies conversation metadata (title, systemPrompt, settings).
-       *
-  
-  
-       * @returns {Promise<object>} The updated conversation document
-       */
-    appendMessages(conversationId: Record<string, unknown>, project: Record<string, unknown>, username: string, newMessages: Record<string, unknown>, conversationMeta?: Record<string, unknown>, { collection }?: Record<string, unknown>): Promise<{
-        modalities: {
-            textIn: boolean;
-            textOut: boolean;
-            imageIn: boolean;
-            imageOut: boolean;
-            audioIn: boolean;
-            audioOut: boolean;
-            docIn: boolean;
-            webSearch: boolean;
-            codeExecution: boolean;
-            functionCalling: boolean;
-            thinking: boolean;
-        };
-        providers: unknown[];
-        totalCost: number;
-        _id: import("bson").ObjectId;
-    }>;
-    /**
-     * Set or clear the isGenerating flag on a conversation.
-     * Lightweight update — only touches isGenerating + updatedAt.
-     *
-  
-  
-     */
-    setGenerating(conversationId: Record<string, unknown>, project: Record<string, unknown>, username: string, generating: Record<string, unknown>, { collection, agent }?: Record<string, unknown>): Promise<void>;
-};
+declare const ConversationService: any;
 export default ConversationService;
 //# sourceMappingURL=ConversationService.d.ts.map

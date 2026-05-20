@@ -1,7 +1,4 @@
-// @ts-ignore
-import { TOOLS_SERVICE_URL, COORDINATOR_DECOMPOSITION_MODEL,
-// @ts-ignore
- } from "../../config.js";
+import { TOOLS_SERVICE_URL, COORDINATOR_DECOMPOSITION_MODEL, } from "../../config.js";
 import { resolve, relative } from "node:path";
 import { existsSync } from "node:fs";
 import logger from "../utils/logger.js";
@@ -48,19 +45,15 @@ function resolveRepoPath(workspaceRoot, files) {
     if (!files?.length)
         return workspaceRoot;
     // Check if workspace root itself is a git repo
-    // @ts-ignore - TODO: strict typing
     if (existsSync(resolve(workspaceRoot, ".git")))
         return workspaceRoot;
     // Take the first file, get its path relative to workspace root,
     // extract the first directory segment (the project dir)
-    // @ts-ignore - TODO: strict typing
     const firstFile = resolve(files[0]);
-    // @ts-ignore - TODO: strict typing
     const rel = relative(workspaceRoot, firstFile);
     const firstSegment = rel.split("/")[0];
     if (!firstSegment)
         return workspaceRoot;
-    // @ts-ignore - TODO: strict typing
     const candidate = resolve(workspaceRoot, firstSegment);
     if (existsSync(resolve(candidate, ".git"))) {
         return candidate;
@@ -81,7 +74,6 @@ const DECOMPOSITION_PROVIDER = "anthropic";
  */
 async function getWorkerFallback() {
     try {
-        // @ts-ignore - TODO: strict typing
         const agents = await SettingsService.getSection("agents");
         if (agents?.subagentProvider && agents?.subagentModel) {
             return { provider: agents.subagentProvider, model: agents.subagentModel };
@@ -112,7 +104,6 @@ registerCleanup(async () => {
     if (running.length === 0)
         return;
     logger.info(`[Coordinator] Shutdown: aborting ${running.length} running worker(s)…`);
-    // @ts-ignore
     for (const worker of running) {
         worker.abortController?.abort();
         worker.status = "stopped";
@@ -121,9 +112,7 @@ registerCleanup(async () => {
     // Clean up worktrees in parallel
     const cleanups = running
         .filter((w) => w.isolated && w.worktreePath)
-        .map((w) => 
-    // @ts-ignore - TODO: strict typing
-    removeWorktree(w.repoPath, w.worktreePath)
+        .map((w) => removeWorktree(w.repoPath, w.worktreePath)
         .then(() => {
         w.worktreePath = null;
     })
@@ -168,12 +157,9 @@ function getActiveOn(instanceId) {
  */
 function selectAndReserveInstance(siblings, coordinatorInstanceId, instanceModelOverrides, defaultModel) {
     // Debug: log the full instance state for tracing assignment decisions
-    // @ts-ignore - TODO: strict typing
     const stateSnapshot = siblings
         .map((s) => {
-        // @ts-ignore - TODO: strict typing
         const active = getActiveOn(s.id);
-        // @ts-ignore - TODO: strict typing
         return `${s.id}(concurrency=${s.concurrency}, active=${active}, free=${s.concurrency - active})`;
     })
         .join(", ");
@@ -192,7 +178,6 @@ function selectAndReserveInstance(siblings, coordinatorInstanceId, instanceModel
     // fallback unnecessarily.
     // Build ordered candidate list: coordinator's instance first, then rest in order
     const ordered = [];
-    // @ts-ignore
     for (const inst of siblings) {
         if (inst.id === coordinatorInstanceId) {
             ordered.unshift(inst); // coordinator instance goes first
@@ -203,11 +188,8 @@ function selectAndReserveInstance(siblings, coordinatorInstanceId, instanceModel
     }
     // Phase 1: find the first instance with free concurrency slots
     let bestInstance = null;
-    // @ts-ignore
     for (const inst of ordered) {
-        // @ts-ignore - TODO: strict typing
         const active = getActiveOn(inst.id);
-        // @ts-ignore - TODO: strict typing
         const available = inst.concurrency - active;
         if (available > 0) {
             bestInstance = inst;
@@ -217,34 +199,26 @@ function selectAndReserveInstance(siblings, coordinatorInstanceId, instanceModel
     // Phase 2: all instances at capacity — least-loaded overflow
     // Spread the overload evenly across instances instead of returning
     // null (which would force all overflow to cloud fallback or queue).
-    // @ts-ignore - TODO: strict typing
     if (!bestInstance && siblings.length > 0) {
         let minActive = Infinity;
-        // @ts-ignore
         for (const inst of ordered) {
-            // @ts-ignore - TODO: strict typing
             const active = getActiveOn(inst.id);
             if (active < minActive) {
                 minActive = active;
                 bestInstance = inst;
             }
         }
-        // @ts-ignore - TODO: strict typing
         const overload = minActive - bestInstance.concurrency;
-        logger.info(
-        // @ts-ignore - TODO: strict typing
-        `[Coordinator] selectAndReserveInstance: all at capacity — overflow to ${bestInstance.id} (active=${minActive}, overload=+${overload + 1})`);
+        logger.info(`[Coordinator] selectAndReserveInstance: all at capacity — overflow to ${bestInstance.id} (active=${minActive}, overload=+${overload + 1})`);
     }
     if (!bestInstance) {
         logger.info(`[Coordinator] selectAndReserveInstance: no instances available`);
         return null;
     }
-    // @ts-ignore - TODO: strict typing
     const available = bestInstance.concurrency - getActiveOn(bestInstance.id);
     // Increment reservation synchronously so the next call sees it
     instanceReservations.set(bestInstance.id, (instanceReservations.get(bestInstance.id) || 0) + 1);
     // Apply quant fallback model if the selected instance has an override
-    // @ts-ignore - TODO: strict typing
     const model = instanceModelOverrides.get(bestInstance.id) || defaultModel;
     return { provider: bestInstance.id, model, slotsAvailable: available };
 }
@@ -260,13 +234,11 @@ async function toolsApiPost(path, body) {
         });
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
-            // @ts-ignore
             return { error: error.error || `API returned ${response.status}` };
         }
         return await response.json();
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         return { error: `Failed to reach tools-api: ${error.message}` };
     }
 }
@@ -312,13 +284,10 @@ async function cleanupWorktrees(repoPath) {
 function getLastAssistantText(messages) {
     if (!messages?.length)
         return "";
-    // @ts-ignore - TODO: strict typing
     for (let i = messages.length - 1; i >= 0; i--) {
         const m = messages[i];
-        // @ts-ignore - TODO: strict typing
         if (m.role !== "assistant")
             continue;
-        // @ts-ignore - TODO: strict typing
         const text = (typeof m.content === "string" ? m.content : "").trim();
         if (text)
             return text;
@@ -334,16 +303,12 @@ function buildWorkerResult(worker) {
             : `Agent "${worker.description}" was stopped`;
     // Return the full last assistant message text (no truncation).
     // Like Claude Code, we trust the model to produce a concise final report.
-    // @ts-ignore - TODO: strict typing
     const lastText = getLastAssistantText(worker.messages);
     // Aggregate tool call names into { name: count } for frontend badge display
     const toolNames = {};
-    // @ts-ignore - TODO: strict typing
     if (worker.toolCalls?.length) {
-        // @ts-ignore
         for (const tc of worker.toolCalls) {
-            const name = tc.name || "unknown";
-            // @ts-ignore
+            const name = tc.name || "any";
             toolNames[name] = (toolNames[name] || 0) + 1;
         }
     }
@@ -352,31 +317,22 @@ function buildWorkerResult(worker) {
         description: worker.description,
         status,
         summary,
-        // @ts-ignore - TODO: strict typing
         result: lastText || (worker.output || "").trim() || null,
-        // @ts-ignore - TODO: strict typing
         toolUses: worker.toolCalls?.length || 0,
         toolNames: Object.keys(toolNames).length > 0 ? toolNames : undefined,
         iterations: worker.iterations || 0,
         durationMs: worker.durationMs || 0,
         // Include full conversation for frontend MessageList rendering.
         // Strip system messages — they're large and not useful for display.
-        // @ts-ignore - TODO: strict typing
         messages: (worker.messages || []).filter((m) => m.role !== "system"),
     };
-    // @ts-ignore - TODO: strict typing
     if (worker.diff?.hasChanges) {
-        // @ts-ignore
         result.diff = {
-            // @ts-ignore - TODO: strict typing
             additions: worker.diff.additions || 0,
-            // @ts-ignore - TODO: strict typing
             deletions: worker.diff.deletions || 0,
-            // @ts-ignore - TODO: strict typing
             files: worker.diff.files || [],
         };
     }
-    // @ts-ignore
     if (worker.error)
         result.error = worker.error;
     return result;
@@ -430,27 +386,7 @@ export default class CoordinatorService {
      * @returns {Promise<object>} Spawn result with agentId
      */
     static async spawnFromTool({ description, prompt, files, model, assignedProvider, assignedModel, coordinatorCtx, }) {
-        const { 
-        // @ts-ignore - TODO: strict typing
-        project, 
-        // @ts-ignore - TODO: strict typing
-        username, 
-        // @ts-ignore - TODO: strict typing
-        agent, 
-        // @ts-ignore - TODO: strict typing
-        providerName, 
-        // @ts-ignore - TODO: strict typing
-        resolvedModel, 
-        // @ts-ignore - TODO: strict typing
-        traceId, 
-        // @ts-ignore - TODO: strict typing
-        agentSessionId: parentAgentSessionId, 
-        // @ts-ignore - TODO: strict typing
-        maxWorkerIterations: clientMaxWorkerIter, 
-        // @ts-ignore - TODO: strict typing
-        minContextLength, 
-        // @ts-ignore - TODO: strict typing
-        workspaceRoot: coordinatorWorkspaceRoot, } = coordinatorCtx;
+        const { project, username, agent, providerName, resolvedModel, traceId, agentSessionId: parentAgentSessionId, maxWorkerIterations: clientMaxWorkerIter, minContextLength, workspaceRoot: coordinatorWorkspaceRoot, } = coordinatorCtx;
         // Resolve max worker iterations: 0 = unlimited (Infinity), positive = clamped 1-100, default = constant
         const resolvedMaxWorkerIterations = clientMaxWorkerIter === 0
             ? Infinity
@@ -485,13 +421,9 @@ export default class CoordinatorService {
             // instance with quant-level fallback for heterogeneous GPU setups.
             let instanceModelOverrides = new Map();
             if (siblings.length > 1) {
-                const { usable, modelOverrides } = await resolveModelForInstances(workerModel, 
-                // @ts-ignore - TODO: strict typing
-                siblings);
+                const { usable, modelOverrides } = await resolveModelForInstances(workerModel, siblings);
                 instanceModelOverrides = modelOverrides;
-                // @ts-ignore - TODO: strict typing
                 if (usable.length > 0) {
-                    // @ts-ignore - TODO: strict typing
                     siblings = usable;
                 }
                 else {
@@ -507,9 +439,7 @@ export default class CoordinatorService {
             //
             // instanceReservations prevents race conditions when multiple team_create
             // calls fire concurrently — the counter is incremented synchronously.
-            const assigned = selectAndReserveInstance(
-            // @ts-ignore - TODO: strict typing
-            siblings, providerName, instanceModelOverrides, workerModel);
+            const assigned = selectAndReserveInstance(siblings, providerName, instanceModelOverrides, workerModel);
             if (assigned) {
                 workerProvider = assigned.provider;
                 workerModel = assigned.model;
@@ -534,23 +464,16 @@ export default class CoordinatorService {
         // Derive the git repo path from worker files.
         // If files live under a git subdirectory (e.g. /workspace/projectA/),
         // use that as the worktree source. Otherwise fall back to workspace root.
-        // @ts-ignore - TODO: strict typing
         const repoPath = resolveRepoPath(workspaceRoot, files);
         // Attempt git worktree creation — best-effort
         // Non-git workspaces gracefully degrade to shared directory mode
         let worktreePath = null;
-        // @ts-ignore - TODO: strict typing
         const worktreeResult = await createWorktree(repoPath, branchName);
-        // @ts-ignore
         if (worktreeResult.error) {
-            // @ts-ignore
-            logger.warn(
-            // @ts-ignore
-            `[Coordinator] Worktree creation skipped for ${agentId}: ${worktreeResult.error}. Running in workspace root.`);
+            logger.warn(`[Coordinator] Worktree creation skipped for ${agentId}: ${worktreeResult.error}. Running in workspace root.`);
             worktreePath = workspaceRoot;
         }
         else {
-            // @ts-ignore
             worktreePath = worktreeResult.worktreePath;
         }
         const workerAgentSessionId = crypto.randomUUID();
@@ -559,11 +482,9 @@ export default class CoordinatorService {
             workerAgentSessionId,
             parentAgentSessionId,
             description,
-            // @ts-ignore
             branchName: worktreeResult.error ? null : branchName,
             worktreePath,
             repoPath,
-            // @ts-ignore
             isolated: !worktreeResult.error, // true if running in a worktree
             status: "running",
             output: "",
@@ -591,9 +512,7 @@ export default class CoordinatorService {
         logger.info(`[Coordinator] Spawned worker ${agentId}: "${description}" → ${workerProvider} (model="${workerModel}") in ${worktreePath}${workerState.isolated ? " (isolated worktree)" : " (shared workspace)"}`);
         // Emit early so the frontend can show live status immediately
         // (before the blocking loop starts and before a result is available)
-        // @ts-ignore - TODO: strict typing
         if (coordinatorCtx.emit) {
-            // @ts-ignore - TODO: strict typing
             coordinatorCtx.emit({
                 type: "worker_status",
                 workerId: agentId,
@@ -605,41 +524,29 @@ export default class CoordinatorService {
         // When multiple team_create calls appear in the same model response,
         // the agentic loop's Promise.all executes them concurrently.
         try {
-            await CoordinatorService._runWorkerLoop(workerState, 
-            // @ts-ignore - TODO: strict typing
-            prompt, coordinatorCtx);
+            await CoordinatorService._runWorkerLoop(workerState, prompt, coordinatorCtx);
         }
         catch (error) {
-            logger.error(
-            // @ts-ignore - TODO: strict typing
-            `[Coordinator] Worker ${agentId} loop error: ${error.message}`);
+            logger.error(`[Coordinator] Worker ${agentId} loop error: ${error.message}`);
             workerState.status = "failed";
-            // @ts-ignore - TODO: strict typing
             workerState.error = error.message;
             workerState.durationMs = Date.now() - workerState.startedAt;
             // Clean up worktree on failure to prevent orphaned branches
             if (workerState.isolated && workerState.worktreePath) {
-                await removeWorktree(
-                // @ts-ignore - TODO: strict typing
-                workerState.repoPath, workerState.worktreePath).catch((error) => logger.warn(`[Coordinator] Worktree cleanup failed for ${agentId}: ${error.message}`));
+                await removeWorktree(workerState.repoPath, workerState.worktreePath).catch((error) => logger.warn(`[Coordinator] Worktree cleanup failed for ${agentId}: ${error.message}`));
             }
             // Notify frontend immediately so the StatusBar stops showing "Generating..."
-            // @ts-ignore - TODO: strict typing
             if (coordinatorCtx.emit) {
-                // @ts-ignore - TODO: strict typing
                 coordinatorCtx.emit({
                     type: "worker_status",
                     workerId: agentId,
                     message: "failed",
-                    // @ts-ignore - TODO: strict typing
                     error: error.message,
                 });
             }
         }
         // Notify UI that worker state changed
-        // @ts-ignore - TODO: strict typing
         if (coordinatorCtx.emit) {
-            // @ts-ignore - TODO: strict typing
             coordinatorCtx.emit({ type: "status", message: "workers_updated" });
         }
         const workerResult = buildWorkerResult(workerState);
@@ -676,7 +583,6 @@ export default class CoordinatorService {
         worker.status = "running";
         worker.startedAt = Date.now();
         logger.info(`[Coordinator] Continuing worker ${agentId} with follow-up`);
-        // @ts-ignore - TODO: strict typing
         CoordinatorService._runWorkerLoop(worker, message, coordinatorCtx).catch((error) => {
             logger.error(`[Coordinator] Worker ${agentId} continuation error: ${error.message}`);
             worker.status = "failed";
@@ -752,7 +658,6 @@ export default class CoordinatorService {
         const stopped = [];
         const alreadyStopped = [];
         const cleanupPromises = [];
-        // @ts-ignore
         for (const [agentId, worker] of activeWorkers) {
             if (worker.parentAgentSessionId !== parentAgentSessionId)
                 continue;
@@ -766,9 +671,7 @@ export default class CoordinatorService {
                 logger.info(`[Coordinator] Aborted worker ${agentId} (parent session stopped)`);
                 // Queue worktree cleanup so orphaned worktrees don't accumulate
                 if (worker.isolated && worker.worktreePath) {
-                    cleanupPromises.push(
-                    // @ts-ignore - TODO: strict typing
-                    removeWorktree(worker.repoPath, worker.worktreePath)
+                    cleanupPromises.push(removeWorktree(worker.repoPath, worker.worktreePath)
                         .then(() => {
                         worker.worktreePath = null;
                     })
@@ -790,7 +693,6 @@ export default class CoordinatorService {
         // Remove all workers for this session from the in-memory Map.
         // Their state has been persisted to the agent session doc already,
         // and keeping them in the Map leads to unbounded growth.
-        // @ts-ignore
         for (const [agentId, worker] of activeWorkers) {
             if (worker.parentAgentSessionId === parentAgentSessionId) {
                 activeWorkers.delete(agentId);
@@ -824,7 +726,6 @@ export default class CoordinatorService {
   
   
      */
-    // @ts-ignore
     static listWorkers({ parentAgentSessionId } = {}) {
         let workers = Array.from(activeWorkers.values());
         if (parentAgentSessionId) {
@@ -837,11 +738,8 @@ export default class CoordinatorService {
             description: w.description,
             status: w.status,
             branchName: w.branchName,
-            // @ts-ignore - TODO: strict typing
             toolCallCount: w.toolCalls?.length || 0,
-            durationMs: 
-            // @ts-ignore - TODO: strict typing
-            w.status === "running" ? Date.now() - w.startedAt : w.durationMs,
+            durationMs: w.status === "running" ? Date.now() - w.startedAt : w.durationMs,
             totalCost: w.totalCost || null,
             usage: w.usage || null,
             traceId: w.traceId,
@@ -865,7 +763,6 @@ export default class CoordinatorService {
      */
     static cleanupSession(parentAgentSessionId) {
         let cleaned = 0;
-        // @ts-ignore
         for (const [agentId, worker] of activeWorkers) {
             if (worker.parentAgentSessionId === parentAgentSessionId) {
                 activeWorkers.delete(agentId);
@@ -913,28 +810,18 @@ export default class CoordinatorService {
         // synchronous reservation increment — so they all see 0 reservations
         // and pick the same instance. Fix: resolve model availability once,
         // then assign instances in a serial loop with synchronous increments.
-        // @ts-ignore
         const assignments = []; // { provider, model } per member
-        // @ts-ignore - TODO: strict typing
         if (localModelQueue.isLocal(providerName)) {
-            // @ts-ignore - TODO: strict typing
             const providerType = getInstanceType(providerName) || providerName;
-            // @ts-ignore - TODO: strict typing
             let siblings = getInstancesByType(providerType);
-            logger.info(
-            // @ts-ignore - TODO: strict typing
-            `[Coordinator] Team "${name}": providerName=${providerName}, providerType=${providerType}, siblings=${siblings.length} [${siblings.map((s) => `${s.id}(c=${s.concurrency})`).join(", ")}]`);
+            logger.info(`[Coordinator] Team "${name}": providerName=${providerName}, providerType=${providerType}, siblings=${siblings.length} [${siblings.map(((s) => `${s.id}(c=${s.concurrency})`)).join(", ")}]`);
             // Run model availability checks once for the entire team
             const defaultModel = resolvedModel;
             let instanceModelOverrides = new Map();
             if (siblings.length > 1) {
-                const { usable, modelOverrides } = await resolveModelForInstances(
-                // @ts-ignore - TODO: strict typing
-                defaultModel, siblings);
+                const { usable, modelOverrides } = await resolveModelForInstances(defaultModel, siblings);
                 instanceModelOverrides = modelOverrides;
-                // @ts-ignore - TODO: strict typing
                 if (usable.length > 0) {
-                    // @ts-ignore - TODO: strict typing
                     siblings = usable;
                 }
                 else {
@@ -951,9 +838,7 @@ export default class CoordinatorService {
                 // can't know valid GGUF identifiers and will hallucinate names.
                 // member.model overrides only work for cloud providers with well-known names.
                 const memberModel = defaultModel;
-                const assigned = selectAndReserveInstance(
-                // @ts-ignore - TODO: strict typing
-                siblings, providerName, instanceModelOverrides, memberModel);
+                const assigned = selectAndReserveInstance(siblings, providerName, instanceModelOverrides, memberModel);
                 if (assigned) {
                     assignments.push({
                         provider: assigned.provider,
@@ -976,42 +861,32 @@ export default class CoordinatorService {
             }
         }
         // Spawn all members in parallel — with pre-assigned instances
-        const results = await Promise.allSettled(
-        // @ts-ignore - TODO: strict typing
-        members.map((member, i) => CoordinatorService.spawnFromTool({
+        const results = await Promise.allSettled(members.map((member, i) => CoordinatorService.spawnFromTool({
             description: `[${name}] ${member.description}`,
             prompt: member.prompt,
             files: member.files,
             // For local providers, don't pass the LLM's model — the pre-assignment
             // already resolved the correct GGUF model identifier.
-            // @ts-ignore - TODO: strict typing
             model: localModelQueue.isLocal(providerName)
                 ? undefined
                 : member.model,
-            // @ts-ignore
             assignedProvider: assignments[i]?.provider || undefined,
-            // @ts-ignore
             assignedModel: assignments[i]?.model || undefined,
             coordinatorCtx,
         })));
         // Collect agentIds and results
-        // @ts-ignore - TODO: strict typing
         const memberResults = results.map((r, i) => {
             if (r.status === "fulfilled") {
                 return {
                     index: i,
-                    // @ts-ignore - TODO: strict typing
                     description: members[i].description,
-                    // @ts-ignore - TODO: strict typing
                     ...r.value,
                 };
             }
             return {
                 index: i,
-                // @ts-ignore - TODO: strict typing
                 description: members[i].description,
                 status: "failed",
-                // @ts-ignore - TODO: strict typing
                 error: r.reason?.message || "Unknown error",
             };
         });
@@ -1049,9 +924,7 @@ export default class CoordinatorService {
         }
         const stopResults = await Promise.allSettled(team.agentIds.map((agentId) => CoordinatorService.stopAgent(agentId)));
         CoordinatorService._activeTeams.delete(teamName);
-        const stopped = stopResults.filter(
-        // @ts-ignore - TODO: strict typing
-        (r) => r.status === "fulfilled" && r.value?.status === "stopped").length;
+        const stopped = stopResults.filter((r) => r.status === "fulfilled" && r.value?.status === "stopped").length;
         logger.info(`[Coordinator] Team "${teamName}" deleted: ${stopped}/${team.agentIds.length} stopped`);
         return {
             team: teamName,
@@ -1074,15 +947,12 @@ export default class CoordinatorService {
             ? `- Commit your changes when done and report what you accomplished`
             : `- Report what you accomplished when done`;
         const workerMessages = [
-            // @ts-ignore - TODO: strict typing
             ...worker.messages,
             {
                 role: "user",
                 content: `You are a worker agent in a multi-agent coding system.\n\n` +
                     `Your workspace is: ${worker.worktreePath}\n` +
-                    // @ts-ignore - TODO: strict typing
                     (worker.files?.length
-                        // @ts-ignore - TODO: strict typing
                         ? `Focus on files: ${worker.files.join(", ")}\n`
                         : "") +
                     `\nTask:\n${prompt}\n\n` +
@@ -1098,34 +968,25 @@ export default class CoordinatorService {
         // and `worker_status` with the worker's agentId for disambiguation.
         const parentEmit = coordinatorCtx.emit;
         let workerOutput = "";
-        // @ts-ignore
         const workerToolCalls = [];
-        // @ts-ignore
         let lastWorkerPhase = null;
-        // @ts-ignore
         let workerFirstChunkTime = null;
-        // @ts-ignore
         let workerLastChunkTime = null;
         let cumulativeOutputChars = 0; // total output characters across all bursts
         let burstOutputChars = 0; // output characters in current generation burst
-        // @ts-ignore
         let burstFirstChunkTime = null; // start of current burst
         const WORKER_PROGRESS_INTERVAL = 1; // emit on every chunk — LM Studio batches SSE deltas heavily under continuous batching
         let burstChunkCount = 0; // raw chunk count for interval gating only
         /** Estimate tokens from character count (~4 chars/token for English). */
-        const estimateTokens = (chars) => 
-        // @ts-ignore - TODO: strict typing
-        chars > 0 ? Math.ceil(chars / 4) : 0;
+        const estimateTokens = (chars) => chars > 0 ? Math.ceil(chars / 4) : 0;
         /** Build the generation_progress payload for the frontend. */
         const buildProgress = () => {
             // Compute per-worker tok/s from burst-scoped character accumulation.
             // This is the ONLY source of per-worker throughput — the
             // SessionGenerationTracker aggregates across all workers
             // and must NOT be used for individual worker display.
-            // @ts-ignore - TODO: strict typing
             const burstTokens = estimateTokens(burstOutputChars);
             let workerTokPerSec = null;
-            // @ts-ignore
             if (burstTokens > 1 && burstFirstChunkTime && workerLastChunkTime) {
                 const elapsedSec = (workerLastChunkTime - burstFirstChunkTime) / 1000;
                 if (elapsedSec > 0.1)
@@ -1137,14 +998,11 @@ export default class CoordinatorService {
                 message: "generation_progress",
                 // Burst-scoped values — used for tok/s computation
                 outputTokens: burstTokens,
-                // @ts-ignore
                 firstChunkTime: burstFirstChunkTime,
-                // @ts-ignore
                 lastChunkTime: workerLastChunkTime,
                 // Per-worker tok/s computed from burst counters
                 tokPerSec: workerTokPerSec,
                 // Cumulative total — used for token badge count
-                // @ts-ignore - TODO: strict typing
                 totalOutputTokens: estimateTokens(cumulativeOutputChars),
             };
         };
@@ -1160,13 +1018,11 @@ export default class CoordinatorService {
         const emitAggregateProgress = () => {
             if (!parentEmit || !parentSessionId)
                 return;
-            // @ts-ignore - TODO: strict typing
             const stats = SessionGenerationTracker.getSessionStats(parentSessionId);
             if (stats.totalOutputTokens > 0 || stats.activeRequests > 0) {
                 hwmOutputTokens = Math.max(hwmOutputTokens, stats.totalOutputTokens);
                 hwmInputTokens = Math.max(hwmInputTokens, stats.totalInputTokens);
                 hwmTotalTokens = Math.max(hwmTotalTokens, stats.totalTokens);
-                // @ts-ignore - TODO: strict typing
                 parentEmit({
                     type: "status",
                     message: "generation_progress",
@@ -1182,14 +1038,11 @@ export default class CoordinatorService {
         const workerEmit = (event) => {
             if (event.type === "chunk") {
                 workerOutput += event.content || "";
-                // @ts-ignore - TODO: strict typing
                 const chunkChars = (event.content || "").length;
                 // Reset burst counters on phase transition (thinking → generating)
                 // so each phase's tok/s is computed independently.
-                // @ts-ignore
                 if (lastWorkerPhase === "thinking" && burstOutputChars > 0) {
                     if (parentEmit) {
-                        // @ts-ignore - TODO: strict typing
                         parentEmit(buildProgress());
                         emitAggregateProgress();
                     }
@@ -1203,18 +1056,14 @@ export default class CoordinatorService {
                 // Use Date.now() (not performance.now()) since these timestamps
                 // cross process boundaries — the frontend needs wall-clock time
                 // to compute staleness and elapsed generation time correctly.
-                // @ts-ignore
                 if (!workerFirstChunkTime)
                     workerFirstChunkTime = Date.now();
-                // @ts-ignore
                 if (!burstFirstChunkTime)
                     burstFirstChunkTime = Date.now();
                 workerLastChunkTime = Date.now();
                 // Notify the frontend that the worker is actively generating text
-                // @ts-ignore
                 if (parentEmit && lastWorkerPhase !== "generating") {
                     lastWorkerPhase = "generating";
-                    // @ts-ignore - TODO: strict typing
                     parentEmit({
                         type: "worker_status",
                         workerId: worker.agentId,
@@ -1227,7 +1076,6 @@ export default class CoordinatorService {
                 const shouldEmit = burstChunkCount === 1 ||
                     burstChunkCount % WORKER_PROGRESS_INTERVAL === 0;
                 if (parentEmit && shouldEmit) {
-                    // @ts-ignore - TODO: strict typing
                     parentEmit(buildProgress());
                     // Also emit aggregate progress for the main token badges
                     emitAggregateProgress();
@@ -1237,14 +1085,11 @@ export default class CoordinatorService {
                 // Thinking IS active generation — the model is producing output
                 // tokens during reasoning. Track thinking characters in the same
                 // burst counters so per-worker tok/s is reported during thinking.
-                // @ts-ignore - TODO: strict typing
                 const thinkChars = (event.content || "").length;
                 // Reset burst counters on phase transition (generating → thinking)
                 // so each phase's tok/s is computed independently.
-                // @ts-ignore
                 if (lastWorkerPhase === "generating" && burstOutputChars > 0) {
                     if (parentEmit) {
-                        // @ts-ignore - TODO: strict typing
                         parentEmit(buildProgress());
                         emitAggregateProgress();
                     }
@@ -1255,18 +1100,14 @@ export default class CoordinatorService {
                 cumulativeOutputChars += thinkChars;
                 burstOutputChars += thinkChars;
                 burstChunkCount++;
-                // @ts-ignore
                 if (!workerFirstChunkTime)
                     workerFirstChunkTime = Date.now();
-                // @ts-ignore
                 if (!burstFirstChunkTime)
                     burstFirstChunkTime = Date.now();
                 workerLastChunkTime = Date.now();
                 // Notify the frontend that the worker is in the thinking phase
-                // @ts-ignore
                 if (parentEmit && lastWorkerPhase !== "thinking") {
                     lastWorkerPhase = "thinking";
-                    // @ts-ignore - TODO: strict typing
                     parentEmit({
                         type: "worker_status",
                         workerId: worker.agentId,
@@ -1278,7 +1119,6 @@ export default class CoordinatorService {
                 const shouldEmitThinking = burstChunkCount === 1 ||
                     burstChunkCount % WORKER_PROGRESS_INTERVAL === 0;
                 if (parentEmit && shouldEmitThinking) {
-                    // @ts-ignore - TODO: strict typing
                     parentEmit(buildProgress());
                     emitAggregateProgress();
                 }
@@ -1286,19 +1126,14 @@ export default class CoordinatorService {
             else if (event.type === "tool_execution") {
                 if (event.status === "calling") {
                     workerToolCalls.push({
-                        // @ts-ignore - TODO: strict typing
                         name: event.tool?.name,
-                        // @ts-ignore - TODO: strict typing
                         args: event.tool?.args,
                     });
                 }
                 // Emit final generation_progress before tool execution pauses generation
-                // @ts-ignore
                 if (parentEmit &&
-                    // @ts-ignore
                     lastWorkerPhase === "generating" &&
                     burstOutputChars > 0) {
-                    // @ts-ignore - TODO: strict typing
                     parentEmit(buildProgress());
                     emitAggregateProgress();
                 }
@@ -1310,7 +1145,6 @@ export default class CoordinatorService {
                 // Forward to parent SSE stream — namespaced so the frontend can
                 // distinguish worker tool calls from the coordinator's own
                 if (parentEmit) {
-                    // @ts-ignore - TODO: strict typing
                     parentEmit({
                         type: "worker_tool_execution",
                         workerId: worker.agentId,
@@ -1323,7 +1157,6 @@ export default class CoordinatorService {
             else if (event.type === "tool_output") {
                 // Forward streaming tool output (shell, python, etc.)
                 if (parentEmit) {
-                    // @ts-ignore - TODO: strict typing
                     parentEmit({
                         type: "worker_tool_output",
                         workerId: worker.agentId,
@@ -1341,7 +1174,6 @@ export default class CoordinatorService {
                         event.message === "workers_updated")) {
                     if (event.iteration)
                         worker.iterations = event.iteration;
-                    // @ts-ignore - TODO: strict typing
                     parentEmit({
                         type: "worker_status",
                         workerId: worker.agentId,
@@ -1359,7 +1191,6 @@ export default class CoordinatorService {
                 // emitted by emitAggregateProgress() as a top-level status event.
                 // Forward server-computed TTFT so the frontend can track per-worker and per-iteration TTFT
                 if (parentEmit && event.message === "generation_started") {
-                    // @ts-ignore - TODO: strict typing
                     parentEmit({
                         type: "worker_status",
                         workerId: worker.agentId,
@@ -1371,7 +1202,6 @@ export default class CoordinatorService {
                 // Include the label text so worker StatusBars can show progress %
                 if (parentEmit && event.phase) {
                     lastWorkerPhase = event.phase;
-                    // @ts-ignore - TODO: strict typing
                     parentEmit({
                         type: "worker_status",
                         workerId: worker.agentId,
@@ -1397,21 +1227,15 @@ export default class CoordinatorService {
                     const finalTokPerSec = event.tokensPerSec || null;
                     // Use provider-reported output tokens (authoritative) when available,
                     // fall back to chars/4 estimation from accumulated characters.
-                    // @ts-ignore - TODO: strict typing
                     const estimatedOutput = estimateTokens(cumulativeOutputChars);
-                    // @ts-ignore - TODO: strict typing
                     const finalOutputTokens = event.usage.outputTokens || estimatedOutput;
-                    // @ts-ignore - TODO: strict typing
                     const burstTokens = estimateTokens(burstOutputChars);
-                    // @ts-ignore - TODO: strict typing
                     parentEmit({
                         type: "worker_status",
                         workerId: worker.agentId,
                         message: "generation_progress",
                         outputTokens: burstTokens || finalOutputTokens,
-                        // @ts-ignore
                         firstChunkTime: burstFirstChunkTime || workerFirstChunkTime,
-                        // @ts-ignore
                         lastChunkTime: workerLastChunkTime || Date.now(),
                         tokPerSec: finalTokPerSec,
                         totalOutputTokens: finalOutputTokens,
@@ -1424,7 +1248,6 @@ export default class CoordinatorService {
                 // directly to the parent SSE stream so the frontend can accumulate
                 // them into the session token badge in real-time.
                 if (parentEmit) {
-                    // @ts-ignore - TODO: strict typing
                     parentEmit(event);
                 }
             }
@@ -1437,37 +1260,28 @@ export default class CoordinatorService {
         let workerEnabledTools;
         if (worker.agent) {
             const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.js");
-            // @ts-ignore - TODO: strict typing
             const persona = AgentPersonaRegistry.get(worker.agent);
             if (persona?.enabledTools) {
                 // Inherit the parent's persona-scoped tools
                 workerEnabledTools = persona.enabledTools;
             }
         }
-        // @ts-ignore - TODO: strict typing
         if (!workerEnabledTools) {
             // Default: all tools minus coordinator-only (for coding agents)
             const allSchemas = ToolOrchestratorService.getToolSchemas();
             const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
-            // @ts-ignore - TODO: strict typing
             workerEnabledTools = allSchemas
-                // @ts-ignore - TODO: strict typing
-                .map((t) => t.name)
-                // @ts-ignore - TODO: strict typing
+                .map(((t) => t.name))
                 .filter((name) => !coordinatorSet.has(name));
         }
-        // @ts-ignore - TODO: strict typing
         const workerProvider = getProvider(worker.providerName);
         const { getModelByName } = await import("../config.js");
-        // @ts-ignore - TODO: strict typing
         const workerModelDef = getModelByName(worker.resolvedModel);
         let loopResult;
         try {
             loopResult = await AgenticLoopService.runAgenticLoop({
                 provider: workerProvider,
-                // @ts-ignore - TODO: strict typing
                 providerName: worker.providerName,
-                // @ts-ignore - TODO: strict typing
                 resolvedModel: worker.resolvedModel,
                 modelDef: workerModelDef,
                 messages: workerMessages,
@@ -1477,34 +1291,23 @@ export default class CoordinatorService {
                     enabledTools: workerEnabledTools,
                     maxIterations: worker.maxIterations,
                     maxTokens: 8192,
-                    // @ts-ignore - TODO: strict typing
                     ...(worker.minContextLength && {
                         minContextLength: worker.minContextLength,
                     }),
                 },
-                // @ts-ignore - TODO: strict typing
                 agentSessionId: worker.workerAgentSessionId,
-                // @ts-ignore - TODO: strict typing
                 parentAgentSessionId: worker.parentAgentSessionId,
-                // @ts-ignore - TODO: strict typing
                 traceId: worker.traceId,
-                // @ts-ignore - TODO: strict typing
                 project: worker.project,
-                // @ts-ignore - TODO: strict typing
                 username: worker.username,
-                // @ts-ignore - TODO: strict typing
                 agent: worker.agent,
                 requestStart: performance.now(),
                 emit: workerEmit,
-                // @ts-ignore - TODO: strict typing
                 signal: worker.abortController.signal,
             });
         }
         catch (error) {
-            if (
-            // @ts-ignore - TODO: strict typing
-            error.name === "AbortError" ||
-                // @ts-ignore - TODO: strict typing
+            if (error.name === "AbortError" ||
                 worker.abortController.signal.aborted) {
                 worker.status = "stopped";
             }
@@ -1515,15 +1318,11 @@ export default class CoordinatorService {
         // Capture the full conversation from the loop (includes all assistant
         // responses, tool calls, and results). Falls back to the initial
         // workerMessages on error/abort paths where the loop didn't return.
-        // @ts-ignore - TODO: strict typing
         const finalMessages = loopResult?.messages || workerMessages;
         // Always populate — including on abort/error paths
-        // @ts-ignore - TODO: strict typing
         worker.output = getLastAssistantText(finalMessages) || workerOutput;
-        // @ts-ignore
         worker.toolCalls = workerToolCalls;
         worker.messages = finalMessages;
-        // @ts-ignore - TODO: strict typing
         worker.durationMs = Date.now() - worker.startedAt;
         // Stage and commit changes in the worktree
         await toolsApiPost("/agentic/command/run", {
@@ -1535,10 +1334,7 @@ export default class CoordinatorService {
             cwd: worker.worktreePath,
         });
         // Collect diff
-        const diffResult = await getWorktreeDiff(
-        // @ts-ignore - TODO: strict typing
-        worker.repoPath, worker.branchName);
-        // @ts-ignore
+        const diffResult = await getWorktreeDiff(worker.repoPath, worker.branchName);
         worker.diff = diffResult.error ? null : diffResult;
         worker.status = "complete";
         // ── Release heavy data from completed workers ──────────────
@@ -1550,14 +1346,12 @@ export default class CoordinatorService {
         // Remove worktree now that the diff has been collected — prevents orphaned
         // worktrees from accumulating on disk across sessions.
         if (worker.isolated && worker.worktreePath) {
-            // @ts-ignore - TODO: strict typing
             await removeWorktree(worker.repoPath, worker.worktreePath).catch((error) => logger.warn(`[Coordinator] Post-completion worktree cleanup failed for ${worker.agentId}: ${error.message}`));
         }
         // Notify frontend immediately so the per-worker StatusBar updates
         // from "Generating..." to a completed state. Each worker finishes
         // independently — can't wait for the parent's `workers_updated` event.
         if (parentEmit) {
-            // @ts-ignore - TODO: strict typing
             parentEmit({
                 type: "worker_status",
                 workerId: worker.agentId,
@@ -1590,7 +1384,6 @@ export default class CoordinatorService {
                 w.status === "running");
             if (othersOnSameInstance.length === 0) {
                 try {
-                    // @ts-ignore - TODO: strict typing
                     const workerProviderObj = getProvider(workerInstanceId);
                     if (workerProviderObj?.unloadModelByKey) {
                         logger.info(`[Coordinator] VRAM eviction: unloading "${worker.resolvedModel}" from secondary instance ${workerInstanceId} (no active workers remain)`);
@@ -1600,7 +1393,6 @@ export default class CoordinatorService {
                     }
                 }
                 catch (error) {
-                    // @ts-ignore - TODO: strict typing
                     logger.warn(`[Coordinator] VRAM eviction error: ${error.message}`);
                 }
             }
@@ -1622,9 +1414,7 @@ export default class CoordinatorService {
      * @returns {Promise<object>} Decomposed plan with sub-tasks
      */
     static async decompose({ task, files, repoPath, endpoint, agentSessionId, }) {
-        // @ts-ignore - TODO: strict typing
         const provider = getProvider(DECOMPOSITION_PROVIDER);
-        // @ts-ignore - TODO: strict typing
         const userMessage = `Task: ${task}\n\nTarget files:\n${files.map((f) => `- ${f}`).join("\n")}`;
         const messages = [
             { role: "system", content: DECOMPOSITION_PROMPT },
@@ -1661,9 +1451,7 @@ export default class CoordinatorService {
             errorMessage: llmError,
             requestStartMs: requestStart,
             extraRequestPayload: {
-                // @ts-ignore - TODO: strict typing
                 task: task.slice(0, 200),
-                // @ts-ignore - TODO: strict typing
                 fileCount: files.length,
             },
         });
@@ -1676,7 +1464,6 @@ export default class CoordinatorService {
         }
         // Validate and cap sub-tasks
         const subTasks = (parsed.subTasks || []).slice(0, MAX_WORKERS);
-        // @ts-ignore
         for (const st of subTasks) {
             if (!st.id)
                 st.id = `task-${crypto.randomUUID().slice(0, 8)}`;
@@ -1685,7 +1472,6 @@ export default class CoordinatorService {
         return {
             taskId: crypto.randomUUID(),
             task,
-            // @ts-ignore
             repoPath: repoPath || getDefaultWorkspaceRoot(),
             subTasks,
             summary: parsed.summary || `Decomposed into ${subTasks.length} sub-tasks`,
@@ -1708,7 +1494,6 @@ export default class CoordinatorService {
             taskId,
             status: "executing",
             repoPath,
-            // @ts-ignore - TODO: strict typing
             workers: subTasks.map((st) => ({
                 id: st.id,
                 files: st.files,
@@ -1724,25 +1509,15 @@ export default class CoordinatorService {
         activeTasks.set(taskId, taskState);
         try {
             // Phase 1: Create all worktrees
-            logger.info(
-            // @ts-ignore - TODO: strict typing
-            `[Coordinator] Creating ${subTasks.length} worktrees for task ${taskId}`);
-            // @ts-ignore
+            logger.info(`[Coordinator] Creating ${subTasks.length} worktrees for task ${taskId}`);
             for (const worker of taskState.workers) {
-                // @ts-ignore - TODO: strict typing
                 const result = await createWorktree(repoPath, worker.branchName);
-                // @ts-ignore
                 if (result.error) {
                     worker.status = "error";
-                    // @ts-ignore
                     worker.error = `Worktree creation failed: ${result.error}`;
-                    // @ts-ignore
-                    logger.error(
-                    // @ts-ignore
-                    `[Coordinator] Worker ${worker.id} worktree failed: ${result.error}`);
+                    logger.error(`[Coordinator] Worker ${worker.id} worktree failed: ${result.error}`);
                     continue;
                 }
-                // @ts-ignore
                 worker.worktreePath = result.worktreePath;
                 worker.status = "ready";
             }
@@ -1751,17 +1526,12 @@ export default class CoordinatorService {
             logger.info(`[Coordinator] Running ${readyWorkers.length} workers in parallel`);
             const workerPromises = readyWorkers.map((worker) => CoordinatorService._runPanelWorker(worker, {
                 repoPath,
-                // @ts-ignore
                 provider: options.provider,
-                // @ts-ignore
                 model: options.model,
-                // @ts-ignore
                 project: options.project,
-                // @ts-ignore
                 username: options.username,
                 onProgress: (update) => {
                     Object.assign(worker, update);
-                    // @ts-ignore
                     options.onProgress?.(taskId, taskState.workers);
                 },
             }));
@@ -1769,14 +1539,10 @@ export default class CoordinatorService {
             // Phase 3: Collect diffs from completed workers
             const completedWorkers = taskState.workers.filter((w) => w.status === "complete");
             logger.info(`[Coordinator] ${completedWorkers.length}/${taskState.workers.length} workers completed`);
-            // @ts-ignore
             for (const worker of completedWorkers) {
-                // @ts-ignore - TODO: strict typing
                 const diffResult = await getWorktreeDiff(repoPath, worker.branchName);
-                // @ts-ignore
                 if (diffResult.error) {
                     worker.diff = null;
-                    // @ts-ignore
                     worker.error = `Diff retrieval failed: ${diffResult.error}`;
                 }
                 else {
@@ -1784,7 +1550,6 @@ export default class CoordinatorService {
                 }
             }
             taskState.status = "review";
-            // @ts-ignore
             options.onProgress?.(taskId, taskState.workers);
             return {
                 taskId,
@@ -1796,9 +1561,7 @@ export default class CoordinatorService {
         }
         catch (error) {
             taskState.status = "error";
-            // @ts-ignore - TODO: strict typing
             logger.error(`[Coordinator] Task ${taskId} failed: ${error.message}`);
-            // @ts-ignore - TODO: strict typing
             return { error: error.message, taskId };
         }
     }
@@ -1808,7 +1571,6 @@ export default class CoordinatorService {
      */
     static async _runPanelWorker(worker, { repoPath: _repoPath, provider: providerName, model, project, username, onProgress, }) {
         worker.status = "running";
-        // @ts-ignore - TODO: strict typing
         onProgress?.({ status: "running" });
         try {
             const { default: AgenticLoopService } = await import("./AgenticLoopService.js");
@@ -1817,7 +1579,6 @@ export default class CoordinatorService {
                     role: "user",
                     content: `You are a worker agent in a multi-agent refactoring task.\n\n` +
                         `Your workspace is: ${worker.worktreePath}\n` +
-                        // @ts-ignore - TODO: strict typing
                         `You are working on files: ${worker.files.join(", ")}\n\n` +
                         `Task:\n${worker.instruction}\n\n` +
                         `Important:\n` +
@@ -1827,7 +1588,6 @@ export default class CoordinatorService {
                 },
             ];
             let workerOutput = "";
-            // @ts-ignore
             const workerToolCalls = [];
             const workerEmit = (event) => {
                 if (event.type === "chunk") {
@@ -1836,38 +1596,26 @@ export default class CoordinatorService {
                 else if (event.type === "tool_execution" &&
                     event.status === "calling") {
                     workerToolCalls.push({
-                        // @ts-ignore - TODO: strict typing
                         name: event.tool?.name,
-                        // @ts-ignore - TODO: strict typing
                         args: event.tool?.args,
                     });
                 }
-                // @ts-ignore - TODO: strict typing
                 onProgress?.({ toolCallCount: workerToolCalls.length });
             };
             // Build enabled tools — exclude coordinator tools
             const allSchemas = ToolOrchestratorService.getToolSchemas();
             const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
             const workerEnabledTools = allSchemas
-                // @ts-ignore - TODO: strict typing
-                .map((t) => t.name)
-                // @ts-ignore - TODO: strict typing
+                .map(((t) => t.name))
                 .filter((name) => !coordinatorSet.has(name));
             let resolvedProviderName = providerName || DECOMPOSITION_PROVIDER;
             let resolvedModel = model || COORDINATOR_DECOMPOSITION_MODEL;
             // Local model guard with instance pooling — same logic as spawnFromTool:
             // distribute workers across all instances of the same type.
-            // @ts-ignore - TODO: strict typing
             if (localModelQueue.isLocal(resolvedProviderName)) {
-                const providerType = 
-                // @ts-ignore - TODO: strict typing
-                getInstanceType(resolvedProviderName) || resolvedProviderName;
-                // @ts-ignore - TODO: strict typing
+                const providerType = getInstanceType(resolvedProviderName) || resolvedProviderName;
                 const siblings = getInstancesByType(providerType);
-                const totalSlots = siblings.reduce(
-                // @ts-ignore - TODO: strict typing
-                (sum, inst) => sum + inst.concurrency, 0);
-                // @ts-ignore - TODO: strict typing
+                const totalSlots = siblings.reduce((sum, inst) => sum + inst.concurrency, 0);
                 if (totalSlots <= 1) {
                     const panelFallback = await getWorkerFallback();
                     if (panelFallback) {
@@ -1883,9 +1631,7 @@ export default class CoordinatorService {
                     // Fill-first: saturate each instance in declaration order
                     // before spilling to the next (matches PROVIDER_* array order)
                     let bestInstance = null;
-                    // @ts-ignore
                     for (const inst of siblings) {
-                        // @ts-ignore - TODO: strict typing
                         const active = localModelQueue._getQueue(inst.id).activeCount;
                         const available = inst.concurrency - active;
                         if (available > 0) {
@@ -1899,33 +1645,26 @@ export default class CoordinatorService {
                     }
                 }
             }
-            // @ts-ignore - TODO: strict typing
             const workerProvider = getProvider(resolvedProviderName);
             const { getModelByName } = await import("../config.js");
-            // @ts-ignore - TODO: strict typing
             const workerModelDef = getModelByName(resolvedModel);
             const abortController = createAbortController();
             worker.abortController = abortController;
             await AgenticLoopService.runAgenticLoop({
                 provider: workerProvider,
-                // @ts-ignore - TODO: strict typing
                 providerName: resolvedProviderName,
-                // @ts-ignore - TODO: strict typing
                 resolvedModel,
                 modelDef: workerModelDef,
                 messages: workerMessages,
                 options: {
                     autoApprove: true,
                     agenticLoopEnabled: true,
-                    // @ts-ignore - TODO: strict typing
                     enabledTools: workerEnabledTools,
                     maxIterations: MAX_WORKER_ITERATIONS,
                     maxTokens: 8192,
                 },
                 agentSessionId: `panel-worker-${worker.id}`,
-                // @ts-ignore - TODO: strict typing
                 project: project || null,
-                // @ts-ignore - TODO: strict typing
                 username: username || "system",
                 requestStart: performance.now(),
                 emit: workerEmit,
@@ -1941,22 +1680,16 @@ export default class CoordinatorService {
                 cwd: worker.worktreePath,
             });
             worker.status = "complete";
-            // @ts-ignore
             worker.toolCalls = workerToolCalls;
             worker.output = workerOutput;
-            // @ts-ignore - TODO: strict typing
             onProgress?.({ status: "complete" });
             logger.info(`[Coordinator] Panel worker ${worker.id} completed (${workerToolCalls.length} tool calls)`);
         }
         catch (error) {
             worker.status = "error";
-            // @ts-ignore - TODO: strict typing
             worker.error = error.message;
-            // @ts-ignore - TODO: strict typing
             onProgress?.({ status: "error", error: error.message });
-            logger.error(
-            // @ts-ignore - TODO: strict typing
-            `[Coordinator] Panel worker ${worker.id} failed: ${error.message}`);
+            logger.error(`[Coordinator] Panel worker ${worker.id} failed: ${error.message}`);
         }
     }
     /**
@@ -1971,20 +1704,13 @@ export default class CoordinatorService {
             return { error: "Task not found" };
         if (task.status !== "review")
             return { error: `Task is in '${task.status}' state, not 'review'` };
-        const completedWorkers = task.workers.filter(
-        // @ts-ignore - TODO: strict typing
-        (w) => w.status === "complete" && w.diff?.hasChanges);
+        const completedWorkers = task.workers.filter((w) => w.status === "complete" && w.diff?.hasChanges);
         const results = [];
-        // @ts-ignore
         for (const worker of completedWorkers) {
-            const mergeResult = await mergeWorktree(
-            // @ts-ignore
-            task.repoPath || getDefaultWorkspaceRoot(), worker.branchName, `[coordinator] ${worker.id}: ${worker.instruction.slice(0, 80)}`);
+            const mergeResult = await mergeWorktree(task.repoPath || getDefaultWorkspaceRoot(), worker.branchName, `[coordinator] ${worker.id}: ${worker.instruction.slice(0, 80)}`);
             results.push({
                 workerId: worker.id,
-                // @ts-ignore
                 merged: !mergeResult.error,
-                // @ts-ignore
                 error: mergeResult.error || null,
             });
         }
@@ -2004,7 +1730,6 @@ export default class CoordinatorService {
         if (!task)
             return { error: "Task not found" };
         // Abort running workers
-        // @ts-ignore
         for (const worker of task.workers) {
             if (worker.abortController) {
                 worker.abortController.abort();
@@ -2026,9 +1751,7 @@ export default class CoordinatorService {
         const task = activeTasks.get(taskId);
         if (!task)
             return;
-        // @ts-ignore
         const repoPath = task.repoPath || getDefaultWorkspaceRoot();
-        // @ts-ignore
         for (const worker of task.workers) {
             if (worker.worktreePath) {
                 await removeWorktree(repoPath, worker.worktreePath);
@@ -2055,7 +1778,6 @@ export default class CoordinatorService {
         return Array.from(activeTasks.values()).map((t) => ({
             taskId: t.taskId,
             status: t.status,
-            // @ts-ignore - TODO: strict typing
             workerCount: t.workers.length,
             startedAt: t.startedAt,
         }));

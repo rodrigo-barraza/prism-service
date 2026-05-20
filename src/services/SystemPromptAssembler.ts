@@ -452,6 +452,7 @@ export default class SystemPromptAssembler {
         const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
         const workerTools = allSchemas
                     .map(((t: any) => t.name as any as (value: any, index: number, array: any[]) => any))
+                    // @ts-ignore - TODO: strict typing
                     .filter((name: string) => !coordinatorSet.has(name));
                 sections.push((getCoordinatorPromptAddendum as any)({ workerTools }));
       }

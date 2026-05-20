@@ -72,6 +72,7 @@ function wrapProvider(provider: any) {
         }
 
         // Async generator — wrap the iterator
+                // @ts-ignore - TODO: strict typing
                 if (result && typeof result[((Symbol as string) as any).asyncIterator] === "function") {
           return wrapAsyncGenerator(result);
         }

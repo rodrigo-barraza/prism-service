@@ -1,9 +1,9 @@
 declare const providers: {
     openai: {
         name: string;
-        generateText(messages: import("./openai.ts").OpenAIMsg[], model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<Record<string, unknown>>;
-        _generateTextResponses(messages: import("./openai.ts").OpenAIMsg[], model: string, options: import("../types/ProviderTypes.ts").ProviderOptions): Promise<Record<string, unknown>>;
-        _generateTextChatCompletions(messages: import("./openai.ts").OpenAIMsg[], model: string, options: import("../types/ProviderTypes.ts").ProviderOptions): Promise<Record<string, unknown>>;
+        generateText(messages: import("./openai.ts").OpenAIMsg[], model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<any>;
+        _generateTextResponses(messages: import("./openai.ts").OpenAIMsg[], model: string, options: import("../types/ProviderTypes.ts").ProviderOptions): Promise<any>;
+        _generateTextChatCompletions(messages: import("./openai.ts").OpenAIMsg[], model: string, options: import("../types/ProviderTypes.ts").ProviderOptions): Promise<any>;
         generateTextStream(messages: import("./openai.ts").OpenAIMsg[], model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): AsyncGenerator<string | {
             type: string;
             content: string;
@@ -220,7 +220,7 @@ declare const providers: {
             imageData: string;
             mimeType?: string;
         }>, model?: string): Promise<{
-            imageData: {};
+            imageData: any;
             mimeType: string;
             text: string;
         }>;
@@ -263,12 +263,12 @@ declare const providers: {
     };
     google: {
         name: string;
-        generateText(messages: import("./google.ts").ConversationMsg[], model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<Record<string, unknown>>;
+        generateText(messages: import("./google.ts").ConversationMsg[], model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<any>;
         generateTextStream(messages: import("./google.ts").ConversationMsg[], model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): AsyncGenerator<string | {
             type: string;
             id: string;
             name: string;
-            args: Record<string, unknown>;
+            args: any;
             thoughtSignature: string | undefined;
             content?: undefined;
             data?: undefined;
@@ -390,7 +390,7 @@ declare const providers: {
             type: string;
             id: string | undefined;
             name: string | undefined;
-            args: Record<string, unknown> | undefined;
+            args: any;
             thoughtSignature: string | undefined;
             content?: undefined;
             usage?: undefined;
@@ -446,29 +446,15 @@ declare const providers: {
                 outputTokens: number;
             };
         }>;
-        generateEmbedding(content: unknown, model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<{
+        generateEmbedding(content: any, model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<{
             embedding: number[];
             dimensions: number;
         }>;
     };
-    elevenlabs: {
-        name: string;
-        generateSpeech(text: Record<string, unknown>, voiceId?: Record<string, unknown>, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<{
-            stream: import("node:stream/web").ReadableStream<any> | null;
-            contentType: string;
-        }>;
-        generateSpeechStream(textStream: Record<string, unknown>, voiceId?: Record<string, unknown>, options?: import("../types/ProviderTypes.ts").ProviderOptions): AsyncGenerator<Buffer<ArrayBufferLike>, void, unknown>;
-    };
-    inworld: {
-        name: string;
-        generateSpeech(text: Record<string, unknown>, voice?: Record<string, unknown>, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<{
-            stream: import("node:stream").Readable;
-            contentType: string;
-        }>;
-        generateSpeechStream(textStream: Record<string, unknown>, voice?: Record<string, unknown>, options?: import("../types/ProviderTypes.ts").ProviderOptions): AsyncGenerator<Buffer<ArrayBuffer>, void, unknown>;
-    };
+    elevenlabs: any;
+    inworld: any;
 };
-export declare function getProvider(name: Record<string, unknown>): any;
+export declare function getProvider(name: any): any;
 export declare function listProviders(): string[];
 export { providers };
 //# sourceMappingURL=index.d.ts.map

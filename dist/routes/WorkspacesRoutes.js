@@ -1,8 +1,6 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import { basename } from "node:path";
-// @ts-ignore
 import { TOOLS_SERVICE_URL } from "../../config.js";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.js";
 import logger from "../utils/logger.js";
@@ -27,7 +25,6 @@ router.get("/", asyncHandler(async (_req, res) => {
         const staticRoots = ToolOrchestratorService.getStaticRoots();
         const workspaces = roots.map((rootPath) => ({
             id: rootPath,
-            // @ts-ignore - TODO: strict typing
             name: basename(rootPath),
             path: rootPath,
             isPinned: staticRoots.includes(rootPath),
@@ -35,7 +32,6 @@ router.get("/", asyncHandler(async (_req, res) => {
         res.json(workspaces);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /workspaces error: ${error.message}`);
         res.status(500).json({ error: "Failed to retrieve workspace roots" });
     }
@@ -58,27 +54,21 @@ router.get("/full", asyncHandler(async (_req, res) => {
             });
             if (configRes.ok) {
                 const config = await configRes.json();
-                // @ts-ignore
                 agents = config.agents || [];
             }
         }
         catch (agentErr) {
-            logger.warn(
-            // @ts-ignore - TODO: strict typing
-            `GET /workspaces/full agent fetch failed: ${agentErr.message}`);
+            logger.warn(`GET /workspaces/full agent fetch failed: ${agentErr.message}`);
         }
         // Build a set of agent-served roots for quick lookup
         const agentRootSet = new Set();
-        // @ts-ignore
         for (const agent of agents) {
-            // @ts-ignore
             for (const root of agent.roots || []) {
                 agentRootSet.add(root);
             }
         }
         const workspaces = roots.map((rootPath) => ({
             id: rootPath,
-            // @ts-ignore - TODO: strict typing
             name: basename(rootPath),
             path: rootPath,
             isPinned: staticRoots.includes(rootPath),
@@ -87,7 +77,6 @@ router.get("/full", asyncHandler(async (_req, res) => {
         res.json({ workspaces, agents, staticRoots });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /workspaces/full error: ${error.message}`);
         res
             .status(500)
@@ -106,7 +95,6 @@ router.put("/", asyncHandler(async (req, res) => {
         res.json(result);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`PUT /workspaces error: ${error.message}`);
         res.status(500).json({ error: "Failed to update workspace roots" });
     }
@@ -122,7 +110,6 @@ router.post("/validate", asyncHandler(async (req, res) => {
         res.json(result);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`POST /workspaces/validate error: ${error.message}`);
         res.status(500).json({ error: "Failed to validate workspace path" });
     }
@@ -146,16 +133,13 @@ router.get("/tree", asyncHandler(async (req, res) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 path: workspacePath,
-                // @ts-ignore - TODO: strict typing
                 maxDepth: maxDepth ? parseInt(maxDepth, 10) : 3,
             }),
             signal: AbortSignal.timeout(10_000),
         });
         if (!toolsRes.ok) {
             const errorBody = await toolsRes.json().catch(() => ({}));
-            // @ts-ignore
             return res.status(toolsRes.status).json({
-                // @ts-ignore
                 error: errorBody.error || `tools-service returned ${toolsRes.status}`,
             });
         }
@@ -163,7 +147,6 @@ router.get("/tree", asyncHandler(async (req, res) => {
         res.json(result);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /workspaces/tree error: ${error.message}`);
         res.status(500).json({ error: "Failed to fetch workspace tree" });
     }

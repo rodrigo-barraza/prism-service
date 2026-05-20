@@ -1,7 +1,5 @@
 import MongoWrapper from "../wrappers/MongoWrapper.js";
-// @ts-ignore
 import { deepMerge } from "@rodrigo-barraza/utilities-library";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.js";
 import { COLLECTIONS } from "../constants.js";
 import logger from "../utils/logger.js";
@@ -24,7 +22,6 @@ const DEFAULTS = {
 // ─── In-memory cache ──────────────────────────────────────────────────────────
 // Hot path: MemoryService + EmbeddingService read these on every call.
 // Cache is invalidated on update() and lazily populated on first get().
-// @ts-ignore
 let _cache = null;
 // ─── Service ──────────────────────────────────────────────────────────────────
 /**
@@ -40,7 +37,6 @@ const SettingsService = {
   
      */
     async get() {
-        // @ts-ignore
         if (_cache)
             return _cache;
         const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTIONS.SETTINGS);
@@ -62,7 +58,6 @@ const SettingsService = {
      */
     async getSection(section) {
         const settings = await this.get();
-        // @ts-ignore
         return settings[section] || DEFAULTS[section] || {};
     },
     /**
@@ -100,7 +95,6 @@ const SettingsService = {
      * @returns {Promise<{ provider: string, model: string }>}
      */
     async getMemoryModelConfig(role) {
-        // @ts-ignore - TODO: strict typing
         const mem = await this.getSection("memory");
         const provider = mem[`${role}Provider`];
         const model = mem[`${role}Model`];

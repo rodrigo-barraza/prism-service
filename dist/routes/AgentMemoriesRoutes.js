@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import MemoryService from "../services/MemoryService.js";
@@ -38,7 +37,6 @@ router.post("/", asyncHandler(async (req, res, next) => {
         res.json(safe);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`[agent-memories] POST ${error.message}`);
         next(error);
     }
@@ -52,15 +50,12 @@ router.get("/", asyncHandler(async (req, res, next) => {
     try {
         const project = req.project;
         const agent = req.query.agent || null;
-        // @ts-ignore - TODO: strict typing
         const limit = parseInt(req.query.limit) || 100;
-        // @ts-ignore - TODO: strict typing
         const skip = parseInt(req.query.skip) || 0;
         const result = await MemoryService.list({ agent, project, limit, skip });
         res.json(result);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`[agent-memories] ${error.message}`);
         next(error);
     }
@@ -71,7 +66,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
  */
 router.delete("/:id", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const deleted = await MemoryService.remove(req.params.id);
         if (!deleted) {
             return res.status(404).json({ error: "Memory not found" });
@@ -79,7 +73,6 @@ router.delete("/:id", asyncHandler(async (req, res, next) => {
         res.json({ success: true });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`[agent-memories] DELETE ${error.message}`);
         next(error);
     }
@@ -95,7 +88,6 @@ router.get("/discover", asyncHandler(async (req, res, next) => {
         res.json({ combos });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`[agent-memories] DISCOVER ${error.message}`);
         next(error);
     }
@@ -107,15 +99,11 @@ router.get("/discover", asyncHandler(async (req, res, next) => {
 router.get("/consolidation-history", asyncHandler(async (req, res, next) => {
     try {
         const project = req.project;
-        // @ts-ignore - TODO: strict typing
         const limit = parseInt(req.query.limit) || 10;
-        const history = await MemoryConsolidationService.getHistory(
-        // @ts-ignore - TODO: strict typing
-        project, limit);
+        const history = await MemoryConsolidationService.getHistory(project, limit);
         res.json({ history });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`[agent-memories] HISTORY ${error.message}`);
         next(error);
     }
@@ -139,7 +127,6 @@ router.post("/consolidate", asyncHandler(async (req, res, next) => {
         res.json(result);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`[agent-memories] CONSOLIDATE ${error.message}`);
         next(error);
     }

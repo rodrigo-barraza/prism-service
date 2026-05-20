@@ -7,7 +7,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -17,6 +17,6 @@
     "rewriteRelativeImportExtensions": true,
     "lib": ["ES2022"]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "boot.ts", "config.ts"],
   "exclude": ["node_modules", "dist", "tests"]
 }

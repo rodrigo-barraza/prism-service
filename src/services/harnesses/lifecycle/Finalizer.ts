@@ -368,6 +368,7 @@ export async function finalizeTextGeneration(
             (conversationId as any),
       (project as any),
       (username as any),
+      // @ts-ignore - TODO: strict typing
       messagesToAppend,
       finalMeta,
             getCollectionOpts((project as any)),

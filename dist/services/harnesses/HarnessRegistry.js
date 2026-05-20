@@ -12,7 +12,6 @@ function register(HarnessClass) {
     registry.set(HarnessClass.id, HarnessClass);
 }
 // ── Built-in harnesses ───────────────────────────────────────
-// @ts-ignore - TODO: strict typing
 register(ReActHarness);
 // Future: register(SingleShotHarness);
 // Future: register(PlanExecuteHarness);

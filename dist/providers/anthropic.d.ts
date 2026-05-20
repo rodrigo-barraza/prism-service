@@ -12,7 +12,7 @@ export interface AnthropicBlock {
     };
     id?: string;
     name?: string;
-    input?: Record<string, unknown>;
+    input?: any;
     tool_use_id?: string;
     content?: string | AnthropicBlock[];
     citations?: Array<{

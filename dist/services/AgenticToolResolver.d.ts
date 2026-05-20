@@ -4,8 +4,8 @@ export default class AgenticToolResolver {
      * Handles MongoDB custom tools, MCP tools, disabledBuiltIns mode, prefix expansion,
      * and native provider tool collision prevention.
      */
-    static resolve({ options, agent, project, username, modelDef }: Record<string, unknown>): Promise<{
-        finalTools: unknown[];
+    static resolve({ options, agent, project, username, modelDef }: any): Promise<{
+        finalTools: any[];
         customToolMap: Map<any, any>;
         resolvedEnabledTools: any;
     }>;

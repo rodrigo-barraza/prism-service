@@ -3,12 +3,12 @@
  * Input:  [{ name, description, parameters }]
  * Output: [{ type: "function", function: { name, description, parameters } }]
  */
-export declare function convertToolsToOpenAI(tools: Record<string, unknown>): {
+export declare function convertToolsToOpenAI(tools: any): {
     type: string;
     function: {
-        name: unknown;
-        description: {};
-        parameters: {};
+        name: any;
+        description: any;
+        parameters: any;
     };
 }[] | null;
 /**
@@ -21,14 +21,14 @@ export declare function convertToolsToOpenAI(tools: Record<string, unknown>): {
 
  * @returns {object} Payload fields to spread into the request body
  */
-export declare function buildPayloadParams(options: Record<string, unknown>, { temperature, maxTokens }?: Record<string, unknown>): {
+export declare function buildPayloadParams(options: any, { temperature, maxTokens }?: any): {
     seed?: number | undefined;
-    temperature: unknown;
-    top_p: {} | null | undefined;
-    frequency_penalty: {} | null | undefined;
-    presence_penalty: {} | null | undefined;
-    stop: {} | null | undefined;
-    max_tokens: unknown;
+    temperature: any;
+    top_p: any;
+    frequency_penalty: any;
+    presence_penalty: any;
+    stop: any;
+    max_tokens: any;
 };
 /**
  * Extract tool calls from a non-streaming OpenAI-compatible message object.
@@ -51,9 +51,9 @@ export declare function extractToolCallsFromMessage(message: string): any;
 
  * @returns {{ inputTokens: number, outputTokens: number, cacheReadInputTokens?: number, reasoningOutputTokens?: number }}
  */
-export declare function normalizeUsage(rawUsage: Record<string, unknown>): {
-    inputTokens: {};
-    outputTokens: {};
+export declare function normalizeUsage(rawUsage: any): {
+    inputTokens: any;
+    outputTokens: any;
 };
 /**
  * The default empty usage object, used when no usage data is available.
@@ -89,7 +89,7 @@ export declare const MEDIA_STRATEGIES: {
 
  * @returns {Promise<Array>} The same messages array with videos expanded
  */
-export declare function expandVideoToFrames(messages: Record<string, unknown>, options?: Record<string, unknown>): Promise<Record<string, unknown>>;
+export declare function expandVideoToFrames(messages: any, options?: any): Promise<any>;
 /**
  * Convert messages with media to OpenAI-compatible multipart content format.
  * Handles images, tool results, assistant tool calls, and optionally
@@ -99,7 +99,7 @@ export declare function expandVideoToFrames(messages: Record<string, unknown>, o
 
  * @returns {Array} OpenAI-compatible messages
  */
-export declare function prepareOpenAICompatMessages(messages: Record<string, unknown>, { mediaStrategy }?: Record<string, unknown>): any;
+export declare function prepareOpenAICompatMessages(messages: any, { mediaStrategy }?: any): any;
 /**
  * Process a non-streaming OpenAI-compatible chat completion response.
  * Extracts text, thinking (native + <think> tags), usage, and tool calls.
@@ -111,12 +111,12 @@ export declare function prepareOpenAICompatMessages(messages: Record<string, unk
 
  * @returns {{ text: string, thinking: string|null, usage: object, toolCalls: Array|null }}
  */
-export declare function processNonStreamingResponse(data: Record<string, unknown>, options?: Record<string, unknown>): {
+export declare function processNonStreamingResponse(data: any, options?: any): {
     text: any;
     thinking: any;
     usage: {
-        inputTokens: {};
-        outputTokens: {};
+        inputTokens: any;
+        outputTokens: any;
     };
     toolCalls: any;
 };
@@ -135,7 +135,7 @@ export declare function processNonStreamingResponse(data: Record<string, unknown
 
 
  */
-export declare function parseSSEStream(reader: Record<string, unknown>, options?: Record<string, unknown>): AsyncGenerator<any, void, unknown>;
+export declare function parseSSEStream(reader: any, options?: any): AsyncGenerator<any, void, unknown>;
 /**
  * Make a fetch request to an OpenAI-compatible endpoint and handle
  * error responses consistently.
@@ -145,5 +145,5 @@ export declare function parseSSEStream(reader: Record<string, unknown>, options?
  * @returns {Promise<Response>} The fetch response (guaranteed to be ok)
  * @throws {Error} With a parsed error message from the API
  */
-export declare function fetchOpenAICompat(url: string, payload: Record<string, unknown>, options?: Record<string, unknown>): Promise<Response>;
+export declare function fetchOpenAICompat(url: string, payload: any, options?: any): Promise<Response>;
 //# sourceMappingURL=openai-compat.d.ts.map

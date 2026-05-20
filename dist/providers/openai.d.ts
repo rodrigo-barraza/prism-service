@@ -8,24 +8,24 @@ export interface OpenAIMsg {
     toolCalls?: Array<{
         id?: string;
         name: string;
-        args: unknown;
+        args: any;
         responsesItemId?: string;
     }>;
     tool_call_id?: string;
     id?: string;
-    [key: string]: unknown;
+    [key: string]: any;
 }
 declare const openaiProvider: {
     name: string;
-    generateText(messages: OpenAIMsg[], model?: string, options?: ProviderOptions): Promise<Record<string, unknown>>;
+    generateText(messages: OpenAIMsg[], model?: string, options?: ProviderOptions): Promise<any>;
     /**
      * Responses API path for GPT-5.2/5.4 models.
      */
-    _generateTextResponses(messages: OpenAIMsg[], model: string, options: ProviderOptions): Promise<Record<string, unknown>>;
+    _generateTextResponses(messages: OpenAIMsg[], model: string, options: ProviderOptions): Promise<any>;
     /**
      * Chat Completions fallback for older models.
      */
-    _generateTextChatCompletions(messages: OpenAIMsg[], model: string, options: ProviderOptions): Promise<Record<string, unknown>>;
+    _generateTextChatCompletions(messages: OpenAIMsg[], model: string, options: ProviderOptions): Promise<any>;
     generateTextStream(messages: OpenAIMsg[], model?: string, options?: ProviderOptions): AsyncGenerator<string | {
         type: string;
         content: string;
@@ -248,7 +248,7 @@ declare const openaiProvider: {
         imageData: string;
         mimeType?: string;
     }>, model?: string): Promise<{
-        imageData: {};
+        imageData: any;
         mimeType: string;
         text: string;
     }>;

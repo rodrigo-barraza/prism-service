@@ -2,7 +2,6 @@ import OpenAI, { toFile } from "openai";
 import { ProviderError } from "../utils/errors.js";
 import logger from "../utils/logger.js";
 import { extractOpenAIRateLimits } from "../utils/rateLimits.js";
-// @ts-ignore
 import { OPENAI_API_KEY, OPENAI_TRANSCRIPTION_MODEL } from "../../config.js";
 import { TYPES, DEFAULT_VOICES, getDefaultModels, getModelByName, } from "../config.js";
 import { convertToolsToOpenAI } from "../utils/openai-compat.js";
@@ -40,7 +39,7 @@ function convertToolsToResponsesAPI(tools) {
         strict: true,
     }));
 }
-/** Narrow unknown errors into ProviderError for all catch blocks. */
+/** Narrow any errors into ProviderError for all catch blocks. */
 function toProviderError(error) {
     let message = String(error);
     let status = 500;
@@ -54,7 +53,7 @@ function toProviderError(error) {
     }
     throw new ProviderError("openai", message, status, error);
 }
-/** Narrow unknown catch to a typed error record for retry logic. */
+/** Narrow any catch to a typed error record for retry logic. */
 function asErrorRecord(error) {
     return error;
 }
@@ -320,7 +319,6 @@ function prepareResponsesInput(messages) {
 const openaiProvider = {
     name: "openai",
     async generateText(messages, model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai, options = {}) {
-        // @ts-ignore - TODO: strict typing
         logger.provider("OpenAI", `generateText model=${model}`);
         try {
             if (useResponsesAPI(model)) {
@@ -344,7 +342,6 @@ const openaiProvider = {
             reasoning.effort = options.reasoningEffort;
         }
         if (options.reasoningSummary) {
-            // @ts-ignore - TODO: strict typing
             reasoning.summary = options.reasoningSummary;
         }
         if (Object.keys(reasoning).length > 0) {
@@ -381,7 +378,6 @@ const openaiProvider = {
             payload.text = text;
         }
         // Temperature/topP only work with reasoning.effort=none
-        // @ts-ignore - TODO: strict typing
         if (options.reasoningEffort === "none") {
             if (options.temperature !== undefined)
                 payload.temperature = options.temperature;
@@ -399,7 +395,6 @@ const openaiProvider = {
             payload.tools = [{ type: "web_search" }];
         }
         // Custom function calling tools
-        // @ts-ignore - TODO: strict typing
         const customTools = convertToolsToResponsesAPI(options.tools);
         if (customTools) {
             payload.tools = [...(payload.tools || []), ...customTools];
@@ -408,7 +403,6 @@ const openaiProvider = {
             .responses.create(payload)
             .withResponse();
         // Extract rate-limit headers
-        // @ts-ignore - TODO: strict typing
         const rateLimits = extractOpenAIRateLimits(rawResponse, model);
         // Collect tool calls and images from output items
         const images = [];
@@ -500,7 +494,6 @@ const openaiProvider = {
             payload.tools = [{ type: "web_search" }];
         }
         // Custom function calling tools
-        // @ts-ignore - TODO: strict typing
         const customTools = convertToolsToOpenAI(options.tools);
         if (customTools) {
             payload.tools = [...(payload.tools || []), ...customTools];
@@ -509,7 +502,6 @@ const openaiProvider = {
             const { data: response, response: rawResponse } = await getClient()
                 .chat.completions.create(payload)
                 .withResponse();
-            // @ts-ignore - TODO: strict typing
             const rateLimits = extractOpenAIRateLimits(rawResponse, model);
             const message = response.choices[0].message;
             const result = {
@@ -563,9 +555,7 @@ const openaiProvider = {
                 for (const param of unsupportedParams) {
                     if (err.message?.includes(`'${param}'`) &&
                         payloadRecord[param] !== undefined) {
-                        logger.provider(
-                        // @ts-ignore - TODO: strict typing
-                        "OpenAI", `Stripping unsupported param '${param}' for ${model} and retrying`);
+                        logger.provider("OpenAI", `Stripping unsupported param '${param}' for ${model} and retrying`);
                         delete payloadRecord[param];
                         stripped = true;
                     }
@@ -585,7 +575,6 @@ const openaiProvider = {
         }
     },
     async *generateTextStream(messages, model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai, options = {}) {
-        // @ts-ignore - TODO: strict typing
         logger.provider("OpenAI", `generateTextStream model=${model}`);
         try {
             if (useResponsesAPI(model)) {
@@ -613,7 +602,6 @@ const openaiProvider = {
             reasoning.effort = options.reasoningEffort;
         }
         if (options.reasoningSummary) {
-            // @ts-ignore - TODO: strict typing
             reasoning.summary = options.reasoningSummary;
         }
         if (Object.keys(reasoning).length > 0) {
@@ -650,7 +638,6 @@ const openaiProvider = {
             payload.text = text;
         }
         // Temperature/topP only work with reasoning.effort=none
-        // @ts-ignore - TODO: strict typing
         if (options.reasoningEffort === "none") {
             if (options.temperature !== undefined)
                 payload.temperature = options.temperature;
@@ -668,7 +655,6 @@ const openaiProvider = {
             payload.tools = [{ type: "web_search" }];
         }
         // Custom function calling tools
-        // @ts-ignore - TODO: strict typing
         const customTools = convertToolsToResponsesAPI(options.tools);
         if (customTools) {
             payload.tools = [...(payload.tools || []), ...customTools];
@@ -678,7 +664,6 @@ const openaiProvider = {
             ...(options.signal && { signal: options.signal }),
         })
             .withResponse();
-        // @ts-ignore - TODO: strict typing
         const rateLimits = extractOpenAIRateLimits(rawStreamResponse, model);
         let usage = null;
         // Track function names from output_item.added events; the arguments.done
@@ -740,7 +725,7 @@ const openaiProvider = {
             if (event.type === "response.function_call_arguments.done") {
                 const ev = event;
                 const tracked = pendingFunctions[ev.item_id];
-                const name = tracked?.name || ev.name || "unknown";
+                const name = tracked?.name || ev.name || "any";
                 const callId = tracked?.callId || ev.call_id || ev.item_id;
                 let args = {};
                 try {
@@ -831,7 +816,6 @@ const openaiProvider = {
             payload.tools = [{ type: "web_search" }];
         }
         // Custom function calling tools
-        // @ts-ignore - TODO: strict typing
         const customTools = convertToolsToOpenAI(options.tools);
         if (customTools) {
             payload.tools = [...(payload.tools || []), ...customTools];
@@ -845,7 +829,6 @@ const openaiProvider = {
             })
                 .withResponse();
             stream = streamData;
-            // @ts-ignore - TODO: strict typing
             rateLimits = extractOpenAIRateLimits(rawStreamResponse, model);
         }
         catch (error) {
@@ -864,9 +847,7 @@ const openaiProvider = {
                 for (const param of unsupportedParams) {
                     if (err.message?.includes(`'${param}'`) &&
                         payloadRecord[param] !== undefined) {
-                        logger.provider(
-                        // @ts-ignore - TODO: strict typing
-                        "OpenAI", `Stripping unsupported param '${param}' for ${model} and retrying (stream)`);
+                        logger.provider("OpenAI", `Stripping unsupported param '${param}' for ${model} and retrying (stream)`);
                         delete payloadRecord[param];
                         stripped = true;
                     }
@@ -878,7 +859,6 @@ const openaiProvider = {
                     })
                         .withResponse();
                     stream = retryResult.data;
-                    // @ts-ignore - TODO: strict typing
                     rateLimits = extractOpenAIRateLimits(retryResult.response, model);
                 }
                 else {
@@ -963,7 +943,6 @@ const openaiProvider = {
         }
     },
     async generateSpeech(text, voice = DEFAULT_VOICES.openai, options = {}) {
-        // @ts-ignore - TODO: strict typing
         logger.provider("OpenAI", `generateSpeech voice=${voice}`);
         try {
             const payload = {
@@ -983,9 +962,7 @@ const openaiProvider = {
         }
     },
     async generateImage(prompt, images = [], model = "gpt-image-1.5") {
-        logger.provider(
-        // @ts-ignore - TODO: strict typing
-        "OpenAI", `generateImage model=${model} images=${images.length}`);
+        logger.provider("OpenAI", `generateImage model=${model} images=${images.length}`);
         try {
             let response;
             if (images.length > 0) {
@@ -1026,7 +1003,6 @@ const openaiProvider = {
                 response = await getClient().images.generate({
                     model,
                     prompt,
-                    // @ts-ignore - TODO: strict typing
                     output_format: "png",
                     size: "1024x1024",
                     quality: "high",
@@ -1048,7 +1024,6 @@ const openaiProvider = {
         }
     },
     async captionImage(images, prompt = "What's in this image?", model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai, systemPrompt) {
-        // @ts-ignore - TODO: strict typing
         logger.provider("OpenAI", `captionImage model=${model}`);
         try {
             const content = [
@@ -1079,7 +1054,6 @@ const openaiProvider = {
         }
     },
     async generateEmbedding(text, model = getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING).openai) {
-        // @ts-ignore - TODO: strict typing
         logger.provider("OpenAI", `generateEmbedding model=${model}`);
         try {
             const response = await getClient().embeddings.create({
@@ -1093,7 +1067,6 @@ const openaiProvider = {
         }
     },
     async transcribeAudio(audioBuffer, mimeType, model = OPENAI_TRANSCRIPTION_MODEL || "whisper-1", options = {}) {
-        // @ts-ignore - TODO: strict typing
         logger.provider("OpenAI", `transcribeAudio model=${model}`);
         try {
             const subType = mimeType.split("/")[1] || "wav";

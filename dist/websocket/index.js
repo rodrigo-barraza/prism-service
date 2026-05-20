@@ -1,7 +1,6 @@
 import { handleConversation } from "../routes/ChatRoutes.js";
 import { handleVoice } from "../routes/AudioRoutes.js";
 import { GoogleGenAI, Modality, StartSensitivity, EndSensitivity, } from "@google/genai";
-// @ts-ignore
 import { GOOGLE_API_KEY, LIVE_AUDIO_MODEL } from "../../config.js";
 import crypto from "crypto";
 import logger from "../utils/logger.js";
@@ -18,27 +17,17 @@ import { calculateTokensPerSec } from "../utils/math.js";
  *   /ws/live   — Persistent Live API session (audio/text bidirectional)
  */
 export function setupWebSocket(wss) {
-    // @ts-ignore - TODO: strict typing
     wss.on("connection", (ws, req) => {
-        // @ts-ignore - TODO: strict typing
         const url = new URL(req.url, `http://${req.headers.host}`);
         const pathname = url.pathname;
-        const project = 
-        // @ts-ignore - TODO: strict typing
-        req.headers["x-project"] || url.searchParams.get("project") || "unknown";
-        const rawIp = 
-        // @ts-ignore - TODO: strict typing
-        req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-            // @ts-ignore - TODO: strict typing
+        const project = req.headers["x-project"] || url.searchParams.get("project") || "any";
+        const rawIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
             req.socket.remoteAddress;
         // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1)
         const clientIp = rawIp?.replace(/^::ffff:/, "") || rawIp;
-        const username = 
-        // @ts-ignore - TODO: strict typing
-        req.headers["x-username"] ||
+        const username = req.headers["x-username"] ||
             url.searchParams.get("username") ||
             "anonymous";
-        // @ts-ignore - TODO: strict typing
         const agent = req.headers["x-agent"] || null;
         logger.info(`WebSocket connection on ${pathname} (project: ${project}, user: ${username})`);
         if (pathname === "/ws/chat") {
@@ -51,12 +40,10 @@ export function setupWebSocket(wss) {
             handleWsLive(ws, project, username, clientIp, agent);
         }
         else {
-            // @ts-ignore - TODO: strict typing
             ws.send(JSON.stringify({
                 type: "error",
                 message: `Unknown WebSocket path: ${pathname}`,
             }));
-            // @ts-ignore - TODO: strict typing
             ws.close();
         }
     });
@@ -65,22 +52,17 @@ export function setupWebSocket(wss) {
  * WebSocket chat handler — delegates to handleConversation() from chat.js.
  */
 function handleWsChat(ws, project, username, clientIp, agent) {
-    // @ts-ignore - TODO: strict typing
     ws.on("message", async (rawData) => {
         let data;
         try {
             data = JSON.parse(rawData.toString());
         }
         catch {
-            // @ts-ignore - TODO: strict typing
             ws.send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
             return;
         }
-        await handleConversation({ ...data, project, username, clientIp, agent }, 
-        // @ts-ignore - TODO: strict typing
-        (event) => {
+        await handleConversation({ ...data, project, username, clientIp, agent }, (event) => {
             if (ws.readyState === ws.OPEN) {
-                // @ts-ignore - TODO: strict typing
                 ws.send(JSON.stringify(event));
             }
         });
@@ -91,28 +73,22 @@ function handleWsChat(ws, project, username, clientIp, agent) {
  * Sends binary audio frames for audio data, JSON for control events.
  */
 function handleWsVoice(ws, project, username, clientIp, agent) {
-    // @ts-ignore - TODO: strict typing
     ws.on("message", async (rawData) => {
         let data;
         try {
             data = JSON.parse(rawData.toString());
         }
         catch {
-            // @ts-ignore - TODO: strict typing
             ws.send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
             return;
         }
         try {
-            await handleVoice({ ...data, project, username, clientIp, agent }, 
-            // @ts-ignore - TODO: strict typing
-            (chunk) => {
+            await handleVoice({ ...data, project, username, clientIp, agent }, (chunk) => {
                 if (ws.readyState === ws.OPEN) {
-                    // @ts-ignore - TODO: strict typing
                     ws.send(chunk); // Binary audio frame
                 }
             }, (event) => {
                 if (ws.readyState === ws.OPEN) {
-                    // @ts-ignore - TODO: strict typing
                     ws.send(JSON.stringify(event));
                 }
             });
@@ -146,14 +122,11 @@ function handleWsVoice(ws, project, username, clientIp, agent) {
  *   { type: "error", message }             — Error
  */
 function handleWsLive(ws, project, username, _clientIp, agent) {
-    // @ts-ignore
     let liveSession = null;
     /** @type {string[]} Accumulated base64 PCM audio chunks for current turn (model output, 24kHz) */
-    // @ts-ignore
     let turnAudioChunks = [];
     let audioSampleRate = 24000;
     /** @type {string[]} Accumulated base64 PCM audio chunks for current turn (user input, 16kHz) */
-    // @ts-ignore
     const userInputAudioChunks = [];
     const userInputSampleRate = 16000;
     /** Whether user audio upload has been triggered for this turn */
@@ -162,22 +135,17 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
     let turnUsage = { inputTokens: 0, outputTokens: 0 };
     // Variables for Request Logging
     let activeModel = LIVE_AUDIO_MODEL;
-    // @ts-ignore
     let activeConversationId = null;
     let activeConfig = {};
     let turnStart = performance.now();
-    // @ts-ignore
     let passFirstTokenTime = null;
     let turnText = "";
     let turnThinking = "";
-    // @ts-ignore
     let turnToolCalls = [];
     let turnInputText = "";
-    // @ts-ignore
     let turnUserAudioRef = null;
     function emit(event) {
         if (ws.readyState === ws.OPEN) {
-            // @ts-ignore - TODO: strict typing
             ws.send(JSON.stringify(event));
         }
     }
@@ -187,21 +155,14 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
   
      * @returns {Promise<string|null>} MinIO ref or null on failure
      */
-    // @ts-ignore
-    async function buildAndUploadAudio(
-    // @ts-ignore
-    chunks = turnAudioChunks, 
-    // @ts-ignore - TODO: strict typing
-    sampleRate = audioSampleRate) {
+    async function buildAndUploadAudio(chunks = turnAudioChunks, sampleRate = audioSampleRate) {
         if (chunks.length === 0)
             return null;
         try {
-            // @ts-ignore - TODO: strict typing
             const pcmBuffers = chunks.map((b64) => Buffer.from(b64, "base64"));
             const pcmData = Buffer.concat(pcmBuffers);
             const numChannels = 1;
             const bitsPerSample = 16;
-            // @ts-ignore - TODO: strict typing
             const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
             const blockAlign = numChannels * (bitsPerSample / 8);
             const wavHeader = Buffer.alloc(44);
@@ -212,7 +173,6 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
             wavHeader.writeUInt32LE(16, 16);
             wavHeader.writeUInt16LE(1, 20);
             wavHeader.writeUInt16LE(numChannels, 22);
-            // @ts-ignore - TODO: strict typing
             wavHeader.writeUInt32LE(sampleRate, 24);
             wavHeader.writeUInt32LE(byteRate, 28);
             wavHeader.writeUInt16LE(blockAlign, 32);
@@ -222,18 +182,14 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
             const wavBuffer = Buffer.concat([wavHeader, pcmData]);
             const dataUrl = `data:audio/wav;base64,${wavBuffer.toString("base64")}`;
             const FileService = (await import("../services/FileService.js")).default;
-            const { ref } = await FileService.uploadFile(dataUrl, "generations", 
-            // @ts-ignore - TODO: strict typing
-            project, username);
+            const { ref } = await FileService.uploadFile(dataUrl, "generations", project, username);
             return ref;
         }
         catch (error) {
-            // @ts-ignore - TODO: strict typing
             logger.error(`[Live API] Failed to build/upload WAV: ${error.message}`);
             return null;
         }
     }
-    // @ts-ignore - TODO: strict typing
     ws.on("message", async (rawData) => {
         let data;
         try {
@@ -246,7 +202,6 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
         const { type } = data;
         // ── Setup: create a new Live API session ────────────────────
         if (type === "setup") {
-            // @ts-ignore
             if (liveSession) {
                 try {
                     liveSession.close();
@@ -258,19 +213,13 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
             }
             const model = data.model || LIVE_AUDIO_MODEL;
             const clientConfig = data.config || {};
-            // @ts-ignore - TODO: strict typing
             activeModel = model;
             activeConversationId =
-                // @ts-ignore - TODO: strict typing
                 data.conversationId || clientConfig?.conversationId || null;
             // Tools setup
             const tools = [];
-            if (
-            // @ts-ignore - TODO: strict typing
-            clientConfig.enabledTools &&
-                // @ts-ignore - TODO: strict typing
+            if (clientConfig.enabledTools &&
                 Array.isArray(clientConfig.enabledTools)) {
-                // @ts-ignore - TODO: strict typing
                 const enabledSet = new Set(clientConfig.enabledTools);
                 if (enabledSet.has("Web Search") || enabledSet.has("Google Search")) {
                     tools.push({ googleSearch: {} });
@@ -280,18 +229,15 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                     const { convertToolsToGoogle } = await import("../providers/google.js");
                     const MongoWrapper = (await import("../wrappers/MongoWrapper.js"))
                         .default;
-                    // @ts-ignore
                     const { MONGO_DB_NAME } = await import("../../config.js");
                     const dynamicTools = [...ToolOrchestratorService.getToolSchemas()];
                     const mClient = MongoWrapper.getClient(MONGO_DB_NAME);
                     if (mClient) {
                         const customToolsData = await mClient
-                            // @ts-ignore
                             .db(MONGO_DB_NAME)
                             .collection("custom_tools")
                             .find({ project, username, enabled: true })
                             .toArray();
-                        // @ts-ignore
                         for (const t of customToolsData) {
                             dynamicTools.push({
                                 name: t.name,
@@ -303,7 +249,6 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                                         {
                                             type: p.type || "string",
                                             description: p.description || "",
-                                            // @ts-ignore - TODO: strict typing
                                             ...(p.enum?.length ? { enum: p.enum } : {}),
                                         },
                                     ])),
@@ -314,38 +259,28 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                             });
                         }
                     }
-                    // @ts-ignore - TODO: strict typing
                     const filtered = dynamicTools.filter((t) => enabledSet.has(t.name));
-                    // @ts-ignore - TODO: strict typing
                     const googleFormats = convertToolsToGoogle(filtered);
                     if (googleFormats) {
                         tools.push(...googleFormats);
                     }
                 }
                 catch (error) {
-                    // @ts-ignore - TODO: strict typing
                     logger.error(`[Live API] Error loading tools: ${error.message}`);
                 }
             }
             // Build Live API config
             const liveConfig = {
-                // @ts-ignore - TODO: strict typing
                 responseModalities: clientConfig.responseModalities || [Modality.AUDIO],
                 // Always include a base system instruction with language hint to anchor
                 // the input transcription model (which has no languageCode field)
-                // @ts-ignore - TODO: strict typing
                 systemInstruction: clientConfig.systemInstruction
-                    // @ts-ignore - TODO: strict typing
                     ? `${clientConfig.systemInstruction}\n\nAlways respond in the same language the user speaks. The user's primary language is English.`
                     : "Always respond in the same language the user speaks. The user's primary language is English.",
-                // @ts-ignore - TODO: strict typing
                 ...(clientConfig.temperature !== undefined && {
-                    // @ts-ignore - TODO: strict typing
                     temperature: clientConfig.temperature,
                 }),
-                // @ts-ignore - TODO: strict typing
                 ...(clientConfig.thinkingConfig && {
-                    // @ts-ignore - TODO: strict typing
                     thinkingConfig: clientConfig.thinkingConfig,
                 }),
                 ...(tools.length > 0 && { tools }),
@@ -363,7 +298,6 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                 speechConfig: {
                     voiceConfig: {
                         prebuiltVoiceConfig: {
-                            // @ts-ignore - TODO: strict typing
                             voiceName: clientConfig.voiceName || "Puck",
                         },
                     },
@@ -376,35 +310,25 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
             try {
                 const client = new GoogleGenAI({ apiKey: GOOGLE_API_KEY });
                 liveSession = await client.live.connect({
-                    // @ts-ignore - TODO: strict typing
                     model,
                     config: liveConfig,
                     callbacks: {
                         onopen: () => {
                             logger.info(`[Live API] Session opened for ${model} (project: ${project}, user: ${username})`);
                             // Mark conversation as generating when the Live session opens
-                            // @ts-ignore
                             if (activeConversationId) {
-                                ConversationService.setGenerating(activeConversationId, project, username, 
-                                // @ts-ignore - TODO: strict typing
-                                true).catch((error) => logger.error(`[Live API] Failed to set isGenerating: ${error.message}`));
+                                ConversationService.setGenerating(activeConversationId, project, username, true).catch((error) => logger.error(`[Live API] Failed to set isGenerating: ${error.message}`));
                             }
                             emit({ type: "setupComplete" });
                         },
-                        // @ts-ignore - TODO: strict typing
                         onmessage: (message) => {
                             // Model turn parts (audio data, text, function calls)
-                            // @ts-ignore - TODO: strict typing
                             if (message.serverContent?.modelTurn?.parts) {
-                                // @ts-ignore
                                 if (!passFirstTokenTime) {
                                     passFirstTokenTime = performance.now();
                                     // Re-set isGenerating at the start of each new turn
-                                    // @ts-ignore
                                     if (activeConversationId) {
-                                        ConversationService.setGenerating(activeConversationId, project, username, 
-                                        // @ts-ignore - TODO: strict typing
-                                        true).catch(() => { });
+                                        ConversationService.setGenerating(activeConversationId, project, username, true).catch(() => { });
                                     }
                                 }
                                 // First model turn message = user is done speaking.
@@ -412,17 +336,13 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                                 // so the audio card shows up before the model finishes.
                                 if (!userAudioUploading && userInputAudioChunks.length > 0) {
                                     userAudioUploading = true;
-                                    // @ts-ignore
-                                    buildAndUploadAudio(
-                                    // @ts-ignore
-                                    userInputAudioChunks, userInputSampleRate).then((userAudioRef) => {
+                                    buildAndUploadAudio(userInputAudioChunks, userInputSampleRate).then((userAudioRef) => {
                                         if (userAudioRef) {
                                             turnUserAudioRef = userAudioRef;
                                             emit({ type: "userAudioReady", userAudioRef });
                                         }
                                     });
                                 }
-                                // @ts-ignore
                                 for (const part of message.serverContent.modelTurn.parts) {
                                     if (part.thought && part.text) {
                                         emit({ type: "thinking", content: part.text });
@@ -463,9 +383,7 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                                 }
                             }
                             // Top-level tool calls
-                            // @ts-ignore - TODO: strict typing
                             if (message.toolCall?.functionCalls) {
-                                // @ts-ignore - TODO: strict typing
                                 const functionCalls = message.toolCall.functionCalls.map((fc) => ({
                                     id: fc.id || `live-tc-${crypto.randomUUID()}`,
                                     name: fc.name,
@@ -473,7 +391,6 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                                 }));
                                 turnToolCalls.push(...functionCalls);
                                 // Emit calling status to the client
-                                // @ts-ignore
                                 for (const fc of functionCalls) {
                                     emit({
                                         type: "tool_execution",
@@ -487,7 +404,6 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                                         const ToolOrchestratorService = (await import("../services/ToolOrchestratorService.js")).default;
                                         const { truncateToolResult } = await import("../utils/FunctionCallingUtilities.js");
                                         const MongoWrapper = (await import("../wrappers/MongoWrapper.js")).default;
-                                        // @ts-ignore
                                         const { MONGO_DB_NAME } = await import("../../config.js");
                                         // Build merged tool map (custom + built-in) for execution
                                         const customToolMap = new Map();
@@ -495,40 +411,30 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                                             const mClient = MongoWrapper.getClient(MONGO_DB_NAME);
                                             if (mClient) {
                                                 const customToolsData = await mClient
-                                                    // @ts-ignore
                                                     .db(MONGO_DB_NAME)
                                                     .collection("custom_tools")
                                                     .find({ project, username, enabled: true })
                                                     .toArray();
-                                                // @ts-ignore
                                                 for (const t of customToolsData) {
                                                     customToolMap.set(t.name, t);
                                                 }
                                             }
                                         }
                                         catch (error) {
-                                            logger.warn(
-                                            // @ts-ignore - TODO: strict typing
-                                            `Failed to fetch custom tools for Live API loop: ${error.message}`);
+                                            logger.warn(`Failed to fetch custom tools for Live API loop: ${error.message}`);
                                         }
                                         const results = await Promise.all(functionCalls.map(async (tc) => {
                                             let result;
                                             const customDef = customToolMap.get(tc.name);
                                             if (customDef) {
-                                                // @ts-ignore - TODO: strict typing
                                                 result =
-                                                    await ToolOrchestratorService.executeCustomTool(customDef, 
-                                                    // @ts-ignore - TODO: strict typing
-                                                    tc.args);
+                                                    await ToolOrchestratorService.executeCustomTool(customDef, tc.args);
                                             }
                                             else {
-                                                result = await ToolOrchestratorService.executeTool(
-                                                // @ts-ignore - TODO: strict typing
-                                                tc.name, tc.args);
+                                                result = await ToolOrchestratorService.executeTool(tc.name, tc.args);
                                             }
                                             return { id: tc.id, name: tc.name, result };
                                         }));
-                                        // @ts-ignore
                                         for (const res of results) {
                                             emit({
                                                 type: "tool_execution",
@@ -543,34 +449,25 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                                         const functionResponses = results.map((r) => ({
                                             id: r.id,
                                             name: r.name,
-                                            // @ts-ignore - TODO: strict typing
                                             response: truncateToolResult(r.result),
                                         }));
-                                        // @ts-ignore
                                         liveSession.sendToolResponse({ functionResponses });
                                     }
                                     catch (error) {
-                                        logger.error(
-                                        // @ts-ignore - TODO: strict typing
-                                        `[Live API] Error executing tools: ${error.message}`);
+                                        logger.error(`[Live API] Error executing tools: ${error.message}`);
                                     }
                                 })();
                             }
                             // Transcriptions
-                            // @ts-ignore - TODO: strict typing
                             if (message.serverContent?.inputTranscription?.text) {
                                 turnInputText +=
-                                    // @ts-ignore - TODO: strict typing
                                     message.serverContent.inputTranscription.text + "\n";
                                 emit({
                                     type: "inputTranscription",
-                                    // @ts-ignore - TODO: strict typing
                                     text: message.serverContent.inputTranscription.text,
                                 });
                             }
-                            // @ts-ignore - TODO: strict typing
                             if (message.serverContent?.outputTranscription?.text) {
-                                // @ts-ignore - TODO: strict typing
                                 const outText = message.serverContent.outputTranscription.text;
                                 turnText += outText;
                                 emit({
@@ -581,13 +478,10 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                             // Usage metadata — accumulate per turn (must run BEFORE
                             // turnComplete / interrupted checks because the final
                             // usageMetadata arrives in the same message as those events)
-                            // @ts-ignore - TODO: strict typing
                             if (message.usageMetadata) {
                                 turnUsage.inputTokens +=
-                                    // @ts-ignore - TODO: strict typing
                                     message.usageMetadata.promptTokenCount ?? 0;
                                 turnUsage.outputTokens +=
-                                    // @ts-ignore - TODO: strict typing
                                     message.usageMetadata.candidatesTokenCount ?? 0;
                             }
                             // Finalize usage: the Live API does not report
@@ -597,14 +491,8 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                             function finalizeUsage() {
                                 if (turnUsage.outputTokens === 0 &&
                                     turnAudioChunks.length > 0) {
-                                    // @ts-ignore
-                                    const totalPcmBytes = turnAudioChunks.reduce((sum, b64) => 
-                                    // @ts-ignore - TODO: strict typing
-                                    sum + Buffer.from(b64, "base64").length, 
-                                    // @ts-ignore - TODO: strict typing
-                                    0);
+                                    const totalPcmBytes = turnAudioChunks.reduce((sum, b64) => sum + Buffer.from(b64, "base64").length, 0);
                                     // 16-bit mono → 2 bytes per sample
-                                    // @ts-ignore - TODO: strict typing
                                     const durationSeconds = totalPcmBytes / (audioSampleRate * 2);
                                     turnUsage.outputTokens = Math.ceil(durationSeconds * 32);
                                 }
@@ -613,21 +501,14 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                             // clearing isGenerating for both turnComplete and interrupted.
                             function finalizeTurn(eventType) {
                                 finalizeUsage();
-                                // @ts-ignore - TODO: strict typing
                                 buildAndUploadAudio().then((audioRef) => {
-                                    // @ts-ignore - TODO: strict typing
                                     const modelDef = getModelByName(model);
-                                    const estimatedCost = calculateLiveCost(turnUsage, 
-                                    // @ts-ignore
-                                    modelDef?.pricing);
+                                    const estimatedCost = calculateLiveCost(turnUsage, modelDef?.pricing);
                                     const totalSec = (performance.now() - turnStart) / 1000;
-                                    // @ts-ignore
                                     const timeToGenerationSec = passFirstTokenTime
                                         ? (passFirstTokenTime - turnStart) / 1000
                                         : null;
-                                    // @ts-ignore
                                     const generationSec = passFirstTokenTime
-                                        // @ts-ignore
                                         ? totalSec - timeToGenerationSec
                                         : null;
                                     RequestLogger.logChatGeneration({
@@ -640,14 +521,11 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                                         agent,
                                         provider: "google",
                                         model: activeModel,
-                                        // @ts-ignore
                                         conversationId: activeConversationId || null,
                                         success: true,
                                         usage: { ...turnUsage },
                                         estimatedCost,
-                                        tokensPerSec: calculateTokensPerSec(
-                                        // @ts-ignore - TODO: strict typing
-                                        turnUsage.outputTokens, generationSec),
+                                        tokensPerSec: calculateTokensPerSec(turnUsage.outputTokens, generationSec),
                                         timeToGenerationSec,
                                         generationSec,
                                         totalSec,
@@ -656,7 +534,6 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                                             {
                                                 role: "user",
                                                 content: turnInputText.trim() || "[Voice Input]",
-                                                // @ts-ignore
                                                 ...(turnUserAudioRef
                                                     ? {
                                                         audio: [turnUserAudioRef],
@@ -667,7 +544,6 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                                         ],
                                         text: turnText,
                                         thinking: turnThinking,
-                                        // @ts-ignore
                                         toolCalls: turnToolCalls,
                                         outputCharacters: turnText.length,
                                         ...(audioRef ? { audioRef } : {}),
@@ -691,41 +567,28 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                                     turnInputText = "";
                                     turnUserAudioRef = null;
                                     // Clear isGenerating flag
-                                    // @ts-ignore
                                     if (activeConversationId) {
-                                        ConversationService.setGenerating(activeConversationId, project, username, 
-                                        // @ts-ignore - TODO: strict typing
-                                        false).catch((error) => logger.error(`[Live API] Failed to clear isGenerating on ${eventType}: ${error.message}`));
+                                        ConversationService.setGenerating(activeConversationId, project, username, false).catch((error) => logger.error(`[Live API] Failed to clear isGenerating on ${eventType}: ${error.message}`));
                                     }
                                 });
                             }
                             // Turn complete — build WAV + upload, then emit with audioRef and usage
-                            // @ts-ignore - TODO: strict typing
                             if (message.serverContent?.turnComplete) {
-                                // @ts-ignore - TODO: strict typing
                                 finalizeTurn("turnComplete");
                                 return;
                             }
                             // Interrupted (model was cut off by user speech)
-                            // @ts-ignore - TODO: strict typing
                             if (message.serverContent?.interrupted) {
-                                // @ts-ignore - TODO: strict typing
                                 finalizeTurn("interrupted");
                                 return;
                             }
                         },
-                        // @ts-ignore - TODO: strict typing
                         onerror: (e) => {
-                            const errMsg = 
-                            // @ts-ignore - TODO: strict typing
-                            e?.error?.message || e?.message || "Live API error";
+                            const errMsg = e?.error?.message || e?.message || "Live API error";
                             logger.error(`[Live API] Error (${project}/${username}): ${errMsg}`);
                             // Clear isGenerating flag on error
-                            // @ts-ignore
                             if (activeConversationId) {
-                                ConversationService.setGenerating(activeConversationId, project, username, 
-                                // @ts-ignore - TODO: strict typing
-                                false).catch(() => { });
+                                ConversationService.setGenerating(activeConversationId, project, username, false).catch(() => { });
                             }
                             emit({ type: "error", message: errMsg });
                         },
@@ -733,11 +596,8 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                             logger.info(`[Live API] Session closed (project: ${project}, user: ${username})`);
                             liveSession = null;
                             // Clear isGenerating flag when the Live API session closes
-                            // @ts-ignore
                             if (activeConversationId) {
-                                ConversationService.setGenerating(activeConversationId, project, username, 
-                                // @ts-ignore - TODO: strict typing
-                                false).catch((error) => logger.error(`[Live API] Failed to clear isGenerating on close: ${error.message}`));
+                                ConversationService.setGenerating(activeConversationId, project, username, false).catch((error) => logger.error(`[Live API] Failed to clear isGenerating on close: ${error.message}`));
                             }
                             emit({ type: "sessionClosed" });
                         },
@@ -745,15 +605,12 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                 });
             }
             catch (error) {
-                // @ts-ignore - TODO: strict typing
                 logger.error(`[Live API] Failed to connect: ${error.message}`);
-                // @ts-ignore - TODO: strict typing
                 emit({ type: "error", message: `Failed to connect: ${error.message}` });
             }
             return;
         }
         // ── All other messages require an active session ─────────────
-        // @ts-ignore
         if (!liveSession) {
             emit({
                 type: "error",
@@ -765,7 +622,6 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
         if (type === "audio") {
             // Accumulate user's mic audio for WAV upload at turn end
             if (data.data) {
-                // @ts-ignore - TODO: strict typing
                 userInputAudioChunks.push(data.data);
             }
             liveSession.sendRealtimeInput({
@@ -794,11 +650,9 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
                 liveSession.sendRealtimeInput({ activityEnd: {} });
             }
             catch (error) {
-                // @ts-ignore - TODO: strict typing
                 logger.error(`[Live API] Failed to send text: ${error.message}`);
                 emit({
                     type: "error",
-                    // @ts-ignore - TODO: strict typing
                     message: `Failed to send text: ${error.message}`,
                 });
             }
@@ -824,9 +678,7 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
         }
     });
     // Clean up on client disconnect
-    // @ts-ignore - TODO: strict typing
     ws.on("close", () => {
-        // @ts-ignore
         if (liveSession) {
             try {
                 liveSession.close();
@@ -837,11 +689,8 @@ function handleWsLive(ws, project, username, _clientIp, agent) {
             liveSession = null;
         }
         // Clear isGenerating flag on client disconnect
-        // @ts-ignore
         if (activeConversationId) {
-            ConversationService.setGenerating(activeConversationId, project, username, 
-            // @ts-ignore - TODO: strict typing
-            false).catch((error) => logger.error(`[Live API] Failed to clear isGenerating on disconnect: ${error.message}`));
+            ConversationService.setGenerating(activeConversationId, project, username, false).catch((error) => logger.error(`[Live API] Failed to clear isGenerating on disconnect: ${error.message}`));
         }
         logger.info(`[Live API] Client disconnected (project: ${project}, user: ${username})`);
     });

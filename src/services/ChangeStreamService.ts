@@ -195,6 +195,7 @@ const ChangeStreamService = {
     streams.clear();
     listeners.clear();
         if (staleGeneratingInterval) {
+      // @ts-ignore - TODO: strict typing
       clearInterval((staleGeneratingInterval as any | number | Timeout | undefined));
       staleGeneratingInterval = null;
     }

@@ -13,9 +13,9 @@ declare const EmbeddingService: {
   
      * @returns {Promise<{ embedding: number[], dimensions: number, provider: string, model: string }>}
      */
-    generate(content: string, options?: Record<string, unknown>): Promise<{
-        embedding: unknown;
-        dimensions: unknown;
+    generate(content: string, options?: any): Promise<{
+        embedding: any;
+        dimensions: any;
         provider: any;
         model: any;
     }>;
@@ -26,7 +26,7 @@ declare const EmbeddingService: {
   
   
      */
-    embed(text: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
+    embed(text: any, options?: any): Promise<any>;
 };
 export default EmbeddingService;
 //# sourceMappingURL=EmbeddingService.d.ts.map

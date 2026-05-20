@@ -147,8 +147,9 @@ function buildGenerateConfig(options, modelDef) {
     if (options.responseFormat === "json_object")
         config.responseMimeType = "application/json";
     // Thinking config
-    if (options.thinkingEnabled !== false &&
-        (options.thinkingLevel || options.thinkingBudget !== undefined)) {
+    const supportsThinking = modelDef?.thinking === true;
+    if (supportsThinking &&
+        options.thinkingEnabled !== false) {
         config.thinkingConfig = { includeThoughts: true };
         if (options.thinkingLevel && modelDef?.thinkingLevels) {
             config.thinkingConfig.thinkingLevel = options.thinkingLevel;
@@ -178,7 +179,7 @@ async function convertMessages(messages) {
                 const toolMsg = messages[j];
                 responseParts.push({
                     functionResponse: {
-                        name: toolMsg.name || "unknown",
+                        name: toolMsg.name || "any",
                         response: {
                             result: typeof toolMsg.content === "string"
                                 ? toolMsg.content
@@ -252,7 +253,6 @@ async function convertMessages(messages) {
 const googleProvider = {
     name: "google",
     async generateText(messages, model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).google, options = {}) {
-        // @ts-ignore - TODO: strict typing
         logger.provider("Google", `generateText model=${model}`);
         try {
             const contents = await convertMessages(messages);
@@ -287,14 +287,13 @@ const googleProvider = {
                 if (part.functionCall) {
                     toolCalls.push({
                         id: `google-tc-${crypto.randomUUID()}`,
-                        name: part.functionCall.name || "unknown",
+                        name: part.functionCall.name || "any",
                         args: (part.functionCall.args || {}),
                         thoughtSignature: part.thoughtSignature,
                     });
                 }
                 else if (part.text) {
                     textParts.push(part.text);
-                    // @ts-ignore - TODO: strict typing
                 }
                 else if (part.inlineData && images.length < maxImages) {
                     images.push({
@@ -332,7 +331,6 @@ const googleProvider = {
         }
     },
     async *generateTextStream(messages, model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).google, options = {}) {
-        // @ts-ignore - TODO: strict typing
         logger.provider("Google", `generateTextStream model=${model}`);
         try {
             const contents = await convertMessages(messages);
@@ -380,7 +378,7 @@ const googleProvider = {
                             yield {
                                 type: "toolCall",
                                 id: `google-tc-${crypto.randomUUID()}`,
-                                name: part.functionCall.name || "unknown",
+                                name: part.functionCall.name || "any",
                                 args: (part.functionCall.args || {}),
                                 thoughtSignature: part.thoughtSignature,
                             };
@@ -390,7 +388,6 @@ const googleProvider = {
                         }
                         else if (part.text) {
                             yield part.text;
-                            // @ts-ignore - TODO: strict typing
                         }
                         else if (part.inlineData && imageCount < maxImages) {
                             imageCount++;
@@ -456,9 +453,8 @@ const googleProvider = {
      * the same interface as generateTextStream().
      */
     async *generateTextStreamLive(messages, model, options = {}) {
-        logger.provider(
-        // @ts-ignore - TODO: strict typing
-        "Google", `generateTextStreamLive (Live API) model=${model}`);
+        logger.provider("Google", `generateTextStreamLive (Live API) model=${model}`);
+        const modelDef = Object.values(MODELS).find((m) => m.name === model);
         let session = null;
         try {
             // ── Build Live API config ────────────────────────────────────
@@ -476,11 +472,13 @@ const googleProvider = {
                 liveConfig.topK = options.topK;
             if (options.maxTokens !== undefined)
                 liveConfig.maxOutputTokens = options.maxTokens;
-            if (options.thinkingEnabled !== false &&
-                (options.thinkingLevel || options.thinkingBudget !== undefined)) {
+            const supportsThinking = modelDef?.thinking === true;
+            if (supportsThinking &&
+                options.thinkingEnabled !== false) {
                 const thinkCfg = { includeThoughts: true };
-                if (options.thinkingLevel)
+                if (options.thinkingLevel && modelDef?.thinkingLevels) {
                     thinkCfg.thinkingLevel = options.thinkingLevel;
+                }
                 if (options.thinkingBudget !== undefined && options.thinkingBudget !== "") {
                     thinkCfg.thinkingBudget = parseInt(String(options.thinkingBudget));
                 }
@@ -528,7 +526,6 @@ const googleProvider = {
                 config: liveConfig,
                 callbacks: {
                     onopen: () => {
-                        // @ts-ignore - TODO: strict typing
                         logger.provider("Google", `Live API session opened for ${model}`);
                     },
                     onmessage: (message) => {
@@ -580,7 +577,7 @@ const googleProvider = {
                                 enqueue({
                                     type: "toolCall",
                                     id: `google-tc-${crypto.randomUUID()}`,
-                                    name: fc.name || "unknown",
+                                    name: fc.name || "any",
                                     args: (fc.args || {}),
                                 });
                             }
@@ -607,7 +604,7 @@ const googleProvider = {
                     onerror: (e) => {
                         const errObj = e;
                         const innerErr = errObj?.error;
-                        const errMsg = innerErr?.message || errObj?.message || "unknown";
+                        const errMsg = innerErr?.message || errObj?.message || "any";
                         logger.error(`[Google Live API] Error: ${errMsg}`);
                         done = true;
                         enqueue({
@@ -616,7 +613,6 @@ const googleProvider = {
                         });
                     },
                     onclose: () => {
-                        // @ts-ignore - TODO: strict typing
                         logger.provider("Google", "Live API session closed");
                         done = true;
                         enqueue({ type: "done" });
@@ -719,7 +715,6 @@ const googleProvider = {
         }
     },
     async captionImage(images, prompt = "Describe this image.", model = getDefaultModels(TYPES.IMAGE, TYPES.TEXT).google, systemPrompt) {
-        // @ts-ignore - TODO: strict typing
         logger.provider("Google", `captionImage model=${model}`);
         try {
             // Process each image into inline data parts
@@ -769,7 +764,6 @@ const googleProvider = {
         }
     },
     async generateImage(prompt, images = [], model = MODELS.GEMINI_3_PRO_IMAGE.name, systemPrompt) {
-        // @ts-ignore - TODO: strict typing
         logger.provider("Google", `generateImage model=${model}`);
         try {
             const config = {
@@ -835,7 +829,6 @@ const googleProvider = {
         }
     },
     async generateSpeech(text, voice = DEFAULT_VOICES.google, options = {}) {
-        // @ts-ignore - TODO: strict typing
         logger.provider("Google", `generateSpeech voice=${voice}`);
         try {
             const config = {
@@ -890,7 +883,6 @@ const googleProvider = {
         }
     },
     async transcribeAudio(audioBuffer, mimeType, model = GOOGLE_TTS_MODEL || "gemini-2.0-flash", options = {}) {
-        // @ts-ignore - TODO: strict typing
         logger.provider("Google", `transcribeAudio model=${model}`);
         try {
             const audioBase64 = audioBuffer.toString("base64");
@@ -931,7 +923,6 @@ const googleProvider = {
             getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)?.google ||
             GOOGLE_EMBEDDING_MODEL ||
             "gemini-embedding-2-preview";
-        // @ts-ignore - TODO: strict typing
         logger.provider("Google", `generateEmbedding model=${resolvedModel}`);
         try {
             const config = {};

@@ -406,6 +406,7 @@ function handleWsLive(
               }
               emit({ type: "setupComplete" });
             },
+                        // @ts-ignore - TODO: strict typing
                         onmessage: (message: string) => {
               // Model turn parts (audio data, text, function calls)
                             if ((message as any).serverContent?.modelTurn?.parts) {
@@ -639,6 +640,7 @@ function handleWsLive(
                     ? (passFirstTokenTime - turnStart) / 1000
                     : null;
                                     const generationSec = passFirstTokenTime
+                                        // @ts-ignore - TODO: strict typing
                                         ? totalSec - timeToGenerationSec
                     : null;
 

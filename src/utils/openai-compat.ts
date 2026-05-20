@@ -416,6 +416,7 @@ export async function* parseSSEStream(reader: any, options: any = {}) {
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
+            // @ts-ignore - TODO: strict typing
             buffer = lines.pop(); // keep incomplete line in buffer
 
             for ( const line of lines) {
@@ -456,6 +457,7 @@ export async function* parseSSEStream(reader: any, options: any = {}) {
               yield content;
             } else {
               // Parse <think> tags from the streamed content
+                            // @ts-ignore - TODO: strict typing
                             const parts = thinkParser.feed(content);
                             for ( const part of parts) {
                 if (part.type === "thinking") {

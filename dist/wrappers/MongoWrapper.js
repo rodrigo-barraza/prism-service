@@ -11,10 +11,7 @@
 //   getCollection(db, col)  → MongoManager.getCollection(col, db)
 //   closeClient(name)       → MongoManager.disconnect(name)
 // ─────────────────────────────────────────────────────────────────────
-// @ts-ignore
-import { connectDB, getDB, getCollection, disconnectDB,
-// @ts-ignore
- } from "@rodrigo-barraza/service-library/mongo";
+import { connectDB, getDB, getCollection, disconnectDB, } from "@rodrigo-barraza/service-library/mongo";
 import logger from "../utils/logger.js";
 const MongoWrapper = {
     async createClient(name, uri) {

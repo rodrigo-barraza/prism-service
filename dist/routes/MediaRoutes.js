@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import requireDb from "../middleware/RequireDbMiddleware.js";
@@ -11,22 +10,16 @@ const REQUESTS_COL = COLLECTIONS.REQUESTS;
 // ─── GET /media — extract media from the caller's project conversations ─
 router.get("/", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const { page = 1, limit = 100, type, origin, search, provider, model, from, to, } = req.query;
-        // @ts-ignore - TODO: strict typing
         const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-        // @ts-ignore - TODO: strict typing
         const lim = parseInt(limit, 10);
         // Always scope to the caller's project
         const preMatch = { project: req.project };
         if (from || to) {
-            // @ts-ignore
             preMatch.updatedAt = {};
-            // @ts-ignore
             if (from)
                 preMatch.updatedAt.$gte = from;
-            // @ts-ignore
             if (to)
                 preMatch.updatedAt.$lte = to;
         }
@@ -138,23 +131,18 @@ router.get("/", asyncHandler(async (req, res, next) => {
             { $sort: { timestamp: -1 } },
         ];
         if (type) {
-            // @ts-ignore
             pipeline.push({ $match: { mediaType: type } });
         }
         if (origin === "user") {
-            // @ts-ignore
             pipeline.push({ $match: { role: "user" } });
         }
         else if (origin === "ai") {
-            // @ts-ignore
             pipeline.push({ $match: { role: "assistant" } });
         }
         if (provider) {
-            // @ts-ignore
             pipeline.push({ $match: { provider } });
         }
         if (model) {
-            // @ts-ignore
             pipeline.push({ $match: { model } });
         }
         // ── Conversation-based media ──────────────────────────────
@@ -178,23 +166,17 @@ router.get("/", asyncHandler(async (req, res, next) => {
                     "responsePayload.images": { $exists: true, $ne: [] },
                 };
                 if (from || to) {
-                    // @ts-ignore
                     reqMatch.timestamp = {};
-                    // @ts-ignore
                     if (from)
                         reqMatch.timestamp.$gte = from;
-                    // @ts-ignore
                     if (to)
                         reqMatch.timestamp.$lte = to;
                 }
-                // @ts-ignore
                 if (provider)
                     reqMatch.provider = provider;
-                // @ts-ignore
                 if (model)
                     reqMatch.model = model;
                 if (search) {
-                    // @ts-ignore
                     reqMatch["requestPayload.messages.content"] = {
                         $regex: search,
                         $options: "i",
@@ -239,7 +221,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
         // (images from skipConversation callers that aren't in any conversation)
         const seenUrls = new Set(convItems.map((i) => i.url));
         const mergedItems = [...convItems];
-        // @ts-ignore
         for (const item of requestGenItems) {
             if (!seenUrls.has(item.url)) {
                 seenUrls.add(item.url);
@@ -273,13 +254,11 @@ router.get("/", asyncHandler(async (req, res, next) => {
             model: item.model,
             provider: item.provider,
             timestamp: item.timestamp,
-            // @ts-ignore - TODO: strict typing
             ...(item.agent && { agent: item.agent }),
         }));
         res.json({
             data,
             total,
-            // @ts-ignore - TODO: strict typing
             page: parseInt(page, 10),
             limit: lim,
             providers: allProviders,
@@ -287,7 +266,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
         });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /media error: ${error.message}`);
         next(error);
     }

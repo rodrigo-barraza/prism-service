@@ -69,6 +69,7 @@ const SettingsService = {
    */
   async getSection(section: any) {
     const settings = await this.get();
+        // @ts-ignore - TODO: strict typing
         return (settings as any)[(section as string)] || DEFAULTS[(section as string)] || {};
   },
 

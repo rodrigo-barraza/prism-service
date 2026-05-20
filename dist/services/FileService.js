@@ -86,7 +86,7 @@ const FileService = {
     /**
      * Get a file stream from a MinIO reference.
      *
-     * @returns {Promise<{ stream: Record<string, unknown>, contentType: string } | null>}
+     * @returns {Promise<{ stream: any, contentType: string } | null>}
      */
     async getFile(key) {
         if (!MinioWrapper.isAvailable())
@@ -101,7 +101,6 @@ const FileService = {
             };
         };
         try {
-            // @ts-ignore - TODO: strict typing
             return await tryKey(key);
         }
         catch {

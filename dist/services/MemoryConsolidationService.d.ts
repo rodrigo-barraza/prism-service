@@ -10,12 +10,12 @@ declare const MemoryConsolidationService: {
   
      * @returns {Promise<object>} Consolidation results
      */
-    consolidate({ agent, project, username, trigger, broadcast, endpoint, traceId, agentSessionId, guildId, }: Record<string, unknown>): Promise<{
-        actionsApplied: unknown;
-        batchCount: unknown;
+    consolidate({ agent, project, username, trigger, broadcast, endpoint, traceId, agentSessionId, guildId, }: any): Promise<{
+        actionsApplied: any;
+        batchCount: any;
         summary: string;
         total: number;
-        trigger: unknown;
+        trigger: any;
         durationMs: number;
         merged: number;
         deleted: number;
@@ -42,7 +42,7 @@ declare const MemoryConsolidationService: {
   
   
      */
-    checkAndRun({ project, username, broadcast, endpoint, agent, traceId, agentSessionId, }: Record<string, unknown>): Promise<void>;
+    checkAndRun({ project, username, broadcast, endpoint, agent, traceId, agentSessionId, }: any): Promise<void>;
     /**
      * Get consolidation run history for a project.
      *
@@ -50,7 +50,7 @@ declare const MemoryConsolidationService: {
   
      * @returns {Promise<Array>} Consolidation history entries, newest first
      */
-    getHistory(project: Record<string, unknown>, limit?: Record<string, unknown>): Promise<import("bson").Document[]>;
+    getHistory(project: any, limit?: any): Promise<import("bson").Document[]>;
 };
 export default MemoryConsolidationService;
 //# sourceMappingURL=MemoryConsolidationService.d.ts.map

@@ -4,9 +4,9 @@ interface GoogleToolDeclaration {
     functionDeclarations: Array<{
         name: string;
         description: string;
-        parameters: Record<string, unknown>;
+        parameters: any;
     }>;
-    [key: string]: unknown;
+    [key: string]: any;
 }
 export interface ConversationMsg {
     role: string;
@@ -14,14 +14,14 @@ export interface ConversationMsg {
     name?: string;
     toolCalls?: Array<{
         name: string;
-        args: Record<string, unknown>;
+        args: any;
         thoughtSignature?: string;
     }>;
     images?: string[];
     audio?: string[];
     video?: string[];
     pdf?: string[];
-    [key: string]: unknown;
+    [key: string]: any;
 }
 /**
  * Convert generic tool schemas to Google's functionDeclarations format.
@@ -31,16 +31,16 @@ export interface ConversationMsg {
 export declare function convertToolsToGoogle(tools: Array<{
     name: string;
     description?: string;
-    parameters?: Record<string, unknown>;
+    parameters?: any;
 }> | null | undefined): GoogleToolDeclaration[] | null;
 declare const googleProvider: {
     name: string;
-    generateText(messages: ConversationMsg[], model?: string, options?: ProviderOptions): Promise<Record<string, unknown>>;
+    generateText(messages: ConversationMsg[], model?: string, options?: ProviderOptions): Promise<any>;
     generateTextStream(messages: ConversationMsg[], model?: string, options?: ProviderOptions): AsyncGenerator<string | {
         type: string;
         id: string;
         name: string;
-        args: Record<string, unknown>;
+        args: any;
         thoughtSignature: string | undefined;
         content?: undefined;
         data?: undefined;
@@ -169,7 +169,7 @@ declare const googleProvider: {
         type: string;
         id: string | undefined;
         name: string | undefined;
-        args: Record<string, unknown> | undefined;
+        args: any;
         thoughtSignature: string | undefined;
         content?: undefined;
         usage?: undefined;
@@ -225,7 +225,7 @@ declare const googleProvider: {
             outputTokens: number;
         };
     }>;
-    generateEmbedding(content: unknown, model?: string, options?: ProviderOptions): Promise<{
+    generateEmbedding(content: any, model?: string, options?: ProviderOptions): Promise<{
         embedding: number[];
         dimensions: number;
     }>;

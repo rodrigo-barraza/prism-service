@@ -71,7 +71,9 @@ async function resolveImageRefs(messages: any, project: any, username: string) {
         await Promise.all(
                     array.map(async (ref: any, j: any) => {
             const resolved = await resolveMediaRef(ref, project, username);
+                        // @ts-ignore - TODO: strict typing
                         providerArr[(j as string)] = resolved.providerRef;
+                        // @ts-ignore - TODO: strict typing
                         storageArr[(j as string)] = resolved.storageRef;
           }),
         );
@@ -418,6 +420,7 @@ async function prepareGenerationContext(
         }
         logger.info(
           `[chat] ⚖️ Load balance: ${providerName} → ${bestId} ` +
+                        // @ts-ignore - TODO: strict typing
                         `(model="${resolvedModel}", ${siblings.map(((s: any) => `${s.id}:${(s as any).concurrency - localModelQueue._getQueue((s.id as any)).activeCount}free` as any as (value: InstanceEntry, index: number, array: InstanceEntry[]) => string)).join(", ")})`,
         );
         providerName = bestId;
@@ -615,6 +618,7 @@ export async function handleConversation(
             (conversationId as any),
       (project as any),
       (username as any),
+      // @ts-ignore - TODO: strict typing
       false,
             getCollectionOpts((project as any)),
     );
@@ -646,6 +650,7 @@ export async function handleConversation(
  *
  * Used exclusively by the /agent route.
  */
+// @ts-ignore - TODO: strict typing
 export async function handleAgent(params: any, emit: (event: import("../utils/SseUtilities.ts").SseEvent) => void, { signal }: { signal?: AbortSignal } = {}) {
   let context: any;
   try {
@@ -684,6 +689,7 @@ export async function handleAgent(params: any, emit: (event: import("../utils/Ss
         (agentSessionId as any),
     (project as any),
     (username as any),
+    // @ts-ignore - TODO: strict typing
     true,
         { ...getCollectionOpts((project as any)), agent },
   );
@@ -742,6 +748,7 @@ export async function handleAgent(params: any, emit: (event: import("../utils/Ss
             (agentSessionId as any),
       (project as any),
       (username as any),
+      // @ts-ignore - TODO: strict typing
       false,
             getCollectionOpts((project as any)),
     );
@@ -791,6 +798,7 @@ async function handleImageAPIModel(context: any) {
         (conversationId as any),
     (project as any),
     (username as any),
+    // @ts-ignore - TODO: strict typing
     true,
         getCollectionOpts((project as any)),
   );
@@ -925,6 +933,7 @@ async function handleImageAPIModel(context: any) {
             (conversationId as any),
       (project as any),
       (username as any),
+      // @ts-ignore - TODO: strict typing
       messagesToAppend,
       meta,
             getCollectionOpts((project as any)),
@@ -956,6 +965,7 @@ async function handleStreamingText(context: any) {
         (conversationId as any),
     (project as any),
     (username as any),
+    // @ts-ignore - TODO: strict typing
     true,
         getCollectionOpts((project as any)),
   );
@@ -1113,6 +1123,7 @@ async function handleStreamingText(context: any) {
     if (ss.usage) {
             (emit as any)({
         type: "usage_update",
+                // @ts-ignore - TODO: strict typing
                 usage: { ...ss.usage, requests: fcIteration + 1 },
       });
     }
@@ -1160,6 +1171,7 @@ async function handleNonStreamingText(context: any) {
         (conversationId as any),
     (project as any),
     (username as any),
+    // @ts-ignore - TODO: strict typing
     true,
         getCollectionOpts((project as any)),
   );

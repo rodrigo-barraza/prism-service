@@ -36,50 +36,33 @@ const PROTECTED_RECENT_TURNS = 4;
 function estimateMessageTokens(message) {
     let tokens = 4; // Per-message overhead (role, formatting)
     // Text content
-    // @ts-ignore - TODO: strict typing
     if (message.content) {
-        tokens += estimateTokens(
-        // @ts-ignore - TODO: strict typing
-        typeof message.content === "string"
-            // @ts-ignore - TODO: strict typing
+        tokens += estimateTokens(typeof message.content === "string"
             ? message.content
-            // @ts-ignore - TODO: strict typing
             : JSON.stringify(message.content));
     }
     // Thinking blocks
-    // @ts-ignore - TODO: strict typing
     if (message.thinking) {
-        // @ts-ignore - TODO: strict typing
         tokens += estimateTokens(message.thinking);
     }
     // Tool calls (function name + args + results)
-    // @ts-ignore - TODO: strict typing
     if (message.toolCalls && Array.isArray(message.toolCalls)) {
-        // @ts-ignore
         for (const tc of message.toolCalls) {
             tokens += estimateTokens(tc.name || "");
-            // @ts-ignore - TODO: strict typing
-            tokens += estimateTokens(tc.args ? JSON.stringify(tc.args) : "");
+            tokens += estimateTokens((tc.args ? JSON.stringify(tc.args) : ""));
             if (tc.result) {
                 tokens += estimateTokens(typeof tc.result === "string" ? tc.result : JSON.stringify(tc.result));
             }
         }
     }
     // Tool response content (standalone tool messages)
-    // @ts-ignore - TODO: strict typing
     if (message.role === "tool" && message.content) {
-        tokens += estimateTokens(
-        // @ts-ignore - TODO: strict typing
-        typeof message.content === "string"
-            // @ts-ignore - TODO: strict typing
+        tokens += estimateTokens(typeof message.content === "string"
             ? message.content
-            // @ts-ignore - TODO: strict typing
             : JSON.stringify(message.content));
     }
     // Images (rough: ~1000 tokens per image reference)
-    // @ts-ignore - TODO: strict typing
     if (message.images && Array.isArray(message.images)) {
-        // @ts-ignore - TODO: strict typing
         tokens += message.images.length * 1000;
     }
     return tokens;
@@ -91,10 +74,7 @@ function estimateMessageTokens(message) {
 
  */
 function estimateTotalTokens(messages) {
-    // @ts-ignore - TODO: strict typing
-    return messages.reduce(
-    // @ts-ignore - TODO: strict typing
-    (sum, message) => sum + estimateMessageTokens(message), 0);
+    return messages.reduce((sum, message) => sum + estimateMessageTokens(message), 0);
 }
 // ────────────────────────────────────────────────────────────
 // Truncation Strategies
@@ -112,36 +92,26 @@ function estimateTotalTokens(messages) {
 
  * @returns {Array} Messages with truncated tool results
  */
-function truncateToolResults(messages, 
-// @ts-ignore - TODO: strict typing
-protectedTurns = PROTECTED_RECENT_TURNS) {
+function truncateToolResults(messages, protectedTurns = PROTECTED_RECENT_TURNS) {
     // Find the protection boundary (same logic as compressOldAssistantMessages)
     let userTurnsSeen = 0;
     let protectionIndex = messages.length;
-    // @ts-ignore - TODO: strict typing
     for (let i = messages.length - 1; i >= 0; i--) {
-        // @ts-ignore - TODO: strict typing
         if (messages[i].role === "user") {
             userTurnsSeen++;
-            // @ts-ignore - TODO: strict typing
             if (userTurnsSeen >= protectedTurns) {
                 protectionIndex = i;
                 break;
             }
         }
     }
-    // @ts-ignore - TODO: strict typing
     return messages.map((message, i) => {
         // Never truncate tool results in recent (protected) messages
-        // @ts-ignore - TODO: strict typing
         if (i >= protectionIndex)
             return message;
-        // @ts-ignore - TODO: strict typing
         if (message.role !== "assistant" || !message.toolCalls?.length)
             return message;
-        // @ts-ignore - TODO: strict typing
         const truncated = { ...message };
-        // @ts-ignore - TODO: strict typing
         truncated.toolCalls = message.toolCalls.map((tc) => {
             if (!tc.result)
                 return tc;
@@ -165,41 +135,29 @@ protectedTurns = PROTECTED_RECENT_TURNS) {
 
 
  */
-function compressOldAssistantMessages(messages, 
-// @ts-ignore - TODO: strict typing
-protectedCount = PROTECTED_RECENT_TURNS) {
+function compressOldAssistantMessages(messages, protectedCount = PROTECTED_RECENT_TURNS) {
     // Count user turns from the end to determine protection boundary
     let userTurnsSeen = 0;
     let protectionIndex = messages.length;
-    // @ts-ignore - TODO: strict typing
     for (let i = messages.length - 1; i >= 0; i--) {
-        // @ts-ignore - TODO: strict typing
         if (messages[i].role === "user") {
             userTurnsSeen++;
-            // @ts-ignore - TODO: strict typing
             if (userTurnsSeen >= protectedCount) {
                 protectionIndex = i;
                 break;
             }
         }
     }
-    // @ts-ignore - TODO: strict typing
     return messages.map((message, i) => {
         // Never compress system messages, user messages, or protected recent messages
-        // @ts-ignore - TODO: strict typing
         if (message.role === "system" || message.role === "user" || i >= protectionIndex) {
             return message;
         }
         // Compress assistant messages
-        // @ts-ignore - TODO: strict typing
         if (message.role === "assistant") {
-            // @ts-ignore - TODO: strict typing
             const compressed = { ...message };
             // Keep a short summary of what the assistant did
-            const toolNames = 
-            // @ts-ignore - TODO: strict typing
-            message.toolCalls?.map((tc) => tc.name).join(", ") || "";
-            // @ts-ignore - TODO: strict typing
+            const toolNames = message.toolCalls?.map((tc) => tc.name).join(", ") || "";
             const contentPreview = message.content?.slice(0, 200) || "";
             compressed.content = `[Earlier response${toolNames ? ` — used: ${toolNames}` : ""}]${contentPreview ? `\n${contentPreview}...` : ""}`;
             compressed.thinking = undefined;
@@ -214,10 +172,8 @@ protectedCount = PROTECTED_RECENT_TURNS) {
             return compressed;
         }
         // Compress standalone tool messages
-        // @ts-ignore - TODO: strict typing
         if (message.role === "tool") {
             return {
-                // @ts-ignore - TODO: strict typing
                 ...message,
                 content: "[tool result truncated for context budget]",
             };
@@ -234,39 +190,29 @@ protectedCount = PROTECTED_RECENT_TURNS) {
 
  */
 function slidingWindowTruncation(messages, maxTokens) {
-    // @ts-ignore - TODO: strict typing
     if (messages.length <= 3)
         return messages;
     // Always keep: system message, first user message
     const head = [];
     let headEnd = 0;
-    // @ts-ignore - TODO: strict typing
     for (let i = 0; i < messages.length; i++) {
-        // @ts-ignore - TODO: strict typing
         head.push(messages[i]);
         headEnd = i + 1;
-        // @ts-ignore - TODO: strict typing
         if (messages[i].role === "user")
             break; // Stop after first user message
     }
     // Build tail from the end until we approach budget
     const tail = [];
     let tailTokens = 0;
-    // @ts-ignore - TODO: strict typing
     const headTokens = estimateTotalTokens(head);
-    // @ts-ignore - TODO: strict typing
     const availableForTail = maxTokens - headTokens - 200; // 200 token buffer for marker
-    // @ts-ignore - TODO: strict typing
     for (let i = messages.length - 1; i >= headEnd; i--) {
-        // @ts-ignore - TODO: strict typing
         const msgTokens = estimateMessageTokens(messages[i]);
         if (tailTokens + msgTokens > availableForTail)
             break;
-        // @ts-ignore - TODO: strict typing
         tail.unshift(messages[i]);
         tailTokens += msgTokens;
     }
-    // @ts-ignore - TODO: strict typing
     const droppedCount = messages.length - head.length - tail.length;
     if (droppedCount > 0) {
         // Insert a context marker so the model knows history was dropped
@@ -292,21 +238,11 @@ export default class ContextWindowManager {
      * @returns {{ messages: Array, truncated: boolean, strategy: string|null, estimatedTokens: number }}
      */
     static enforce(messages, options = {}) {
-        const { 
-        // @ts-ignore
-        maxInputTokens = 128_000, 
-        // @ts-ignore
-        maxOutputTokens = MIN_OUTPUT_RESERVE, 
-        // @ts-ignore
-        toolCount = 0, } = options;
+        const { maxInputTokens = 128_000, maxOutputTokens = MIN_OUTPUT_RESERVE, toolCount = 0, } = options;
         // Calculate the effective token budget
-        // @ts-ignore - TODO: strict typing
         const schemaOverhead = TOOL_SCHEMA_OVERHEAD_TOKENS + toolCount * 150;
-        // @ts-ignore - TODO: strict typing
         const outputReserve = Math.max(maxOutputTokens, MIN_OUTPUT_RESERVE);
-        const budget = Math.floor(
-        // @ts-ignore - TODO: strict typing
-        (maxInputTokens - outputReserve - schemaOverhead) * TARGET_UTILIZATION);
+        const budget = Math.floor((maxInputTokens - outputReserve - schemaOverhead) * TARGET_UTILIZATION);
         if (budget <= 0) {
             logger.warn(`[ContextWindowManager] Negative budget: maxInput=${maxInputTokens}, outputReserve=${outputReserve}, schemaOverhead=${schemaOverhead}`);
             return {
@@ -352,7 +288,6 @@ export default class ContextWindowManager {
             };
         }
         // Strategy 3: Sliding window — drop middle turns
-        // @ts-ignore - TODO: strict typing
         result = slidingWindowTruncation(result, budget);
         currentTokens = estimateTotalTokens(result);
         logger.info(`[ContextWindowManager] Applied sliding window: ${currentTokens} tokens (budget: ${budget})`);

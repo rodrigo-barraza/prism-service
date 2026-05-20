@@ -12,14 +12,14 @@ declare class MutationQueue {
   
   
      */
-    acquire(filePath: Record<string, unknown>, workerId?: Record<string, unknown>): Promise<unknown>;
+    acquire(filePath: any, workerId?: any): Promise<unknown>;
     /**
      * Release a lock on a file path.
      * If there are queued waiters, the next one is granted the lock.
      *
   
      */
-    release(filePath: Record<string, unknown>): void;
+    release(filePath: any): void;
     /**
      * Execute a function while holding a lock on the given file path.
      * The lock is automatically released after the function completes (or throws).
@@ -28,12 +28,12 @@ declare class MutationQueue {
   
      * @returns {Promise<*>} Result of fn()
      */
-    withLock(filePath: Record<string, unknown>, fn: Record<string, unknown>, workerId?: Record<string, unknown>): Promise<any>;
+    withLock(filePath: any, fn: any, workerId?: any): Promise<any>;
     /**
      * Get the current lock status for debugging.
      * @returns {Array<{ filePath: string, holder: string|null, queueLength: number }>}
      */
-    getStatus(): Record<string, unknown>[];
+    getStatus(): any[];
     /**
      * Force-release all locks. Use for cleanup on abort/shutdown.
      */

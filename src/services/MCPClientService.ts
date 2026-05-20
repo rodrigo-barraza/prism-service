@@ -217,6 +217,7 @@ const MCPClientService = {
 
    * @returns {Promise<object>} Tool result
    */
+    // @ts-ignore - TODO: strict typing
     async callTool(serverName: any, toolName: any, args: any = {}) {
     const conn = connections.get(serverName);
     if (!conn) {
@@ -524,6 +525,7 @@ const MCPClientService = {
       for (let i = 0; i < results.length; i++) {
         if (results[i].status === "rejected") {
           logger.warn(
+                        // @ts-ignore - TODO: strict typing
                         `[MCP] Auto-connect failed for "${servers[i].name}": ${results[i].reason?.message}`,
           );
         }

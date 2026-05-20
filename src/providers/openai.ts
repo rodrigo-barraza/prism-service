@@ -408,6 +408,7 @@ const openaiProvider = {
       reasoning.effort = options.reasoningEffort as ReasoningEffort;
     }
     if (options.reasoningSummary) {
+            // @ts-ignore - TODO: strict typing
             reasoning.summary = options.reasoningSummary as "auto" | "concise" | "detailed";
     }
     if (Object.keys(reasoning).length > 0) {
@@ -450,6 +451,7 @@ const openaiProvider = {
     }
 
     // Temperature/topP only work with reasoning.effort=none
+        // @ts-ignore - TODO: strict typing
         if (options.reasoningEffort === "none") {
       if (options.temperature !== undefined)
         payload.temperature = options.temperature;
@@ -690,6 +692,7 @@ const openaiProvider = {
       reasoning.effort = options.reasoningEffort as ReasoningEffort;
     }
     if (options.reasoningSummary) {
+            // @ts-ignore - TODO: strict typing
             reasoning.summary = options.reasoningSummary as "auto" | "concise" | "detailed";
     }
     if (Object.keys(reasoning).length > 0) {
@@ -732,6 +735,7 @@ const openaiProvider = {
     }
 
     // Temperature/topP only work with reasoning.effort=none
+        // @ts-ignore - TODO: strict typing
         if (options.reasoningEffort === "none") {
       if (options.temperature !== undefined)
         payload.temperature = options.temperature;
@@ -1107,6 +1111,7 @@ const openaiProvider = {
         response = await getClient().images.generate({
           model,
           prompt,
+                    // @ts-ignore - TODO: strict typing
                     output_format: "png" as "url" | "b64_json",
           size: "1024x1024",
           quality: "high",

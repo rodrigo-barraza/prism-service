@@ -82,7 +82,6 @@ export default {
         if (questions && Array.isArray(questions) && questions.length > 0) {
             // Multi-question mode — validate uniqueness
             const seen = new Set();
-            // @ts-ignore
             for (const q of questions) {
                 if (!q.question || typeof q.question !== "string") {
                     return {
@@ -98,7 +97,6 @@ export default {
                 // Validate option label uniqueness within each question
                 if (q.options?.length > 0) {
                     const labelsSeen = new Set();
-                    // @ts-ignore
                     for (const opt of q.options) {
                         if (labelsSeen.has(opt.label)) {
                             return {
@@ -112,12 +110,9 @@ export default {
             if (questions.length > 4) {
                 return { error: "Maximum 4 questions per call" };
             }
-            // @ts-ignore - TODO: strict typing
             normalizedQuestions = questions.map((q) => ({
                 question: q.question,
-                // @ts-ignore - TODO: strict typing
                 header: q.header?.slice(0, 16) || null,
-                // @ts-ignore - TODO: strict typing
                 options: (q.options || []).slice(0, 6).map((o) => ({
                     label: o.label,
                     preview: o.preview || null,
@@ -127,12 +122,10 @@ export default {
         }
         else if (question && typeof question === "string") {
             // Single question mode — backward-compatible
-            // @ts-ignore - TODO: strict typing
             normalizedQuestions = [
                 {
                     question,
                     header: null,
-                    // @ts-ignore - TODO: strict typing
                     options: (choices || []).map((c) => ({
                         label: c,
                         preview: null,
@@ -152,46 +145,33 @@ export default {
                 error: "No agent session — ask_user_question requires an active session",
             };
         }
-        // @ts-ignore - TODO: strict typing
-        const totalOptions = normalizedQuestions.reduce(
-        // @ts-ignore - TODO: strict typing
-        (sum, q) => sum + q.options.length, 0);
+        const totalOptions = normalizedQuestions.reduce((sum, q) => sum + q.options.length, 0);
         logger.info(`[AskUserQuestion] ${normalizedQuestions.length} question(s), ` +
             `${totalOptions} total options — ` +
-            // @ts-ignore - TODO: strict typing
             `"${normalizedQuestions[0].question.slice(0, 60)}${normalizedQuestions[0].question.length > 60 ? "..." : ""}"`);
         // Emit the SSE event with the full questions array
         if (context._emit) {
-            // @ts-ignore - TODO: strict typing
             context._emit({
                 type: "user_question",
                 // Full multi-question payload
                 questions: normalizedQuestions,
                 // Backward-compat fields for simple consumers
-                // @ts-ignore - TODO: strict typing
                 question: normalizedQuestions[0].question,
-                // @ts-ignore - TODO: strict typing
                 choices: normalizedQuestions[0].options.map((o) => o.label),
                 context: questionContext || null,
             });
         }
         const { default: AgenticLoopService } = await import("../AgenticLoopService.js");
-        // @ts-ignore - TODO: strict typing
         const result = await new Promise((resolve) => {
-            const timeoutId = setTimeout(
-            // @ts-ignore - TODO: strict typing
-            () => resolve({ answers: null, timedOut: true }), 300_000);
-            // @ts-ignore - TODO: strict typing
+            const timeoutId = setTimeout(() => resolve({ answers: null, timedOut: true }), 300_000);
             AgenticLoopService._setPendingQuestion(sessionId, {
                 resolve: (value) => {
                     clearTimeout(timeoutId);
-                    // @ts-ignore - TODO: strict typing
                     resolve(value);
                 },
                 questions: normalizedQuestions,
             });
         });
-        // @ts-ignore
         if (result.timedOut) {
             logger.warn(`[AskUserQuestion] Timed out after 5 minutes`);
             return {
@@ -200,22 +180,14 @@ export default {
                 message: "The user did not respond within 5 minutes.",
             };
         }
-        // @ts-ignore
-        logger.info(
-        // @ts-ignore
-        `[AskUserQuestion] Answered: ${JSON.stringify(result.answers).slice(0, 200)}`);
+        logger.info(`[AskUserQuestion] Answered: ${JSON.stringify(result.answers).slice(0, 200)}`);
         // Return structured response
         return {
-            // @ts-ignore - TODO: strict typing
             questions: normalizedQuestions.map((q) => q.question),
-            // @ts-ignore
             answers: result.answers,
             // Backward-compat for simple single-question consumers
-            // @ts-ignore
             answer: Array.isArray(result.answers)
-                // @ts-ignore
                 ? result.answers[0]?.answer
-                // @ts-ignore
                 : result.answers,
         };
     },

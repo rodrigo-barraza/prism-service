@@ -17,6 +17,7 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { project, username, db } = req;
       const filter = { project, username };
             if (req.query.type) (filter as any).type = req.query.type;
@@ -46,6 +47,7 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { project, username, db } = req;
       const { type, key, meta } = req.body;
 
@@ -87,6 +89,7 @@ router.delete(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { project, username, db } = req;
       const { type, key } = req.query;
 

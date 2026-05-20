@@ -1,5 +1,4 @@
 import MongoWrapper from "../wrappers/MongoWrapper.js";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.js";
 /**
  * Express middleware that attaches the MongoDB database instance to `req.db`.
@@ -13,7 +12,6 @@ export default function requireDb(req, res, next) {
     if (!db) {
         return res.status(503).json({ error: "Database not available" });
     }
-    // @ts-ignore - TODO: strict typing
     req.db = db;
     next();
 }

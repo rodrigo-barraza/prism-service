@@ -86,9 +86,7 @@ const TIER_LABELS = {
  */
 export default class AutoApprovalEngine {
     constructor(options = {}) {
-        // @ts-ignore
         this.fullAuto = options.fullAuto || false;
-        // @ts-ignore
         this.tierOverrides = options.tierOverrides || {};
     }
     /**
@@ -97,12 +95,9 @@ export default class AutoApprovalEngine {
      * @returns {number} Tier constant (1, 2, or 3)
      */
     getTier(toolName) {
-        // @ts-ignore
         if (this.tierOverrides[toolName] !== undefined) {
-            // @ts-ignore
             return this.tierOverrides[toolName];
         }
-        // @ts-ignore
         return DEFAULT_TIER_MAP[toolName] ?? APPROVAL_TIERS.WRITE; // Unknown tools default to Tier 2
     }
     /**
@@ -120,11 +115,9 @@ export default class AutoApprovalEngine {
      * @returns {{ approved: boolean, tier: number, tierLabel: string, reason: string }}
      */
     check(toolCall) {
-        // @ts-ignore - TODO: strict typing
         const tier = this.getTier(toolCall.name);
         const tierLabel = TIER_LABELS[tier] || "write";
         // Full Auto mode: everything runs
-        // @ts-ignore
         if (this.fullAuto) {
             return { approved: true, tier, tierLabel, reason: "full_auto" };
         }
@@ -144,7 +137,6 @@ export default class AutoApprovalEngine {
     checkBatch(toolCalls) {
         const autoApproved = [];
         const needsApproval = [];
-        // @ts-ignore
         for (const tc of toolCalls) {
             const result = this.check(tc);
             if (result.approved) {

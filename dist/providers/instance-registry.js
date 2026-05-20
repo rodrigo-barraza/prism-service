@@ -1,8 +1,6 @@
 // ─── Multi-Instance Local Provider Support ──────────────────
 import logger from "../utils/logger.js";
-import { PROVIDER_LM_STUDIO, PROVIDER_VLLM, PROVIDER_OLLAMA, PROVIDER_LLAMA_CPP,
-// @ts-ignore
- } from "../../config.js";
+import { PROVIDER_LM_STUDIO, PROVIDER_VLLM, PROVIDER_OLLAMA, PROVIDER_LLAMA_CPP, } from "../../config.js";
 // Import factories
 import { createLmStudioProvider } from "./lm-studio.js";
 import { createOllamaProvider } from "./ollama.js";
@@ -40,7 +38,6 @@ const registry = new Map();
  * @param {Array<{url: string, concurrency?: number, nickname?: string}>} instances
  */
 function registerType(type, instances) {
-    // @ts-ignore
     const factory = FACTORIES[type];
     if (!factory)
         return;
@@ -60,7 +57,6 @@ function registerType(type, instances) {
             instanceNumber,
             provider,
         };
-        // @ts-ignore
         if (nickname)
             entry.nickname = nickname;
         registry.set(id, entry);
@@ -69,7 +65,6 @@ function registerType(type, instances) {
     }
 }
 // ── Register all instances from secrets ─────────────────────
-// @ts-ignore
 for (const [type, instances] of Object.entries(PROVIDER_ARRAYS)) {
     registerType(type, instances);
 }

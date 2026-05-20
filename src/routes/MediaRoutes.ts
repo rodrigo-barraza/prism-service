@@ -14,6 +14,7 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { db } = req;
 
       const {

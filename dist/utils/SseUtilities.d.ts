@@ -24,7 +24,7 @@ export declare function createSseEmitter(res: Response, signal: AbortSignal): (e
 
  * @returns {{ error?: object, response?: object }}
  */
-export declare function buildJsonResponseFromEvents(events: SseEvent[], reqBody: Record<string, any>): {
+export declare function buildJsonResponseFromEvents(events: SseEvent[], reqBody: any): {
     error: ProviderError;
     response?: undefined;
 } | {
@@ -56,7 +56,7 @@ export declare function buildJsonResponseFromEvents(events: SseEvent[], reqBody:
 
 
  */
-export declare function handleSseRequest(req: Request, res: Response, params: Record<string, any>, handler?: (params: Record<string, any>, onEvent: (event: SseEvent) => void, context: {
+export declare function handleSseRequest(req: Request, res: Response, params: any, handler?: (params: any, onEvent: (event: SseEvent) => void, context: {
     signal: AbortSignal;
 }) => Promise<void>): Promise<void>;
 /**
@@ -66,5 +66,5 @@ export declare function handleSseRequest(req: Request, res: Response, params: Re
 
 
  */
-export declare function handleJsonRequest(req: Request, res: Response, next: NextFunction, params: Record<string, any>, handler?: (params: Record<string, any>, onEvent: (event: SseEvent) => void) => Promise<void>): Promise<void>;
+export declare function handleJsonRequest(req: Request, res: Response, next: NextFunction, params: any, handler?: (params: any, onEvent: (event: SseEvent) => void) => Promise<void>): Promise<void>;
 //# sourceMappingURL=SseUtilities.d.ts.map

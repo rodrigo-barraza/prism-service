@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router } from "express";
 import logger from "../utils/logger.js";
@@ -20,26 +19,20 @@ const COLLECTION = COLLECTIONS.VRAM_BENCHMARKS;
  */
 router.get("/", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const filter = { error: null };
         if (req.query.settings) {
-            // @ts-ignore
             filter["settings.label"] = req.query.settings;
         }
         if (req.query.hostname) {
-            // @ts-ignore
             filter["system.hostname"] = req.query.hostname;
         }
         if (req.query.ctx) {
-            // @ts-ignore
             filter.contextLength = parseInt(req.query.ctx);
         }
         if (req.query.provider) {
-            // @ts-ignore
             filter.provider = req.query.provider;
         }
-        // @ts-ignore - TODO: strict typing
         const limit = Math.min(parseInt(req.query.limit) || 2000, 10000);
         // Full projection — includes all measurement fields from the benchmark script
         const projection = {
@@ -98,7 +91,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
         res.json({ count: docs.length, data: docs });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /vram-benchmarks error: ${error.message}`);
         next(error);
     }
@@ -109,7 +101,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
  */
 router.get("/machines", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const pipeline = [
             { $match: { "system.hostname": { $exists: true } } },
@@ -139,7 +130,6 @@ router.get("/machines", asyncHandler(async (req, res, next) => {
         res.json(machines.map((m) => ({
             hostname: m._id,
             gpu: m.gpu,
-            // @ts-ignore - TODO: strict typing
             gpuVramGB: m.gpuVramMiB ? Math.round(m.gpuVramMiB / 1024) : null,
             gpuVendor: m.gpuVendor || null,
             gpuDriver: m.gpuDriver || null,
@@ -154,7 +144,6 @@ router.get("/machines", asyncHandler(async (req, res, next) => {
         })));
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /vram-benchmarks/machines error: ${error.message}`);
         next(error);
     }
@@ -165,26 +154,21 @@ router.get("/machines", asyncHandler(async (req, res, next) => {
  */
 router.get("/settings", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const labels = await db
             .collection(COLLECTION)
             .distinct("settings.label", { error: null });
         // Sort with "default" first, then alphabetically
         labels.sort((a, b) => {
-            // @ts-ignore - TODO: strict typing
             if (a === "default")
                 return -1;
-            // @ts-ignore - TODO: strict typing
             if (b === "default")
                 return 1;
-            // @ts-ignore - TODO: strict typing
             return a.localeCompare(b);
         });
         res.json(labels);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /vram-benchmarks/settings error: ${error.message}`);
         next(error);
     }
@@ -195,22 +179,18 @@ router.get("/settings", asyncHandler(async (req, res, next) => {
  */
 router.get("/contexts", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const filter = { error: null };
         if (req.query.settings) {
-            // @ts-ignore
             filter["settings.label"] = req.query.settings;
         }
         const contexts = await db
             .collection(COLLECTION)
             .distinct("contextLength", filter);
-        // @ts-ignore - TODO: strict typing
         contexts.sort((a, b) => a - b);
         res.json(contexts);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /vram-benchmarks/contexts error: ${error.message}`);
         next(error);
     }

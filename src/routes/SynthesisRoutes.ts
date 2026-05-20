@@ -17,6 +17,7 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { project, username, db } = req;
       const runs = await db
         .collection(COLLECTION)
@@ -40,6 +41,7 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { project, username, db } = req;
       const run = await db
         .collection(COLLECTION)
@@ -65,6 +67,7 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { project, username, db } = req;
       const {
         id,
@@ -118,6 +121,7 @@ router.patch(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { project, username, db } = req;
       const allowedFields = [
         "title",
@@ -169,6 +173,7 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { project, username, db } = req;
       const result = await db
         .collection(COLLECTION)

@@ -8,14 +8,12 @@ import { join } from "path";
 import sharp from "sharp";
 import logger from "./logger.js";
 // ── ffmpeg availability (cached per process) ────────────────
-// @ts-ignore
 let _ffmpegAvailable = null;
 /**
  * Probe whether ffmpeg is on the PATH. Result is cached after first call.
 
  */
 async function isFfmpegAvailable() {
-    // @ts-ignore
     if (_ffmpegAvailable !== null)
         return _ffmpegAvailable;
     return new Promise((resolve) => {
@@ -111,7 +109,7 @@ export async function constrainImageDimensions(base64Data, mediaType, maxDim = M
             pipeline = pipeline.webp();
         }
         else {
-            // JPEG for everything else (bmp, tiff, avif, unknown)
+            // JPEG for everything else (bmp, tiff, avif, any)
             pipeline = pipeline.jpeg({ quality: 90, mozjpeg: true });
             outputMime = "image/jpeg";
         }
@@ -147,7 +145,6 @@ async function compressGifWithFfmpeg(base64Data, maxBytes) {
         // Progressive resize: 75% → 56% → 42% → 32% → 24% → 18% of original
         const scaleFactors = [0.75, 0.75, 0.75, 0.75, 0.75, 0.75];
         let cumulativeScale = 1;
-        // @ts-ignore
         for (const factor of scaleFactors) {
             cumulativeScale *= factor;
             const outputPath = join(tmpDir, `output_${Math.round(cumulativeScale * 100)}.gif`);
@@ -220,7 +217,6 @@ async function compressWithSharp(base64Data, maxBytes) {
     let buffer = Buffer.from(base64Data, "base64");
     const qualitySteps = [85, 70, 50];
     // Step 1: try quality reduction (convert to JPEG)
-    // @ts-ignore
     for (const quality of qualitySteps) {
         const compressed = await sharp(buffer)
             .jpeg({ quality, mozjpeg: true })
@@ -234,7 +230,6 @@ async function compressWithSharp(base64Data, maxBytes) {
                 mediaType: "image/jpeg",
             };
         }
-        // @ts-ignore
         buffer = compressed;
     }
     // Step 2: progressive resize (shrink by 25% each iteration)
@@ -289,7 +284,7 @@ export function getUrlType(url) {
         return "data";
     if (url.startsWith("http://") || url.startsWith("https://"))
         return "http";
-    return "unknown";
+    return "any";
 }
 /**
  * Infer MIME category from a URL's file extension.
@@ -309,7 +304,7 @@ export function inferMimeFromUrl(url) {
     catch {
         /* ignore */
     }
-    return "unknown";
+    return "any";
 }
 // ── Video Frame Extraction ──────────────────────────────────
 /**
@@ -325,7 +320,6 @@ export function inferMimeFromUrl(url) {
  * @returns {Promise<string[]>} Array of data:image/jpeg;base64,... URLs
  */
 export async function extractVideoFrames(videoDataUrl, options = {}) {
-    // @ts-ignore
     const { fps = 1, maxFrames = 8, quality = 5 } = options;
     // ── Graceful degradation: fail fast if ffmpeg is not installed
     const hasFfmpeg = await isFfmpegAvailable();
@@ -391,9 +385,8 @@ export async function extractVideoFrames(videoDataUrl, options = {}) {
         }
         if (frames.length === 0) {
             // ffmpeg ran but produced no frames — extract error details
-            // @ts-ignore
             const durationMatch = ffmpegStderr?.match(/Duration: ([^,]+)/);
-            const duration = durationMatch?.[1] || "unknown";
+            const duration = durationMatch?.[1] || "any";
             throw new Error(`ffmpeg produced 0 frames from ${fileSizeMB} MB ${ext} video (duration: ${duration}). ` +
                 `The file may be corrupt, use an unsupported codec, or contain no video stream.`);
         }

@@ -11,8 +11,8 @@ export declare function createLlamaCppProvider(baseUrl: string, instanceId?: str
         text: any;
         thinking: any;
         usage: {
-            inputTokens: {};
-            outputTokens: {};
+            inputTokens: any;
+            outputTokens: any;
         };
     }>;
     generateTextStream(messages: ChatMessage[], model?: string, options?: ProviderOptions): AsyncGenerator<any, void, unknown>;
@@ -35,7 +35,7 @@ export declare function createLlamaCppProvider(baseUrl: string, instanceId?: str
     } | {
         ok: boolean;
         status: string;
-        error: any;
+        error: string;
         slotsIdle?: undefined;
         slotsProcessing?: undefined;
     }>;

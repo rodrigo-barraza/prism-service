@@ -101,10 +101,12 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       // ── beforePrompt hook (iteration 1 only) ──────────────
       if (state.iterations === 1) {
+        // @ts-ignore - TODO: strict typing
         interface HookContextType extends any {
           _injectedSkills?: any[];
         }
         const hookContext: HookContextType = {
+          // @ts-ignore - TODO: strict typing
           messages: currentMessages,
           project,
           username,

@@ -12,12 +12,12 @@ declare const ChangeStreamService: {
      * Register a listener for collection change events.
   
      */
-    subscribe(callback: Record<string, unknown>): void;
+    subscribe(callback: any): void;
     /**
      * Unregister a listener.
   
      */
-    unsubscribe(callback: Record<string, unknown>): void;
+    unsubscribe(callback: any): void;
     /**
      * Close all Change Streams. Call on shutdown.
      */

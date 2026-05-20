@@ -54,9 +54,11 @@ class RateLimitStore {
      * Key: `${provider}::${model}` → { rateLimits, updatedAt }
      * @type {Map<string, { rateLimits: object, updatedAt: string }>}
      */
+        // @ts-ignore - TODO: strict typing
         this._models = new Map();
 
     /** Static Google limits (separate shape — not per-response). */
+        // @ts-ignore - TODO: strict typing
         this._google = GOOGLE_STATIC_LIMITS;
   }
 

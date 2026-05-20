@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import FileService from "../services/FileService.js";
@@ -20,7 +19,6 @@ router.post("/upload", asyncHandler(async (req, res, next) => {
         res.json(result);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`File upload error: ${error.message}`);
         next(error);
     }
@@ -44,11 +42,9 @@ router.get("/*key", asyncHandler(async (req, res, next) => {
         }
         res.setHeader("Content-Type", result.contentType);
         res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-        // @ts-ignore - TODO: strict typing
         result.stream.pipe(res);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`File retrieval error: ${error.message}`);
         next(error);
     }

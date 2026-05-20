@@ -69,7 +69,7 @@ declare const _default: {
     };
     domain: string;
     labels: string[];
-    execute(args: Record<string, unknown>, context: Record<string, unknown>): Promise<{
+    execute(args: any, context: any): Promise<{
         error: string;
         answers?: undefined;
         timedOut?: undefined;

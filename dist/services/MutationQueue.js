@@ -19,7 +19,6 @@ import logger from "../utils/logger.js";
 class MutationQueue {
     constructor() {
         /** @type {Map<string, { queue: Array<Function>, holder: string|null }>} */
-        // @ts-ignore
         this._locks = new Map();
     }
     /**
@@ -29,14 +28,10 @@ class MutationQueue {
   
   
      */
-    // @ts-ignore - TODO: strict typing
-    async acquire(filePath, workerId = "unknown") {
-        // @ts-ignore
+    async acquire(filePath, workerId = "any") {
         if (!this._locks.has(filePath)) {
-            // @ts-ignore
             this._locks.set(filePath, { queue: [], holder: null });
         }
-        // @ts-ignore
         const lock = this._locks.get(filePath);
         // If no one holds the lock, acquire immediately
         if (!lock.holder) {
@@ -49,12 +44,10 @@ class MutationQueue {
         }
         // Otherwise, enqueue and wait
         logger.info(`[MutationQueue] Waiting for lock: ${filePath} (worker: ${workerId}, held by: ${lock.holder})`);
-        // @ts-ignore - TODO: strict typing
         return new Promise((resolve) => {
             lock.queue.push(() => {
                 lock.holder = workerId;
                 logger.info(`[MutationQueue] Lock acquired (from queue): ${filePath} (worker: ${workerId})`);
-                // @ts-ignore - TODO: strict typing
                 resolve({
                     filePath,
                     release: () => this.release(filePath),
@@ -69,7 +62,6 @@ class MutationQueue {
   
      */
     release(filePath) {
-        // @ts-ignore
         const lock = this._locks.get(filePath);
         if (!lock)
             return;
@@ -82,7 +74,6 @@ class MutationQueue {
         }
         else {
             // No waiters — clean up the entry
-            // @ts-ignore
             this._locks.delete(filePath);
         }
         logger.info(`[MutationQueue] Lock released: ${filePath} (was: ${previousHolder})`);
@@ -95,15 +86,12 @@ class MutationQueue {
   
      * @returns {Promise<*>} Result of fn()
      */
-    // @ts-ignore - TODO: strict typing
-    async withLock(filePath, fn, workerId = "unknown") {
+    async withLock(filePath, fn, workerId = "any") {
         const handle = await this.acquire(filePath, workerId);
         try {
-            // @ts-ignore - TODO: strict typing
             return await fn();
         }
         finally {
-            // @ts-ignore
             handle.release();
         }
     }
@@ -113,7 +101,6 @@ class MutationQueue {
      */
     getStatus() {
         const entries = [];
-        // @ts-ignore
         for (const [filePath, lock] of this._locks) {
             entries.push({
                 filePath,
@@ -127,11 +114,9 @@ class MutationQueue {
      * Force-release all locks. Use for cleanup on abort/shutdown.
      */
     releaseAll() {
-        // @ts-ignore
         for (const [filePath] of this._locks) {
             this.release(filePath);
         }
-        // @ts-ignore
         this._locks.clear();
         logger.info("[MutationQueue] All locks released");
     }

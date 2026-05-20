@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router } from "express";
 import { ObjectId } from "mongodb";
@@ -17,23 +16,13 @@ const MEDIA_FIELDS = ["images", "audio", "video", "pdf"];
  * Upload a single value if it's a base64 data URL, returning the minio:// ref.
  * Non-data-URL strings (minio://, http://, etc.) pass through unchanged.
  */
-async function uploadIfDataUrl(value, 
-// @ts-ignore - TODO: strict typing
-category = "uploads", 
-// @ts-ignore - TODO: strict typing
-project = null, 
-// @ts-ignore - TODO: strict typing
-username = null) {
-    // @ts-ignore - TODO: strict typing
+async function uploadIfDataUrl(value, category = "uploads", project = null, username = null) {
     if (typeof value === "string" && value.startsWith("data:")) {
         try {
-            const { ref } = await FileService.uploadFile(value, 
-            // @ts-ignore - TODO: strict typing
-            category, project, username);
+            const { ref } = await FileService.uploadFile(value, category, project, username);
             return ref;
         }
         catch (error) {
-            // @ts-ignore - TODO: strict typing
             logger.error(`Workflow file upload failed: ${error.message}`);
             return value;
         }
@@ -45,45 +34,32 @@ username = null) {
  * replacing them with minio:// refs.  Mirrors the extractFiles pattern
  * used by ConversationService for chat messages.
  */
-async function extractWorkflowFiles(nodes, 
-// @ts-ignore - TODO: strict typing
-project = null, 
-// @ts-ignore - TODO: strict typing
-username = null) {
+async function extractWorkflowFiles(nodes, project = null, username = null) {
     if (!Array.isArray(nodes) || !FileService.isExternalStorage())
         return nodes;
     const processed = [];
-    // @ts-ignore
     for (const node of nodes) {
         const updated = { ...node };
         // 1. Node-level content (asset input nodes store content as a data URL)
         if (typeof updated.content === "string" &&
             updated.content.startsWith("data:")) {
-            updated.content = await uploadIfDataUrl(updated.content, 
-            // @ts-ignore - TODO: strict typing
-            "uploads", project, username);
+            updated.content = await uploadIfDataUrl(updated.content, "uploads", project, username);
         }
         // 2. Messages array (conversation / model nodes)
         if (Array.isArray(updated.messages)) {
             const newMessages = [];
-            // @ts-ignore
             for (const message of updated.messages) {
                 const m = { ...message };
-                // @ts-ignore
                 for (const field of MEDIA_FIELDS) {
                     const value = m[field];
                     if (Array.isArray(value)) {
                         const array = [];
-                        // @ts-ignore
                         for (const item of value) {
-                            array.push(
-                            // @ts-ignore - TODO: strict typing
-                            await uploadIfDataUrl(item, "uploads", project, username));
+                            array.push(await uploadIfDataUrl(item, "uploads", project, username));
                         }
                         m[field] = array;
                     }
                     else if (typeof value === "string" && value.startsWith("data:")) {
-                        // @ts-ignore - TODO: strict typing
                         m[field] = await uploadIfDataUrl(value, "uploads", project, username);
                     }
                 }
@@ -95,12 +71,8 @@ username = null) {
         if (updated.receivedOutputs &&
             typeof updated.receivedOutputs === "object") {
             const newReceived = {};
-            // @ts-ignore
             for (const [mod, data] of Object.entries(updated.receivedOutputs)) {
-                // @ts-ignore
-                newReceived[mod] = await uploadIfDataUrl(
-                // @ts-ignore - TODO: strict typing
-                data, "uploads", project, username);
+                newReceived[mod] = await uploadIfDataUrl(data, "uploads", project, username);
             }
             updated.receivedOutputs = newReceived;
         }
@@ -112,64 +84,45 @@ username = null) {
  * Walk nodeResults and upload any base64 data URLs to MinIO.
  * Shape: { [nodeId]: { [modality]: dataUrl | messagesArray } }
  */
-async function extractNodeResultFiles(nodeResults, 
-// @ts-ignore - TODO: strict typing
-project = null, 
-// @ts-ignore - TODO: strict typing
-username = null) {
+async function extractNodeResultFiles(nodeResults, project = null, username = null) {
     if (!nodeResults ||
         typeof nodeResults !== "object" ||
         !FileService.isExternalStorage())
         return nodeResults;
     const processed = {};
-    // @ts-ignore
     for (const [nodeId, outputs] of Object.entries(nodeResults)) {
         if (!outputs || typeof outputs !== "object") {
-            // @ts-ignore
             processed[nodeId] = outputs;
             continue;
         }
         const newOutputs = {};
-        // @ts-ignore
         for (const [mod, data] of Object.entries(outputs)) {
             // conversation modality is an array of message objects with nested media
             if (mod === "conversation" && Array.isArray(data)) {
                 const msgs = [];
-                // @ts-ignore
                 for (const message of data) {
                     const m = { ...message };
-                    // @ts-ignore
                     for (const field of MEDIA_FIELDS) {
                         const value = m[field];
                         if (Array.isArray(value)) {
                             const array = [];
-                            // @ts-ignore
                             for (const item of value) {
-                                array.push(
-                                // @ts-ignore - TODO: strict typing
-                                await uploadIfDataUrl(item, "uploads", project, username));
+                                array.push(await uploadIfDataUrl(item, "uploads", project, username));
                             }
                             m[field] = array;
                         }
                         else if (typeof value === "string" && value.startsWith("data:")) {
-                            m[field] = await uploadIfDataUrl(
-                            // @ts-ignore - TODO: strict typing
-                            value, "uploads", project, username);
+                            m[field] = await uploadIfDataUrl(value, "uploads", project, username);
                         }
                     }
                     msgs.push(m);
                 }
-                // @ts-ignore
                 newOutputs[mod] = msgs;
             }
             else {
-                // @ts-ignore
-                newOutputs[mod] = await uploadIfDataUrl(data, 
-                // @ts-ignore - TODO: strict typing
-                "uploads", project, username);
+                newOutputs[mod] = await uploadIfDataUrl(data, "uploads", project, username);
             }
         }
-        // @ts-ignore
         processed[nodeId] = newOutputs;
     }
     return processed;
@@ -179,9 +132,7 @@ username = null) {
  * Non-minio strings (data URLs, http URLs, etc.) pass through unchanged.
  */
 function resolveMinioRef(value, baseUrl) {
-    // @ts-ignore - TODO: strict typing
     if (typeof value === "string" && value.startsWith("minio://")) {
-        // @ts-ignore - TODO: strict typing
         const key = value.replace("minio://", "");
         // Use direct MinIO URL when available, otherwise proxy through Prism
         const minioBase = MinioWrapper.getBucketUrl();
@@ -198,7 +149,6 @@ function resolveMinioRef(value, baseUrl) {
 function resolveWorkflowFileRefs(workflow, baseUrl) {
     // Resolve nodes
     if (Array.isArray(workflow.nodes)) {
-        // @ts-ignore
         for (const node of workflow.nodes) {
             // Node-level content (asset input nodes)
             if (typeof node.content === "string") {
@@ -206,16 +156,13 @@ function resolveWorkflowFileRefs(workflow, baseUrl) {
             }
             // Messages array (conversation / model nodes)
             if (Array.isArray(node.messages)) {
-                // @ts-ignore
                 for (const message of node.messages) {
-                    // @ts-ignore
                     for (const field of MEDIA_FIELDS) {
                         const value = message[field];
                         if (Array.isArray(value)) {
                             message[field] = value.map((item) => resolveMinioRef(item, baseUrl));
                         }
                         else if (typeof value === "string") {
-                            // @ts-ignore - TODO: strict typing
                             message[field] = resolveMinioRef(value, baseUrl);
                         }
                     }
@@ -223,9 +170,7 @@ function resolveWorkflowFileRefs(workflow, baseUrl) {
             }
             // Viewer receivedOutputs
             if (node.receivedOutputs && typeof node.receivedOutputs === "object") {
-                // @ts-ignore
                 for (const [mod, data] of Object.entries(node.receivedOutputs)) {
-                    // @ts-ignore - TODO: strict typing
                     node.receivedOutputs[mod] = resolveMinioRef(data, baseUrl);
                 }
             }
@@ -233,31 +178,25 @@ function resolveWorkflowFileRefs(workflow, baseUrl) {
     }
     // Resolve nodeResults: { [nodeId]: { [modality]: value | messagesArray } }
     if (workflow.nodeResults && typeof workflow.nodeResults === "object") {
-        // @ts-ignore
         for (const outputs of Object.values(workflow.nodeResults)) {
             if (!outputs || typeof outputs !== "object")
                 continue;
-            // @ts-ignore
             for (const [mod, data] of Object.entries(outputs)) {
                 // conversation modality is an array of message objects with nested media
                 if (mod === "conversation" && Array.isArray(data)) {
-                    // @ts-ignore
                     for (const message of data) {
-                        // @ts-ignore
                         for (const field of MEDIA_FIELDS) {
                             const value = message[field];
                             if (Array.isArray(value)) {
                                 message[field] = value.map((item) => resolveMinioRef(item, baseUrl));
                             }
                             else if (typeof value === "string") {
-                                // @ts-ignore - TODO: strict typing
                                 message[field] = resolveMinioRef(value, baseUrl);
                             }
                         }
                     }
                 }
                 else {
-                    // @ts-ignore
                     outputs[mod] = resolveMinioRef(data, baseUrl);
                 }
             }
@@ -269,9 +208,7 @@ function resolveWorkflowFileRefs(workflow, baseUrl) {
  * Build the external base URL from the request (handles proxies, HTTPS, etc.).
  */
 function getBaseUrl(req) {
-    // @ts-ignore - TODO: strict typing
     const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
-    // @ts-ignore - TODO: strict typing
     const host = req.headers["x-forwarded-host"] || req.get("host");
     return `${proto}://${host}`;
 }
@@ -282,24 +219,19 @@ function getBaseUrl(req) {
  */
 function computeWorkflowMeta(nodes) {
     const providers = [
-        ...new Set(
-        // @ts-ignore - TODO: strict typing
-        (nodes || [])
+        ...new Set((nodes || [])
             .filter((n) => !n.nodeType && n.provider)
             .map((n) => n.provider)),
     ];
     const modalities = {};
-    // @ts-ignore
     for (const n of nodes || []) {
         // Only include boundary nodes: input assets define workflow inputs,
         // viewer nodes define workflow outputs
         if (n.nodeType === "input") {
-            // @ts-ignore
             for (const t of n.outputTypes || [])
                 modalities[`${t}In`] = true;
         }
         else if (n.nodeType === "viewer") {
-            // @ts-ignore
             for (const t of n.inputTypes || [])
                 modalities[`${t}Out`] = true;
         }
@@ -312,7 +244,6 @@ function computeWorkflowMeta(nodes) {
  */
 router.get("/", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const source = req.query.source || "prism-client";
         const query = source === "all" ? {} : { source };
@@ -325,7 +256,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
         res.json(workflows);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /workflows error: ${error.message}`);
         next(error);
     }
@@ -336,11 +266,9 @@ router.get("/", asyncHandler(async (req, res, next) => {
  */
 router.get("/:id", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { db } = req;
         let filter;
         try {
-            // @ts-ignore - TODO: strict typing
             filter = { _id: new ObjectId(req.params.id) };
         }
         catch {
@@ -349,14 +277,11 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
         const workflow = await db.collection(WORKFLOWS_COL).findOne(filter);
         if (!workflow)
             return res.status(404).json({ error: "Workflow not found" });
-        // @ts-ignore - TODO: strict typing
         const baseUrl = getBaseUrl(req);
-        // @ts-ignore - TODO: strict typing
         resolveWorkflowFileRefs(workflow, baseUrl);
         res.json(workflow);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /workflows/:id error: ${error.message}`);
         next(error);
     }
@@ -373,7 +298,6 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
  */
 router.post("/", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const project = req.project;
         const username = req.username || null;
@@ -387,15 +311,10 @@ router.post("/", asyncHandler(async (req, res, next) => {
             edges = graph.edges;
             nodeResults = graph.nodeResults;
         }
-        const processedNodes = await extractWorkflowFiles(nodes, 
-        // @ts-ignore - TODO: strict typing
-        project, username);
-        const processedResults = await extractNodeResultFiles(nodeResults, 
-        // @ts-ignore - TODO: strict typing
-        project, username);
+        const processedNodes = await extractWorkflowFiles(nodes, project, username);
+        const processedResults = await extractNodeResultFiles(nodeResults, project, username);
         const now = new Date().toISOString();
         const finalNodes = processedNodes || nodes;
-        // @ts-ignore - TODO: strict typing
         const meta = computeWorkflowMeta(finalNodes);
         // Compute totalCost from linked conversations (source of truth for cost)
         let totalCost = 0;
@@ -406,9 +325,7 @@ router.post("/", asyncHandler(async (req, res, next) => {
                 .find({ id: { $in: convIds } })
                 .project({ totalCost: 1 })
                 .toArray();
-            totalCost = conversations.reduce(
-            // @ts-ignore - TODO: strict typing
-            (sum, c) => sum + (c.totalCost || 0), 0);
+            totalCost = conversations.reduce((sum, c) => sum + (c.totalCost || 0), 0);
         }
         const workflow = {
             ...req.body,
@@ -427,7 +344,6 @@ router.post("/", asyncHandler(async (req, res, next) => {
         res.json({ success: true, id: result.insertedId.toString() });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`POST /workflows error: ${error.message}`);
         next(error);
     }
@@ -438,11 +354,9 @@ router.post("/", asyncHandler(async (req, res, next) => {
  */
 router.put("/:id", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { db } = req;
         let filter;
         try {
-            // @ts-ignore - TODO: strict typing
             filter = { _id: new ObjectId(req.params.id) };
         }
         catch {
@@ -452,16 +366,13 @@ router.put("/:id", asyncHandler(async (req, res, next) => {
         const username = req.username || null;
         const body = { ...req.body };
         if (Array.isArray(body.nodes)) {
-            // @ts-ignore - TODO: strict typing
             body.nodes = await extractWorkflowFiles(body.nodes, project, username);
             body.nodeCount = body.nodes.length;
             // Recompute metadata
             Object.assign(body, computeWorkflowMeta(body.nodes));
         }
         if (body.nodeResults && typeof body.nodeResults === "object") {
-            body.nodeResults = await extractNodeResultFiles(body.nodeResults, 
-            // @ts-ignore - TODO: strict typing
-            project, username);
+            body.nodeResults = await extractNodeResultFiles(body.nodeResults, project, username);
         }
         if (Array.isArray(body.edges))
             body.edgeCount = body.edges.length;
@@ -480,7 +391,6 @@ router.put("/:id", asyncHandler(async (req, res, next) => {
         res.json({ success: true });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`PUT /workflows/:id error: ${error.message}`);
         next(error);
     }
@@ -492,11 +402,9 @@ router.put("/:id", asyncHandler(async (req, res, next) => {
  */
 router.patch("/:id/conversations", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { db } = req;
         let filter;
         try {
-            // @ts-ignore - TODO: strict typing
             filter = { _id: new ObjectId(req.params.id) };
         }
         catch {
@@ -524,9 +432,7 @@ router.patch("/:id/conversations", asyncHandler(async (req, res, next) => {
                 .find({ id: { $in: allConvIds } })
                 .project({ totalCost: 1 })
                 .toArray();
-            const totalCost = conversations.reduce(
-            // @ts-ignore - TODO: strict typing
-            (sum, c) => sum + (c.totalCost || 0), 0);
+            const totalCost = conversations.reduce((sum, c) => sum + (c.totalCost || 0), 0);
             await db.collection(WORKFLOWS_COL).updateOne(filter, {
                 $set: { totalCost },
             });
@@ -534,9 +440,7 @@ router.patch("/:id/conversations", asyncHandler(async (req, res, next) => {
         res.json({ success: true });
     }
     catch (error) {
-        logger.error(
-        // @ts-ignore - TODO: strict typing
-        `PATCH /workflows/:id/conversations error: ${error.message}`);
+        logger.error(`PATCH /workflows/:id/conversations error: ${error.message}`);
         next(error);
     }
 }));
@@ -546,11 +450,9 @@ router.patch("/:id/conversations", asyncHandler(async (req, res, next) => {
  */
 router.delete("/:id", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { db } = req;
         let filter;
         try {
-            // @ts-ignore - TODO: strict typing
             filter = { _id: new ObjectId(req.params.id) };
         }
         catch {
@@ -560,7 +462,6 @@ router.delete("/:id", asyncHandler(async (req, res, next) => {
         res.json({ success: true });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`DELETE /workflows/:id error: ${error.message}`);
         next(error);
     }

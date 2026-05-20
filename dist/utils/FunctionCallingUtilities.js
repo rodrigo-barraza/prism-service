@@ -22,13 +22,11 @@ const TRUNCATABLE_ARRAY_KEYS = [
  * The full result is still stored in the DB and shown in the UI;
  * this only affects what gets re-sent to the model.
  */
-// @ts-ignore - TODO: strict typing
 export function truncateToolResult(result, maxChars = 8000) {
     if (!result || typeof result !== "object")
         return result;
     // If result has a known array wrapper, cap items at 10
     const trimmed = { ...result };
-    // @ts-ignore
     for (const key of TRUNCATABLE_ARRAY_KEYS) {
         if (Array.isArray(trimmed[key]) && trimmed[key].length > 10) {
             const total = trimmed[key].length;
@@ -41,14 +39,11 @@ export function truncateToolResult(result, maxChars = 8000) {
         const sliced = result.slice(0, 10);
         sliced.push({ _truncated: `Showing 10 of ${result.length}` });
         const str = JSON.stringify(sliced);
-        // @ts-ignore - TODO: strict typing
         return str.length > maxChars ? str.slice(0, maxChars) + "…}" : sliced;
     }
     const str = JSON.stringify(trimmed);
-    // @ts-ignore - TODO: strict typing
     if (str.length <= maxChars)
         return trimmed;
-    // @ts-ignore - TODO: strict typing
     return str.slice(0, maxChars) + "…}";
 }
 /**
@@ -63,26 +58,19 @@ export function truncateToolResult(result, maxChars = 8000) {
  */
 export function expandMessagesForFC(messages, { filterDeleted = true } = {}) {
     const filtered = filterDeleted
-        // @ts-ignore - TODO: strict typing
         ? messages.filter((m) => !m.deleted &&
-            // @ts-ignore - TODO: strict typing
             (m.role !== "assistant" || m.content?.trim() || m.toolCalls?.length))
         : messages;
     return filtered.flatMap((m) => {
         // Expand assistant messages with toolCalls into
         // [assistant(tool_calls), tool(result1), tool(result2), ...]
-        // @ts-ignore - TODO: strict typing
         if (m.role === "assistant" && m.toolCalls?.length > 0) {
             const assistantMsg = {
                 role: "assistant",
-                // @ts-ignore - TODO: strict typing
                 content: m.content?.trim() || null,
                 // Preserve thinking + signature for Anthropic multi-turn round-trips
-                // @ts-ignore - TODO: strict typing
                 ...(m.thinking && { thinking: m.thinking }),
-                // @ts-ignore - TODO: strict typing
                 ...(m.thinkingSignature && { thinkingSignature: m.thinkingSignature }),
-                // @ts-ignore - TODO: strict typing
                 toolCalls: m.toolCalls.map((tc) => ({
                     id: tc.id,
                     name: tc.name,
@@ -95,7 +83,6 @@ export function expandMessagesForFC(messages, { filterDeleted = true } = {}) {
                         : {}),
                 })),
             };
-            // @ts-ignore - TODO: strict typing
             const toolMsgs = m.toolCalls
                 .filter((tc) => tc.result !== undefined)
                 .map((tc) => ({
@@ -104,7 +91,6 @@ export function expandMessagesForFC(messages, { filterDeleted = true } = {}) {
                 tool_call_id: tc.id,
                 content: typeof tc.result === "string"
                     ? tc.result
-                    // @ts-ignore - TODO: strict typing
                     : JSON.stringify(truncateToolResult(tc.result)),
             }));
             return [assistantMsg, ...toolMsgs];
@@ -126,15 +112,10 @@ export function expandMessagesForFC(messages, { filterDeleted = true } = {}) {
         return [
             {
                 role: m.role,
-                // @ts-ignore - TODO: strict typing
                 ...(m.content?.trim() ? { content: m.content } : { content: " " }),
-                // @ts-ignore - TODO: strict typing
                 ...(m.images?.length > 0 ? { images: m.images } : {}),
-                // @ts-ignore - TODO: strict typing
                 ...(m.video?.length > 0 ? { video: m.video } : {}),
-                // @ts-ignore - TODO: strict typing
                 ...(m.audio?.length > 0 ? { audio: m.audio } : {}),
-                // @ts-ignore - TODO: strict typing
                 ...(m.pdf?.length > 0 ? { pdf: m.pdf } : {}),
                 ...(m.role === "assistant" && m.thinking
                     ? { thinking: m.thinking }

@@ -37,12 +37,10 @@ async function init() {
         import("./AskUserQuestionTool.js"),
         import("./McpTools.js"),
     ]);
-    // @ts-ignore
     for (const mod of modules) {
         const tools = mod.default;
         // Modules can export a single tool or an array of tools
         if (Array.isArray(tools)) {
-            // @ts-ignore
             for (const tool of tools)
                 register(tool);
         }
@@ -88,7 +86,6 @@ export default class InternalToolRegistry {
      */
     static getClientSchemas() {
         return [...registry.values()].map((t) => ({
-            // @ts-ignore - TODO: strict typing
             ...t.schema,
             domain: t.domain || "Reasoning",
             labels: t.labels || ["coding"],

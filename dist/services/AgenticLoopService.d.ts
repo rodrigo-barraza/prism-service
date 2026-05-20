@@ -27,9 +27,9 @@ export default class AgenticLoopService {
     };
     /** Store a pending question resolver (called by ToolOrchestratorService). */
     static _setPendingQuestion(agentSessionId: string, entry: {
-        resolve: (value: unknown) => void;
+        resolve: (value: any) => void;
         question?: string;
-        questions?: unknown[];
+        questions?: any[];
         choices?: string[];
     }): void;
     /** Resolve a pending question for an agent session. */

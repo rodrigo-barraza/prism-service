@@ -22,6 +22,7 @@ import logger from "../utils/logger.ts";
 class MutationQueue {
   constructor() {
     /** @type {Map<string, { queue: Array<Function>, holder: string|null }>} */
+        // @ts-ignore - TODO: strict typing
         this._locks = new Map();
   }
 

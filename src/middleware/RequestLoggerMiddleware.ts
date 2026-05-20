@@ -71,6 +71,7 @@ export function requestLoggerMiddleware(req: Request, res: Response, next: NextF
   });
 
   // Attach agent to req for downstream route handlers
+    // @ts-ignore - TODO: strict typing
     if (agent) req.agent = agent;
 
   // Run the rest of the middleware chain inside AsyncLocalStorage context

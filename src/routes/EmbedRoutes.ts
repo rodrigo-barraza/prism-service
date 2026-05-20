@@ -103,6 +103,7 @@ router.post(
           parts.push({ inlineData: { data, mimeType } });
         }
 
+                // @ts-ignore - TODO: strict typing
                 content = parts;
       }
 

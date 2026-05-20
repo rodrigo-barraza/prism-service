@@ -24,6 +24,7 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { db } = req;
 
       const filter = { error: null };
@@ -124,6 +125,7 @@ router.get(
   "/machines",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { db } = req;
 
       const pipeline: any[] = [
@@ -185,6 +187,7 @@ router.get(
   "/settings",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { db } = req;
 
       const labels = await db
@@ -214,6 +217,7 @@ router.get(
   "/contexts",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { db } = req;
 
       const filter = { error: null };

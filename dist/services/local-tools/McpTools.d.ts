@@ -24,13 +24,13 @@ declare const _default: ({
         note?: undefined;
     } | {
         resources: any;
-        serverName: Record<string, unknown>;
+        serverName: any;
         count: any;
         error?: undefined;
         note?: undefined;
     } | {
         resources: never[];
-        serverName: Record<string, unknown>;
+        serverName: any;
         count: number;
         note: string;
         error?: undefined;
@@ -78,12 +78,12 @@ declare const _default: ({
         uri: any;
         mimeType: any;
         content: any;
-        serverName: Record<string, unknown>;
+        serverName: any;
         error?: undefined;
         contents?: undefined;
     } | {
         contents: any;
-        serverName: Record<string, unknown>;
+        serverName: any;
         error?: undefined;
         uri?: undefined;
         mimeType?: undefined;
@@ -131,7 +131,7 @@ declare const _default: ({
         message?: undefined;
     } | {
         acknowledged: boolean;
-        serverName: Record<string, unknown>;
+        serverName: any;
         toolCount: number;
         message: string;
         error?: undefined;

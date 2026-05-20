@@ -163,29 +163,21 @@ const ARCH_DB = {
  * @param {number} [bitsPerWeight=4] — quantization bits per weight
  * @returns {{ layers: number, kvHeads: number, headDim: number, attnRatio: number, isKnown: boolean }}
  */
-export function resolveArchParams(architecture, paramsString, sizeBytes, 
-// @ts-ignore - TODO: strict typing
-bitsPerWeight = 4) {
+export function resolveArchParams(architecture, paramsString, sizeBytes, bitsPerWeight = 4) {
     let billions = 0;
     if (paramsString) {
-        // @ts-ignore - TODO: strict typing
         const match = paramsString.match(/([\d.]+)\s*[Bb]/);
         if (match)
             billions = parseFloat(match[1]);
     }
-    // @ts-ignore - TODO: strict typing
     if (!billions && sizeBytes > 0 && bitsPerWeight > 0) {
-        // @ts-ignore - TODO: strict typing
         billions = (sizeBytes * 8) / (bitsPerWeight * 1e9);
     }
     if (billions <= 0)
         billions = 7;
-    // @ts-ignore - TODO: strict typing
     const archKey = architecture?.toLowerCase() || "";
-    // @ts-ignore
     const variants = ARCH_DB[archKey];
     if (variants) {
-        // @ts-ignore
         for (const v of variants) {
             if (billions >= v.minB && billions < v.maxB) {
                 return {
@@ -209,59 +201,38 @@ bitsPerWeight = 4) {
     // Fallback: generic estimate from param count
     let layers, kvHeads, headDim;
     if (billions < 2) {
-        // @ts-ignore - TODO: strict typing
         layers = 24;
-        // @ts-ignore - TODO: strict typing
         kvHeads = 4;
-        // @ts-ignore - TODO: strict typing
         headDim = 64;
     }
     else if (billions < 5) {
-        // @ts-ignore - TODO: strict typing
         layers = 32;
-        // @ts-ignore - TODO: strict typing
         kvHeads = 4;
-        // @ts-ignore - TODO: strict typing
         headDim = 128;
     }
     else if (billions < 10) {
-        // @ts-ignore - TODO: strict typing
         layers = 32;
-        // @ts-ignore - TODO: strict typing
         kvHeads = 8;
-        // @ts-ignore - TODO: strict typing
         headDim = 128;
     }
     else if (billions < 20) {
-        // @ts-ignore - TODO: strict typing
         layers = 40;
-        // @ts-ignore - TODO: strict typing
         kvHeads = 8;
-        // @ts-ignore - TODO: strict typing
         headDim = 128;
     }
     else if (billions < 40) {
-        // @ts-ignore - TODO: strict typing
         layers = 64;
-        // @ts-ignore - TODO: strict typing
         kvHeads = 8;
-        // @ts-ignore - TODO: strict typing
         headDim = 128;
     }
     else if (billions < 80) {
-        // @ts-ignore - TODO: strict typing
         layers = 80;
-        // @ts-ignore - TODO: strict typing
         kvHeads = 8;
-        // @ts-ignore - TODO: strict typing
         headDim = 128;
     }
     else {
-        // @ts-ignore - TODO: strict typing
         layers = 96;
-        // @ts-ignore - TODO: strict typing
         kvHeads = 8;
-        // @ts-ignore - TODO: strict typing
         headDim = 128;
     }
     return { layers, kvHeads, headDim, attnRatio: 1.0, isKnown: false };
@@ -295,11 +266,8 @@ const GiB = 1024 ** 3;
 export function estimateMemory({ sizeBytes, archParams, gpuLayers, contextLength, offloadKvCache = true, flashAttention = true, vision = false, gpuTotalGiB, gpuBaselineGiB = 0, }) {
     if (!sizeBytes || !archParams)
         return { gpuGiB: 0, totalGiB: 0, cpuOffloaded: false };
-    // @ts-ignore - TODO: strict typing
     const { layers, kvHeads, headDim, attnRatio } = archParams;
-    // @ts-ignore - TODO: strict typing
     const fileSizeGiB = sizeBytes / GiB;
-    // @ts-ignore - TODO: strict typing
     const ratio = Math.min(gpuLayers / layers, 1);
     const weightsOnGPU = fileSizeGiB * ratio;
     const weightsOnCPU = fileSizeGiB * (1 - ratio);
@@ -312,7 +280,6 @@ export function estimateMemory({ sizeBytes, archParams, gpuLayers, contextLength
         kvHeads *
         headDim *
         bytesPerElement *
-        // @ts-ignore - TODO: strict typing
         contextLength) /
         GiB;
     // ── CUDA context + compute buffer overhead ────────────────
@@ -320,7 +287,6 @@ export function estimateMemory({ sizeBytes, archParams, gpuLayers, contextLength
     // Small models (<3 GiB file) carry proportionally more overhead from
     // CUDA context, scratch buffers, and the llama.cpp compute graph.
     let overhead = 0;
-    // @ts-ignore - TODO: strict typing
     if (gpuLayers > 0) {
         overhead = 0.8;
         // Small-model surcharge: below 3 GB file size, add up to 0.4 GiB extra
@@ -334,7 +300,6 @@ export function estimateMemory({ sizeBytes, archParams, gpuLayers, contextLength
     // encoder that isn't captured by the GGUF weights-only file size.
     // Benchmarked: +0.7 to +1.7 GiB extra, scales roughly with model size.
     let visionOverhead = 0;
-    // @ts-ignore - TODO: strict typing
     if (vision && gpuLayers > 0) {
         // ~0.7 GiB base + ~2.5% of file size for larger encoders
         visionOverhead = 0.7 + fileSizeGiB * 0.025;
@@ -350,9 +315,7 @@ export function estimateMemory({ sizeBytes, archParams, gpuLayers, contextLength
     // (benchmarked: 20.6 GB qwen2 q4_1 estimated 20.2G but actual was 18.5G
     //  because ~2G of weights were silently moved to CPU)
     let cpuOffloaded = false;
-    // @ts-ignore - TODO: strict typing
     if (gpuTotalGiB && gpuTotalGiB > 0) {
-        // @ts-ignore - TODO: strict typing
         const availableGiB = gpuTotalGiB - gpuBaselineGiB;
         if (gpuGiB > availableGiB) {
             gpuGiB = availableGiB;

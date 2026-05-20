@@ -3,7 +3,6 @@ import MemoryService from "./MemoryService.js";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.js";
 import EmbeddingService from "./EmbeddingService.js";
 import MongoWrapper from "../wrappers/MongoWrapper.js";
-// @ts-ignore
 import { TOOLS_SERVICE_URL, MONGO_DB_NAME } from "../../config.js";
 import logger from "../utils/logger.js";
 import { cosineSimilarity } from "../utils/math.js";
@@ -25,18 +24,13 @@ const SKILL_RELEVANCE_THRESHOLD = 0.3;
  */
 export default class SystemPromptAssembler {
     constructor(options = {}) {
-        // @ts-ignore
         this.workspaceRoot =
-            // @ts-ignore
             options.workspaceRoot ||
                 ToolOrchestratorService.getWorkspaceRoot() ||
                 process.env.HOME ||
                 "/home";
-        // @ts-ignore
         this._directoryCache = null;
-        // @ts-ignore
         this._directoryCacheTime = 0;
-        // @ts-ignore
         this._directoryCacheTTL = DIRECTORY_CACHE_TTL_MS;
     }
     /**
@@ -47,19 +41,13 @@ export default class SystemPromptAssembler {
      */
     async fetchDirectoryTree() {
         const now = Date.now();
-        // @ts-ignore
-        if (
-        // @ts-ignore
-        this._directoryCache &&
-            // @ts-ignore
+        if (this._directoryCache &&
             now - this._directoryCacheTime < this._directoryCacheTTL) {
-            // @ts-ignore
             return this._directoryCache;
         }
         try {
             const controller = createAbortController();
             const timeout = setTimeout(() => controller.abort(), DIRECTORY_FETCH_TIMEOUT_MS);
-            // @ts-ignore
             const url = `${TOOLS_SERVICE_URL}/filesystem/list?path=${encodeURIComponent(this.workspaceRoot)}&depth=2`;
             const response = await fetch(url, { signal: controller.signal });
             clearTimeout(timeout);
@@ -68,19 +56,13 @@ export default class SystemPromptAssembler {
                 return "";
             }
             const data = await response.json();
-            // @ts-ignore - TODO: strict typing
             const tree = this._formatDirectoryTree(data);
-            // @ts-ignore
             this._directoryCache = tree;
-            // @ts-ignore
             this._directoryCacheTime = now;
             return tree;
         }
         catch (error) {
-            logger.warn(
-            // @ts-ignore - TODO: strict typing
-            `[SystemPromptAssembler] Directory fetch error: ${error.message}`);
-            // @ts-ignore
+            logger.warn(`[SystemPromptAssembler] Directory fetch error: ${error.message}`);
             return this._directoryCache || "";
         }
     }
@@ -93,22 +75,17 @@ export default class SystemPromptAssembler {
         if (!data || !data.entries)
             return "";
         const lines = [];
-        // @ts-ignore
         for (const entry of data.entries) {
             const prefix = entry.type === "directory" ? "📁" : "📄";
             const name = entry.name || entry.path;
-            // @ts-ignore - TODO: strict typing
             lines.push(`${prefix} ${name}`);
             // Include first-level children for directories
             if (entry.children && Array.isArray(entry.children)) {
-                // @ts-ignore
                 for (const child of entry.children.slice(0, 20)) {
                     const childPrefix = child.type === "directory" ? "📁" : "📄";
-                    // @ts-ignore - TODO: strict typing
                     lines.push(`  ${childPrefix} ${child.name || child.path}`);
                 }
                 if (entry.children.length > 20) {
-                    // @ts-ignore - TODO: strict typing
                     lines.push(`  ... and ${entry.children.length - 20} more`);
                 }
             }
@@ -127,19 +104,15 @@ export default class SystemPromptAssembler {
      */
     buildToolDescriptions(enabledTools) {
         const schemas = ToolOrchestratorService.getToolSchemas();
-        // @ts-ignore - TODO: strict typing
         const enabledSet = enabledTools ? new Set(enabledTools) : null;
         const filtered = enabledSet
-            // @ts-ignore - TODO: strict typing
             ? schemas.filter((t) => enabledSet.has(t.name))
             : schemas;
         if (filtered.length === 0)
             return "";
         // Group by domain
         const groups = new Map();
-        // @ts-ignore
         for (const tool of filtered) {
-            // @ts-ignore - TODO: strict typing
             const domain = (tool.domain || "Other").replace(/^Agentic:\s*/i, "");
             if (!groups.has(domain))
                 groups.set(domain, []);
@@ -147,17 +120,13 @@ export default class SystemPromptAssembler {
         }
         // Build categorised sections with parameter details
         const sections = [];
-        // @ts-ignore
         for (const [domain, domainTools] of groups) {
             const entries = domainTools.map((tool) => {
                 const desc = tool.description || "";
-                // @ts-ignore - TODO: strict typing
                 const params = tool.parameters?.properties || {};
                 const paramNames = Object.keys(params);
-                // @ts-ignore - TODO: strict typing
                 const required = tool.parameters?.required || [];
                 const paramStr = paramNames
-                    // @ts-ignore - TODO: strict typing
                     .map((p) => {
                     const isReq = required.includes(p);
                     const paramDesc = params[p].description || "";
@@ -166,7 +135,6 @@ export default class SystemPromptAssembler {
                     .join("\n");
                 return `### ${tool.name}\n${desc}\n${paramStr}`;
             });
-            // @ts-ignore - TODO: strict typing
             sections.push(`**${domain}**\n${entries.join("\n\n")}`);
         }
         return sections.join("\n\n");
@@ -180,10 +148,7 @@ export default class SystemPromptAssembler {
   
      * @returns {Promise<string>} Formatted memory sections for the system prompt
      */
-    // @ts-ignore
-    async fetchMemories(agent, project, queryText, 
-    // @ts-ignore
-    { traceId, agentSessionId, endpoint, _username } = {}) {
+    async fetchMemories(agent, project, queryText, { traceId, agentSessionId, endpoint, _username } = {}) {
         try {
             const memories = await MemoryService.search({
                 agent,
@@ -197,13 +162,10 @@ export default class SystemPromptAssembler {
             if (!memories || memories.length === 0)
                 return "";
             logger.info(`[SystemPromptAssembler] Memory search returned ${memories.length} results for ${agent}`);
-            // @ts-ignore - TODO: strict typing
             return MemoryService.formatForPrompt(memories);
         }
         catch (error) {
-            logger.warn(
-            // @ts-ignore - TODO: strict typing
-            `[SystemPromptAssembler] Memory fetch error: ${error.message}`);
+            logger.warn(`[SystemPromptAssembler] Memory fetch error: ${error.message}`);
             return "";
         }
     }
@@ -214,10 +176,7 @@ export default class SystemPromptAssembler {
   
      * @returns {Promise<Array<{ name: string, content: string, score: number }>>}
      */
-    // @ts-ignore
-    async fetchSkills(project, username, queryText, 
-    // @ts-ignore
-    { traceId, agentSessionId, endpoint, agent } = {}) {
+    async fetchSkills(project, username, queryText, { traceId, agentSessionId, endpoint, agent } = {}) {
         try {
             const db = MongoWrapper.getDb(MONGO_DB_NAME);
             if (!db)
@@ -230,7 +189,6 @@ export default class SystemPromptAssembler {
             if (skills.length === 0)
                 return [];
             // If no query or no skills have embeddings, return all (graceful fallback)
-            // @ts-ignore - TODO: strict typing
             const hasEmbeddings = skills.some((s) => s.embedding?.length > 0);
             if (!queryText || !hasEmbeddings) {
                 logger.info(`[SystemPromptAssembler] Returning all ${skills.length} skills (no query or no embeddings)`);
@@ -244,7 +202,6 @@ export default class SystemPromptAssembler {
             // Generate query embedding
             let queryEmbedding;
             try {
-                // @ts-ignore - TODO: strict typing
                 queryEmbedding = await EmbeddingService.embed(queryText, {
                     source: "skill-relevance",
                     project,
@@ -255,9 +212,7 @@ export default class SystemPromptAssembler {
                 });
             }
             catch (error) {
-                logger.warn(
-                // @ts-ignore - TODO: strict typing
-                `[SystemPromptAssembler] Query embedding failed: ${error.message} — returning all skills`);
+                logger.warn(`[SystemPromptAssembler] Query embedding failed: ${error.message} — returning all skills`);
                 return skills.map((s) => ({
                     name: s.name,
                     content: s.content,
@@ -272,23 +227,16 @@ export default class SystemPromptAssembler {
                 content: s.content,
                 description: s.description,
                 score: s.embedding
-                    // @ts-ignore - TODO: strict typing
                     ? cosineSimilarity(queryEmbedding, s.embedding)
                     : 0,
             }))
-                // @ts-ignore - TODO: strict typing
                 .filter((s) => s.score >= SKILL_RELEVANCE_THRESHOLD)
-                // @ts-ignore - TODO: strict typing
                 .sort((a, b) => b.score - a.score);
-            logger.info(
-            // @ts-ignore - TODO: strict typing
-            `[SystemPromptAssembler] Skills: ${scored.length}/${skills.length} above threshold (${scored.map((s) => `${s.name}:${s.score.toFixed(2)}`).join(", ")})`);
+            logger.info(`[SystemPromptAssembler] Skills: ${scored.length}/${skills.length} above threshold (${scored.map((s) => `${s.name}:${s.score.toFixed(2)}`).join(", ")})`);
             return scored;
         }
         catch (error) {
-            logger.warn(
-            // @ts-ignore - TODO: strict typing
-            `[SystemPromptAssembler] Skills fetch error: ${error.message}`);
+            logger.warn(`[SystemPromptAssembler] Skills fetch error: ${error.message}`);
             return [];
         }
     }
@@ -323,15 +271,12 @@ export default class SystemPromptAssembler {
         // null/undefined agent = direct chat mode (no persona)
         const isDirectMode = !context.agent;
         const agentId = context.agent || "CODING";
-        // @ts-ignore - TODO: strict typing
         const persona = isDirectMode ? null : AgentPersonaRegistry.get(agentId);
         // If no persona found, fall back to CODING defaults (unless direct mode)
         const codingFallback = !isDirectMode && (!persona || persona.id === "CODING");
         // ── 1. Agent Identity ────────────────────────────────────────
         if (isDirectMode) {
-            sections.push(
-            // @ts-ignore - TODO: strict typing
-            `You are a helpful AI assistant with access to a comprehensive suite of real-time data and utility tools. Present data clearly with relevant formatting. For questions that don't require API data, respond naturally without tool calls.`);
+            sections.push(`You are a helpful AI assistant with access to a comprehensive suite of real-time data and utility tools. Present data clearly with relevant formatting. For questions that don't require API data, respond naturally without tool calls.`);
         }
         else if (persona) {
             const identityText = typeof persona.identity === "function"
@@ -340,9 +285,7 @@ export default class SystemPromptAssembler {
             sections.push(identityText);
         }
         else {
-            sections.push(
-            // @ts-ignore - TODO: strict typing
-            `You are a highly capable coding agent with access to file system, git, command execution, and web tools.`);
+            sections.push(`You are a highly capable coding agent with access to file system, git, command execution, and web tools.`);
         }
         // ── 2. Agent Context (runtime data from caller) ──────────────
         // Only injected when the caller provides agentContext (e.g. Lupos
@@ -351,58 +294,38 @@ export default class SystemPromptAssembler {
             const ac = context.agentContext;
             // Structured context blocks — each is a pre-formatted text block
             // assembled by the caller (Lupos/Prism Client/etc.)
-            // @ts-ignore - TODO: strict typing
             if (ac.discordContext) {
-                // @ts-ignore - TODO: strict typing
                 sections.push(ac.discordContext);
             }
-            // @ts-ignore - TODO: strict typing
             if (ac.serverContext) {
-                // @ts-ignore - TODO: strict typing
                 sections.push(ac.serverContext);
             }
-            // @ts-ignore - TODO: strict typing
             if (ac.imageContext) {
-                // @ts-ignore - TODO: strict typing
                 sections.push(ac.imageContext);
             }
-            // @ts-ignore - TODO: strict typing
             if (ac.clockCrewContext) {
-                // @ts-ignore - TODO: strict typing
                 sections.push(ac.clockCrewContext);
             }
             // Stickers kiosk context — stage flow, emotion state, visual context
-            // @ts-ignore - TODO: strict typing
             if (ac.stickersContext) {
-                // @ts-ignore - TODO: strict typing
                 sections.push(ac.stickersContext);
             }
-            // @ts-ignore - TODO: strict typing
             if (ac.emotionContext) {
-                // @ts-ignore - TODO: strict typing
                 sections.push(ac.emotionContext);
             }
-            // @ts-ignore - TODO: strict typing
             if (ac.visualContext) {
-                // @ts-ignore - TODO: strict typing
                 sections.push(ac.visualContext);
             }
             // Discord IDs — explicitly inject so discord tools get the correct IDs
             // (the LLM cannot infer these from guild/channel names alone)
-            // @ts-ignore - TODO: strict typing
             if (ac.guildId) {
-                // @ts-ignore - TODO: strict typing
                 let idsBlock = `# Discord IDs\n- Guild ID: ${ac.guildId}`;
-                // @ts-ignore - TODO: strict typing
                 if (ac.channelId)
                     idsBlock += `\n- Channel ID: ${ac.channelId}`;
-                // @ts-ignore - TODO: strict typing
                 sections.push(idsBlock);
             }
             // Lights context — current light states, night lock, automation mode
-            // @ts-ignore - TODO: strict typing
             if (ac.lightsContext) {
-                // @ts-ignore - TODO: strict typing
                 sections.push(ac.lightsContext);
             }
         }
@@ -419,16 +342,13 @@ export default class SystemPromptAssembler {
         // This ensures every persona (CODING, LUPOS, future agents) gets the
         // same domain-grouped tool documentation in its system prompt.
         {
-            // @ts-ignore - TODO: strict typing
             const toolDescs = this.buildToolDescriptions(context.enabledTools);
             if (toolDescs) {
                 const schemas = ToolOrchestratorService.getToolSchemas();
                 const count = context.enabledTools
-                    // @ts-ignore - TODO: strict typing
                     ? schemas.filter((t) => new Set(context.enabledTools).has(t.name))
                         .length
                     : schemas.length;
-                // @ts-ignore - TODO: strict typing
                 sections.push(`## Available Tools (${count})\n` + toolDescs);
             }
         }
@@ -442,9 +362,7 @@ export default class SystemPromptAssembler {
                 sections.push(persona.guidelines);
             }
             else if (codingFallback || persona?.usesCodingGuidelines) {
-                sections.push(
-                // @ts-ignore - TODO: strict typing
-                `## Coding Guidelines\n` +
+                sections.push(`## Coding Guidelines\n` +
                     `- Always read relevant files before making edits to understand context\n` +
                     `- After making changes, verify them by reading the modified section\n` +
                     `- Keep your explanations concise and technical\n` +
@@ -456,83 +374,63 @@ export default class SystemPromptAssembler {
         }
         // ── 5b. Coordinator Mode Addendum (when coordinator tools available) ──
         if (!isDirectMode && (codingFallback || persona?.usesCodingGuidelines)) {
-            // @ts-ignore - TODO: strict typing
             const enabledSet = context.enabledTools ? new Set(context.enabledTools) : null;
             const coordinatorAvailable = enabledSet
-                // @ts-ignore - TODO: strict typing
-                ? COORDINATOR_ONLY_TOOLS.some((t) => enabledSet.has(t))
+                ? COORDINATOR_ONLY_TOOLS.some(((t) => enabledSet.has(t)))
                 : true; // No filter = all tools available including coordinator
             if (coordinatorAvailable) {
                 const allSchemas = ToolOrchestratorService.getToolSchemas();
                 const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
                 const workerTools = allSchemas
-                    // @ts-ignore - TODO: strict typing
-                    .map((t) => t.name)
-                    // @ts-ignore - TODO: strict typing
+                    .map(((t) => t.name))
                     .filter((name) => !coordinatorSet.has(name));
-                // @ts-ignore
                 sections.push(getCoordinatorPromptAddendum({ workerTools }));
             }
         }
         // ── 6. Environment ───────────────────────────────────────────
-        sections.push(
-        // @ts-ignore - TODO: strict typing
-        `## Environment\n` +
+        sections.push(`## Environment\n` +
             `- Date/Time: ${new Date().toLocaleString("en-US", { dateStyle: "full", timeStyle: "long" })}\n` +
             `- OS: Linux (WSL2)\n` +
-            // @ts-ignore
             `- Workspace: ${this.workspaceRoot}`);
         // ── 7. Project Structure (cached) ────────────────────────────
         if (codingFallback || persona?.usesDirectoryTree) {
             const dirTree = await this.fetchDirectoryTree();
             if (dirTree) {
-                // @ts-ignore - TODO: strict typing
                 sections.push(`## Project Structure\n` + dirTree);
             }
         }
         // ── 8. Project Skills (relevance-filtered) ────────────────────
-        // @ts-ignore - TODO: strict typing
         const lastUserMsg = [...(context.messages || [])]
             .reverse()
             .find((m) => m.role === "user");
         const queryText = lastUserMsg?.content || "";
-        const skills = await this.fetchSkills(
-        // @ts-ignore - TODO: strict typing
-        context.project, context.username, queryText, {
+        const skills = await this.fetchSkills(context.project, context.username, queryText, {
             traceId: context.traceId,
             agentSessionId: context.agentSessionId,
             endpoint: "/agent",
             agent: agentId,
         });
-        // @ts-ignore
         const skillNames = [];
         if (skills.length > 0) {
             const skillBlocks = skills.map((s) => {
-                // @ts-ignore - TODO: strict typing
                 skillNames.push(s.name);
                 return `### ${s.name}\n${s.content}`;
             });
-            sections.push(
-            // @ts-ignore - TODO: strict typing
-            `## Project Skills (${skills.length})\n` + skillBlocks.join("\n\n"));
+            sections.push(`## Project Skills (${skills.length})\n` + skillBlocks.join("\n\n"));
         }
         // ── 9. Session Memory (embedding search) ────────────────────
         const memoryQuery = queryText || context.project || "";
         if (memoryQuery) {
-            const memories = await this.fetchMemories(
-            // @ts-ignore - TODO: strict typing
-            agentId, context.project, memoryQuery, {
+            const memories = await this.fetchMemories(agentId, context.project, memoryQuery, {
                 traceId: context.traceId,
                 agentSessionId: context.agentSessionId,
                 endpoint: "/agent",
                 username: context.username,
             });
             if (memories) {
-                // @ts-ignore - TODO: strict typing
                 sections.push(`## Agent Memory\n` + memories);
             }
         }
-        // @ts-ignore
         return { prompt: sections.join("\n\n"), skillNames };
     }
     /**
@@ -553,22 +451,17 @@ export default class SystemPromptAssembler {
                 // Expose skill names on ctx for downstream emission
                 context._injectedSkills = skillNames;
                 // Replace existing system message or prepend a new one
-                // @ts-ignore - TODO: strict typing
                 const systemIdx = context.messages?.findIndex((m) => m.role === "system");
                 if (systemIdx !== undefined && systemIdx >= 0) {
-                    // @ts-ignore - TODO: strict typing
                     context.messages[systemIdx].content = systemPrompt;
                 }
                 else {
-                    // @ts-ignore - TODO: strict typing
                     context.messages?.unshift({ role: "system", content: systemPrompt });
                 }
                 logger.info(`[SystemPromptAssembler] Assembled ${systemPrompt.length} char system prompt for agent="${context.agent || "DIRECT"}" (${skillNames.length} skills)`);
             }
             catch (error) {
-                logger.error(
-                // @ts-ignore - TODO: strict typing
-                `[SystemPromptAssembler] Assembly failed: ${error.message}`);
+                logger.error(`[SystemPromptAssembler] Assembly failed: ${error.message}`);
             }
         };
     }

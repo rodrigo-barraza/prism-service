@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import { EventEmitter } from "node:events";
@@ -19,7 +18,6 @@ registerCleanup(async () => {
     if (activeRuns.size === 0)
         return;
     logger.info(`[Benchmark] Shutdown: aborting ${activeRuns.size} active run(s)`);
-    // @ts-ignore
     for (const [id, controller] of activeRuns) {
         controller.abort();
         activeRuns.delete(id);
@@ -28,21 +26,14 @@ registerCleanup(async () => {
 // ─── GET /benchmark — List all benchmark tests for the caller's project ─
 router.get("/", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const benchmarks = await BenchmarkService.list(req.project);
         // Attach latest run summary + cumulative cost across ALL runs
         const enriched = await Promise.all(benchmarks.map(async (b) => {
             const [latestRun, allRuns] = await Promise.all([
-                // @ts-ignore - TODO: strict typing
                 BenchmarkService.getLatestRun(b.id, req.project),
-                // @ts-ignore - TODO: strict typing
                 BenchmarkService.getRuns(b.id, req.project),
             ]);
-            const cumulativeCost = allRuns.reduce(
-            // @ts-ignore - TODO: strict typing
-            (sum, r) => sum + (r.summary?.totalCost || 0), 
-            // @ts-ignore - TODO: strict typing
-            0);
+            const cumulativeCost = allRuns.reduce((sum, r) => sum + (r.summary?.totalCost || 0), 0);
             return {
                 ...b,
                 cumulativeCost,
@@ -59,7 +50,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
         res.json({ benchmarks: enriched, count: enriched.length });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /benchmark error: ${error.message}`);
         next(error);
     }
@@ -70,7 +60,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
 // across all runs for accurate historical totals.
 router.get("/stats", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const benchmarks = await BenchmarkService.list(req.project);
         // Phase 1: For each benchmark, find the latest result per model config.
         // getRuns() returns runs sorted by startedAt DESC, so the first
@@ -90,14 +79,10 @@ router.get("/stats", asyncHandler(async (req, res, next) => {
             const agent = r.agent || "";
             return `${r.provider}:${r.model}:${thinking}:${tools}:${agent}`;
         };
-        // @ts-ignore
         for (const b of benchmarks) {
-            // @ts-ignore - TODO: strict typing
             const runs = await BenchmarkService.getRuns(b.id, req.project);
             const seenForBenchmark = new Set(); // track which model configs we've already recorded as "latest"
-            // @ts-ignore
             for (const run of runs) {
-                // @ts-ignore
                 for (const result of run.models || []) {
                     const modelKey = makeKey(result);
                     // Accumulate ALL-run cost/latency regardless of dedup
@@ -154,9 +139,7 @@ router.get("/stats", asyncHandler(async (req, res, next) => {
             }
         }
         // Phase 2: Build per-model-config stats from deduplicated latest results
-        const models = [...latestResults.entries()].map(
-        // @ts-ignore - TODO: strict typing
-        ([modelKey, benchmarkMap]) => {
+        const models = [...latestResults.entries()].map(([modelKey, benchmarkMap]) => {
             const benchmarkResults = [...benchmarkMap.values()];
             const first = benchmarkResults[0];
             const rt = allRunTotals.get(modelKey) || {
@@ -168,7 +151,6 @@ router.get("/stats", asyncHandler(async (req, res, next) => {
             let failed = 0;
             let errored = 0;
             const perBenchmark = [];
-            // @ts-ignore
             for (const r of benchmarkResults) {
                 if (r.error)
                     errored++;
@@ -212,9 +194,7 @@ router.get("/stats", asyncHandler(async (req, res, next) => {
             };
         });
         // Sort by pass rate descending, then by total benchmarks descending
-        models.sort(
-        // @ts-ignore - TODO: strict typing
-        (a, b) => b.passRate - a.passRate || b.total - a.total);
+        models.sort((a, b) => b.passRate - a.passRate || b.total - a.total);
         res.json({
             models,
             totalModels: models.length,
@@ -222,7 +202,6 @@ router.get("/stats", asyncHandler(async (req, res, next) => {
         });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /benchmark/stats error: ${error.message}`);
         next(error);
     }
@@ -272,7 +251,6 @@ router.post("/", asyncHandler(async (req, res, next) => {
         }
         // Validate assertions array if provided
         if (assertions && Array.isArray(assertions)) {
-            // @ts-ignore
             for (const a of assertions) {
                 if (a.matchMode && !validModes.includes(a.matchMode)) {
                     return res.status(400).json({
@@ -300,13 +278,10 @@ router.post("/", asyncHandler(async (req, res, next) => {
             benchmarkMode,
             agentAssertions,
             agentAssertionOperator,
-        }, 
-        // @ts-ignore - TODO: strict typing
-        req.project, req.username);
+        }, req.project, req.username);
         res.status(201).json(benchmark);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`POST /benchmark error: ${error.message}`);
         next(error);
     }
@@ -314,19 +289,14 @@ router.post("/", asyncHandler(async (req, res, next) => {
 // ─── GET /benchmark/:id — Get a single benchmark test + latest run ─
 router.get("/:id", asyncHandler(async (req, res, next) => {
     try {
-        const benchmark = await BenchmarkService.getById(
-        // @ts-ignore - TODO: strict typing
-        req.params.id, req.project);
+        const benchmark = await BenchmarkService.getById(req.params.id, req.project);
         if (!benchmark) {
             return res.status(404).json({ error: "Benchmark not found" });
         }
-        const latestRun = await BenchmarkService.getLatestRun(benchmark.id, 
-        // @ts-ignore - TODO: strict typing
-        req.project);
+        const latestRun = await BenchmarkService.getLatestRun(benchmark.id, req.project);
         res.json({ ...benchmark, latestRun: latestRun || null });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /benchmark/:id error: ${error.message}`);
         next(error);
     }
@@ -334,18 +304,14 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
 // ─── DELETE /benchmark/:id — Delete a benchmark test and its runs ─
 router.delete("/:id", asyncHandler(async (req, res, next) => {
     try {
-        const existing = await BenchmarkService.getById(
-        // @ts-ignore - TODO: strict typing
-        req.params.id, req.project);
+        const existing = await BenchmarkService.getById(req.params.id, req.project);
         if (!existing) {
             return res.status(404).json({ error: "Benchmark not found" });
         }
-        // @ts-ignore - TODO: strict typing
         await BenchmarkService.remove(req.params.id, req.project);
         res.json({ deleted: true, id: req.params.id });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`DELETE /benchmark/:id error: ${error.message}`);
         next(error);
     }
@@ -361,9 +327,7 @@ router.delete("/:id", asyncHandler(async (req, res, next) => {
 //   run_complete  { ...run }
 router.post("/:id/run", asyncHandler(async (req, res) => {
     try {
-        const benchmark = await BenchmarkService.getById(
-        // @ts-ignore - TODO: strict typing
-        req.params.id, req.project);
+        const benchmark = await BenchmarkService.getById(req.params.id, req.project);
         if (!benchmark) {
             return res.status(404).json({ error: "Benchmark not found" });
         }
@@ -426,9 +390,7 @@ router.post("/:id/run", asyncHandler(async (req, res) => {
             }
         };
         const { models: modelTargets } = req.body || {};
-        const run = await BenchmarkService.runBenchmark(benchmark, modelTargets, 
-        // @ts-ignore - TODO: strict typing
-        req.project, req.username, {
+        const run = await BenchmarkService.runBenchmark(benchmark, modelTargets, req.project, req.username, {
             signal: abortController.signal,
             onRunStart: (info) => {
                 // Store total model count for reconnecting clients
@@ -439,7 +401,6 @@ router.post("/:id/run", asyncHandler(async (req, res) => {
                     type: "run_info",
                     totalModels: info.totalModels,
                 });
-                // @ts-ignore - TODO: strict typing
                 send("run_info", { totalModels: info.totalModels });
             },
             onModelStart: (model) => {
@@ -456,7 +417,6 @@ router.post("/:id/run", asyncHandler(async (req, res) => {
                 // Emit to followers
                 emitter.emit("event", { type: "model_start", ...data });
                 // Send to original connection
-                // @ts-ignore - TODO: strict typing
                 send("model_start", data);
             },
             onModelComplete: (result) => {
@@ -469,7 +429,6 @@ router.post("/:id/run", asyncHandler(async (req, res) => {
                 // Emit to followers
                 emitter.emit("event", { type: "model_complete", ...result });
                 // Send to original connection
-                // @ts-ignore - TODO: strict typing
                 send("model_complete", result);
             },
             onEvent: (event) => {
@@ -484,31 +443,25 @@ router.post("/:id/run", asyncHandler(async (req, res) => {
                     event.type === "tool_execution" ||
                     event.type === "tool_output") {
                     const { type, _sourceModel, ...rest } = event;
-                    // @ts-ignore - TODO: strict typing
                     send(type, { ...rest, ...sourceTag });
                 }
                 else {
-                    // @ts-ignore - TODO: strict typing
                     send(event.type, { content: event.content, ...sourceTag });
                 }
             },
         });
         // Emit run_complete to followers before cleanup
         emitter.emit("event", { type: "run_complete", ...run });
-        // @ts-ignore - TODO: strict typing
         send("run_complete", run);
         if (!clientClosed)
             res.end();
         cleanup();
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`POST /benchmark/:id/run error: ${error.message}`);
         if (res.headersSent) {
             try {
-                res.write(
-                // @ts-ignore - TODO: strict typing
-                `data: ${JSON.stringify({ type: "error", message: error.message })}\n\n`);
+                res.write(`data: ${JSON.stringify({ type: "error", message: error.message })}\n\n`);
                 res.end();
             }
             catch {
@@ -576,7 +529,6 @@ router.get("/:id/follow", (req, res) => {
     // Send total model count first so the client knows the denominator
     res.write(`data: ${JSON.stringify({ type: "run_info", totalModels: state.totalModels })}\n\n`);
     // Replay completed results
-    // @ts-ignore
     for (const result of state.completedResults) {
         res.write(`data: ${JSON.stringify({ type: "model_complete", ...result })}\n\n`);
     }
@@ -611,18 +563,14 @@ router.get("/:id/follow", (req, res) => {
 // ─── GET /benchmark/:id/runs — Get all past runs for a benchmark ─
 router.get("/:id/runs", asyncHandler(async (req, res, next) => {
     try {
-        const benchmark = await BenchmarkService.getById(
-        // @ts-ignore - TODO: strict typing
-        req.params.id, req.project);
+        const benchmark = await BenchmarkService.getById(req.params.id, req.project);
         if (!benchmark) {
             return res.status(404).json({ error: "Benchmark not found" });
         }
-        // @ts-ignore - TODO: strict typing
         const runs = await BenchmarkService.getRuns(benchmark.id, req.project);
         res.json({ runs, count: runs.length });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /benchmark/:id/runs error: ${error.message}`);
         next(error);
     }
@@ -630,15 +578,11 @@ router.get("/:id/runs", asyncHandler(async (req, res, next) => {
 // ─── POST /benchmark/:id/runs/:runId/rerun — Re-run with same models ─
 router.post("/:id/runs/:runId/rerun", asyncHandler(async (req, res, next) => {
     try {
-        const benchmark = await BenchmarkService.getById(
-        // @ts-ignore - TODO: strict typing
-        req.params.id, req.project);
+        const benchmark = await BenchmarkService.getById(req.params.id, req.project);
         if (!benchmark) {
             return res.status(404).json({ error: "Benchmark not found" });
         }
-        const previousRun = await BenchmarkService.getRunById(
-        // @ts-ignore - TODO: strict typing
-        req.params.runId, req.project);
+        const previousRun = await BenchmarkService.getRunById(req.params.runId, req.project);
         if (!previousRun) {
             return res.status(404).json({ error: "Run not found" });
         }
@@ -647,15 +591,11 @@ router.post("/:id/runs/:runId/rerun", asyncHandler(async (req, res, next) => {
             provider: m.provider,
             model: m.model,
         }));
-        const run = await BenchmarkService.runBenchmark(benchmark, modelTargets, 
-        // @ts-ignore - TODO: strict typing
-        req.project, req.username);
+        const run = await BenchmarkService.runBenchmark(benchmark, modelTargets, req.project, req.username);
         res.json(run);
     }
     catch (error) {
-        logger.error(
-        // @ts-ignore - TODO: strict typing
-        `POST /benchmark/:id/runs/:runId/rerun error: ${error.message}`);
+        logger.error(`POST /benchmark/:id/runs/:runId/rerun error: ${error.message}`);
         next(error);
     }
 }));

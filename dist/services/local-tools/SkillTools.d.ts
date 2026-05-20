@@ -46,7 +46,7 @@ declare const _default: ({
     };
     domain: string;
     labels: string[];
-    execute(args: Record<string, unknown>): Promise<{
+    execute(args: any): Promise<{
         error: string;
         skill?: undefined;
         message?: undefined;
@@ -79,7 +79,7 @@ declare const _default: ({
     };
     domain: string;
     labels: string[];
-    execute(args: Record<string, unknown>, context: Record<string, unknown>): Promise<{
+    execute(args: any, context: any): Promise<{
         error: string;
         skillId?: undefined;
         name?: undefined;
@@ -88,15 +88,15 @@ declare const _default: ({
         unresolved?: undefined;
         steps?: undefined;
     } | {
-        agent_id: unknown;
-        description: unknown;
-        status: unknown;
+        agent_id: any;
+        description: any;
+        status: any;
         summary: string;
         result: any;
         toolUses: any;
-        toolNames: {} | undefined;
-        iterations: {};
-        durationMs: {};
+        toolNames: any;
+        iterations: any;
+        durationMs: any;
         messages: any;
     } | {
         error: string;
@@ -117,7 +117,7 @@ declare const _default: ({
         agent_id?: undefined;
         status?: undefined;
     } | {
-        agent_id: Record<string, unknown>;
+        agent_id: any;
         status: string;
         error?: undefined;
     } | {
@@ -127,7 +127,7 @@ declare const _default: ({
         stopped?: undefined;
         total?: undefined;
     } | {
-        team: never;
+        team: string;
         deleted: boolean;
         stopped: number;
         total: any;
@@ -151,7 +151,7 @@ declare const _default: ({
     };
     domain: string;
     labels: string[];
-    execute(args: Record<string, unknown>, context: Record<string, unknown>): Promise<{
+    execute(args: any, context: any): Promise<{
         skills: ({
             [x: string]: unknown;
         } | null)[];
@@ -175,7 +175,7 @@ declare const _default: ({
     };
     domain: string;
     labels: string[];
-    execute(args: Record<string, unknown>): Promise<{
+    execute(args: any): Promise<{
         error: string;
         deleted?: undefined;
         skillId?: undefined;

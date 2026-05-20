@@ -16,6 +16,7 @@ const DEFAULT_COLLECTION = COLLECTIONS.CONVERSATIONS;
 export async function extractFiles(
   messages: any,
     project: any = null,
+    // @ts-ignore - TODO: strict typing
     username: string = null,
 ) {
   if (!messages || !(FileService as any).isExternalStorage()) return messages;

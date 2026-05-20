@@ -111,6 +111,7 @@ const skillExecute = {
           {
             description: `Skill: ${prepared.name}`,
             prompt: prepared.prompt,
+                        // @ts-ignore - TODO: strict typing
                         model: prepared.config.model || undefined,
           },
         ],

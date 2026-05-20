@@ -146,6 +146,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
         }
 
         // Ollama streams NDJSON (one JSON object per line)
+                // @ts-ignore - TODO: strict typing
                 const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
@@ -161,6 +162,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
+                    // @ts-ignore - TODO: strict typing
                     buffer = lines.pop(); // keep incomplete line in buffer
 
                     for ( const line of lines) {

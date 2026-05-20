@@ -43,11 +43,8 @@ export default {
             openQuestions: openQuestions || [],
             timestamp: new Date().toISOString(),
         };
-        logger.info(
-        // @ts-ignore - TODO: strict typing
-        `[Brief] ${summary.length} chars, ${(keyFiles || []).length} files, ${(openQuestions || []).length} questions`);
+        logger.info(`[Brief] ${summary.length} chars, ${(keyFiles || []).length} files, ${(openQuestions || []).length} questions`);
         if (context._emit) {
-            // @ts-ignore - TODO: strict typing
             context._emit({ type: "brief_update", brief });
         }
         return { acknowledged: true, brief };

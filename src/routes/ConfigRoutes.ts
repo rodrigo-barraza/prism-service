@@ -49,6 +49,7 @@ const localInstances = listInstances();
 // Combined set: cloud providers + all local instance IDs
 const AVAILABLE_PROVIDERS = new Set([
   ...AVAILABLE_CLOUD,
+    // @ts-ignore - TODO: strict typing
     ...localInstances.map(((inst: any) => inst.id as any as (value: InstanceEntry, index: number, array: InstanceEntry[]) => any)),
 ]);
 

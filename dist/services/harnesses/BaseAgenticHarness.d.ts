@@ -41,12 +41,12 @@ export default class BaseAgenticHarness {
      * Create an LLM text stream from the provider.
      * Handles liveAPI fallback and message expansion.
      */
-    createProviderStream(messages: ConversationMessage[], passOptions: Record<string, unknown>): AsyncIterable<unknown>;
+    createProviderStream(messages: ConversationMessage[], passOptions: any): AsyncIterable<any>;
     /**
      * Consume an LLM stream, routing each chunk through `processStreamChunk`.
      * Handles abort signals and stream teardown.
      */
-    consumeStream(stream: AsyncIterable<unknown>, pass: PassState, allowedToolNames: Set<string>): Promise<void>;
+    consumeStream(stream: AsyncIterable<any>, pass: PassState, allowedToolNames: Set<string>): Promise<void>;
     /** Register a request with SessionGenerationTracker. */
     registerTrackerRequest(passRequestId: string): void;
     /**
@@ -57,11 +57,11 @@ export default class BaseAgenticHarness {
      *   `skip`     — chunk was filtered/dropped
      *   `break`    — abort signal received
      */
-    processStreamChunk(chunk: unknown, pass: PassState, allowedToolNames: Set<string>): ChunkAction | Promise<ChunkAction>;
+    processStreamChunk(chunk: any, pass: PassState, allowedToolNames: Set<string>): ChunkAction | Promise<ChunkAction>;
     /** Log a single iteration to the request log. */
     logIteration(pass: PassState, currentMessages: ConversationMessage[]): void;
     /** Create a fresh per-iteration pass state object. */
-    createPassState(passOptions: Record<string, unknown>): PassState;
+    createPassState(passOptions: any): PassState;
     /**
      * Shared finalization logic — cost calculation, persistence,
      * done event, worker snapshot persistence, and afterResponse hooks.

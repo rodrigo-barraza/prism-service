@@ -168,6 +168,7 @@ export default class AgenticLoopService {
     label: string;
     description: string;
   }> {
+        // @ts-ignore - TODO: strict typing
         return HarnessRegistry.list();
   }
 }

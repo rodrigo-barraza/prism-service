@@ -37,7 +37,6 @@ export default class AgenticLoopService {
         if (!harnessId) {
             try {
                 const { default: SettingsService } = await import("./SettingsService.js");
-                // @ts-ignore - TODO: strict typing
                 const agentSettings = await SettingsService.getSection("agents");
                 harnessId = agentSettings?.harness || "standard";
             }
@@ -45,7 +44,6 @@ export default class AgenticLoopService {
                 harnessId = "standard";
             }
         }
-        // @ts-ignore - TODO: strict typing
         const HarnessClass = HarnessRegistry.get(harnessId);
         logger.info(`[AgenticLoop] Using harness: "${HarnessClass.id}" (${HarnessClass.label})`);
         // 4. Instantiate and run
@@ -59,11 +57,9 @@ export default class AgenticLoopService {
             pendingQuestions.delete(agentSessionId);
             if (!parentAgentSessionId) {
                 const trackerSessionId = parentAgentSessionId || agentSessionId;
-                // @ts-ignore - TODO: strict typing
                 SessionGenerationTracker.cleanup(trackerSessionId);
                 try {
                     const { default: CoordinatorService } = await import("./CoordinatorService.js");
-                    // @ts-ignore - TODO: strict typing
                     CoordinatorService.cleanupSession(agentSessionId);
                 }
                 catch {
@@ -121,7 +117,6 @@ export default class AgenticLoopService {
     // ── Harness Discovery API ──────────────────────────────
     /** List available harnesses for the settings UI. */
     static listHarnesses() {
-        // @ts-ignore - TODO: strict typing
         return HarnessRegistry.list();
     }
 }

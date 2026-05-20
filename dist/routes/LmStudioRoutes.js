@@ -1,6 +1,4 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-// @ts-ignore
 import { sleep } from "@rodrigo-barraza/utilities-library";
 import express from "express";
 import { getProvider } from "../providers/index.js";
@@ -11,7 +9,6 @@ import { initSseResponse } from "../utils/SseUtilities.js";
 const router = express.Router();
 /** Resolve instance ID from request — supports ?instance=lm-studio-2 */
 function resolveInstanceId(req) {
-    // @ts-ignore - TODO: strict typing
     const id = req.query.instance || req.body?.instance || "lm-studio";
     // Validate it's actually a registered instance
     if (!isInstance(id))
@@ -24,14 +21,12 @@ function resolveInstanceId(req) {
  */
 router.get("/models", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const instanceId = resolveInstanceId(req);
         const provider = getProvider(instanceId);
         const data = await provider.listModels();
         res.json(data);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`GET /lm-studio/models error: ${error.message}`);
         next(error);
     }
@@ -49,25 +44,17 @@ router.post("/load", asyncHandler(async (req, res, next) => {
                 .status(400)
                 .json({ error: "Missing 'model' in request body" });
         }
-        // @ts-ignore - TODO: strict typing
         const instanceId = resolveInstanceId(req);
         const provider = getProvider(instanceId);
         // Build load options from request body
         const loadOptions = {};
-        // @ts-ignore
         if (context_length != null)
             loadOptions.context_length = context_length;
-        // @ts-ignore
         if (flash_attention != null)
-            // @ts-ignore
             loadOptions.flash_attention = flash_attention;
-        // @ts-ignore
         if (offload_kv_cache_to_gpu != null)
-            // @ts-ignore
             loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
-        // @ts-ignore
         if (eval_batch_size != null)
-            // @ts-ignore
             loadOptions.eval_batch_size = eval_batch_size;
         // ensureModelLoaded handles: skip if already loaded, unload others, then load
         const { alreadyLoaded } = await provider.ensureModelLoaded(model, loadOptions);
@@ -78,7 +65,6 @@ router.post("/load", asyncHandler(async (req, res, next) => {
         res.json({ model, alreadyLoaded: false });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`POST /lm-studio/load error: ${error.message}`);
         next(error);
     }
@@ -113,26 +99,18 @@ router.post("/load-stream", asyncHandler(async (req, res) => {
         aborted = true;
     });
     try {
-        // @ts-ignore - TODO: strict typing
         const instanceId = resolveInstanceId(req);
         const provider = getProvider(instanceId);
         send({ type: "start", model });
         // Build load options
         const loadOptions = {};
-        // @ts-ignore
         if (context_length != null)
             loadOptions.context_length = context_length;
-        // @ts-ignore
         if (flash_attention != null)
-            // @ts-ignore
             loadOptions.flash_attention = flash_attention;
-        // @ts-ignore
         if (offload_kv_cache_to_gpu != null)
-            // @ts-ignore
             loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
-        // @ts-ignore
         if (eval_batch_size != null)
-            // @ts-ignore
             loadOptions.eval_batch_size = eval_batch_size;
         if (aborted)
             return res.end();
@@ -152,9 +130,7 @@ router.post("/load-stream", asyncHandler(async (req, res) => {
             }
             else {
                 // Unload any other loaded models first (single-model enforcement)
-                // @ts-ignore
                 for (const m of models || []) {
-                    // @ts-ignore
                     for (const inst of m.loaded_instances || []) {
                         send({ type: "unloading", model: m.key });
                         logger.info(`[load-stream] Auto-unloading ${inst.id} before loading ${model}`);
@@ -164,9 +140,7 @@ router.post("/load-stream", asyncHandler(async (req, res) => {
             }
         }
         catch (listErr) {
-            logger.warn(
-            // @ts-ignore - TODO: strict typing
-            `[load-stream] Could not check models before loading: ${listErr.message}`);
+            logger.warn(`[load-stream] Could not check models before loading: ${listErr.message}`);
         }
         if (!needsLoad || aborted) {
             return res.end();
@@ -202,9 +176,7 @@ router.post("/load-stream", asyncHandler(async (req, res) => {
         if (aborted)
             return res.end();
         if (loadError) {
-            // @ts-ignore
             logger.error(`[load-stream] loadModel failed: ${loadError.message}`);
-            // @ts-ignore
             send({ type: "error", message: loadError.message });
         }
         else {
@@ -214,9 +186,7 @@ router.post("/load-stream", asyncHandler(async (req, res) => {
         }
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`POST /lm-studio/load-stream error: ${error.message}`);
-        // @ts-ignore - TODO: strict typing
         send({ type: "error", message: error.message });
     }
     finally {
@@ -237,14 +207,12 @@ router.post("/unload", asyncHandler(async (req, res, next) => {
                 error: "Missing 'instance_id' in request body",
             });
         }
-        // @ts-ignore - TODO: strict typing
         const instanceId = resolveInstanceId(req);
         const provider = getProvider(instanceId);
         const data = await provider.unloadModel(instance_id);
         res.json(data);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`POST /lm-studio/unload error: ${error.message}`);
         next(error);
     }
@@ -265,7 +233,6 @@ router.post("/estimate", asyncHandler(async (req, res, next) => {
         // Delegate to gateway — it handles the full fetch → estimate pipeline.
         // Fall back to direct gguf-arch if we need raw model data (e.g. for
         // custom gpuLayers values from the slider).
-        // @ts-ignore - TODO: strict typing
         const instanceId = resolveInstanceId(req);
         const provider = getProvider(instanceId);
         const result = await provider.listModels();
@@ -288,7 +255,6 @@ router.post("/estimate", asyncHandler(async (req, res, next) => {
         res.json(estimate);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`POST /lm-studio/estimate error: ${error.message}`);
         next(error);
     }

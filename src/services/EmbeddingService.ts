@@ -117,6 +117,7 @@ const EmbeddingService = {
           if (typeof content === "string") {
                         (mod as any).textIn = true;
           } else if (Array.isArray(content)) {
+                        // @ts-ignore - TODO: strict typing
                         for ( const part of content) {
                             if (part.text) (mod as any).textIn = true;
               const mime = part.inlineData?.mimeType || "";

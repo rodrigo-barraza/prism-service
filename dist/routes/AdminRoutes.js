@@ -1,8 +1,6 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import MongoWrapper from "../wrappers/MongoWrapper.js";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.js";
 import { getProvider } from "../providers/index.js";
 import ChangeStreamService from "../services/ChangeStreamService.js";
@@ -13,10 +11,7 @@ import { resolveArchParams, estimateMemory } from "../utils/gguf-arch.js";
 import { COLLECTIONS, COST_SUM_EXPR, TOTAL_TOKENS_EXPR, AVG_TOKENS_PER_SEC_EXPR, SSE_KEEPALIVE_INTERVAL_MS, } from "../constants.js";
 import AgentPersonaRegistry from "../services/AgentPersonaRegistry.js";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.js";
-// @ts-ignore
-import { MS_PER_MINUTE, MS_PER_HOUR, hours as hoursToMs, minutes,
-// @ts-ignore
- } from "@rodrigo-barraza/utilities-library";
+import { MS_PER_MINUTE, MS_PER_HOUR, hours as hoursToMs, minutes, } from "@rodrigo-barraza/utilities-library";
 import os from "os";
 const router = express.Router();
 const { REQUESTS: REQUESTS_COL, CONVERSATIONS: CONVERSATIONS_COL, WORKFLOWS: WORKFLOWS_COL, } = COLLECTIONS;
@@ -28,40 +23,28 @@ router.get("/requests", asyncHandler(async (req, res, next) => {
             return res.status(503).json({ error: "Database not available" });
         const { page = 1, limit = 50, project, username, provider, model, endpoint, operation, success, from, to, sort = "timestamp", order = "desc", } = req.query;
         const filter = {};
-        // @ts-ignore
         if (project)
             filter.project = project;
-        // @ts-ignore
         if (username)
             filter.username = username;
-        // @ts-ignore
         if (provider)
             filter.provider = provider;
-        // @ts-ignore
         if (model)
             filter.model = model;
-        // @ts-ignore
         if (endpoint)
             filter.endpoint = endpoint;
-        // @ts-ignore
         if (operation)
             filter.operation = operation;
-        // @ts-ignore
         if (success !== undefined)
             filter.success = success === "true";
         if (from || to) {
-            // @ts-ignore
             filter.timestamp = {};
-            // @ts-ignore
             if (from)
                 filter.timestamp.$gte = from;
-            // @ts-ignore
             if (to)
                 filter.timestamp.$lte = to;
         }
-        // @ts-ignore - TODO: strict typing
         const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-        // @ts-ignore - TODO: strict typing
         const lim = parseInt(limit, 10);
         const sortDir = order === "asc" ? 1 : -1;
         const [docs, total] = await Promise.all([
@@ -70,18 +53,15 @@ router.get("/requests", asyncHandler(async (req, res, next) => {
                 .find(filter, {
                 projection: { requestPayload: 0, responsePayload: 0 },
             })
-                // @ts-ignore - TODO: strict typing
                 .sort({ [sort]: sortDir })
                 .skip(skip)
                 .limit(lim)
                 .toArray(),
             db.collection(REQUESTS_COL).countDocuments(filter),
         ]);
-        // @ts-ignore - TODO: strict typing
         res.json({ data: docs, total, page: parseInt(page, 10), limit: lim });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /requests error: ${error.message}`);
         next(error);
     }
@@ -100,7 +80,6 @@ router.get("/requests/:id", asyncHandler(async (req, res, next) => {
         res.json(document);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /requests/:id error: ${error.message}`);
         next(error);
     }
@@ -146,7 +125,6 @@ router.get("/requests/:id/associations", asyncHandler(async (req, res, next) => 
                 .toArray();
             // Normalize _id to string id
             workflows = workflows.map((w) => ({
-                // @ts-ignore - TODO: strict typing
                 id: w._id.toString(),
                 name: w.name || "Untitled Workflow",
                 nodeCount: w.nodeCount || 0,
@@ -155,7 +133,6 @@ router.get("/requests/:id/associations", asyncHandler(async (req, res, next) => 
             }));
             // Derive traces from requests — traces are no longer a collection
             const traceIds = new Set();
-            // @ts-ignore
             for (const c of conversations) {
                 if (c.traceId)
                     traceIds.add(c.traceId);
@@ -191,7 +168,6 @@ router.get("/requests/:id/associations", asyncHandler(async (req, res, next) => 
         res.json({ conversations, workflows, traces });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /requests/:id/associations error: ${error.message}`);
         next(error);
     }
@@ -204,16 +180,12 @@ router.get("/stats", asyncHandler(async (req, res, next) => {
             return res.status(503).json({ error: "Database not available" });
         const { from, to, project } = req.query;
         const match = {};
-        // @ts-ignore
         if (project)
             match.project = project;
         if (from || to) {
-            // @ts-ignore
             match.timestamp = {};
-            // @ts-ignore
             if (from)
                 match.timestamp.$gte = from;
-            // @ts-ignore
             if (to)
                 match.timestamp.$lte = to;
         }
@@ -247,31 +219,23 @@ router.get("/stats", asyncHandler(async (req, res, next) => {
         ];
         // Count total traces and conversations (respecting date + project filters)
         const convMatch = {};
-        // @ts-ignore
         if (project)
             convMatch.project = project;
         if (from || to) {
-            // @ts-ignore
             convMatch.createdAt = {};
-            // @ts-ignore
             if (from)
                 convMatch.createdAt.$gte = from;
-            // @ts-ignore
             if (to)
                 convMatch.createdAt.$lte = to;
         }
         // Traces: count distinct traceIds from requests that match filters
         const traceMatch = { traceId: { $ne: null } };
-        // @ts-ignore
         if (project)
             traceMatch.project = project;
         if (from || to) {
-            // @ts-ignore
             traceMatch.timestamp = {};
-            // @ts-ignore
             if (from)
                 traceMatch.timestamp.$gte = from;
-            // @ts-ignore
             if (to)
                 traceMatch.timestamp.$lte = to;
         }
@@ -288,8 +252,7 @@ router.get("/stats", asyncHandler(async (req, res, next) => {
                 .collection(REQUESTS_COL)
                 .aggregate(pipeline)
                 .toArray()
-                // @ts-ignore - TODO: strict typing
-                .then((r) => r[0]),
+                .then(((r) => r[0])),
             db.collection(REQUESTS_COL).aggregate(toolCallPipeline).toArray(),
             db.collection(REQUESTS_COL).aggregate(traceCountPipeline).toArray(),
             db.collection(CONVERSATIONS_COL).countDocuments(convMatch),
@@ -306,7 +269,6 @@ router.get("/stats", asyncHandler(async (req, res, next) => {
             totalDuration: 0,
             successCount: 0,
             errorCount: 0,
-            // @ts-ignore - TODO: strict typing
             ...result,
             traceCount,
             conversationCount,
@@ -316,7 +278,6 @@ router.get("/stats", asyncHandler(async (req, res, next) => {
         });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /stats error: ${error.message}`);
         next(error);
     }
@@ -329,16 +290,12 @@ router.get("/stats/projects", asyncHandler(async (req, res, next) => {
             return res.status(503).json({ error: "Database not available" });
         const { from, to, project } = req.query;
         const match = {};
-        // @ts-ignore
         if (project)
             match.project = project;
         if (from || to) {
-            // @ts-ignore
             match.timestamp = {};
-            // @ts-ignore
             if (from)
                 match.timestamp.$gte = from;
-            // @ts-ignore
             if (to)
                 match.timestamp.$lte = to;
         }
@@ -406,27 +363,21 @@ router.get("/stats/projects", asyncHandler(async (req, res, next) => {
         ]);
         // Build a project → workflowCount map
         const wfMap = {};
-        // @ts-ignore
         for (const wc of workflowCounts) {
-            // @ts-ignore
-            wfMap[wc._id || "unknown"] = wc.workflowCount;
+            wfMap[wc._id || "any"] = wc.workflowCount;
         }
         // Build a project → conversationCount map
         const convMap = {};
-        // @ts-ignore
         for (const cc of convCounts) {
-            // @ts-ignore
-            convMap[cc._id || "unknown"] = cc.conversationCount;
+            convMap[cc._id || "any"] = cc.conversationCount;
         }
         // Build a project → traceCount map
         const traceMap = {};
-        // @ts-ignore
         for (const tc of traceCounts) {
-            // @ts-ignore
-            traceMap[tc._id || "unknown"] = tc.traceCount;
+            traceMap[tc._id || "any"] = tc.traceCount;
         }
         res.json(results.map((r) => ({
-            project: r._id || "unknown",
+            project: r._id || "any",
             totalRequests: r.totalRequests,
             totalInputTokens: r.totalInputTokens,
             totalOutputTokens: r.totalOutputTokens,
@@ -437,20 +388,14 @@ router.get("/stats/projects", asyncHandler(async (req, res, next) => {
             lastRequest: r.lastRequest,
             modelCount: r.modelCount,
             providerCount: r.providerCount,
-            // @ts-ignore - TODO: strict typing
             models: (r._models || []).filter(Boolean),
-            // @ts-ignore - TODO: strict typing
             providers: (r._providers || []).filter(Boolean),
-            // @ts-ignore
-            workflowCount: wfMap[r._id || "unknown"] || 0,
-            // @ts-ignore
-            conversationCount: convMap[r._id || "unknown"] || 0,
-            // @ts-ignore
-            traceCount: traceMap[r._id || "unknown"] || 0,
+            workflowCount: wfMap[r._id || "any"] || 0,
+            conversationCount: convMap[r._id || "any"] || 0,
+            traceCount: traceMap[r._id || "any"] || 0,
         })));
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /stats/projects error: ${error.message}`);
         next(error);
     }
@@ -479,7 +424,7 @@ router.get("/stats/users", asyncHandler(async (req, res, next) => {
             .aggregate(pipeline)
             .toArray();
         res.json(results.map((r) => ({
-            username: r._id || "unknown",
+            username: r._id || "any",
             totalRequests: r.totalRequests,
             totalTokens: r.totalTokens,
             totalCost: r.totalCost,
@@ -488,7 +433,6 @@ router.get("/stats/users", asyncHandler(async (req, res, next) => {
         })));
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /stats/users error: ${error.message}`);
         next(error);
     }
@@ -501,16 +445,12 @@ router.get("/stats/models", asyncHandler(async (req, res, next) => {
             return res.status(503).json({ error: "Database not available" });
         const { from, to, project } = req.query;
         const match = {};
-        // @ts-ignore
         if (project)
             match.project = project;
         if (from || to) {
-            // @ts-ignore
             match.timestamp = {};
-            // @ts-ignore
             if (from)
                 match.timestamp.$gte = from;
-            // @ts-ignore
             if (to)
                 match.timestamp.$lte = to;
         }
@@ -540,9 +480,7 @@ router.get("/stats/models", asyncHandler(async (req, res, next) => {
             .toArray();
         // Collect all distinct conversationIds to look up workflow links
         const allConvIds = new Set();
-        // @ts-ignore
         for (const r of results) {
-            // @ts-ignore
             for (const cid of r._convIds || []) {
                 if (cid)
                     allConvIds.add(cid);
@@ -567,9 +505,7 @@ router.get("/stats/models", asyncHandler(async (req, res, next) => {
                 { $project: { _id: 1, workflowCount: { $size: "$wfIds" } } },
             ])
                 .toArray();
-            // @ts-ignore
             for (const w of wfResults) {
-                // @ts-ignore
                 wfByConv[w._id] = w.workflowCount;
             }
         }
@@ -584,30 +520,22 @@ router.get("/stats/models", asyncHandler(async (req, res, next) => {
             })
                 .project({ id: 1, traceId: 1 })
                 .toArray();
-            // @ts-ignore
             for (const c of convDocs) {
-                // @ts-ignore
                 traceByConv[c.id] = c.traceId;
             }
         }
         res.json(results.map((r) => {
-            // @ts-ignore - TODO: strict typing
             const convIds = (r._convIds || []).filter(Boolean);
             const conversationCount = convIds.length;
             let workflowCount = 0;
             const traceSet = new Set();
-            // @ts-ignore
             for (const cid of convIds) {
-                // @ts-ignore
                 workflowCount += wfByConv[cid] || 0;
-                // @ts-ignore
                 if (traceByConv[cid])
                     traceSet.add(traceByConv[cid]);
             }
             return {
-                // @ts-ignore - TODO: strict typing
                 model: r._id.model,
-                // @ts-ignore - TODO: strict typing
                 provider: r._id.provider,
                 totalRequests: r.totalRequests,
                 totalInputTokens: r.totalInputTokens,
@@ -624,7 +552,6 @@ router.get("/stats/models", asyncHandler(async (req, res, next) => {
         }));
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /stats/models error: ${error.message}`);
         next(error);
     }
@@ -637,16 +564,12 @@ router.get("/stats/tools", asyncHandler(async (req, res, next) => {
             return res.status(503).json({ error: "Database not available" });
         const { from, to, project, tool } = req.query;
         const match = { toolApiNames: { $exists: true, $ne: [] } };
-        // @ts-ignore
         if (project)
             match.project = project;
         if (from || to) {
-            // @ts-ignore
             match.timestamp = {};
-            // @ts-ignore
             if (from)
                 match.timestamp.$gte = from;
-            // @ts-ignore
             if (to)
                 match.timestamp.$lte = to;
         }
@@ -691,32 +614,24 @@ router.get("/stats/tools", asyncHandler(async (req, res, next) => {
         res.json(results.map((r) => {
             // Count top models
             const modelCounts = {};
-            // @ts-ignore
             for (const m of r._models || []) {
-                // @ts-ignore
                 if (m)
                     modelCounts[m] = (modelCounts[m] || 0) + 1;
             }
             const topModels = Object.entries(modelCounts)
-                // @ts-ignore - TODO: strict typing
-                .sort((a, b) => b[1] - a[1])
+                .sort(((a, b) => b[1] - a[1]))
                 .slice(0, 5)
-                // @ts-ignore - TODO: strict typing
-                .map(([model, count]) => ({ model, count }));
+                .map((([model, count]) => ({ model, count })));
             // Count top agents
             const agentCounts = {};
-            // @ts-ignore
             for (const a of r._agents || []) {
-                // @ts-ignore
                 if (a)
                     agentCounts[a] = (agentCounts[a] || 0) + 1;
             }
             const topAgents = Object.entries(agentCounts)
-                // @ts-ignore - TODO: strict typing
-                .sort((a, b) => b[1] - a[1])
+                .sort(((a, b) => b[1] - a[1]))
                 .slice(0, 5)
-                // @ts-ignore - TODO: strict typing
-                .map(([agent, count]) => ({ agent, count }));
+                .map((([agent, count]) => ({ agent, count })));
             return {
                 tool: r._id,
                 totalCalls: r.totalCalls,
@@ -727,7 +642,6 @@ router.get("/stats/tools", asyncHandler(async (req, res, next) => {
                 avgLatency: r.avgLatency,
                 firstUsed: r.firstUsed,
                 lastUsed: r.lastUsed,
-                // @ts-ignore - TODO: strict typing
                 providers: r._providers?.filter(Boolean) || [],
                 topModels,
                 topAgents,
@@ -737,7 +651,6 @@ router.get("/stats/tools", asyncHandler(async (req, res, next) => {
         }));
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /stats/tools error: ${error.message}`);
         next(error);
     }
@@ -751,12 +664,9 @@ router.get("/stats/endpoints", asyncHandler(async (req, res, next) => {
         const { from, to } = req.query;
         const match = {};
         if (from || to) {
-            // @ts-ignore
             match.timestamp = {};
-            // @ts-ignore
             if (from)
                 match.timestamp.$gte = from;
-            // @ts-ignore
             if (to)
                 match.timestamp.$lte = to;
         }
@@ -781,7 +691,7 @@ router.get("/stats/endpoints", asyncHandler(async (req, res, next) => {
             .aggregate(pipeline)
             .toArray();
         res.json(results.map((r) => ({
-            endpoint: r._id || "unknown",
+            endpoint: r._id || "any",
             totalRequests: r.totalRequests,
             totalTokens: r.totalTokens,
             totalCost: r.totalCost,
@@ -790,7 +700,6 @@ router.get("/stats/endpoints", asyncHandler(async (req, res, next) => {
         })));
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /stats/endpoints error: ${error.message}`);
         next(error);
     }
@@ -804,12 +713,9 @@ router.get("/stats/costs", asyncHandler(async (req, res, next) => {
         const { from, to } = req.query;
         const match = {};
         if (from || to) {
-            // @ts-ignore
             match.timestamp = {};
-            // @ts-ignore
             if (from)
                 match.timestamp.$gte = from;
-            // @ts-ignore
             if (to)
                 match.timestamp.$lte = to;
         }
@@ -889,15 +795,12 @@ router.get("/stats/costs", asyncHandler(async (req, res, next) => {
         const { totals, byProject, byProvider, byModel, byEndpoint, byProjectProvider, byProjectEndpoint, byProjectModel, } = result;
         // Nest provider breakdown under each project
         const providersByProject = {};
-        // @ts-ignore
         for (const row of byProjectProvider) {
-            const proj = row._id.project || "unknown";
-            // @ts-ignore
+            const proj = row._id.project || "any";
             if (!providersByProject[proj])
                 providersByProject[proj] = [];
-            // @ts-ignore
             providersByProject[proj].push({
-                provider: row._id.provider || "unknown",
+                provider: row._id.provider || "any",
                 totalCost: row.totalCost,
                 totalInputTokens: row.totalInputTokens,
                 totalOutputTokens: row.totalOutputTokens,
@@ -907,15 +810,12 @@ router.get("/stats/costs", asyncHandler(async (req, res, next) => {
         }
         // Nest endpoint breakdown under each project
         const endpointsByProject = {};
-        // @ts-ignore
         for (const row of byProjectEndpoint) {
-            const proj = row._id.project || "unknown";
-            // @ts-ignore
+            const proj = row._id.project || "any";
             if (!endpointsByProject[proj])
                 endpointsByProject[proj] = [];
-            // @ts-ignore
             endpointsByProject[proj].push({
-                endpoint: row._id.endpoint || "unknown",
+                endpoint: row._id.endpoint || "any",
                 totalCost: row.totalCost,
                 totalInputTokens: row.totalInputTokens,
                 totalOutputTokens: row.totalOutputTokens,
@@ -925,16 +825,13 @@ router.get("/stats/costs", asyncHandler(async (req, res, next) => {
         }
         // Nest model breakdown under each project
         const modelsByProject = {};
-        // @ts-ignore
         for (const row of byProjectModel) {
-            const proj = row._id.project || "unknown";
-            // @ts-ignore
+            const proj = row._id.project || "any";
             if (!modelsByProject[proj])
                 modelsByProject[proj] = [];
-            // @ts-ignore
             modelsByProject[proj].push({
-                model: row._id.model || "unknown",
-                provider: row._id.provider || "unknown",
+                model: row._id.model || "any",
+                provider: row._id.provider || "any",
                 totalCost: row.totalCost,
                 totalInputTokens: row.totalInputTokens,
                 totalOutputTokens: row.totalOutputTokens,
@@ -957,31 +854,26 @@ router.get("/stats/costs", asyncHandler(async (req, res, next) => {
                 avgTokensPerSec: t.avgTokensPerSec,
             },
             byProject: byProject.map((r) => ({
-                project: r._id || "unknown",
+                project: r._id || "any",
                 totalCost: r.totalCost,
                 totalInputTokens: r.totalInputTokens,
                 totalOutputTokens: r.totalOutputTokens,
                 totalRequests: r.totalRequests,
                 avgTokensPerSec: r.avgTokensPerSec,
-                // @ts-ignore
-                byProvider: providersByProject[r._id || "unknown"] || [],
-                // @ts-ignore
-                byEndpoint: endpointsByProject[r._id || "unknown"] || [],
-                // @ts-ignore
-                byModel: modelsByProject[r._id || "unknown"] || [],
+                byProvider: providersByProject[r._id || "any"] || [],
+                byEndpoint: endpointsByProject[r._id || "any"] || [],
+                byModel: modelsByProject[r._id || "any"] || [],
             })),
             byProvider: byProvider.map((r) => ({
-                provider: r._id || "unknown",
+                provider: r._id || "any",
                 totalCost: r.totalCost,
                 totalInputTokens: r.totalInputTokens,
                 totalOutputTokens: r.totalOutputTokens,
                 totalRequests: r.totalRequests,
             })),
             byModel: byModel.map((r) => ({
-                // @ts-ignore - TODO: strict typing
-                model: r._id.model || "unknown",
-                // @ts-ignore - TODO: strict typing
-                provider: r._id.provider || "unknown",
+                model: r._id.model || "any",
+                provider: r._id.provider || "any",
                 totalCost: r.totalCost,
                 totalInputTokens: r.totalInputTokens,
                 totalOutputTokens: r.totalOutputTokens,
@@ -989,7 +881,7 @@ router.get("/stats/costs", asyncHandler(async (req, res, next) => {
                 avgTokensPerSec: r.avgTokensPerSec,
             })),
             byEndpoint: byEndpoint.map((r) => ({
-                endpoint: r._id || "unknown",
+                endpoint: r._id || "any",
                 totalCost: r.totalCost,
                 totalInputTokens: r.totalInputTokens,
                 totalOutputTokens: r.totalOutputTokens,
@@ -999,7 +891,6 @@ router.get("/stats/costs", asyncHandler(async (req, res, next) => {
         });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /stats/costs error: ${error.message}`);
         next(error);
     }
@@ -1013,18 +904,14 @@ router.get("/stats/timeline", asyncHandler(async (req, res, next) => {
         const { hours = 24, from, to, project } = req.query;
         let sinceDate, untilDate;
         if (from) {
-            // @ts-ignore - TODO: strict typing
             sinceDate = new Date(from);
         }
         else {
-            // @ts-ignore - TODO: strict typing
             sinceDate = new Date(Date.now() - hoursToMs(parseInt(hours, 10)));
         }
         if (to) {
-            // @ts-ignore - TODO: strict typing
             untilDate = new Date(to);
         }
-        // @ts-ignore - TODO: strict typing
         const spanMs = (untilDate || new Date()) - sinceDate;
         const spanMinutes = spanMs / (1000 * 60);
         const spanHours = spanMinutes / 60;
@@ -1034,7 +921,6 @@ router.get("/stats/timeline", asyncHandler(async (req, res, next) => {
         let granularity, groupId;
         if (spanMinutes <= 2) {
             // ≤ 2 minutes → 1-second bins  (max 120 pts)  "2026-04-02T22:05:31"
-            // @ts-ignore - TODO: strict typing
             granularity = "1s";
             groupId = {
                 $dateToString: {
@@ -1046,7 +932,6 @@ router.get("/stats/timeline", asyncHandler(async (req, res, next) => {
         }
         else if (spanMinutes <= 10) {
             // ≤ 10 minutes → 5-second bins  (max 120 pts)  "2026-04-02T22:05:05"
-            // @ts-ignore - TODO: strict typing
             granularity = "5s";
             groupId = {
                 $concat: [
@@ -1116,7 +1001,6 @@ router.get("/stats/timeline", asyncHandler(async (req, res, next) => {
         }
         else if (spanHours <= 1) {
             // ≤ 1 hour → 15-second bins  (max 240 pts)  "2026-04-02T22:05:15"
-            // @ts-ignore - TODO: strict typing
             granularity = "15s";
             groupId = {
                 $concat: [
@@ -1186,7 +1070,6 @@ router.get("/stats/timeline", asyncHandler(async (req, res, next) => {
         }
         else if (spanHours <= 4) {
             // ≤ 4 hours → 1-minute bins  (max 240 pts)  "2026-04-02T22:05"
-            // @ts-ignore - TODO: strict typing
             granularity = "1min";
             groupId = {
                 $dateToString: {
@@ -1198,7 +1081,6 @@ router.get("/stats/timeline", asyncHandler(async (req, res, next) => {
         }
         else if (spanDays <= 1) {
             // ≤ 24 hours → 5-minute bins  (max 288 pts)
-            // @ts-ignore - TODO: strict typing
             granularity = "5min";
             groupId = {
                 $concat: [
@@ -1223,13 +1105,11 @@ router.get("/stats/timeline", asyncHandler(async (req, res, next) => {
         }
         else if (spanDays <= 7) {
             // 1–7 days → hourly bins  (max 168 pts)
-            // @ts-ignore - TODO: strict typing
             granularity = "hour";
             groupId = { $substr: ["$timestamp", 0, 13] }; // "2026-03-21T14"
         }
         else if (spanDays <= 60) {
             // 7–60 days → 6-hour bins  (max 240 pts)
-            // @ts-ignore - TODO: strict typing
             granularity = "6h";
             groupId = {
                 $concat: [
@@ -1296,17 +1176,13 @@ router.get("/stats/timeline", asyncHandler(async (req, res, next) => {
         }
         else {
             // > 60 days → daily bins
-            // @ts-ignore - TODO: strict typing
             granularity = "day";
             groupId = { $substr: ["$timestamp", 0, 10] }; // "2026-03-21"
         }
-        // @ts-ignore - TODO: strict typing
         const timeMatch = { $gte: sinceDate.toISOString() };
-        // @ts-ignore
         if (untilDate)
             timeMatch.$lte = untilDate.toISOString();
         const matchFilter = { timestamp: timeMatch };
-        // @ts-ignore
         if (project)
             matchFilter.project = project;
         const pipeline = [
@@ -1343,16 +1219,12 @@ router.get("/stats/timeline", asyncHandler(async (req, res, next) => {
                 requests: r.requests,
                 tokens: r.tokens,
                 cost: r.cost,
-                // @ts-ignore - TODO: strict typing
                 avgLatency: r.avgLatency ? Math.round(r.avgLatency) : 0,
-                successRate: 
-                // @ts-ignore - TODO: strict typing
-                r.requests > 0 ? Math.round((r.successes / r.requests) * 100) : 100,
+                successRate: r.requests > 0 ? Math.round((r.successes / r.requests) * 100) : 100,
             })),
         });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /stats/timeline error: ${error.message}`);
         next(error);
     }
@@ -1365,13 +1237,10 @@ router.get("/conversations", asyncHandler(async (req, res, next) => {
             return res.status(503).json({ error: "Database not available" });
         const { page = 1, limit = 50, project, username, search, provider, model, trace, from, to, sort = "updatedAt", order = "desc", } = req.query;
         const filter = {};
-        // @ts-ignore
         if (trace)
             filter.traceId = trace;
-        // @ts-ignore
         if (project)
             filter.project = project;
-        // @ts-ignore
         if (username)
             filter.username = username;
         if (search) {
@@ -1383,43 +1252,32 @@ router.get("/conversations", asyncHandler(async (req, res, next) => {
             ];
             // IP lives on requests, not conversations — resolve matching
             // conversationIds first, then fold them into the $or filter.
-            // @ts-ignore - TODO: strict typing
             if (/^[\d.:a-f]+$/i.test(search.trim())) {
                 const matchingConvIds = await db
                     .collection(REQUESTS_COL)
                     .distinct("conversationId", { clientIp: regex });
                 if (matchingConvIds.length > 0) {
-                    // @ts-ignore
                     orClauses.push({ id: { $in: matchingConvIds } });
                 }
             }
-            // @ts-ignore
             filter.$or = orClauses;
         }
-        // @ts-ignore
         if (provider)
             filter.providers = provider;
-        // @ts-ignore
         if (model)
             filter["messages.model"] = model;
         if (from || to) {
-            // @ts-ignore
             filter.updatedAt = {};
-            // @ts-ignore
             if (from)
                 filter.updatedAt.$gte = from;
-            // @ts-ignore
             if (to)
                 filter.updatedAt.$lte = to;
         }
-        // @ts-ignore - TODO: strict typing
         const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-        // @ts-ignore - TODO: strict typing
         const lim = parseInt(limit, 10);
         const sortDir = order === "asc" ? 1 : -1;
         const pipeline = [
             ...(Object.keys(filter).length ? [{ $match: filter }] : []),
-            // @ts-ignore - TODO: strict typing
             { $sort: { [sort]: sortDir } },
             {
                 $project: {
@@ -1567,11 +1425,9 @@ router.get("/conversations", asyncHandler(async (req, res, next) => {
             db.collection(CONVERSATIONS_COL).aggregate(pipeline).toArray(),
             db.collection(CONVERSATIONS_COL).countDocuments(filter),
         ]);
-        // @ts-ignore - TODO: strict typing
         res.json({ data: docs, total, page: parseInt(page, 10), limit: lim });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /conversations error: ${error.message}`);
         next(error);
     }
@@ -1595,7 +1451,6 @@ router.get("/conversations/filters", asyncHandler(async (req, res, next) => {
         });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /conversations/filters error: ${error.message}`);
         next(error);
     }
@@ -1628,7 +1483,6 @@ router.get("/conversations/stats", asyncHandler(async (req, res, next) => {
         });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /conversations/stats error: ${error.message}`);
         next(error);
     }
@@ -1665,9 +1519,7 @@ router.get("/conversations/stream", asyncHandler(async (req, res) => {
             // Auto-clear stale isGenerating flags (> 5 min without update)
             db.collection(CONVERSATIONS_COL)
                 .updateMany({ isGenerating: true, updatedAt: { $lt: fiveMinAgo } }, { $set: { isGenerating: false } })
-                // @ts-ignore - TODO: strict typing
                 .then(({ modifiedCount }) => {
-                // @ts-ignore - TODO: strict typing
                 if (modifiedCount > 0)
                     logger.info(`Auto-cleared ${modifiedCount} stale isGenerating flag(s)`);
             })
@@ -1685,7 +1537,6 @@ router.get("/conversations/stream", asyncHandler(async (req, res) => {
             }
         }
         catch (error) {
-            // @ts-ignore - TODO: strict typing
             logger.error(`SSE conversations/stream error: ${error.message}`);
         }
     };
@@ -1698,7 +1549,6 @@ router.get("/conversations/stream", asyncHandler(async (req, res) => {
                 sendStats();
             }
         };
-        // @ts-ignore - TODO: strict typing
         ChangeStreamService.subscribe(onEvent);
         // Secondary poll: catch generation activity not tracked via Change
         // Streams (benchmarks skip conversation persistence, and provider
@@ -1721,7 +1571,6 @@ router.get("/conversations/stream", asyncHandler(async (req, res) => {
             }
         }, SSE_KEEPALIVE_INTERVAL_MS);
         req.on("close", () => {
-            // @ts-ignore - TODO: strict typing
             ChangeStreamService.unsubscribe(onEvent);
             clearInterval(generationPoll);
             clearInterval(keepAlive);
@@ -1759,7 +1608,6 @@ router.get("/changes/stream", asyncHandler(async (req, res) => {
                 // Client disconnected
             }
         };
-        // @ts-ignore - TODO: strict typing
         ChangeStreamService.subscribe(onEvent);
         // Keep-alive ping every 30s
         const keepAlive = setInterval(() => {
@@ -1771,7 +1619,6 @@ router.get("/changes/stream", asyncHandler(async (req, res) => {
             }
         }, SSE_KEEPALIVE_INTERVAL_MS);
         req.on("close", () => {
-            // @ts-ignore - TODO: strict typing
             ChangeStreamService.unsubscribe(onEvent);
             clearInterval(keepAlive);
         });
@@ -1807,7 +1654,6 @@ router.get("/conversations/:id", asyncHandler(async (req, res, next) => {
         res.json(document);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /conversations/:id error: ${error.message}`);
         next(error);
     }
@@ -1819,9 +1665,7 @@ router.get("/live", asyncHandler(async (req, res, next) => {
         if (!db)
             return res.status(503).json({ error: "Database not available" });
         const { minutes: minParam = 5 } = req.query;
-        const since = new Date(
-        // @ts-ignore - TODO: strict typing
-        Date.now() - parseInt(minParam, 10) * MS_PER_MINUTE).toISOString();
+        const since = new Date(Date.now() - parseInt(minParam, 10) * MS_PER_MINUTE).toISOString();
         const [rawConversations, recentRequests] = await Promise.all([
             db
                 .collection(CONVERSATIONS_COL)
@@ -1849,7 +1693,6 @@ router.get("/live", asyncHandler(async (req, res, next) => {
         // Enrich conversations with lastMessage info and remap fields
         const conversations = rawConversations.map((c) => {
             const msgs = c.messages || [];
-            // @ts-ignore - TODO: strict typing
             const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
             let lastMessageText = null;
             if (lastMsg) {
@@ -1864,7 +1707,6 @@ router.get("/live", asyncHandler(async (req, res, next) => {
             }
             // Compute totalCost from messages (covers docs saved before totalCost field existed)
             const totalCost = c.totalCost ||
-                // @ts-ignore - TODO: strict typing
                 msgs.reduce((sum, m) => sum + (m.estimatedCost || 0), 0);
             return {
                 id: c.id,
@@ -1872,7 +1714,6 @@ router.get("/live", asyncHandler(async (req, res, next) => {
                 username: c.username,
                 title: c.title,
                 lastActivity: c.updatedAt,
-                // @ts-ignore - TODO: strict typing
                 messageCount: msgs.length,
                 lastMessage: lastMessageText,
                 lastMessageRole: lastMsg?.role || null,
@@ -1886,7 +1727,6 @@ router.get("/live", asyncHandler(async (req, res, next) => {
         const totalRecent = await db
             .collection(REQUESTS_COL)
             .countDocuments({ timestamp: { $gte: since } });
-        // @ts-ignore - TODO: strict typing
         const requestsPerMinute = totalRecent / parseInt(minParam, 10);
         res.json({
             conversations,
@@ -1896,7 +1736,6 @@ router.get("/live", asyncHandler(async (req, res, next) => {
         });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /live error: ${error.message}`);
         next(error);
     }
@@ -1940,13 +1779,11 @@ router.get("/health", asyncHandler(async (_req, res) => {
  */
 router.get("/lm-studio/models", asyncHandler(async (_req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const provider = getProvider("lm-studio");
         const data = await provider.listModels();
         res.json(data);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /lm-studio/models error: ${error.message}`);
         next(error);
     }
@@ -1965,20 +1802,14 @@ router.post("/lm-studio/load", asyncHandler(async (req, res, next) => {
                 .status(400)
                 .json({ error: "Missing 'model' in request body" });
         }
-        // @ts-ignore - TODO: strict typing
         const provider = getProvider("lm-studio");
         // Build load options from request body
         const loadOptions = {};
-        // @ts-ignore
         if (context_length != null)
             loadOptions.context_length = context_length;
-        // @ts-ignore
         if (flash_attention != null)
-            // @ts-ignore
             loadOptions.flash_attention = flash_attention;
-        // @ts-ignore
         if (offload_kv_cache_to_gpu != null)
-            // @ts-ignore
             loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
         // ensureModelLoaded handles: skip if already loaded, unload others, then load
         const { alreadyLoaded } = await provider.ensureModelLoaded(model, loadOptions);
@@ -1988,7 +1819,6 @@ router.post("/lm-studio/load", asyncHandler(async (req, res, next) => {
         res.json({ model, alreadyLoaded });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /lm-studio/load error: ${error.message}`);
         next(error);
     }
@@ -2006,13 +1836,11 @@ router.post("/lm-studio/unload", asyncHandler(async (req, res, next) => {
                 error: "Missing 'instance_id' in request body",
             });
         }
-        // @ts-ignore - TODO: strict typing
         const provider = getProvider("lm-studio");
         const data = await provider.unloadModel(instance_id);
         res.json(data);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /lm-studio/unload error: ${error.message}`);
         next(error);
     }
@@ -2030,7 +1858,6 @@ router.post("/lm-studio/estimate", asyncHandler(async (req, res, next) => {
                 .status(400)
                 .json({ error: "Missing 'model' in request body" });
         }
-        // @ts-ignore - TODO: strict typing
         const provider = getProvider("lm-studio");
         const result = await provider.listModels();
         const allModels = result?.data || result?.models || [];
@@ -2058,7 +1885,6 @@ router.post("/lm-studio/estimate", asyncHandler(async (req, res, next) => {
         });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /lm-studio/estimate error: ${error.message}`);
         next(error);
     }
@@ -2074,22 +1900,16 @@ router.get("/workflows", asyncHandler(async (req, res, next) => {
             return res.status(503).json({ error: "Database not available" });
         const { page = 1, limit = 50, project, provider, model, guildId, userId, userName, from, to, sort = "createdAt", order = "desc", } = req.query;
         const filter = {};
-        // @ts-ignore
         if (guildId)
             filter.guildId = guildId;
-        // @ts-ignore
         if (userId)
             filter.userId = userId;
-        // @ts-ignore
         if (userName)
             filter.userName = { $regex: userName, $options: "i" };
         if (from || to) {
-            // @ts-ignore
             filter.createdAt = {};
-            // @ts-ignore
             if (from)
                 filter.createdAt.$gte = from;
-            // @ts-ignore
             if (to)
                 filter.createdAt.$lte = to;
         }
@@ -2097,24 +1917,18 @@ router.get("/workflows", asyncHandler(async (req, res, next) => {
         // and filter workflows that reference those conversations
         if (project || provider || model) {
             const convFilter = {};
-            // @ts-ignore
             if (project)
                 convFilter.project = project;
-            // @ts-ignore
             if (provider)
                 convFilter.providers = provider;
-            // @ts-ignore
             if (model)
                 convFilter["messages.model"] = model;
             const convIds = await db
                 .collection(CONVERSATIONS_COL)
                 .distinct("id", convFilter);
-            // @ts-ignore
             filter.conversationIds = { $elemMatch: { $in: convIds } };
         }
-        // @ts-ignore - TODO: strict typing
         const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-        // @ts-ignore - TODO: strict typing
         const lim = parseInt(limit, 10);
         const sortDir = order === "asc" ? 1 : -1;
         const [docs, total] = await Promise.all([
@@ -2141,18 +1955,15 @@ router.get("/workflows", asyncHandler(async (req, res, next) => {
                 createdAt: 1,
                 updatedAt: 1,
             })
-                // @ts-ignore - TODO: strict typing
                 .sort({ [sort]: sortDir })
                 .skip(skip)
                 .limit(lim)
                 .toArray(),
             db.collection(WORKFLOWS_COL).countDocuments(filter),
         ]);
-        // @ts-ignore - TODO: strict typing
         res.json({ data: docs, total, page: parseInt(page, 10), limit: lim });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin GET /workflows error: ${error.message}`);
         next(error);
     }
@@ -2168,7 +1979,6 @@ router.get("/workflows/:id", asyncHandler(async (req, res, next) => {
         const { ObjectId } = await import("mongodb");
         let objectId;
         try {
-            // @ts-ignore - TODO: strict typing
             objectId = new ObjectId(req.params.id);
         }
         catch {
@@ -2180,7 +1990,6 @@ router.get("/workflows/:id", asyncHandler(async (req, res, next) => {
         res.json(document);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin GET /workflows/:id error: ${error.message}`);
         next(error);
     }
@@ -2192,9 +2001,7 @@ router.get("/media", asyncHandler(async (req, res, next) => {
         if (!db)
             return res.status(503).json({ error: "Database not available" });
         const { page = 1, limit = 100, type, origin, search, project, username, from, to, } = req.query;
-        // @ts-ignore - TODO: strict typing
         const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-        // @ts-ignore - TODO: strict typing
         const lim = parseInt(limit, 10);
         // Get distinct projects and usernames for filter dropdowns
         const [convProjects, convUsernames, reqProjects, reqUsernames] = await Promise.all([
@@ -2219,19 +2026,14 @@ router.get("/media", asyncHandler(async (req, res, next) => {
             .sort();
         // Use aggregation to unwind messages and extract media in one query
         const preMatch = {};
-        // @ts-ignore
         if (project)
             preMatch.project = project;
-        // @ts-ignore
         if (username)
             preMatch.username = username;
         if (from || to) {
-            // @ts-ignore
             preMatch.updatedAt = {};
-            // @ts-ignore
             if (from)
                 preMatch.updatedAt.$gte = from;
-            // @ts-ignore
             if (to)
                 preMatch.updatedAt.$lte = to;
         }
@@ -2364,24 +2166,18 @@ router.get("/media", asyncHandler(async (req, res, next) => {
                     success: true,
                     "responsePayload.images": { $exists: true, $ne: [] },
                 };
-                // @ts-ignore
                 if (project)
                     reqMatch.project = project;
-                // @ts-ignore
                 if (username)
                     reqMatch.username = username;
                 if (from || to) {
-                    // @ts-ignore
                     reqMatch.timestamp = {};
-                    // @ts-ignore
                     if (from)
                         reqMatch.timestamp.$gte = from;
-                    // @ts-ignore
                     if (to)
                         reqMatch.timestamp.$lte = to;
                 }
                 if (search) {
-                    // @ts-ignore
                     reqMatch["requestPayload.messages.content"] = {
                         $regex: search,
                         $options: "i",
@@ -2422,7 +2218,6 @@ router.get("/media", asyncHandler(async (req, res, next) => {
         // ── Merge and deduplicate ──────────────────────────────────
         const seenUrls = new Set(convItems.map((i) => i.url));
         const mergedItems = [...convItems];
-        // @ts-ignore
         for (const item of requestGenItems) {
             if (!seenUrls.has(item.url)) {
                 seenUrls.add(item.url);
@@ -2446,13 +2241,11 @@ router.get("/media", asyncHandler(async (req, res, next) => {
             username: item.username,
             model: item.model,
             timestamp: item.timestamp,
-            // @ts-ignore - TODO: strict typing
             ...(item.agent && { agent: item.agent }),
         }));
         res.json({
             data,
             total,
-            // @ts-ignore - TODO: strict typing
             page: parseInt(page, 10),
             limit: lim,
             projects: allProjects,
@@ -2460,7 +2253,6 @@ router.get("/media", asyncHandler(async (req, res, next) => {
         });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /media error: ${error.message}`);
         next(error);
     }
@@ -2472,21 +2264,15 @@ router.get("/text", asyncHandler(async (req, res, next) => {
         if (!db)
             return res.status(503).json({ error: "Database not available" });
         const { page = 1, limit = 50, origin, search, project, from, to, } = req.query;
-        // @ts-ignore - TODO: strict typing
         const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-        // @ts-ignore - TODO: strict typing
         const lim = parseInt(limit, 10);
         const preMatch = {};
-        // @ts-ignore
         if (project)
             preMatch.project = project;
         if (from || to) {
-            // @ts-ignore
             preMatch.updatedAt = {};
-            // @ts-ignore
             if (from)
                 preMatch.updatedAt.$gte = from;
-            // @ts-ignore
             if (to)
                 preMatch.updatedAt.$lte = to;
         }
@@ -2532,7 +2318,6 @@ router.get("/text", asyncHandler(async (req, res, next) => {
             .aggregate(countPipeline)
             .toArray();
         const total = countResult?.total || 0;
-        // @ts-ignore
         pipeline.push({ $skip: skip }, { $limit: lim });
         const items = await db
             .collection(CONVERSATIONS_COL)
@@ -2548,15 +2333,12 @@ router.get("/text", asyncHandler(async (req, res, next) => {
             username: item.username,
             model: item.model,
             estimatedCost: item.estimatedCost,
-            // @ts-ignore - TODO: strict typing
             hasImages: item.images > 0,
             timestamp: item.timestamp,
         }));
-        // @ts-ignore - TODO: strict typing
         res.json({ data, total, page: parseInt(page, 10), limit: lim });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /text error: ${error.message}`);
         next(error);
     }
@@ -2570,25 +2352,18 @@ router.get("/traces", asyncHandler(async (req, res, next) => {
         const { page = 1, limit = 50, project, username, from, to, sort = "createdAt", order = "desc", } = req.query;
         // Base filter: only requests with a traceId
         const match = { traceId: { $ne: null } };
-        // @ts-ignore
         if (project)
             match.project = project;
-        // @ts-ignore
         if (username)
             match.username = username;
         if (from || to) {
-            // @ts-ignore
             match.timestamp = {};
-            // @ts-ignore
             if (from)
                 match.timestamp.$gte = from;
-            // @ts-ignore
             if (to)
                 match.timestamp.$lte = to;
         }
-        // @ts-ignore - TODO: strict typing
         const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-        // @ts-ignore - TODO: strict typing
         const lim = parseInt(limit, 10);
         const sortDir = order === "asc" ? 1 : -1;
         const pipeline = [
@@ -2723,24 +2498,20 @@ router.get("/traces", asyncHandler(async (req, res, next) => {
                     _requests: 0,
                 },
             },
-            // @ts-ignore - TODO: strict typing
             { $sort: { [sort]: sortDir } },
         ];
         // Count total matching traces
         const countPipeline = [...pipeline, { $count: "total" }];
         // Add pagination to the data pipeline
-        // @ts-ignore
         pipeline.push({ $skip: skip }, { $limit: lim });
         const [docs, countResult] = await Promise.all([
             db.collection(REQUESTS_COL).aggregate(pipeline).toArray(),
             db.collection(REQUESTS_COL).aggregate(countPipeline).toArray(),
         ]);
         const total = countResult[0]?.total || 0;
-        // @ts-ignore - TODO: strict typing
         res.json({ data: docs, total, page: parseInt(page, 10), limit: lim });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /traces error: ${error.message}`);
         next(error);
     }
@@ -2764,33 +2535,16 @@ router.get("/traces/:id", asyncHandler(async (req, res, next) => {
             project: requests[0].project,
             username: requests[0].username,
             requestCount: requests.length,
-            totalCost: requests.reduce(
-            // @ts-ignore - TODO: strict typing
-            (sum, r) => sum + (r.estimatedCost || 0), 
-            // @ts-ignore - TODO: strict typing
-            0),
-            totalInputTokens: requests.reduce(
-            // @ts-ignore - TODO: strict typing
-            (sum, r) => sum + (r.inputTokens || 0), 
-            // @ts-ignore - TODO: strict typing
-            0),
-            totalOutputTokens: requests.reduce(
-            // @ts-ignore - TODO: strict typing
-            (sum, r) => sum + (r.outputTokens || 0), 
-            // @ts-ignore - TODO: strict typing
-            0),
-            createdAt: requests.reduce(
-            // @ts-ignore - TODO: strict typing
-            (min, r) => (!min || r.timestamp < min ? r.timestamp : min), null),
-            updatedAt: requests.reduce(
-            // @ts-ignore - TODO: strict typing
-            (max, r) => (!max || r.timestamp > max ? r.timestamp : max), null),
+            totalCost: requests.reduce((sum, r) => sum + (r.estimatedCost || 0), 0),
+            totalInputTokens: requests.reduce((sum, r) => sum + (r.inputTokens || 0), 0),
+            totalOutputTokens: requests.reduce((sum, r) => sum + (r.outputTokens || 0), 0),
+            createdAt: requests.reduce((min, r) => (!min || r.timestamp < min ? r.timestamp : min), null),
+            updatedAt: requests.reduce((max, r) => (!max || r.timestamp > max ? r.timestamp : max), null),
             requests,
         };
         res.json(trace);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /traces/:id error: ${error.message}`);
         next(error);
     }
@@ -2815,7 +2569,6 @@ router.get("/sessions/:id/stats", asyncHandler(async (req, res, next) => {
             if (childIds.length === 0)
                 break;
             const newIds = childIds.filter(Boolean);
-            // @ts-ignore
             for (const id of newIds)
                 allSessionIds.add(id);
             frontier = newIds;
@@ -2858,7 +2611,6 @@ router.get("/sessions/:id/stats", asyncHandler(async (req, res, next) => {
         let totalReasoningOutputTokens = 0;
         const mergedModalities = {};
         const toolCounts = {};
-        // @ts-ignore
         for (const r of requests) {
             totalCost += r.estimatedCost || 0;
             totalInputTokens += r.inputTokens || 0;
@@ -2874,34 +2626,24 @@ router.get("/sessions/:id/stats", asyncHandler(async (req, res, next) => {
                 operations.add(r.operation);
             // Merge modalities
             if (r.modalities) {
-                // @ts-ignore
                 for (const [k, v] of Object.entries(r.modalities)) {
-                    // @ts-ignore
                     if (v)
                         mergedModalities[k] = true;
                 }
             }
             // Count tool usage
             if (r.toolApiNames?.length > 0) {
-                // @ts-ignore
                 for (const name of r.toolApiNames) {
-                    // @ts-ignore
                     toolCounts[name] = (toolCounts[name] || 0) + 1;
                 }
             }
         }
         const workerRequestCount = requests.filter((r) => r.agentSessionId !== sessionId).length;
-        const createdAt = requests.reduce(
-        // @ts-ignore - TODO: strict typing
-        (min, r) => (!min || r.timestamp < min ? r.timestamp : min), null);
-        const updatedAt = requests.reduce(
-        // @ts-ignore - TODO: strict typing
-        (max, r) => (!max || r.timestamp > max ? r.timestamp : max), null);
+        const createdAt = requests.reduce((min, r) => (!min || r.timestamp < min ? r.timestamp : min), null);
+        const updatedAt = requests.reduce((max, r) => (!max || r.timestamp > max ? r.timestamp : max), null);
         // Wall-clock elapsed time: from first request to last request (includes workers)
         const totalElapsedTime = createdAt && updatedAt
-            ? Math.max(0, 
-            // @ts-ignore - TODO: strict typing
-            (new Date(updatedAt).getTime() - new Date(createdAt).getTime()) /
+            ? Math.max(0, (new Date(updatedAt).getTime() - new Date(createdAt).getTime()) /
                 1000)
             : 0;
         res.json({
@@ -2926,7 +2668,6 @@ router.get("/sessions/:id/stats", asyncHandler(async (req, res, next) => {
         });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /sessions/:id/stats error: ${error.message}`);
         next(error);
     }
@@ -2955,7 +2696,6 @@ router.get("/sessions/:id/requests", asyncHandler(async (req, res, next) => {
             if (childRequests.length === 0)
                 break;
             const newIds = childRequests.filter(Boolean);
-            // @ts-ignore
             for (const id of newIds)
                 allSessionIds.add(id);
             frontier = newIds;
@@ -3000,7 +2740,6 @@ router.get("/sessions/:id/requests", asyncHandler(async (req, res, next) => {
         });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /sessions/:id/requests error: ${error.message}`);
         next(error);
     }
@@ -3013,22 +2752,16 @@ router.get("/agent-sessions", asyncHandler(async (req, res, next) => {
             return res.status(503).json({ error: "Database not available" });
         const { page = 1, limit = 50, project, from, to, sort = "updatedAt", order = "desc", } = req.query;
         const filter = {};
-        // @ts-ignore
         if (project)
             filter.project = project;
         if (from || to) {
-            // @ts-ignore
             filter.updatedAt = {};
-            // @ts-ignore
             if (from)
                 filter.updatedAt.$gte = from;
-            // @ts-ignore
             if (to)
                 filter.updatedAt.$lte = to;
         }
-        // @ts-ignore - TODO: strict typing
         const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-        // @ts-ignore - TODO: strict typing
         const lim = parseInt(limit, 10);
         const sortDir = order === "asc" ? 1 : -1;
         const [docs, total] = await Promise.all([
@@ -3038,18 +2771,15 @@ router.get("/agent-sessions", asyncHandler(async (req, res, next) => {
                 // Exclude full message history for the list view — too heavy
                 projection: { messages: 0 },
             })
-                // @ts-ignore - TODO: strict typing
                 .sort({ [sort]: sortDir })
                 .skip(skip)
                 .limit(lim)
                 .toArray(),
             db.collection(COLLECTIONS.AGENT_SESSIONS).countDocuments(filter),
         ]);
-        // @ts-ignore - TODO: strict typing
         res.json({ data: docs, total, page: parseInt(page, 10), limit: lim });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /agent-sessions error: ${error.message}`);
         next(error);
     }
@@ -3068,7 +2798,6 @@ router.get("/agent-sessions/:id", asyncHandler(async (req, res, next) => {
         res.json(document);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Admin /agent-sessions/:id error: ${error.message}`);
         next(error);
     }

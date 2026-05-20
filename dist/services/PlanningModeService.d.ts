@@ -16,20 +16,20 @@ export default class PlanningModeService {
      *
   
      */
-    static injectPlanningInstruction(messages: Record<string, unknown>): void;
+    static injectPlanningInstruction(messages: any): void;
     /**
      * Strip the planning instruction from the system message.
      * Called when exiting plan mode so execution doesn't carry stale constraints.
      *
   
      */
-    static stripPlanningInstruction(messages: Record<string, unknown>): void;
+    static stripPlanningInstruction(messages: any): void;
     /**
      * Extract step descriptions from a plan for progress tracking.
      *
   
      * @returns {Array<string>} Step descriptions
      */
-    static extractSteps(planText: Record<string, unknown>): Record<string, unknown>[];
+    static extractSteps(planText: any): any[];
 }
 //# sourceMappingURL=PlanningModeService.d.ts.map

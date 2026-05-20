@@ -16,7 +16,7 @@ declare const _default: ({
     };
     domain: string;
     labels: string[];
-    execute(args: Record<string, unknown>, context: Record<string, unknown>): Promise<{
+    execute(args: any, context: any): Promise<{
         error: string;
         acknowledged?: undefined;
         branch?: undefined;
@@ -27,7 +27,7 @@ declare const _default: ({
         acknowledged: boolean;
         branch: string;
         worktreePath: any;
-        reason: {} | null;
+        reason: any;
         message: string;
         error?: undefined;
     }>;
@@ -54,7 +54,7 @@ declare const _default: ({
     };
     domain: string;
     labels: string[];
-    execute(args: Record<string, unknown>, context: Record<string, unknown>): Promise<{
+    execute(args: any, context: any): Promise<{
         error: string;
         acknowledged?: undefined;
         action?: undefined;
@@ -63,7 +63,7 @@ declare const _default: ({
         message?: undefined;
     } | {
         acknowledged: boolean;
-        action: unknown;
+        action: any;
         branch: any;
         merged: unknown;
         message: string;

@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import requireDb from "../middleware/RequireDbMiddleware.js";
@@ -13,10 +12,8 @@ const COLLECTION = COLLECTIONS.FAVORITES;
  */
 router.get("/", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const filter = { project, username };
-        // @ts-ignore
         if (req.query.type)
             filter.type = req.query.type;
         const favorites = await db
@@ -27,7 +24,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
         res.json(favorites);
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Error fetching favorites: ${error.message}`);
         next(error);
     }
@@ -41,7 +37,6 @@ router.get("/", asyncHandler(async (req, res, next) => {
  */
 router.post("/", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const { type, key, meta } = req.body;
         if (!type || !key) {
@@ -62,7 +57,6 @@ router.post("/", asyncHandler(async (req, res, next) => {
         res.json({ success: true, favorite: document });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Error adding favorite: ${error.message}`);
         next(error);
     }
@@ -73,7 +67,6 @@ router.post("/", asyncHandler(async (req, res, next) => {
  */
 router.delete("/", asyncHandler(async (req, res, next) => {
     try {
-        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const { type, key } = req.query;
         if (!type || !key) {
@@ -87,7 +80,6 @@ router.delete("/", asyncHandler(async (req, res, next) => {
         res.json({ success: true, deleted: result.deletedCount });
     }
     catch (error) {
-        // @ts-ignore - TODO: strict typing
         logger.error(`Error removing favorite: ${error.message}`);
         next(error);
     }

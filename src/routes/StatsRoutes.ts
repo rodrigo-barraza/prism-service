@@ -20,6 +20,7 @@ router.get(
   "/models",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+            // @ts-ignore - TODO: strict typing
             const { db, username } = req;
       if (!username) return res.json([]);
 

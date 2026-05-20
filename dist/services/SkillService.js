@@ -1,5 +1,4 @@
 import MongoWrapper from "../wrappers/MongoWrapper.js";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.js";
 import { COLLECTIONS } from "../constants.js";
 import logger from "../utils/logger.js";
@@ -86,19 +85,16 @@ const SkillService = {
   
   
      */
-    // @ts-ignore
     async list({ project, limit = 50 } = {}) {
         const col = getCollection();
         if (!col)
             return { skills: [], total: 0 };
         const filter = {};
-        // @ts-ignore
         if (project)
             filter.project = project;
         const skills = await col
             .find(filter)
             .sort({ usageCount: -1, name: 1 })
-            // @ts-ignore - TODO: strict typing
             .limit(Math.min(limit, 100))
             .toArray();
         return {
@@ -158,14 +154,12 @@ const SkillService = {
         }
         // Interpolate variables into the prompt template
         let prompt = document.prompt;
-        // @ts-ignore
         for (const [key, value] of Object.entries(variables)) {
             prompt = prompt.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), String(value));
         }
         // Warn about unresolved variables
         const unresolvedMatch = prompt.match(/\{\{(\w+)\}\}/g);
         const unresolved = unresolvedMatch
-            // @ts-ignore - TODO: strict typing
             ? [...new Set(unresolvedMatch.map((m) => m.slice(2, -2)))]
             : [];
         // Increment usage counter
