@@ -23,9 +23,6 @@ const MATCH_MODES: any = {
 };
 /**
  * Evaluate whether a model response matches the expected value.
- * @param {string} response   The raw model output
- * @param {string} expected   The expected value
- * @param {string} matchMode  One of: "contains", "exact", "startsWith", "regex"
 
  */
 function evaluate(
@@ -56,12 +53,6 @@ function evaluate(
 }
 /**
  * Evaluate a response against multiple assertions using AND/OR logic.
- *
- * @param {string} response          The raw model output
- * @param {Object} benchmark         The benchmark definition
- * @param {Array}  benchmark.assertions       Array of { expectedValue, matchMode }
- * @param {string} benchmark.assertionOperator "AND" or "OR"
-
  */
 function evaluateAssertions(response: any, benchmark: any) {
   const assertions = benchmark.assertions;
@@ -93,10 +84,6 @@ const COMPARATORS = {
 };
 /**
  * Evaluate a single agent assertion against execution result data.
- *
- * @param {Object} assertion       — { type, operator?, operand? }
- * @param {Object} executionData   — { response, thinking, toolCalls, turnCount }
-
  */
 function evaluateSingleAgentAssertion(assertion: any, executionData: any) {
   const { type, operator, operand } = assertion;
@@ -130,10 +117,6 @@ function evaluateSingleAgentAssertion(assertion: any, executionData: any) {
 }
 /**
  * Evaluate all agent assertions against execution result data.
- *
- * @param {Object} benchmark       The benchmark definition
- * @param {Object} executionData   — { response, thinking, toolCalls, turnCount }
-
  */
 function evaluateAgentAssertions(benchmark: any, executionData: any) {
   const assertions = benchmark.agentAssertions;
@@ -445,11 +428,8 @@ const BenchmarkService = {
   },
   /**
    * Run a benchmark test against the specified models (or all available).
-   * @param {Object}   benchmark   The benchmark definition document
-   * @param {Array}    [modelTargets]  Optional array of { provider, model } to test
 
 
-   * @returns {Object} The completed run document
    */
   async runBenchmark(
     benchmark: any,

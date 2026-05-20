@@ -28,13 +28,6 @@ function getCollection() {
 const SkillService = {
   /**
    * Create a new skill.
-   *
-
-   * @param {string} data.name - Unique skill name (e.g. "refactor_and_test")
-   * @param {string} data.description - What the skill does
-   * @param {string} data.prompt - Prompt template. Use {{variable}} for interpolation.
-
-
    */
   async create(data: Record<string, unknown>) {
     const col = getCollection();
@@ -163,10 +156,6 @@ const SkillService = {
    *
    * The caller (ToolOrchestratorService) is responsible for actually
    * running the agentic loop with the returned config.
-   *
-
-
-   * @returns {Promise<object>} { prompt, config } or { error }
    */
   async prepare(skillId: Record<string, unknown>, variables: Record<string, unknown> = {}) {
     const col = getCollection();

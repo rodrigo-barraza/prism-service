@@ -10,10 +10,6 @@ const MAX_TOKENS_PER_SEC = 10_000;
  * Pass a provider-reported value in `opts.providerReported` to prefer
  * it over manual computation, and `opts.fallbackSec` to use totalSec
  * when generationSec is unavailable.
- *
-
-
- * @returns {number|null} Rounded to 1 decimal, or null if not computable
  */
 export function calculateTokensPerSec(tokens: any, sec: any, opts: any = {}) {
   // 1. Provider-reported value takes priority

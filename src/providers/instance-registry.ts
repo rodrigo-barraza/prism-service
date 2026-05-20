@@ -34,7 +34,6 @@ const PROVIDER_ARRAYS = {
 // ── Registry ────────────────────────────────────────────────
 
 /**
- * @typedef {object} InstanceEntry
  * @property {string} id            - Unique instance ID (e.g. "lm-studio-2")
  * @property {string} type          - Provider type (e.g. "lm-studio")
  * @property {string} baseUrl       - Server URL
@@ -50,7 +49,6 @@ const registry = new Map<string, InstanceEntry>();
 /**
  * Register all instances for a provider type from its array.
 
- * @param {Array<{url: string, concurrency?: number, nickname?: string}>} instances
  */
 function registerType(type: string, instances: ProviderInstanceConfig[]) {
     const factory = (FACTORIES as any)[type];
@@ -94,7 +92,6 @@ for ( const [type, instances] of Object.entries(PROVIDER_ARRAYS)) {
 /**
  * Get a provider instance by ID.
 
- * @returns {object|null} Provider object or null if not found
  */
 export function getInstanceProvider(id: string) {
   return registry.get(id)?.provider || null;

@@ -42,8 +42,6 @@ let initialized = false;
  * When the main agent calls enter_worktree, its session's workspace root
  * is redirected to the worktree path. All file/git/shell tool calls
  * then operate in the worktree until exit_worktree is called.
- *
- * @type {Map<string, { originalRoot: string, worktreePath: string, branchName: string, repoPath: string }>}
  */
 const activeWorktrees = new Map();
 
@@ -254,7 +252,6 @@ async function executeToolGeneric(name: string, args: any = {}, context: any = {
  * Build X-context headers from the caller context object.
  * These are consumed by tools-api's ToolCallLoggerMiddleware.
 
- * @returns {object} Headers object
  */
 function buildContextHeaders(context: any = {}) {
   const headers: any = {};
@@ -590,7 +587,6 @@ export default class ToolOrchestratorService {
   /**
    * Get the active worktree state for a session, if any.
 
-   * @returns {{ worktreePath: string, branchName: string, originalRoot: string }|null}
    */
   static getWorktreeState(agentSessionId: any) {
     return activeWorktrees.get(agentSessionId) || null;
@@ -759,9 +755,6 @@ export default class ToolOrchestratorService {
   /**
    * Execute a coordinator tool (team_create, send_message, stop_agent).
    * These are Prism-local — they dispatch to CoordinatorService in-process.
-   *
-
-
    */
   static async executeCoordinatorTool(name: string, args: any = {}, context: any = {}) {
     const { default: CoordinatorService } =
@@ -815,9 +808,6 @@ export default class ToolOrchestratorService {
   /**
    * Execute a tool on an MCP server.
    * Parses the namespaced tool name and delegates to MCPClientService.
-   *
-
-
    */
   static async executeMCPTool(fullName: any, args: any = {}) {
     const parsed = MCPClientService.parseMCPToolName(fullName);
@@ -854,10 +844,6 @@ export default class ToolOrchestratorService {
    * Execute a tool using the streaming SSE endpoint.
    * Calls `onChunk(event, data)` for each stdout/stderr chunk.
    * Returns the full result as a JSON object (same shape as executeTool).
-   *
-
-
-   * @returns {Promise<object>} final result
    */
   static async executeToolStreaming(
     name: string,

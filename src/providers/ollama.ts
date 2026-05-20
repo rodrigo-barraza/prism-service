@@ -28,7 +28,6 @@ function prepareOllamaMessages(messages: ChatMessage[]) {
  * Factory: create an Ollama provider instance targeting a specific baseUrl.
 
 
- * @returns {object} Provider object with all Ollama methods
  */
 export function createOllamaProvider(baseUrl: string, instanceId: string = "ollama") {
   const getBaseUrl = () => baseUrl;

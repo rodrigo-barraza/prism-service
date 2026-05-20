@@ -67,7 +67,6 @@ const CustomAgentService = {
   /**
    * Create a new custom agent.
 
-   * @returns {Promise<object>} The created document
    */
   async create(data: Record<string, unknown>) {
     const col = getCollection();
@@ -111,7 +110,6 @@ const CustomAgentService = {
    * Update an existing custom agent.
 
 
-   * @returns {Promise<object>} The updated document
    */
   async update(id: string, updates: Record<string, unknown>) {
     const col = getCollection();

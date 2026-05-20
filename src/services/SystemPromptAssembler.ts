@@ -42,8 +42,6 @@ export default class SystemPromptAssembler {
   /**
    * Fetch project directory tree from tools-api.
    * Cached for 1 minute to avoid hammering the API.
-   *
-   * @returns {Promise<string>} Formatted directory tree
    */
   async fetchDirectoryTree() {
     const now = Date.now();
@@ -117,9 +115,6 @@ export default class SystemPromptAssembler {
    * Groups tools by their `domain` field, then for each tool shows:
    *   - Name + first sentence of description (capability summary)
    *   - Full parameter listing with required markers
-   *
-
-
    */
   buildToolDescriptions(enabledTools: any) {
     const schemas = ToolOrchestratorService.getToolSchemas();
@@ -169,10 +164,6 @@ export default class SystemPromptAssembler {
    * Fetch relevant memories via embedding similarity search.
    * Queries the unified `memories` collection using cosine similarity,
    * scoped by agent and project.
-   *
-
-
-   * @returns {Promise<string>} Formatted memory sections for the system prompt
    */
     async fetchMemories(
     agent: any,
@@ -207,10 +198,6 @@ export default class SystemPromptAssembler {
 
   /**
    * Fetch enabled skills relevant to the user's query via embedding similarity.
-   *
-
-
-   * @returns {Promise<Array<{ name: string, content: string, score: number }>>}
    */
     async fetchSkills(
     project: any,
@@ -309,15 +296,6 @@ export default class SystemPromptAssembler {
    *   7. Project directory tree (CODING only)
    *   8. Project skills (relevance-filtered)
    *   9. Session memory from past conversations
-   *
-
-   * @param {string} context.project - Project identifier
-   * @param {string} context.username - Username
-
-
-   * @param {Array} context.messages - Current messages array
-
-   * @returns {Promise<{ prompt: string, skillNames: string[] }>} Complete system prompt + skill names for UI emission
    */
   async assemble(context: any) {
     const sections: any[] = [];
@@ -530,8 +508,6 @@ export default class SystemPromptAssembler {
    * Replaces or creates the system message with the fully assembled prompt.
    * Any existing system message content from the client is ignored — the
    * backend is the single source of truth for the agent system prompt.
-   *
-
    */
   createHook() {
     return async (context: any) => {

@@ -34,7 +34,6 @@ const HarnessRegistry = {
 
   /**
    * List all registered harnesses for the settings UI.
-   * @returns {Array<{ id: string, label: string, description: string }>}
    */
   list() {
     return [...registry.values()].map((H: Record<string, unknown>) => ({

@@ -198,15 +198,6 @@ const MemoryService = {
   // ── Store ──────────────────────────────────────────────────────────────────
   /**
    * Store a single memory with embedding generation and duplicate detection.
-   *
-
-   * @param {string} params.agent - Agent identifier ("LUPOS", "CODING", etc.)
-
-
-   * @param {string} params.content - Full memory text
-
-
-   * @returns {Promise<object|null>} Stored memory document, or null if duplicate
    */
   async store({
     agent,
@@ -286,14 +277,6 @@ const MemoryService = {
   // ── LUPOS: Extract & Store ─────────────────────────────────────────────────
   /**
    * Extract and store LUPOS memories from a Discord conversation chunk.
-   *
-
-   * @param {string} params.guildId
-   * @param {string} params.channelId
-   * @param {Array} params.messages - Recent conversation messages
-   * @param {Array} params.participants - Array of { id, username, displayName }
-
-   * @returns {Promise<Array>} The stored memory documents
    */
   async extractAndStore({
     guildId,
@@ -365,14 +348,6 @@ const MemoryService = {
   /**
    * Search for relevant memories using cosine similarity.
    * Always scoped by `agent`.
-   *
-
-   * @param {string} params.agent - Agent identifier
-
-
-   * @param {string} params.queryText - Text to search for
-
-   * @returns {Promise<Array>} Relevant memories sorted by relevance
    */
   async search({
     agent,
@@ -448,12 +423,6 @@ const MemoryService = {
   // ── List ────────────────────────────────────────────────────────────────────
   /**
    * List memories for a specific agent, optionally filtered by project/guild/user.
-   *
-
-   * @param {string} params.agent - Agent identifier
-
-
-   * @returns {Promise<{ memories: Array, total: number }>}
    */
   async list({ agent, project, guildId, userId, limit = 50, skip = 0 }: any) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
@@ -477,8 +446,6 @@ const MemoryService = {
   /**
    * Aggregate all distinct project/agent combinations with memory counts.
    * Bypasses project scoping — used by the consolidation CLI's --all sweep.
-   *
-   * @returns {Promise<Array<{ project: string, agent: string, count: number }>>}
    */
   async discoverCombos() {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
@@ -505,9 +472,6 @@ const MemoryService = {
   // ── Delete / Remove ────────────────────────────────────────────────────────
   /**
    * Delete a specific memory by its id field.
-   *
-
-   * @returns {Promise<boolean>} Whether a document was deleted
    */
   async delete(memoryId: any) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
@@ -523,9 +487,6 @@ const MemoryService = {
   // ── Update ─────────────────────────────────────────────────────────────────
   /**
    * Update an existing memory.
-   *
-
-
    */
   async update(memoryId: any, { title, content, type }: any) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
@@ -552,9 +513,6 @@ const MemoryService = {
   /**
    * Format memories for injection into the system prompt.
    * Adds type badges and staleness caveats.
-   *
-
-   * @returns {string} Formatted text block
    */
   formatForPrompt(memories: any) {
     if (!memories || memories.length === 0) return "";

@@ -51,7 +51,6 @@ import {
  * Factory: create a llama.cpp provider instance targeting a specific baseUrl.
 
 
- * @returns {object} Provider object with all llama.cpp methods
  */
 export function createLlamaCppProvider(baseUrl: string, instanceId: string = "llama-cpp") {
   const getBaseUrl = () => baseUrl;

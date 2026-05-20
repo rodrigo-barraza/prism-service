@@ -10,10 +10,6 @@
 
 /**
  * Build the coordinator system prompt addendum.
- *
-
-
- * @returns {string} System prompt section to append
  */
 export function getCoordinatorPromptAddendum({ workerTools = [] }: Record<string, unknown> = {}) {
   const workerToolList =

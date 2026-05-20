@@ -22,9 +22,6 @@ const GGUF_QUANT_SUFFIX_RE =
  *   "qwen3-32b@q4_k_m" → { base: "qwen3-32b", quant: "Q4_K_M" }
  *   "lmstudio-community/qwen3-32b-GGUF/qwen3-32b-Q8_0.gguf"
  *     → { base: "lmstudio-community/qwen3-32b-GGUF/qwen3-32b", quant: "Q8_0" }
- *
-
- * @returns {{ base: string, quant: string|null }}
  */
 export function parseModelQuant(modelKey: any) {
   // Handle @quant suffix (e.g. "qwen3-32b@q4_k_m")
@@ -49,10 +46,6 @@ export function parseModelQuant(modelKey: any) {
  * Find the best available variant of a model among the available models
  * on a specific instance. Ranks by `size_bytes` (file size on disk) —
  * the largest file is the highest-quality quantization.
- *
-
- * @param {Array<{key?: string, id?: string, size_bytes?: number}>} availableModels - Models on the instance
- * @returns {string|null} The best available model key (by file size), or null
  */
 export function findBestQuantFallback(targetModel: any, availableModels: any) {
   const { base: targetBase, quant: targetQuant } = parseModelQuant(targetModel);
@@ -96,10 +89,6 @@ export function findBestQuantFallback(targetModel: any, availableModels: any) {
  * along with per-instance model overrides when a quant fallback is used.
  *
  * This is the same logic the CoordinatorService uses for worker agents.
- *
-
- * @param {Array<{id: string, concurrency: number}>} siblings - All instances of this provider type
- * @returns {Promise<{ usable: Array<{id: string, concurrency: number}>, modelOverrides: Map<string, string> }>}
  */
 export async function resolveModelForInstances(modelKey: any, siblings: any) {
   /** @type {Map<string, string>} Per-instance model override (when quant fallback is used) */

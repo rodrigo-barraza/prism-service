@@ -133,8 +133,6 @@ async function clearStaleSessions(): Promise<HousekeepingSessionResult> {
 /**
  * Remove request logs older than REQUEST_LOG_MAX_AGE_DAYS.
  * Keeps the DB from growing unbounded over time.
- *
- * @returns {Promise<number>} Number of documents deleted
  */
 async function pruneOldRequestLogs(): Promise<number> {
   const db = MongoWrapper.getDb(MONGO_DB_NAME);
@@ -166,8 +164,6 @@ const STRUCTURAL_PREFIXES = new Set(["projects", "uploads", "generations"]);
  *
  * Conservative approach: only orphan-checks objects whose top-level prefix
  * looks like a conversation ID (not a known structural prefix like "projects/").
- *
- * @returns {Promise<number>} Number of orphaned objects removed
  */
 async function pruneMinioOrphans(): Promise<number> {
   if (!MinioWrapper.isAvailable()) return 0;
@@ -237,8 +233,6 @@ const BackgroundHousekeepingService = {
   /**
    * Run all housekeeping tasks.
    * Safe to call at any time — each task is independent and failure-tolerant.
-   *
-   * @returns {Promise<HousekeepingResult>} Summary of actions taken
    */
   async run({ trigger = "boot" }: { trigger?: string } = {}): Promise<HousekeepingResult> {
     const startTime = performance.now();

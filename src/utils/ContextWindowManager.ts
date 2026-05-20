@@ -36,9 +36,6 @@ const PROTECTED_RECENT_TURNS = 4;
 /**
  * Estimate token count for a single message.
  * Accounts for content, tool calls, tool results, thinking blocks, and images.
- *
-
-
  */
 function estimateMessageTokens(message: string) {
   let tokens = 4; // Per-message overhead (role, formatting)
@@ -89,9 +86,6 @@ function estimateMessageTokens(message: string) {
 
 /**
  * Estimate total tokens across all messages.
- *
-
-
  */
 function estimateTotalTokens(messages: any) {
     return (messages as any).reduce(
@@ -112,10 +106,6 @@ function estimateTotalTokens(messages: any) {
  *
  * Recent tool results (within the last `protectedTurns` user turns) are
  * preserved in full — the LLM is actively reasoning about them.
- *
-
-
- * @returns {Array} Messages with truncated tool results
  */
 function truncateToolResults(
   messages: any,
@@ -164,9 +154,6 @@ function truncateToolResults(
  * Strategy 2: Compress old assistant messages — keep only a summary marker.
  * Replaces assistant content with a "[Earlier response summarized]" marker.
  * Preserves tool call names but drops results.
- *
-
-
  */
 function compressOldAssistantMessages(
   messages: any,
@@ -234,9 +221,6 @@ function compressOldAssistantMessages(
  * Strategy 3: Drop middle turns entirely (sliding window).
  * Keeps the system prompt, first user message (for task context),
  * and the most recent N turns.
- *
-
-
  */
 function slidingWindowTruncation(messages: any, maxTokens: any) {
     if ((messages as any).length <= 3) return messages;
@@ -287,10 +271,6 @@ export default class ContextWindowManager {
    *
    * Applies truncation strategies in order of aggressiveness until
    * the estimated token count fits within the model's context window.
-   *
-
-
-   * @returns {{ messages: Array, truncated: boolean, strategy: string|null, estimatedTokens: number }}
    */
   static enforce(messages: any, options: any = {}) {
     const {

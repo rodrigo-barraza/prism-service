@@ -39,8 +39,6 @@ export default class PlanningModeService {
   /**
    * Inject the planning instruction into the system message.
    * Called once before the agentic loop starts when planFirst=true.
-   *
-
    */
   static injectPlanningInstruction(messages: any) {
         const systemMsg = (messages as any).find((m: any) => m.role === "system");
@@ -63,8 +61,6 @@ export default class PlanningModeService {
   /**
    * Strip the planning instruction from the system message.
    * Called when exiting plan mode so execution doesn't carry stale constraints.
-   *
-
    */
   static stripPlanningInstruction(messages: any) {
         const systemMsg = (messages as any).find((m: any) => m.role === "system");
@@ -78,9 +74,6 @@ export default class PlanningModeService {
 
   /**
    * Extract step descriptions from a plan for progress tracking.
-   *
-
-   * @returns {Array<string>} Step descriptions
    */
   static extractSteps(planText: any) {
     const stepRegex = /^\d+\.\s+(.+)$/gm;

@@ -21,7 +21,6 @@ import {
  * Factory: create a vLLM provider instance targeting a specific baseUrl.
 
 
- * @returns {object} Provider object with all vLLM methods
  */
 export function createVllmProvider(baseUrl: string, instanceId: string = "vllm") {
   const getBaseUrl = () => baseUrl;
@@ -208,10 +207,6 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
      * Generate an embedding via the OpenAI-compatible /v1/embeddings endpoint.
      * vLLM also exposes /v2/embed, but /v1/embeddings keeps the response
      * contract identical to the OpenAI provider.
-     *
-
-
-     * @returns {Promise<{ embedding: number[], dimensions: number }>}
      */
     async generateEmbedding(content: any, model: any, options: ProviderOptions = {}) {
       const baseUrl = getBaseUrl();

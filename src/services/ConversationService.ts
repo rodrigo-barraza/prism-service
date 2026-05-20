@@ -27,8 +27,6 @@ export interface ConversationServiceInterface {
 /**
  * Upload any base64 data URLs in message images/audio to external storage.
  * Replaces inline data with minio:// refs when MinIO is available.
- *
- * @returns {Promise<Array>} messages with refs replacing inline data
  */
 export async function extractFiles(
   messages: any[],
@@ -97,8 +95,6 @@ export async function extractFiles(
 
 /**
  * Compute input/output modalities from messages for lightweight querying.
- *
- * @returns {Object} modalities flags
  */
 export function computeModalities(messages: any[]): Record<string, boolean> {
   const mod = {
@@ -223,8 +219,6 @@ export function computeTotalCost(messages: any[]): number {
 /**
  * Build the $set fields for a conversation/agent-session PATCH request.
  * Centralises the identical logic shared by conversations.js and agent-sessions.js.
- *
- * @returns {object} $set fields ready for updateOne
  */
 export function buildConversationPatchFields({
   title,
@@ -256,8 +250,6 @@ const ConversationService: ConversationServiceInterface = {
    * Append messages to a conversation, auto-creating it if it doesn't exist.
    * Handles file extraction (MinIO upload) and recomputes derived fields.
    * Optionally applies conversation metadata (title, systemPrompt, settings).
-   *
-   * @returns {Promise<object>} The updated conversation document
    */
   async appendMessages(
     conversationId: string,

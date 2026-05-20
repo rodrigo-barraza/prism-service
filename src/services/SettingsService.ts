@@ -89,7 +89,6 @@ const SettingsService = {
 
   /**
    * Update settings. Performs a deep merge with existing settings.
-   * @returns {Promise<object>} The full settings after merge
    */
   async update(data: any) {
     const collection = MongoWrapper.getCollection(
@@ -126,8 +125,6 @@ const SettingsService = {
    * Resolve provider + model for a memory subsystem role.
    * Centralises the identical getXxxConfig() helpers in MemoryService,
    * MemoryConsolidationService, and EmbeddingService.
-   *
-   * @returns {Promise<{ provider: string, model: string }>}
    */
   async getMemoryModelConfig(role: string) {
     const mem = await this.getSection("memory");

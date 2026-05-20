@@ -86,7 +86,6 @@ const DECOMPOSITION_PROVIDER = "anthropic";
  * Resolve the user-configured subagent provider/model from settings.
  * Returns null when no subagent model is configured — callers should
  * keep the local provider (queuing) when this returns null.
- * @returns {Promise<{ provider: string, model: string }|null>}
  */
 async function getWorkerFallback() {
   try {
@@ -189,11 +188,6 @@ function getActiveOn(instanceId: any) {
  * Select the best instance from `siblings`, increment its reservation
  * counter, and return the assignment. Returns null if all instances
  * are at capacity.
- *
- * @param {Array<{id: string, concurrency: number}>} siblings - Available instances
-
-
- * @returns {{ provider: string, model: string, slotsAvailable: number }|null}
  */
 function selectAndReserveInstance(
   siblings: any,
@@ -455,14 +449,6 @@ export default class CoordinatorService {
    * Creates a git worktree, runs AgenticLoopService.runAgenticLoop() in it,
    * collects the diff when complete, and injects a [WORKER COMPLETED] notification into
    * the coordinator's conversation.
-   *
-
-   * @param {string} params.description - Short label for the worker
-   * @param {string} params.prompt - Self-contained task prompt for the worker
-
-
-   * @param {object} params.coordinatorCtx - Coordinator's loop context
-   * @returns {Promise<object>} Spawn result with agentId
    */
   static async spawnFromTool({
     description,
@@ -826,9 +812,6 @@ export default class CoordinatorService {
    * Abort all running workers spawned under a given parent agent session.
    * Called when the coordinator's SSE connection is severed (user presses stop)
    * or explicitly via the REST endpoint.
-   *
-
-   * @returns {{ stopped: string[], alreadyStopped: string[] }}
    */
   static async abortWorkersBySession(parentAgentSessionId: any) {
     const stopped: any[] = [];
@@ -959,8 +942,6 @@ export default class CoordinatorService {
    * Remove all workers associated with a parent coordinator session.
    * Called when the coordinator loop completes/errors to prevent unbounded
    * growth of the in-memory activeWorkers Map.
-   *
-
    */
   static cleanupSession(parentAgentSessionId: any) {
     let cleaned = 0;
@@ -981,12 +962,6 @@ export default class CoordinatorService {
    * Create a named team of parallel worker agents.
    * Each member is spawned via spawnFromTool and runs concurrently.
    * Returns aggregated results from all members when they all complete.
-   *
-
-   * @param {string} args.name - Team name
-   * @param {Array} args.members - [{ description, prompt, files?, model? }]
-
-
    */
   static async createTeam(args: any, coordinatorCtx: any) {
     const { name, members } = args;
@@ -1713,12 +1688,6 @@ export default class CoordinatorService {
 
   /**
    * Decompose a task into parallel sub-tasks using LLM.
-   *
-
-   * @param {string} params.task - The refactoring task description
-   * @param {string[]} params.files - Target file paths
-
-   * @returns {Promise<object>} Decomposed plan with sub-tasks
    */
   static async decompose({
     task,
@@ -1804,10 +1773,6 @@ export default class CoordinatorService {
 
   /**
    * Execute an approved plan — spawn workers in git worktrees.
-   *
-
-
-   * @returns {Promise<object>} Execution results with diffs
    */
   static async execute(plan: any, options: any = {}) {
     const { taskId, subTasks, repoPath } = plan;
@@ -2081,9 +2046,6 @@ export default class CoordinatorService {
 
   /**
    * Approve and merge all completed worker branches.
-   *
-
-
    */
   static async approveMerge(taskId: any) {
     const task = activeTasks.get(taskId);
@@ -2119,9 +2081,6 @@ export default class CoordinatorService {
 
   /**
    * Abort a running task — kill workers and clean up worktrees.
-   *
-
-
    */
   static async abort(taskId: any) {
     const task = activeTasks.get(taskId);
@@ -2169,9 +2128,6 @@ export default class CoordinatorService {
 
   /**
    * Get the current status of a coordinator task.
-   *
-
-
    */
   static getStatus(taskId: any) {
     return activeTasks.get(taskId) || null;

@@ -763,13 +763,6 @@ const MemoryConsolidationService = {
   /**
    * Run memory consolidation for a specific agent within a project.
    * Processes memories in batches to avoid context window overflow.
-   *
-
-   * @param {string} params.agent - Agent identifier
-   * @param {string} params.project - Project identifier
-
-
-   * @returns {Promise<object>} Consolidation results
    */
   async consolidate({
     agent = "CODING",
@@ -1070,11 +1063,6 @@ const MemoryConsolidationService = {
   /**
    * Check if consolidation should run and trigger if needed.
    * Called by MemoryExtractor after storing new memories.
-   *
-
-   * @param {string} params.project - Project identifier
-
-
    */
   async checkAndRun({
     project,
@@ -1116,10 +1104,6 @@ const MemoryConsolidationService = {
   },
   /**
    * Get consolidation run history for a project.
-   *
-
-
-   * @returns {Promise<Array>} Consolidation history entries, newest first
    */
     async getHistory(project: any, limit: any = 10) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);

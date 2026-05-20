@@ -33,10 +33,6 @@ export function convertToolsToOpenAI(tools: any) {
  * OpenAI-compatible Chat Completions payload.
  *
  * Returns a plain object with only the non-undefined fields set.
- *
-
-
- * @returns {object} Payload fields to spread into the request body
  */
 export function buildPayloadParams(
   options: any,
@@ -69,9 +65,6 @@ export function buildPayloadParams(
  * Extract tool calls from a non-streaming OpenAI-compatible message object.
  * Handles both nested OpenAI format ({ function: { name, arguments } })
  * and flat llama.cpp format ({ name, arguments }).
- *
-
- * @returns {Array|null} Array of { id, name, args } or null if no tool calls
  */
 export function extractToolCallsFromMessage(message: string) {
     if (!(message as any)?.tool_calls || (message as any).tool_calls.length === 0) return null;
@@ -103,9 +96,6 @@ export function extractToolCallsFromMessage(message: string) {
  *
  * The cache field uses the same key as Anthropic (cacheReadInputTokens) so
  * CostCalculator, RequestLogger, and console logging handle it uniformly.
- *
-
- * @returns {{ inputTokens: number, outputTokens: number, cacheReadInputTokens?: number, reasoningOutputTokens?: number }}
  */
 export function normalizeUsage(rawUsage: any) {
   const usage = {
@@ -161,10 +151,6 @@ export const MEDIA_STRATEGIES = {
  *
  * Call this BEFORE prepareOpenAICompatMessages() for providers that need
  * video-as-frames support.
- *
-
-
- * @returns {Promise<Array>} The same messages array with videos expanded
  */
 export async function expandVideoToFrames(messages: any, options: any = {}) {
   const { extractVideoFrames, getDataUrlMimeType } = await import("./media.js");
@@ -216,10 +202,6 @@ export async function expandVideoToFrames(messages: any, options: any = {}) {
  * Convert messages with media to OpenAI-compatible multipart content format.
  * Handles images, tool results, assistant tool calls, and optionally
  * audio/video/PDF based on the media strategy.
- *
-
-
- * @returns {Array} OpenAI-compatible messages
  */
 export function prepareOpenAICompatMessages(
   messages: any,
@@ -352,10 +334,6 @@ export function prepareOpenAICompatMessages(
  *
  * When thinkingEnabled is false, thinking content is folded into the text
  * output and the `thinking` field is null.
- *
-
-
- * @returns {{ text: string, thinking: string|null, usage: object, toolCalls: Array|null }}
  */
 export function processNonStreamingResponse(data: any, options: any = {}) {
     const message = data.choices?.[0]?.message;
@@ -392,9 +370,6 @@ export function processNonStreamingResponse(data: any, options: any = {}) {
  * When thinkingEnabled is false, all thinking content (native reasoning_content
  * and <think> tag content) is yielded as plain text strings instead of
  * { type: "thinking" } events.
- *
-
-
  */
 export async function* parseSSEStream(reader: any, options: any = {}) {
   const decoder = new TextDecoder();
@@ -554,7 +529,6 @@ export async function* parseSSEStream(reader: any, options: any = {}) {
  *
 
 
- * @returns {Promise<Response>} The fetch response (guaranteed to be ok)
  * @throws {Error} With a parsed error message from the API
  */
 export async function fetchOpenAICompat(url: string, payload: any, options: any = {}) {

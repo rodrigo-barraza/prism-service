@@ -55,10 +55,6 @@ export function truncateToolResult(result: any, maxChars: any = 8000) {
  * function calling. Assistant messages with toolCalls are expanded into
  * [assistant(tool_calls), tool(result1), tool(result2), ...] per the
  * OpenAI Chat Completions spec.
- *
-
-
- * @returns {Array} Provider-ready messages
  */
 export function expandMessagesForFC(
   messages: any,

@@ -31,7 +31,6 @@ const MIN_ELAPSED_SEC = 0.5; // 500ms minimum sample window
 const MIN_TOKENS_FOR_RATE = 10; // minimum tokens before reporting rate
 
 /**
- * @typedef {object} ActiveRequest
  * @property {string} requestId
  * @property {string} agentSessionId
  * @property {number} startTime        - performance.now() when request began
@@ -55,7 +54,6 @@ const activeRequests = new Map();
 const sessionIndex = new Map();
 
 /**
- * @typedef {object} SessionAccumulator
  * @property {number} completedOutputTokens   - cumulative output tokens from completed requests
  * @property {number} completedInputTokens    - cumulative input tokens from completed requests
  * @property {number[]} ttftSamples           - TTFT values (seconds) from each completed request
@@ -68,13 +66,6 @@ const sessionAccumulators = new Map();
 const SessionGenerationTracker = ({
   /**
    * Register a new LLM request for tracking.
-   *
-
-
-   * @param {string} meta.provider
-   * @param {string} meta.model
-
-
    */
     register(
     agentSessionId: any,
@@ -122,9 +113,6 @@ const SessionGenerationTracker = ({
   /**
    * Update a tracked request with new token data.
    * Called on each chunk/thinking event or on usage completion.
-   *
-
-
    */
     update(requestId: any, { outputTokens, inputTokens, ttft }: any = {}) {
     const entry = activeRequests.get(requestId);
@@ -154,9 +142,6 @@ const SessionGenerationTracker = ({
    * (50-200+ chars) as a single chunk, so chunkCount severely
    * undercounts tokens. Using `outputCharacters / 4` (~4 chars/token
    * for English) gives a reliable cross-provider heuristic.
-   *
-
-
    */
     recordChunkTiming(requestId: any, charCount: any = 0) {
     const entry = activeRequests.get(requestId);
@@ -173,8 +158,6 @@ const SessionGenerationTracker = ({
    * Rolls the request's final token counts and computed tok/s into
    * the session accumulator so cumulative totals remain monotonically
    * non-decreasing.
-   *
-
    */
   complete(requestId: any) {
     const entry = activeRequests.get(requestId);
@@ -236,13 +219,6 @@ const SessionGenerationTracker = ({
    * from single large chunks arriving in near-zero elapsed time.
    *
 
-   * @returns {{
-   *   tokPerSec: number|null,
-   *   activeRequests: number,
-   *   totalOutputTokens: number,
-   *   totalInputTokens: number,
-   *   totalTokens: number,
-   *   avgTtft: number|null,
    * }}
    */
   getSessionStats(agentSessionId: any) {
@@ -361,8 +337,6 @@ const SessionGenerationTracker = ({
 
   /**
    * Clean up all tracking data for a session.
-   *
-
    */
   cleanup(agentSessionId: any) {
     const requestIds = sessionIndex.get(agentSessionId);
@@ -377,9 +351,6 @@ const SessionGenerationTracker = ({
 
   /**
    * Check if a session has any active requests.
-   *
-
-
    */
   hasActiveRequests(agentSessionId: any) {
     const requestIds = sessionIndex.get(agentSessionId);

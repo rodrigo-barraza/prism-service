@@ -63,7 +63,6 @@ const elevenlabsProvider = ({
    * Stream text to ElevenLabs via WebSocket and yield audio chunks.
 
 
-   * @returns {AsyncGenerator<Buffer>} Audio chunks.
    */
   async *generateSpeechStream(
     textStream: any,

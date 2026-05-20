@@ -295,7 +295,6 @@ function buildNativeInput(messages: ChatMessage[]) {
  * Factory: create an LM Studio provider instance targeting a specific baseUrl.
 
 
- * @returns {object} Provider object with all LM Studio methods
  */
 export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm-studio") {
   const getBaseUrl = () => baseUrl;
@@ -930,10 +929,6 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
      * Generate an embedding via the OpenAI-compatible /v1/embeddings endpoint.
      * LM Studio exposes this for any loaded embedding model (e.g. Granite,
      * nomic-embed, etc.).
-     *
-
-
-     * @returns {Promise<{ embedding: number[], dimensions: number }>}
      */
     async generateEmbedding(content: any, model: any, options: ProviderOptions = {}) {
       const baseUrl = getBaseUrl();
@@ -1011,10 +1006,6 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
      * - If the requested model is already loaded, returns immediately with its context info.
      * - If a different model is loaded, unloads it first.
      * - If no model is loaded, loads the requested one.
-     *
-
-
-     * @returns {{ alreadyLoaded: boolean, contextLength: number|null }} - Info about the loaded model.
      */
     async ensureModelLoaded(
       modelKey: any,

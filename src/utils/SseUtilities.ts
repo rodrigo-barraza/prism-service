@@ -9,8 +9,6 @@ import { SseEvent } from "../types/SseTypes.ts";
 /**
  * Configure an Express response for SSE (Server-Sent Events) streaming.
  * Sets the required headers and flushes them immediately.
- *
-
  */
 export function initSseResponse(res: Response) {
   res.setHeader("Content-Type", "text/event-stream");
@@ -22,9 +20,6 @@ export function initSseResponse(res: Response) {
 /**
  * Create an SSE emit callback that writes events to the response.
  * Strips heavy base64 data from image events when minioRef is available.
- *
-
-
  */
 export function createSseEmitter(res: Response, signal: AbortSignal) {
   // Disable Nagle's algorithm for minimal SSE latency.
@@ -60,10 +55,6 @@ export function createSseEmitter(res: Response, signal: AbortSignal) {
 /**
  * Build a flat JSON response from collected SSE events.
  * Used by non-streaming callers (?stream=false).
- *
-
-
- * @returns {{ error?: object, response?: object }}
  */
 export function buildJsonResponseFromEvents(events: SseEvent[], reqBody: any) {
   const errorEvent = events.find((e: SseEvent) => e.type === "error");
@@ -116,9 +107,6 @@ export function buildJsonResponseFromEvents(events: SseEvent[], reqBody: any) {
 /**
  * Handle a full SSE streaming request lifecycle.
  * Sets up SSE headers, AbortController, runs the handler, and closes.
- *
-
-
  */
 export async function handleSseRequest(
   req: Request,
@@ -143,9 +131,6 @@ export async function handleSseRequest(
 /**
  * Handle a non-streaming JSON request lifecycle.
  * Collects events from the handler and returns a flat JSON response.
- *
-
-
  */
 export async function handleJsonRequest(
   req: Request,

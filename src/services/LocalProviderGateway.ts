@@ -166,7 +166,6 @@ function matchesAny(nameLower: any, patterns: any) {
  * Detect capabilities for a model based on its name and provider metadata.
 
 
- * @returns {object} Detected capabilities
  */
 function detectCapabilities(modelKey: any, providerMeta: any = {}) {
     const nameLower = (modelKey || "").toLowerCase();
@@ -578,7 +577,6 @@ class LocalProviderGateway {
 
   /**
    * Get all registered local provider instances.
-   * @returns {Array<{ id: string, type: string, instanceNumber: number, concurrency: number }>}
    */
   getInstances() {
     return listInstances().map((inst: InstanceEntry) => ({
@@ -608,7 +606,6 @@ class LocalProviderGateway {
 
   /**
    * Get total concurrency capacity across all local instances.
-   * @returns {{ total: number, byType: { [type: string]: number }, byInstance: { [id: string]: number } }}
    */
   getConcurrencyCapacity() {
     const instances = listInstances();
@@ -631,10 +628,6 @@ class LocalProviderGateway {
    * Discover all models across all local provider instances.
    * Results are normalized into a canonical format and enriched
    * with capability detection and (optionally) HuggingFace metadata.
-   *
-
-
-   * @returns {Promise<{ [instanceId: string]: object[] }>} Normalized models grouped by instance
    */
   async discoverModels({ timeoutMs = 3000, enrich = true }: any = {}) {
     const instances = listInstances();
@@ -680,7 +673,6 @@ class LocalProviderGateway {
    * Discover models for a single instance.
 
 
-   * @returns {Promise<object[]>} Normalized model entries
    */
   async discoverModelsForInstance(
     instanceId: any,
@@ -743,10 +735,6 @@ class LocalProviderGateway {
 
   /**
    * Search for models across all local providers matching a capability filter.
-   *
-
-
-   * @returns {Promise<Array<{ instanceId: string, model: object }>>}
    */
   async searchModels(filter: any = {}) {
     const allModels = await this.discoverModels();
@@ -849,10 +837,6 @@ class LocalProviderGateway {
   /**
    * Resolve which provider instance serves a given model.
    * Queries each instance's model list and returns the first match.
-   *
-
-
-   * @returns {Promise<{ instanceId: string, type: string, provider: object } | null>}
    */
   async resolveProvider(modelName: any, { timeoutMs = 3000 }: any = {}) {
     const instances = listInstances();
@@ -898,9 +882,6 @@ class LocalProviderGateway {
    *
    * For providers that expose checkHealth() (llama.cpp), uses that.
    * For others, performs a lightweight listModels() probe.
-   *
-
-   * @returns {Promise<{ [instanceId: string]: { ok: boolean, status: string, type: string, models?: number } }>}
    */
     async checkHealth(timeoutMs: any = 3000) {
     const instances = listInstances();
@@ -978,10 +959,6 @@ class LocalProviderGateway {
   /**
    * Estimate VRAM usage for a GGUF model served by a local provider.
    * Primarily useful for LM Studio models that report GGUF metadata.
-   *
-
-
-   * @returns {{ gpuGiB: number, totalGiB: number, cpuOffloaded: boolean, archParams: object, totalLayers: number } | null}
    */
   estimateVRAM(modelData: any, options: any = {}) {
     if (!modelData) return null;
@@ -1020,9 +997,6 @@ class LocalProviderGateway {
   /**
    * Estimate VRAM for a model by its key on a specific instance.
    * Fetches model metadata from the provider, then runs estimateVRAM.
-   *
-
-
    */
   async estimateVRAMForModel(instanceId: any, modelKey: any, options: any = {}) {
     const provider = getProvider(instanceId);
@@ -1044,9 +1018,6 @@ class LocalProviderGateway {
   /**
    * Load a model on a specific instance.
    * Only supported by providers that expose loadModel (LM Studio).
-   *
-
-
    */
   async loadModel(instanceId: any, modelKey: any, options: any = {}, signal: any) {
     const provider = getProvider(instanceId);
@@ -1059,10 +1030,6 @@ class LocalProviderGateway {
   /**
    * Ensure a specific model is loaded on a specific instance.
    * Handles unloading of other models if necessary (single-model enforcement).
-   *
-
-
-   * @returns {Promise<{ alreadyLoaded: boolean, contextLength: number|null }>}
    */
   async ensureModelLoaded(
     instanceId: any,
@@ -1082,9 +1049,6 @@ class LocalProviderGateway {
 
   /**
    * Unload a model from a specific instance.
-   *
-
-
    */
   async unloadModel(instanceId: any, modelInstanceId: any) {
     const provider = getProvider(instanceId);
@@ -1106,10 +1070,6 @@ class LocalProviderGateway {
    * and any other provider-specific option normalization.
    *
    * Call this during request preparation (prepareGenerationContext).
-   *
-
-
-   * @returns {object} The mutated options object (for chaining)
    */
   applyLocalDefaults(providerName: any, options: any, clientParams: any = {}) {
     if (!this.isLocal(providerName)) return options;
@@ -1134,10 +1094,6 @@ class LocalProviderGateway {
   /**
    * Generate text (non-streaming) via a local provider.
    * Auto-resolves the provider if only a model name is given.
-   *
-
-
-   * @returns {Promise<{ text: string, thinking: string|null, usage: object }>}
    */
   async generateText(messages: any, model: any, options: any = {}, instanceId: any) {
     const provider = await this._getProviderForModel(model, instanceId);
@@ -1147,9 +1103,6 @@ class LocalProviderGateway {
   /**
    * Generate text (streaming) via a local provider.
    * Auto-resolves the provider if only a model name is given.
-   *
-
-
    */
   async *generateTextStream(
     messages: any,
@@ -1163,10 +1116,6 @@ class LocalProviderGateway {
 
   /**
    * Generate an embedding via a local provider.
-   *
-
-
-   * @returns {Promise<{ embedding: number[], dimensions: number }>}
    */
   async generateEmbedding(
     content: string,
@@ -1183,10 +1132,6 @@ class LocalProviderGateway {
 
   /**
    * Caption an image via a local provider.
-   *
-
-
-   * @returns {Promise<{ text: string, usage: object }>}
    */
   async captionImage(
     images: any,

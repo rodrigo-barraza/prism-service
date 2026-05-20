@@ -90,9 +90,6 @@ function resolveModelModalities(step: any) {
  *
  * Utility steps (🧠 prefix) are shown in the graph but without viewers
  * or chain edges, keeping the visualization focused on output.
- *
-
- * @returns {{ nodes, edges, nodeResults }}
  */
 function assembleGraph(steps: any) {
   if (!Array.isArray(steps) || steps.length === 0) {

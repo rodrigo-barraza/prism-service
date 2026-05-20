@@ -116,14 +116,6 @@ interface ExtractedMemory {
 export default class MemoryExtractor {
   /**
    * Extract memories from a conversation and store in the unified memories collection.
-   *
-
-   * @param {string} params.project - Project identifier
-   * @param {string} params.username - Username
-   * @param {Array} params.messages - Full conversation messages
-
-
-   * @returns {Promise<Array>} Stored memory documents
    */
   static async extractAndStore({
     project,
@@ -377,8 +369,6 @@ export default class MemoryExtractor {
   /**
    * Create an afterResponse hook handler for AgentHooks.
    * Runs as fire-and-forget (non-blocking).
-   *
-
    */
   static createHook() {
     return async (context: any, { _text, messages, toolCalls }: any) => {

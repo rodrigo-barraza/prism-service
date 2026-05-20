@@ -64,9 +64,6 @@ const FileService: FileServiceInterface = {
 
   /**
    * Upload a file from a base64 data URL.
-   *
-   * @returns {Promise<{ ref: string, size: number, contentType: string }>}
-   *   ref is either `minio://...` or the original dataUrl.
    */
   async uploadFile(
     dataUrl: string,
@@ -121,8 +118,6 @@ const FileService: FileServiceInterface = {
 
   /**
    * Get a file stream from a MinIO reference.
-   *
-   * @returns {Promise<{ stream: any, contentType: string } | null>}
    */
   async getFile(key: string): Promise<{ stream: any; contentType: string } | null> {
     if (!MinioWrapper.isAvailable()) return null;
@@ -155,8 +150,6 @@ const FileService: FileServiceInterface = {
 
   /**
    * Extract the object key from a MinIO reference.
-   *
-   * @returns {string} - e.g. "files/abc-123.png"
    */
   extractKey(ref: string): string {
     return ref.replace("minio://", "");

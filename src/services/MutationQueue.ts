@@ -14,7 +14,6 @@ import logger from "../utils/logger.ts";
 // ────────────────────────────────────────────────────────────
 
 /**
- * @typedef {object} LockHandle
  * @property {string} filePath - The locked file path
  * @property {Function} release - Call to release the lock
  */
@@ -104,8 +103,6 @@ class MutationQueue {
   /**
    * Execute a function while holding a lock on the given file path.
    * The lock is automatically released after the function completes (or throws).
-   *
-   * @returns {Promise<T>} Result of fn()
    */
   async withLock<T>(
     filePath: string,
@@ -122,7 +119,6 @@ class MutationQueue {
 
   /**
    * Get the current lock status for debugging.
-   * @returns {Array<{ filePath: string, holder: string|null, queueLength: number }>}
    */
   getStatus() {
     const entries: Array<{

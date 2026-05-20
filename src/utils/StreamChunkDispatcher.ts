@@ -14,9 +14,6 @@ import logger from "./logger.ts";
  *
  * Handles both completed tags (matched pairs) and incomplete tags at the
  * end of a streaming buffer (closing tag hasn't arrived yet).
- *
-
-
  */
 export function stripToolCallMarkup(text: any) {
   return (
@@ -35,10 +32,6 @@ export function stripToolCallMarkup(text: any) {
 
 /**
  * Process a provider image chunk: upload to MinIO and track the ref.
- *
-
-
- * @returns {Promise<string|null>} MinIO ref, or null on failure
  */
 export async function uploadImageChunk(
   chunk: any,
@@ -65,9 +58,6 @@ export async function uploadImageChunk(
 
 /**
  * Create an image ref string, preferring MinIO ref over inline base64.
- *
-
-
  */
 export function imageRefOrInline(
   minioRef: any,
@@ -82,27 +72,6 @@ export function imageRefOrInline(
  *
  * This is the single source of truth for the chunk type → handler mapping that was
  * previously duplicated across chat.js (handleStreamingText) and AgenticLoopService.
- *
-
-
- * @param {string|null} state.thinking - Accumulated thinking text
- * @param {string} state.thinkingSignature - Anthropic thinking signature
- * @param {Array} state.images - Accumulated MinIO image refs
- * @param {Array} state.toolCalls - Accumulated tool call entries
- * @param {Array} state.audioChunks - Base64-encoded PCM audio chunks
- * @param {number} state.audioSampleRate - Detected audio sample rate
- * @param {number} state.outputCharacters - Total output character count
- * @param {string} state.text - Accumulated text output
- * @param {number|null} state.firstTokenTime - First text token timestamp
- * @param {number|null} state.generationEnd - Last token timestamp
- * @param {object|null} state.usage - Usage object from provider
-
- * @param {Function} context.emit - SSE emit function
- * @param {string} context.project
- * @param {string} context.username
-
-
- * @returns {Promise<boolean>} true if chunk was handled, false if unrecognised
  */
 export async function dispatchChunk(
   chunk: any,

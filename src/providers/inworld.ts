@@ -56,10 +56,6 @@ const inworldProvider = ({
   /**
    * Generate speech via Inworld TTS (MP3).
    * Returns a Node Readable stream suitable for piping to an HTTP response.
-   *
-
-
-   * @returns {{ stream: Readable, contentType: string }}
    */
   async generateSpeech(
     text: any,

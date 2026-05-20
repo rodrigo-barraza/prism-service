@@ -31,8 +31,6 @@ interface MultimodalPart {
 const EmbeddingService = {
   /**
    * Generate an embedding and log the request.
-   *
-   * @returns {Promise<{ embedding: number[], dimensions: number, provider: string, model: string }>}
    */
   async generate(content: string | MultimodalPart[], options: any = {}) {
     const requestId = crypto.randomUUID();

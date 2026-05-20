@@ -576,7 +576,6 @@ const anthropicProvider = {
    * Caption / describe images (image-to-text).
 
 
-   * @returns {Promise<{ text: string, usage: object }>}
    */
   async captionImage(
     images: string[],

@@ -109,7 +109,6 @@ export default class AutoApprovalEngine {
   /**
    * Get the approval tier for a tool.
 
-   * @returns {number} Tier constant (1, 2, or 3)
    */
   getTier(toolName: any) {
         if ((this as any).tierOverrides[toolName] !== undefined) {
@@ -129,9 +128,6 @@ export default class AutoApprovalEngine {
 
   /**
    * Check whether a tool call should auto-execute.
-   *
-
-   * @returns {{ approved: boolean, tier: number, tierLabel: string, reason: string }}
    */
   check(toolCall: any) {
         const tier = this.getTier((toolCall.name as any));
@@ -153,9 +149,6 @@ export default class AutoApprovalEngine {
 
   /**
    * Check a batch of tool calls. Returns the ones needing approval.
-   *
-
-   * @returns {{ autoApproved: Array, needsApproval: Array }}
    */
   checkBatch(toolCalls: any) {
     const autoApproved: any[] = [];

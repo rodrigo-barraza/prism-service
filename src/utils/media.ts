@@ -50,10 +50,6 @@ const MAX_IMAGE_DIMENSION = 2000;
  * Strategy:
  *  - GIFs → ffmpeg resize (preserves animation for models that support it)
  *  - Everything else → sharp JPEG conversion + progressive downscale
- *
-
-
- * @returns {Promise<{ data: string, mediaType: string }>} Compressed base64 + updated MIME
  */
 export async function compressImageForSizeLimit(
   base64Data: string,
@@ -92,10 +88,6 @@ export async function compressImageForSizeLimit(
  * proportionally using sharp's Lanczos3 resampler.
  *
  * GIFs are skipped (ffmpeg handles them separately in byte-size compression).
- *
-
-
- * @returns {Promise<{ data: string, mediaType: string }>} Possibly resized base64 + MIME
  */
 export async function constrainImageDimensions(
   base64Data: string,
@@ -353,7 +345,6 @@ async function compressWithSharp(base64Data: string, maxBytes: number) {
 /**
  * Detect MIME type from a base64 data URL.
 
- * @returns {string|null} The MIME type (e.g. "image/png") or null
  */
 export function getDataUrlMimeType(dataUrl: string) {
   const match = dataUrl.match(/^data:([^;]+);base64,/);
@@ -399,10 +390,6 @@ export function inferMimeFromUrl(url: string) {
  * Each image frame costs ~256 tokens in vision models. Default maxFrames=8
  * keeps total image tokens ~2K, leaving room for text generation in
  * local models with limited context windows (4K-8K typical).
- *
-
-
- * @returns {Promise<string[]>} Array of data:image/jpeg;base64,... URLs
  */
 export async function extractVideoFrames(videoDataUrl: string, options: { fps?: number; maxFrames?: number; quality?: number } = {}) {
     const { fps = 1, maxFrames = 8, quality = 5 } = options;

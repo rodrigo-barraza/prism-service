@@ -89,7 +89,6 @@ async function resolveImageRefs(messages: any[], project: any, username: string)
  * Parses the data URL, checks decoded size, runs through compressImageForSizeLimit,
  * and reconstructs if compression changed the data.
 
- * @returns {Promise<string>} - Possibly compressed data URL
  */
 async function compressDataUrlIfOversized(dataUrl: any) {
     const match = (dataUrl as any).match(/^data:([^;]+);base64,(.+)$/);
@@ -137,7 +136,6 @@ async function compressDataUrlIfOversized(dataUrl: any) {
 }
 /**
  * Resolve a single media reference for both provider and storage use.
- * @returns {{ providerRef: string, storageRef: string }}
  */
 async function resolveMediaRef(ref: any, project: any, username: string) {
   // Already a base64 data URL — compress if oversized, upload to MinIO for storage
@@ -224,12 +222,6 @@ async function resolveMediaRef(ref: any, project: any, username: string) {
  *
  * Returns a prepared context object shared by handleConversation
  * and handleAgent, or throws on validation failure.
- *
- * @param {Object}   params   Raw request parameters
- * @param {Function} emit     Event emitter callback
-
-
- * @returns {Promise<Object>} Prepared generation context
  */
 async function prepareGenerationContext(
   params: any,

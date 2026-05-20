@@ -263,7 +263,6 @@ const LUPOS_ENABLED_TOOLS = [
 // ── Persona Definitions ──────────────────────────────────────────
 
 /**
- * @typedef {object} AgentPersona
  * @property {string} id           - Unique agent identifier
  * @property {string} name         - Display name
  * @property {string} type         - Agent type category (e.g. "coding", "conversational")
@@ -1230,7 +1229,6 @@ const AgentPersonaRegistry = {
 
   /**
    * List all registered personas.
-   * @returns {Array<{ id: string, name: string, custom?: boolean }>}
    */
   list() {
     return [...PERSONAS.values()]
@@ -1269,8 +1267,6 @@ const AgentPersonaRegistry = {
    * Register a custom (user-defined) agent persona at runtime.
    * Converts a MongoDB document into a persona object compatible
    * with the built-in format, then inserts into the PERSONAS map.
-   *
-
    */
   registerCustom(document: any) {
     if (!document?.agentId) return;

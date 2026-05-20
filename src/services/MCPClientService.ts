@@ -17,7 +17,6 @@ const MCP_PREFIX = "mcp" + MCP_DELIMITER;
 
 /**
  * Map of serverName → { client: Client, transport, tools: [], config, status }
- * @type {Map<string, object>}
  */
 const connections = new Map();
 
@@ -108,13 +107,6 @@ function createTransport(config: any) {
 const MCPClientService = {
   /**
    * Connect to an MCP server and discover its tools.
-   *
-
-   * @param {string} config.name - Unique server slug
-   * @param {string} config.transport - "stdio" | "streamable-http"
-
-
-   * @returns {Promise<{ tools: Array, serverName: string }>}
    */
   async connect(config: any) {
     const { name: serverName } = config;
@@ -202,7 +194,6 @@ const MCPClientService = {
   /**
    * Reconnect to an MCP server (disconnect then connect).
 
-   * @returns {Promise<{ tools: Array, serverName: string }>}
    */
   async reconnect(serverName: any) {
     const conn = connections.get(serverName);
@@ -212,10 +203,6 @@ const MCPClientService = {
 
   /**
    * Call a tool on a connected MCP server.
-   *
-
-
-   * @returns {Promise<object>} Tool result
    */
     // @ts-ignore - TODO: strict typing
     async callTool(serverName: any, toolName: any, args: any = {}) {
@@ -281,7 +268,6 @@ const MCPClientService = {
 
   /**
    * Get all tool schemas from all connected MCP servers.
-   * @returns {Array} Namespaced tool schemas
    */
   getToolSchemas() {
     const allSchemas: any[] = [];
@@ -293,7 +279,6 @@ const MCPClientService = {
 
   /**
    * Get connection info for all servers.
-   * @returns {Array<{ name, status, toolCount, transport, connectedAt }>}
    */
   getConnectedServers() {
     const servers: any[] = [];
@@ -334,7 +319,6 @@ const MCPClientService = {
   /**
    * Parse an MCP-namespaced tool name.
 
-   * @returns {{ serverName: string, toolName: string } | null}
    */
   parseMCPToolName(fullName: any) {
     return parseMCPToolName(fullName);
@@ -344,9 +328,6 @@ const MCPClientService = {
    * List available resources from a connected MCP server.
    * MCP Resources are read-only data sources (files, DB rows, API data)
    * that can be fetched by URI.
-   *
-
-   * @returns {Promise<{ resources: Array<{ uri: string, name: string, description?: string, mimeType?: string }> }>}
    */
   async listResources(serverName: any) {
     const conn = connections.get(serverName);
@@ -385,10 +366,6 @@ const MCPClientService = {
 
   /**
    * Read a specific resource from a connected MCP server by URI.
-   *
-
-
-   * @returns {Promise<object>} Resource content
    */
   async readResource(serverName: any, uri: string) {
     const conn = connections.get(serverName);
@@ -433,10 +410,6 @@ const MCPClientService = {
    * - Bearer token auth (most common for HTTP MCP servers)
    * - API key header auth
    * - Environment variable injection (for stdio servers)
-   *
-
-
-   * @returns {Promise<object>} Reconnection result
    */
   async authenticate(serverName: any, auth: any = {}) {
     const conn = connections.get(serverName);

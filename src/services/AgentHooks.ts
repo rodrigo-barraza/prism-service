@@ -29,9 +29,6 @@ export default class AgentHooks extends EventEmitter {
   /**
    * Register a named async hook for a lifecycle event.
    * Hooks run sequentially in registration order.
-   *
-
-
    */
   register(event: any, handler: any, name: string) {
         if (!(this as any)._hooks.has(event)) {
@@ -45,10 +42,6 @@ export default class AgentHooks extends EventEmitter {
   /**
    * Run all registered hooks for an event sequentially.
    * Each hook can mutate ctx or return a control object.
-   *
-
-
-   * @returns {Promise<object|undefined>} Merged results from handlers
    */
     async run(event: any, ...args: any) {
         const hooks = (this as any)._hooks.get(event) || [];

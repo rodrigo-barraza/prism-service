@@ -197,7 +197,6 @@ function handleWsLive(
    * Build a WAV from accumulated PCM chunks, upload to MinIO, and return the ref.
 
 
-   * @returns {Promise<string|null>} MinIO ref or null on failure
    */
     async function buildAndUploadAudio(
         chunks: any = turnAudioChunks,

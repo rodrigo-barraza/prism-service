@@ -11,7 +11,6 @@ export const requestContext = new AsyncLocalStorage();
 
 /**
  * Get the current request context, or an empty object if none.
- * @returns {{ project?: string, username?: string, clientIp?: string, workspaceId?: string | null }}
  */
 export function getRequestContext() {
   return requestContext.getStore() || {};

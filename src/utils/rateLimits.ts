@@ -19,10 +19,6 @@ import rateLimitStore from "../services/RateLimitStore.ts";
  *   x-ratelimit-remaining-tokens    → remaining TPM
  *   x-ratelimit-reset-requests      → RPM reset time
  *   x-ratelimit-reset-tokens        → TPM reset time
- *
-
-
- * @returns {object|null} Parsed rate-limit data, or null if unavailable
  */
 export function extractOpenAIRateLimits(response: any, model: string) {
   if (!response?.headers) return null;
@@ -67,8 +63,6 @@ export function extractOpenAIRateLimits(response: any, model: string) {
  *   anthropic-ratelimit-requests-reset      → RPM reset time
  *   anthropic-ratelimit-tokens-reset        → TPM reset time
  *   retry-after                             → seconds to wait if 429
- *
- * @returns {object|null} Parsed rate-limit data, or null if unavailable
  */
 export function extractAnthropicRateLimits(response: any, model: string) {
   if (!response?.headers) return null;

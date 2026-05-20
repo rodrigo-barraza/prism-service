@@ -106,9 +106,6 @@ class LocalModelQueue {
   /**
    * Acquire a semaphore slot for an instance. Resolves immediately if a
    * slot is available, otherwise enqueues and waits (FIFO order).
-   *
-   * @returns {Promise<() => void>} A release function — MUST be called
-   *   when inference is complete (use try/finally).
    */
   acquire(instanceId: string = "_default"): Promise<() => void> {
     return this._getQueue(instanceId).acquire();
