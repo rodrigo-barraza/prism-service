@@ -1,3 +1,4 @@
+import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
 /**
  * AgenticLoopService — public façade for agentic loop execution.
  *
@@ -10,68 +11,43 @@
  * Also exposes approval/question resolution APIs used by AgentRoutes.
  */
 export default class AgenticLoopService {
-    /**
-     * Run an agentic loop using the specified (or default) harness.
-     * @param {object} context — generation context from ChatRoutes.prepareGenerationContext
-     * @returns {Promise<{ messages: object[] }>}
-     */
-    static runAgenticLoop(context: any): Promise<any>;
-    /**
-     * Resolve a pending approval for an agent session.
-  
-  
-     * @returns {boolean} true if resolved
-     */
-    static resolveApproval(agentSessionId: any, approved: any, { approveAll }?: {
-        approveAll?: boolean | undefined;
+    /** Run an agentic loop using the specified (or default) harness. */
+    static runAgenticLoop(context: AgenticContext): Promise<{
+        messages: ConversationMessage[];
+    }>;
+    /** Resolve a pending approval for an agent session. */
+    static resolveApproval(agentSessionId: string, approved: boolean, { approveAll }?: {
+        approveAll?: boolean;
     }): boolean;
-    /**
-     * Check if an agent session has a pending approval.
-  
-     * @returns {{ pending: boolean, type?: string, tools?: string[] }}
-     */
-    static getPendingApproval(agentSessionId: any): {
+    /** Check if an agent session has a pending approval. */
+    static getPendingApproval(agentSessionId: string): {
         pending: boolean;
-        type?: undefined;
-        tools?: undefined;
-    } | {
-        pending: boolean;
-        type: any;
-        tools: any;
+        type?: string;
+        tools?: string[];
     };
-    /**
-     * Store a pending question resolver (called by ToolOrchestratorService).
-     */
-    static _setPendingQuestion(agentSessionId: any, entry: any): void;
-    /**
-     * Resolve a pending question for an agent session.
-  
-     * @param {Array<{ answer: string|string[], annotations?: string }>} answers
-     * @returns {boolean} true if resolved
-     */
-    static resolveUserQuestion(agentSessionId: any, answers: any): boolean;
-    /**
-     * Check if an agent session has a pending question.
-  
-     * @returns {{ pending: boolean, question?: string, choices?: string[] }}
-     */
-    static getPendingQuestion(agentSessionId: any): {
+    /** Store a pending question resolver (called by ToolOrchestratorService). */
+    static _setPendingQuestion(agentSessionId: string, entry: {
+        resolve: (value: unknown) => void;
+        question?: string;
+        questions?: unknown[];
+        choices?: string[];
+    }): void;
+    /** Resolve a pending question for an agent session. */
+    static resolveUserQuestion(agentSessionId: string, answers: Array<{
+        answer: string | string[];
+        annotations?: string;
+    }>): boolean;
+    /** Check if an agent session has a pending question. */
+    static getPendingQuestion(agentSessionId: string): {
         pending: boolean;
-        question?: undefined;
-        choices?: undefined;
-    } | {
-        pending: boolean;
-        question: any;
-        choices: any;
+        question?: string;
+        choices?: string[];
     };
-    /**
-     * List available harnesses for the settings UI.
-     * @returns {Array<{ id: string, label: string, description: string }>}
-     */
-    static listHarnesses(): {
-        id: any;
-        label: any;
-        description: any;
-    }[];
+    /** List available harnesses for the settings UI. */
+    static listHarnesses(): Array<{
+        id: string;
+        label: string;
+        description: string;
+    }>;
 }
 //# sourceMappingURL=AgenticLoopService.d.ts.map

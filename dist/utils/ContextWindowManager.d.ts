@@ -9,7 +9,7 @@ export default class ContextWindowManager {
   
      * @returns {{ messages: Array, truncated: boolean, strategy: string|null, estimatedTokens: number }}
      */
-    static enforce(messages: any, options?: {}): {
+    static enforce(messages: any, options?: any): {
         messages: any;
         truncated: boolean;
         strategy: null;

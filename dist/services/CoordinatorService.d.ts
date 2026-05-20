@@ -127,7 +127,7 @@ export default class CoordinatorService {
   
   
      */
-    static listWorkers({ parentAgentSessionId }?: {}): {
+    static listWorkers({ parentAgentSessionId }?: any): {
         agentId: any;
         workerAgentSessionId: any;
         parentAgentSessionId: any;
@@ -238,7 +238,7 @@ export default class CoordinatorService {
   
      * @returns {Promise<object>} Execution results with diffs
      */
-    static execute(plan: any, options?: {}): Promise<{
+    static execute(plan: any, options?: any): Promise<{
         error: string;
         taskId?: undefined;
         status?: undefined;
@@ -277,11 +277,7 @@ export default class CoordinatorService {
         merged?: undefined;
     } | {
         taskId: any;
-        merged: {
-            workerId: any;
-            merged: boolean;
-            error: any;
-        }[];
+        merged: any[];
         error?: undefined;
     }>;
     /**

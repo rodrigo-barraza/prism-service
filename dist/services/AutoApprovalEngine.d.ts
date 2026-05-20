@@ -17,7 +17,7 @@ export declare const APPROVAL_TIERS: {
  * Registered as a `beforeToolCall` hook in AgentHooks.
  */
 export default class AutoApprovalEngine {
-    constructor(options?: {});
+    constructor(options?: any);
     /**
      * Get the approval tier for a tool.
   

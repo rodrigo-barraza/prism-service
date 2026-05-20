@@ -1,6 +1,5 @@
 import { expandMessagesForFC } from "../../utils/FunctionCallingUtilities.js";
-import { mergeUsage, createUsageAccumulator, } from "../../utils/CostCalculator.js";
-import { calculateTextCost } from "../../utils/CostCalculator.js";
+import { mergeUsage, createUsageAccumulator, calculateTextCost, } from "../../utils/CostCalculator.js";
 import { calculateTokensPerSec } from "../../utils/math.js";
 import { getPricing, TYPES } from "../../config.js";
 import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.js";
@@ -8,6 +7,11 @@ import ContextWindowManager from "../../utils/ContextWindowManager.js";
 import SessionGenerationTracker from "../SessionGenerationTracker.js";
 import RequestLogger from "../RequestLogger.js";
 import FileService from "../FileService.js";
+import MongoWrapper from "../../wrappers/MongoWrapper.js";
+// @ts-ignore — root-level config export
+import { MONGO_DB_NAME } from "../../../config.js";
+import { COLLECTIONS } from "../../constants.js";
+import { finalizeTextGeneration } from "./lifecycle/Finalizer.js";
 import logger from "../../utils/logger.js";
 /**
  * BaseAgenticHarness — abstract base class that defines the contract
@@ -18,37 +22,30 @@ import logger from "../../utils/logger.js";
  * inheriting shared infrastructure:
  *
  *   - Stream chunk routing (`processStreamChunk`)
+ *   - Stream consumption (`consumeStream` — full pass with chunk routing)
  *   - Progress emission (`emitGenerationProgress`, `maybeEmitProgress`)
  *   - Iteration logging (`logIteration`)
  *   - Context window enforcement (`enforceContextWindow`)
  *   - LLM stream creation (`createProviderStream`)
- *   - Stream consumption (`consumeStream` — full pass with chunk routing)
+ *   - Finalization (`finalize` — cost, persistence, done event)
  */
 export default class BaseAgenticHarness {
     /** Harness identifier — subclasses MUST override. */
     static id = "base";
     static label = "Base (abstract)";
     static description = "Abstract base harness — do not use directly.";
-    /**
-     * @param {object}              context    — generation context from ChatRoutes
-     * @param {AgenticLoopState}    state  — shared mutable state accumulator
-     * @param {object}              tools  — { finalTools, customToolMap, resolvedEnabledTools }
-     */
+    ctx;
+    state;
+    tools;
+    trackerSessionId;
     constructor(context, state, tools) {
-        // @ts-ignore
         this.ctx = context;
-        // @ts-ignore
         this.state = state;
-        // @ts-ignore
         this.tools = tools;
-        const { parentAgentSessionId, agentSessionId } = context;
-        // @ts-ignore
-        this.trackerSessionId = parentAgentSessionId || agentSessionId;
+        this.trackerSessionId =
+            context.parentAgentSessionId || context.agentSessionId;
     }
-    /**
-     * Execute the agentic loop. Subclasses MUST override.
-     * @returns {Promise<{ messages: object[] }>}
-     */
+    /** Execute the agentic loop. Subclasses MUST override. */
     async run() {
         throw new Error(`${this.constructor.name}.run() is abstract — subclasses must override.`);
     }
@@ -58,14 +55,9 @@ export default class BaseAgenticHarness {
     // ── Progress emission ────────────────────────────────────
     /** Emit a generation_progress status event with current session stats. */
     emitGenerationProgress() {
-        // @ts-ignore
         const { emit } = this.ctx;
-        // @ts-ignore
         const state = this.state;
-        // @ts-ignore
-        const stats = SessionGenerationTracker.getSessionStats(
-        // @ts-ignore
-        this.trackerSessionId);
+        const stats = SessionGenerationTracker.getSessionStats(this.trackerSessionId);
         if (stats.activeRequests > 0 || stats.totalOutputTokens > 0) {
             state.hwmOutputTokens = Math.max(state.hwmOutputTokens, stats.totalOutputTokens);
             state.hwmInputTokens = Math.max(state.hwmInputTokens, stats.totalInputTokens);
@@ -88,7 +80,6 @@ export default class BaseAgenticHarness {
     }
     /** Check if it's time to emit a progress event. */
     maybeEmitProgress() {
-        // @ts-ignore
         const state = this.state;
         state.chunksSinceLastProgress++;
         const timeSinceLast = performance.now() - state.lastProgressEmitTime;
@@ -98,14 +89,8 @@ export default class BaseAgenticHarness {
         }
     }
     // ── Context window enforcement ───────────────────────────
-    /**
-     * Enforce token budget on messages before sending to provider.
-  
-  
-     * @returns {object[]} — possibly truncated messages
-     */
+    /** Enforce token budget on messages before sending to provider. */
     enforceContextWindow(messages, toolCount) {
-        // @ts-ignore
         const { modelDef, options, emit } = this.ctx;
         const contextResult = ContextWindowManager.enforce(messages, {
             maxInputTokens: modelDef?.maxInputTokens || 128_000,
@@ -129,7 +114,6 @@ export default class BaseAgenticHarness {
      * Handles liveAPI fallback and message expansion.
      */
     createProviderStream(messages, passOptions) {
-        // @ts-ignore
         const { provider, resolvedModel, modelDef, signal } = this.ctx;
         const expandedMessages = expandMessagesForFC(messages, {
             filterDeleted: false,
@@ -144,16 +128,27 @@ export default class BaseAgenticHarness {
                 signal,
             });
     }
+    // ── Stream consumption ────────────────────────────────────
+    /**
+     * Consume an LLM stream, routing each chunk through `processStreamChunk`.
+     * Handles abort signals and stream teardown.
+     */
+    async consumeStream(stream, pass, allowedToolNames) {
+        for await (const chunk of stream) {
+            const result = await this.processStreamChunk(chunk, pass, allowedToolNames);
+            if (result.action === "break") {
+                const returnable = stream;
+                if (typeof returnable.return === "function")
+                    returnable.return(undefined);
+                break;
+            }
+        }
+    }
     // ── Session tracking helpers ──────────────────────────────
     /** Register a request with SessionGenerationTracker. */
     registerTrackerRequest(passRequestId) {
-        // @ts-ignore
-        const { providerName, resolvedModel, parentAgentSessionId, agentSessionId,
-        // @ts-ignore
-         } = this.ctx;
-        // @ts-ignore
+        const { providerName, resolvedModel, parentAgentSessionId, agentSessionId } = this.ctx;
         SessionGenerationTracker.register(this.trackerSessionId, passRequestId, {
-            // @ts-ignore
             provider: providerName,
             model: resolvedModel,
             source: parentAgentSessionId ? "worker" : "orchestrator",
@@ -164,28 +159,23 @@ export default class BaseAgenticHarness {
     /**
      * Process a single stream chunk — routes to the appropriate handler.
      * Returns an action descriptor for the caller:
-     *   { action: "continue" }     — chunk was consumed, keep iterating
-     *   { action: "toolCall", tc }  — a tool call was detected
-     *   { action: "skip" }         — chunk was filtered/dropped
-     *
-     * @param {*}      chunk            — raw chunk from provider stream
-     * @param {object} pass             — per-iteration pass state
-     * @param {Set}    allowedToolNames — tool names in the current schema
-  
+     *   `continue` — chunk was consumed, keep iterating
+     *   `toolCall` — a tool call was detected
+     *   `skip`     — chunk was filtered/dropped
+     *   `break`    — abort signal received
      */
     processStreamChunk(chunk, pass, allowedToolNames) {
-        // @ts-ignore
         const { emit, signal } = this.ctx;
-        // @ts-ignore
         const state = this.state;
+        const c = chunk;
         // Abort check
         if (signal?.aborted)
             return { action: "break" };
         // ── Usage event ──────────────────────────────────────
-        if (chunk?.type === "usage") {
-            mergeUsage(state.overallUsage, chunk.usage);
-            mergeUsage(pass.usage, chunk.usage);
-            const reportedInput = chunk.usage?.inputTokens || chunk.usage?.promptTokens || 0;
+        if (c?.type === "usage") {
+            mergeUsage(state.overallUsage, c.usage);
+            mergeUsage(pass.usage, c.usage);
+            const reportedInput = c.usage?.inputTokens || c.usage?.promptTokens || 0;
             if (reportedInput > 0) {
                 SessionGenerationTracker.update(pass.requestId, {
                     inputTokens: reportedInput,
@@ -194,16 +184,16 @@ export default class BaseAgenticHarness {
             return { action: "continue" };
         }
         // ── Rate limits ──────────────────────────────────────
-        if (chunk?.type === "rateLimits") {
-            state.lastRateLimits = chunk.rateLimits;
+        if (c?.type === "rateLimits") {
+            state.lastRateLimits = c.rateLimits;
             return { action: "continue" };
         }
         // ── Thinking ─────────────────────────────────────────
-        if (chunk?.type === "thinking") {
+        if (c?.type === "thinking") {
             this._recordFirstToken(pass);
             this._recordTiming(pass);
-            state.streamedThinking += chunk.content;
-            pass.streamedThinking += chunk.content;
+            state.streamedThinking += c.content;
+            pass.streamedThinking += c.content;
             // Display segment tracking
             if (state.lastDisplaySegType !== "thinking") {
                 state.displaySegments.push({
@@ -213,129 +203,129 @@ export default class BaseAgenticHarness {
                 state.displayThinkingFragments.push("");
                 state.lastDisplaySegType = "thinking";
             }
-            state.displayThinkingFragments[state.displayThinkingFragments.length - 1] += chunk.content;
-            state.overallOutputCharacters += chunk.content.length;
-            SessionGenerationTracker.recordChunkTiming(pass.requestId, chunk.content.length);
+            state.displayThinkingFragments[state.displayThinkingFragments.length - 1] += c.content;
+            state.overallOutputCharacters += c.content.length;
+            SessionGenerationTracker.recordChunkTiming(pass.requestId, c.content.length);
             emit({
                 type: "thinking",
-                content: chunk.content,
+                content: c.content,
                 outputCharacters: state.overallOutputCharacters,
             });
             this.maybeEmitProgress();
             return { action: "continue" };
         }
         // ── Thinking signature (Anthropic) ───────────────────
-        if (chunk?.type === "thinking_signature") {
-            pass.thinkingSignature = chunk.signature;
+        if (c?.type === "thinking_signature") {
+            pass.thinkingSignature = c.signature;
             return { action: "continue" };
         }
         // ── Tool call argument delta ─────────────────────────
-        if (chunk?.type === "toolCallDelta") {
+        if (c?.type === "toolCallDelta") {
             this._recordFirstToken(pass);
             this._recordTiming(pass);
-            state.overallOutputCharacters += chunk.characters;
-            SessionGenerationTracker.recordChunkTiming(pass.requestId, chunk.characters);
+            state.overallOutputCharacters += c.characters;
+            SessionGenerationTracker.recordChunkTiming(pass.requestId, c.characters);
             this.maybeEmitProgress();
             return { action: "continue" };
         }
         // ── Tool call ────────────────────────────────────────
-        if (chunk?.type === "toolCall") {
+        if (c?.type === "toolCall") {
             this._recordFirstToken(pass);
             this._recordTiming(pass);
-            SessionGenerationTracker.recordChunkTiming(pass.requestId, JSON.stringify(chunk.args || {}).length);
+            SessionGenerationTracker.recordChunkTiming(pass.requestId, JSON.stringify(c.args || {}).length);
             this.maybeEmitProgress();
             // Native MCP tool calls: pass through directly
-            if (chunk.native) {
-                if (chunk.status === "calling") {
-                    const tcId = chunk.id || `ntc-${state.streamedToolCalls.length}`;
+            if (c.native) {
+                if (c.status === "calling") {
+                    const tcId = c.id || `ntc-${state.streamedToolCalls.length}`;
                     state.streamedToolCalls.push({
                         id: tcId,
-                        name: chunk.name,
-                        args: chunk.args || {},
+                        name: c.name,
+                        args: c.args || {},
                     });
                     this._trackToolDisplaySegment(tcId);
                 }
-                else if (chunk.status === "done" || chunk.status === "error") {
-                    const existing = state.streamedToolCalls.find((tc) => (chunk.id && tc.id === chunk.id) ||
-                        (!chunk.id && tc.name === chunk.name));
+                else if (c.status === "done" || c.status === "error") {
+                    const existing = state.streamedToolCalls.find((tc) => (c.id && tc.id === c.id) ||
+                        (!c.id && tc.name === c.name));
                     if (existing) {
-                        existing.result = chunk.result;
-                        existing.status = chunk.status;
-                        if (chunk.args && Object.keys(chunk.args).length > 0)
-                            existing.args = chunk.args;
+                        existing.result = c.result;
+                        existing.status = c.status;
+                        if (c.args && Object.keys(c.args).length > 0)
+                            existing.args = c.args;
                     }
                 }
                 emit({
                     type: "toolCall",
-                    id: chunk.id || null,
-                    name: chunk.name,
-                    args: chunk.args || {},
-                    result: chunk.result || undefined,
-                    status: chunk.status || "calling",
+                    id: c.id || null,
+                    name: c.name,
+                    args: c.args || {},
+                    result: c.result || undefined,
+                    status: c.status || "calling",
                 });
                 return { action: "continue" };
             }
             // Schema enforcement
-            if (!allowedToolNames.has(chunk.name)) {
-                logger.warn(`[AgenticLoop] Dropped tool call "${chunk.name}" — not in schema: [${[...allowedToolNames].join(", ")}]`);
+            if (!allowedToolNames.has(c.name)) {
+                logger.warn(`[AgenticLoop] Dropped tool call "${c.name}" — not in schema: [${[...allowedToolNames].join(", ")}]`);
                 return { action: "skip" };
             }
-            const stdTcId = chunk.id || `tc-${state.streamedToolCalls.length}`;
+            const stdTcId = c.id || `tc-${state.streamedToolCalls.length}`;
             const tc = {
                 id: stdTcId,
-                responsesItemId: chunk.responsesItemId || undefined,
-                name: chunk.name,
-                args: chunk.args || {},
-                thoughtSignature: chunk.thoughtSignature || undefined,
+                responsesItemId: c.responsesItemId || undefined,
+                name: c.name,
+                args: c.args || {},
+                thoughtSignature: c.thoughtSignature || undefined,
             };
             pass.pendingToolCalls.push(tc);
             state.streamedToolCalls.push({ ...tc });
             this._trackToolDisplaySegment(stdTcId);
             emit({
                 type: "tool_execution",
-                tool: { name: chunk.name, args: chunk.args || {}, id: stdTcId },
+                tool: { name: c.name, args: c.args || {}, id: stdTcId },
                 status: "calling",
             });
             return { action: "toolCall", tc };
         }
         // ── Image ────────────────────────────────────────────
-        if (chunk?.type === "image") {
-            return this._handleImageChunk(chunk, pass);
+        if (c?.type === "image") {
+            return this._handleImageChunk(c, pass);
         }
         // ── Pass-through events ──────────────────────────────
-        if (chunk?.type === "executableCode") {
+        if (c?.type === "executableCode") {
             emit({
                 type: "executableCode",
-                code: chunk.code,
-                language: chunk.language,
+                code: c.code,
+                language: c.language,
             });
             return { action: "continue" };
         }
-        if (chunk?.type === "codeExecutionResult") {
+        if (c?.type === "codeExecutionResult") {
             emit({
                 type: "codeExecutionResult",
-                output: chunk.output,
-                outcome: chunk.outcome,
+                output: c.output,
+                outcome: c.outcome,
             });
             return { action: "continue" };
         }
-        if (chunk?.type === "webSearchResult") {
-            emit({ type: "webSearchResult", results: chunk.results });
+        if (c?.type === "webSearchResult") {
+            emit({ type: "webSearchResult", results: c.results });
             return { action: "continue" };
         }
-        if (chunk?.type === "audio") {
-            emit({ type: "audio", data: chunk.data, mimeType: chunk.mimeType });
-            if (chunk.data)
-                state.streamedAudioChunks.push(chunk.data);
-            if (chunk.mimeType) {
-                const rateMatch = chunk.mimeType.match(/rate=(\d+)/);
+        if (c?.type === "audio") {
+            emit({ type: "audio", data: c.data, mimeType: c.mimeType });
+            if (c.data)
+                state.streamedAudioChunks.push(c.data);
+            if (c.mimeType) {
+                const rateMatch = c.mimeType.match(/rate=(\d+)/);
                 if (rateMatch)
                     state.audioSampleRate = parseInt(rateMatch[1], 10);
             }
             return { action: "continue" };
         }
-        if (chunk?.type === "status") {
-            const { type: _t, ...statusRest } = chunk;
+        if (c?.type === "status") {
+            const { type: _t, ...statusRest } = c;
             emit({ type: "status", ...statusRest });
             return { action: "continue" };
         }
@@ -374,17 +364,10 @@ export default class BaseAgenticHarness {
         return { action: "continue" };
     }
     // ── Iteration logging ─────────────────────────────────────
-    /**
-     * Log a single iteration to the request log.
-     */
+    /** Log a single iteration to the request log. */
     logIteration(pass, currentMessages) {
-        // @ts-ignore
-        const { resolvedModel, providerName, project, username, agent, agentSessionId, parentAgentSessionId, traceId,
-        // @ts-ignore
-         } = this.ctx;
-        // @ts-ignore
+        const { resolvedModel, providerName, project, username, agent, agentSessionId, parentAgentSessionId, traceId, } = this.ctx;
         const state = this.state;
-        // @ts-ignore
         const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
         const passTotalSec = (performance.now() - pass.start) / 1000;
         const passGenerationSec = pass.firstTokenTime && pass.generationEnd
@@ -393,13 +376,11 @@ export default class BaseAgenticHarness {
         const passTokensPerSec = calculateTokensPerSec(pass.usage.outputTokens, passGenerationSec);
         const passEstimatedCost = calculateTextCost(pass.usage, pricing);
         RequestLogger.logChatGeneration({
-            // @ts-ignore
             requestId: `${this.ctx.requestId}-${state.iterations}`,
             endpoint: "/agent",
             operation: "agent:iteration",
             project,
             username,
-            // @ts-ignore
             clientIp: this.ctx.clientIp,
             agent: agent || null,
             provider: providerName,
@@ -427,9 +408,7 @@ export default class BaseAgenticHarness {
         }).catch((error) => logger.error(`[AgenticLoopService] Failed to log intermediate request: ${error.message}`));
     }
     // ── Per-iteration pass state factory ──────────────────────
-    /**
-     * Create a fresh per-iteration pass state object.
-     */
+    /** Create a fresh per-iteration pass state object. */
     createPassState(passOptions) {
         return {
             streamedText: "",
@@ -446,9 +425,85 @@ export default class BaseAgenticHarness {
             requestId: null, // set after tracker registration
         };
     }
+    // ── Finalization ──────────────────────────────────────────
+    /**
+     * Shared finalization logic — cost calculation, persistence,
+     * done event, worker snapshot persistence, and afterResponse hooks.
+     *
+     * Lifted from ReActHarness so all harnesses share the same
+     * finalization path without copy-paste.
+     */
+    async finalize(currentMessages, hooks) {
+        const context = this.ctx;
+        const state = this.state;
+        const { agentSessionId, project, username } = context;
+        const requestStart = context.requestStart ?? performance.now();
+        const now = performance.now();
+        state.overallUsage.requests = state.iterations;
+        const { cleanSegments, cleanTextFragments, cleanThinkingFragments } = state.getCleanDisplayData();
+        const newTurnMessages = currentMessages.slice(Math.max(0, state.originalMessageCount - 1));
+        logger.info(`[AgenticLoop] finalize: session=${agentSessionId} project=${project} ` +
+            `originalMsgCount=${state.originalMessageCount} currentMsgs=${currentMessages.length} ` +
+            `newTurnMsgs=${newTurnMessages.length} ` +
+            `roles=[${newTurnMessages.map((message) => message.role).join(",")}] ` +
+            `text=${(state.finalStreamedText || "").length}chars`);
+        await finalizeTextGeneration(context, {
+            text: state.finalStreamedText.trim(),
+            thinking: state.streamedThinking.trim() || "",
+            images: state.streamedImages,
+            toolCalls: state.streamedToolCalls,
+            audioChunks: state.streamedAudioChunks,
+            audioSampleRate: state.audioSampleRate,
+            usage: state.overallUsage,
+            outputCharacters: state.overallOutputCharacters,
+            timeToGenerationSec: state.overallFirstTokenTime
+                ? (state.overallFirstTokenTime - requestStart) / 1000
+                : null,
+            generationSec: state.overallFirstTokenTime && state.overallGenerationEnd
+                ? (state.overallGenerationEnd - state.overallFirstTokenTime) / 1000
+                : null,
+            totalSec: (now - requestStart) / 1000,
+            rateLimits: state.lastRateLimits,
+            contentSegments: cleanSegments,
+            textFragments: cleanTextFragments,
+            thinkingFragments: cleanThinkingFragments,
+        }, newTurnMessages);
+        // Persist worker snapshots for coordinator sessions
+        if (state.streamedToolCalls.some((tc) => tc.name === "team_create") &&
+            agentSessionId) {
+            try {
+                const { default: CoordinatorService } = await import("../CoordinatorService.js");
+                const workers = CoordinatorService.listWorkers({
+                    parentAgentSessionId: agentSessionId,
+                });
+                if (workers.length > 0) {
+                    const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTIONS.AGENT_SESSIONS);
+                    await collection.updateOne({ id: agentSessionId, project, username }, {
+                        $set: {
+                            workers,
+                            workersUpdatedAt: new Date().toISOString(),
+                        },
+                    });
+                    logger.info(`[AgenticLoop] Persisted ${workers.length} worker(s) to session ${agentSessionId}`);
+                }
+            }
+            catch (error) {
+                const msg = error instanceof Error ? error.message : String(error);
+                logger.error(`[AgenticLoop] Failed to persist workers: ${msg}`);
+            }
+        }
+        // afterResponse hook (fire-and-forget)
+        hooks
+            .run("afterResponse", context, {
+            text: state.finalStreamedText,
+            thinking: state.streamedThinking,
+            toolCalls: state.streamedToolCalls,
+            messages: currentMessages,
+        })
+            .catch((error) => logger.error(`[AgenticLoopService] afterResponse hooks failed: ${error.message}`));
+    }
     // ── Private helpers ───────────────────────────────────────
     _recordFirstToken(pass) {
-        // @ts-ignore
         const state = this.state;
         if (!state.overallFirstTokenTime)
             state.overallFirstTokenTime = performance.now();
@@ -456,7 +511,6 @@ export default class BaseAgenticHarness {
             pass.firstTokenTime = performance.now();
             const ttftSec = (pass.firstTokenTime - pass.start) / 1000;
             SessionGenerationTracker.update(pass.requestId, { ttft: ttftSec });
-            // @ts-ignore
             this.ctx.emit({
                 type: "status",
                 message: "generation_started",
@@ -465,15 +519,14 @@ export default class BaseAgenticHarness {
         }
     }
     _recordTiming(pass) {
-        // @ts-ignore
         this.state.overallGenerationEnd = performance.now();
         pass.generationEnd = performance.now();
     }
     _trackToolDisplaySegment(tcId) {
-        // @ts-ignore
         const state = this.state;
-        if (state.lastDisplaySegType === "tools") {
-            state.displaySegments[state.displaySegments.length - 1].toolIds.push(tcId);
+        const lastSeg = state.displaySegments[state.displaySegments.length - 1];
+        if (state.lastDisplaySegType === "tools" && lastSeg?.type === "tools") {
+            lastSeg.toolIds.push(tcId);
         }
         else {
             state.displaySegments.push({ type: "tools", toolIds: [tcId] });
@@ -481,9 +534,7 @@ export default class BaseAgenticHarness {
         }
     }
     async _handleImageChunk(chunk, pass) {
-        // @ts-ignore
         const { emit, project, username } = this.ctx;
-        // @ts-ignore
         const state = this.state;
         let minioRef = null;
         if (chunk.data) {
@@ -494,7 +545,8 @@ export default class BaseAgenticHarness {
                 minioRef = ref;
             }
             catch (error) {
-                logger.error(`MinIO upload failed: ${error.message}`);
+                const msg = error instanceof Error ? error.message : String(error);
+                logger.error(`MinIO upload failed: ${msg}`);
             }
             const imgRef = minioRef ||
                 `data:${chunk.mimeType || "image/png"};base64,${chunk.data}`;

@@ -1005,103 +1005,72 @@ function getModels(inputType, outputType) {
 /**
  * Get listed model options grouped by provider
  * for a given input→output type combination.
- * Returns: { [provider]: [{ name, label }, ...] }
+ * Returns: { [provider]: [{ name, label, ... }, ...] }
  */
 function getModelOptions(inputType, outputType) {
     const opts = {};
-    // @ts-ignore
     for (const m of getModels(inputType, outputType)) {
-        // @ts-ignore
-        if (m.listed !== false) {
+        const mAny = m;
+        if (mAny.listed !== false) {
             const entry = { name: m.name, label: m.label };
-            // @ts-ignore
-            if (m.thinking)
+            if (mAny.thinking)
                 entry.thinking = true;
-            // @ts-ignore
             if (m.inputTypes?.includes(TYPES.IMAGE))
                 entry.vision = true;
-            // @ts-ignore
-            if (m.webSearch)
-                entry.webSearch = m.webSearch;
-            // @ts-ignore
+            if (mAny.webSearch)
+                entry.webSearch = mAny.webSearch;
             if (m.inputTypes)
                 entry.inputTypes = m.inputTypes;
-            // @ts-ignore
             if (m.outputTypes)
                 entry.outputTypes = m.outputTypes;
-            // @ts-ignore
-            if (m.tools)
-                entry.tools = m.tools;
-            // @ts-ignore
-            if (m.pricing)
-                entry.pricing = m.pricing;
-            // @ts-ignore
-            if (m.arena)
-                entry.arena = m.arena;
-            // @ts-ignore
-            if (m.maxInputTokens)
-                entry.contextLength = m.maxInputTokens;
-            // @ts-ignore
-            if (m.maxOutputTokens)
-                entry.maxOutputTokens = m.maxOutputTokens;
-            // @ts-ignore
-            if (m.assistantImages === false)
+            if (mAny.tools)
+                entry.tools = mAny.tools;
+            if (mAny.pricing)
+                entry.pricing = mAny.pricing;
+            if (mAny.arena)
+                entry.arena = mAny.arena;
+            if (mAny.maxInputTokens)
+                entry.contextLength = mAny.maxInputTokens;
+            if (mAny.maxOutputTokens)
+                entry.maxOutputTokens = mAny.maxOutputTokens;
+            if (mAny.assistantImages === false)
                 entry.assistantImages = false;
             // JSON mode: OpenAI + Google support response_format / responseMimeType
             if (m.modelType === MODEL_TYPES.CONVERSATION &&
                 [PROVIDERS.OPENAI, PROVIDERS.GOOGLE].includes(m.provider)) {
-                // @ts-ignore
                 entry.jsonMode = true;
             }
-            // @ts-ignore
-            if (m.codeExecution)
+            if (mAny.codeExecution)
                 entry.codeExecution = true;
-            // @ts-ignore
-            if (m.webFetch)
+            if (mAny.webFetch)
                 entry.webFetch = true;
-            // @ts-ignore
-            if (m.urlContext)
+            if (mAny.urlContext)
                 entry.urlContext = true;
-            // @ts-ignore
-            if (m.defaultTemperature !== undefined)
-                // @ts-ignore
-                entry.defaultTemperature = m.defaultTemperature;
-            // @ts-ignore
-            if (m.verbosity)
+            if (mAny.defaultTemperature !== undefined)
+                entry.defaultTemperature = mAny.defaultTemperature;
+            if (mAny.verbosity)
                 entry.verbosity = true;
-            // @ts-ignore
-            if (m.reasoningSummary)
+            if (mAny.reasoningSummary)
                 entry.reasoningSummary = true;
-            // @ts-ignore
-            if (m.responsesAPI)
+            if (mAny.responsesAPI)
                 entry.responsesAPI = true;
-            // @ts-ignore
-            if (m.size)
-                entry.size = m.size;
-            // @ts-ignore
+            if (mAny.size)
+                entry.size = mAny.size;
             if (m.modelType)
                 entry.modelType = m.modelType;
-            // @ts-ignore
-            if (m.liveAPI)
+            if (mAny.liveAPI)
                 entry.liveAPI = true;
-            // @ts-ignore
-            if (m.thinkingLevels)
-                entry.thinkingLevels = m.thinkingLevels;
-            // @ts-ignore
-            if (m.mediaLimits)
-                entry.mediaLimits = m.mediaLimits;
-            // @ts-ignore
-            if (m.year)
-                entry.year = m.year;
+            if (mAny.thinkingLevels)
+                entry.thinkingLevels = mAny.thinkingLevels;
+            if (mAny.mediaLimits)
+                entry.mediaLimits = mAny.mediaLimits;
+            if (mAny.year)
+                entry.year = mAny.year;
             // System prompt support: true for chat models, false for image-only/TTS/embedding APIs
-            // @ts-ignore
             entry.supportsSystemPrompt =
-                // @ts-ignore
-                m.supportsSystemPrompt !== undefined
-                    ? // @ts-ignore
-                        m.supportsSystemPrompt
+                mAny.supportsSystemPrompt !== undefined
+                    ? mAny.supportsSystemPrompt
                     : m.outputTypes.includes(TYPES.TEXT);
-            // @ts-ignore
             (opts[m.provider] ??= []).push(entry);
         }
     }
@@ -1114,11 +1083,9 @@ function getModelOptions(inputType, outputType) {
  */
 function getDefaultModels(inputType, outputType) {
     const defaults = {};
-    // @ts-ignore
     for (const m of getModels(inputType, outputType)) {
-        // @ts-ignore
-        if (m.default) {
-            // @ts-ignore
+        const mAny = m;
+        if (mAny.default) {
             defaults[m.provider] = m.name;
         }
     }
@@ -1126,16 +1093,14 @@ function getDefaultModels(inputType, outputType) {
 }
 /**
  * Get pricing map for a given input→output type combination.
- * Returns: { [modelName]: { inputPerMillion, outputPerMillion } }
+ * Returns: { [modelName]: pricingObject }
  */
 function getPricing(inputType, outputType) {
     const pricing = {};
-    // @ts-ignore
     for (const m of getModels(inputType, outputType)) {
-        // @ts-ignore
-        if (m.pricing) {
-            // @ts-ignore
-            pricing[m.name] = m.pricing;
+        const mAny = m;
+        if (mAny.pricing) {
+            pricing[m.name] = mAny.pricing;
         }
     }
     return pricing;

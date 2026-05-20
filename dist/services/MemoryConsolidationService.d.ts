@@ -50,7 +50,7 @@ declare const MemoryConsolidationService: {
   
      * @returns {Promise<Array>} Consolidation history entries, newest first
      */
-    getHistory(project: any, limit?: number): Promise<import("bson").Document[]>;
+    getHistory(project: any, limit?: any): Promise<import("bson").Document[]>;
 };
 export default MemoryConsolidationService;
 //# sourceMappingURL=MemoryConsolidationService.d.ts.map

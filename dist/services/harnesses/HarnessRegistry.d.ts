@@ -1,6 +1,6 @@
 declare const HarnessRegistry: {
     /**
-     * Get a harness class by ID, falling back to "standard".
+     * Get a harness class by ID, falling back to the ReAct harness.
   
   
      */

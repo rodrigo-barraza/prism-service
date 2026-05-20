@@ -1,6 +1,6 @@
 declare const anthropicProvider: {
     name: string;
-    generateText(messages: any, model?: any, options?: {}): Promise<{
+    generateText(messages: any, model?: any, options?: any): Promise<{
         text: string;
         usage: {
             inputTokens: any;
@@ -15,7 +15,7 @@ declare const anthropicProvider: {
   
      * @returns {Promise<{ text: string, usage: object }>}
      */
-    captionImage(images: any, prompt: string | undefined, model: any, systemPrompt: any): Promise<{
+    captionImage(images: any, prompt: any | undefined, model: any | undefined, systemPrompt: any): Promise<{
         text: string;
         usage: {
             inputTokens: any;
@@ -24,7 +24,7 @@ declare const anthropicProvider: {
             cacheCreationInputTokens: any;
         };
     }>;
-    generateTextStream(messages: any, model?: any, options?: {}): any;
+    generateTextStream(messages: any, model?: any, options?: any): any;
 };
 export default anthropicProvider;
 //# sourceMappingURL=anthropic.d.ts.map

@@ -16,14 +16,14 @@ export declare function stripToolCallMarkup(text: any): any;
 
  * @returns {Promise<string|null>} MinIO ref, or null on failure
  */
-export declare function uploadImageChunk(chunk: any, project: any, username: any, logPrefix?: string): Promise<any>;
+export declare function uploadImageChunk(chunk: any, project: any, username: any, logPrefix?: any): Promise<any>;
 /**
  * Create an image ref string, preferring MinIO ref over inline base64.
  *
 
 
  */
-export declare function imageRefOrInline(minioRef: any, data: any, mimeType?: string): any;
+export declare function imageRefOrInline(minioRef: any, data: any, mimeType?: any): any;
 /**
  * Dispatch a single typed chunk to an accumulator state object and emit function.
  *
@@ -51,7 +51,7 @@ export declare function imageRefOrInline(minioRef: any, data: any, mimeType?: st
 
  * @returns {Promise<boolean>} true if chunk was handled, false if unrecognised
  */
-export declare function dispatchChunk(chunk: any, state: any, context: any, options?: {}): Promise<boolean>;
+export declare function dispatchChunk(chunk: any, state: any, context: any, options?: any): Promise<boolean>;
 /**
  * Create a fresh state accumulator for stream chunk dispatching.
 

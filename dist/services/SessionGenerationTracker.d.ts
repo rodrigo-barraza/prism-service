@@ -9,10 +9,7 @@ declare const SessionGenerationTracker: {
   
   
      */
-    register(agentSessionId: any, requestId: any, { provider, model, source, workerId }?: {
-        source?: string | undefined;
-        workerId?: null | undefined;
-    }): void;
+    register(agentSessionId: any, requestId: any, { provider, model, source, workerId }?: any): void;
     /**
      * Update a tracked request with new token data.
      * Called on each chunk/thinking event or on usage completion.
@@ -20,7 +17,7 @@ declare const SessionGenerationTracker: {
   
   
      */
-    update(requestId: any, { outputTokens, inputTokens, ttft }?: {}): void;
+    update(requestId: any, { outputTokens, inputTokens, ttft }?: any): void;
     /**
      * Record chunk timing, increment the chunk counter, and accumulate
      * output characters for token estimation.
@@ -34,7 +31,7 @@ declare const SessionGenerationTracker: {
   
   
      */
-    recordChunkTiming(requestId: any, charCount?: number): void;
+    recordChunkTiming(requestId: any, charCount?: any): void;
     /**
      * Mark a request as complete and remove it from active tracking.
      * Rolls the request's final token counts and computed tok/s into

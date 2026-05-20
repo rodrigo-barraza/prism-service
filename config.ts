@@ -7,6 +7,12 @@
 
 // ── Helpers ────────────────────────────────────────────────────
 
+export interface ProviderInstance {
+  url: string;
+  concurrency: number;
+  nickname?: string;
+}
+
 /**
  * Parse indexed env vars into an array of provider instance objects.
  *
@@ -17,14 +23,14 @@
  *
  * Returns: [{ url, concurrency, nickname? }, ...]
  */
-function parseProviderInstances(envPrefix: any) {
-  const instances: any[] = [];
+function parseProviderInstances(envPrefix: string): ProviderInstance[] {
+  const instances: ProviderInstance[] = [];
   for (let i = 1; i <= 10; i++) {
     const url = process.env[`${envPrefix}_${i}_URL`];
     if (!url) continue;
-    const concurrency = parseInt(process.env[`${envPrefix}_${i}_CONCURRENCY`] as string, 10) || 1;
+    const concurrency = parseInt(process.env[`${envPrefix}_${i}_CONCURRENCY`] ?? "", 10) || 1;
     const nickname = process.env[`${envPrefix}_${i}_NICKNAME`];
-    const entry: { url: string; concurrency: number; nickname?: string } = { url, concurrency };
+    const entry: ProviderInstance = { url, concurrency };
     if (nickname) entry.nickname = nickname;
     instances.push(entry);
   }
@@ -70,6 +76,5 @@ export const GOOGLE_TTS_MODEL = process.env.GOOGLE_TTS_MODEL;
 export const GOOGLE_EMBEDDING_MODEL = process.env.GOOGLE_EMBEDDING_MODEL;
 
 // ── LM Studio Tuning ──────────────────────────────────────────
-export const LM_STUDIO_EVAL_BATCH_SIZE = parseInt(process.env.LM_STUDIO_EVAL_BATCH_SIZE as any, 10) || 512;
-export const LM_STUDIO_DEFAULT_MAX_CONTEXT = parseInt(process.env.LM_STUDIO_DEFAULT_MAX_CONTEXT as any, 10) || 262144;
-
+export const LM_STUDIO_EVAL_BATCH_SIZE = parseInt(process.env.LM_STUDIO_EVAL_BATCH_SIZE ?? "", 10) || 512;
+export const LM_STUDIO_DEFAULT_MAX_CONTEXT = parseInt(process.env.LM_STUDIO_DEFAULT_MAX_CONTEXT ?? "", 10) || 262144;

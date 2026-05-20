@@ -79,5 +79,5 @@ export declare function calculateLiveCost(usage: any, pricing: any): number | nu
 
  * @returns {number|null} Cost in USD, or null if pricing is unavailable.
  */
-export declare function calculateImageCost(prompt: any, pricing: any, inputImages?: number, outputImageTokens?: number): number | null;
+export declare function calculateImageCost(prompt: any, pricing: any, inputImages?: any, outputImageTokens?: any): number | null;
 //# sourceMappingURL=CostCalculator.d.ts.map

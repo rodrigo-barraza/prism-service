@@ -24,11 +24,20 @@ router.get("/", asyncHandler(async (req, res, next) => {
         const { project, username, db } = req;
         const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
         const cursor = req.query.cursor || null;
+        const agent = req.query.agent || null;
         const filter = { project, username };
+        // Match sessions belonging to this agent OR legacy sessions that
+        // predate the agent field (backward compat for unique-project agents
+        // like Lupos where all sessions belong to the same agent).
+        if (agent) {
+            filter.$or = [
+                { agent },
+                { agent: { $exists: false } },
+            ];
+        }
         if (cursor) {
             // updatedAt is stored as ISO-8601 strings — compare string-to-string
             // to match BSON type and allow index range scan
-            // @ts-ignore
             filter.updatedAt = { $lt: cursor };
         }
         // Fetch limit + 1 to detect if there's a next page
@@ -39,6 +48,7 @@ router.get("/", asyncHandler(async (req, res, next) => {
             id: 1,
             project: 1,
             username: 1,
+            agent: 1,
             title: 1,
             createdAt: 1,
             updatedAt: 1,

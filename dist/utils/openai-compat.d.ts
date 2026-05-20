@@ -21,10 +21,7 @@ export declare function convertToolsToOpenAI(tools: any): {
 
  * @returns {object} Payload fields to spread into the request body
  */
-export declare function buildPayloadParams(options: any, { temperature, maxTokens }?: {
-    temperature?: number | undefined;
-    maxTokens?: number | undefined;
-}): {
+export declare function buildPayloadParams(options: any, { temperature, maxTokens }?: any): {
     seed?: number | undefined;
     temperature: any;
     top_p: any;
@@ -92,7 +89,7 @@ export declare const MEDIA_STRATEGIES: {
 
  * @returns {Promise<Array>} The same messages array with videos expanded
  */
-export declare function expandVideoToFrames(messages: any, options?: {}): Promise<any>;
+export declare function expandVideoToFrames(messages: any, options?: any): Promise<any>;
 /**
  * Convert messages with media to OpenAI-compatible multipart content format.
  * Handles images, tool results, assistant tool calls, and optionally
@@ -102,9 +99,7 @@ export declare function expandVideoToFrames(messages: any, options?: {}): Promis
 
  * @returns {Array} OpenAI-compatible messages
  */
-export declare function prepareOpenAICompatMessages(messages: any, { mediaStrategy }?: {
-    mediaStrategy?: string | undefined;
-}): any;
+export declare function prepareOpenAICompatMessages(messages: any, { mediaStrategy }?: any): any;
 /**
  * Process a non-streaming OpenAI-compatible chat completion response.
  * Extracts text, thinking (native + <think> tags), usage, and tool calls.
@@ -116,7 +111,7 @@ export declare function prepareOpenAICompatMessages(messages: any, { mediaStrate
 
  * @returns {{ text: string, thinking: string|null, usage: object, toolCalls: Array|null }}
  */
-export declare function processNonStreamingResponse(data: any, options?: {}): {
+export declare function processNonStreamingResponse(data: any, options?: any): {
     text: any;
     thinking: any;
     usage: {
@@ -140,7 +135,7 @@ export declare function processNonStreamingResponse(data: any, options?: {}): {
 
 
  */
-export declare function parseSSEStream(reader: any, options?: {}): AsyncGenerator<any, void, unknown>;
+export declare function parseSSEStream(reader: any, options?: any): AsyncGenerator<any, void, unknown>;
 /**
  * Make a fetch request to an OpenAI-compatible endpoint and handle
  * error responses consistently.
@@ -150,5 +145,5 @@ export declare function parseSSEStream(reader: any, options?: {}): AsyncGenerato
  * @returns {Promise<Response>} The fetch response (guaranteed to be ok)
  * @throws {Error} With a parsed error message from the API
  */
-export declare function fetchOpenAICompat(url: any, payload: any, options?: {}): Promise<Response>;
+export declare function fetchOpenAICompat(url: any, payload: any, options?: any): Promise<Response>;
 //# sourceMappingURL=openai-compat.d.ts.map

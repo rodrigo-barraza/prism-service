@@ -1009,15 +1009,52 @@ const MODELS = {
   },
 };
 
+// ─── Model Type ─────────────────────────────────────────────
+
+/** Shape of a single entry in the MODELS catalog. */
+export type ModelDefinition = (typeof MODELS)[keyof typeof MODELS];
+
+/** Client-facing model option entry returned by getModelOptions(). */
+interface ModelOptionEntry {
+  name: string;
+  label: string;
+  thinking?: boolean;
+  vision?: boolean;
+  webSearch?: boolean | string;
+  inputTypes?: string[];
+  outputTypes?: string[];
+  tools?: string[];
+  pricing?: Record<string, number>;
+  arena?: Record<string, number>;
+  contextLength?: number;
+  maxOutputTokens?: number;
+  assistantImages?: boolean;
+  jsonMode?: boolean;
+  codeExecution?: boolean;
+  webFetch?: boolean;
+  urlContext?: boolean;
+  defaultTemperature?: number;
+  verbosity?: boolean;
+  reasoningSummary?: boolean;
+  responsesAPI?: boolean;
+  size?: string;
+  modelType?: string;
+  liveAPI?: boolean;
+  thinkingLevels?: string[];
+  mediaLimits?: Record<string, unknown>;
+  year?: number;
+  supportsSystemPrompt?: boolean;
+}
+
 // ─── derive defaults, options, pricing from MODELS ──────────
 
 /**
  * Get all models whose inputTypes includes `inputType`
  * and whose outputTypes includes `outputType`.
  */
-function getModels(inputType: any, outputType: any) {
+function getModels(inputType: string, outputType: string): ModelDefinition[] {
   return Object.values(MODELS).filter(
-    (m: any) =>
+    (m) =>
       m.inputTypes.includes(inputType) && m.outputTypes.includes(outputType),
   );
 }
@@ -1025,82 +1062,51 @@ function getModels(inputType: any, outputType: any) {
 /**
  * Get listed model options grouped by provider
  * for a given input→output type combination.
- * Returns: { [provider]: [{ name, label }, ...] }
+ * Returns: { [provider]: [{ name, label, ... }, ...] }
  */
-function getModelOptions(inputType: any, outputType: any) {
-  const opts = {};
-  // @ts-ignore
-  for ( const m of getModels(inputType, outputType)) {
-    // @ts-ignore
-    if (m.listed !== false) {
-      const entry = { name: m.name, label: m.label };
-      // @ts-ignore
-      if (m.thinking) entry.thinking = true;
-      // @ts-ignore
+function getModelOptions(inputType: string, outputType: string): Record<string, ModelOptionEntry[]> {
+  const opts: Record<string, ModelOptionEntry[]> = {};
+  for (const m of getModels(inputType, outputType)) {
+    const mAny = m as ModelDefinition & Record<string, unknown>;
+    if (mAny.listed !== false) {
+      const entry: ModelOptionEntry = { name: m.name, label: m.label };
+      if (mAny.thinking) entry.thinking = true;
       if (m.inputTypes?.includes(TYPES.IMAGE)) entry.vision = true;
-      // @ts-ignore
-      if (m.webSearch) entry.webSearch = m.webSearch;
-      // @ts-ignore
+      if (mAny.webSearch) entry.webSearch = mAny.webSearch as boolean | string;
       if (m.inputTypes) entry.inputTypes = m.inputTypes;
-      // @ts-ignore
       if (m.outputTypes) entry.outputTypes = m.outputTypes;
-      // @ts-ignore
-      if (m.tools) entry.tools = m.tools;
-      // @ts-ignore
-      if (m.pricing) entry.pricing = m.pricing;
-      // @ts-ignore
-      if (m.arena) entry.arena = m.arena;
-      // @ts-ignore
-      if (m.maxInputTokens) entry.contextLength = m.maxInputTokens;
-      // @ts-ignore
-      if (m.maxOutputTokens) entry.maxOutputTokens = m.maxOutputTokens;
-      // @ts-ignore
-      if (m.assistantImages === false) entry.assistantImages = false;
+      if (mAny.tools) entry.tools = mAny.tools as string[];
+      if (mAny.pricing) entry.pricing = mAny.pricing as Record<string, number>;
+      if (mAny.arena) entry.arena = mAny.arena as Record<string, number>;
+      if (mAny.maxInputTokens) entry.contextLength = mAny.maxInputTokens as number;
+      if (mAny.maxOutputTokens) entry.maxOutputTokens = mAny.maxOutputTokens as number;
+      if (mAny.assistantImages === false) entry.assistantImages = false;
       // JSON mode: OpenAI + Google support response_format / responseMimeType
       if (
         m.modelType === MODEL_TYPES.CONVERSATION &&
         [PROVIDERS.OPENAI, PROVIDERS.GOOGLE].includes(m.provider)
       ) {
-        // @ts-ignore
         entry.jsonMode = true;
       }
-      // @ts-ignore
-      if (m.codeExecution) entry.codeExecution = true;
-      // @ts-ignore
-      if (m.webFetch) entry.webFetch = true;
-      // @ts-ignore
-      if (m.urlContext) entry.urlContext = true;
-      // @ts-ignore
-      if (m.defaultTemperature !== undefined)
-        // @ts-ignore
-        entry.defaultTemperature = m.defaultTemperature;
-      // @ts-ignore
-      if (m.verbosity) entry.verbosity = true;
-      // @ts-ignore
-      if (m.reasoningSummary) entry.reasoningSummary = true;
-      // @ts-ignore
-      if (m.responsesAPI) entry.responsesAPI = true;
-      // @ts-ignore
-      if (m.size) entry.size = m.size;
-      // @ts-ignore
+      if (mAny.codeExecution) entry.codeExecution = true;
+      if (mAny.webFetch) entry.webFetch = true;
+      if (mAny.urlContext) entry.urlContext = true;
+      if (mAny.defaultTemperature !== undefined)
+        entry.defaultTemperature = mAny.defaultTemperature as number;
+      if (mAny.verbosity) entry.verbosity = true;
+      if (mAny.reasoningSummary) entry.reasoningSummary = true;
+      if (mAny.responsesAPI) entry.responsesAPI = true;
+      if (mAny.size) entry.size = mAny.size as string;
       if (m.modelType) entry.modelType = m.modelType;
-      // @ts-ignore
-      if (m.liveAPI) entry.liveAPI = true;
-      // @ts-ignore
-      if (m.thinkingLevels) entry.thinkingLevels = m.thinkingLevels;
-      // @ts-ignore
-      if (m.mediaLimits) entry.mediaLimits = m.mediaLimits;
-      // @ts-ignore
-      if (m.year) entry.year = m.year;
+      if (mAny.liveAPI) entry.liveAPI = true;
+      if (mAny.thinkingLevels) entry.thinkingLevels = mAny.thinkingLevels as string[];
+      if (mAny.mediaLimits) entry.mediaLimits = mAny.mediaLimits as Record<string, unknown>;
+      if (mAny.year) entry.year = mAny.year as number;
       // System prompt support: true for chat models, false for image-only/TTS/embedding APIs
-      // @ts-ignore
       entry.supportsSystemPrompt =
-        // @ts-ignore
-        m.supportsSystemPrompt !== undefined
-          ? // @ts-ignore
-            m.supportsSystemPrompt
+        mAny.supportsSystemPrompt !== undefined
+          ? mAny.supportsSystemPrompt as boolean
           : m.outputTypes.includes(TYPES.TEXT);
-      // @ts-ignore
       (opts[m.provider] ??= []).push(entry);
     }
   }
@@ -1112,13 +1118,11 @@ function getModelOptions(inputType: any, outputType: any) {
  * for a given input→output type combination.
  * Returns: { [provider]: modelName }
  */
-function getDefaultModels(inputType: any, outputType: any) {
-  const defaults = {};
-  // @ts-ignore
-  for ( const m of getModels(inputType, outputType)) {
-    // @ts-ignore
-    if (m.default) {
-      // @ts-ignore
+function getDefaultModels(inputType: string, outputType: string): Record<string, string> {
+  const defaults: Record<string, string> = {};
+  for (const m of getModels(inputType, outputType)) {
+    const mAny = m as ModelDefinition & Record<string, unknown>;
+    if (mAny.default) {
       defaults[m.provider] = m.name;
     }
   }
@@ -1127,16 +1131,14 @@ function getDefaultModels(inputType: any, outputType: any) {
 
 /**
  * Get pricing map for a given input→output type combination.
- * Returns: { [modelName]: { inputPerMillion, outputPerMillion } }
+ * Returns: { [modelName]: pricingObject }
  */
-function getPricing(inputType: any, outputType: any) {
-  const pricing = {};
-  // @ts-ignore
-  for ( const m of getModels(inputType, outputType)) {
-    // @ts-ignore
-    if (m.pricing) {
-      // @ts-ignore
-      pricing[m.name] = m.pricing;
+function getPricing(inputType: string, outputType: string): Record<string, Record<string, number>> {
+  const pricing: Record<string, Record<string, number>> = {};
+  for (const m of getModels(inputType, outputType)) {
+    const mAny = m as ModelDefinition & Record<string, unknown>;
+    if (mAny.pricing) {
+      pricing[m.name] = mAny.pricing as Record<string, number>;
     }
   }
   return pricing;
@@ -1146,8 +1148,8 @@ function getPricing(inputType: any, outputType: any) {
  * Find a single model object by its API name.
  * Returns the model object or null.
  */
-function getModelByName(name: any) {
-  return Object.values(MODELS).find((m: any) => m.name === name) || null;
+function getModelByName(name: string): ModelDefinition | null {
+  return Object.values(MODELS).find((m) => m.name === name) || null;
 }
 
 // ─── VOICES (per provider — applies to TEXT → AUDIO models) ─

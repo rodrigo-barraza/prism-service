@@ -5,7 +5,7 @@
 
  * @returns {Promise<Array>} messages with refs replacing inline data
  */
-export declare function extractFiles(messages: any, project?: null, username?: null): Promise<any>;
+export declare function extractFiles(messages: any, project?: any, username?: any): Promise<any>;
 /**
  * Compute input/output modalities from messages for lightweight querying.
 
@@ -60,9 +60,7 @@ declare const ConversationService: {
   
        * @returns {Promise<object>} The updated conversation document
        */
-    appendMessages(conversationId: any, project: any, username: any, newMessages: any, conversationMeta?: null, { collection }?: {
-        collection?: string | undefined;
-    }): Promise<{
+    appendMessages(conversationId: any, project: any, username: any, newMessages: any, conversationMeta?: any, { collection }?: any): Promise<{
         modalities: {
             textIn: boolean;
             textOut: boolean;
@@ -87,9 +85,7 @@ declare const ConversationService: {
   
   
      */
-    setGenerating(conversationId: any, project: any, username: any, generating: any, { collection }?: {
-        collection?: string | undefined;
-    }): Promise<void>;
+    setGenerating(conversationId: any, project: any, username: any, generating: any, { collection, agent }?: any): Promise<void>;
 };
 export default ConversationService;
 //# sourceMappingURL=ConversationService.d.ts.map

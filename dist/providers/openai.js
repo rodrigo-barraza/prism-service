@@ -2,7 +2,6 @@ import OpenAI, { toFile } from "openai";
 import { ProviderError } from "../utils/errors.js";
 import logger from "../utils/logger.js";
 import { extractOpenAIRateLimits } from "../utils/rateLimits.js";
-// @ts-ignore
 import { OPENAI_API_KEY, OPENAI_TRANSCRIPTION_MODEL } from "../../config.js";
 import { TYPES, DEFAULT_VOICES, getDefaultModels, getModelByName, } from "../config.js";
 import { convertToolsToOpenAI } from "../utils/openai-compat.js";
@@ -12,13 +11,10 @@ import { getDataUrlMimeType, getUrlType, inferMimeFromUrl, } from "../utils/medi
  */
 function useResponsesAPI(model) {
     const modelDef = getModelByName(model);
-    // @ts-ignore
     return modelDef?.responsesAPI === true;
 }
-// @ts-ignore
 let client = null;
 function getClient() {
-    // @ts-ignore
     if (!client) {
         if (!OPENAI_API_KEY) {
             throw new ProviderError("openai", "OPENAI_API_KEY is not set", 401);
@@ -42,13 +38,21 @@ function convertToolsToResponsesAPI(tools) {
         parameters: t.parameters || {},
     }));
 }
+/** Narrow unknown errors into ProviderError for all catch blocks. */
+function toProviderError(error) {
+    const err = error;
+    throw new ProviderError("openai", err.message || String(error), err.status || 500, error);
+}
+/** Narrow unknown catch to a typed error record for retry logic. */
+function asErrorRecord(error) {
+    return error;
+}
 /**
  * Convert messages with media to OpenAI multimodal content format (Chat Completions).
  */
 function prepareOpenAIMessages(messages) {
     return messages.map((m) => {
         const base = { role: m.role };
-        // @ts-ignore
         if (m.name)
             base.name = m.name;
         // Tool result messages — include tool_call_id for correlation
@@ -80,7 +84,6 @@ function prepareOpenAIMessages(messages) {
         }
         if (m.images && m.images.length > 0) {
             const content = [];
-            // @ts-ignore
             for (const mediaRef of m.images) {
                 const urlType = getUrlType(mediaRef);
                 if (urlType === "data") {
@@ -154,16 +157,14 @@ function prepareOpenAIMessages(messages) {
  */
 function prepareResponsesInput(messages) {
     const result = [];
-    // @ts-ignore
     for (const m of messages) {
         // Assistant message with tool calls → expand into function_call items
-        if (m.role === "assistant" && m.toolCalls?.length > 0) {
+        if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
             // If the assistant also produced text, include it first
             if (m.content?.trim()) {
                 result.push({ role: "assistant", content: m.content });
             }
             // Each tool call becomes a function_call output item
-            // @ts-ignore
             for (const tc of m.toolCalls) {
                 // Responses API requires the function_call id to start with "fc_"
                 // responsesItemId is the fc_ prefixed ID from the streaming handler
@@ -194,12 +195,10 @@ function prepareResponsesInput(messages) {
         // Standard message (system, user, assistant without tools)
         const role = m.role === "system" ? "developer" : m.role;
         const base = { role };
-        // @ts-ignore
         if (m.name)
             base.name = m.name;
         if (m.images && m.images.length > 0) {
             const content = [];
-            // @ts-ignore
             for (const mediaRef of m.images) {
                 const urlType = getUrlType(mediaRef);
                 if (urlType === "data") {
@@ -272,9 +271,7 @@ function prepareResponsesInput(messages) {
 }
 const openaiProvider = {
     name: "openai",
-    async generateText(messages, 
-    // @ts-ignore
-    model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai, options = {}) {
+    async generateText(messages, model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai, options = {}) {
         logger.provider("OpenAI", `generateText model=${model}`);
         try {
             if (useResponsesAPI(model)) {
@@ -283,7 +280,7 @@ const openaiProvider = {
             return await this._generateTextChatCompletions(messages, model, options);
         }
         catch (error) {
-            throw new ProviderError("openai", error.message, error.status || 500, error);
+            toProviderError(error);
         }
     },
     /**
@@ -294,45 +291,34 @@ const openaiProvider = {
         const payload = { model, input };
         // Reasoning
         const reasoning = {};
-        // @ts-ignore
         if (options.reasoningEffort)
             reasoning.effort = options.reasoningEffort;
-        // @ts-ignore
         if (options.reasoningSummary)
             reasoning.summary = options.reasoningSummary;
-        // @ts-ignore
         if (Object.keys(reasoning).length > 0)
             payload.reasoning = reasoning;
         // Text / verbosity
         const text = {};
-        // @ts-ignore
         if (options.verbosity)
             text.format = { type: "text" };
-        // @ts-ignore
         if (options.verbosity)
             text.verbosity = options.verbosity;
-        // @ts-ignore
         if (Object.keys(text).length > 0)
             payload.text = text;
-        // @ts-ignore
         if (options.maxTokens)
             payload.max_output_tokens = options.maxTokens;
         // Seed for reproducibility
-        // @ts-ignore
         if (options.seed !== undefined)
             payload.seed = options.seed;
         // Service tier: auto / default / priority
-        // @ts-ignore
         if (options.serviceTier)
             payload.service_tier = options.serviceTier;
         // Response format (JSON mode) — maps to text.format for Responses API
         if (options.responseFormat === "json_object") {
-            // @ts-ignore
             text.format = { type: "json_object" };
         }
         else if (options.responseFormat === "json_schema" &&
             options.responseSchema) {
-            // @ts-ignore
             text.format = {
                 type: "json_schema",
                 json_schema: options.responseSchema,
@@ -341,30 +327,23 @@ const openaiProvider = {
         // Temperature/topP only work with reasoning.effort=none
         if (options.reasoningEffort === "none") {
             if (options.temperature !== undefined)
-                // @ts-ignore
                 payload.temperature = options.temperature;
-            // @ts-ignore
             if (options.topP !== undefined)
                 payload.top_p = options.topP;
             if (options.frequencyPenalty !== undefined)
-                // @ts-ignore
                 payload.frequency_penalty = options.frequencyPenalty;
             if (options.presencePenalty !== undefined)
-                // @ts-ignore
                 payload.presence_penalty = options.presencePenalty;
             if (options.stopSequences !== undefined)
-                // @ts-ignore
                 payload.stop = options.stopSequences;
         }
         // Web search tool
         if (options.webSearch) {
-            // @ts-ignore
             payload.tools = [{ type: "web_search" }];
         }
         // Custom function calling tools
         const customTools = convertToolsToResponsesAPI(options.tools);
         if (customTools) {
-            // @ts-ignore
             payload.tools = [...(payload.tools || []), ...customTools];
         }
         const { data: response, response: rawResponse } = await getClient()
@@ -376,7 +355,6 @@ const openaiProvider = {
         const images = [];
         const toolCalls = [];
         if (response.output) {
-            // @ts-ignore
             for (const item of response.output) {
                 if (item.type === "image_generation_call" && item.result) {
                     images.push({
@@ -409,10 +387,8 @@ const openaiProvider = {
                 outputTokens: response.usage?.output_tokens ?? 0,
             },
         };
-        // @ts-ignore
         if (toolCalls.length > 0)
             result.toolCalls = toolCalls;
-        // @ts-ignore
         if (rateLimits)
             result.rateLimits = rateLimits;
         return result;
@@ -422,63 +398,48 @@ const openaiProvider = {
      */
     async _generateTextChatCompletions(messages, model, options) {
         const modelDef = getModelByName(model);
-        const isReasoning = 
-        // @ts-ignore
-        modelDef?.thinking || model.includes("o1") || model.includes("o3");
+        const isReasoning = modelDef?.thinking || model.includes("o1") || model.includes("o3");
         const prepared = prepareOpenAIMessages(messages);
         const payload = {
             model,
             messages: prepared,
         };
         if (isReasoning) {
-            // @ts-ignore
             if (options.maxTokens)
                 payload.max_completion_tokens = options.maxTokens;
             if (options.reasoningEffort)
-                // @ts-ignore
                 payload.reasoning_effort = options.reasoningEffort;
         }
         else {
             if (options.temperature !== undefined)
-                // @ts-ignore
                 payload.temperature = options.temperature;
-            // @ts-ignore
             if (options.topP !== undefined)
                 payload.top_p = options.topP;
             if (options.frequencyPenalty !== undefined)
-                // @ts-ignore
                 payload.frequency_penalty = options.frequencyPenalty;
             if (options.presencePenalty !== undefined)
-                // @ts-ignore
                 payload.presence_penalty = options.presencePenalty;
             if (options.stopSequences !== undefined)
-                // @ts-ignore
                 payload.stop = options.stopSequences;
-            // @ts-ignore
             if (options.maxTokens)
                 payload.max_completion_tokens = options.maxTokens;
         }
         // Seed for reproducibility
-        // @ts-ignore
         if (options.seed !== undefined)
             payload.seed = options.seed;
         // Service tier: auto / default / priority
-        // @ts-ignore
         if (options.serviceTier)
             payload.service_tier = options.serviceTier;
         // Response format (JSON mode)
         if (options.responseFormat === "json_object") {
-            // @ts-ignore
             payload.response_format = { type: "json_object" };
         }
         if (options.webSearch) {
-            // @ts-ignore
             payload.tools = [{ type: "web_search" }];
         }
         // Custom function calling tools
         const customTools = convertToolsToOpenAI(options.tools);
         if (customTools) {
-            // @ts-ignore
             payload.tools = [...(payload.tools || []), ...customTools];
         }
         try {
@@ -494,32 +455,32 @@ const openaiProvider = {
                     outputTokens: response.usage?.completion_tokens ?? 0,
                 },
             };
-            // Extract tool calls if present
             if (message.tool_calls && message.tool_calls.length > 0) {
-                // @ts-ignore
-                result.toolCalls = message.tool_calls.map((tc) => {
+                result.toolCalls = message.tool_calls.map((rawTc) => {
+                    const tc = rawTc;
+                    const fn = tc.function;
                     let args = {};
                     try {
-                        args = JSON.parse(tc.function.arguments || "{}");
+                        args = JSON.parse(fn?.arguments || "{}");
                     }
                     catch {
                         /* ignore */
                     }
                     return {
                         id: tc.id,
-                        name: tc.function.name,
+                        name: fn?.name || "",
                         args,
                     };
                 });
             }
-            // @ts-ignore
             if (rateLimits)
                 result.rateLimits = rateLimits;
             return result;
         }
         catch (error) {
+            const err = asErrorRecord(error);
             // Retry once after stripping unsupported parameters (e.g. gpt-5-nano rejects temperature)
-            if (error.status === 400 && error.message?.includes("Unsupported")) {
+            if (err.status === 400 && err.message?.includes("Unsupported")) {
                 const unsupportedParams = [
                     "temperature",
                     "top_p",
@@ -528,13 +489,10 @@ const openaiProvider = {
                     "max_completion_tokens",
                 ];
                 let stripped = false;
-                // @ts-ignore
                 for (const param of unsupportedParams) {
-                    if (error.message.includes(`'${param}'`) &&
-                        // @ts-ignore
+                    if (err.message?.includes(`'${param}'`) &&
                         payload[param] !== undefined) {
                         logger.provider("OpenAI", `Stripping unsupported param '${param}' for ${model} and retrying`);
-                        // @ts-ignore
                         delete payload[param];
                         stripped = true;
                     }
@@ -553,9 +511,7 @@ const openaiProvider = {
             throw error;
         }
     },
-    async *generateTextStream(messages, 
-    // @ts-ignore
-    model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai, options = {}) {
+    async *generateTextStream(messages, model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai, options = {}) {
         logger.provider("OpenAI", `generateTextStream model=${model}`);
         try {
             if (useResponsesAPI(model)) {
@@ -568,7 +524,7 @@ const openaiProvider = {
         catch (error) {
             if (error.name === "AbortError")
                 return;
-            throw new ProviderError("openai", error.message, error.status || 500, error);
+            toProviderError(error);
         }
     },
     /**
@@ -579,45 +535,34 @@ const openaiProvider = {
         const payload = { model, input, stream: true };
         // Reasoning
         const reasoning = {};
-        // @ts-ignore
         if (options.reasoningEffort)
             reasoning.effort = options.reasoningEffort;
-        // @ts-ignore
         if (options.reasoningSummary)
             reasoning.summary = options.reasoningSummary;
-        // @ts-ignore
         if (Object.keys(reasoning).length > 0)
             payload.reasoning = reasoning;
         // Text / verbosity
         const text = {};
-        // @ts-ignore
         if (options.verbosity)
             text.format = { type: "text" };
-        // @ts-ignore
         if (options.verbosity)
             text.verbosity = options.verbosity;
-        // @ts-ignore
         if (Object.keys(text).length > 0)
             payload.text = text;
-        // @ts-ignore
         if (options.maxTokens)
             payload.max_output_tokens = options.maxTokens;
         // Seed for reproducibility
-        // @ts-ignore
         if (options.seed !== undefined)
             payload.seed = options.seed;
         // Service tier: auto / default / priority
-        // @ts-ignore
         if (options.serviceTier)
             payload.service_tier = options.serviceTier;
         // Response format (JSON mode) — maps to text.format for Responses API
         if (options.responseFormat === "json_object") {
-            // @ts-ignore
             text.format = { type: "json_object" };
         }
         else if (options.responseFormat === "json_schema" &&
             options.responseSchema) {
-            // @ts-ignore
             text.format = {
                 type: "json_schema",
                 json_schema: options.responseSchema,
@@ -626,44 +571,38 @@ const openaiProvider = {
         // Temperature/topP only work with reasoning.effort=none
         if (options.reasoningEffort === "none") {
             if (options.temperature !== undefined)
-                // @ts-ignore
                 payload.temperature = options.temperature;
-            // @ts-ignore
             if (options.topP !== undefined)
                 payload.top_p = options.topP;
             if (options.frequencyPenalty !== undefined)
-                // @ts-ignore
                 payload.frequency_penalty = options.frequencyPenalty;
             if (options.presencePenalty !== undefined)
-                // @ts-ignore
                 payload.presence_penalty = options.presencePenalty;
             if (options.stopSequences !== undefined)
-                // @ts-ignore
                 payload.stop = options.stopSequences;
         }
         // Web search tool
         if (options.webSearch) {
-            // @ts-ignore
             payload.tools = [{ type: "web_search" }];
         }
         // Custom function calling tools
         const customTools = convertToolsToResponsesAPI(options.tools);
         if (customTools) {
-            // @ts-ignore
             payload.tools = [...(payload.tools || []), ...customTools];
         }
-        const { data: stream, response: rawStreamResponse } = await getClient()
+        const { data: streamData, response: rawStreamResponse } = await getClient()
             .responses.create(payload, {
             ...(options.signal && { signal: options.signal }),
         })
             .withResponse();
+        const stream = streamData;
         const rateLimits = extractOpenAIRateLimits(rawStreamResponse, model);
         let usage = null;
         // Track function names from output_item.added events; the arguments.done
         // event may not include the name property (known OpenAI SDK issue).
         const pendingFunctions = {};
-        // @ts-ignore
-        for await (const event of stream) {
+        for await (const rawEvent of stream) {
+            const event = rawEvent;
             if (options.signal?.aborted)
                 break;
             // Text delta from output_text
@@ -687,7 +626,6 @@ const openaiProvider = {
             // item.id matches item_id on subsequent delta/done events
             if (event.type === "response.output_item.added" &&
                 event.item?.type === "function_call") {
-                // @ts-ignore
                 pendingFunctions[event.item.id] = {
                     name: event.item.name,
                     callId: event.item.call_id,
@@ -696,7 +634,6 @@ const openaiProvider = {
             }
             // Accumulate argument deltas (keyed by item_id)
             if (event.type === "response.function_call_arguments.delta") {
-                // @ts-ignore
                 const entry = pendingFunctions[event.item_id];
                 const partial = event.delta || "";
                 if (entry) {
@@ -710,7 +647,6 @@ const openaiProvider = {
             }
             // Function call completed (Responses API)
             if (event.type === "response.function_call_arguments.done") {
-                // @ts-ignore
                 const tracked = pendingFunctions[event.item_id];
                 const name = tracked?.name || event.name || "unknown";
                 const callId = tracked?.callId || event.call_id || event.item_id;
@@ -730,7 +666,6 @@ const openaiProvider = {
                     args,
                 };
                 // Clean up
-                // @ts-ignore
                 delete pendingFunctions[event.item_id];
             }
             // Completed response — extract usage
@@ -756,9 +691,7 @@ const openaiProvider = {
      */
     async *_streamChatCompletions(messages, model, options) {
         const modelDef = getModelByName(model);
-        const isReasoning = 
-        // @ts-ignore
-        modelDef?.thinking || model.includes("o1") || model.includes("o3");
+        const isReasoning = modelDef?.thinking || model.includes("o1") || model.includes("o3");
         const prepared = prepareOpenAIMessages(messages);
         const payload = {
             model,
@@ -767,54 +700,41 @@ const openaiProvider = {
             stream_options: { include_usage: true },
         };
         if (isReasoning) {
-            // @ts-ignore
             if (options.maxTokens)
                 payload.max_completion_tokens = options.maxTokens;
             if (options.reasoningEffort)
-                // @ts-ignore
                 payload.reasoning_effort = options.reasoningEffort;
         }
         else {
             if (options.temperature !== undefined)
-                // @ts-ignore
                 payload.temperature = options.temperature;
-            // @ts-ignore
             if (options.topP !== undefined)
                 payload.top_p = options.topP;
             if (options.frequencyPenalty !== undefined)
-                // @ts-ignore
                 payload.frequency_penalty = options.frequencyPenalty;
             if (options.presencePenalty !== undefined)
-                // @ts-ignore
                 payload.presence_penalty = options.presencePenalty;
             if (options.stopSequences !== undefined)
-                // @ts-ignore
                 payload.stop = options.stopSequences;
-            // @ts-ignore
             if (options.maxTokens)
                 payload.max_completion_tokens = options.maxTokens;
         }
         // Seed for reproducibility
-        // @ts-ignore
         if (options.seed !== undefined)
             payload.seed = options.seed;
         // Service tier: auto / default / priority
-        // @ts-ignore
         if (options.serviceTier)
             payload.service_tier = options.serviceTier;
         // Response format (JSON mode)
         if (options.responseFormat === "json_object") {
-            // @ts-ignore
             payload.response_format = { type: "json_object" };
         }
         if (options.webSearch) {
-            // @ts-ignore
             payload.tools = [{ type: "web_search" }];
         }
         // Custom function calling tools
         const customTools = convertToolsToOpenAI(options.tools);
         if (customTools) {
-            // @ts-ignore
             payload.tools = [...(payload.tools || []), ...customTools];
         }
         let stream;
@@ -829,8 +749,9 @@ const openaiProvider = {
             rateLimits = extractOpenAIRateLimits(rawStreamResponse, model);
         }
         catch (error) {
+            const err = asErrorRecord(error);
             // Retry once after stripping unsupported parameters (e.g. gpt-5-nano rejects temperature)
-            if (error.status === 400 && error.message?.includes("Unsupported")) {
+            if (err.status === 400 && err.message?.includes("Unsupported")) {
                 const unsupportedParams = [
                     "temperature",
                     "top_p",
@@ -839,13 +760,10 @@ const openaiProvider = {
                     "max_completion_tokens",
                 ];
                 let stripped = false;
-                // @ts-ignore
                 for (const param of unsupportedParams) {
-                    if (error.message.includes(`'${param}'`) &&
-                        // @ts-ignore
+                    if (err.message?.includes(`'${param}'`) &&
                         payload[param] !== undefined) {
                         logger.provider("OpenAI", `Stripping unsupported param '${param}' for ${model} and retrying (stream)`);
-                        // @ts-ignore
                         delete payload[param];
                         stripped = true;
                     }
@@ -870,8 +788,8 @@ const openaiProvider = {
         let usage = null;
         // Accumulate tool calls across chunks
         const pendingToolCalls = {};
-        // @ts-ignore
-        for await (const chunk of stream) {
+        for await (const rawChunk of stream) {
+            const chunk = rawChunk;
             if (options.signal?.aborted)
                 break;
             if (chunk.usage) {
@@ -880,7 +798,7 @@ const openaiProvider = {
                     outputTokens: chunk.usage.completion_tokens ?? 0,
                 };
             }
-            const delta = chunk.choices[0]?.delta;
+            const delta = chunk.choices?.[0]?.delta;
             const content = delta?.content || "";
             if (content) {
                 yield content;
@@ -888,26 +806,20 @@ const openaiProvider = {
             // Accumulate tool call deltas
             if (delta?.tool_calls) {
                 let deltaChars = 0;
-                // @ts-ignore
                 for (const tc of delta.tool_calls) {
                     const index = tc.index;
-                    // @ts-ignore
                     if (!pendingToolCalls[index]) {
-                        // @ts-ignore
                         pendingToolCalls[index] = {
                             id: tc.id || "",
                             name: tc.function?.name || "",
                             args: "",
                         };
                     }
-                    // @ts-ignore
                     if (tc.id)
                         pendingToolCalls[index].id = tc.id;
-                    // @ts-ignore
                     if (tc.function?.name)
                         pendingToolCalls[index].name = tc.function.name;
                     if (tc.function?.arguments) {
-                        // @ts-ignore
                         pendingToolCalls[index].args += tc.function.arguments;
                         deltaChars += tc.function.arguments.length;
                     }
@@ -920,11 +832,9 @@ const openaiProvider = {
             }
             // If finish_reason is "tool_calls", yield accumulated tool calls
             if (chunk.choices[0]?.finish_reason === "tool_calls") {
-                // @ts-ignore
                 for (const tc of Object.values(pendingToolCalls)) {
                     let args = {};
                     try {
-                        // @ts-ignore
                         args = JSON.parse(tc.args || "{}");
                     }
                     catch {
@@ -932,9 +842,7 @@ const openaiProvider = {
                     }
                     yield {
                         type: "toolCall",
-                        // @ts-ignore
                         id: tc.id,
-                        // @ts-ignore
                         name: tc.name,
                         args,
                     };
@@ -955,20 +863,16 @@ const openaiProvider = {
         logger.provider("OpenAI", `generateSpeech voice=${voice}`);
         try {
             const response = await getClient().audio.speech.create({
-                model: 
-                // @ts-ignore
-                options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).openai,
+                model: options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).openai,
                 voice,
                 input: text,
-                // @ts-ignore
                 instructions: options.instructions || undefined,
-                // @ts-ignore
                 response_format: options.format || "mp3",
             });
             return { stream: response.body, contentType: "audio/mpeg" };
         }
         catch (error) {
-            throw new ProviderError("openai", error.message, error.status || 500, error);
+            toProviderError(error);
         }
     },
     async generateImage(prompt, images = [], model = "gpt-image-1.5") {
@@ -980,17 +884,13 @@ const openaiProvider = {
                 // Take the last image in conversation as the one to edit
                 const lastImage = images[images.length - 1];
                 let imageBuffer, mimeType;
-                // @ts-ignore
                 if (typeof lastImage === "object" && lastImage.imageData) {
                     // Object format: { imageData: base64, mimeType }
-                    // @ts-ignore
                     imageBuffer = Buffer.from(lastImage.imageData, "base64");
-                    // @ts-ignore
                     mimeType = lastImage.mimeType || "image/png";
                 }
                 else {
                     // Data URL format: data:image/png;base64,...
-                    // @ts-ignore
                     const base64Match = lastImage.match(/^data:([^;]+);base64,(.+)$/);
                     if (!base64Match) {
                         throw new Error("Invalid image data format");
@@ -1030,12 +930,10 @@ const openaiProvider = {
             };
         }
         catch (error) {
-            throw new ProviderError("openai", error.message, error.status || 500, error);
+            toProviderError(error);
         }
     },
-    async captionImage(images, prompt = "What's in this image?", 
-    // @ts-ignore
-    model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai, systemPrompt) {
+    async captionImage(images, prompt = "What's in this image?", model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai, systemPrompt) {
         logger.provider("OpenAI", `captionImage model=${model}`);
         try {
             const content = [
@@ -1062,12 +960,10 @@ const openaiProvider = {
             return { text: response.choices[0].message.content, usage };
         }
         catch (error) {
-            throw new ProviderError("openai", error.message, error.status || 500, error);
+            toProviderError(error);
         }
     },
-    async generateEmbedding(text, 
-    // @ts-ignore
-    model = getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING).openai) {
+    async generateEmbedding(text, model = getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING).openai) {
         logger.provider("OpenAI", `generateEmbedding model=${model}`);
         try {
             const response = await getClient().embeddings.create({
@@ -1077,13 +973,13 @@ const openaiProvider = {
             return { embedding: response.data[0].embedding };
         }
         catch (error) {
-            throw new ProviderError("openai", error.message, error.status || 500, error);
+            toProviderError(error);
         }
     },
-    async transcribeAudio(audioBuffer, mimeType, model = OPENAI_TRANSCRIPTION_MODEL, options = {}) {
+    async transcribeAudio(audioBuffer, mimeType, model = OPENAI_TRANSCRIPTION_MODEL || "whisper-1", options = {}) {
         logger.provider("OpenAI", `transcribeAudio model=${model}`);
         try {
-            const ext = mimeType.split("/")[1] || "wav";
+            const ext = (mimeType.split("/")[1] || "wav");
             const file = await toFile(audioBuffer, `audio.${ext}`, {
                 type: mimeType,
             });
@@ -1091,24 +987,20 @@ const openaiProvider = {
                 file,
                 model,
             };
-            // @ts-ignore
             if (options.language)
                 payload.language = options.language;
-            // @ts-ignore
             if (options.prompt)
                 payload.prompt = options.prompt;
             const response = await getClient().audio.transcriptions.create(payload);
             const usage = {};
-            if (response.usage) {
-                if (response.usage.type === "tokens") {
-                    // @ts-ignore
-                    usage.inputTokens = response.usage.input_tokens ?? 0;
-                    // @ts-ignore
-                    usage.outputTokens = response.usage.output_tokens ?? 0;
+            const responseUsage = response.usage;
+            if (responseUsage) {
+                if (responseUsage.type === "tokens") {
+                    usage.inputTokens = responseUsage.input_tokens ?? 0;
+                    usage.outputTokens = responseUsage.output_tokens ?? 0;
                 }
-                else if (response.usage.type === "duration") {
-                    // @ts-ignore
-                    usage.durationSeconds = response.usage.seconds ?? 0;
+                else if (responseUsage.type === "duration") {
+                    usage.durationSeconds = responseUsage.seconds ?? 0;
                 }
             }
             return {
@@ -1117,7 +1009,7 @@ const openaiProvider = {
             };
         }
         catch (error) {
-            throw new ProviderError("openai", error.message, error.status || 500, error);
+            toProviderError(error);
         }
     },
 };

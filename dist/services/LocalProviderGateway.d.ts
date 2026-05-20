@@ -52,13 +52,13 @@ declare function matchesAny(nameLower: any, patterns: any): any;
 
  * @returns {object} Detected capabilities
  */
-declare function detectCapabilities(modelKey: any, providerMeta?: {}): {
+declare function detectCapabilities(modelKey: any, providerMeta?: any): {
     thinking: any;
     functionCalling: any;
     vision: any;
     video: any;
     audio: any;
-    tools: string[];
+    tools: any[];
     inputTypes: string[];
     outputTypes: string[];
 };
@@ -244,20 +244,14 @@ declare class LocalProviderGateway {
   
      * @returns {Promise<{ [instanceId: string]: object[] }>} Normalized models grouped by instance
      */
-    discoverModels({ timeoutMs, enrich }?: {
-        timeoutMs?: number | undefined;
-        enrich?: boolean | undefined;
-    }): Promise<{}>;
+    discoverModels({ timeoutMs, enrich }?: any): Promise<{}>;
     /**
      * Discover models for a single instance.
   
   
      * @returns {Promise<object[]>} Normalized model entries
      */
-    discoverModelsForInstance(instanceId: any, { timeoutMs, enrich }?: {
-        timeoutMs?: number | undefined;
-        enrich?: boolean | undefined;
-    }): Promise<any[]>;
+    discoverModelsForInstance(instanceId: any, { timeoutMs, enrich }?: any): Promise<any[]>;
     /**
      * Internal: Fetch, normalize, and optionally enrich models for an instance.
      * @private
@@ -270,10 +264,7 @@ declare class LocalProviderGateway {
   
      * @returns {Promise<Array<{ instanceId: string, model: object }>>}
      */
-    searchModels(filter?: {}): Promise<{
-        instanceId: string;
-        model: any;
-    }[]>;
+    searchModels(filter?: any): Promise<any[]>;
     /**
      * Check if a model entry matches the given filter criteria.
      * @private
@@ -312,9 +303,7 @@ declare class LocalProviderGateway {
   
      * @returns {Promise<{ instanceId: string, type: string, provider: object } | null>}
      */
-    resolveProvider(modelName: any, { timeoutMs }?: {
-        timeoutMs?: number | undefined;
-    }): Promise<{
+    resolveProvider(modelName: any, { timeoutMs }?: any): Promise<{
         instanceId: any;
         type: any;
         provider: any;
@@ -329,7 +318,7 @@ declare class LocalProviderGateway {
   
      * @returns {Promise<{ [instanceId: string]: { ok: boolean, status: string, type: string, models?: number } }>}
      */
-    checkHealth(timeoutMs?: number): Promise<{}>;
+    checkHealth(timeoutMs?: any): Promise<{}>;
     /**
      * Estimate VRAM usage for a GGUF model served by a local provider.
      * Primarily useful for LM Studio models that report GGUF metadata.
@@ -338,7 +327,7 @@ declare class LocalProviderGateway {
   
      * @returns {{ gpuGiB: number, totalGiB: number, cpuOffloaded: boolean, archParams: object, totalLayers: number } | null}
      */
-    estimateVRAM(modelData: any, options?: {}): {
+    estimateVRAM(modelData: any, options?: any): {
         archParams: {
             layers: any;
             kvHeads: any;
@@ -358,7 +347,7 @@ declare class LocalProviderGateway {
   
   
      */
-    estimateVRAMForModel(instanceId: any, modelKey: any, options?: {}): Promise<{
+    estimateVRAMForModel(instanceId: any, modelKey: any, options?: any): Promise<{
         archParams: {
             layers: any;
             kvHeads: any;
@@ -378,7 +367,7 @@ declare class LocalProviderGateway {
   
   
      */
-    loadModel(instanceId: any, modelKey: any, options: {} | undefined, signal: any): Promise<any>;
+    loadModel(instanceId: any, modelKey: any, options: any | undefined, signal: any): Promise<any>;
     /**
      * Ensure a specific model is loaded on a specific instance.
      * Handles unloading of other models if necessary (single-model enforcement).
@@ -387,7 +376,7 @@ declare class LocalProviderGateway {
   
      * @returns {Promise<{ alreadyLoaded: boolean, contextLength: number|null }>}
      */
-    ensureModelLoaded(instanceId: any, modelKey: any, options: {} | undefined, signal: any, onStatus: any): Promise<any>;
+    ensureModelLoaded(instanceId: any, modelKey: any, options: any | undefined, signal: any, onStatus: any): Promise<any>;
     /**
      * Unload a model from a specific instance.
      *
@@ -406,7 +395,7 @@ declare class LocalProviderGateway {
   
      * @returns {object} The mutated options object (for chaining)
      */
-    applyLocalDefaults(providerName: any, options: any, clientParams?: {}): any;
+    applyLocalDefaults(providerName: any, options: any, clientParams?: any): any;
     /**
      * Generate text (non-streaming) via a local provider.
      * Auto-resolves the provider if only a model name is given.
@@ -415,7 +404,7 @@ declare class LocalProviderGateway {
   
      * @returns {Promise<{ text: string, thinking: string|null, usage: object }>}
      */
-    generateText(messages: any, model: any, options: {} | undefined, instanceId: any): Promise<any>;
+    generateText(messages: any, model: any, options: any | undefined, instanceId: any): Promise<any>;
     /**
      * Generate text (streaming) via a local provider.
      * Auto-resolves the provider if only a model name is given.
@@ -423,7 +412,7 @@ declare class LocalProviderGateway {
   
   
      */
-    generateTextStream(messages: any, model: any, options: {} | undefined, instanceId: any): AsyncGenerator<any, void, any>;
+    generateTextStream(messages: any, model: any, options: any | undefined, instanceId: any): AsyncGenerator<any, void, any>;
     /**
      * Generate an embedding via a local provider.
      *
@@ -431,7 +420,7 @@ declare class LocalProviderGateway {
   
      * @returns {Promise<{ embedding: number[], dimensions: number }>}
      */
-    generateEmbedding(content: any, model: any, options: {} | undefined, instanceId: any): Promise<any>;
+    generateEmbedding(content: any, model: any, options: any | undefined, instanceId: any): Promise<any>;
     /**
      * Caption an image via a local provider.
      *

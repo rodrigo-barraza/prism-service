@@ -46,11 +46,13 @@ export default class ToolOrchestratorService {
     static getToolFields(toolName: any): any;
     static checkApiHealth(): Promise<{
         offline: Set<unknown>;
-        apiStatus: {};
+        apiStatus: {
+            [x: string]: boolean;
+        };
     }>;
     static refreshSchemas(): Promise<number>;
     static isInitialized(): boolean;
-    static executeTool(name: any, args?: {}, context?: {}): Promise<any>;
+    static executeTool(name: any, args?: any, context?: any): Promise<any>;
     /**
      * Execute a coordinator tool (team_create, send_message, stop_agent).
      * These are Prism-local — they dispatch to CoordinatorService in-process.
@@ -58,7 +60,7 @@ export default class ToolOrchestratorService {
   
   
      */
-    static executeCoordinatorTool(name: any, args?: {}, context?: {}): Promise<{
+    static executeCoordinatorTool(name: any, args?: any, context?: any): Promise<{
         agent_id: any;
         description: any;
         status: any;
@@ -111,7 +113,7 @@ export default class ToolOrchestratorService {
   
   
      */
-    static executeMCPTool(fullName: any, args?: {}): Promise<any>;
+    static executeMCPTool(fullName: any, args?: any): Promise<any>;
     /**
      * Get all tool schemas from connected MCP servers.
   
@@ -137,9 +139,9 @@ export default class ToolOrchestratorService {
   
      * @returns {Promise<object>} final result
      */
-    static executeToolStreaming(name: any, args: {} | undefined, onChunk: any, context?: {}): Promise<any>;
+    static executeToolStreaming(name: any, args: any | undefined, onChunk: any, context?: any): Promise<any>;
     static executeToolCalls(toolCalls: any): Promise<any[]>;
-    static executeCustomTool(toolDef: any, args?: {}): Promise<unknown>;
+    static executeCustomTool(toolDef: any, args?: any): Promise<unknown>;
     /** @internal */ static _setWorktree(sessionId: any, state: any): void;
     /** @internal */ static _clearWorktree(sessionId: any): void;
     /** @internal */ static _proxyPost(path: any, body: any, context: any): Promise<unknown>;

@@ -11,7 +11,7 @@
  * of the default coding agent sections.
  */
 export default class SystemPromptAssembler {
-    constructor(options?: {});
+    constructor(options?: any);
     /**
      * Fetch project directory tree from tools-api.
      * Cached for 1 minute to avoid hammering the API.
@@ -45,7 +45,7 @@ export default class SystemPromptAssembler {
   
      * @returns {Promise<string>} Formatted memory sections for the system prompt
      */
-    fetchMemories(agent: any, project: any, queryText: any, { traceId, agentSessionId, endpoint, _username }?: {}): Promise<any>;
+    fetchMemories(agent: any, project: any, queryText: any, { traceId, agentSessionId, endpoint, _username }?: any): Promise<any>;
     /**
      * Fetch enabled skills relevant to the user's query via embedding similarity.
      *
@@ -53,7 +53,7 @@ export default class SystemPromptAssembler {
   
      * @returns {Promise<Array<{ name: string, content: string, score: number }>>}
      */
-    fetchSkills(project: any, username: any, queryText: any, { traceId, agentSessionId, endpoint, agent }?: {}): Promise<{
+    fetchSkills(project: any, username: any, queryText: any, { traceId, agentSessionId, endpoint, agent }?: any): Promise<{
         name: any;
         content: any;
         description: any;

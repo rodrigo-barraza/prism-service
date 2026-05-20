@@ -46,7 +46,7 @@ declare const MCPClientService: {
   
      * @returns {Promise<object>} Tool result
      */
-    callTool(serverName: any, toolName: any, args?: {}): any;
+    callTool(serverName: any, toolName: any, args?: any): any;
     /**
      * Get all tool schemas from all connected MCP servers.
      * @returns {Array} Namespaced tool schemas
@@ -56,14 +56,7 @@ declare const MCPClientService: {
      * Get connection info for all servers.
      * @returns {Array<{ name, status, toolCount, transport, connectedAt }>}
      */
-    getConnectedServers(): {
-        name: any;
-        status: any;
-        toolCount: any;
-        tools: any;
-        transport: any;
-        connectedAt: any;
-    }[];
+    getConnectedServers(): any[];
     /**
      * Check if a specific server is connected.
   
@@ -154,7 +147,7 @@ declare const MCPClientService: {
   
      * @returns {Promise<object>} Reconnection result
      */
-    authenticate(serverName: any, auth?: {}): Promise<{
+    authenticate(serverName: any, auth?: any): Promise<{
         error: string;
         acknowledged?: undefined;
         serverName?: undefined;

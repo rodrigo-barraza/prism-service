@@ -7,7 +7,7 @@
  * @param {number} [bitsPerWeight=4] — quantization bits per weight
  * @returns {{ layers: number, kvHeads: number, headDim: number, attnRatio: number, isKnown: boolean }}
  */
-export declare function resolveArchParams(architecture: any, paramsString: any, sizeBytes: any, bitsPerWeight?: number): {
+export declare function resolveArchParams(architecture: any, paramsString: any, sizeBytes: any, bitsPerWeight?: any): {
     layers: any;
     kvHeads: any;
     headDim: any;

@@ -19,7 +19,7 @@ declare const FileService: {
      * @returns {Promise<{ ref: string, size: number, contentType: string }>}
      *   ref is either `minio://...` or the original dataUrl.
      */
-    uploadFile(dataUrl: any, category?: string, project?: null, username?: null): Promise<{
+    uploadFile(dataUrl: any, category?: any, project?: any, username?: any): Promise<{
         ref: any;
         size: number;
         contentType: string;

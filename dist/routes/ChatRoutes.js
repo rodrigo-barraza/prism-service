@@ -3,16 +3,16 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // @ts-ignore
 import { formatCostTag, roundMs } from "@rodrigo-barraza/utilities-library";
 import express from "express";
+import { finalizeTextGeneration, getCollectionOpts, } from "../services/harnesses/lifecycle/Finalizer.js";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.js";
 import { ProviderError } from "../utils/errors.js";
 import { TYPES, getDefaultModels, getPricing, getModelByName, } from "../config.js";
-import { estimateTokens, calculateTextCost, calculateImageCost, getTotalInputTokens, mergeUsage, } from "../utils/CostCalculator.js";
+import { estimateTokens, calculateImageCost, mergeUsage, } from "../utils/CostCalculator.js";
 import logger from "../utils/logger.js";
 import RequestLogger from "../services/RequestLogger.js";
 import FileService from "../services/FileService.js";
 import { createStreamState, dispatchChunk, } from "../utils/StreamChunkDispatcher.js";
-import { calculateTokensPerSec } from "../utils/math.js";
 import { compressImageForSizeLimit, constrainImageDimensions, } from "../utils/media.js";
 import SessionGenerationTracker from "../services/SessionGenerationTracker.js";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.js";
@@ -22,19 +22,7 @@ import { getInstancesByType } from "../providers/instance-registry.js";
 import { resolveModelForInstances } from "../utils/ModelResolution.js";
 import { markGenerating, appendAndFinalize, } from "../utils/ConversationUtilities.js";
 import { handleSseRequest, handleJsonRequest } from "../utils/SseUtilities.js";
-import { COLLECTIONS } from "../constants.js";
-import AgentPersonaRegistry from "../services/AgentPersonaRegistry.js";
 const router = express.Router();
-/**
- * Resolve the MongoDB collection for conversation persistence.
- * Agent projects go to agent_sessions; everything else to conversations.
- */
-function getCollectionOpts(project) {
-    if (AgentPersonaRegistry.isAgentProject(project)) {
-        return { collection: COLLECTIONS.AGENT_SESSIONS };
-    }
-    return undefined;
-}
 // ─── converts refs for providers & storage ──────────────────
 /**
  * Resolve image references in messages for both provider use and storage.
@@ -552,7 +540,7 @@ export async function handleAgent(params, emit, { signal } = {}) {
     // Create the session document immediately via upsert so that
     // GET /agent-sessions/:id never 404s while the loop is running
     // (e.g. when the user switches away and back during generation).
-    markGenerating(agentSessionId, project, username, true, getCollectionOpts(project));
+    markGenerating(agentSessionId, project, username, true, { ...getCollectionOpts(project), agent });
     try {
         try {
             if (!context.provider.generateTextStream && !context.provider.generateText) {
@@ -737,276 +725,10 @@ async function handleImageAPIModel(context) {
         appendAndFinalize(conversationId, project, username, messagesToAppend, meta, getCollectionOpts(project));
     }
 }
-// ─── Shared: Post-generation finalization ───────────────────
-export async function finalizeTextGeneration(context, { text, thinking, thinkingSignature, images, toolCalls, audioChunks, audioSampleRate, usage, outputCharacters, timeToGenerationSec, generationSec, totalSec, rateLimits, 
-// Display segment metadata (from AgenticLoopService)
-contentSegments, textFragments, thinkingFragments, }, overrideMessagesToAppend = null) {
-    const { providerName, resolvedModel, modelDef, messages, originalMessages, options, conversationId: rawConversationId, agentSessionId, parentAgentSessionId, userMessage, conversationMeta, traceId, project, username, clientIp, agent, workspaceRoot, requestId, emit, signal, } = context;
-    // Agent sessions use agentSessionId as the persistence key
-    const conversationId = rawConversationId ?? agentSessionId;
-    // ── Cost calculation ──────────────────────────────────────────
-    let estimatedCost = null;
-    let tokensPerSec = null;
-    if (usage) {
-        const imageCount = images.length;
-        if (imageCount > 0) {
-            const imgPricing = 
-            // @ts-ignore
-            getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel] || modelDef?.pricing;
-            if (imgPricing?.imageOutputPerMillion) {
-                // Derive image tokens dynamically from the API-reported total.
-                // The API's outputTokens already includes both text and image tokens,
-                // so we estimate text tokens from the generated text length (~4 chars/token)
-                // and attribute the remainder to images. This adapts to any resolution
-                // (512px≈747tok, 1024px≈1120tok, 2048px≈1680tok, 4096px≈2520tok).
-                const estimatedTextOutputTokens = Math.ceil((text?.length || 0) / 4);
-                const imageTokens = Math.max(0, usage.outputTokens - estimatedTextOutputTokens);
-                const textOutputTokens = Math.max(0, usage.outputTokens - imageTokens);
-                const inputCost = (usage.inputTokens / 1_000_000) * (imgPricing.inputPerMillion || 0);
-                const textOutCost = (textOutputTokens / 1_000_000) * (imgPricing.outputPerMillion || 0);
-                const imageOutCost = (imageTokens / 1_000_000) * imgPricing.imageOutputPerMillion;
-                estimatedCost = parseFloat((inputCost + textOutCost + imageOutCost).toFixed(8));
-            }
-            else {
-                // @ts-ignore
-                const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
-                estimatedCost = calculateTextCost(usage, pricing);
-            }
-        }
-        else {
-            // @ts-ignore
-            const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
-            estimatedCost = calculateTextCost(usage, pricing);
-        }
-        tokensPerSec = calculateTokensPerSec(usage.outputTokens, generationSec, {
-            providerReported: usage.tokensPerSec,
-            fallbackSec: totalSec,
-        });
-    }
-    // ── Console logging ───────────────────────────────────────────
-    const inputTokens = getTotalInputTokens(usage);
-    const outputTokens = usage?.outputTokens || 0;
-    const tokensPerSecStr = tokensPerSec !== null ? tokensPerSec.toFixed(1) : "N/A";
-    const cacheInfo = usage?.cacheReadInputTokens || usage?.cacheCreationInputTokens
-        ? `, cache_read: ${usage.cacheReadInputTokens || 0}, cache_write: ${usage.cacheCreationInputTokens || 0}`
-        : "";
-    logger.request(project, username, clientIp, `[chat] ${providerName} ${resolvedModel} — ` +
-        `in: ${inputTokens} tokens, out: ${outputTokens} tokens${cacheInfo}, ` +
-        `speed: ${tokensPerSecStr} tok/s, ` +
-        `ttg: ${timeToGenerationSec !== null ? timeToGenerationSec.toFixed(2) + "s" : "N/A"}, ` +
-        `generation: ${generationSec !== null ? generationSec.toFixed(2) + "s" : "N/A"}, ` +
-        `total: ${totalSec.toFixed(2)}s` +
-        formatCostTag(estimatedCost));
-    // ── Build WAV from accumulated PCM audio chunks ───────────────
-    let audioRef = null;
-    if (audioChunks.length > 0) {
-        try {
-            const pcmBuffers = audioChunks.map((b64) => Buffer.from(b64, "base64"));
-            const pcmData = Buffer.concat(pcmBuffers);
-            const numChannels = 1;
-            const bitsPerSample = 16;
-            const byteRate = audioSampleRate * numChannels * (bitsPerSample / 8);
-            const blockAlign = numChannels * (bitsPerSample / 8);
-            const wavHeader = Buffer.alloc(44);
-            wavHeader.write("RIFF", 0);
-            wavHeader.writeUInt32LE(36 + pcmData.length, 4);
-            wavHeader.write("WAVE", 8);
-            wavHeader.write("fmt ", 12);
-            wavHeader.writeUInt32LE(16, 16);
-            wavHeader.writeUInt16LE(1, 20);
-            wavHeader.writeUInt16LE(numChannels, 22);
-            wavHeader.writeUInt32LE(audioSampleRate, 24);
-            wavHeader.writeUInt32LE(byteRate, 28);
-            wavHeader.writeUInt16LE(blockAlign, 32);
-            wavHeader.writeUInt16LE(bitsPerSample, 34);
-            wavHeader.write("data", 36);
-            wavHeader.writeUInt32LE(pcmData.length, 40);
-            const wavBuffer = Buffer.concat([wavHeader, pcmData]);
-            const dataUrl = `data:audio/wav;base64,${wavBuffer.toString("base64")}`;
-            const { ref } = await FileService.uploadFile(dataUrl, "generations", project, username);
-            audioRef = ref;
-        }
-        catch (error) {
-            logger.error(`[chat] Failed to build/upload Live API audio WAV: ${error.message}`);
-        }
-    }
-    // ── Request logging with sanitized payloads ────────────────────
-    // Placed after audio build so audioRef is available for modality detection.
-    // Agentic requests are logged granularly per-iteration by AgenticLoopService,
-    // so we only log here for non-agentic paths (chat, live).
-    if (!options.agenticLoopEnabled) {
-        RequestLogger.logChatGeneration({
-            requestId,
-            endpoint: modelDef?.liveAPI ? "/live" : "/chat",
-            operation: modelDef?.liveAPI ? "live" : "chat",
-            project,
-            username,
-            clientIp,
-            agent,
-            provider: providerName,
-            model: resolvedModel,
-            conversationId: conversationId || null,
-            // When Direct Chat routes through /chat, agentSessionId maps the
-            // request to the correct agent session for stats aggregation.
-            agentSessionId: agentSessionId || conversationId || null,
-            traceId: traceId || null,
-            success: true,
-            usage,
-            estimatedCost,
-            tokensPerSec,
-            timeToGenerationSec,
-            generationSec,
-            totalSec,
-            options,
-            messages: originalMessages || messages,
-            text,
-            thinking,
-            images,
-            toolCalls,
-            outputCharacters,
-            audioRef,
-            rateLimits,
-        });
-    }
-    // ── Emit done event ───────────────────────────────────────────
-    if (!signal?.aborted) {
-        emit({
-            type: "done",
-            provider: providerName,
-            model: resolvedModel,
-            usage: usage || null,
-            estimatedCost,
-            tokensPerSec,
-            ...(audioRef ? { audioRef } : {}),
-            timeToGeneration: timeToGenerationSec !== null ? roundMs(timeToGenerationSec) : null,
-            generationTime: generationSec !== null ? roundMs(generationSec) : null,
-            totalTime: roundMs(totalSec),
-            ...(traceId && { traceId }),
-            ...(conversationId && { conversationId }),
-        });
-    }
-    // ── Link conversation to trace ──────────────────────────────
-    // ── Conversation persistence ──────────────────────────────────
-    if (conversationId) {
-        let messagesToAppend = [];
-        if (overrideMessagesToAppend) {
-            messagesToAppend = [...overrideMessagesToAppend];
-            // When the agentic loop ran multiple iterations, intermediate assistant
-            // messages already carry their own content + toolCalls. Attaching the
-            // full-turn contentSegments/textFragments to the final message would
-            // duplicate that content on page refresh (each intermediate message
-            // renders its own content, then segments re-render everything again).
-            // Only include segments on single-iteration turns where the final
-            // message is the sole assistant message — segments preserve the
-            // thinking ↔ tools ↔ text interleaving for that case.
-            // @ts-ignore
-            const hasIntermediateToolMessages = overrideMessagesToAppend.some((m) => m.role === "assistant" && m.toolCalls?.length > 0);
-            // Append the final LLM response block (contains telemetry and final text step)
-            // @ts-ignore
-            messagesToAppend.push({
-                role: "assistant",
-                content: text,
-                ...(thinking && { thinking }),
-                ...(thinkingSignature && { thinkingSignature }),
-                ...(images.length > 0 && { images }),
-                ...(audioRef && { audio: audioRef }),
-                // Include toolCalls on the final message if no intermediate message
-                // already persists them. The regular agentic loop embeds toolCalls in
-                // intermediate assistant messages (overrideMessagesToAppend), but
-                // native MCP tool calls (e.g. LM Studio) bypass that path — without
-                // this, tool calls vanish on page refresh.
-                ...(!hasIntermediateToolMessages &&
-                    toolCalls.length > 0 && { toolCalls }),
-                model: resolvedModel,
-                provider: providerName,
-                timestamp: new Date().toISOString(),
-                usage: usage || null,
-                totalTime: roundMs(totalSec),
-                tokensPerSec,
-                estimatedCost,
-                // Display segment metadata — preserves interleaving order for Prism Client.
-                // Only attach when there are NO intermediate tool-calling messages;
-                // otherwise intermediate messages already carry their own content and
-                // the segments would cause duplicate rendering on page refresh.
-                ...(!hasIntermediateToolMessages &&
-                    contentSegments?.length > 0 && { contentSegments }),
-                ...(!hasIntermediateToolMessages &&
-                    textFragments?.length > 0 && { textFragments }),
-                ...(!hasIntermediateToolMessages &&
-                    thinkingFragments?.length > 0 && { thinkingFragments }),
-                // Generation settings — source of truth per request
-                generationSettings: {
-                    temperature: options.temperature,
-                    maxTokens: options.maxTokens,
-                    thinkingEnabled: options.thinkingEnabled || false,
-                    ...(options.reasoningEffort && {
-                        reasoningEffort: options.reasoningEffort,
-                    }),
-                    ...(options.thinkingBudget && {
-                        thinkingBudget: options.thinkingBudget,
-                    }),
-                },
-            });
-        }
-        else {
-            // Only append the user message on the first call for this turn
-            // (indicated by conversationMeta). Follow-up tool iterations reuse
-            // the same conversationId but omit conversationMeta, so the user
-            // message is already persisted from the first call.
-            if (userMessage && conversationMeta) {
-                messagesToAppend.push({
-                    role: "user",
-                    ...userMessage,
-                    timestamp: userMessage.timestamp || new Date().toISOString(),
-                });
-            }
-            messagesToAppend.push({
-                role: "assistant",
-                content: text,
-                ...(thinking && { thinking }),
-                ...(thinkingSignature && { thinkingSignature }),
-                ...(images.length > 0 && { images }),
-                ...(audioRef && { audio: audioRef }),
-                ...(toolCalls.length > 0 && { toolCalls }),
-                model: resolvedModel,
-                provider: providerName,
-                timestamp: new Date().toISOString(),
-                usage: usage || null,
-                totalTime: roundMs(totalSec),
-                tokensPerSec,
-                estimatedCost,
-                // Generation settings — source of truth per request
-                generationSettings: {
-                    temperature: options.temperature,
-                    maxTokens: options.maxTokens,
-                    thinkingEnabled: options.thinkingEnabled || false,
-                    ...(options.reasoningEffort && {
-                        reasoningEffort: options.reasoningEffort,
-                    }),
-                    ...(options.thinkingBudget && {
-                        thinkingBudget: options.thinkingBudget,
-                    }),
-                },
-            });
-        }
-        const meta = conversationMeta
-            ? {
-                ...conversationMeta,
-                settings: { provider: providerName, model: resolvedModel },
-            }
-            : undefined;
-        // Merge parentAgentSessionId and workspaceRoot into meta for persistence
-        let finalMeta = meta;
-        if (parentAgentSessionId) {
-            finalMeta = { ...(finalMeta || {}), parentAgentSessionId };
-        }
-        if (workspaceRoot) {
-            finalMeta = { ...(finalMeta || {}), workspaceRoot };
-        }
-        appendAndFinalize(conversationId, project, username, messagesToAppend, finalMeta, getCollectionOpts(project));
-    }
-}
-// ─── Dispatch: Streaming text/multimodal generation ─────────
+// ─── Post-generation finalization ────────────────────────────
+// Moved to src/services/harnesses/lifecycle/Finalizer.ts
+// Imported at the top of this file via:
+//   import { finalizeTextGeneration, getCollectionOpts } from "../services/harnesses/lifecycle/Finalizer.ts";
 async function handleStreamingText(context) {
     const { provider, providerName, resolvedModel, modelDef, messages, options, conversationId, project, username, requestStart, emit, signal, } = context;
     // Mark conversation as generating

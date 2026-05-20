@@ -1,3 +1,6 @@
+import type AgenticLoopState from "../AgenticLoopState.ts";
+import type AgentHooks from "../AgentHooks.ts";
+import type { AgenticContext, ResolvedTools, PassState, ChunkAction, ConversationMessage } from "./types.ts";
 /**
  * BaseAgenticHarness — abstract base class that defines the contract
  * for agentic loop execution strategies ("harnesses").
@@ -7,105 +10,69 @@
  * inheriting shared infrastructure:
  *
  *   - Stream chunk routing (`processStreamChunk`)
+ *   - Stream consumption (`consumeStream` — full pass with chunk routing)
  *   - Progress emission (`emitGenerationProgress`, `maybeEmitProgress`)
  *   - Iteration logging (`logIteration`)
  *   - Context window enforcement (`enforceContextWindow`)
  *   - LLM stream creation (`createProviderStream`)
- *   - Stream consumption (`consumeStream` — full pass with chunk routing)
+ *   - Finalization (`finalize` — cost, persistence, done event)
  */
 export default class BaseAgenticHarness {
     /** Harness identifier — subclasses MUST override. */
     static id: string;
     static label: string;
     static description: string;
-    /**
-     * @param {object}              context    — generation context from ChatRoutes
-     * @param {AgenticLoopState}    state  — shared mutable state accumulator
-     * @param {object}              tools  — { finalTools, customToolMap, resolvedEnabledTools }
-     */
-    constructor(context: any, state: any, tools: any);
-    /**
-     * Execute the agentic loop. Subclasses MUST override.
-     * @returns {Promise<{ messages: object[] }>}
-     */
-    run(): Promise<void>;
+    protected ctx: AgenticContext;
+    protected state: AgenticLoopState;
+    protected tools: ResolvedTools;
+    protected trackerSessionId: string;
+    constructor(context: AgenticContext, state: AgenticLoopState, tools: ResolvedTools);
+    /** Execute the agentic loop. Subclasses MUST override. */
+    run(): Promise<{
+        messages: ConversationMessage[];
+    }>;
     /** Emit a generation_progress status event with current session stats. */
     emitGenerationProgress(): void;
     /** Check if it's time to emit a progress event. */
     maybeEmitProgress(): void;
-    /**
-     * Enforce token budget on messages before sending to provider.
-  
-  
-     * @returns {object[]} — possibly truncated messages
-     */
-    enforceContextWindow(messages: any, toolCount: any): any;
+    /** Enforce token budget on messages before sending to provider. */
+    enforceContextWindow(messages: ConversationMessage[], toolCount: number): ConversationMessage[];
     /**
      * Create an LLM text stream from the provider.
      * Handles liveAPI fallback and message expansion.
      */
-    createProviderStream(messages: any, passOptions: any): any;
+    createProviderStream(messages: ConversationMessage[], passOptions: Record<string, unknown>): AsyncIterable<unknown>;
+    /**
+     * Consume an LLM stream, routing each chunk through `processStreamChunk`.
+     * Handles abort signals and stream teardown.
+     */
+    protected consumeStream(stream: AsyncIterable<unknown>, pass: PassState, allowedToolNames: Set<string>): Promise<void>;
     /** Register a request with SessionGenerationTracker. */
-    registerTrackerRequest(passRequestId: any): void;
+    registerTrackerRequest(passRequestId: string): void;
     /**
      * Process a single stream chunk — routes to the appropriate handler.
      * Returns an action descriptor for the caller:
-     *   { action: "continue" }     — chunk was consumed, keep iterating
-     *   { action: "toolCall", tc }  — a tool call was detected
-     *   { action: "skip" }         — chunk was filtered/dropped
+     *   `continue` — chunk was consumed, keep iterating
+     *   `toolCall` — a tool call was detected
+     *   `skip`     — chunk was filtered/dropped
+     *   `break`    — abort signal received
+     */
+    processStreamChunk(chunk: unknown, pass: PassState, allowedToolNames: Set<string>): ChunkAction | Promise<ChunkAction>;
+    /** Log a single iteration to the request log. */
+    logIteration(pass: PassState, currentMessages: ConversationMessage[]): void;
+    /** Create a fresh per-iteration pass state object. */
+    createPassState(passOptions: Record<string, unknown>): PassState;
+    /**
+     * Shared finalization logic — cost calculation, persistence,
+     * done event, worker snapshot persistence, and afterResponse hooks.
      *
-     * @param {*}      chunk            — raw chunk from provider stream
-     * @param {object} pass             — per-iteration pass state
-     * @param {Set}    allowedToolNames — tool names in the current schema
-  
+     * Lifted from ReActHarness so all harnesses share the same
+     * finalization path without copy-paste.
      */
-    processStreamChunk(chunk: any, pass: any, allowedToolNames: any): Promise<{
-        action: string;
-    }> | {
-        action: string;
-        tc?: undefined;
-    } | {
-        action: string;
-        tc: {
-            id: any;
-            responsesItemId: any;
-            name: any;
-            args: any;
-            thoughtSignature: any;
-        };
-    };
-    /**
-     * Log a single iteration to the request log.
-     */
-    logIteration(pass: any, currentMessages: any): void;
-    /**
-     * Create a fresh per-iteration pass state object.
-     */
-    createPassState(passOptions: any): {
-        streamedText: string;
-        streamedThinking: string;
-        thinkingSignature: string;
-        pendingToolCalls: never[];
-        streamedImages: never[];
-        start: number;
-        firstTokenTime: null;
-        generationEnd: null;
-        outputCharacters: number;
-        usage: {
-            inputTokens: number;
-            outputTokens: number;
-            cacheReadInputTokens: number;
-            cacheCreationInputTokens: number;
-            reasoningOutputTokens: number;
-        };
-        options: any;
-        requestId: null;
-    };
-    _recordFirstToken(pass: any): void;
-    _recordTiming(pass: any): void;
-    _trackToolDisplaySegment(tcId: any): void;
-    _handleImageChunk(chunk: any, pass: any): Promise<{
-        action: string;
-    }>;
+    protected finalize(currentMessages: ConversationMessage[], hooks: AgentHooks): Promise<void>;
+    private _recordFirstToken;
+    private _recordTiming;
+    private _trackToolDisplaySegment;
+    private _handleImageChunk;
 }
 //# sourceMappingURL=BaseAgenticHarness.d.ts.map

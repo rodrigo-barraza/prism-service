@@ -3,15 +3,10 @@ import crypto from "crypto";
 import { Readable } from "stream";
 import { ProviderError } from "../utils/errors.js";
 import logger from "../utils/logger.js";
-// @ts-ignore
-import { GOOGLE_API_KEY, GOOGLE_TTS_MODEL, GOOGLE_EMBEDDING_MODEL,
-// @ts-ignore
- } from "../../config.js";
+import { GOOGLE_API_KEY, GOOGLE_TTS_MODEL, GOOGLE_EMBEDDING_MODEL, } from "../../config.js";
 import { TYPES, MODELS, DEFAULT_VOICES, getDefaultModels } from "../config.js";
-// @ts-ignore
 let client = null;
 function getClient() {
-    // @ts-ignore
     if (!client) {
         if (!GOOGLE_API_KEY) {
             throw new ProviderError("google", "GOOGLE_API_KEY is not set", 401);
@@ -59,12 +54,6 @@ function addWavHeader(buffer, sampleRate = 24000, numChannels = 1) {
     return Buffer.concat([header, buffer]);
 }
 /**
- * Convert OpenAI-style messages to Google GenAI content format.
- * Handles image content from base64 data URLs.
- * Note: Images on assistant/model messages are stripped to avoid
- * Gemini's thought_signature requirement for model-generated images.
- */
-/**
  * Recursively sanitize a JSON Schema object for Google's restricted format.
  * Gemini's functionDeclarations only support a subset of JSON Schema —
  * unsupported keywords like `const`, `$schema`, `$id`, `$ref`, `examples`,
@@ -91,20 +80,16 @@ const GOOGLE_UNSUPPORTED_KEYS = new Set([
     "not",
     "title",
 ]);
-// @ts-ignore
 function sanitizeSchemaForGoogle(schema, isPropertyMap = false) {
     if (!schema || typeof schema !== "object")
         return schema;
-    // @ts-ignore
     if (Array.isArray(schema))
-        // @ts-ignore
         return schema.map((item) => sanitizeSchemaForGoogle(item, false));
+    const source = schema;
     const cleaned = {};
-    // @ts-ignore
-    for (const [key, value] of Object.entries(schema)) {
+    for (const [key, value] of Object.entries(source)) {
         // Convert `const` → single-value `enum`
         if (key === "const" && !isPropertyMap) {
-            // @ts-ignore
             cleaned.enum = [value];
             continue;
         }
@@ -114,7 +99,6 @@ function sanitizeSchemaForGoogle(schema, isPropertyMap = false) {
         if (!isPropertyMap && GOOGLE_UNSUPPORTED_KEYS.has(key))
             continue;
         // When we hit a "properties" key, its children are a map of field names → schemas
-        // @ts-ignore
         cleaned[key] = sanitizeSchemaForGoogle(value, key === "properties");
     }
     return cleaned;
@@ -136,6 +120,48 @@ export function convertToolsToGoogle(tools) {
             })),
         },
     ];
+}
+/**
+ * Build a GoogleGenerateConfig from ProviderOptions.
+ * Centralizes the repeated config-building pattern across generateText,
+ * generateTextStream, and generateTextStreamLive.
+ */
+function buildGenerateConfig(options, modelDef) {
+    const config = {};
+    if (options.temperature !== undefined)
+        config.temperature = options.temperature;
+    if (options.topP !== undefined)
+        config.topP = options.topP;
+    if (options.topK !== undefined)
+        config.topK = options.topK;
+    if (options.presencePenalty !== undefined)
+        config.presencePenalty = options.presencePenalty;
+    if (options.frequencyPenalty !== undefined)
+        config.frequencyPenalty = options.frequencyPenalty;
+    if (options.stopSequences !== undefined)
+        config.stopSequences = options.stopSequences;
+    if (options.maxTokens !== undefined)
+        config.maxOutputTokens = options.maxTokens;
+    if (options.seed !== undefined)
+        config.seed = parseInt(String(options.seed));
+    if (options.responseFormat === "json_object")
+        config.responseMimeType = "application/json";
+    // Thinking config
+    if (options.thinkingEnabled !== false &&
+        (options.thinkingLevel || options.thinkingBudget !== undefined)) {
+        config.thinkingConfig = { includeThoughts: true };
+        if (options.thinkingLevel && modelDef?.thinkingLevels) {
+            config.thinkingConfig.thinkingLevel = options.thinkingLevel;
+        }
+        if (options.thinkingBudget !== undefined && options.thinkingBudget !== "") {
+            config.thinkingConfig.thinkingBudget = parseInt(String(options.thinkingBudget));
+        }
+    }
+    // System prompt
+    if (options.systemPrompt) {
+        config.systemInstruction = options.systemPrompt;
+    }
+    return config;
 }
 async function convertMessages(messages) {
     const result = [];
@@ -170,11 +196,9 @@ async function convertMessages(messages) {
         // require a thought_signature when sent back, so we skip them.
         if (item.role !== "assistant") {
             // All media fields are arrays of data URLs or HTTP URLs
-            // @ts-ignore
             for (const field of ["images", "audio", "video", "pdf"]) {
                 const array = item[field];
                 if (array && Array.isArray(array)) {
-                    // @ts-ignore
                     for (const mediaRef of array) {
                         const match = mediaRef.match(/^data:([\w-]+\/[\w.+-]+);base64,(.+)$/);
                         if (match) {
@@ -206,12 +230,10 @@ async function convertMessages(messages) {
         }
         // Assistant messages with tool calls — include functionCall parts
         if (item.role === "assistant" && item.toolCalls) {
-            // @ts-ignore
             for (const tc of item.toolCalls) {
                 const fcPart = { functionCall: { name: tc.name, args: tc.args || {} } };
                 // Preserve thoughtSignature (sibling of functionCall, required by Gemini)
                 if (tc.thoughtSignature) {
-                    // @ts-ignore
                     fcPart.thoughtSignature = tc.thoughtSignature;
                 }
                 parts.push(fcPart);
@@ -229,136 +251,44 @@ async function convertMessages(messages) {
 }
 const googleProvider = {
     name: "google",
-    async generateText(messages, 
-    // @ts-ignore
-    model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).google, options = {}) {
+    async generateText(messages, model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).google, options = {}) {
         logger.provider("Google", `generateText model=${model}`);
         try {
             const contents = await convertMessages(messages);
-            const config = {};
-            // @ts-ignore
-            if (options.temperature !== undefined) {
-                // @ts-ignore
-                config.temperature = options.temperature;
-            }
-            // @ts-ignore
-            if (options.topP !== undefined) {
-                // @ts-ignore
-                config.topP = options.topP;
-            }
-            // @ts-ignore
-            if (options.topK !== undefined) {
-                // @ts-ignore
-                config.topK = options.topK;
-            }
-            // @ts-ignore
-            if (options.presencePenalty !== undefined) {
-                // @ts-ignore
-                config.presencePenalty = options.presencePenalty;
-            }
-            // @ts-ignore
-            if (options.frequencyPenalty !== undefined) {
-                // @ts-ignore
-                config.frequencyPenalty = options.frequencyPenalty;
-            }
-            // @ts-ignore
-            if (options.stopSequences !== undefined) {
-                // @ts-ignore
-                config.stopSequences = options.stopSequences;
-            }
-            // @ts-ignore
-            if (options.maxTokens !== undefined) {
-                // @ts-ignore
-                config.maxOutputTokens = options.maxTokens;
-            }
-            // Seed for reproducibility
-            // @ts-ignore
-            if (options.seed !== undefined) {
-                // @ts-ignore
-                config.seed = parseInt(options.seed);
-            }
-            // Response format (JSON mode)
-            // @ts-ignore
-            if (options.responseFormat === "json_object") {
-                // @ts-ignore
-                config.responseMimeType = "application/json";
-            }
-            // Resolve model definition early — needed for thinking and image checks
             const modelDef = Object.values(MODELS).find((m) => m.name === model);
-            // @ts-ignore
-            if (
-            // @ts-ignore
-            options.thinkingEnabled !== false &&
-                // @ts-ignore
-                (options.thinkingLevel || options.thinkingBudget !== undefined)) {
-                // @ts-ignore
-                config.thinkingConfig = {
-                    includeThoughts: true,
-                };
-                // Only send thinkingLevel if the model explicitly supports it
-                // (image models support thinking but reject thinkingLevel)
-                // @ts-ignore
-                if (options.thinkingLevel && modelDef?.thinkingLevels) {
-                    // @ts-ignore
-                    config.thinkingConfig.thinkingLevel = options.thinkingLevel;
-                }
-                if (
-                // @ts-ignore
-                options.thinkingBudget !== undefined &&
-                    // @ts-ignore
-                    options.thinkingBudget !== "") {
-                    // @ts-ignore
-                    config.thinkingConfig.thinkingBudgetTokens = parseInt(
-                    // @ts-ignore
-                    options.thinkingBudget);
-                }
-            }
-            // @ts-ignore
+            const config = buildGenerateConfig(options, modelDef);
+            // Web search
             if (options.webSearch) {
-                // @ts-ignore
                 config.tools = [{ googleSearch: {} }];
             }
             // Custom function calling tools
-            // @ts-ignore
             const customTools = convertToolsToGoogle(options.tools);
             if (customTools) {
-                // @ts-ignore
                 config.tools = [...(config.tools || []), ...customTools];
             }
             // For models that output images, set responseModalities explicitly.
             // These models REQUIRE ["TEXT", "IMAGE"] — ["TEXT"] alone returns 0 tokens.
-            if (modelDef?.outputTypes?.includes(TYPES.IMAGE)) {
-                // @ts-ignore
+            if (modelDef?.outputTypes && modelDef.outputTypes.includes(TYPES.IMAGE)) {
                 config.responseModalities = options.forceImageGeneration
                     ? ["IMAGE"]
                     : ["TEXT", "IMAGE"];
-            }
-            // System prompt — used by callers like CreativeRoutes to inject
-            // editing instructions for image generation with reference images.
-            // @ts-ignore
-            if (options.systemPrompt) {
-                // @ts-ignore
-                config.systemInstruction = options.systemPrompt;
             }
             const response = await getClient().models.generateContent({
                 model,
                 contents,
                 config,
             });
-            // Check for function calls, images, and text in the response
             const toolCalls = [];
             const textParts = [];
             const images = [];
-            // @ts-ignore
             const maxImages = options.imageCount || 1;
-            // @ts-ignore
             for (const part of response.candidates?.[0]?.content?.parts || []) {
                 if (part.functionCall) {
                     toolCalls.push({
                         id: `google-tc-${crypto.randomUUID()}`,
-                        name: part.functionCall.name,
-                        args: part.functionCall.args || {},
-                        thoughtSignature: part.thoughtSignature || undefined,
+                        name: part.functionCall.name || "unknown",
+                        args: (part.functionCall.args || {}),
+                        thoughtSignature: part.thoughtSignature,
                     });
                 }
                 else if (part.text) {
@@ -366,7 +296,7 @@ const googleProvider = {
                 }
                 else if (part.inlineData && images.length < maxImages) {
                     images.push({
-                        data: part.inlineData.data,
+                        data: part.inlineData.data || "",
                         mimeType: part.inlineData.mimeType || "image/png",
                     });
                 }
@@ -378,10 +308,8 @@ const googleProvider = {
                     outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
                 },
             };
-            // @ts-ignore
             if (toolCalls.length > 0)
                 result.toolCalls = toolCalls;
-            // @ts-ignore
             if (images.length > 0)
                 result.images = images;
             return result;
@@ -401,121 +329,35 @@ const googleProvider = {
             throw new ProviderError("google", error.message, 500, error);
         }
     },
-    async *generateTextStream(messages, 
-    // @ts-ignore
-    model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).google, options = {}) {
+    async *generateTextStream(messages, model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).google, options = {}) {
         logger.provider("Google", `generateTextStream model=${model}`);
         try {
             const contents = await convertMessages(messages);
-            const config = {};
-            // @ts-ignore
-            if (options.temperature !== undefined) {
-                // @ts-ignore
-                config.temperature = options.temperature;
-            }
-            // @ts-ignore
-            if (options.topP !== undefined) {
-                // @ts-ignore
-                config.topP = options.topP;
-            }
-            // @ts-ignore
-            if (options.topK !== undefined) {
-                // @ts-ignore
-                config.topK = options.topK;
-            }
-            // @ts-ignore
-            if (options.presencePenalty !== undefined) {
-                // @ts-ignore
-                config.presencePenalty = options.presencePenalty;
-            }
-            // @ts-ignore
-            if (options.frequencyPenalty !== undefined) {
-                // @ts-ignore
-                config.frequencyPenalty = options.frequencyPenalty;
-            }
-            // @ts-ignore
-            if (options.stopSequences !== undefined) {
-                // @ts-ignore
-                config.stopSequences = options.stopSequences;
-            }
-            // @ts-ignore
-            if (options.maxTokens !== undefined) {
-                // @ts-ignore
-                config.maxOutputTokens = options.maxTokens;
-            }
-            // Seed for reproducibility
-            // @ts-ignore
-            if (options.seed !== undefined) {
-                // @ts-ignore
-                config.seed = parseInt(options.seed);
-            }
-            // Response format (JSON mode)
-            // @ts-ignore
-            if (options.responseFormat === "json_object") {
-                // @ts-ignore
-                config.responseMimeType = "application/json";
-            }
-            // Resolve model definition early — needed for thinking and image checks
             const modelDef = Object.values(MODELS).find((m) => m.name === model);
-            // @ts-ignore
-            if (
-            // @ts-ignore
-            options.thinkingEnabled !== false &&
-                // @ts-ignore
-                (options.thinkingLevel || options.thinkingBudget !== undefined)) {
-                // @ts-ignore
-                config.thinkingConfig = {
-                    includeThoughts: true,
-                };
-                // Only send thinkingLevel if the model explicitly supports it
-                // @ts-ignore
-                if (options.thinkingLevel && modelDef?.thinkingLevels) {
-                    // @ts-ignore
-                    config.thinkingConfig.thinkingLevel = options.thinkingLevel;
-                }
-                if (
-                // @ts-ignore
-                options.thinkingBudget !== undefined &&
-                    // @ts-ignore
-                    options.thinkingBudget !== "") {
-                    // @ts-ignore
-                    config.thinkingConfig.thinkingBudgetTokens = parseInt(
-                    // @ts-ignore
-                    options.thinkingBudget);
-                }
-            }
+            const config = buildGenerateConfig(options, modelDef);
             // Build tools array based on enabled options
             const tools = [];
-            // @ts-ignore
             if (options.webSearch)
                 tools.push({ googleSearch: {} });
-            // @ts-ignore
             if (options.codeExecution)
                 tools.push({ codeExecution: {} });
-            // @ts-ignore
             if (options.urlContext)
                 tools.push({ urlContext: {} });
             // Custom function calling tools
-            // @ts-ignore
             const customTools = convertToolsToGoogle(options.tools);
             if (customTools)
                 tools.push(...customTools);
-            // @ts-ignore
             if (tools.length > 0)
                 config.tools = tools;
             // For models that output images, set responseModalities explicitly.
-            // These models REQUIRE ["TEXT", "IMAGE"] — ["TEXT"] alone returns 0 tokens.
-            if (modelDef?.outputTypes?.includes(TYPES.IMAGE)) {
-                // @ts-ignore
+            if (modelDef?.outputTypes && modelDef.outputTypes.includes(TYPES.IMAGE)) {
                 config.responseModalities = options.forceImageGeneration
                     ? ["IMAGE"]
                     : ["TEXT", "IMAGE"];
             }
             const streamConfig = { ...config };
-            // @ts-ignore
             if (options.signal) {
-                // @ts-ignore
-                streamConfig.httpOptions = { signal: options.signal };
+                streamConfig.httpOptions = { timeout: 0 };
             }
             const responseStream = await getClient().models.generateContentStream({
                 model,
@@ -523,25 +365,21 @@ const googleProvider = {
                 config: streamConfig,
             });
             let usage = null;
-            // @ts-ignore
             const maxImages = options.imageCount || 1;
             let imageCount = 0;
-            // @ts-ignore
             for await (const chunk of responseStream) {
-                // @ts-ignore
                 if (options.signal?.aborted)
                     break;
                 // Process all parts in the chunk
                 if (chunk.candidates?.[0]?.content?.parts) {
-                    // @ts-ignore
                     for (const part of chunk.candidates[0].content.parts) {
                         if (part.functionCall) {
                             yield {
                                 type: "toolCall",
                                 id: `google-tc-${crypto.randomUUID()}`,
-                                name: part.functionCall.name,
-                                args: part.functionCall.args || {},
-                                thoughtSignature: part.thoughtSignature || undefined,
+                                name: part.functionCall.name || "unknown",
+                                args: (part.functionCall.args || {}),
+                                thoughtSignature: part.thoughtSignature,
                             };
                         }
                         else if (part.thought && part.text) {
@@ -554,7 +392,7 @@ const googleProvider = {
                             imageCount++;
                             yield {
                                 type: "image",
-                                data: part.inlineData.data,
+                                data: part.inlineData.data || "",
                                 mimeType: part.inlineData.mimeType || "image/png",
                             };
                         }
@@ -624,77 +462,43 @@ const googleProvider = {
                 responseModalities: [Modality.AUDIO],
                 outputAudioTranscription: {},
             };
-            // @ts-ignore
-            if (options.temperature !== undefined) {
-                // @ts-ignore
+            if (options.temperature !== undefined)
                 liveConfig.temperature = options.temperature;
-            }
-            // @ts-ignore
-            if (options.topP !== undefined) {
-                // @ts-ignore
+            if (options.topP !== undefined)
                 liveConfig.topP = options.topP;
-            }
-            // @ts-ignore
-            if (options.topK !== undefined) {
-                // @ts-ignore
+            if (options.topK !== undefined)
                 liveConfig.topK = options.topK;
-            }
-            // @ts-ignore
-            if (options.maxTokens !== undefined) {
-                // @ts-ignore
+            if (options.maxTokens !== undefined)
                 liveConfig.maxOutputTokens = options.maxTokens;
-            }
-            // @ts-ignore
-            if (
-            // @ts-ignore
-            options.thinkingEnabled !== false &&
-                // @ts-ignore
+            if (options.thinkingEnabled !== false &&
                 (options.thinkingLevel || options.thinkingBudget !== undefined)) {
-                // @ts-ignore
-                liveConfig.thinkingConfig = { includeThoughts: true };
-                // @ts-ignore
-                if (options.thinkingLevel) {
-                    // @ts-ignore
-                    liveConfig.thinkingConfig.thinkingLevel = options.thinkingLevel;
+                const thinkCfg = { includeThoughts: true };
+                if (options.thinkingLevel)
+                    thinkCfg.thinkingLevel = options.thinkingLevel;
+                if (options.thinkingBudget !== undefined && options.thinkingBudget !== "") {
+                    thinkCfg.thinkingBudget = parseInt(String(options.thinkingBudget));
                 }
-                if (
-                // @ts-ignore
-                options.thinkingBudget !== undefined &&
-                    // @ts-ignore
-                    options.thinkingBudget !== "") {
-                    // @ts-ignore
-                    liveConfig.thinkingConfig.thinkingBudgetTokens = parseInt(
-                    // @ts-ignore
-                    options.thinkingBudget);
-                }
+                liveConfig.thinkingConfig = thinkCfg;
             }
             // Tools
             const tools = [];
-            // @ts-ignore
             if (options.webSearch)
                 tools.push({ googleSearch: {} });
-            // @ts-ignore
             const customTools = convertToolsToGoogle(options.tools);
             if (customTools)
                 tools.push(...customTools);
-            // @ts-ignore
             if (tools.length > 0)
                 liveConfig.tools = tools;
             // System instruction from messages[0] if role === "system"
             const systemMsg = messages.find((m) => m.role === "system");
             if (systemMsg?.content) {
-                // @ts-ignore
                 liveConfig.systemInstruction = systemMsg.content;
             }
-            // ── Async queue to bridge callbacks → async generator ─────────
-            // @ts-ignore
             const queue = [];
-            // @ts-ignore
             let resolver = null;
             let done = false;
             let setupComplete = false;
             function enqueue(item) {
-                // @ts-ignore
                 if (resolver) {
                     const r = resolver;
                     resolver = null;
@@ -706,7 +510,6 @@ const googleProvider = {
             }
             function dequeue() {
                 if (queue.length > 0) {
-                    // @ts-ignore
                     return Promise.resolve(queue.shift());
                 }
                 return new Promise((resolve) => {
@@ -730,7 +533,6 @@ const googleProvider = {
                         }
                         // Audio data from model turn (inlineData)
                         if (message.serverContent?.modelTurn?.parts) {
-                            // @ts-ignore
                             for (const part of message.serverContent.modelTurn.parts) {
                                 if (part.thought && part.text) {
                                     enqueue({ type: "thinking", content: part.text });
@@ -767,25 +569,24 @@ const googleProvider = {
                         }
                         // Tool calls from the server
                         if (message.toolCall?.functionCalls) {
-                            // @ts-ignore
                             for (const fc of message.toolCall.functionCalls) {
                                 enqueue({
                                     type: "toolCall",
                                     id: `google-tc-${crypto.randomUUID()}`,
-                                    name: fc.name,
-                                    args: fc.args || {},
+                                    name: fc.name || "unknown",
+                                    args: (fc.args || {}),
                                 });
                             }
                         }
                         // Usage metadata
                         if (message.usageMetadata) {
                             const u = message.usageMetadata;
-                            if (u.promptTokenCount || u.candidatesTokenCount) {
+                            if (u.promptTokenCount || u.responseTokenCount) {
                                 enqueue({
                                     type: "usage",
                                     usage: {
                                         inputTokens: u.promptTokenCount ?? 0,
-                                        outputTokens: u.candidatesTokenCount ?? 0,
+                                        outputTokens: u.responseTokenCount ?? 0,
                                     },
                                 });
                             }
@@ -797,11 +598,14 @@ const googleProvider = {
                         }
                     },
                     onerror: (e) => {
-                        logger.error(`[Google Live API] Error: ${e?.error?.message || e?.message || "unknown"}`);
+                        const errObj = e;
+                        const innerErr = errObj?.error;
+                        const errMsg = innerErr?.message || errObj?.message || "unknown";
+                        logger.error(`[Google Live API] Error: ${errMsg}`);
                         done = true;
                         enqueue({
                             type: "error",
-                            message: e?.error?.message || e?.message || "Live API error",
+                            message: errMsg,
                         });
                     },
                     onclose: () => {
@@ -817,7 +621,7 @@ const googleProvider = {
                 if (item?.type === "setupComplete")
                     break;
                 if (item?.type === "error")
-                    throw new ProviderError("google", item.message, 500);
+                    throw new ProviderError("google", item.message || "Unknown error", 500);
                 if (item?.type === "done")
                     return;
             }
@@ -832,15 +636,14 @@ const googleProvider = {
             // Build Content objects for prior history turns
             if (priorMessages.length > 0) {
                 const historyTurns = [];
-                // @ts-ignore
-                for (const message of priorMessages) {
+                for (const msg of priorMessages) {
                     const parts = [];
-                    if (message.content) {
-                        parts.push({ text: message.content });
+                    if (msg.content) {
+                        parts.push({ text: msg.content });
                     }
                     if (parts.length > 0) {
                         historyTurns.push({
-                            role: message.role === "assistant" ? "model" : "user",
+                            role: msg.role === "assistant" ? "model" : "user",
                             parts,
                         });
                     }
@@ -858,14 +661,13 @@ const googleProvider = {
             }
             // ── Yield chunks from the queue ───────────────────────────────
             while (!done || queue.length > 0) {
-                // @ts-ignore
                 if (options.signal?.aborted)
                     break;
                 const item = await dequeue();
                 if (!item || item.type === "done")
                     break;
                 if (item.type === "error") {
-                    throw new ProviderError("google", item.message, 500);
+                    throw new ProviderError("google", item.message || "Unknown error", 500);
                 }
                 if (item.type === "text") {
                     yield item.content;
@@ -908,14 +710,11 @@ const googleProvider = {
             }
         }
     },
-    async captionImage(images, prompt = "Describe this image.", 
-    // @ts-ignore
-    model = getDefaultModels(TYPES.IMAGE, TYPES.TEXT).google, systemPrompt) {
+    async captionImage(images, prompt = "Describe this image.", model = getDefaultModels(TYPES.IMAGE, TYPES.TEXT).google, systemPrompt) {
         logger.provider("Google", `captionImage model=${model}`);
         try {
             // Process each image into inline data parts
             const imageParts = [];
-            // @ts-ignore
             for (const imageUrlOrBase64 of images) {
                 let imageData = imageUrlOrBase64;
                 let mimeType = "image/jpeg";
@@ -943,7 +742,6 @@ const googleProvider = {
             ];
             const config = {};
             if (systemPrompt) {
-                // @ts-ignore
                 config.systemInstruction = systemPrompt;
             }
             const response = await getClient().models.generateContent({
@@ -969,31 +767,24 @@ const googleProvider = {
                 imageConfig: { imageSize: "1K" },
             };
             if (systemPrompt) {
-                // @ts-ignore
                 config.systemInstruction = systemPrompt;
             }
             const parts = [{ text: prompt }];
             if (images.length) {
-                // @ts-ignore
                 for (const image of images) {
                     // Support both data URL strings and { imageData, mimeType } objects
                     if (typeof image === "string") {
-                        // @ts-ignore
                         const match = image.match(/^data:([\w-]+\/[\w.+-]+);base64,(.+)$/);
                         if (match) {
                             parts.push({
-                                // @ts-ignore
                                 inlineData: { mimeType: match[1], data: match[2] },
                             });
                         }
                     }
                     else {
                         parts.push({
-                            // @ts-ignore
                             inlineData: {
-                                // @ts-ignore
                                 data: image.imageData,
-                                // @ts-ignore
                                 mimeType: image.mimeType || "image/jpeg",
                             },
                         });
@@ -1007,7 +798,6 @@ const googleProvider = {
                 contents,
             });
             let combinedText = "";
-            // @ts-ignore
             for await (const chunk of response) {
                 if (!chunk.candidates?.[0]?.content?.parts)
                     continue;
@@ -1048,16 +838,15 @@ const googleProvider = {
                     },
                 },
             };
+            const speechModel = options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).google;
+            const speechText = options.prompt ? `${options.prompt}\n\n${text}` : text;
             const response = await getClient().models.generateContent({
-                model: 
-                // @ts-ignore
-                options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).google,
+                model: speechModel,
                 contents: [
                     {
                         role: "user",
                         parts: [
-                            // @ts-ignore
-                            { text: options.prompt ? `${options.prompt}\n\n${text}` : text },
+                            { text: speechText },
                         ],
                     },
                 ],
@@ -1089,13 +878,11 @@ const googleProvider = {
             throw new ProviderError("google", error.message, 500, error);
         }
     },
-    async transcribeAudio(audioBuffer, mimeType, model = GOOGLE_TTS_MODEL, options = {}) {
+    async transcribeAudio(audioBuffer, mimeType, model = GOOGLE_TTS_MODEL || "gemini-2.0-flash", options = {}) {
         logger.provider("Google", `transcribeAudio model=${model}`);
         try {
             const audioBase64 = audioBuffer.toString("base64");
-            const prompt = 
-            // @ts-ignore
-            options.prompt ||
+            const prompt = options.prompt ||
                 "Transcribe the following audio accurately. Return only the transcription text, nothing else.";
             const contents = [
                 {
@@ -1107,9 +894,7 @@ const googleProvider = {
                 },
             ];
             const config = {};
-            // @ts-ignore
             if (options.language) {
-                // @ts-ignore
                 config.systemInstruction = `Transcribe in ${options.language}.`;
             }
             const response = await getClient().models.generateContent({
@@ -1130,54 +915,39 @@ const googleProvider = {
         }
     },
     async generateEmbedding(content, model, options = {}) {
-        model =
-            model ||
-                // @ts-ignore
-                getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)?.google ||
-                GOOGLE_EMBEDDING_MODEL;
-        logger.provider("Google", `generateEmbedding model=${model}`);
+        const resolvedModel = model ||
+            getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)?.google ||
+            GOOGLE_EMBEDDING_MODEL;
+        logger.provider("Google", `generateEmbedding model=${resolvedModel}`);
         try {
-            const params = { model };
+            const params = { model: resolvedModel };
             const config = {};
             // Build the contents for the embedding request
             if (typeof content === "string") {
                 // Simple text-only input
-                // @ts-ignore
                 params.contents = content;
             }
             else if (Array.isArray(content)) {
                 // Multimodal: wrap all parts in a single Content object.
-                // The SDK maps each top-level array item to a separate batch request,
-                // so we must bundle parts into one Content to get a single embedding.
-                // @ts-ignore
                 params.contents = { role: "user", parts: content };
             }
             else {
-                // @ts-ignore
                 params.contents = content;
             }
-            // @ts-ignore
             if (options.taskType) {
-                // @ts-ignore
                 config.taskType = options.taskType;
             }
-            // @ts-ignore
             if (options.dimensions) {
-                // @ts-ignore
                 config.outputDimensionality = options.dimensions;
             }
             if (Object.keys(config).length > 0) {
-                // @ts-ignore
                 params.config = config;
             }
             const response = await getClient().models.embedContent(params);
             // embedContent returns { embeddings: [{ values: [...] }] } for batch/multimodal,
             // or { embedding: { values: [...] } } for single text
             let values;
-            if (response.embedding?.values) {
-                values = response.embedding.values;
-            }
-            else if (response.embeddings?.[0]?.values) {
+            if (response.embeddings?.[0]?.values) {
                 values = response.embeddings[0].values;
             }
             else {

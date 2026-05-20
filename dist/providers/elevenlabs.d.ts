@@ -1,6 +1,6 @@
 declare const elevenlabsProvider: {
     name: string;
-    generateSpeech(text: any, voiceId?: string, options?: {}): Promise<{
+    generateSpeech(text: any, voiceId?: any, options?: any): Promise<{
         stream: import("node:stream/web").ReadableStream<any> | null;
         contentType: string;
     }>;
@@ -10,7 +10,7 @@ declare const elevenlabsProvider: {
   
      * @returns {AsyncGenerator<Buffer>} Audio chunks.
      */
-    generateSpeechStream(textStream: any, voiceId?: string, options?: {}): AsyncGenerator<Buffer<ArrayBuffer>, void, unknown>;
+    generateSpeechStream(textStream: any, voiceId?: any, options?: any): AsyncGenerator<Buffer<ArrayBuffer>, void, unknown>;
 };
 export default elevenlabsProvider;
 //# sourceMappingURL=elevenlabs.d.ts.map

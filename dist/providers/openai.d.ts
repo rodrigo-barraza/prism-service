@@ -1,68 +1,65 @@
+import type { ProviderOptions } from "../types/provider.ts";
+/** OpenAI conversation message (same shape as Google's ConversationMsg) */
+interface OpenAIMsg {
+    role: string;
+    content?: string;
+    name?: string;
+    images?: string[];
+    toolCalls?: Array<{
+        id?: string;
+        name: string;
+        args: unknown;
+        responsesItemId?: string;
+    }>;
+    tool_call_id?: string;
+    id?: string;
+    [key: string]: unknown;
+}
 declare const openaiProvider: {
     name: string;
-    generateText(messages: any, model?: any, options?: {}): Promise<{
-        text: any;
-        usage: {
-            inputTokens: any;
-            outputTokens: any;
-        };
-    }>;
+    generateText(messages: OpenAIMsg[], model?: string, options?: ProviderOptions): Promise<Record<string, unknown>>;
     /**
      * Responses API path for GPT-5.2/5.4 models.
      */
-    _generateTextResponses(messages: any, model: any, options: any): Promise<{
-        text: any;
-        images: {
-            type: string;
-            data: any;
-            mimeType: string;
-        }[];
-        usage: {
-            inputTokens: any;
-            outputTokens: any;
-        };
-    }>;
+    _generateTextResponses(messages: OpenAIMsg[], model: string, options: ProviderOptions): Promise<Record<string, unknown>>;
     /**
      * Chat Completions fallback for older models.
      */
-    _generateTextChatCompletions(messages: any, model: any, options: any): Promise<{
-        text: any;
-        usage: {
-            inputTokens: any;
-            outputTokens: any;
-        };
-    }>;
-    generateTextStream(messages: any, model?: any, options?: {}): AsyncGenerator<any, void, unknown>;
+    _generateTextChatCompletions(messages: OpenAIMsg[], model: string, options: ProviderOptions): Promise<Record<string, unknown>>;
+    generateTextStream(messages: OpenAIMsg[], model?: string, options?: ProviderOptions): AsyncGenerator<any, void, unknown>;
     /**
      * Streaming via the Responses API.
      */
-    _streamResponses(messages: any, model: any, options: any): AsyncGenerator<any, void, unknown>;
+    _streamResponses(messages: OpenAIMsg[], model: string, options: ProviderOptions): AsyncGenerator<any, void, unknown>;
     /**
      * Streaming via Chat Completions (fallback for older models).
      */
-    _streamChatCompletions(messages: any, model: any, options: any): AsyncGenerator<any, void, unknown>;
-    generateSpeech(text: any, voice?: string, options?: {}): Promise<{
-        stream: any;
+    _streamChatCompletions(messages: OpenAIMsg[], model: string, options: ProviderOptions): AsyncGenerator<any, void, unknown>;
+    generateSpeech(text: string, voice?: string, options?: ProviderOptions): Promise<{
+        stream: import("node:stream/web").ReadableStream<any> | null;
         contentType: string;
     }>;
-    generateImage(prompt: any, images?: never[], model?: string): Promise<{
-        imageData: any;
+    generateImage(prompt: string, images?: Array<string | {
+        imageData: string;
+        mimeType?: string;
+    }>, model?: string): Promise<{
+        imageData: {};
         mimeType: string;
-        text: any;
+        text: string;
     }>;
-    captionImage(images: any, prompt: string | undefined, model: any, systemPrompt: any): Promise<{
-        text: any;
+    captionImage(images: string[], prompt?: string, model?: string, systemPrompt?: string): Promise<{
+        text: string | null;
         usage: {
-            inputTokens: any;
-            outputTokens: any;
+            inputTokens: number;
+            outputTokens: number;
         };
     }>;
-    generateEmbedding(text: any, model?: any): Promise<{
-        embedding: any;
+    generateEmbedding(text: string, model?: string): Promise<{
+        embedding: number[];
     }>;
-    transcribeAudio(audioBuffer: any, mimeType: any, model?: string | undefined, options?: {}): Promise<{
-        text: any;
-        usage: {};
+    transcribeAudio(audioBuffer: Buffer, mimeType: string, model?: string, options?: ProviderOptions): Promise<{
+        text: string;
+        usage: Record<string, number>;
     }>;
 };
 export default openaiProvider;

@@ -10,7 +10,7 @@ export default class InternalToolRegistry {
   
   
      */
-    static execute(name: any, args: any, context?: {}): Promise<any>;
+    static execute(name: any, args: any, context?: any): Promise<any>;
     /**
      * Get all internal tool schemas (for LLM consumption — no endpoint metadata).
   

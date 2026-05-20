@@ -1,6 +1,17 @@
+import type { Request, Response, NextFunction } from "express";
 export declare class ProviderError extends Error {
-    constructor(provider: any, message: any, statusCode?: number, originalError?: null);
-    toJSON(): any;
+    provider: string;
+    statusCode: number;
+    originalError: unknown;
+    errorType: string | null;
+    constructor(provider: string, message: string, statusCode?: number, originalError?: unknown);
+    toJSON(): {
+        errorType?: string | undefined;
+        error: boolean;
+        provider: string;
+        message: string;
+        statusCode: number;
+    };
 }
-export declare function errorHandler(error: any, _req: any, res: any, _next: any): any;
+export declare function errorHandler(error: ProviderError | Error, _req: Request, res: Response, _next: NextFunction): Response<any, Record<string, any>>;
 //# sourceMappingURL=errors.d.ts.map

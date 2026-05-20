@@ -40,6 +40,9 @@ const AVAILABLE_PROVIDERS = new Set([
 function resolveEnabledToolsToSet(enabledTools) {
     if (!enabledTools || !Array.isArray(enabledTools))
         return new Set();
+    // "*" wildcard means all tools — return null sentinel
+    if (enabledTools.includes("*"))
+        return null;
     const hasPrefixed = enabledTools.some((e) => e.startsWith("label:") || e.startsWith("domain:"));
     if (!hasPrefixed)
         return new Set(enabledTools);
@@ -305,6 +308,8 @@ router.get("/agents", (_req, res) => {
     const agents = AgentPersonaRegistry.list().map((a) => {
         const persona = AgentPersonaRegistry.get(a.id);
         const resolvedTools = resolveEnabledToolsToSet(persona?.enabledTools);
+        // null sentinel means "*" wildcard → all tools
+        const isWildcard = resolvedTools === null;
         return {
             id: a.id,
             name: a.name,
@@ -314,8 +319,8 @@ router.get("/agents", (_req, res) => {
             color: persona?.color || "",
             backgroundImage: persona?.backgroundImage || "",
             project: persona?.project,
-            toolCount: resolvedTools.size,
-            enabledToolNames: [...resolvedTools],
+            toolCount: isWildcard ? -1 : resolvedTools.size,
+            enabledToolNames: isWildcard ? ["*"] : [...resolvedTools],
             canSpawnWorkers: COORDINATOR_ONLY_TOOLS.includes("team_create"),
             usesDirectoryTree: persona?.usesDirectoryTree || false,
             usesCodingGuidelines: persona?.usesCodingGuidelines || false,
@@ -334,7 +339,10 @@ router.get("/tools", (_req, res) => {
         const persona = AgentPersonaRegistry.get(agentId);
         if (persona?.enabledTools) {
             const enabledSet = resolveEnabledToolsToSet(persona.enabledTools);
-            return res.json(schemas.filter((t) => enabledSet.has(t.name)));
+            // null = wildcard ("*") → return all schemas unfiltered
+            if (enabledSet !== null) {
+                return res.json(schemas.filter((t) => enabledSet.has(t.name)));
+            }
         }
     }
     res.json(schemas);

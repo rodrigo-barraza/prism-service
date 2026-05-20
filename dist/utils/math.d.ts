@@ -11,5 +11,5 @@ export { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 
  * @returns {number|null} Rounded to 1 decimal, or null if not computable
  */
-export declare function calculateTokensPerSec(tokens: any, sec: any, opts?: {}): number | null;
+export declare function calculateTokensPerSec(tokens: any, sec: any, opts?: any): number | null;
 //# sourceMappingURL=math.d.ts.map

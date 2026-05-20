@@ -22,15 +22,15 @@ declare class LocalModelQueue {
      * @returns {Promise<() => void>} A release function — MUST be called
      *   when inference is complete (use try/finally).
      */
-    acquire(instanceId?: string): any;
+    acquire(instanceId?: any): any;
     /** Number of requests waiting for a specific instance. */
-    pending(instanceId?: string): any;
+    pending(instanceId?: any): any;
     /** Whether all slots are in use for a specific instance. */
-    busy(instanceId?: string): any;
+    busy(instanceId?: any): any;
     /** Number of active slots for a specific instance. */
     get activeCount(): number;
     /** Max concurrency for a specific instance (or default). */
-    maxConcurrency(instanceId?: string): any;
+    maxConcurrency(instanceId?: any): any;
     /** Total requests processed across all instances. */
     get totalProcessed(): number;
 }

@@ -4,9 +4,9 @@
 
  * @returns {object} Provider object with all LM Studio methods
  */
-export declare function createLmStudioProvider(baseUrl: any, instanceId?: string): {
-    name: string;
-    generateText(messages: any, model?: any, options?: {}): Promise<{
+export declare function createLmStudioProvider(baseUrl: any, instanceId?: any): {
+    name: any;
+    generateText(messages: any, model?: any, options?: any): Promise<{
         text: any;
         thinking: any;
         usage: {
@@ -14,7 +14,7 @@ export declare function createLmStudioProvider(baseUrl: any, instanceId?: string
             outputTokens: any;
         };
     }>;
-    generateTextStream(messages: any, model?: any, options?: {}): AsyncGenerator<any, void, unknown>;
+    generateTextStream(messages: any, model?: any, options?: any): AsyncGenerator<any, void, unknown>;
     /**
      * OpenAI-compat streaming path — used when coordinator tools are enabled.
      * Sends a standard /v1/chat/completions request with `tools` array.
@@ -33,11 +33,11 @@ export declare function createLmStudioProvider(baseUrl: any, instanceId?: string
 
      * @returns {Promise<{ embedding: number[], dimensions: number }>}
      */
-    generateEmbedding(content: any, model: any, options?: {}): Promise<{
+    generateEmbedding(content: any, model: any, options?: any): Promise<{
         embedding: any;
         dimensions: any;
     }>;
-    captionImage(images: any, prompt: string | undefined, model: any, systemPrompt: any): Promise<{
+    captionImage(images: any, prompt: any | undefined, model: any | undefined, systemPrompt: any): Promise<{
         text: any;
         usage: {
             inputTokens: any;
@@ -54,7 +54,7 @@ export declare function createLmStudioProvider(baseUrl: any, instanceId?: string
 
      * @returns {{ alreadyLoaded: boolean, contextLength: number|null }} - Info about the loaded model.
      */
-    ensureModelLoaded(modelKey: any, loadOptions: {} | undefined, signal: any, onStatus: any): Promise<{
+    ensureModelLoaded(modelKey: any, loadOptions: any | undefined, signal: any, onStatus: any): Promise<{
         alreadyLoaded: boolean;
         contextLength: any;
     }>;
@@ -66,7 +66,7 @@ export declare function createLmStudioProvider(baseUrl: any, instanceId?: string
     /**
      * Load a model into LM Studio memory.
      */
-    loadModel(model: any, options: {} | undefined, signal: any): Promise<unknown>;
+    loadModel(model: any, options: any | undefined, signal: any): Promise<unknown>;
     /**
      * Unload a model from LM Studio by its model key.
      * Looks up the loaded instance ID and unloads it.

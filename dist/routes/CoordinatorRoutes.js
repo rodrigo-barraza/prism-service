@@ -140,7 +140,7 @@ router.get("/workers", asyncHandler(async (req, res) => {
             const { COLLECTIONS } = await import("../constants.js");
             const col = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTIONS.AGENT_SESSIONS);
             const session = await col.findOne({ id: agentSessionId }, { projection: { workers: 1 } });
-            if (session?.workers?.length > 0) {
+            if (session && session.workers && session.workers.length > 0) {
                 workers = session.workers;
             }
         }

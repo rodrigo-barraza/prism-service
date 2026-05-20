@@ -91,7 +91,9 @@ export default class AgenticToolResolver {
             Array.isArray(options.disabledBuiltIns)) {
             const disabledSet = new Set(options.disabledBuiltIns);
             const persona = agent ? AgentPersonaRegistry.get(agent) : null;
-            const baseTools = persona?.enabledTools || null;
+            const rawBaseTools = persona?.enabledTools || null;
+            // "*" wildcard = all tools — treat same as no persona base tools
+            const baseTools = rawBaseTools?.includes("*") ? null : rawBaseTools;
             if (baseTools) {
                 const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
                 const expandedSet = new Set();
@@ -134,8 +136,14 @@ export default class AgenticToolResolver {
         if (!resolvedEnabledTools && agent) {
             const persona = AgentPersonaRegistry.get(agent);
             if (persona?.enabledTools) {
-                resolvedEnabledTools = persona.enabledTools;
-                logger.info(`[AgenticLoop] Using persona "${agent}" enabledTools: [${resolvedEnabledTools.join(", ")}]`);
+                // "*" wildcard means "all tools" — skip filtering entirely
+                if (persona.enabledTools.includes("*")) {
+                    logger.info(`[AgenticLoop] Persona "${agent}" uses wildcard enabledTools — all tools enabled`);
+                }
+                else {
+                    resolvedEnabledTools = persona.enabledTools;
+                    logger.info(`[AgenticLoop] Using persona "${agent}" enabledTools: [${resolvedEnabledTools.join(", ")}]`);
+                }
             }
         }
         let finalTools = dynamicTools;

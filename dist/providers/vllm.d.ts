@@ -4,9 +4,9 @@
 
  * @returns {object} Provider object with all vLLM methods
  */
-export declare function createVllmProvider(baseUrl: any, instanceId?: string): {
-    name: string;
-    generateText(messages: any, model?: any, options?: {}): Promise<{
+export declare function createVllmProvider(baseUrl: any, instanceId?: any): {
+    name: any;
+    generateText(messages: any, model?: any, options?: any): Promise<{
         text: any;
         thinking: any;
         usage: {
@@ -14,8 +14,8 @@ export declare function createVllmProvider(baseUrl: any, instanceId?: string): {
             outputTokens: any;
         };
     }>;
-    generateTextStream(messages: any, model?: any, options?: {}): AsyncGenerator<any, void, unknown>;
-    captionImage(images: any, prompt: string | undefined, model: any, systemPrompt: any): Promise<{
+    generateTextStream(messages: any, model?: any, options?: any): AsyncGenerator<any, void, unknown>;
+    captionImage(images: any, prompt: any | undefined, model: any | undefined, systemPrompt: any): Promise<{
         text: any;
         usage: {
             inputTokens: any;
@@ -31,7 +31,7 @@ export declare function createVllmProvider(baseUrl: any, instanceId?: string): {
 
      * @returns {Promise<{ embedding: number[], dimensions: number }>}
      */
-    generateEmbedding(content: any, model: any, options?: {}): Promise<{
+    generateEmbedding(content: any, model: any, options?: any): Promise<{
         embedding: any;
         dimensions: any;
     }>;

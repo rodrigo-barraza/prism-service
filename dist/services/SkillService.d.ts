@@ -23,9 +23,7 @@ declare const SkillService: {
   
   
      */
-    list({ project, limit }?: {
-        limit?: number | undefined;
-    }): Promise<{
+    list({ project, limit }?: any): Promise<{
         skills: any[];
         total: number;
     }>;
@@ -62,7 +60,7 @@ declare const SkillService: {
   
      * @returns {Promise<object>} { prompt, config } or { error }
      */
-    prepare(skillId: any, variables?: {}): Promise<{
+    prepare(skillId: any, variables?: any): Promise<{
         error: string;
         skillId?: undefined;
         name?: undefined;

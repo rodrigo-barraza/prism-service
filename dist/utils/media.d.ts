@@ -9,7 +9,7 @@
 
  * @returns {Promise<{ data: string, mediaType: string }>} Compressed base64 + updated MIME
  */
-export declare function compressImageForSizeLimit(base64Data: any, mediaType: any, maxBytes?: number): Promise<{
+export declare function compressImageForSizeLimit(base64Data: any, mediaType: any, maxBytes?: any): Promise<{
     data: any;
     mediaType: any;
 }>;
@@ -24,7 +24,7 @@ export declare function compressImageForSizeLimit(base64Data: any, mediaType: an
 
  * @returns {Promise<{ data: string, mediaType: string }>} Possibly resized base64 + MIME
  */
-export declare function constrainImageDimensions(base64Data: any, mediaType: any, maxDim?: number): Promise<{
+export declare function constrainImageDimensions(base64Data: any, mediaType: any, maxDim?: any): Promise<{
     data: any;
     mediaType: any;
 }>;
@@ -58,5 +58,5 @@ export declare function inferMimeFromUrl(url: any): "unknown" | "text" | "image"
 
  * @returns {Promise<string[]>} Array of data:image/jpeg;base64,... URLs
  */
-export declare function extractVideoFrames(videoDataUrl: any, options?: {}): Promise<string[]>;
+export declare function extractVideoFrames(videoDataUrl: any, options?: any): Promise<any[]>;
 //# sourceMappingURL=media.d.ts.map

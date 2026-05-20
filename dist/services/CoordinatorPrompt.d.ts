@@ -5,9 +5,7 @@
 
  * @returns {string} System prompt section to append
  */
-export declare function getCoordinatorPromptAddendum({ workerTools }?: {
-    workerTools?: never[] | undefined;
-}): string;
+export declare function getCoordinatorPromptAddendum({ workerTools }?: any): string;
 /**
  * Get the list of tool names that workers should NOT have access to.
  * Workers cannot spawn sub-workers (prevents recursion).

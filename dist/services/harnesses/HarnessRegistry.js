@@ -1,4 +1,4 @@
-import StandardAgenticHarness from "./StandardAgenticHarness.js";
+import ReActHarness from "./ReActHarness.js";
 /**
  * HarnessRegistry — maps harness IDs to their implementation classes.
  *
@@ -12,13 +12,12 @@ function register(HarnessClass) {
     registry.set(HarnessClass.id, HarnessClass);
 }
 // ── Built-in harnesses ───────────────────────────────────────
-register(StandardAgenticHarness);
-// Future: register(ReactAgenticHarness);
+register(ReActHarness);
 // Future: register(SingleShotHarness);
 // Future: register(PlanExecuteHarness);
 const HarnessRegistry = {
     /**
-     * Get a harness class by ID, falling back to "standard".
+     * Get a harness class by ID, falling back to the ReAct harness.
   
   
      */

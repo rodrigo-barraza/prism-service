@@ -5,16 +5,12 @@
  * @param {string} matchMode  One of: "contains", "exact", "startsWith", "regex"
 
  */
-declare function evaluate(response: any, expected: any, matchMode?: string): any;
+declare function evaluate(response: any, expected: any, matchMode?: any): any;
 /**
  * Get all listed conversation-type models grouped by provider.
  * Returns flat array of { provider, model, label }.
  */
-declare function getConversationModels(): {
-    provider: string;
-    model: string;
-    label: string;
-}[];
+declare function getConversationModels(): any[];
 declare const BenchmarkService: {
     MATCH_MODES: {
         CONTAINS: string;
@@ -34,7 +30,7 @@ declare const BenchmarkService: {
   
      * @returns {Object} The completed run document
      */
-    runBenchmark(benchmark: any, modelTargets: any, project: any, username: any, { onRunStart, onModelStart, onModelComplete, onEvent, signal }?: {}): Promise<{
+    runBenchmark(benchmark: any, modelTargets: any, project: any, username: any, { onRunStart, onModelStart, onModelComplete, onEvent, signal }?: any): Promise<{
         id: `${string}-${string}-${string}-${string}-${string}`;
         benchmarkId: any;
         project: any;

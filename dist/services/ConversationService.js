@@ -313,6 +313,12 @@ const ConversationService = {
                 // @ts-ignore
                 workspaceRoot: conversationMeta.workspaceRoot,
             }),
+            // Agent identity — stored on agent sessions for per-agent filtering
+            // @ts-ignore
+            ...(isAgentSession && conversationMeta?.agent && {
+                // @ts-ignore
+                agent: conversationMeta.agent,
+            }),
             createdAt: now,
         };
         // MongoDB forbids the same field path in both $set and $setOnInsert —
@@ -355,7 +361,7 @@ const ConversationService = {
   
   
      */
-    async setGenerating(conversationId, project, username, generating, { collection = DEFAULT_COLLECTION } = {}) {
+    async setGenerating(conversationId, project, username, generating, { collection = DEFAULT_COLLECTION, agent } = {}) {
         const db = MongoWrapper.getDb(MONGO_DB_NAME);
         if (!db)
             return;
@@ -373,6 +379,8 @@ const ConversationService = {
                     modalities: computeModalities([]),
                     providers: [],
                     totalCost: 0,
+                    // Agent identity — stored on agent sessions for per-agent filtering
+                    ...(isAgentSession && agent && { agent }),
                     createdAt: now,
                 },
             }, { upsert: true });

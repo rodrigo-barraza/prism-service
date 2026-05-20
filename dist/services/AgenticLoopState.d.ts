@@ -1,3 +1,4 @@
+import type { UsageAccumulator, DisplaySegment, ToolCall, AgenticLoopStateInit } from "./harnesses/types.ts";
 /**
  * AgenticLoopState — encapsulates all mutable accumulated state
  * for an agentic loop execution.
@@ -10,17 +11,40 @@
  * persistence code without inheritance coupling.
  */
 export default class AgenticLoopState {
-    constructor({ originalMessageCount, planModeActive }?: {
-        originalMessageCount?: number | undefined;
-        planModeActive?: boolean | undefined;
-    });
-    /**
-     * Get clean display segments (trimmed, empty-filtered) for DB persistence.
-     */
+    iterations: number;
+    overallUsage: UsageAccumulator;
+    overallFirstTokenTime: number | null;
+    overallGenerationEnd: number | null;
+    overallOutputCharacters: number;
+    finalStreamedText: string;
+    streamedThinking: string;
+    streamedImages: string[];
+    streamedToolCalls: ToolCall[];
+    streamedAudioChunks: string[];
+    audioSampleRate: number;
+    lastRateLimits: Record<string, unknown> | null;
+    displaySegments: DisplaySegment[];
+    displayTextFragments: string[];
+    displayThinkingFragments: string[];
+    lastDisplaySegType: string | null;
+    planModeActive: boolean;
+    planModeText: string;
+    originalMessageCount: number;
+    toolErrorCounts: Map<string, number>;
+    hwmOutputTokens: number;
+    hwmInputTokens: number;
+    hwmTotalTokens: number;
+    hwmOutputCharacters: number;
+    readonly PROGRESS_CHUNK_INTERVAL = 10;
+    readonly PROGRESS_TIME_INTERVAL_MS = 500;
+    lastProgressEmitTime: number;
+    chunksSinceLastProgress: number;
+    constructor({ originalMessageCount, planModeActive, }?: AgenticLoopStateInit);
+    /** Get clean display segments (trimmed, empty-filtered) for DB persistence. */
     getCleanDisplayData(): {
-        cleanSegments: any[];
-        cleanTextFragments: any[];
-        cleanThinkingFragments: any[];
+        cleanSegments: DisplaySegment[];
+        cleanTextFragments: string[];
+        cleanThinkingFragments: string[];
     };
 }
 //# sourceMappingURL=AgenticLoopState.d.ts.map

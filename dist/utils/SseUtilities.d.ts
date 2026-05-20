@@ -1,5 +1,4 @@
-import { handleConversation } from "../routes/ChatRoutes.js";
-import { ProviderError } from "./errors.js";
+import { ProviderError } from "./errors.ts";
 /**
  * Configure an Express response for SSE (Server-Sent Events) streaming.
  * Sets the required headers and flushes them immediately.
@@ -37,7 +36,7 @@ export declare function buildJsonResponseFromEvents(events: any, reqBody: any): 
 
 
  */
-export declare function handleSseRequest(req: any, res: any, params: any, handler?: typeof handleConversation): Promise<void>;
+export declare function handleSseRequest(req: any, res: any, params: any, handler?: any): Promise<void>;
 /**
  * Handle a non-streaming JSON request lifecycle.
  * Collects events from the handler and returns a flat JSON response.
@@ -45,5 +44,5 @@ export declare function handleSseRequest(req: any, res: any, params: any, handle
 
 
  */
-export declare function handleJsonRequest(req: any, res: any, next: any, params: any, handler?: typeof handleConversation): Promise<any>;
+export declare function handleJsonRequest(req: any, res: any, next: any, params: any, handler?: any): Promise<any>;
 //# sourceMappingURL=SseUtilities.d.ts.map
