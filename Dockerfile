@@ -11,7 +11,7 @@ FROM node:26-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN apk add --no-cache git
-RUN npm ci
+RUN --mount=type=ssh npm ci
 
 # ── Stage 2: Build TypeScript ─────────────────────────────────
 FROM deps AS build
