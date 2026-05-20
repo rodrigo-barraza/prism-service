@@ -187,9 +187,10 @@ function buildGenerateConfig(options: ProviderOptions, modelDef: Record<string, 
   if (options.responseFormat === "json_object") config.responseMimeType = "application/json";
 
   // Thinking config
+  const supportsThinking = modelDef?.thinking === true;
   if (
-    options.thinkingEnabled !== false &&
-    (options.thinkingLevel || options.thinkingBudget !== undefined)
+    supportsThinking &&
+    options.thinkingEnabled !== false
   ) {
     config.thinkingConfig = { includeThoughts: true };
     if (options.thinkingLevel && modelDef?.thinkingLevels) {
@@ -527,6 +528,7 @@ const googleProvider = {
       "Google",
       `generateTextStreamLive (Live API) model=${model}`,
     );
+    const modelDef = Object.values(MODELS).find((m) => m.name === model) as Record<string, unknown> | undefined;
     let session: Awaited<ReturnType<GoogleGenAI["live"]["connect"]>> | null = null;
     try {
       // ── Build Live API config ────────────────────────────────────
@@ -542,12 +544,15 @@ const googleProvider = {
       if (options.topK !== undefined) liveConfig.topK = options.topK;
       if (options.maxTokens !== undefined) liveConfig.maxOutputTokens = options.maxTokens;
 
+      const supportsThinking = modelDef?.thinking === true;
       if (
-        options.thinkingEnabled !== false &&
-        (options.thinkingLevel || options.thinkingBudget !== undefined)
+        supportsThinking &&
+        options.thinkingEnabled !== false
       ) {
         const thinkCfg: Record<string, unknown> = { includeThoughts: true };
-        if (options.thinkingLevel) thinkCfg.thinkingLevel = options.thinkingLevel;
+        if (options.thinkingLevel && modelDef?.thinkingLevels) {
+          thinkCfg.thinkingLevel = options.thinkingLevel;
+        }
         if (options.thinkingBudget !== undefined && options.thinkingBudget !== "") {
           thinkCfg.thinkingBudget = parseInt(String(options.thinkingBudget));
         }
