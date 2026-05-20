@@ -379,10 +379,10 @@ const ConversationService = {
     await col.updateOne(
       { id: conversationId, project, username },
       {
-        $push: { messages: { $each: processedMessages } } as any,
+        $push: { messages: { $each: processedMessages } },
         $set: setFields,
         $setOnInsert: setOnInsert,
-      },
+      } as Record<string, unknown>,
       { upsert: true },
     );
 

@@ -101,7 +101,10 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       // ── beforePrompt hook (iteration 1 only) ──────────────
       if (state.iterations === 1) {
-        const hookContext: Record<string, unknown> = {
+        interface HookContextType extends Record<string, unknown> {
+          _injectedSkills?: unknown[];
+        }
+        const hookContext: HookContextType = {
           messages: currentMessages,
           project,
           username,
@@ -115,13 +118,13 @@ export default class ReActHarness extends BaseAgenticHarness {
         await hooks.run("beforePrompt", hookContext);
 
         if (
-          Array.isArray((hookContext as any)._injectedSkills) &&
-          ((hookContext as any)._injectedSkills as unknown[]).length > 0
+          Array.isArray(hookContext._injectedSkills) &&
+          hookContext._injectedSkills.length > 0
         ) {
           emit({
             type: "status",
             message: "skills_injected",
-            skills: (hookContext as any)._injectedSkills,
+            skills: hookContext._injectedSkills,
           });
         }
 

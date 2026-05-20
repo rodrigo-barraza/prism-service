@@ -1034,37 +1034,43 @@ const googleProvider = {
     const resolvedModel =
       model ||
       getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)?.google ||
-      GOOGLE_EMBEDDING_MODEL;
+      GOOGLE_EMBEDDING_MODEL ||
+      "gemini-embedding-2-preview";
     logger.provider("Google", `generateEmbedding model=${resolvedModel}`);
     try {
-      const params: Record<string, unknown> = { model: resolvedModel };
-      const config: Record<string, unknown> = {};
+      type EmbedParams = Parameters<GoogleGenAI["models"]["embedContent"]>[0];
+      const config: NonNullable<EmbedParams["config"]> = {};
+
+      let contents: EmbedParams["contents"];
 
       // Build the contents for the embedding request
       if (typeof content === "string") {
         // Simple text-only input
-        params.contents = content;
+        contents = content;
       } else if (Array.isArray(content)) {
         // Multimodal: wrap all parts in a single Content object.
-        params.contents = { role: "user", parts: content };
+        contents = { role: "user", parts: content as Record<string, unknown>[] };
       } else {
-        params.contents = content;
+        contents = content as EmbedParams["contents"];
       }
 
-      if (options.taskType) {
+      if (typeof options.taskType === "string") {
         config.taskType = options.taskType;
       }
-      if (options.dimensions) {
+      if (typeof options.dimensions === "number") {
         config.outputDimensionality = options.dimensions;
       }
+
+      const params: EmbedParams = {
+        model: resolvedModel,
+        contents,
+      };
 
       if (Object.keys(config).length > 0) {
         params.config = config;
       }
 
-      const response = await getClient().models.embedContent(
-        params as unknown as Parameters<GoogleGenAI["models"]["embedContent"]>[0],
-      );
+      const response = await getClient().models.embedContent(params);
 
       // embedContent returns { embeddings: [{ values: [...] }] } for batch/multimodal,
       // or { embedding: { values: [...] } } for single text

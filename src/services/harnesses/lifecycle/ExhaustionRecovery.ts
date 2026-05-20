@@ -78,7 +78,7 @@ export async function runExhaustionRecoveryPass(
 
   // Use the shared consumeStream — all chunk routing goes through processStreamChunk,
   // so new chunk types added to the base dispatcher are automatically handled.
-  await (harness as any).consumeStream(exhaustionStream, exhaustionPass, emptyToolNames);
+  await harness.consumeStream(exhaustionStream, exhaustionPass, emptyToolNames);
 
   harness.emitGenerationProgress();
   SessionGenerationTracker.complete(exhaustionRequestId);

@@ -186,7 +186,7 @@ export default class BaseAgenticHarness {
    * Consume an LLM stream, routing each chunk through `processStreamChunk`.
    * Handles abort signals and stream teardown.
    */
-  protected async consumeStream(
+  public async consumeStream(
     stream: AsyncIterable<unknown>,
     pass: PassState,
     allowedToolNames: Set<string>,

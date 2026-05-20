@@ -191,26 +191,28 @@ async function pruneMinioOrphans() {
 
     // Group objects by their top-level prefix — only check prefixes that are
     // NOT known structural paths (projects/, uploads/, generations/, etc.)
-    const prefixes = new Set();
-    // @ts-ignore
-    for ( const object of objects) {
-      const prefix = ((object.name || object) as any).split("/")[0];
+    const prefixes = new Set<string>();
+    for (const object of objects) {
+      const name = typeof object === "string" ? object : (object as { name?: string })?.name;
+      const prefix = name ? name.split("/")[0] : "";
       if (prefix && !validIds.has(prefix) && !STRUCTURAL_PREFIXES.has(prefix)) {
         prefixes.add(prefix);
       }
     }
 
     // Remove orphaned prefixes
-    // @ts-ignore
-    for ( const prefix of prefixes) {
-      const orphanedObjects = objects.filter((o: any) =>
-        (o.name || o).startsWith(`${prefix}/`),
-      );
-      // @ts-ignore
-      for ( const object of orphanedObjects) {
+    for (const prefix of prefixes) {
+      const orphanedObjects = objects.filter((o: any) => {
+        const name = typeof o === "string" ? o : (o as { name?: string })?.name;
+        return name ? name.startsWith(`${prefix}/`) : false;
+      });
+      for (const object of orphanedObjects) {
         try {
-          await MinioWrapper.remove(object.name || object);
-          removed++;
+          const name = typeof object === "string" ? object : (object as { name?: string })?.name;
+          if (name) {
+            await MinioWrapper.remove(name);
+            removed++;
+          }
         } catch {
           // Best-effort — skip failures
         }

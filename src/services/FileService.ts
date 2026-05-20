@@ -5,7 +5,7 @@ import logger from "../utils/logger.ts";
 /**
  * MIME type → file extension map for common file types.
  */
-const MIME_TO_EXT = {
+const MIME_TO_EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/gif": "gif",
@@ -25,6 +25,13 @@ const MIME_TO_EXT = {
   "application/json": "json",
 };
 
+interface MinioStatResult {
+  metaData?: Record<string, string>;
+  size?: number;
+  lastModified?: Date;
+  etag?: string;
+}
+
 /**
  * FileService — abstracts file storage with MinIO primary / MongoDB inline fallback.
  *
@@ -38,23 +45,22 @@ const FileService = {
   /**
    * Whether external (MinIO) storage is active.
    */
-  isExternalStorage() {
+  isExternalStorage(): boolean {
     return MinioWrapper.isAvailable();
   },
 
   /**
    * Upload a file from a base64 data URL.
-
-
+   *
    * @returns {Promise<{ ref: string, size: number, contentType: string }>}
    *   ref is either `minio://...` or the original dataUrl.
    */
   async uploadFile(
-    dataUrl: any,
-    category: any = "uploads",
-    project: any = null,
-    username: any = null,
-  ) {
+    dataUrl: string,
+    category = "uploads",
+    project: string | null = null,
+    username: string | null = null,
+  ): Promise<{ ref: string; size: number; contentType: string }> {
     // If MinIO is not available, return the data URL as-is (MongoDB inline)
     if (!MinioWrapper.isAvailable()) {
       const size = Math.round((dataUrl.length * 3) / 4); // rough base64 → bytes
@@ -71,18 +77,15 @@ const FileService = {
     const contentType = match[1];
     const base64Data = match[2];
     const buffer = Buffer.from(base64Data, "base64");
-    // @ts-ignore
     const ext = MIME_TO_EXT[contentType] || "bin";
 
     // Build path: projects/{project}/{username}/{category}/{uuid}.{ext}
     // Falls back to flat {category}/{uuid}.{ext} when project/username not provided
-    let key: any;
+    let key: string;
     if (project && username) {
       // Sanitize: never use raw IP addresses as path segments — they cause
       // duplicate directories when the same user is later identified by name.
-      // @ts-ignore
       const safeUsername =
-        // @ts-ignore
         /^\d{1,3}(\.\d{1,3}){3}$/.test(username) || username.includes(":")
           ? "anonymous"
           : username;
@@ -105,20 +108,20 @@ const FileService = {
 
   /**
    * Get a file stream from a MinIO reference.
-
-   * @returns {Promise<{ stream: import('stream').Readable, contentType: string } | null>}
+   *
+   * @returns {Promise<{ stream: any, contentType: string } | null>}
    */
-  async getFile(key: any) {
+  async getFile(key: string): Promise<{ stream: any; contentType: string } | null> {
     if (!MinioWrapper.isAvailable()) return null;
 
     // Helper to fetch stat + stream for a given key
-    const tryKey = async (k: any) => {
-      const stat = await MinioWrapper.stat(k);
+    const tryKey = async (k: string) => {
+      const stat = (await MinioWrapper.stat(k)) as MinioStatResult | null | undefined;
       const stream = await MinioWrapper.get(k);
       return {
         stream,
         contentType:
-          (stat as any).metaData?.["content-type"] || "application/octet-stream",
+          stat?.metaData?.["content-type"] || "application/octet-stream",
       };
     };
 
@@ -132,19 +135,17 @@ const FileService = {
 
   /**
    * Check if a string is a MinIO reference.
-
-
    */
-  isMinioRef(ref: any) {
+  isMinioRef(ref: unknown): ref is string {
     return typeof ref === "string" && ref.startsWith("minio://");
   },
 
   /**
    * Extract the object key from a MinIO reference.
-
+   *
    * @returns {string} - e.g. "files/abc-123.png"
    */
-  extractKey(ref: any) {
+  extractKey(ref: string): string {
     return ref.replace("minio://", "");
   },
 };

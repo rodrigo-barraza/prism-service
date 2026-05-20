@@ -70,18 +70,26 @@ function freshnessCaveat(createdAt: any) {
   if (ageDays <= 1) return "";
   return ` ⚠️ ${ageDays} days old — verify against current code before acting on this.`;
 }
+interface ExtractedFact {
+  fact: string;
+  aboutUserId: string;
+  aboutUsername: string;
+  sourceUserId?: string;
+  sourceUsername?: string;
+  category?: string;
+  confidence?: number;
+}
+
 // ─── LUPOS Fact Extraction ────────────────────────────────────────────────────
 /**
  * Call an AI provider to extract facts from a conversation.
  * Returns an array of { fact, aboutUserId, aboutUsername, category, confidence }.
-
-
  */
 async function extractFactsFromConversation(
   messages: any,
   participants: any,
   meta: any = {},
-) {
+): Promise<ExtractedFact[]> {
   // @ts-ignore
   const endpoint = meta.endpoint || null;
   // @ts-ignore
@@ -181,7 +189,7 @@ ${participantList}`;
       f.aboutUsername &&
       typeof f.confidence === "number" &&
       f.confidence >= 0.5,
-  );
+  ) as ExtractedFact[];
 }
 // ─── Unified Memory Service ──────────────────────────────────────────────────
 /**
@@ -329,7 +337,7 @@ const MemoryService = {
       `[MemoryService] Extracted ${facts.length} fact(s), generating embeddings...`,
     );
     const storedMemories: any[] = [];
-    for ( const fact of facts as any[]) {
+    for ( const fact of facts) {
       try {
         const embedding = await generateEmbedding(fact.fact, {
           project,

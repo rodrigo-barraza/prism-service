@@ -1821,7 +1821,10 @@ export default class CoordinatorService {
       },
     });
 
-    const parsed = parseJsonFromLlmResponse(result.text) as any;
+    const parsed = parseJsonFromLlmResponse(result.text) as {
+      subTasks?: any[];
+      summary?: string;
+    } | null;
     if (!parsed) {
       return {
         error: "Failed to parse decomposition result",

@@ -19,6 +19,11 @@ import {
 import { TYPES } from "../config.ts";
 import { resolveArchParams, estimateMemory } from "../utils/gguf-arch.ts";
 
+interface ListModelsResponse {
+  models?: any[];
+  data?: any[];
+}
+
 // ─── PROVIDER TYPE CONSTANTS ────────────────────────────────
 // Canonical provider type identifiers used across the system.
 
@@ -746,13 +751,13 @@ class LocalProviderGateway {
       const provider = getProvider(inst.id);
       if (!provider?.listModels) return [];
 
-      const rawResult = await withTimeoutFallback(
+      const rawResult = (await withTimeoutFallback(
         provider.listModels(),
         timeoutMs,
         { models: [] },
-      );
+      )) as ListModelsResponse | null | undefined;
 
-      const rawModels = rawResult?.models || (rawResult as any)?.data || [];
+      const rawModels = rawResult?.models || rawResult?.data || [];
       if (!Array.isArray(rawModels) || rawModels.length === 0) return [];
 
       // @ts-ignore
@@ -912,12 +917,12 @@ class LocalProviderGateway {
         const provider = getProvider(inst.id);
         if (!provider?.listModels) return null;
 
-        const result = await withTimeoutFallback(
+        const result = (await withTimeoutFallback(
           provider.listModels(),
           timeoutMs,
           { models: [] },
-        );
-        const models = result?.models || (result as any)?.data || [];
+        )) as ListModelsResponse | null | undefined;
+        const models = result?.models || result?.data || [];
         const found = models.some((m: any) => {
           const key = m.key || m.id || m.model || m.name;
           return key === modelName;
@@ -978,11 +983,11 @@ class LocalProviderGateway {
         // Fallback: probe via listModels
         if (provider?.listModels) {
           try {
-            const result = await withTimeoutFallback(
+            const result = (await withTimeoutFallback(
               provider.listModels(),
               timeoutMs,
               null,
-            );
+            )) as ListModelsResponse | null | undefined;
             if (!result) {
               return {
                 id: inst.id,
@@ -991,7 +996,7 @@ class LocalProviderGateway {
                 status: "timeout",
               };
             }
-            const models = (result as any)?.models || (result as any)?.data || [];
+            const models = result.models || result.data || [];
             return {
               id: inst.id,
               type: inst.type,

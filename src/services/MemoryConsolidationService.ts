@@ -739,7 +739,7 @@ async function processBatch(
   }
 
   // Parse response with enhanced diagnostics
-  const parsed = parseJsonFromLlmResponse(result.text);
+  const parsed = parseJsonFromLlmResponse(result.text) as { actions?: any[] } | null;
   if (!parsed) {
     const responseLen = result.text?.length || 0;
     const snippet = result.text?.substring(0, 300) || "(empty)";
@@ -753,7 +753,7 @@ async function processBatch(
     return [];
   }
 
-  return (parsed as any).actions || [];
+  return parsed.actions || [];
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────

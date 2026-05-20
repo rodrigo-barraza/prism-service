@@ -93,6 +93,12 @@ Example:
 
 If nothing worth remembering happened, return an empty array: []`;
 
+interface ExtractedMemory {
+  type: string;
+  title: string;
+  content: string;
+}
+
 // ─── MemoryExtractor ─────────────────────────────────────────────────────────
 
 /**
@@ -280,7 +286,7 @@ export default class MemoryExtractor {
         }
       }
 
-      const memories = parseJsonFromLlmResponse(result.text);
+      const memories = parseJsonFromLlmResponse(result.text) as ExtractedMemory[] | null;
       if (!Array.isArray(memories)) {
         logger.warn("[MemoryExtractor] Response was not an array");
         return [];
@@ -290,7 +296,7 @@ export default class MemoryExtractor {
       const agentId = agent || "CODING";
       const stored: any[] = [];
 
-      for ( const mem of memories as any[]) {
+      for ( const mem of memories) {
         if (!mem.content || !mem.title) continue;
 
         // Validate type — default to "project" if unknown
