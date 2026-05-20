@@ -1,6 +1,6 @@
 // @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import SettingsService from "../services/SettingsService.ts";
 import logger from "../utils/logger.ts";
 
@@ -12,11 +12,12 @@ const router = express.Router();
  */
 router.get(
   "/",
-  asyncHandler(async (_req: any, res: any, next: any) => {
+  asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const settings = await SettingsService.get();
       res.json(settings);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // @ts-ignore - TODO: strict typing
       logger.error(`GET /settings error: ${error.message}`);
       next(error);
     }
@@ -29,7 +30,7 @@ router.get(
  */
 router.put(
   "/",
-  asyncHandler(async (req: any, res: any, next: any) => {
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = req.body;
       if (!data || typeof data !== "object") {
@@ -40,7 +41,8 @@ router.put(
 
       const updated = await SettingsService.update(data);
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // @ts-ignore - TODO: strict typing
       logger.error(`PUT /settings error: ${error.message}`);
       next(error);
     }
@@ -51,7 +53,7 @@ router.put(
  * GET /settings/defaults
  * Returns the compiled defaults for reference (useful for "Reset" buttons).
  */
-router.get("/defaults", (_req: any, res: any) => {
+router.get("/defaults", (_req: Request, res: Response) => {
   res.json(SettingsService.getDefaults());
 });
 
@@ -61,7 +63,7 @@ router.get("/defaults", (_req: any, res: any) => {
  */
 router.get(
   "/harnesses",
-  asyncHandler(async (_req: any, res: any) => {
+  asyncHandler(async (_req: Request, res: Response) => {
     const { default: AgenticLoopService } =
       await import("../services/AgenticLoopService.js");
     res.json(AgenticLoopService.listHarnesses());

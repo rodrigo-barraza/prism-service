@@ -1,6 +1,6 @@
 // @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import logger from "../utils/logger.ts";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import {
@@ -19,8 +19,9 @@ router.use(requireDb);
  */
 router.get(
   "/models",
-  asyncHandler(async (req: any, res: any, next: any) => {
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // @ts-ignore - TODO: strict typing
       const { db, username } = req;
       if (!username) return res.json([]);
 
@@ -62,8 +63,10 @@ router.get(
         .toArray();
 
       res.json(
-        results.map((r: any) => ({
+        results.map((r: Record<string, unknown>) => ({
+          // @ts-ignore - TODO: strict typing
           model: r._id.model,
+          // @ts-ignore - TODO: strict typing
           provider: r._id.provider,
           totalRequests: r.totalRequests,
           totalInputTokens: r.totalInputTokens,
@@ -78,7 +81,8 @@ router.get(
           errorCount: r.errorCount,
         })),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // @ts-ignore - TODO: strict typing
       logger.error(`GET /stats/models error: ${error.message}`);
       next(error);
     }

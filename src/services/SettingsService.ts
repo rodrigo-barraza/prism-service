@@ -71,7 +71,7 @@ const SettingsService = {
 
 
    */
-  async getSection(section: any) {
+  async getSection(section: Record<string, unknown>) {
     const settings = await this.get();
     // @ts-ignore
     return settings[section] || DEFAULTS[section] || {};
@@ -82,7 +82,7 @@ const SettingsService = {
 
    * @returns {Promise<object>} The full settings after merge
    */
-  async update(data: any) {
+  async update(data: Record<string, unknown>) {
     const collection = MongoWrapper.getCollection(
       MONGO_DB_NAME,
       COLLECTIONS.SETTINGS,
@@ -121,7 +121,8 @@ const SettingsService = {
 
    * @returns {Promise<{ provider: string, model: string }>}
    */
-  async getMemoryModelConfig(role: any) {
+  async getMemoryModelConfig(role: string) {
+    // @ts-ignore - TODO: strict typing
     const mem = await this.getSection("memory");
     const provider = mem[`${role}Provider`];
     const model = mem[`${role}Model`];

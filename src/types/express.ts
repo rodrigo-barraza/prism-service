@@ -2,12 +2,25 @@
  * Express Type Helpers
  *
  * Re-exports and extends Express types for route handlers.
- * Eliminates `(req: any, res: any, next: any)` across all route files.
+ * Eliminates `(req: Request, res: Response, next: NextFunction)` across all route files.
  */
 
 import type { Request, Response, NextFunction, ErrorRequestHandler } from "express";
 
 export type { Request, Response, NextFunction, ErrorRequestHandler };
+
+declare global {
+  namespace Express {
+    interface Request {
+      project?: string;
+      clientIp?: string;
+      username?: string;
+      workspaceId?: string;
+      files?: unknown;
+      file?: unknown;
+    }
+  }
+}
 
 /**
  * Route handler function signature.

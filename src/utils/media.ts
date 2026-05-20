@@ -20,8 +20,8 @@ let _ffmpegAvailable = null;
 async function isFfmpegAvailable() {
   // @ts-ignore
   if (_ffmpegAvailable !== null) return _ffmpegAvailable;
-  return new Promise((resolve: any) => {
-    execFile("ffmpeg", ["-version"], { timeout: 5_000 }, (error: any) => {
+  return new Promise((resolve) => {
+    execFile("ffmpeg", ["-version"], { timeout: 5_000 }, (error: Error | null) => {
       _ffmpegAvailable = !error;
       if (!_ffmpegAvailable) {
         logger.warn(
@@ -58,9 +58,9 @@ const MAX_IMAGE_DIMENSION = 2000;
  * @returns {Promise<{ data: string, mediaType: string }>} Compressed base64 + updated MIME
  */
 export async function compressImageForSizeLimit(
-  base64Data: any,
-  mediaType: any,
-  maxBytes: any = ANTHROPIC_IMAGE_MAX_BYTES,
+  base64Data: string,
+  mediaType: string,
+  maxBytes: number = ANTHROPIC_IMAGE_MAX_BYTES,
 ) {
   // Step 0: enforce pixel dimension limits first (avoids sending oversized pixels)
   const dimensionResult = await constrainImageDimensions(base64Data, mediaType);
@@ -100,9 +100,9 @@ export async function compressImageForSizeLimit(
  * @returns {Promise<{ data: string, mediaType: string }>} Possibly resized base64 + MIME
  */
 export async function constrainImageDimensions(
-  base64Data: any,
-  mediaType: any,
-  maxDim: any = MAX_IMAGE_DIMENSION,
+  base64Data: string,
+  mediaType: string,
+  maxDim: number = MAX_IMAGE_DIMENSION,
 ) {
   // GIFs are animated — skip (ffmpeg handles them in compressGifWithFfmpeg)
   if (mediaType === "image/gif") {
@@ -154,9 +154,9 @@ export async function constrainImageDimensions(
     );
 
     return { data: resizedB64, mediaType: outputMime };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.warn(
-      `[media] Dimension check failed (${error.message}), passing through`,
+      `[media] Dimension check failed (${error instanceof Error ? error.message : String(error)}), passing through`,
     );
     return { data: base64Data, mediaType };
   }
@@ -166,7 +166,7 @@ export async function constrainImageDimensions(
  * Compress an animated GIF using ffmpeg's scale filter.
  * Preserves animation — progressively halves dimensions until under limit.
  */
-async function compressGifWithFfmpeg(base64Data: any, maxBytes: any) {
+async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
   // ── Graceful degradation: if ffmpeg is not installed, convert the
   //    first frame to a static JPEG via sharp instead of crashing.
   const hasFfmpeg = await isFfmpegAvailable();
@@ -196,7 +196,7 @@ async function compressGifWithFfmpeg(base64Data: any, maxBytes: any) {
         `output_${Math.round(cumulativeScale * 100)}.gif`,
       );
 
-      await new Promise((resolve: any, reject: any) => {
+      await new Promise<void>((resolve, reject) => {
         execFile(
           "ffmpeg",
           [
@@ -210,7 +210,7 @@ async function compressGifWithFfmpeg(base64Data: any, maxBytes: any) {
             outputPath,
           ],
           { timeout: 30_000 },
-          (error: any, _stdout: any, stderr: any) => {
+          (error: Error | null, _stdout: string | Buffer, stderr: string | Buffer) => {
             if (error)
               reject(
                 new Error(
@@ -238,7 +238,7 @@ async function compressGifWithFfmpeg(base64Data: any, maxBytes: any) {
 
     // Final fallback: tiny GIF
     const fallbackPath = join(tmpDir, "output_fallback.gif");
-    await new Promise((resolve: any, reject: any) => {
+    await new Promise<void>((resolve, reject) => {
       execFile(
         "ffmpeg",
         [
@@ -252,7 +252,7 @@ async function compressGifWithFfmpeg(base64Data: any, maxBytes: any) {
           fallbackPath,
         ],
         { timeout: 30_000 },
-        (error: any, _stdout: any, stderr: any) => {
+        (error: Error | null, _stdout: string | Buffer, stderr: string | Buffer) => {
           if (error)
             reject(
               new Error(
@@ -284,7 +284,7 @@ async function compressGifWithFfmpeg(base64Data: any, maxBytes: any) {
  * Compress a non-GIF image using sharp.
  * Converts to JPEG with progressive quality + dimension reduction.
  */
-async function compressWithSharp(base64Data: any, maxBytes: any) {
+async function compressWithSharp(base64Data: string, maxBytes: number) {
   let buffer = Buffer.from(base64Data, "base64");
   const qualitySteps = [85, 70, 50];
 
@@ -359,7 +359,7 @@ async function compressWithSharp(base64Data: any, maxBytes: any) {
 
  * @returns {string|null} The MIME type (e.g. "image/png") or null
  */
-export function getDataUrlMimeType(dataUrl: any) {
+export function getDataUrlMimeType(dataUrl: string) {
   const match = dataUrl.match(/^data:([^;]+);base64,/);
   return match ? match[1] : null;
 }
@@ -369,7 +369,7 @@ export function getDataUrlMimeType(dataUrl: any) {
 
 
  */
-export function getUrlType(url: any) {
+export function getUrlType(url: string) {
   if (url.startsWith("data:")) return "data";
   if (url.startsWith("http://") || url.startsWith("https://")) return "http";
   return "unknown";
@@ -380,7 +380,7 @@ export function getUrlType(url: any) {
 
 
  */
-export function inferMimeFromUrl(url: any) {
+export function inferMimeFromUrl(url: string) {
   try {
     const pathname = new URL(url).pathname.toLowerCase();
     if (/\.(png|jpg|jpeg|gif|webp|bmp|svg|avif)$/i.test(pathname))
@@ -408,7 +408,7 @@ export function inferMimeFromUrl(url: any) {
 
  * @returns {Promise<string[]>} Array of data:image/jpeg;base64,... URLs
  */
-export async function extractVideoFrames(videoDataUrl: any, options: any = {}) {
+export async function extractVideoFrames(videoDataUrl: string, options: { fps?: number; maxFrames?: number; quality?: number } = {}) {
   // @ts-ignore
   const { fps = 1, maxFrames = 8, quality = 5 } = options;
 
@@ -449,7 +449,7 @@ export async function extractVideoFrames(videoDataUrl: any, options: any = {}) {
     await writeFile(inputPath, videoBuffer);
 
     // Extract frames with ffmpeg
-    const ffmpegStderr = await new Promise((resolve: any, reject: any) => {
+    const ffmpegStderr = await new Promise((resolve, reject) => {
       execFile(
         "ffmpeg",
         [
@@ -466,7 +466,7 @@ export async function extractVideoFrames(videoDataUrl: any, options: any = {}) {
           outputPattern,
         ],
         { timeout: 30_000 },
-        (error: any, _stdout: any, stderr: any) => {
+        (error: Error | null, _stdout: string | Buffer, stderr: string | Buffer) => {
           if (error) {
             reject(
               new Error(
@@ -481,7 +481,7 @@ export async function extractVideoFrames(videoDataUrl: any, options: any = {}) {
     });
 
     // Read extracted frames and convert to data URLs
-    const frames: any[] = [];
+    const frames: string[] = [];
     for (let i = 1; i <= maxFrames; i++) {
       const framePath = join(tmpDir, `frame_${String(i).padStart(4, "0")}.jpg`);
       try {

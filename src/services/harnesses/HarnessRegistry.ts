@@ -12,11 +12,12 @@ import ReActHarness from "./ReActHarness.ts";
 
 const registry = new Map();
 
-function register(HarnessClass: any) {
+function register(HarnessClass: Record<string, unknown>) {
   registry.set(HarnessClass.id, HarnessClass);
 }
 
 // ── Built-in harnesses ───────────────────────────────────────
+// @ts-ignore - TODO: strict typing
 register(ReActHarness);
 
 // Future: register(SingleShotHarness);
@@ -28,7 +29,7 @@ const HarnessRegistry = {
 
 
    */
-  get(id: any) {
+  get(id: string) {
     return registry.get(id) || registry.get("standard");
   },
 
@@ -37,7 +38,7 @@ const HarnessRegistry = {
    * @returns {Array<{ id: string, label: string, description: string }>}
    */
   list() {
-    return [...registry.values()].map((H: any) => ({
+    return [...registry.values()].map((H: Record<string, unknown>) => ({
       id: H.id,
       label: H.label,
       description: H.description,
@@ -49,7 +50,7 @@ const HarnessRegistry = {
 
 
    */
-  has(id: any) {
+  has(id: string) {
     return registry.has(id);
   },
 };

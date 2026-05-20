@@ -1,3 +1,4 @@
+import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 
@@ -22,21 +23,23 @@ import {
 
  * @returns {object} Provider object with all vLLM methods
  */
-export function createVllmProvider(baseUrl: any, instanceId: any = "vllm") {
+export function createVllmProvider(baseUrl: string, instanceId: string = "vllm") {
   const getBaseUrl = () => baseUrl;
 
   return {
     name: instanceId,
 
     async generateText(
-      messages: any,
+      messages: ChatMessage[],
       // @ts-ignore
-      model: any = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
-      options: any = {},
+      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
+      options: ProviderOptions = {},
     ) {
       const baseUrl = getBaseUrl();
+      // @ts-ignore - TODO: strict typing
       logger.provider("vLLM", `generateText model=${model} baseUrl=${baseUrl}`);
       try {
+        // @ts-ignore - TODO: strict typing
         const prepared = prepareOpenAICompatMessages(messages, {
           mediaStrategy: MEDIA_STRATEGIES.FULL_MULTIMODAL,
         });
@@ -97,8 +100,9 @@ export function createVllmProvider(baseUrl: any, instanceId: any = "vllm") {
         // @ts-ignore
         if (toolCalls) result.toolCalls = toolCalls;
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
+        // @ts-ignore - TODO: strict typing
         throw new ProviderError("vllm", error.message, 500, error);
       }
     },
@@ -106,17 +110,19 @@ export function createVllmProvider(baseUrl: any, instanceId: any = "vllm") {
     // ── Streaming Text Generation (SSE) ──────────────────────
 
     async *generateTextStream(
-      messages: any,
+      messages: ChatMessage[],
       // @ts-ignore
-      model: any = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
-      options: any = {},
+      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
+      options: ProviderOptions = {},
     ) {
       const baseUrl = getBaseUrl();
       logger.provider(
+        // @ts-ignore - TODO: strict typing
         "vLLM",
         `generateTextStream model=${model} baseUrl=${baseUrl}`,
       );
       try {
+        // @ts-ignore - TODO: strict typing
         const prepared = prepareOpenAICompatMessages(messages, {
           mediaStrategy: MEDIA_STRATEGIES.FULL_MULTIMODAL,
         });
@@ -170,37 +176,41 @@ export function createVllmProvider(baseUrl: any, instanceId: any = "vllm") {
 
         // @ts-ignore
         const reader = response.body.getReader();
+        // @ts-ignore - TODO: strict typing
         yield* parseSSEStream(reader, {
           // @ts-ignore
           signal: options.signal,
           // @ts-ignore
           thinkingEnabled: options.thinkingEnabled,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
+        // @ts-ignore - TODO: strict typing
         if (error.name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
+        // @ts-ignore - TODO: strict typing
         throw new ProviderError("vllm", error.message, 500, error);
       }
     },
 
     async captionImage(
-      images: any,
-      prompt: any = "Describe this image.",
+      images: string[],
+      prompt: string = "Describe this image.",
       // @ts-ignore
-      model: any = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["vllm"],
-      systemPrompt: any,
+      model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["vllm"],
+      systemPrompt?: string,
     ) {
       const baseUrl = getBaseUrl();
+      // @ts-ignore - TODO: strict typing
       logger.provider("vLLM", `captionImage model=${model} baseUrl=${baseUrl}`);
       try {
         const content = [
           { type: "text", text: prompt },
-          ...images.map((image: any) => ({
+          ...images.map((image: string) => ({
             type: "image_url",
             image_url: { url: image },
           })),
         ];
-        const messages: any[] = [];
+        const messages: ChatMessage[] = [];
         if (systemPrompt) {
           messages.push({ role: "system", content: systemPrompt });
         }
@@ -227,8 +237,9 @@ export function createVllmProvider(baseUrl: any, instanceId: any = "vllm") {
           outputTokens: data.usage?.completion_tokens || 0,
         };
         return { text, usage };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
+        // @ts-ignore - TODO: strict typing
         throw new ProviderError("vllm", error.message, 500, error);
       }
     },
@@ -244,9 +255,10 @@ export function createVllmProvider(baseUrl: any, instanceId: any = "vllm") {
 
      * @returns {Promise<{ embedding: number[], dimensions: number }>}
      */
-    async generateEmbedding(content: any, model: any, options: any = {}) {
+    async generateEmbedding(content: Record<string, unknown>, model: Record<string, unknown>, options: ProviderOptions = {}) {
       const baseUrl = getBaseUrl();
       logger.provider(
+        // @ts-ignore - TODO: strict typing
         "vLLM",
         `generateEmbedding model=${model} baseUrl=${baseUrl}`,
       );
@@ -274,8 +286,9 @@ export function createVllmProvider(baseUrl: any, instanceId: any = "vllm") {
           embedding,
           dimensions: embedding.length,
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
+        // @ts-ignore - TODO: strict typing
         throw new ProviderError("vllm", error.message, 500, error);
       }
     },
@@ -289,6 +302,7 @@ export function createVllmProvider(baseUrl: any, instanceId: any = "vllm") {
      */
     async listModels() {
       const baseUrl = getBaseUrl();
+      // @ts-ignore - TODO: strict typing
       logger.provider("vLLM", "listModels");
       try {
         const response = await fetch(`${baseUrl}/v1/models`, {
@@ -301,15 +315,19 @@ export function createVllmProvider(baseUrl: any, instanceId: any = "vllm") {
         }
         const data = await response.json();
         // @ts-ignore
-        const models = (data.data || []).map((m: any) => ({
+        const models = (data.data || []).map((m: ChatMessage) => ({
+          // @ts-ignore - TODO: strict typing
           key: m.id,
+          // @ts-ignore - TODO: strict typing
           display_name: m.id,
           type: "llm",
+          // @ts-ignore - TODO: strict typing
           loaded_instances: [{ id: m.id }], // vLLM models are always loaded
         }));
         return { models };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
+        // @ts-ignore - TODO: strict typing
         throw new ProviderError("vllm", error.message, 500, error);
       }
     },

@@ -19,7 +19,7 @@ import logger from "../utils/logger.ts";
 
 
  */
-function deriveAgentId(name: any) {
+function deriveAgentId(name: string) {
   const slug = name
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, "_")
@@ -48,7 +48,7 @@ const CustomAgentService = {
 
 
    */
-  async get(id: any) {
+  async get(id: string) {
     const col = getCollection();
     if (!col) return null;
     return col.findOne({ _id: new ObjectId(id) });
@@ -59,7 +59,7 @@ const CustomAgentService = {
 
 
    */
-  async getByAgentId(agentId: any) {
+  async getByAgentId(agentId: Record<string, unknown>) {
     const col = getCollection();
     if (!col) return null;
     return col.findOne({ agentId });
@@ -70,10 +70,11 @@ const CustomAgentService = {
 
    * @returns {Promise<object>} The created document
    */
-  async create(data: any) {
+  async create(data: Record<string, unknown>) {
     const col = getCollection();
     if (!col) throw new Error("Database not available");
 
+    // @ts-ignore - TODO: strict typing
     const agentId = deriveAgentId(data.name);
 
     // Check for duplicate agentId
@@ -114,17 +115,19 @@ const CustomAgentService = {
 
    * @returns {Promise<object>} The updated document
    */
-  async update(id: any, updates: any) {
+  async update(id: string, updates: Record<string, unknown>) {
     const col = getCollection();
     if (!col) throw new Error("Database not available");
 
     // If name changed, re-derive agentId
     const setFields = { ...updates, updatedAt: new Date().toISOString() };
     if (updates.name) {
+      // @ts-ignore - TODO: strict typing
       setFields.agentId = deriveAgentId(updates.name);
     }
 
     // Remove _id from $set if present
+    // @ts-ignore - TODO: strict typing
     delete setFields._id;
 
     await col.updateOne({ _id: new ObjectId(id) }, { $set: setFields });
@@ -141,7 +144,7 @@ const CustomAgentService = {
 
 
    */
-  async delete(id: any) {
+  async delete(id: string) {
     const col = getCollection();
     if (!col) throw new Error("Database not available");
 

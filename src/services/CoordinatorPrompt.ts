@@ -15,9 +15,11 @@
 
  * @returns {string} System prompt section to append
  */
-export function getCoordinatorPromptAddendum({ workerTools = [] }: any = {}) {
+export function getCoordinatorPromptAddendum({ workerTools = [] }: Record<string, unknown> = {}) {
   const workerToolList =
+    // @ts-ignore - TODO: strict typing
     workerTools.length > 0
+      // @ts-ignore - TODO: strict typing
       ? workerTools.sort().join(", ")
       : "all standard tools (read, write, search, shell, etc.)";
 

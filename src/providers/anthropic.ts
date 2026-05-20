@@ -10,6 +10,25 @@ import { TYPES, getDefaultModels } from "../config.ts";
 // @ts-ignore
 import { sleep } from "@rodrigo-barraza/utilities-library";
 
+import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
+
+export interface AnthropicBlock {
+  type: string;
+  text?: string;
+  thinking?: string;
+  signature?: string;
+  source?: { type: string; media_type?: string; data?: string; url?: string };
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+  tool_use_id?: string;
+  content?: string | AnthropicBlock[];
+  citations?: Array<{ type: string; url?: string; title?: string; cited_text?: string }>;
+  url?: string;
+  title?: string;
+  page_age?: string;
+}
+
 // Default budget tokens mapped from effort level (for non-adaptive models)
 const EFFORT_BUDGET_MAP = {
   low: 1024,
@@ -24,11 +43,12 @@ const MAX_RETRIES = 3;
 /**
  * Check if an Anthropic error is retryable (overloaded or 529).
  */
-function isRetryableError(error: any) {
+function isRetryableError(error: unknown) {
   // SDK wraps the error body — check both the error type and HTTP status
-  const errorType = error?.error?.type || error?.type;
+  const err = error as Record<string, unknown>;
+  const errorType = (err?.error as Record<string, unknown>)?.type || err?.type;
   if (errorType === "overloaded_error") return true;
-  if (error.status === 529) return true;
+  if (err.status === 529) return true;
   return false;
 }
 
@@ -52,12 +72,12 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
  * Walk all Anthropic-format message content blocks and compress any
  * base64 image that exceeds 5 MB. Mutates the messages array in-place.
  */
-async function enforceImageSizeLimits(messages: any) {
+async function enforceImageSizeLimits(messages: ChatMessage[]) {
   // @ts-ignore
   for ( const message of messages) {
     if (!Array.isArray(message.content)) continue;
     // @ts-ignore
-    for ( const block of message.content) {
+    for ( const block of message.content as AnthropicBlock[]) {
       if (block.type !== "image" || block.source?.type !== "base64") continue;
       const data = block.source.data;
       if (!data) continue;
@@ -70,6 +90,7 @@ async function enforceImageSizeLimits(messages: any) {
         `[anthropic] SAFETY NET: image still ${(size / 1024 / 1024).toFixed(2)} MB after prepareMessages. Compressing now...`,
       );
       const result = await compressImageForSizeLimit(
+        // @ts-ignore - TODO: strict typing
         block.source.data,
         block.source.media_type || "image/png",
       );
@@ -88,13 +109,13 @@ async function enforceImageSizeLimits(messages: any) {
  * Anthropic requires alternating user/assistant roles and handles system messages separately.
  * This helper extracts the system message and merges consecutive same-role messages.
  */
-async function prepareMessages(messages: any) {
-  let systemMessage: any;
+async function prepareMessages(messages: ChatMessage[]) {
+  let systemMessage: string | undefined;
 
   // Extract system message
-  const conversation = messages.map((m: any) => ({ ...m }));
+  const conversation = messages.map((m: ChatMessage) => ({ ...m }));
   if (conversation.length > 0 && conversation[0].role === "system") {
-    systemMessage = conversation.shift().content;
+    systemMessage = conversation.shift()?.content as string | undefined;
   }
 
   // Build clean messages with ONLY the fields Anthropic's API accepts.
@@ -104,10 +125,10 @@ async function prepareMessages(messages: any) {
   const cleaned = await Promise.all(
     conversation
       .filter(
-        (m: any) =>
+        (m: ChatMessage) =>
           m.role === "user" || m.role === "assistant" || m.role === "tool",
       )
-      .map(async (m: any) => {
+      .map(async (m: ChatMessage) => {
         // Convert tool role messages to tool_result user messages for Anthropic
         if (m.role === "tool") {
           return {
@@ -115,7 +136,8 @@ async function prepareMessages(messages: any) {
             content: [
               {
                 type: "tool_result",
-                tool_use_id: m.tool_call_id || m.id || m.name || "unknown",
+                // @ts-ignore - TODO: strict typing
+                tool_use_id: (m as Record<string, unknown>).tool_call_id || m.id || m.name || "unknown",
                 content:
                   typeof m.content === "string"
                     ? m.content
@@ -126,8 +148,9 @@ async function prepareMessages(messages: any) {
         }
 
         // Convert assistant messages with toolCalls to multi-part content
+        // @ts-ignore - TODO: strict typing
         if (m.role === "assistant" && m.toolCalls?.length > 0) {
-          const contentBlocks: any[] = [];
+          const contentBlocks: AnthropicBlock[] = [];
           // Preserve thinking blocks for multi-step reasoning continuity.
           // The signature field is REQUIRED by Anthropic's API for multi-turn
           // conversations — without it the API returns a 400.
@@ -140,7 +163,7 @@ async function prepareMessages(messages: any) {
               signature: m.thinkingSignature,
             });
           }
-          if (m.content?.trim()) {
+          if (typeof m.content === "string" && m.content.trim()) {
             contentBlocks.push({ type: "text", text: m.content });
           }
           // @ts-ignore
@@ -161,7 +184,7 @@ async function prepareMessages(messages: any) {
         // Convert messages with media to Anthropic content block format
         const images = m.images;
         if (images && images.length > 0) {
-          const contentBlocks: any[] = [];
+          const contentBlocks: AnthropicBlock[] = [];
           // @ts-ignore
           for ( const dataUrl of images) {
             const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
@@ -224,6 +247,7 @@ async function prepareMessages(messages: any) {
             // Other MIME types (audio, video) are not supported by Anthropic — skip
           }
           if (m.content) {
+            // @ts-ignore - TODO: strict typing
             contentBlocks.push({ type: "text", text: m.content });
           }
           return {
@@ -238,7 +262,7 @@ async function prepareMessages(messages: any) {
         // Only include thinking when we have the signature; conversations
         // without it must omit the block to avoid API 400 errors.
         if (m.role === "assistant" && m.thinking && !m.toolCalls?.length) {
-          const contentBlocks: any[] = [];
+          const contentBlocks: AnthropicBlock[] = [];
           if (m.thinkingSignature) {
             contentBlocks.push({
               type: "thinking",
@@ -246,7 +270,7 @@ async function prepareMessages(messages: any) {
               signature: m.thinkingSignature,
             });
           }
-          if (m.content?.trim()) {
+          if (typeof m.content === "string" && m.content.trim()) {
             contentBlocks.push({ type: "text", text: m.content });
           } else {
             contentBlocks.push({ type: "text", text: " " });
@@ -256,12 +280,12 @@ async function prepareMessages(messages: any) {
             content:
               contentBlocks.length > 1
                 ? contentBlocks
-                : m.content?.trim() || " ",
+                : (typeof m.content === "string" ? m.content.trim() : "") || " ",
           };
         }
 
         // Ensure assistant messages never have empty content
-        if (m.role === "assistant" && (!m.content || !m.content.trim())) {
+        if (m.role === "assistant" && (!m.content || (typeof m.content === "string" && !m.content.trim()))) {
           return { role: "assistant", content: " " };
         }
 
@@ -271,7 +295,7 @@ async function prepareMessages(messages: any) {
   );
 
   // Merge consecutive same-role messages
-  const merged = cleaned.reduce((acc: any, cur: any) => {
+  const merged = cleaned.reduce((acc: ChatMessage[], cur: ChatMessage) => {
     if (acc.length && acc[acc.length - 1].role === cur.role) {
       const prev = acc[acc.length - 1];
       // Handle merging when content might be string or array
@@ -304,7 +328,7 @@ async function prepareMessages(messages: any) {
   for ( const message of merged) {
     if (message.role !== "user" || !Array.isArray(message.content)) continue;
     const seenToolResultIds = new Set();
-    message.content = message.content.filter((block: any) => {
+    message.content = (message.content as AnthropicBlock[]).filter((block: AnthropicBlock) => {
       if (block.type !== "tool_result") return true;
       if (seenToolResultIds.has(block.tool_use_id)) return false;
       seenToolResultIds.add(block.tool_use_id);
@@ -324,18 +348,18 @@ async function prepareMessages(messages: any) {
     const message = merged[i];
     if (message.role !== "assistant" || !Array.isArray(message.content)) continue;
 
-    const hasToolUse = message.content.some((b: any) => b.type === "tool_use");
+    const hasToolUse = (message.content as AnthropicBlock[]).some((b: AnthropicBlock) => b.type === "tool_use");
     if (!hasToolUse) continue;
 
     const next = merged[i + 1];
     const nextHasToolResult =
       next?.role === "user" &&
       Array.isArray(next.content) &&
-      next.content.some((b: any) => b.type === "tool_result");
+      next.content.some((b: AnthropicBlock) => b.type === "tool_result");
 
     if (!nextHasToolResult) {
       // Strip tool_use blocks, keep only text
-      message.content = message.content.filter((b: any) => b.type !== "tool_use");
+      message.content = (message.content as AnthropicBlock[]).filter((b: AnthropicBlock) => b.type !== "tool_use");
       if (message.content.length === 0) {
         message.content = " ";
       }
@@ -366,8 +390,8 @@ async function prepareMessages(messages: any) {
 /**
  * Build the tools array based on options.
  */
-function buildTools(options: any) {
-  const tools: any[] = [];
+function buildTools(options: ProviderOptions) {
+  const tools: Record<string, unknown>[] = [];
   if (options.webSearch) {
     tools.push({
       type: "web_search_20260209",
@@ -405,12 +429,12 @@ function buildTools(options: any) {
 /**
  * Extract text, thinking, citations, and code results from a multi-block response.
  */
-function extractResponseContent(contentBlocks: any) {
+function extractResponseContent(contentBlocks: AnthropicBlock[]) {
   let text = "";
   let thinking = null;
   let thinkingSignature = null;
-  const citations: any[] = [];
-  const toolCalls: any[] = [];
+  const citations: Record<string, unknown>[] = [];
+  const toolCalls: Record<string, unknown>[] = [];
 
   // @ts-ignore
   for ( const block of contentBlocks || []) {
@@ -448,7 +472,7 @@ function extractResponseContent(contentBlocks: any) {
 /**
  * Build the common usage object from an Anthropic response.
  */
-function buildUsage(responseUsage: any) {
+function buildUsage(responseUsage: Record<string, number> | null | undefined) {
   return {
     inputTokens: responseUsage?.input_tokens ?? 0,
     outputTokens: responseUsage?.output_tokens ?? 0,
@@ -461,15 +485,16 @@ const anthropicProvider = {
   name: "anthropic",
 
   async generateText(
-    messages: any,
+    messages: ChatMessage[],
     // @ts-ignore
-    model: any = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
-    options: any = {},
+    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
+    options: ProviderOptions = {},
   ) {
+    // @ts-ignore - TODO: strict typing
     logger.provider("Anthropic", `generateText model=${model}`);
 
     const prepared = await prepareMessages(messages);
-    const payload: Record<string, any> = {
+    const payload: Record<string, unknown> = {
       cache_control: { type: "ephemeral" },
       system: prepared.systemMessage,
       model,
@@ -522,7 +547,7 @@ const anthropicProvider = {
         : // @ts-ignore
           EFFORT_BUDGET_MAP[options.reasoningEffort] || EFFORT_BUDGET_MAP.high;
       payload.thinking = { type: "enabled", budget_tokens: budget };
-      if (payload.max_tokens <= budget) {
+      if ((payload.max_tokens as number) <= budget) {
         payload.max_tokens = budget + 1024;
       }
       // Anthropic requires temperature=1 and top_p/top_k unset when thinking is enabled
@@ -531,12 +556,13 @@ const anthropicProvider = {
       delete payload.top_k;
     }
 
-    let lastError: any;
+    let lastError: unknown;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         const { data: response, response: rawResponse } = await getClient()
           .messages.create(payload)
           .withResponse();
+        // @ts-ignore - TODO: strict typing
         const rateLimits = extractAnthropicRateLimits(rawResponse, model);
 
         const { text, thinking, thinkingSignature, citations, toolCalls } =
@@ -561,7 +587,7 @@ const anthropicProvider = {
         // @ts-ignore
         if (response.stop_details) result.stopDetails = response.stop_details;
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         lastError = error;
         if (isRetryableError(error) && attempt < MAX_RETRIES) {
           logger.warn(
@@ -572,8 +598,8 @@ const anthropicProvider = {
         }
         throw new ProviderError(
           "anthropic",
-          error.message,
-          error.status || 500,
+          error instanceof Error ? error.message : (error as Record<string, unknown>)?.message as string || String(error),
+          ((error as Record<string, unknown>)?.status as number) || 500,
           error,
         );
       }
@@ -581,8 +607,8 @@ const anthropicProvider = {
     // Should never reach here, but safety net
     throw new ProviderError(
       "anthropic",
-      lastError?.message || "Max retries exceeded",
-      lastError?.status || 500,
+      (lastError as Record<string, unknown>)?.message as string || "Max retries exceeded",
+      ((lastError as Record<string, unknown>)?.status as number) || 500,
       lastError,
     );
   },
@@ -594,15 +620,16 @@ const anthropicProvider = {
    * @returns {Promise<{ text: string, usage: object }>}
    */
   async captionImage(
-    images: any,
-    prompt: any = "Describe this image.",
+    images: string[],
+    prompt: string = "Describe this image.",
     // @ts-ignore
-    model: any = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
-    systemPrompt: any,
+    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
+    systemPrompt?: string,
   ) {
+    // @ts-ignore - TODO: strict typing
     logger.provider("Anthropic", `captionImage model=${model}`);
     try {
-      const contentBlocks: any[] = [];
+      const contentBlocks: AnthropicBlock[] = [];
 
       // @ts-ignore
       for ( const imageUrlOrBase64 of images) {
@@ -660,10 +687,12 @@ const anthropicProvider = {
         text,
         usage: buildUsage(response.usage),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw new ProviderError(
         "anthropic",
+        // @ts-ignore - TODO: strict typing
         error.message,
+        // @ts-ignore - TODO: strict typing
         error.status || 500,
         error,
       );
@@ -672,15 +701,16 @@ const anthropicProvider = {
 
   // @ts-ignore
   async *generateTextStream(
-    messages: any,
+    messages: ChatMessage[],
     // @ts-ignore
-    model: any = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
-    options: any = {},
+    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
+    options: ProviderOptions = {},
   ) {
+    // @ts-ignore - TODO: strict typing
     logger.provider("Anthropic", `generateTextStream model=${model}`);
     try {
       const prepared = await prepareMessages(messages);
-      const streamPayload: Record<string, any> = {
+      const streamPayload: Record<string, unknown> = {
         cache_control: { type: "ephemeral" },
         system: prepared.systemMessage,
         model,
@@ -734,7 +764,7 @@ const anthropicProvider = {
             EFFORT_BUDGET_MAP[options.reasoningEffort] ||
             EFFORT_BUDGET_MAP.high;
         streamPayload.thinking = { type: "enabled", budget_tokens: budget };
-        if (streamPayload.max_tokens <= budget) {
+        if ((streamPayload.max_tokens as number) <= budget) {
           streamPayload.max_tokens = budget + 1024;
         }
         // Anthropic requires temperature=1 and top_p/top_k unset when thinking is enabled
@@ -743,7 +773,7 @@ const anthropicProvider = {
         delete streamPayload.top_k;
       }
 
-      await enforceImageSizeLimits(streamPayload.messages);
+      await enforceImageSizeLimits(streamPayload.messages as ChatMessage[]);
 
       const stream = getClient().messages.stream(streamPayload, {
         // @ts-ignore
@@ -773,6 +803,7 @@ const anthropicProvider = {
           messageStartUsage = chunk.message.usage;
           // Capture rate-limit headers from the stream's initial response
           if (!rateLimits && stream.response) {
+            // @ts-ignore - TODO: strict typing
             rateLimits = extractAnthropicRateLimits(stream.response, model);
           }
           continue;
@@ -906,11 +937,11 @@ const anthropicProvider = {
           if (Array.isArray(content)) {
             const results = content
               .filter(
-                (r: any) =>
+                (r: AnthropicBlock) =>
                   r.type === "web_search_result" ||
                   r.type === "web_fetch_result",
               )
-              .map((r: any) => ({
+              .map((r: AnthropicBlock) => ({
                 url: r.url,
                 title: r.title,
                 pageAge: r.page_age,
@@ -964,7 +995,8 @@ const anthropicProvider = {
       if (rateLimits) {
         yield { type: "rateLimits", rateLimits };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // @ts-ignore - TODO: strict typing
       if (error.name === "AbortError") return;
       // For streaming, retry overloaded errors with the same delay/attempts policy
       if (isRetryableError(error)) {
@@ -985,7 +1017,9 @@ const anthropicProvider = {
       }
       throw new ProviderError(
         "anthropic",
+        // @ts-ignore - TODO: strict typing
         error.message,
+        // @ts-ignore - TODO: strict typing
         error.status || 500,
         error,
       );

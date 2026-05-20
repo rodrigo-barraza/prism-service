@@ -1,6 +1,8 @@
 import { handleConversation } from "../routes/ChatRoutes.ts";
 import { ProviderError } from "./errors.ts";
 import { createAbortController } from "./AbortController.ts";
+import { Request, Response, NextFunction } from "express";
+import { SseEvent } from "../types/SseTypes.ts";
 
 // ─── shared by /chat and /agent routes ──────────────────────
 
@@ -10,7 +12,7 @@ import { createAbortController } from "./AbortController.ts";
  *
 
  */
-export function initSseResponse(res: any) {
+export function initSseResponse(res: Response) {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -24,13 +26,13 @@ export function initSseResponse(res: any) {
 
 
  */
-export function createSseEmitter(res: any, signal: any) {
+export function createSseEmitter(res: Response, signal: AbortSignal) {
   // Disable Nagle's algorithm for minimal SSE latency.
   // Without this, small SSE events can sit in the TCP buffer when
   // the server blocks on await (e.g. plan approval promise).
   if (res.socket) res.socket.setNoDelay(true);
 
-  return (event: any) => {
+  return (event: SseEvent) => {
     if (!signal.aborted) {
       if (event.type === "image" && event.minioRef && event.data) {
         const { data: _stripped, ...lightweight } = event;
@@ -43,8 +45,9 @@ export function createSseEmitter(res: any, signal: any) {
       // Node flushes pending writes to the socket immediately. Critical
       // for events emitted before an await block (plan_proposal,
       // approval_required) where no further writes push the buffer.
-      if (typeof res.flush === "function") {
-        res.flush();
+      const resWithFlush = res as Response & { flush?: () => void };
+      if (typeof resWithFlush.flush === "function") {
+        resWithFlush.flush();
       } else if (res.socket && !res.socket.destroyed) {
         res.socket.uncork?.();
         res.socket.cork?.();
@@ -62,32 +65,32 @@ export function createSseEmitter(res: any, signal: any) {
 
  * @returns {{ error?: object, response?: object }}
  */
-export function buildJsonResponseFromEvents(events: any, reqBody: any) {
-  const errorEvent = events.find((e: any) => e.type === "error");
+export function buildJsonResponseFromEvents(events: SseEvent[], reqBody: Record<string, any>) {
+  const errorEvent = events.find((e: SseEvent) => e.type === "error");
   if (errorEvent) {
-    return { error: new ProviderError("server", errorEvent.message, 500) };
+    return { error: new ProviderError("server", errorEvent.message || "Unknown error", 500) };
   }
 
-  const doneEvent = events.find((e: any) => e.type === "done") || {};
+  const doneEvent = events.find((e: SseEvent) => e.type === "done") || ({} as SseEvent);
   const text = events
-    .filter((e: any) => e.type === "chunk")
-    .map((e: any) => e.content)
+    .filter((e: SseEvent) => e.type === "chunk")
+    .map((e: SseEvent) => e.content)
     .join("");
   const thinking = events
-    .filter((e: any) => e.type === "thinking")
-    .map((e: any) => e.content)
+    .filter((e: SseEvent) => e.type === "thinking")
+    .map((e: SseEvent) => e.content)
     .join("");
   const images = events
-    .filter((e: any) => e.type === "image")
-    .map((e: any) => ({
+    .filter((e: SseEvent) => e.type === "image")
+    .map((e: SseEvent) => ({
       data: e.data,
       mimeType: e.mimeType,
       minioRef: e.minioRef || null,
     }));
 
   const toolCalls = events
-    .filter((e: any) => e.type === "tool_execution" && e.status === "calling")
-    .map((e: any) => ({
+    .filter((e: SseEvent) => e.type === "tool_execution" && e.status === "calling")
+    .map((e: SseEvent) => ({
       name: e.tool?.name,
       args: e.tool?.args,
     }));
@@ -118,10 +121,11 @@ export function buildJsonResponseFromEvents(events: any, reqBody: any) {
 
  */
 export async function handleSseRequest(
-  req: any,
-  res: any,
-  params: any,
-  handler: any = handleConversation,
+  req: Request,
+  res: Response,
+  params: Record<string, any>,
+  // @ts-ignore - TODO: strict typing
+  handler: (params: Record<string, any>, onEvent: (event: SseEvent) => void, context: { signal: AbortSignal }) => Promise<void> = handleConversation,
 ) {
   initSseResponse(res);
 
@@ -145,15 +149,16 @@ export async function handleSseRequest(
 
  */
 export async function handleJsonRequest(
-  req: any,
-  res: any,
-  next: any,
-  params: any,
-  handler: any = handleConversation,
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  params: Record<string, any>,
+  // @ts-ignore - TODO: strict typing
+  handler: (params: Record<string, any>, onEvent: (event: SseEvent) => void) => Promise<void> = handleConversation,
 ) {
   // @ts-ignore
-  const events: any[] = [];
-  await handler(params, (event: any) => events.push(event));
+  const events: SseEvent[] = [];
+  await handler(params, (event: SseEvent) => events.push(event));
 
   // @ts-ignore
   const { error, response } = buildJsonResponseFromEvents(events, req.body);

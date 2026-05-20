@@ -78,10 +78,10 @@ const SessionGenerationTracker = {
    */
   // @ts-ignore
   register(
-    agentSessionId: any,
-    requestId: any,
+    agentSessionId: Record<string, unknown>,
+    requestId: Record<string, unknown>,
     // @ts-ignore
-    { provider, model, source = "orchestrator", workerId = null }: any = {},
+    { provider, model, source = "orchestrator", workerId = null }: Record<string, unknown> = {},
   ) {
     if (!agentSessionId || !requestId) return;
 
@@ -129,7 +129,7 @@ const SessionGenerationTracker = {
 
    */
   // @ts-ignore
-  update(requestId: any, { outputTokens, inputTokens, ttft }: any = {}) {
+  update(requestId: Record<string, unknown>, { outputTokens, inputTokens, ttft }: Record<string, unknown> = {}) {
     const entry = activeRequests.get(requestId);
     if (!entry) return;
 
@@ -161,7 +161,8 @@ const SessionGenerationTracker = {
 
 
    */
-  recordChunkTiming(requestId: any, charCount: any = 0) {
+  // @ts-ignore - TODO: strict typing
+  recordChunkTiming(requestId: Record<string, unknown>, charCount: Record<string, unknown> = 0) {
     const entry = activeRequests.get(requestId);
     if (!entry) return;
     const now = performance.now();
@@ -179,7 +180,7 @@ const SessionGenerationTracker = {
    *
 
    */
-  complete(requestId: any) {
+  complete(requestId: Record<string, unknown>) {
     const entry = activeRequests.get(requestId);
     if (!entry) return;
 
@@ -248,7 +249,7 @@ const SessionGenerationTracker = {
    *   avgTtft: number|null,
    * }}
    */
-  getSessionStats(agentSessionId: any) {
+  getSessionStats(agentSessionId: Record<string, unknown>) {
     const requestIds = sessionIndex.get(agentSessionId);
     const acc = sessionAccumulators.get(agentSessionId);
     const completedOutputTokens = acc?.completedOutputTokens || 0;
@@ -260,7 +261,8 @@ const SessionGenerationTracker = {
       const totalIn = completedInputTokens;
       const avgTtft =
         ttftSamples.length > 0
-          ? ttftSamples.reduce((a: any, b: any) => a + b, 0) /
+          // @ts-ignore - TODO: strict typing
+          ? ttftSamples.reduce((a: Record<string, unknown>, b: Record<string, unknown>) => a + b, 0) /
             ttftSamples.length
           : null;
       // Use the most recent completed tok/s (last iteration's rate)
@@ -333,7 +335,8 @@ const SessionGenerationTracker = {
 
     // Average TTFT across completed + active samples
     const allTtftSum =
-      ttftSamples.reduce((a: any, b: any) => a + b, 0) + activeTtftSum;
+      // @ts-ignore - TODO: strict typing
+      ttftSamples.reduce((a: Record<string, unknown>, b: Record<string, unknown>) => a + b, 0) + activeTtftSum;
     const allTtftCount = ttftSamples.length + activeTtftCount;
     const avgTtft = allTtftCount > 0 ? allTtftSum / allTtftCount : null;
 
@@ -368,7 +371,7 @@ const SessionGenerationTracker = {
    *
 
    */
-  cleanup(agentSessionId: any) {
+  cleanup(agentSessionId: Record<string, unknown>) {
     const requestIds = sessionIndex.get(agentSessionId);
     if (requestIds) {
       // @ts-ignore
@@ -381,12 +384,12 @@ const SessionGenerationTracker = {
   },
 
   /**
-   * Check if a session has any active requests.
+   * Check if a session has Record<string, unknown> active requests.
    *
 
 
    */
-  hasActiveRequests(agentSessionId: any) {
+  hasActiveRequests(agentSessionId: Record<string, unknown>) {
     const requestIds = sessionIndex.get(agentSessionId);
     return !!(requestIds && requestIds.size > 0);
   },

@@ -23,10 +23,10 @@ import {
 import logger from "../utils/logger.ts";
 
 const MongoWrapper = {
-  async createClient(name: any, uri: any) {
+  async createClient(name: string, uri: string) {
     return connectDB(uri, { name, dbName: name, logger });
   },
-  getClient(_name: any) {
+  getClient(_name: string) {
     // Deprecated — getClient returns the raw MongoClient, which is no
     // longer exposed by MongoManager. Use getDb() instead.
     // Callers that used getClient(name).db(name) should use getDb(name).
@@ -34,14 +34,14 @@ const MongoWrapper = {
       "MongoWrapper.getClient() is deprecated — use MongoWrapper.getDb() instead",
     );
   },
-  getDb(name: any) {
+  getDb(name: string) {
     return getDB(name);
   },
-  getCollection(dbName: any, collectionName: any) {
+  getCollection(dbName: string, collectionName: string) {
     // Note: service-library uses (collectionName, dbName) — reversed order
     return getCollection(collectionName, dbName);
   },
-  closeClient(name: any) {
+  closeClient(name: string) {
     return disconnectDB(name);
   },
 };

@@ -14,6 +14,7 @@ import { createLmStudioProvider } from "./lm-studio.ts";
 import { createOllamaProvider } from "./ollama.ts";
 import { createVllmProvider } from "./vllm.ts";
 import { createLlamaCppProvider } from "./llama-cpp.ts";
+import { InstanceEntry, ProviderInstanceConfig } from "../types/ProviderTypes.ts";
 
 // ── Factory map ─────────────────────────────────────────────
 const FACTORIES = {
@@ -45,14 +46,14 @@ const PROVIDER_ARRAYS = {
  */
 
 
-const registry = new Map();
+const registry = new Map<string, InstanceEntry>();
 
 /**
  * Register all instances for a provider type from its array.
 
  * @param {Array<{url: string, concurrency?: number, nickname?: string}>} instances
  */
-function registerType(type: any, instances: any) {
+function registerType(type: string, instances: ProviderInstanceConfig[]) {
   // @ts-ignore
   const factory = FACTORIES[type];
   if (!factory) return;
@@ -63,7 +64,7 @@ function registerType(type: any, instances: any) {
 
     const instanceNumber = i + 1;
     const id = instanceNumber === 1 ? type : `${type}-${instanceNumber}`;
-    const maxConcurrency = Math.max(1, parseInt(concurrency, 10) || 1);
+    const maxConcurrency = Math.max(1, typeof concurrency === 'number' ? concurrency : parseInt(String(concurrency), 10) || 1);
     const provider = factory(url, id);
 
     const entry = {
@@ -99,7 +100,7 @@ for ( const [type, instances] of Object.entries(PROVIDER_ARRAYS)) {
 
  * @returns {object|null} Provider object or null if not found
  */
-export function getInstanceProvider(id: any) {
+export function getInstanceProvider(id: string) {
   return registry.get(id)?.provider || null;
 }
 
@@ -108,7 +109,7 @@ export function getInstanceProvider(id: any) {
 
 
  */
-export function getInstance(id: any) {
+export function getInstance(id: string): InstanceEntry | null {
   return registry.get(id) || null;
 }
 
@@ -117,7 +118,7 @@ export function getInstance(id: any) {
 
 
  */
-export function isInstance(id: any) {
+export function isInstance(id: string) {
   return registry.has(id);
 }
 
@@ -134,7 +135,7 @@ export function listInstances() {
 
  */
 export function listInstanceTypes() {
-  return [...new Set([...registry.values()].map((e: any) => e.type))];
+  return [...new Set([...registry.values()].map((e: InstanceEntry) => e.type))];
 }
 
 /**
@@ -142,8 +143,8 @@ export function listInstanceTypes() {
 
 
  */
-export function getInstancesByType(type: any) {
-  return [...registry.values()].filter((e: any) => e.type === type);
+export function getInstancesByType(type: string) {
+  return [...registry.values()].filter((e: InstanceEntry) => e.type === type);
 }
 
 /**
@@ -152,6 +153,6 @@ export function getInstancesByType(type: any) {
 
 
  */
-export function getInstanceType(id: any) {
+export function getInstanceType(id: string) {
   return registry.get(id)?.type || null;
 }

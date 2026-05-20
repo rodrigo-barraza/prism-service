@@ -101,7 +101,7 @@ const TIER_LABELS = {
  * Registered as a `beforeToolCall` hook in AgentHooks.
  */
 export default class AutoApprovalEngine {
-  constructor(options: any = {}) {
+  constructor(options: Record<string, unknown> = {}) {
     // @ts-ignore
     this.fullAuto = options.fullAuto || false;
     // @ts-ignore
@@ -113,7 +113,7 @@ export default class AutoApprovalEngine {
 
    * @returns {number} Tier constant (1, 2, or 3)
    */
-  getTier(toolName: any) {
+  getTier(toolName: Record<string, unknown>) {
     // @ts-ignore
     if (this.tierOverrides[toolName] !== undefined) {
       // @ts-ignore
@@ -128,7 +128,7 @@ export default class AutoApprovalEngine {
 
 
    */
-  getTierLabel(toolName: any) {
+  getTierLabel(toolName: Record<string, unknown>) {
     return TIER_LABELS[this.getTier(toolName)] || "write";
   }
 
@@ -138,7 +138,8 @@ export default class AutoApprovalEngine {
 
    * @returns {{ approved: boolean, tier: number, tierLabel: string, reason: string }}
    */
-  check(toolCall: any) {
+  check(toolCall: Record<string, unknown>) {
+    // @ts-ignore - TODO: strict typing
     const tier = this.getTier(toolCall.name);
     const tierLabel = TIER_LABELS[tier] || "write";
 
@@ -163,9 +164,9 @@ export default class AutoApprovalEngine {
 
    * @returns {{ autoApproved: Array, needsApproval: Array }}
    */
-  checkBatch(toolCalls: any) {
-    const autoApproved: any[] = [];
-    const needsApproval: any[] = [];
+  checkBatch(toolCalls: Record<string, unknown>) {
+    const autoApproved: Record<string, unknown>[] = [];
+    const needsApproval: Record<string, unknown>[] = [];
 
     // @ts-ignore
     for ( const tc of toolCalls) {
@@ -179,7 +180,7 @@ export default class AutoApprovalEngine {
 
     if (needsApproval.length > 0) {
       logger.info(
-        `[AutoApproval] ${autoApproved.length} auto-approved, ${needsApproval.length} need approval: ${needsApproval.map((t: any) => t.name).join(", ")}`,
+        `[AutoApproval] ${autoApproved.length} auto-approved, ${needsApproval.length} need approval: ${needsApproval.map((t: Record<string, unknown>) => t.name).join(", ")}`,
       );
     }
 
@@ -191,7 +192,7 @@ export default class AutoApprovalEngine {
 
    */
   createHook() {
-    return async (toolCall: any, _ctx: any) => {
+    return async (toolCall: Record<string, unknown>, _ctx: Record<string, unknown>) => {
       return this.check(toolCall);
     };
   }

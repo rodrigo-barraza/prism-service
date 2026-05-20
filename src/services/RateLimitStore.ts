@@ -69,7 +69,7 @@ class RateLimitStore {
 
 
    */
-  update(providerName: any, model: any, rateLimits: any) {
+  update(providerName: Record<string, unknown>, model: Record<string, unknown>, rateLimits: Record<string, unknown>) {
     if (!rateLimits || !providerName || !model) return;
 
     const key = `${providerName}::${model}`;

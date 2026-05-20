@@ -19,7 +19,7 @@ const MinioWrapper = {
 
 
    */
-  async init(endpoint: any, accessKey: any, secretKey: any, bucket: any) {
+  async init(endpoint: string, accessKey: string, secretKey: string, bucket: string) {
     return MinioManager.init({
       endpoint,
       accessKey,
@@ -32,13 +32,13 @@ const MinioWrapper = {
 
   isAvailable: () => MinioManager.isAvailable(),
   getBucketUrl: () => MinioManager.getBucketUrl(),
-  getPublicUrl: (key: any) => MinioManager.getPublicUrl(key),
-  upload: (key: any, buffer: any, contentType: any) =>
+  getPublicUrl: (key: string) => MinioManager.getPublicUrl(key),
+  upload: (key: string, buffer: Buffer, contentType: string) =>
     MinioManager.upload(key, buffer, contentType),
-  get: (key: any) => MinioManager.get(key),
-  remove: (key: any) => MinioManager.remove(key),
-  stat: (key: any) => MinioManager.stat(key),
-  listObjects: (prefix: any) => MinioManager.listObjects(prefix),
+  get: (key: string) => MinioManager.get(key),
+  remove: (key: string) => MinioManager.remove(key),
+  stat: (key: string) => MinioManager.stat(key),
+  listObjects: (prefix: string) => MinioManager.listObjects(prefix),
 };
 
 export default MinioWrapper;

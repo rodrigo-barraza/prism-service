@@ -1,3 +1,4 @@
+import { Request, Response, NextFunction } from "express";
 import { formatBytes } from "@rodrigo-barraza/utilities-library";
 import logger from "../utils/logger.ts";
 import { requestContext } from "../utils/RequestContext.ts";
@@ -9,7 +10,7 @@ import { requestContext } from "../utils/RequestContext.ts";
  *   2. Logs every completed request with identity, IP, method, path,
  *      status, timing, and transfer sizes.
  */
-export function requestLoggerMiddleware(req: any, res: any, next: any) {
+export function requestLoggerMiddleware(req: Request, res: Response, next: NextFunction) {
   const start = performance.now();
 
   // Resolve identity + IP early (before authMiddleware for admin/files routes)
@@ -26,6 +27,7 @@ export function requestLoggerMiddleware(req: any, res: any, next: any) {
   }
   const rawIp =
     req.clientIp ||
+    // @ts-ignore - TODO: strict typing
     req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
     req.ip;
   // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1)
@@ -36,8 +38,10 @@ export function requestLoggerMiddleware(req: any, res: any, next: any) {
   res.on("finish", () => {
     // Skip SSE streaming requests — those are logged in detail by the route handlers
     const contentType = res.getHeader("content-type") || "";
+    // @ts-ignore - TODO: strict typing
     if (contentType.includes("text/event-stream")) return;
     // Skip binary audio streams — logged by route handler
+    // @ts-ignore - TODO: strict typing
     if (contentType.includes("audio/")) return;
 
     const elapsed = performance.now() - start;
@@ -57,11 +61,13 @@ export function requestLoggerMiddleware(req: any, res: any, next: any) {
 
     // Request / response sizes (from headers — zero-cost)
     const inBytes = parseInt(req.headers["content-length"] || "0", 10);
+    // @ts-ignore - TODO: strict typing
     const outBytes = parseInt(res.getHeader("content-length") || "0", 10);
     const totalBytes = inBytes + outBytes;
     const sizeTag = `(in: ${formatBytes(inBytes)}, out: ${formatBytes(outBytes)}, total: ${formatBytes(totalBytes)})`;
 
     logger.request(
+      // @ts-ignore - TODO: strict typing
       finalProject,
       finalUsername,
       finalIp,
@@ -70,6 +76,7 @@ export function requestLoggerMiddleware(req: any, res: any, next: any) {
   });
 
   // Attach agent to req for downstream route handlers
+  // @ts-ignore - TODO: strict typing
   if (agent) req.agent = agent;
 
   // Run the rest of the middleware chain inside AsyncLocalStorage context

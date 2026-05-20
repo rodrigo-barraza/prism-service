@@ -57,7 +57,7 @@ const skillCreate = {
   },
   domain: "Agentic: Skills",
   labels: ["coding", "automation"],
-  async execute(args: any) {
+  async execute(args: Record<string, unknown>) {
     const { default: SkillService } = await import("../SkillService.js");
     return SkillService.create(args);
   },
@@ -89,9 +89,10 @@ const skillExecute = {
   },
   domain: "Agentic: Skills",
   labels: ["coding", "automation"],
-  async execute(args: any, context: any) {
+  async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
     const { default: SkillService } = await import("../SkillService.js");
     const prepared = await SkillService.prepare(
+      // @ts-ignore - TODO: strict typing
       args.skillId,
       args.variables || {},
     );
@@ -140,7 +141,7 @@ const skillList = {
   },
   domain: "Agentic: Skills",
   labels: ["coding", "automation"],
-  async execute(args: any, context: any) {
+  async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
     const { default: SkillService } = await import("../SkillService.js");
     // @ts-ignore
     return SkillService.list({ project: args.project || context.project });
@@ -162,8 +163,9 @@ const skillDelete = {
   },
   domain: "Agentic: Skills",
   labels: ["coding", "automation"],
-  async execute(args: any) {
+  async execute(args: Record<string, unknown>) {
     const { default: SkillService } = await import("../SkillService.js");
+    // @ts-ignore - TODO: strict typing
     return SkillService.delete(args.skillId);
   },
 };

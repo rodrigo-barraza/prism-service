@@ -1,6 +1,6 @@
 // @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
@@ -16,8 +16,9 @@ const COLLECTION = COLLECTIONS.FAVORITES;
  */
 router.get(
   "/",
-  asyncHandler(async (req: any, res: any, next: any) => {
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // @ts-ignore - TODO: strict typing
       const { project, username, db } = req;
       const filter = { project, username };
       // @ts-ignore
@@ -30,7 +31,8 @@ router.get(
         .toArray();
 
       res.json(favorites);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // @ts-ignore - TODO: strict typing
       logger.error(`Error fetching favorites: ${error.message}`);
       next(error);
     }
@@ -46,8 +48,9 @@ router.get(
  */
 router.post(
   "/",
-  asyncHandler(async (req: any, res: any, next: any) => {
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // @ts-ignore - TODO: strict typing
       const { project, username, db } = req;
       const { type, key, meta } = req.body;
 
@@ -74,7 +77,8 @@ router.post(
         );
 
       res.json({ success: true, favorite: document });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // @ts-ignore - TODO: strict typing
       logger.error(`Error adding favorite: ${error.message}`);
       next(error);
     }
@@ -87,8 +91,9 @@ router.post(
  */
 router.delete(
   "/",
-  asyncHandler(async (req: any, res: any, next: any) => {
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // @ts-ignore - TODO: strict typing
       const { project, username, db } = req;
       const { type, key } = req.query;
 
@@ -103,7 +108,8 @@ router.delete(
         .deleteOne({ project, username, type, key });
 
       res.json({ success: true, deleted: result.deletedCount });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // @ts-ignore - TODO: strict typing
       logger.error(`Error removing favorite: ${error.message}`);
       next(error);
     }

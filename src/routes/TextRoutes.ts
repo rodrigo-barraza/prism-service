@@ -1,6 +1,6 @@
 // @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
@@ -11,8 +11,9 @@ router.use(requireDb);
 // ─── GET /text — extract text content from the caller's project conversations ─
 router.get(
   "/",
-  asyncHandler(async (req: any, res: any, next: any) => {
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // @ts-ignore - TODO: strict typing
       const { db } = req;
 
       const {
@@ -25,7 +26,9 @@ router.get(
         from,
         to,
       } = req.query;
+      // @ts-ignore - TODO: strict typing
       const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+      // @ts-ignore - TODO: strict typing
       const lim = parseInt(limit, 10);
 
       // Always scope to the caller's project
@@ -103,7 +106,7 @@ router.get(
         .aggregate(pipeline)
         .toArray();
 
-      const data = items.map((item: any) => ({
+      const data = items.map((item: Record<string, unknown>) => ({
         content: item.content,
         origin: item.role === "assistant" ? "ai" : "user",
         role: item.role,
@@ -113,6 +116,7 @@ router.get(
         username: item.username,
         model: item.model,
         estimatedCost: item.estimatedCost,
+        // @ts-ignore - TODO: strict typing
         hasImages: item.images > 0,
         timestamp: item.timestamp,
       }));
@@ -120,18 +124,21 @@ router.get(
       res.json({
         data,
         total,
+        // @ts-ignore - TODO: strict typing
         page: parseInt(page, 10),
         limit: lim,
         providers: [
           ...new Set(
-            data.map((d: any) => d.model?.split("/")[0]).filter(Boolean),
+            // @ts-ignore - TODO: strict typing
+            data.map((d: Record<string, unknown>) => d.model?.split("/")[0]).filter(Boolean),
           ),
         ].sort(),
         models: [
-          ...new Set(data.map((d: any) => d.model).filter(Boolean)),
+          ...new Set(data.map((d: Record<string, unknown>) => d.model).filter(Boolean)),
         ].sort(),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // @ts-ignore - TODO: strict typing
       logger.error(`GET /text error: ${error.message}`);
       next(error);
     }

@@ -25,6 +25,7 @@ export async function checkAndWaitForApproval(
 ): Promise<{ approved: boolean; approveAll: boolean }> {
   const { agentSessionId, emit, options } = context;
 
+  // @ts-ignore - TODO: strict typing
   const { needsApproval } = approvalEngine.checkBatch(toolCalls);
 
   if (needsApproval.length === 0 || options.autoApprove) {
@@ -40,7 +41,9 @@ export async function checkAndWaitForApproval(
         args: toolCallRequiringApproval.args,
         id: toolCallRequiringApproval.id,
       },
+      // @ts-ignore - TODO: strict typing
       tier: toolCallRequiringApproval._approval?.tier,
+      // @ts-ignore - TODO: strict typing
       tierLabel: toolCallRequiringApproval._approval?.tierLabel,
     });
   }

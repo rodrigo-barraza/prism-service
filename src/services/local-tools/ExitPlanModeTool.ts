@@ -23,7 +23,7 @@ export default {
   domain: "Agentic: Control Flow",
   labels: ["coding"],
 
-  async execute(args: any) {
+  async execute(args: Record<string, unknown>) {
     logger.info(`[ExitPlanMode] ${args.summary || "(no summary)"}`);
     // Note: AgenticLoopService overrides this result with the approved plan
     // and Claude Code-style approval message after the approval gate.
