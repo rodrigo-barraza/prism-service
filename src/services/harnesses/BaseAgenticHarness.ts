@@ -427,8 +427,9 @@ export default class BaseAgenticHarness {
     pass.outputCharacters += rawChunkStr.length;
     pass.streamedText += rawChunkStr;
     // Strip tool call XML markup leaked by some local models
-        const cleanedPassText = stripToolCallMarkup((pass.streamedText as any));
-    const chunkStr = cleanedPassText.slice(state.finalStreamedText.length);
+    const cleanedPassText = stripToolCallMarkup((pass.streamedText as any));
+    const chunkStr = cleanedPassText.slice((pass.finalStreamedText || "").length);
+    pass.finalStreamedText = cleanedPassText;
     state.finalStreamedText = cleanedPassText;
     if (state.planModeActive) state.planModeText += chunkStr;
     // Display segment tracking
@@ -527,6 +528,7 @@ export default class BaseAgenticHarness {
   createPassState(passOptions: any): PassState {
     return {
       streamedText: "",
+      finalStreamedText: "",
       streamedThinking: "",
       thinkingSignature: "",
       pendingToolCalls: [],

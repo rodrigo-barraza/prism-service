@@ -176,6 +176,7 @@ export interface AgenticContext {
 
 export interface PassState {
   streamedText: string;
+  finalStreamedText: string;
   streamedThinking: string;
   thinkingSignature: string;
   pendingToolCalls: ToolCall[];
