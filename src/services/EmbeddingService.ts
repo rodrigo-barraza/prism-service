@@ -20,23 +20,29 @@ async function getEmbeddingConfig() {
  * ensuring both HTTP `/embed` requests and internal callers (MemoryService,
  * SystemPromptAssembler) flow through the same path.
  */
+interface MultimodalPart {
+  text?: string;
+  inlineData?: {
+    mimeType?: string;
+    data?: string;
+  };
+}
+
 const EmbeddingService = {
   /**
    * Generate an embedding and log the request.
    *
-
-
    * @returns {Promise<{ embedding: number[], dimensions: number, provider: string, model: string }>}
    */
-  async generate(content: string, options: any = {}) {
+  async generate(content: string | MultimodalPart[], options: any = {}) {
     const requestId = crypto.randomUUID();
     const requestStart = performance.now();
     // Resolve defaults from settings when no explicit provider/model given
     const embedConfig = await getEmbeddingConfig();
-        const providerName = options.provider || embedConfig.provider;
+    const providerName = options.provider || embedConfig.provider;
     const resolvedModel =
-            options.model ||
-            getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)?.[providerName] ||
+      options.model ||
+      getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)?.[providerName] ||
       embedConfig.model;
     let result: any;
     let success = true;
@@ -51,8 +57,8 @@ const EmbeddingService = {
         );
       }
       const providerOptions: any = {};
-            if (options.taskType) providerOptions.taskType = options.taskType;
-            if (options.dimensions) providerOptions.dimensions = options.dimensions;
+      if (options.taskType) providerOptions.taskType = options.taskType;
+      if (options.dimensions) providerOptions.dimensions = options.dimensions;
       result = await provider.generateEmbedding(
         content,
         resolvedModel,
@@ -60,20 +66,20 @@ const EmbeddingService = {
       );
     } catch (error: any) {
       success = false;
-            errorMessage = (error as Error).message;
+      errorMessage = (error as Error).message;
       throw error;
     } finally {
       const totalSec = (performance.now() - requestStart) / 1000;
       // Cost estimation
-            const pricing = getPricing(TYPES.TEXT, TYPES.EMBEDDING)[resolvedModel];
+      const pricing = getPricing(TYPES.TEXT, TYPES.EMBEDDING)[resolvedModel];
       const approxInputTokens =
-                typeof content === "string" ? estimateTokens((content as any)) : 100;
+        typeof content === "string" ? estimateTokens(content) : 100;
       let estimatedCost = null;
       if (pricing?.inputPerMillion) {
         estimatedCost =
           (approxInputTokens / 1_000_000) * pricing.inputPerMillion;
       }
-            const source = options.source || "any";
+      const source = options.source || "any";
       // Determine input content type for payload logging
       const contentType =
         typeof content === "string"
@@ -83,48 +89,47 @@ const EmbeddingService = {
             : "any";
       const inputCharacters = typeof content === "string" ? content.length : 0;
       logger.request(
-                (options.project || null as any),
-                options.username || "system",
-                options.clientIp || null,
+        options.project || null,
+        options.username || "system",
+        options.clientIp || null,
         `[embed] ${providerName} model=${resolvedModel} source=${source} — ` +
           (success
-                        ? `dims: ${result?.dimensions}, total: ${totalSec.toFixed(2)}s`
+            ? `dims: ${result?.dimensions}, total: ${totalSec.toFixed(2)}s`
             : `FAILED: ${errorMessage}`) +
           formatCostTag(estimatedCost),
       );
       RequestLogger.log({
         requestId,
-                endpoint: options.endpoint || null,
+        endpoint: options.endpoint || null,
         operation: `embed:${source}`,
-                project: options.project || null,
-                username: options.username || "system",
-                clientIp: options.clientIp || null,
-                agent: options.agent || null,
+        project: options.project || null,
+        username: options.username || "system",
+        clientIp: options.clientIp || null,
+        agent: options.agent || null,
         provider: providerName,
         model: resolvedModel,
-                traceId: options.traceId || null,
-                agentSessionId: options.agentSessionId || null,
+        traceId: options.traceId || null,
+        agentSessionId: options.agentSessionId || null,
         success,
         errorMessage,
         estimatedCost,
         inputTokens: approxInputTokens,
         outputTokens: 0, // Embeddings produce vectors, not output tokens
-                tokensPerSec: calculateTokensPerSec((approxInputTokens as any), (totalSec as any)),
+        tokensPerSec: calculateTokensPerSec(approxInputTokens, totalSec),
         inputCharacters,
         totalTime: roundMs(totalSec),
         modalities: (() => {
-          const mod = { embeddingOut: true };
+          const mod: Record<string, boolean> = { embeddingOut: true };
           if (typeof content === "string") {
-                        (mod as any).textIn = true;
+            mod.textIn = true;
           } else if (Array.isArray(content)) {
-                        // @ts-ignore - TODO: strict typing
-                        for ( const part of content) {
-                            if (part.text) (mod as any).textIn = true;
+            for (const part of content) {
+              if (part.text) mod.textIn = true;
               const mime = part.inlineData?.mimeType || "";
-                            if (mime.startsWith("image/")) (mod as any).imageIn = true;
-                            else if (mime.startsWith("audio/")) (mod as any).audioIn = true;
-                            else if (mime.startsWith("video/")) (mod as any).videoIn = true;
-                            else if (mime === "application/pdf") (mod as any).docIn = true;
+              if (mime.startsWith("image/")) mod.imageIn = true;
+              else if (mime.startsWith("audio/")) mod.audioIn = true;
+              else if (mime.startsWith("video/")) mod.videoIn = true;
+              else if (mime === "application/pdf") mod.docIn = true;
             }
           }
           return mod;
@@ -153,15 +158,8 @@ const EmbeddingService = {
       model: resolvedModel,
     };
   },
-  /**
-   * Convenience wrapper — returns just the embedding vector.
-   * Used by internal callers that only need the float array.
-   *
-
-
-   */
-  async embed(text: any, options: any = {}) {
-        const result = await this.generate((text as any), options);
+  async embed(text: string | MultimodalPart[], options: any = {}) {
+    const result = await this.generate(text, options);
     return result.embedding;
   },
 };

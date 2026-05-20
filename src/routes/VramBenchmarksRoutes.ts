@@ -3,11 +3,57 @@ import { Router, Request, Response, NextFunction } from "express";
 import logger from "../utils/logger.ts";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import { COLLECTIONS } from "../constants.ts";
+import { MongoFilter, GetVramBenchmarksQuerySchema } from "../types/index.ts";
 
 const router = Router();
 router.use(requireDb);
 
 const COLLECTION = COLLECTIONS.VRAM_BENCHMARKS;
+
+interface VramBenchmarkDocument {
+  displayName?: string;
+  model: string;
+  provider: string;
+  runId?: string;
+  contextLength?: number;
+  architecture?: string;
+  quantization?: string;
+  bitsPerWeight?: number;
+  fileSizeGB?: number;
+  fileSizeBytes?: number;
+  archParams?: any;
+  modality?: string;
+  settings?: {
+    label?: string;
+    [key: string]: any;
+  };
+  baselineVramMiB?: number;
+  loadedVramMiB?: number;
+  modelVramMiB?: number;
+  modelVramGiB?: number;
+  estimatedGiB?: number;
+  deltaGiB?: number;
+  fitsInVram?: boolean;
+  generation?: any;
+  tokensPerSecond?: number;
+  loadTimeMs?: number;
+  gpu?: any;
+  ttft?: number;
+  cpuRam?: any;
+  vramDuringGen?: any;
+  gpuBandwidth?: number;
+  hysteresis?: number;
+  system?: {
+    hostname?: string;
+    os?: any;
+    gpu?: any;
+    cpu?: any;
+    ram?: any;
+    motherboard?: any;
+  };
+  createdAt: Date | string;
+  error?: string | null;
+}
 
 /**
  * GET /vram-benchmarks
@@ -24,25 +70,25 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { db } = req;
+      const { db } = req;
+      const parsedQuery = GetVramBenchmarksQuerySchema.parse(req.query);
 
-      const filter = { error: null };
+      const filter: MongoFilter = { error: null };
 
-      if (req.query.settings) {
-                (filter as any)["settings.label"] = req.query.settings;
+      if (parsedQuery.settings) {
+        filter["settings.label"] = parsedQuery.settings;
       }
-      if (req.query.hostname) {
-                (filter as any)["system.hostname"] = req.query.hostname;
+      if (parsedQuery.hostname) {
+        filter["system.hostname"] = parsedQuery.hostname;
       }
-      if (req.query.ctx) {
-                (filter as any).contextLength = parseInt((req.query.ctx as any));
+      if (parsedQuery.ctx !== undefined) {
+        filter.contextLength = parsedQuery.ctx;
       }
-      if (req.query.provider) {
-                (filter as any).provider = req.query.provider;
+      if (parsedQuery.provider) {
+        filter.provider = parsedQuery.provider;
       }
 
-            const limit = Math.min(parseInt((req.query.limit as any)) || 2000, 10000);
+      const limit = Math.min(parsedQuery.limit, 10000);
 
       // Full projection — includes all measurement fields from the benchmark script
       const projection = {
@@ -103,15 +149,15 @@ router.get(
       };
 
       const docs = await db
-        .collection(COLLECTION)
+        .collection<VramBenchmarkDocument>(COLLECTION)
         .find(filter, { projection })
         .sort({ modelVramGiB: 1 })
         .limit(limit)
         .toArray();
 
       res.json({ count: docs.length, data: docs });
-    } catch (error: any) {
-            logger.error(`GET /vram-benchmarks error: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`GET /vram-benchmarks error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -125,10 +171,9 @@ router.get(
   "/machines",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { db } = req;
+      const { db } = req;
 
-      const pipeline: any[] = [
+      const pipeline = [
         { $match: { "system.hostname": { $exists: true } } },
         {
           $group: {
@@ -151,15 +196,15 @@ router.get(
       ];
 
       const machines = await db
-        .collection(COLLECTION)
+        .collection<VramBenchmarkDocument>(COLLECTION)
         .aggregate(pipeline)
         .toArray();
 
       res.json(
-        machines.map((m: any) => ({
+        machines.map((m) => ({
           hostname: m._id,
           gpu: m.gpu,
-                    gpuVramGB: m.gpuVramMiB ? Math.round(m.gpuVramMiB / 1024) : null,
+          gpuVramGB: m.gpuVramMiB ? Math.round(m.gpuVramMiB / 1024) : null,
           gpuVendor: m.gpuVendor || null,
           gpuDriver: m.gpuDriver || null,
           cpu: m.cpu,
@@ -172,8 +217,8 @@ router.get(
           lastRun: m.lastRun,
         })),
       );
-    } catch (error: any) {
-            logger.error(`GET /vram-benchmarks/machines error: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`GET /vram-benchmarks/machines error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -187,23 +232,22 @@ router.get(
   "/settings",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { db } = req;
+      const { db } = req;
 
-      const labels = await db
-        .collection(COLLECTION)
-        .distinct("settings.label", { error: null });
+      const labels = (await db
+        .collection<VramBenchmarkDocument>(COLLECTION)
+        .distinct("settings.label", { error: null })) as string[];
 
       // Sort with "default" first, then alphabetically
-      labels.sort((a: any, b: any) => {
-                if (a === "default") return -1;
-                if (b === "default") return 1;
-                return (a as any).localeCompare(b);
+      labels.sort((a, b) => {
+        if (a === "default") return -1;
+        if (b === "default") return 1;
+        return a.localeCompare(b);
       });
 
       res.json(labels);
-    } catch (error: any) {
-            logger.error(`GET /vram-benchmarks/settings error: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`GET /vram-benchmarks/settings error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -217,23 +261,22 @@ router.get(
   "/contexts",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { db } = req;
+      const { db } = req;
 
-      const filter = { error: null };
-      if (req.query.settings) {
-                (filter as any)["settings.label"] = req.query.settings;
+      const filter: MongoFilter = { error: null };
+      if (req.query.settings && typeof req.query.settings === "string") {
+        filter["settings.label"] = req.query.settings;
       }
 
-      const contexts = await db
-        .collection(COLLECTION)
-        .distinct("contextLength", filter);
+      const contexts = (await db
+        .collection<VramBenchmarkDocument>(COLLECTION)
+        .distinct("contextLength", filter)) as number[];
 
-            contexts.sort((a: any, b: any) => a - b);
+      contexts.sort((a, b) => a - b);
 
       res.json(contexts);
-    } catch (error: any) {
-            logger.error(`GET /vram-benchmarks/contexts error: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`GET /vram-benchmarks/contexts error: ${(error as Error).message}`);
       next(error);
     }
   }),

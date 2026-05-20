@@ -19,6 +19,7 @@ declare global {
       workspaceId?: string;
       files?: unknown;
       file?: unknown;
+      db: import("mongodb").Db;
     }
   }
 }

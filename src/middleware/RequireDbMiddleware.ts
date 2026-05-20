@@ -14,6 +14,6 @@ export default function requireDb(req: Request, res: Response, next: NextFunctio
   if (!db) {
     return res.status(503).json({ error: "Database not available" });
   }
-    (req as any).db = db;
+  req.db = db;
   next();
 }

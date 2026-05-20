@@ -4,11 +4,28 @@ import { ObjectId } from "mongodb";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
+import { PostCustomToolSchema, PutCustomToolSchema } from "../types/index.ts";
 
 const router = express.Router();
 router.use(requireDb);
 
 const COLLECTION = COLLECTIONS.CUSTOM_TOOLS;
+
+interface CustomToolDocument {
+  _id: ObjectId;
+  project: string;
+  username: string;
+  name: string;
+  description: string;
+  code: string;
+  endpoint: string;
+  method: string;
+  parameters: unknown[];
+  execution: "privileged" | "sandboxed";
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 /**
  * GET /custom-tools
@@ -18,17 +35,18 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
+      const db = req.db!;
+      const project = req.project || "any";
+      const username = req.username || "any";
 
       const tools = await db
-        .collection(COLLECTION)
+        .collection<CustomToolDocument>(COLLECTION)
         .find({ project, username })
         .sort({ createdAt: -1 })
         .toArray();
 
-            res.json(tools.map((t: any) => ({ ...t, id: (t as any)._id.toString() })));
-    } catch (error: any) {
+      res.json(tools.map((t) => ({ ...t, id: t._id.toString() })));
+    } catch (error: unknown) {
       next(error);
     }
   }),
@@ -42,21 +60,29 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
+      const db = req.db!;
+      const project = req.project || "any";
+      const username = req.username || "any";
 
-      const document = {
+      const parseResult = PostCustomToolSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          error: `Validation failed: ${parseResult.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+        });
+      }
+
+      const validated = parseResult.data;
+      const document: Omit<CustomToolDocument, "_id"> = {
         project,
         username,
-        name: req.body.name,
-        description: req.body.description || "",
-        code: req.body.code || "",
-        endpoint: req.body.endpoint || "",
-        method: req.body.method || "GET",
-        parameters: req.body.parameters || [],
-        execution:
-          req.body.execution === "privileged" ? "privileged" : "sandboxed",
-        enabled: req.body.enabled !== false,
+        name: validated.name,
+        description: validated.description,
+        code: validated.code,
+        endpoint: validated.endpoint,
+        method: validated.method,
+        parameters: validated.parameters,
+        execution: validated.execution as "sandboxed" | "privileged",
+        enabled: validated.enabled,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -65,7 +91,7 @@ router.post(
 
       logger.info(`Custom tool created: ${document.name} (${result.insertedId})`);
       res.status(201).json({ ...document, id: result.insertedId.toString() });
-    } catch (error: any) {
+    } catch (error: unknown) {
       next(error);
     }
   }),
@@ -79,33 +105,24 @@ router.put(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { db } = req;
+      const db = req.db!;
+
+      const parseResult = PutCustomToolSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          error: `Validation failed: ${parseResult.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+        });
+      }
 
       const updates = {
-        ...(req.body.name !== undefined && { name: req.body.name }),
-        ...(req.body.description !== undefined && {
-          description: req.body.description,
-        }),
-        ...(req.body.code !== undefined && { code: req.body.code }),
-        ...(req.body.endpoint !== undefined && { endpoint: req.body.endpoint }),
-        ...(req.body.method !== undefined && { method: req.body.method }),
-        ...(req.body.parameters !== undefined && {
-          parameters: req.body.parameters,
-        }),
-        ...(req.body.execution !== undefined && {
-          execution:
-            req.body.execution === "privileged" ? "privileged" : "sandboxed",
-        }),
-        ...(req.body.enabled !== undefined && { enabled: req.body.enabled }),
+        ...parseResult.data,
         updatedAt: new Date(),
       };
 
       const result = await db
-        .collection(COLLECTION)
+        .collection<CustomToolDocument>(COLLECTION)
         .findOneAndUpdate(
-                    // @ts-ignore - TODO: strict typing
-                    { _id: new ObjectId(req.params.id) },
+          { _id: new ObjectId(req.params.id as string) },
           { $set: updates },
           { returnDocument: "after" },
         );
@@ -116,7 +133,7 @@ router.put(
 
       logger.info(`Custom tool updated: ${result.name} (${req.params.id})`);
       res.json({ ...result, id: result._id.toString() });
-    } catch (error: any) {
+    } catch (error: unknown) {
       next(error);
     }
   }),
@@ -130,13 +147,11 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { db } = req;
+      const db = req.db!;
 
       const result = await db
-        .collection(COLLECTION)
-                // @ts-ignore - TODO: strict typing
-                .findOneAndDelete({ _id: new ObjectId(req.params.id) });
+        .collection<CustomToolDocument>(COLLECTION)
+        .findOneAndDelete({ _id: new ObjectId(req.params.id as string) });
 
       if (!result) {
         return res.status(404).json({ error: "Tool not found" });
@@ -144,7 +159,7 @@ router.delete(
 
       logger.info(`Custom tool deleted: ${result.name} (${req.params.id})`);
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       next(error);
     }
   }),

@@ -1,16 +1,48 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
+import { ObjectId } from "mongodb";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import ConversationService, {
   buildConversationPatchFields,
 } from "../services/ConversationService.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
+import {
+  GetConversationsQuerySchema,
+  PostConversationMessagesBodySchema,
+  PatchConversationBodySchema,
+} from "../types/index.ts";
 
 const router = express.Router();
 router.use(requireDb);
 
 const COLLECTION = COLLECTIONS.CONVERSATIONS;
+
+interface ConversationDocument {
+  _id: ObjectId;
+  id: string;
+  project: string;
+  username: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  modalities?: Record<string, boolean>;
+  providers?: string[];
+  totalCost?: number;
+  isGenerating?: boolean;
+  traceId?: string | null;
+  synthetic?: boolean;
+  messages: any[];
+  systemPrompt?: string;
+  settings?: Record<string, any>;
+}
+
+interface WorkflowDocument {
+  _id: ObjectId;
+  workflowName: string;
+  conversationIds: string[];
+  updatedAt: Date;
+}
 
 /**
  * GET /conversations
@@ -26,26 +58,29 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
-      const limit = Math.min(
-                Math.max(parseInt((req.query.limit as any), 10) || 50, 1),
-        200,
-      );
-      const cursor = req.query.cursor || null;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
 
-      const filter = { project, username };
+      const parsed = GetConversationsQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.format() });
+      }
+
+      const { limit, cursor } = parsed.data;
+
+      const filter: Record<string, any> = { project, username };
       if (cursor) {
         // updatedAt is stored as ISO-8601 strings — compare string-to-string
         // to match BSON type and allow index range scan
-                (filter as any).updatedAt = { $lt: cursor };
+        filter.updatedAt = { $lt: cursor };
       }
 
       // Fetch limit + 1 to detect if there's a next page
       const rows = await db
-        .collection(COLLECTION)
+        .collection<ConversationDocument>(COLLECTION)
         .find(filter)
-        .project({
+        .project<Omit<ConversationDocument, "messages" | "systemPrompt" | "settings">>({
           id: 1,
           project: 1,
           username: 1,
@@ -68,8 +103,9 @@ router.get(
       const nextCursor = hasMore ? items[items.length - 1].updatedAt : null;
 
       res.json({ items, nextCursor, hasMore });
-    } catch (error: any) {
-            logger.error(`Error fetching conversations: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error fetching conversations: ${errorMessage}`);
       next(error);
     }
   }),
@@ -83,19 +119,23 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
+      const conversationId = req.params.id as string;
+
       const conversation = await db
-        .collection(COLLECTION)
-        .findOne({ id: req.params.id, project, username });
+        .collection<ConversationDocument>(COLLECTION)
+        .findOne({ id: conversationId, project, username });
 
       if (!conversation) {
         return res.status(404).json({ error: "Conversation not found" });
       }
 
       res.json(conversation);
-    } catch (error: any) {
-            logger.error(`Error fetching conversation: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error fetching conversation: ${errorMessage}`);
       next(error);
     }
   }),
@@ -109,18 +149,19 @@ router.get(
   "/:id/workflows",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { db } = req;
+      const { db } = req;
+      const conversationId = req.params.id as string;
 
       const workflows = await db
-        .collection("workflows")
-        .find({ conversationIds: req.params.id })
+        .collection<WorkflowDocument>("workflows")
+        .find({ conversationIds: conversationId })
         .project({ workflowName: 1, updatedAt: 1 })
         .toArray();
 
       res.json(workflows);
-    } catch (error: any) {
-            logger.error(`Error fetching conversation workflows: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error fetching conversation workflows: ${errorMessage}`);
       next(error);
     }
   }),
@@ -134,17 +175,19 @@ router.post(
   "/:id/messages",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { project, username } = req;
-      const { messages, conversationMeta } = req.body;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const conversationId = req.params.id as string;
 
-      if (!messages || !Array.isArray(messages) || messages.length === 0) {
-        return res
-          .status(400)
-          .json({ error: "messages must be a non-empty array" });
+      const parsed = PostConversationMessagesBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.format() });
       }
 
+      const { messages, conversationMeta } = parsed.data;
+
       const conversation = await (ConversationService as any).appendMessages(
-                (req.params.id as any),
+        conversationId,
         project,
         username,
         messages,
@@ -152,8 +195,9 @@ router.post(
       );
 
       res.json(conversation);
-    } catch (error: any) {
-            logger.error(`Error appending messages: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error appending messages: ${errorMessage}`);
       next(error);
     }
   }),
@@ -168,14 +212,22 @@ router.patch(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
-      const setFields = buildConversationPatchFields(req.body);
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
+      const conversationId = req.params.id as string;
+
+      const parsed = PatchConversationBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.format() });
+      }
+
+      const setFields = buildConversationPatchFields(parsed.data);
 
       const result = await db
-        .collection(COLLECTION)
+        .collection<ConversationDocument>(COLLECTION)
         .updateOne(
-          { id: req.params.id, project, username },
+          { id: conversationId, project, username },
           { $set: setFields },
         );
 
@@ -184,12 +236,13 @@ router.patch(
       }
 
       const conversation = await db
-        .collection(COLLECTION)
-        .findOne({ id: req.params.id, project, username });
+        .collection<ConversationDocument>(COLLECTION)
+        .findOne({ id: conversationId, project, username });
 
       res.json(conversation);
-    } catch (error: any) {
-            logger.error(`Error patching conversation: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error patching conversation: ${errorMessage}`);
       next(error);
     }
   }),
@@ -203,19 +256,23 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
+      const conversationId = req.params.id as string;
+
       const result = await db
-        .collection(COLLECTION)
-        .deleteOne({ id: req.params.id, project, username });
+        .collection<ConversationDocument>(COLLECTION)
+        .deleteOne({ id: conversationId, project, username });
 
       if (result.deletedCount === 0) {
         return res.status(404).json({ error: "Conversation not found" });
       }
 
-      res.json({ success: true, id: req.params.id });
-    } catch (error: any) {
-            logger.error(`Error deleting conversation: ${(error as Error).message}`);
+      res.json({ success: true, id: conversationId });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error deleting conversation: ${errorMessage}`);
       next(error);
     }
   }),

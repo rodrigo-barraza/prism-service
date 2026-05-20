@@ -3,40 +3,61 @@ import express, { Request, Response, NextFunction } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
+import { GetTextQuerySchema } from "../types/index.ts";
 
 const router = express.Router();
 router.use(requireDb);
+
+interface AggregateTextItem {
+  convId: string;
+  convTitle?: string;
+  project: string;
+  username: string;
+  role: string;
+  content: string;
+  timestamp: string | Date;
+  model?: string;
+  estimatedCost?: number;
+  images: number;
+}
 
 // ─── GET /text — extract text content from the caller's project conversations ─
 router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { db } = req;
+      const db = req.db;
+
+      const parseResult = GetTextQuerySchema.safeParse(req.query);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          error: `Validation failed: ${parseResult.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+        });
+      }
 
       const {
-        page = 1,
-        limit = 50,
+        page,
+        limit,
         origin,
         search,
         provider,
         model,
         from,
         to,
-      } = req.query;
-            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
-            const lim = parseInt((limit as any), 10);
+      } = parseResult.data;
+
+      const skip = (page - 1) * limit;
 
       // Always scope to the caller's project
-      const preMatch: any = { project: req.project };
+      const preMatch: Record<string, unknown> = { project: req.project };
       if (from || to) {
-                preMatch.updatedAt = {};
-                if (from) preMatch.updatedAt.$gte = from;
-                if (to) preMatch.updatedAt.$lte = to;
+        const updatedAtFilter: Record<string, unknown> = {};
+        if (from) updatedAtFilter.$gte = from;
+        if (to) updatedAtFilter.$lte = to;
+        preMatch.updatedAt = updatedAtFilter;
       }
 
-      const pipeline: any[] = [
+      const pipeline: Record<string, unknown>[] = [
         { $match: preMatch },
         { $unwind: "$messages" },
         {
@@ -62,39 +83,42 @@ router.get(
       ];
 
       if (origin === "user") {
-                pipeline.push({ $match: { role: "user" } });
+        pipeline.push({ $match: { role: "user" } });
       } else if (origin === "ai") {
-                pipeline.push({ $match: { role: "assistant" } });
-      }
-      if (search) {
-        pipeline.push({
-                    $match: { content: { $regex: search, $options: "i" } },
-        });
-      }
-      if (provider) {
-        pipeline.push({
-                    $match: { model: { $regex: `^${provider}/`, $options: "i" } },
-        });
-      }
-      if (model) {
-                pipeline.push({ $match: { model } });
+        pipeline.push({ $match: { role: "assistant" } });
       }
 
-      const countPipeline: any[] = [...pipeline, { $count: "total" }];
+      if (search) {
+        pipeline.push({
+          $match: { content: { $regex: search, $options: "i" } },
+        });
+      }
+
+      if (provider) {
+        pipeline.push({
+          $match: { model: { $regex: `^${provider}/`, $options: "i" } },
+        });
+      }
+
+      if (model) {
+        pipeline.push({ $match: { model } });
+      }
+
+      const countPipeline = [...pipeline, { $count: "total" }];
       const [countResult] = await db
         .collection(COLLECTIONS.CONVERSATIONS)
-        .aggregate(countPipeline)
+        .aggregate<{ total: number }>(countPipeline)
         .toArray();
       const total = countResult?.total || 0;
 
-            pipeline.push({ $skip: skip }, { $limit: lim });
+      pipeline.push({ $skip: skip }, { $limit: limit });
 
       const items = await db
         .collection(COLLECTIONS.CONVERSATIONS)
-        .aggregate(pipeline)
+        .aggregate<AggregateTextItem>(pipeline)
         .toArray();
 
-      const data = items.map((item: any) => ({
+      const data = items.map((item) => ({
         content: item.content,
         origin: item.role === "assistant" ? "ai" : "user",
         role: item.role,
@@ -104,26 +128,26 @@ router.get(
         username: item.username,
         model: item.model,
         estimatedCost: item.estimatedCost,
-                hasImages: (item as any).images > 0,
+        hasImages: item.images > 0,
         timestamp: item.timestamp,
       }));
 
       res.json({
         data,
         total,
-                page: parseInt((page as any), 10),
-        limit: lim,
+        page,
+        limit,
         providers: [
           ...new Set(
-                        data.map((d: any) => (d.model as any)?.split("/")[0]).filter(Boolean),
+            data.map((d) => d.model?.split("/")[0]).filter(Boolean),
           ),
         ].sort(),
         models: [
-          ...new Set(data.map((d: any) => d.model).filter(Boolean)),
+          ...new Set(data.map((d) => d.model).filter(Boolean)),
         ].sort(),
       });
-    } catch (error: any) {
-            logger.error(`GET /text error: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`GET /text error: ${(error as Error).message}`);
       next(error);
     }
   }),

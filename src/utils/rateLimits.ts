@@ -24,12 +24,12 @@ import rateLimitStore from "../services/RateLimitStore.ts";
 
  * @returns {object|null} Parsed rate-limit data, or null if unavailable
  */
-export function extractOpenAIRateLimits(response: Record<string, unknown>, model: Record<string, unknown>) {
+export function extractOpenAIRateLimits(response: any, model: string) {
   if (!response?.headers) return null;
   const headers = response.headers;
 
-    const limitRequests = (headers as any).get("x-ratelimit-limit-requests");
-    const limitTokens = (headers as any).get("x-ratelimit-limit-tokens");
+  const limitRequests = headers.get("x-ratelimit-limit-requests");
+  const limitTokens = headers.get("x-ratelimit-limit-tokens");
 
   // Only return if we actually got rate-limit headers
   if (!limitRequests && !limitTokens) return null;
@@ -38,18 +38,18 @@ export function extractOpenAIRateLimits(response: Record<string, unknown>, model
     provider: "openai",
     requests: {
       limit: safeInt(limitRequests),
-            remaining: safeInt((headers as any).get("x-ratelimit-remaining-requests")),
-            reset: (headers as any).get("x-ratelimit-reset-requests") || null,
+      remaining: safeInt(headers.get("x-ratelimit-remaining-requests")),
+      reset: headers.get("x-ratelimit-reset-requests") || null,
     },
     tokens: {
       limit: safeInt(limitTokens),
-            remaining: safeInt((headers as any).get("x-ratelimit-remaining-tokens")),
-            reset: (headers as any).get("x-ratelimit-reset-tokens") || null,
+      remaining: safeInt(headers.get("x-ratelimit-remaining-tokens")),
+      reset: headers.get("x-ratelimit-reset-tokens") || null,
     },
   };
 
   // Update the global store with the latest per-model snapshot
-    rateLimitStore.update(("openai" as any), model, result);
+  rateLimitStore.update("openai", model, result);
 
   return result;
 }
@@ -68,16 +68,14 @@ export function extractOpenAIRateLimits(response: Record<string, unknown>, model
  *   anthropic-ratelimit-tokens-reset        → TPM reset time
  *   retry-after                             → seconds to wait if 429
  *
-
-
  * @returns {object|null} Parsed rate-limit data, or null if unavailable
  */
-export function extractAnthropicRateLimits(response: Record<string, unknown>, model: Record<string, unknown>) {
+export function extractAnthropicRateLimits(response: any, model: string) {
   if (!response?.headers) return null;
   const headers = response.headers;
 
-    const limitRequests = (headers as any).get("anthropic-ratelimit-requests-limit");
-    const limitTokens = (headers as any).get("anthropic-ratelimit-tokens-limit");
+  const limitRequests = headers.get("anthropic-ratelimit-requests-limit");
+  const limitTokens = headers.get("anthropic-ratelimit-tokens-limit");
 
   // Only return if we actually got rate-limit headers
   if (!limitRequests && !limitTokens) return null;
@@ -86,28 +84,28 @@ export function extractAnthropicRateLimits(response: Record<string, unknown>, mo
     provider: "anthropic",
     requests: {
       limit: safeInt(limitRequests),
-            remaining: safeInt((headers as any).get("anthropic-ratelimit-requests-remaining")),
-            reset: (headers as any).get("anthropic-ratelimit-requests-reset") || null,
+      remaining: safeInt(headers.get("anthropic-ratelimit-requests-remaining")),
+      reset: headers.get("anthropic-ratelimit-requests-reset") || null,
     },
     tokens: {
       limit: safeInt(limitTokens),
-            remaining: safeInt((headers as any).get("anthropic-ratelimit-tokens-remaining")),
-            reset: (headers as any).get("anthropic-ratelimit-tokens-reset") || null,
+      remaining: safeInt(headers.get("anthropic-ratelimit-tokens-remaining")),
+      reset: headers.get("anthropic-ratelimit-tokens-reset") || null,
     },
     inputTokens: {
-            limit: safeInt((headers as any).get("anthropic-ratelimit-input-tokens-limit")),
-            remaining: safeInt((headers as any).get("anthropic-ratelimit-input-tokens-remaining")),
-            reset: (headers as any).get("anthropic-ratelimit-input-tokens-reset") || null,
+      limit: safeInt(headers.get("anthropic-ratelimit-input-tokens-limit")),
+      remaining: safeInt(headers.get("anthropic-ratelimit-input-tokens-remaining")),
+      reset: headers.get("anthropic-ratelimit-input-tokens-reset") || null,
     },
     outputTokens: {
-            limit: safeInt((headers as any).get("anthropic-ratelimit-output-tokens-limit")),
-            remaining: safeInt((headers as any).get("anthropic-ratelimit-output-tokens-remaining")),
-            reset: (headers as any).get("anthropic-ratelimit-output-tokens-reset") || null,
+      limit: safeInt(headers.get("anthropic-ratelimit-output-tokens-limit")),
+      remaining: safeInt(headers.get("anthropic-ratelimit-output-tokens-remaining")),
+      reset: headers.get("anthropic-ratelimit-output-tokens-reset") || null,
     },
   };
 
   // Update the global store with the latest per-model snapshot
-    rateLimitStore.update(("anthropic" as any), model, result);
+  rateLimitStore.update("anthropic", model, result);
 
   return result;
 }
@@ -115,8 +113,8 @@ export function extractAnthropicRateLimits(response: Record<string, unknown>, mo
 /**
  * Safely parse a string to an integer, returning null on failure.
  */
-function safeInt(value: Record<string, unknown>) {
+function safeInt(value: any) {
   if (value == null) return null;
-    const parsed = parseInt((value as any), 10);
+  const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;
 }

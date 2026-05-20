@@ -4,8 +4,21 @@ import { basename } from "node:path";
 import { TOOLS_SERVICE_URL } from "../../config.ts";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
 import logger from "../utils/logger.ts";
+import { PutWorkspacesSchema, ValidateWorkspaceSchema } from "../types/index.ts";
 
 const router = express.Router();
+
+interface WorkspaceAgent {
+  id: string;
+  name: string;
+  roots?: string[];
+  [key: string]: unknown;
+}
+
+interface WorkspaceConfig {
+  agents?: WorkspaceAgent[];
+  [key: string]: unknown;
+}
 
 /**
  * GET /workspaces
@@ -26,19 +39,19 @@ router.get(
       // Refresh from tools-api to pick up agent-registered roots
       await ToolOrchestratorService.refreshWorkspaceRoots();
 
-      const roots = ToolOrchestratorService.getWorkspaceRoots();
-      const staticRoots = ToolOrchestratorService.getStaticRoots();
+      const roots = ToolOrchestratorService.getWorkspaceRoots() as string[];
+      const staticRoots = ToolOrchestratorService.getStaticRoots() as string[];
 
-      const workspaces = roots.map((rootPath: any) => ({
+      const workspaces = roots.map((rootPath: string) => ({
         id: rootPath,
-                name: basename((rootPath as any)),
+        name: basename(rootPath),
         path: rootPath,
         isPinned: staticRoots.includes(rootPath),
       }));
 
       res.json(workspaces);
-    } catch (error: any) {
-            logger.error(`GET /workspaces error: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`GET /workspaces error: ${(error as Error).message}`);
       res.status(500).json({ error: "Failed to retrieve workspace roots" });
     }
   }),
@@ -54,44 +67,44 @@ router.get(
   "/full",
   asyncHandler(async (_req: Request, res: Response) => {
     try {
-      const roots = ToolOrchestratorService.getWorkspaceRoots();
-      const staticRoots = ToolOrchestratorService.getStaticRoots();
+      const roots = ToolOrchestratorService.getWorkspaceRoots() as string[];
+      const staticRoots = ToolOrchestratorService.getStaticRoots() as string[];
 
       // Fetch full config from tools-api to get agent metadata
-      let agents: any[] = [];
+      let agents: WorkspaceAgent[] = [];
       try {
         const configRes = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
           signal: AbortSignal.timeout(3000),
         });
         if (configRes.ok) {
-          const config = await configRes.json();
-                    agents = (config as any).agents || [];
+          const config = (await configRes.json()) as WorkspaceConfig;
+          agents = config.agents || [];
         }
-      } catch (agentErr: any) {
+      } catch (agentErr: unknown) {
         logger.warn(
-                    `GET /workspaces/full agent fetch failed: ${(agentErr as Error).message}`,
+          `GET /workspaces/full agent fetch failed: ${(agentErr as Error).message}`,
         );
       }
 
       // Build a set of agent-served roots for quick lookup
-      const agentRootSet = new Set();
-            for ( const agent of agents) {
-                for ( const root of agent.roots || []) {
+      const agentRootSet = new Set<string>();
+      for (const agent of agents) {
+        for (const root of agent.roots || []) {
           agentRootSet.add(root);
         }
       }
 
-      const workspaces = roots.map((rootPath: any) => ({
+      const workspaces = roots.map((rootPath: string) => ({
         id: rootPath,
-                name: basename((rootPath as any)),
+        name: basename(rootPath),
         path: rootPath,
         isPinned: staticRoots.includes(rootPath),
         isAgentServed: agentRootSet.has(rootPath),
       }));
 
       res.json({ workspaces, agents, staticRoots });
-    } catch (error: any) {
-            logger.error(`GET /workspaces/full error: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`GET /workspaces/full error: ${(error as Error).message}`);
       res
         .status(500)
         .json({ error: "Failed to retrieve full workspace config" });
@@ -108,13 +121,20 @@ router.get(
 router.put(
   "/",
   asyncHandler(async (req: Request, res: Response) => {
+    const parseResult = PutWorkspacesSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: `Validation failed: ${parseResult.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+      });
+    }
+
     try {
       const result = await ToolOrchestratorService.updateWorkspaceRoots(
-        req.body?.roots || [],
+        parseResult.data.roots,
       );
       res.json(result);
-    } catch (error: any) {
-            logger.error(`PUT /workspaces error: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`PUT /workspaces error: ${(error as Error).message}`);
       res.status(500).json({ error: "Failed to update workspace roots" });
     }
   }),
@@ -128,13 +148,20 @@ router.put(
 router.post(
   "/validate",
   asyncHandler(async (req: Request, res: Response) => {
+    const parseResult = ValidateWorkspaceSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: `Validation failed: ${parseResult.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+      });
+    }
+
     try {
       const result = await ToolOrchestratorService.validateWorkspacePath(
-        req.body?.path,
+        parseResult.data.path,
       );
       res.json(result);
-    } catch (error: any) {
-            logger.error(`POST /workspaces/validate error: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`POST /workspaces/validate error: ${(error as Error).message}`);
       res.status(500).json({ error: "Failed to validate workspace path" });
     }
   }),
@@ -164,23 +191,23 @@ router.get(
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             path: workspacePath,
-                        maxDepth: maxDepth ? parseInt((maxDepth as any), 10) : 3,
+            maxDepth: maxDepth ? parseInt(String(maxDepth), 10) : 3,
           }),
           signal: AbortSignal.timeout(10_000),
         },
       );
 
       if (!toolsRes.ok) {
-        const errorBody = await toolsRes.json().catch(() => ({}));
-                return res.status(toolsRes.status).json({
-                    error: (errorBody as any).error || `tools-service returned ${toolsRes.status}`,
+        const errorBody = (await toolsRes.json().catch(() => ({}))) as { error?: string };
+        return res.status(toolsRes.status).json({
+          error: errorBody.error || `tools-service returned ${toolsRes.status}`,
         });
       }
 
       const result = await toolsRes.json();
       res.json(result);
-    } catch (error: any) {
-            logger.error(`GET /workspaces/tree error: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`GET /workspaces/tree error: ${(error as Error).message}`);
       res.status(500).json({ error: "Failed to fetch workspace tree" });
     }
   }),

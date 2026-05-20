@@ -102,3 +102,164 @@ export const ChatRequestSchema = z
   .passthrough(); // Support extra provider/custom parameters dynamically
 
 export type ChatRequest = z.infer<typeof ChatRequestSchema>;
+
+export const PutWorkspacesSchema = z.object({
+  roots: z.array(z.string()),
+});
+
+export const ValidateWorkspaceSchema = z.object({
+  path: z.string(),
+});
+
+export const PostCustomToolSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  description: z.string().optional().default(""),
+  code: z.string().optional().default(""),
+  endpoint: z.string().optional().default(""),
+  method: z.string().optional().default("GET"),
+  parameters: z.array(z.any()).optional().default([]),
+  execution: z.enum(["sandboxed", "privileged"]).optional().default("sandboxed"),
+  enabled: z.boolean().optional().default(true),
+});
+
+export const PutCustomToolSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+  code: z.string().optional(),
+  endpoint: z.string().optional(),
+  method: z.string().optional(),
+  parameters: z.array(z.any()).optional(),
+  execution: z.enum(["sandboxed", "privileged"]).optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const GetTextQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(500).default(50),
+  origin: z.enum(["user", "ai"]).optional(),
+  search: z.string().optional(),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+});
+
+export const GetMediaQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+  type: z.enum(["image", "audio"]).optional(),
+  origin: z.enum(["user", "ai"]).optional(),
+  search: z.string().optional(),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+});
+
+export const GetFavoritesQuerySchema = z.object({
+  type: z.string().optional(),
+});
+
+export const PostFavoritesBodySchema = z.object({
+  type: z.string().min(1, "type is required"),
+  key: z.string().min(1, "key is required"),
+  meta: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const DeleteFavoritesQuerySchema = z.object({
+  type: z.string().min(1, "type is required"),
+  key: z.string().min(1, "key is required"),
+});
+
+export const PostMcpServerSchema = z.object({
+  name: z.string().min(1, "name is required"),
+  displayName: z.string().optional(),
+  transport: z.enum(["stdio", "sse"]).optional().default("stdio"),
+  command: z.string().optional().default(""),
+  args: z.array(z.string()).optional().default([]),
+  env: z.record(z.string(), z.string()).optional().default({}),
+  url: z.string().optional().default(""),
+  headers: z.record(z.string(), z.string()).optional().default({}),
+  enabled: z.boolean().optional().default(true),
+});
+
+export const PutMcpServerSchema = z.object({
+  name: z.string().min(1).optional(),
+  displayName: z.string().optional(),
+  transport: z.enum(["stdio", "sse"]).optional(),
+  command: z.string().optional(),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
+  url: z.string().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const GetConversationsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  cursor: z.string().nullable().optional(),
+});
+
+export const PostConversationMessagesBodySchema = z.object({
+  messages: z.array(ChatMessageSchema).nonempty("messages must be a non-empty array"),
+  conversationMeta: z.record(z.string(), z.unknown()).nullable().optional(),
+});
+
+export const PatchConversationBodySchema = z.object({
+  title: z.string().optional(),
+  messages: z.array(ChatMessageSchema).optional(),
+  systemPrompt: z.string().optional(),
+  settings: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const PostSynthesisBodySchema = z.object({
+  id: z.string().min(1, "id is required"),
+  title: z.string().optional().default("Untitled Synthesis"),
+  systemPrompt: z.string().optional().default(""),
+  userPersona: z.string().optional().default(""),
+  category: z.string().optional().default("Chat"),
+  targetTurns: z.number().int().optional().default(4),
+  seedMessages: z.array(z.any()).optional().default([]),
+  settings: z.record(z.string(), z.unknown()).optional().default({}),
+  conversationId: z.string().nullable().optional().default(null),
+});
+
+export const PatchSynthesisBodySchema = z.object({
+  title: z.string().optional(),
+  systemPrompt: z.string().optional(),
+  assistantPersona: z.string().optional(),
+  userPersona: z.string().optional(),
+  category: z.string().optional(),
+  targetTurns: z.number().int().optional(),
+  seedMessages: z.array(z.any()).optional(),
+  settings: z.record(z.string(), z.unknown()).optional(),
+  conversationId: z.string().nullable().optional(),
+});export const PostSkillSchema = z.object({
+  name: z.string().min(1, "name is required"),
+  description: z.string().optional().default(""),
+  content: z.string().optional().default(""),
+  enabled: z.boolean().optional().default(true),
+});
+
+export const PutSkillSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+  content: z.string().optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const GetAgentSessionsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  cursor: z.string().nullable().optional(),
+  agent: z.string().nullable().optional(),
+});
+
+export const GetVramBenchmarksQuerySchema = z.object({
+  settings: z.string().optional(),
+  hostname: z.string().optional(),
+  ctx: z.coerce.number().int().optional(),
+  provider: z.string().optional(),
+  limit: z.coerce.number().int().min(1).default(2000),
+});
+
+

@@ -26,7 +26,25 @@ const DEFAULTS = {
 // Hot path: MemoryService + EmbeddingService read these on every call.
 // Cache is invalidated on update() and lazily populated on first get().
 
-let _cache: any = null;
+interface SettingsData {
+  memory: {
+    extractionProvider: string;
+    extractionModel: string;
+    consolidationProvider: string;
+    consolidationModel: string;
+    embeddingProvider: string;
+    embeddingModel: string;
+    [key: string]: string; // Support dynamic string index for provider/model retrieval
+  };
+  agents: {
+    subagentProvider: string;
+    subagentModel: string;
+    harness: string;
+    [key: string]: string;
+  };
+}
+
+let _cache: SettingsData | null = null;
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
@@ -40,10 +58,9 @@ let _cache: any = null;
 const SettingsService = {
   /**
    * Get the current settings, merging with defaults for any missing keys.
-
    */
-  async get() {
-        if (_cache) return _cache;
+  async get(): Promise<SettingsData> {
+    if (_cache) return _cache;
 
     const collection = MongoWrapper.getCollection(
       MONGO_DB_NAME,
@@ -58,24 +75,20 @@ const SettingsService = {
     }
 
     // Deep merge: defaults ← stored
-    _cache = deepMerge(DEFAULTS, document.data || {});
+    _cache = deepMerge(DEFAULTS as unknown as Record<string, unknown>, (document.data || {}) as Record<string, unknown>) as unknown as SettingsData;
     return _cache;
   },
 
   /**
    * Get a specific section of settings (e.g. "memory").
-
-
    */
-  async getSection(section: any) {
+  async getSection<K extends keyof SettingsData>(section: K): Promise<SettingsData[K]> {
     const settings = await this.get();
-        // @ts-ignore - TODO: strict typing
-        return (settings as any)[(section as string)] || DEFAULTS[(section as string)] || {};
+    return settings[section] || DEFAULTS[section];
   },
 
   /**
    * Update settings. Performs a deep merge with existing settings.
-
    * @returns {Promise<object>} The full settings after merge
    */
   async update(data: any) {
@@ -86,7 +99,7 @@ const SettingsService = {
     if (!collection) throw new Error("Database not available");
 
     const current = await this.get();
-    const merged = deepMerge((current as any), data);
+    const merged = deepMerge(current as unknown as Record<string, unknown>, data);
 
     await collection.updateOne(
       { _key: "global" },
@@ -104,7 +117,7 @@ const SettingsService = {
     );
 
     // Invalidate cache
-    _cache = merged;
+    _cache = merged as unknown as SettingsData;
     logger.info("[SettingsService] Settings updated and cache refreshed");
     return merged;
   },
@@ -114,11 +127,10 @@ const SettingsService = {
    * Centralises the identical getXxxConfig() helpers in MemoryService,
    * MemoryConsolidationService, and EmbeddingService.
    *
-
    * @returns {Promise<{ provider: string, model: string }>}
    */
   async getMemoryModelConfig(role: string) {
-        const mem = await this.getSection(("memory" as any));
+    const mem = await this.getSection("memory");
     const provider = mem[`${role}Provider`];
     const model = mem[`${role}Model`];
     if (!provider || !model) {

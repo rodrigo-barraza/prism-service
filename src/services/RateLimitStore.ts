@@ -48,32 +48,29 @@ const GOOGLE_STATIC_LIMITS = {
 };
 
 class RateLimitStore {
+  private _models: Map<string, { rateLimits: any; updatedAt: string }>;
+  private _google: typeof GOOGLE_STATIC_LIMITS;
+
   constructor() {
     /**
      * Per-model rate limits for dynamic providers.
      * Key: `${provider}::${model}` → { rateLimits, updatedAt }
-     * @type {Map<string, { rateLimits: object, updatedAt: string }>}
      */
-        // @ts-ignore - TODO: strict typing
-        this._models = new Map();
+    this._models = new Map();
 
     /** Static Google limits (separate shape — not per-response). */
-        // @ts-ignore - TODO: strict typing
-        this._google = GOOGLE_STATIC_LIMITS;
+    this._google = GOOGLE_STATIC_LIMITS;
   }
 
   /**
    * Update the stored rate-limit snapshot for a provider + model.
    * Called after every API response that contains rate-limit headers.
-   *
-
-
    */
-  update(providerName: any, model: any, rateLimits: any) {
+  update(providerName: string, model: string, rateLimits: any): void {
     if (!rateLimits || !providerName || !model) return;
 
     const key = `${providerName}::${model}`;
-        (this as any)._models.set(key, {
+    this._models.set(key, {
       rateLimits,
       updatedAt: new Date().toISOString(),
     });
@@ -93,19 +90,19 @@ class RateLimitStore {
     const result: any = {};
 
     // Group dynamic models by provider
-        for ( const [key, value] of (this as any)._models) {
+    for (const [key, value] of this._models) {
       const [provider, model] = key.split("::");
-            if (!result[provider]) {
-                result[provider] = { dynamic: true, models: {} };
+      if (!result[provider]) {
+        result[provider] = { dynamic: true, models: {} };
       }
-            (result as any)[provider].models[model] = value;
+      result[provider].models[model] = value;
     }
 
     // Add Google static limits
-        result.google = {
+    result.google = {
       dynamic: false,
-            note: (this as any)._google.note,
-            models: (this as any)._google.models,
+      note: this._google.note,
+      models: this._google.models,
     };
 
     return result;

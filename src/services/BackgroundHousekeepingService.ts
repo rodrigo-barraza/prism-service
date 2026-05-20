@@ -36,31 +36,48 @@ const REQUEST_LOG_MAX_AGE_DAYS = 90;
 /** Stale isGenerating flags left from crashes */
 const STALE_SESSION_CUTOFF_MS = hours(2);
 
+export interface HousekeepingWorktreeResult {
+  pruned: string[];
+  errors: string[];
+}
+
+export interface HousekeepingSessionResult {
+  conversationsCleared: number;
+  agentSessionsCleared: number;
+}
+
+export interface HousekeepingResult {
+  worktrees?: HousekeepingWorktreeResult | { error: string };
+  staleSessions?: HousekeepingSessionResult | { error: string };
+  requestLogs?: { deleted: number } | { error: string };
+  minioOrphans?: { removed: number } | { error: string };
+  durationMs: number;
+  trigger: string;
+}
+
 // ─── Worktree Pruning ─────────────────────────────────────────────────────────
 
 /**
  * Remove orphaned worktrees in /tmp/prism-worktrees/ older than 24h.
  * These accumulate when workers crash or the process is killed without
  * running CleanupRegistry teardown.
- *
- * @returns {Promise<{ pruned: string[], errors: string[] }>}
  */
-async function pruneOrphanedWorktrees() {
-    const pruned: any[] = [];
-    const errors: any[] = [];
+async function pruneOrphanedWorktrees(): Promise<HousekeepingWorktreeResult> {
+  const pruned: string[] = [];
+  const errors: string[] = [];
 
-  let entries: any;
+  let entries: string[];
   try {
-        entries = await readdir(WORKTREE_ROOT).catch(() => []);
+    entries = await readdir(WORKTREE_ROOT);
   } catch {
-        return { pruned, errors };
+    return { pruned, errors };
   }
 
-    if (entries.length === 0) return { pruned, errors };
+  if (entries.length === 0) return { pruned, errors };
 
   const cutoff = Date.now() - WORKTREE_MAX_AGE_MS;
 
-    for ( const entry of entries) {
+  for (const entry of entries) {
     const entryPath = resolve(WORKTREE_ROOT, entry);
     try {
       const info = await stat(entryPath);
@@ -70,8 +87,8 @@ async function pruneOrphanedWorktrees() {
         await rm(entryPath, { recursive: true, force: true });
         pruned.push(entry);
       }
-    } catch (error: any) {
-            errors.push((`${entry}: ${(error as Error).message}` as any));
+    } catch (error: unknown) {
+      errors.push(`${entry}: ${(error as Error).message}`);
     }
   }
 
@@ -83,10 +100,8 @@ async function pruneOrphanedWorktrees() {
 /**
  * Clear isGenerating flags that were left dangling by a crash.
  * Also removes sessions that have been in "generating" state for >2h.
- *
- * @returns {Promise<{ conversationsCleared: number, agentSessionsCleared: number }>}
  */
-async function clearStaleSessions() {
+async function clearStaleSessions(): Promise<HousekeepingSessionResult> {
   const db = MongoWrapper.getDb(MONGO_DB_NAME);
   if (!db) return { conversationsCleared: 0, agentSessionsCleared: 0 };
 
@@ -97,13 +112,13 @@ async function clearStaleSessions() {
       .collection(COLLECTIONS.CONVERSATIONS)
       .updateMany(
         { isGenerating: true, updatedAt: { $lt: cutoff } },
-        { $set: { isGenerating: false } },
+        { $set: { isGenerating: false } }
       ),
     db
       .collection(COLLECTIONS.AGENT_SESSIONS)
       .updateMany(
         { isGenerating: true, updatedAt: { $lt: cutoff } },
-        { $set: { isGenerating: false } },
+        { $set: { isGenerating: false } }
       ),
   ]);
 
@@ -121,12 +136,12 @@ async function clearStaleSessions() {
  *
  * @returns {Promise<number>} Number of documents deleted
  */
-async function pruneOldRequestLogs() {
+async function pruneOldRequestLogs(): Promise<number> {
   const db = MongoWrapper.getDb(MONGO_DB_NAME);
   if (!db) return 0;
 
   const cutoff = new Date(
-    Date.now() - REQUEST_LOG_MAX_AGE_DAYS * MS_PER_DAY,
+    Date.now() - REQUEST_LOG_MAX_AGE_DAYS * MS_PER_DAY
   ).toISOString();
   const result = await db.collection(COLLECTIONS.REQUESTS).deleteMany({
     timestamp: { $lt: cutoff },
@@ -154,7 +169,7 @@ const STRUCTURAL_PREFIXES = new Set(["projects", "uploads", "generations"]);
  *
  * @returns {Promise<number>} Number of orphaned objects removed
  */
-async function pruneMinioOrphans() {
+async function pruneMinioOrphans(): Promise<number> {
   if (!MinioWrapper.isAvailable()) return 0;
 
   const db = MongoWrapper.getDb(MONGO_DB_NAME);
@@ -164,27 +179,27 @@ async function pruneMinioOrphans() {
 
   try {
     // Stream IDs instead of distinct() to avoid materializing the entire array
-    const validIds = new Set();
+    const validIds = new Set<string>();
     const convCursor = db
       .collection(COLLECTIONS.CONVERSATIONS)
-      .find({}, { projection: { id: 1, _id: 0 } });
+      .find<{ id: string }>({}, { projection: { id: 1, _id: 0 } });
     const sessionCursor = db
       .collection(COLLECTIONS.AGENT_SESSIONS)
-      .find({}, { projection: { id: 1, _id: 0 } });
-        for await ( const document of convCursor) validIds.add(document.id);
-        for await ( const document of sessionCursor) validIds.add(document.id);
+      .find<{ id: string }>({}, { projection: { id: 1, _id: 0 } });
+    for await (const document of convCursor) validIds.add(document.id);
+    for await (const document of sessionCursor) validIds.add(document.id);
 
     // List MinIO objects with the conversation-scoped prefix pattern
     // Convention: conversation objects are stored as {conversationId}/{filename}
     // FileService objects use: projects/{project}/{user}/{category}/{uuid}.{ext}
-    const objects = await MinioWrapper.listObjects("").catch(() => []);
-    if (!Array.isArray(objects) || objects.length === 0) return 0;
+    const objects = (await MinioWrapper.listObjects("").catch(() => [])) as (string | { name?: string })[];
+    if (objects.length === 0) return 0;
 
     // Group objects by their top-level prefix — only check prefixes that are
     // NOT known structural paths (projects/, uploads/, generations/, etc.)
     const prefixes = new Set<string>();
     for (const object of objects) {
-      const name = typeof object === "string" ? object : (object as { name?: string })?.name;
+      const name = typeof object === "string" ? object : object?.name;
       const prefix = name ? name.split("/")[0] : "";
       if (prefix && !validIds.has(prefix) && !STRUCTURAL_PREFIXES.has(prefix)) {
         prefixes.add(prefix);
@@ -193,13 +208,13 @@ async function pruneMinioOrphans() {
 
     // Remove orphaned prefixes
     for (const prefix of prefixes) {
-            const orphanedObjects = objects.filter((o: any) => {
-        const name = typeof o === "string" ? o : (o as { name?: string })?.name;
+      const orphanedObjects = objects.filter((o) => {
+        const name = typeof o === "string" ? o : o?.name;
         return name ? name.startsWith(`${prefix}/`) : false;
       });
       for (const object of orphanedObjects) {
         try {
-          const name = typeof object === "string" ? object : (object as { name?: string })?.name;
+          const name = typeof object === "string" ? object : object?.name;
           if (name) {
             await MinioWrapper.remove(name);
             removed++;
@@ -209,8 +224,8 @@ async function pruneMinioOrphans() {
         }
       }
     }
-  } catch (error: any) {
-        logger.warn(`[Housekeeping] MinIO orphan scan failed: ${(error as Error).message}`);
+  } catch (error: unknown) {
+    logger.warn(`[Housekeeping] MinIO orphan scan failed: ${(error as Error).message}`);
   }
 
   return removed;
@@ -223,89 +238,87 @@ const BackgroundHousekeepingService = {
    * Run all housekeeping tasks.
    * Safe to call at any time — each task is independent and failure-tolerant.
    *
-
-
-   * @returns {Promise<object>} Summary of actions taken
+   * @returns {Promise<HousekeepingResult>} Summary of actions taken
    */
-  async run({ trigger = "boot" }: any = {}) {
+  async run({ trigger = "boot" }: { trigger?: string } = {}): Promise<HousekeepingResult> {
     const startTime = performance.now();
     logger.info(`[Housekeeping] Starting (trigger: ${trigger})…`);
 
-    const results: any = {};
+    const results: Partial<HousekeepingResult> = {};
 
     // 1. Prune orphaned worktrees
     try {
       const worktrees = await pruneOrphanedWorktrees();
-            results.worktrees = worktrees;
+      results.worktrees = worktrees;
       if (worktrees.pruned.length > 0) {
         logger.info(
-          `[Housekeeping] Pruned ${worktrees.pruned.length} orphaned worktree(s): ${worktrees.pruned.join(", ")}`,
+          `[Housekeeping] Pruned ${worktrees.pruned.length} orphaned worktree(s): ${worktrees.pruned.join(", ")}`
         );
       }
       if (worktrees.errors.length > 0) {
         logger.warn(
-          `[Housekeeping] Worktree errors: ${worktrees.errors.join("; ")}`,
+          `[Housekeeping] Worktree errors: ${worktrees.errors.join("; ")}`
         );
       }
-    } catch (error: any) {
-            results.worktrees = { error: (error as Error).message };
-            logger.error(`[Housekeeping] Worktree pruning failed: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      results.worktrees = { error: (error as Error).message };
+      logger.error(`[Housekeeping] Worktree pruning failed: ${(error as Error).message}`);
     }
 
     // 2. Clear stale sessions
     try {
       const sessions = await clearStaleSessions();
-            results.staleSessions = sessions;
+      results.staleSessions = sessions;
       const total =
         sessions.conversationsCleared + sessions.agentSessionsCleared;
       if (total > 0) {
         logger.info(
-          `[Housekeeping] Cleared ${total} stale isGenerating flag(s)`,
+          `[Housekeeping] Cleared ${total} stale isGenerating flag(s)`
         );
       }
-    } catch (error: any) {
-            results.staleSessions = { error: (error as Error).message };
-            logger.error(`[Housekeeping] Session cleanup failed: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      results.staleSessions = { error: (error as Error).message };
+      logger.error(`[Housekeeping] Session cleanup failed: ${(error as Error).message}`);
     }
 
     // 3. Prune old request logs
     try {
       const deletedLogs = await pruneOldRequestLogs();
-            results.requestLogs = { deleted: deletedLogs };
+      results.requestLogs = { deleted: deletedLogs };
       if (deletedLogs > 0) {
         logger.info(
-          `[Housekeeping] Pruned ${deletedLogs} request log(s) older than ${REQUEST_LOG_MAX_AGE_DAYS} days`,
+          `[Housekeeping] Pruned ${deletedLogs} request log(s) older than ${REQUEST_LOG_MAX_AGE_DAYS} days`
         );
       }
-    } catch (error: any) {
-            results.requestLogs = { error: (error as Error).message };
+    } catch (error: unknown) {
+      results.requestLogs = { error: (error as Error).message };
       logger.error(
-                `[Housekeeping] Request log pruning failed: ${(error as Error).message}`,
+        `[Housekeeping] Request log pruning failed: ${(error as Error).message}`
       );
     }
 
     // 4. MinIO orphan cleanup
     try {
       const minioOrphans = await pruneMinioOrphans();
-            results.minioOrphans = { removed: minioOrphans };
+      results.minioOrphans = { removed: minioOrphans };
       if (minioOrphans > 0) {
         logger.info(
-          `[Housekeeping] Removed ${minioOrphans} orphaned MinIO object(s)`,
+          `[Housekeeping] Removed ${minioOrphans} orphaned MinIO object(s)`
         );
       }
-    } catch (error: any) {
-            results.minioOrphans = { error: (error as Error).message };
+    } catch (error: unknown) {
+      results.minioOrphans = { error: (error as Error).message };
       logger.error(
-                `[Housekeeping] MinIO orphan cleanup failed: ${(error as Error).message}`,
+        `[Housekeeping] MinIO orphan cleanup failed: ${(error as Error).message}`
       );
     }
 
     const durationMs = Math.round(performance.now() - startTime);
-        results.durationMs = durationMs;
-        results.trigger = trigger;
+    results.durationMs = durationMs;
+    results.trigger = trigger;
 
     logger.success(`[Housekeeping] Complete (${durationMs}ms)`);
-    return results;
+    return results as HousekeepingResult;
   },
 };
 

@@ -3,11 +3,29 @@ import express, { Request, Response, NextFunction } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
+import { PostSynthesisBodySchema, PatchSynthesisBodySchema } from "../types/index.ts";
 
 const router = express.Router();
 router.use(requireDb);
 
 const COLLECTION = COLLECTIONS.SYNTHESIS;
+
+interface SynthesisDocument {
+  id: string;
+  project: string;
+  username: string;
+  title: string;
+  systemPrompt: string;
+  assistantPersona?: string;
+  userPersona: string;
+  category: string;
+  targetTurns: number;
+  seedMessages: any[];
+  settings: Record<string, any>;
+  conversationId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
  * GET /synthesis
@@ -17,17 +35,20 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
+
       const runs = await db
-        .collection(COLLECTION)
+        .collection<SynthesisDocument>(COLLECTION)
         .find({ project, username })
         .sort({ updatedAt: -1 })
         .toArray();
 
       res.json(runs);
-    } catch (error: any) {
-            logger.error(`Error fetching synthesis runs: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error fetching synthesis runs: ${errorMessage}`);
       next(error);
     }
   }),
@@ -41,19 +62,23 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
+      const runId = req.params.id as string;
+
       const run = await db
-        .collection(COLLECTION)
-        .findOne({ id: req.params.id, project, username });
+        .collection<SynthesisDocument>(COLLECTION)
+        .findOne({ id: runId, project, username });
 
       if (!run) {
         return res.status(404).json({ error: "Synthesis run not found" });
       }
 
       res.json(run);
-    } catch (error: any) {
-            logger.error(`Error fetching synthesis run: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error fetching synthesis run: ${errorMessage}`);
       next(error);
     }
   }),
@@ -67,8 +92,15 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
+
+      const parsed = PostSynthesisBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.format() });
+      }
+
       const {
         id,
         title,
@@ -79,35 +111,31 @@ router.post(
         seedMessages,
         settings,
         conversationId,
-      } = req.body;
-
-      if (!id) {
-        return res.status(400).json({ error: "id is required" });
-      }
+      } = parsed.data;
 
       const now = new Date().toISOString();
-      const document = {
+      const document: SynthesisDocument = {
         id,
         project,
         username,
-        title: title || "Untitled Synthesis",
-        systemPrompt: systemPrompt || "",
-
-        userPersona: userPersona || "",
-        category: category || "Chat",
-        targetTurns: targetTurns || 4,
-        seedMessages: seedMessages || [],
-        settings: settings || {},
-        conversationId: conversationId || null,
+        title,
+        systemPrompt,
+        userPersona,
+        category,
+        targetTurns,
+        seedMessages,
+        settings,
+        conversationId,
         createdAt: now,
         updatedAt: now,
       };
 
-      await db.collection(COLLECTION).insertOne(document);
+      await db.collection<SynthesisDocument>(COLLECTION).insertOne(document);
 
       res.json(document);
-    } catch (error: any) {
-            logger.error(`Error creating synthesis run: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error creating synthesis run: ${errorMessage}`);
       next(error);
     }
   }),
@@ -121,31 +149,32 @@ router.patch(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
-      const allowedFields = [
-        "title",
-        "systemPrompt",
-        "assistantPersona",
-        "userPersona",
-        "category",
-        "targetTurns",
-        "seedMessages",
-        "settings",
-        "conversationId",
-      ];
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
+      const runId = req.params.id as string;
 
-      const setFields = { updatedAt: new Date().toISOString() };
-            for ( const field of allowedFields) {
-        if (req.body[field] !== undefined) {
-                    (setFields as any)[field] = req.body[field];
-        }
+      const parsed = PatchSynthesisBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.format() });
       }
 
+      const setFields: Record<string, any> = {
+        ...parsed.data,
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Filter out undefined values from updates to only update provided fields
+      Object.keys(setFields).forEach((key) => {
+        if (setFields[key] === undefined) {
+          delete setFields[key];
+        }
+      });
+
       const result = await db
-        .collection(COLLECTION)
+        .collection<SynthesisDocument>(COLLECTION)
         .updateOne(
-          { id: req.params.id, project, username },
+          { id: runId, project, username },
           { $set: setFields },
         );
 
@@ -154,12 +183,13 @@ router.patch(
       }
 
       const updated = await db
-        .collection(COLLECTION)
-        .findOne({ id: req.params.id, project, username });
+        .collection<SynthesisDocument>(COLLECTION)
+        .findOne({ id: runId, project, username });
 
       res.json(updated);
-    } catch (error: any) {
-            logger.error(`Error patching synthesis run: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error patching synthesis run: ${errorMessage}`);
       next(error);
     }
   }),
@@ -173,19 +203,23 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
+      const runId = req.params.id as string;
+
       const result = await db
-        .collection(COLLECTION)
-        .deleteOne({ id: req.params.id, project, username });
+        .collection<SynthesisDocument>(COLLECTION)
+        .deleteOne({ id: runId, project, username });
 
       if (result.deletedCount === 0) {
         return res.status(404).json({ error: "Synthesis run not found" });
       }
 
-      res.json({ success: true, id: req.params.id });
-    } catch (error: any) {
-            logger.error(`Error deleting synthesis run: ${(error as Error).message}`);
+      res.json({ success: true, id: runId });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error deleting synthesis run: ${errorMessage}`);
       next(error);
     }
   }),

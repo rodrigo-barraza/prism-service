@@ -20,11 +20,26 @@ router.get(
   "/models",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { db, username } = req;
+      const db = req.db;
+      const username = req.username;
       if (!username) return res.json([]);
 
-      const pipeline: any[] = [
+      interface ModelStatAggregateResult {
+        _id: { model: string; provider: string };
+        totalRequests: number;
+        totalInputTokens: number;
+        totalOutputTokens: number;
+        totalTokens: number;
+        totalCost: number;
+        avgLatency: number;
+        avgTokensPerSec: number;
+        firstUsed: Date | string;
+        lastUsed: Date | string;
+        successCount: number;
+        errorCount: number;
+      }
+
+      const pipeline: Record<string, unknown>[] = [
         { $match: { username } },
         {
           $group: {
@@ -58,13 +73,13 @@ router.get(
 
       const results = await db
         .collection(COLLECTIONS.REQUESTS)
-        .aggregate(pipeline)
+        .aggregate<ModelStatAggregateResult>(pipeline)
         .toArray();
 
       res.json(
-        results.map((r: any) => ({
-                    model: (r as any)._id.model,
-                    provider: (r as any)._id.provider,
+        results.map((r) => ({
+          model: r._id.model,
+          provider: r._id.provider,
           totalRequests: r.totalRequests,
           totalInputTokens: r.totalInputTokens,
           totalOutputTokens: r.totalOutputTokens,
@@ -78,8 +93,8 @@ router.get(
           errorCount: r.errorCount,
         })),
       );
-    } catch (error: any) {
-            logger.error(`GET /stats/models error: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`GET /stats/models error: ${(error as Error).message}`);
       next(error);
     }
   }),

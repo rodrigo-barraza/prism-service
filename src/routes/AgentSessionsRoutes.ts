@@ -1,14 +1,58 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
+import { ObjectId } from "mongodb";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import { buildConversationPatchFields } from "../services/ConversationService.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
+import { GetAgentSessionsQuerySchema } from "../types/index.ts";
 
 const router = express.Router();
 router.use(requireDb);
 
 const COLLECTION = COLLECTIONS.AGENT_SESSIONS;
+
+interface AgentSessionDocument {
+  _id: ObjectId;
+  id: string;
+  project: string;
+  username: string;
+  agent?: string;
+  title?: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  modalities?: Record<string, boolean>;
+  providers?: string[];
+  totalCost?: number;
+  isGenerating?: boolean;
+  settings?: Record<string, any>;
+  traceId?: string | null;
+  parentAgentSessionId?: string | null;
+  workspaceRoot?: string | null;
+  [key: string]: any; // Allow arbitrary/enrichment fields if we spread/mutate them
+}
+
+interface AggregatedStats {
+  requestCount: number;
+  totalCost: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  totalCacheReadInputTokens: number;
+  totalCacheCreationInputTokens: number;
+  totalReasoningOutputTokens: number;
+  providers: unknown[];
+  models: unknown[];
+  operations: unknown[];
+  modalities: Record<string, boolean>;
+  toolCounts: Record<string, number>;
+  totalElapsedTime: number;
+  avgTokensPerSec: number | null;
+  avgTimeToGeneration: number | null;
+  createdAt: any;
+  updatedAt: any;
+  workerRequestCount?: number;
+}
 
 /**
  * GET /agent-sessions
@@ -25,16 +69,16 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
-      const limit = Math.min(
-                Math.max(parseInt((req.query.limit as any), 10) || 50, 1),
-        200,
-      );
-      const cursor = req.query.cursor || null;
-      const agent = req.query.agent || null;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
+      
+      const parsedQuery = GetAgentSessionsQuerySchema.parse(req.query);
+      const limit = parsedQuery.limit;
+      const cursor = parsedQuery.cursor || null;
+      const agent = parsedQuery.agent || null;
 
-      const filter: any = { project, username };
+      const filter: Record<string, any> = { project, username };
       // Match sessions belonging to this agent OR legacy sessions that
       // predate the agent field (backward compat for unique-project agents
       // like Lupos where all sessions belong to the same agent).
@@ -52,9 +96,9 @@ router.get(
 
       // Fetch limit + 1 to detect if there's a next page
       const rows = await db
-        .collection(COLLECTION)
+        .collection<AgentSessionDocument>(COLLECTION)
         .find(filter)
-        .project({
+        .project<AgentSessionDocument>({
           id: 1,
           project: 1,
           username: 1,
@@ -82,7 +126,7 @@ router.get(
       // ── Enrich session items from request logs (single aggregation) ──
       // Collects authoritative cost, unique models/providers, merged modalities,
       // and per-tool counts in one pipeline pass rather than separate queries.
-      const sessionIds = items.map((s: any) => s.id);
+      const sessionIds = items.map((s) => s.id);
 
       const enrichDocs =
         sessionIds.length > 0
@@ -125,23 +169,23 @@ router.get(
           : [];
 
       // Build sessionId → enrichment map
-      const enrichMap = new Map();
-            for ( const document of enrichDocs) {
+      const enrichMap = new Map<string, any>();
+      for (const document of enrichDocs) {
         // Unique non-null models and providers
         const models = document.models.filter(Boolean);
         const providers = document.providers.filter(Boolean);
 
         // Merge modality keys from all requests into a single flags object
-        const mergedModalities: any = {};
-                for ( const keySet of document.modalityKeys) {
-                    for ( const k of keySet) mergedModalities[k] = true;
+        const mergedModalities: Record<string, boolean> = {};
+        for (const keySet of document.modalityKeys) {
+          for (const k of keySet) mergedModalities[k] = true;
         }
 
         // Count per-tool occurrences
-        const toolCounts: any = {};
-                for ( const array of document.allToolApiNames) {
-                    for ( const name of array) {
-                        toolCounts[name] = (toolCounts[name] || 0) + 1;
+        const toolCounts: Record<string, number> = {};
+        for (const array of document.allToolApiNames) {
+          for (const name of array) {
+            toolCounts[name] = (toolCounts[name] || 0) + 1;
           }
         }
 
@@ -155,33 +199,23 @@ router.get(
       }
 
       // Merge enriched data into each session
-            for ( const session of items) {
+      for (const session of items) {
         const enrichment = enrichMap.get(session.id);
         if (!enrichment) continue;
 
         session.toolCounts = enrichment.toolCounts;
 
         // Overlay request-log cost when it's higher than the document-level cost.
-        // Request-log aggregation is authoritative for NEW sessions (includes background
-        // costs like memory extraction). For OLD sessions with the cache-token NaN bug,
-        // per-iteration request logs under-report cost — the document's message-level
-        // totalCost (computed from overallUsage) is more accurate in that case.
         session.totalCost = Math.max(
           session.totalCost || 0,
           enrichment.totalCost,
         );
 
-        // Authoritative models/providers from request logs — the document-level
-        // fields may be stale or absent because they're only recomputed from messages.
         if (enrichment.models.length > 0)
           session.modelNames = enrichment.models;
         if (enrichment.providers.length > 0)
           session.providers = enrichment.providers;
 
-        // Merge request-log modalities into the document-level modalities.
-        // Request logs capture per-request modalities (e.g. imageOut from DALL-E,
-        // thinking from Claude) that the document-level field may miss because
-        // it's computed only from persisted messages.
         if (Object.keys(enrichment.modalities).length > 0) {
           session.modalities = {
             ...(session.modalities || {}),
@@ -191,8 +225,8 @@ router.get(
       }
 
       res.json({ items, nextCursor, hasMore });
-    } catch (error: any) {
-            logger.error(`Error fetching agent sessions: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`Error fetching agent sessions: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -206,10 +240,11 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
       const session = await db
-        .collection(COLLECTION)
+        .collection<AgentSessionDocument>(COLLECTION)
         .findOne({ id: req.params.id, project, username });
 
       if (!session) {
@@ -229,8 +264,8 @@ router.get(
             agentSessionId: { $nin: [...allSessionIds] },
           });
         if (childIds.length === 0) break;
-        const newIds = childIds.filter(Boolean);
-                for ( const id of newIds) allSessionIds.add(id);
+        const newIds = childIds.filter(Boolean) as string[];
+        for (const id of newIds) allSessionIds.add(id);
         frontier = newIds;
       }
 
@@ -260,24 +295,24 @@ router.get(
         .toArray();
 
       // ── Shared aggregation helper ───────────────────────────────
-      const aggregateRequests = (reqs: any) => {
+      const aggregateRequests = (reqs: any[]): AggregatedStats | null => {
         if (reqs.length === 0) return null;
-        const providers = new Set();
-        const models = new Set();
-        const operations = new Set();
+        const providers = new Set<string>();
+        const models = new Set<string>();
+        const operations = new Set<string>();
         let totalCost = 0;
         let totalInputTokens = 0;
         let totalOutputTokens = 0;
         let totalCacheReadInputTokens = 0;
         let totalCacheCreationInputTokens = 0;
         let totalReasoningOutputTokens = 0;
-        const mergedModalities: any = {};
-        const toolCounts: any = {};
+        const mergedModalities: Record<string, boolean> = {};
+        const toolCounts: Record<string, number> = {};
         // Collect per-request tok/s for generation-only average
-        const tpsValues: any[] = [];
-        const ttftValues: any[] = [];
+        const tpsValues: number[] = [];
+        const ttftValues: number[] = [];
 
-                for ( const r of reqs) {
+        for (const r of reqs) {
           totalCost += r.estimatedCost || 0;
           totalInputTokens += r.inputTokens || 0;
           totalOutputTokens += r.outputTokens || 0;
@@ -288,13 +323,13 @@ router.get(
           if (r.model) models.add(r.model);
           if (r.operation) operations.add(r.operation);
           if (r.modalities) {
-                        for ( const [k, v] of Object.entries(r.modalities)) {
-                            if (v) mergedModalities[k] = true;
+            for (const [k, v] of Object.entries(r.modalities)) {
+              if (v) mergedModalities[k] = true;
             }
           }
           if (r.toolApiNames?.length > 0) {
-                        for ( const name of r.toolApiNames) {
-                            toolCounts[name] = (toolCounts[name] || 0) + 1;
+            for (const name of r.toolApiNames) {
+              toolCounts[name] = (toolCounts[name] || 0) + 1;
             }
           }
           // Per-request generation metrics (null-safe)
@@ -306,12 +341,12 @@ router.get(
           }
         }
 
-                const earliest = (reqs as any).reduce(
-                    (min: any, r: any) => (!min || (r as any).timestamp < min ? r.timestamp : min),
+        const earliest = reqs.reduce(
+          (min, r) => (!min || r.timestamp < min ? r.timestamp : min),
           null,
         );
-                const latest = (reqs as any).reduce(
-                    (max: any, r: any) => (!max || (r as any).timestamp > max ? r.timestamp : max),
+        const latest = reqs.reduce(
+          (max, r) => (!max || r.timestamp > max ? r.timestamp : max),
           null,
         );
         const totalElapsedTime =
@@ -328,12 +363,11 @@ router.get(
         // time (only generation phases contribute measurements).
         const avgTokensPerSec =
           tpsValues.length > 0
-                        ? tpsValues.reduce((a: any, b: any) => a + b, 0) / tpsValues.length
+            ? tpsValues.reduce((a, b) => a + b, 0) / tpsValues.length
             : null;
         const avgTimeToGeneration =
           ttftValues.length > 0
-                        ? ttftValues.reduce((a: any, b: any) => a + b, 0) /
-              ttftValues.length
+            ? ttftValues.reduce((a, b) => a + b, 0) / ttftValues.length
             : null;
 
         return {
@@ -360,24 +394,21 @@ router.get(
 
       // ── Split requests into orchestrator vs worker buckets ────
       const orchestratorRequests = requests.filter(
-        (r: any) => r.agentSessionId === sessionId,
+        (r) => r.agentSessionId === sessionId,
       );
       const workerRequests = requests.filter(
-        (r: any) => r.agentSessionId !== sessionId,
+        (r) => r.agentSessionId !== sessionId,
       );
 
       let stats = null;
       if (requests.length > 0) {
-        const allStats = aggregateRequests(requests);
-                // @ts-ignore - TODO: strict typing
-                allStats.workerRequestCount = workerRequests.length;
+        const allStats = aggregateRequests(requests) as AggregatedStats;
+        allStats.workerRequestCount = workerRequests.length;
         // Guard against old sessions where per-iteration request logs under-report
         // cost due to the NaN cache token bug — prefer the higher of request-log
         // aggregate vs document-level message cost.
-                // @ts-ignore - TODO: strict typing
-                allStats.totalCost = Math.max(
-                    // @ts-ignore - TODO: strict typing
-                    allStats.totalCost,
+        allStats.totalCost = Math.max(
+          allStats.totalCost,
           session.totalCost || 0,
         );
         stats = {
@@ -388,8 +419,8 @@ router.get(
       }
 
       res.json({ ...session, stats });
-    } catch (error: any) {
-            logger.error(`Error fetching agent session: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`Error fetching agent session: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -403,12 +434,13 @@ router.patch(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
       const setFields = buildConversationPatchFields(req.body);
 
       const result = await db
-        .collection(COLLECTION)
+        .collection<AgentSessionDocument>(COLLECTION)
         .updateOne(
           { id: req.params.id, project, username },
           { $set: setFields },
@@ -419,12 +451,12 @@ router.patch(
       }
 
       const session = await db
-        .collection(COLLECTION)
+        .collection<AgentSessionDocument>(COLLECTION)
         .findOne({ id: req.params.id, project, username });
 
       res.json(session);
-    } catch (error: any) {
-            logger.error(`Error patching agent session: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`Error patching agent session: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -438,10 +470,11 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
       const result = await db
-        .collection(COLLECTION)
+        .collection<AgentSessionDocument>(COLLECTION)
         .deleteOne({ id: req.params.id, project, username });
 
       if (result.deletedCount === 0) {
@@ -449,8 +482,8 @@ router.delete(
       }
 
       res.json({ success: true, id: req.params.id });
-    } catch (error: any) {
-            logger.error(`Error deleting agent session: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`Error deleting agent session: ${(error as Error).message}`);
       next(error);
     }
   }),

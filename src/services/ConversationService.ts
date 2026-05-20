@@ -15,9 +15,8 @@ const DEFAULT_COLLECTION = COLLECTIONS.CONVERSATIONS;
  */
 export async function extractFiles(
   messages: any,
-    project: any = null,
-    // @ts-ignore - TODO: strict typing
-    username: string = null,
+  project: string | null = null,
+  username: string | null = null,
 ) {
   if (!messages || !(FileService as any).isExternalStorage()) return messages;
 
@@ -240,7 +239,7 @@ export function buildConversationPatchFields({
  * ConversationService — shared logic for managing conversations in MongoDB.
  * Used by both the conversations REST API and generation routes.
  */
-const ConversationService = ({
+const ConversationService = {
   /**
      * Append messages to a conversation, auto-creating it if it doesn't exist.
      * Handles file extraction (MinIO upload) and recomputes derived fields.
@@ -422,6 +421,6 @@ const ConversationService = ({
         );
     }
   },
-} as any);
+};
 
 export default ConversationService;

@@ -101,14 +101,14 @@ export async function handleVoice(params: any, emitBinary: any, emitJSON: any) {
     const totalSec = (performance.now() - requestStart) / 1000;
     const contentType = result.contentType || "audio/mpeg";
     // Collect audio chunks for MinIO upload when conversationId is provided
-    const audioChunks = conversationId ? [] : null;
+    const audioChunks: Buffer[] | null = conversationId ? [] : null;
     if (result.stream.pipe) {
       // Node.js readable stream
       if (audioChunks) {
-                result.stream.on("data", (chunk: any) => audioChunks.push((chunk as any as never)));
+        result.stream.on("data", (chunk: Buffer) => audioChunks.push(chunk));
       }
-            for await ( const chunk of result.stream) {
-                emitBinary(chunk);
+      for await (const chunk of result.stream) {
+        emitBinary(chunk);
       }
     } else {
       // Web ReadableStream (from fetch)
@@ -116,9 +116,8 @@ export async function handleVoice(params: any, emitBinary: any, emitJSON: any) {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-                // @ts-ignore - TODO: strict typing
-                if (audioChunks) audioChunks.push((Buffer.from as any as never)(value));
-                emitBinary(value);
+        if (audioChunks && value) audioChunks.push(Buffer.from(value));
+        emitBinary(value);
       }
     }
     logger.request(

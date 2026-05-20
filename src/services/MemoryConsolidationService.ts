@@ -58,53 +58,63 @@ function daysSince(isoDate: any) {
  * Find clusters of semantically similar memories using Union-Find.
  * Returns arrays of memory groups (each group has 2+ memories).
  */
-function findClusters(memories: any, threshold: any = CLUSTER_THRESHOLD) {
+function findClusters(memories: any[], threshold: number = CLUSTER_THRESHOLD) {
   const n = memories.length;
-    if ((n as any) < 2) return [];
+  if (n < 2) return [];
+
   // Union-Find
-    const parent = Array.from({ length: n }, (_: any, i: any) => i);
+  const parent = Array.from({ length: n }, (_, i) => i);
   const rank = new Array(n).fill(0);
-  function find(x: any) {
-        // @ts-ignore - TODO: strict typing
-        if (parent[(x as string)] !== x) parent[(x as string)] = (find as string)(parent[(x as string)]);
-        // @ts-ignore - TODO: strict typing
-        return parent[(x as string)];
+
+  function find(x: number): number {
+    if (parent[x] !== x) {
+      parent[x] = find(parent[x]);
+    }
+    return parent[x];
   }
-  function union(x: any, y: any) {
-    const px = find(x),
-      py = find(y);
+
+  function union(x: number, y: number): void {
+    const px = find(x);
+    const py = find(y);
     if (px === py) return;
-        if ((rank as any)[px] < (rank as any)[py]) parent[px] = py;
-        else if ((rank as any)[px] > (rank as any)[py]) parent[py] = px;
-    else {
+    if (rank[px] < rank[py]) {
+      parent[px] = py;
+    } else if (rank[px] > rank[py]) {
       parent[py] = px;
-            (rank as any)[px]++;
+    } else {
+      parent[py] = px;
+      rank[px]++;
     }
   }
+
   // Pairwise comparison — O(n²) but fine for <500 memories
-    for (let i = 0; i < (n as any); i++) {
-        for (let j = i + 1; j < (n as any); j++) {
-            if (!(memories as any)[i].embedding || !(memories as any)[j].embedding) continue;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (!memories[i].embedding || !memories[j].embedding) continue;
       const sim = cosineSimilarity(
-                (memories as any)[i].embedding,
-                (memories as any)[j].embedding,
+        memories[i].embedding,
+        memories[j].embedding,
       );
-            if (sim > threshold) {
-                union((i as any), (j as any));
+      if (sim > threshold) {
+        union(i, j);
       }
     }
   }
+
   // Group by root
-  const groups = new Map();
-    for (let i = 0; i < (n as any); i++) {
-        const root = find((i as any));
-    if (!groups.has(root)) groups.set(root, []);
-    groups.get(root).push(memories[i]);
+  const groups = new Map<number, any[]>();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    if (!groups.has(root)) {
+      groups.set(root, []);
+    }
+    groups.get(root)!.push(memories[i]);
   }
+
   // Only return clusters with 2+ members, capped at MAX_CLUSTER_SIZE
   return [...groups.values()]
-        .filter((g: any) => (g as any).length >= 2)
-        .map((g: any) => (g as any).slice(0, MAX_CLUSTER_SIZE));
+    .filter((g) => g.length >= 2)
+    .map((g) => g.slice(0, MAX_CLUSTER_SIZE));
 }
 // ─── LLM Prompts ─────────────────────────────────────────────────────────────
 const CONSOLIDATION_PROMPT = `You are a memory consolidation agent. You review a set of stored memories and determine how to optimize them.

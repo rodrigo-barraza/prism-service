@@ -5,11 +5,38 @@ import requireDb from "../middleware/RequireDbMiddleware.ts";
 import MCPClientService from "../services/MCPClientService.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
+import { PostMcpServerSchema, PutMcpServerSchema } from "../types/index.ts";
 
 const router = express.Router();
 router.use(requireDb);
 
 const COLLECTION = COLLECTIONS.MCP_SERVERS;
+
+interface McpServerDocument {
+  _id: ObjectId;
+  project: string;
+  username: string;
+  name: string;
+  displayName: string;
+  transport: "stdio" | "sse";
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface ConnectedServerInfo {
+  name: string;
+  status: string;
+  toolCount: number;
+  tools: Array<{ name: string; description: string }>;
+  transport: string;
+  connectedAt: Date;
+}
 
 /**
  * GET /mcp-servers
@@ -19,26 +46,27 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
 
       const servers = await db
-        .collection(COLLECTION)
+        .collection<McpServerDocument>(COLLECTION)
         .find({ project, username })
         .sort({ createdAt: -1 })
         .toArray();
 
       // Enrich with live connection status
-      const connectedServers = MCPClientService.getConnectedServers();
-      const connectedMap = new Map(
-        connectedServers.map((s: any) => [s.name, s]),
+      const connectedServers = MCPClientService.getConnectedServers() as ConnectedServerInfo[];
+      const connectedMap = new Map<string, ConnectedServerInfo>(
+        connectedServers.map((s) => [s.name, s]),
       );
 
-      const enriched = servers.map((s: any) => {
+      const enriched = servers.map((s) => {
         const conn = connectedMap.get(s.name);
         return {
           ...s,
-                    id: (s as any)._id.toString(),
+          id: s._id.toString(),
           connected: !!conn,
           toolCount: conn?.toolCount || 0,
           tools: conn?.tools || [],
@@ -47,7 +75,7 @@ router.get(
       });
 
       res.json(enriched);
-    } catch (error: any) {
+    } catch (error: unknown) {
       next(error);
     }
   }),
@@ -61,21 +89,39 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
+
+      const parsed = PostMcpServerSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.format() });
+      }
+
+      const {
+        name,
+        displayName,
+        transport,
+        command,
+        args,
+        env,
+        url,
+        headers,
+        enabled,
+      } = parsed.data;
 
       const document = {
         project,
         username,
-        name: req.body.name,
-        displayName: req.body.displayName || req.body.name,
-        transport: req.body.transport || "stdio",
-        command: req.body.command || "",
-        args: req.body.args || [],
-        env: req.body.env || {},
-        url: req.body.url || "",
-        headers: req.body.headers || {},
-        enabled: req.body.enabled !== false,
+        name,
+        displayName: displayName || name,
+        transport: transport as "stdio" | "sse",
+        command,
+        args,
+        env,
+        url,
+        headers,
+        enabled,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -84,7 +130,7 @@ router.post(
 
       logger.info(`MCP server added: ${document.name} (${result.insertedId})`);
       res.status(201).json({ ...document, id: result.insertedId.toString() });
-    } catch (error: any) {
+    } catch (error: unknown) {
       next(error);
     }
   }),
@@ -98,31 +144,30 @@ router.put(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { db } = req;
+      const { db } = req;
+      const serverId = req.params.id as string;
 
-      const updates = {
-        ...(req.body.name !== undefined && { name: req.body.name }),
-        ...(req.body.displayName !== undefined && {
-          displayName: req.body.displayName,
-        }),
-        ...(req.body.transport !== undefined && {
-          transport: req.body.transport,
-        }),
-        ...(req.body.command !== undefined && { command: req.body.command }),
-        ...(req.body.args !== undefined && { args: req.body.args }),
-        ...(req.body.env !== undefined && { env: req.body.env }),
-        ...(req.body.url !== undefined && { url: req.body.url }),
-        ...(req.body.headers !== undefined && { headers: req.body.headers }),
-        ...(req.body.enabled !== undefined && { enabled: req.body.enabled }),
+      const parsed = PutMcpServerSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.format() });
+      }
+
+      const updates: Record<string, any> = {
+        ...parsed.data,
         updatedAt: new Date(),
       };
 
+      // Filter out undefined values from updates to only update provided fields
+      Object.keys(updates).forEach((key) => {
+        if (updates[key] === undefined) {
+          delete updates[key];
+        }
+      });
+
       const result = await db
-        .collection(COLLECTION)
+        .collection<McpServerDocument>(COLLECTION)
         .findOneAndUpdate(
-                    // @ts-ignore - TODO: strict typing
-                    { _id: new ObjectId(req.params.id) },
+          { _id: new ObjectId(serverId) },
           { $set: updates },
           { returnDocument: "after" },
         );
@@ -131,9 +176,9 @@ router.put(
         return res.status(404).json({ error: "MCP server not found" });
       }
 
-      logger.info(`MCP server updated: ${result.name} (${req.params.id})`);
+      logger.info(`MCP server updated: ${result.name} (${serverId})`);
       res.json({ ...result, id: result._id.toString() });
-    } catch (error: any) {
+    } catch (error: unknown) {
       next(error);
     }
   }),
@@ -147,13 +192,12 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { db } = req;
+      const { db } = req;
+      const serverId = req.params.id as string;
 
       const result = await db
-        .collection(COLLECTION)
-                // @ts-ignore - TODO: strict typing
-                .findOneAndDelete({ _id: new ObjectId(req.params.id) });
+        .collection<McpServerDocument>(COLLECTION)
+        .findOneAndDelete({ _id: new ObjectId(serverId) });
 
       if (!result) {
         return res.status(404).json({ error: "MCP server not found" });
@@ -164,9 +208,9 @@ router.delete(
         await MCPClientService.disconnect(result.name);
       }
 
-      logger.info(`MCP server deleted: ${result.name} (${req.params.id})`);
+      logger.info(`MCP server deleted: ${result.name} (${serverId})`);
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       next(error);
     }
   }),
@@ -178,20 +222,21 @@ router.delete(
  */
 router.post(
   "/:id/connect",
-    asyncHandler(async (req: any, res: any, _next: any) => {
+  asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
     try {
       const { db } = req;
+      const serverId = req.params.id as string;
 
-            const server = await (db as any)
-        .collection(COLLECTION)
-                .findOne({ _id: new ObjectId((req as any).params.id) });
+      const server = await db
+        .collection<McpServerDocument>(COLLECTION)
+        .findOne({ _id: new ObjectId(serverId) });
 
       if (!server) {
-                return (res as any).status(404).json({ error: "MCP server not found" });
+        return res.status(404).json({ error: "MCP server not found" });
       }
 
       const result = await MCPClientService.connect(server);
-            (res as any).json({
+      res.json({
         success: true,
         serverName: result.serverName,
         toolCount: result.tools.length,
@@ -200,10 +245,12 @@ router.post(
           description: t.description,
         })),
       });
-    } catch (error: any) {
-            logger.error(`MCP connect failed for ${(req as any).params.id}: ${(error as Error).message}`);
-            logger.error(`MCP connection failed: ${(error as Error).message}`);
-            (res as any).status(502).json({ error: "MCP server connection failed" });
+    } catch (error: unknown) {
+      const serverId = req.params.id as string;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`MCP connect failed for ${serverId}: ${errorMessage}`);
+      logger.error(`MCP connection failed: ${errorMessage}`);
+      res.status(502).json({ error: "MCP server connection failed" });
     }
   }),
 );
@@ -214,15 +261,14 @@ router.post(
  */
 router.post(
   "/:id/disconnect",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { db } = req;
+      const { db } = req;
+      const serverId = req.params.id as string;
 
       const server = await db
-        .collection(COLLECTION)
-                // @ts-ignore - TODO: strict typing
-                .findOne({ _id: new ObjectId(req.params.id) });
+        .collection<McpServerDocument>(COLLECTION)
+        .findOne({ _id: new ObjectId(serverId) });
 
       if (!server) {
         return res.status(404).json({ error: "MCP server not found" });
@@ -230,8 +276,8 @@ router.post(
 
       await MCPClientService.disconnect(server.name);
       res.json({ success: true });
-    } catch (error: any) {
-      next(error);
+    } catch (error: unknown) {
+      _next(error);
     }
   }),
 );

@@ -34,7 +34,28 @@ export {
   ChatMessageContentSchema,
   ChatMessageSchema,
   ChatRequestSchema,
+  PutWorkspacesSchema,
+  ValidateWorkspaceSchema,
+  PostCustomToolSchema,
+  PutCustomToolSchema,
+  GetTextQuerySchema,
+  GetMediaQuerySchema,
+  GetFavoritesQuerySchema,
+  PostFavoritesBodySchema,
+  DeleteFavoritesQuerySchema,
+  PostMcpServerSchema,
+  PutMcpServerSchema,
+  GetConversationsQuerySchema,
+  PostConversationMessagesBodySchema,
+  PatchConversationBodySchema,
+  PostSynthesisBodySchema,
+  PatchSynthesisBodySchema,
+  PostSkillSchema,
+  PutSkillSchema,
+  GetAgentSessionsQuerySchema,
+  GetVramBenchmarksQuerySchema,
 } from "./schemas.ts";
 
 export type { ChatRequest } from "./schemas.ts";
+
 

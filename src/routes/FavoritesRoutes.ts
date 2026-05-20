@@ -3,11 +3,25 @@ import express, { Request, Response, NextFunction } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
+import {
+  GetFavoritesQuerySchema,
+  PostFavoritesBodySchema,
+  DeleteFavoritesQuerySchema,
+} from "../types/index.ts";
 
 const router = express.Router();
 router.use(requireDb);
 
 const COLLECTION = COLLECTIONS.FAVORITES;
+
+interface FavoriteDocument {
+  project: string;
+  username: string;
+  type: string;
+  key: string;
+  meta: Record<string, unknown>;
+  createdAt: string;
+}
 
 /**
  * GET /favorites?type=model
@@ -17,20 +31,31 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
-      const filter = { project, username };
-            if (req.query.type) (filter as any).type = req.query.type;
+      const db = req.db;
+      const project = req.project || "any";
+      const username = req.username || "any";
+
+      const parseResult = GetFavoritesQuerySchema.safeParse(req.query);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          error: `Validation failed: ${parseResult.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+        });
+      }
+
+      const filter: Record<string, unknown> = { project, username };
+      if (parseResult.data.type) {
+        filter.type = parseResult.data.type;
+      }
 
       const favorites = await db
-        .collection(COLLECTION)
+        .collection<FavoriteDocument>(COLLECTION)
         .find(filter)
         .sort({ createdAt: -1 })
         .toArray();
 
       res.json(favorites);
-    } catch (error: any) {
-            logger.error(`Error fetching favorites: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`Error fetching favorites: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -47,15 +72,20 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
-      const { type, key, meta } = req.body;
+      const db = req.db;
+      const project = req.project || "any";
+      const username = req.username || "any";
 
-      if (!type || !key) {
-        return res.status(400).json({ error: "type and key are required" });
+      const parseResult = PostFavoritesBodySchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          error: `Validation failed: ${parseResult.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+        });
       }
 
-      const document = {
+      const { type, key, meta } = parseResult.data;
+
+      const document: FavoriteDocument = {
         project,
         username,
         type,
@@ -66,7 +96,7 @@ router.post(
 
       // Upsert to prevent duplicates
       await db
-        .collection(COLLECTION)
+        .collection<FavoriteDocument>(COLLECTION)
         .updateOne(
           { project, username, type, key },
           { $set: document },
@@ -74,8 +104,8 @@ router.post(
         );
 
       res.json({ success: true, favorite: document });
-    } catch (error: any) {
-            logger.error(`Error adding favorite: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`Error adding favorite: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -89,23 +119,26 @@ router.delete(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            // @ts-ignore - TODO: strict typing
-            const { project, username, db } = req;
-      const { type, key } = req.query;
+      const db = req.db;
+      const project = req.project || "any";
+      const username = req.username || "any";
 
-      if (!type || !key) {
-        return res
-          .status(400)
-          .json({ error: "type and key query params are required" });
+      const parseResult = DeleteFavoritesQuerySchema.safeParse(req.query);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          error: `Validation failed: ${parseResult.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+        });
       }
 
+      const { type, key } = parseResult.data;
+
       const result = await db
-        .collection(COLLECTION)
+        .collection<FavoriteDocument>(COLLECTION)
         .deleteOne({ project, username, type, key });
 
       res.json({ success: true, deleted: result.deletedCount });
-    } catch (error: any) {
-            logger.error(`Error removing favorite: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      logger.error(`Error removing favorite: ${(error as Error).message}`);
       next(error);
     }
   }),

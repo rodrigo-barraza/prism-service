@@ -57,7 +57,7 @@ router.post(
       }
 
       // Build content for provider — text-only vs multimodal
-      let content: string;
+      let content: string | any[];
       const isMultimodal =
         (images && images.length > 0) || audio || video || pdf;
 
@@ -103,8 +103,7 @@ router.post(
           parts.push({ inlineData: { data, mimeType } });
         }
 
-                // @ts-ignore - TODO: strict typing
-                content = parts;
+        content = parts;
       }
 
       const result = await EmbeddingService.generate(content, {
