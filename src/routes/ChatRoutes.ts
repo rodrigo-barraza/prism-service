@@ -106,7 +106,7 @@ async function compressDataUrlIfOversized(dataUrl: any) {
         `[chat] Dimension-constrained image: now ${(base64Data.length / 1024 / 1024).toFixed(2)} MB b64 (${mimeType})`,
       );
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
         logger.warn(`[chat] Dimension constraint failed: ${(error as Error).message}`);
   }
   // Step 2: enforce byte-size limit
@@ -127,16 +127,13 @@ async function compressDataUrlIfOversized(dataUrl: any) {
       `[chat] Compressed: ${(b64Len / 1024 / 1024).toFixed(2)} MB → ${(newLen / 1024 / 1024).toFixed(2)} MB b64 (${result.mediaType})`,
     );
     return newUrl;
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error(
             `[chat] Image compression failed: ${(error as Error).message}. Sending original.`,
     );
     return `data:${mimeType};base64,${base64Data}`;
   }
 }
-/**
- * Resolve a single media reference for both provider and storage use.
- */
 async function resolveMediaRef(ref: any, project: any, username: string) {
   // Already a base64 data URL — compress if oversized, upload to MinIO for storage
     if ((ref as any).startsWith("data:")) {
@@ -152,7 +149,7 @@ async function resolveMediaRef(ref: any, project: any, username: string) {
         username,
       );
             storageRef = minioRef;
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`[chat] Failed to upload media to MinIO: ${(error as Error).message}`);
     }
     return { providerRef, storageRef };
@@ -179,7 +176,7 @@ async function resolveMediaRef(ref: any, project: any, username: string) {
         providerRef,
         storageRef: ref,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(
                 `[chat] Failed to resolve MinIO ref ${ref}: ${(error as Error).message}`,
       );
@@ -207,7 +204,7 @@ async function resolveMediaRef(ref: any, project: any, username: string) {
         providerRef,
         storageRef: ref,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`[chat] Failed to fetch media URL ${ref}: ${(error as Error).message}`);
       return { providerRef: ref, storageRef: ref };
     }
@@ -502,7 +499,7 @@ export async function handleConversation(
   let context: any;
   try {
     context = await prepareGenerationContext(params, emit, { signal });
-  } catch (error: any) {
+  } catch (error: unknown) {
         emit({ type: "error", message: (error as Error).message });
     return;
   }
@@ -621,7 +618,7 @@ export async function handleConversation(
         logger.info(`[chat] 🔓 Released local GPU lock for ${resolvedModel}`);
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     markGenerating(
       conversationId,
       project,
@@ -661,7 +658,7 @@ export async function handleAgent(params: any, emit: (event: SseEvent) => void, 
   let context: any;
   try {
     context = await prepareGenerationContext(params, emit, { signal });
-  } catch (error: any) {
+  } catch (error: unknown) {
         emit({ type: "error", message: (error as Error).message });
     return;
   }
@@ -743,12 +740,12 @@ export async function handleAgent(params: any, emit: (event: SseEvent) => void, 
           const { default: CoordinatorService } =
             await import("../services/CoordinatorService.js");
                     await CoordinatorService.abortWorkersBySession((agentSessionId as any));
-        } catch (cleanupErr: any) {
+        } catch (cleanupErr: unknown) {
                     logger.warn(`[agent] Worker cleanup failed: ${(cleanupErr as Error).message}`);
         }
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     markGenerating(
       agentSessionId,
       project,
@@ -853,7 +850,7 @@ async function handleImageAPIModel(context: any) {
         username,
       );
       minioRef = ref;
-    } catch (uploadErr: any) {
+    } catch (uploadErr: unknown) {
       logger.error(
                 `[chat/image-api] MinIO upload failed: ${(uploadErr as Error).message}`,
       );
@@ -1047,7 +1044,7 @@ async function handleStreamingText(context: any) {
           result,
                     status: (tc as any).status,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
                 (tc as any).result = { error: (error as Error).message };
                 (tc as any).status = "error";
                 (emit as any)({
@@ -1238,7 +1235,7 @@ async function handleNonStreamingText(context: any) {
             username,
           );
           minioRef = ref;
-        } catch (uploadErr: any) {
+        } catch (uploadErr: unknown) {
           logger.error(
                         `[chat/non-stream] MinIO upload failed: ${(uploadErr as Error).message}`,
           );

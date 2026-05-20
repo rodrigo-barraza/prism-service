@@ -13,9 +13,6 @@ import RequestLogger from "../services/RequestLogger.ts";
 import {} from "../utils/utilities.ts";
 const router = express.Router();
 // ─── used by both REST and WebSocket ────────────────────────
-/**
- * Handle an audio (TTS) request.
- */
 export async function handleVoice(params: any, emitBinary: any, emitJSON: any) {
   const requestId = crypto.randomUUID();
   const requestStart = performance.now();
@@ -140,7 +137,7 @@ export async function handleVoice(params: any, emitBinary: any, emitJSON: any) {
           username,
         );
         audioRef = ref;
-      } catch (error: any) {
+      } catch (error: unknown) {
                 logger.error(`Failed to upload TTS audio: ${(error as Error).message}`);
       }
       const messagesToAppend: any[] = [];
@@ -185,7 +182,7 @@ export async function handleVoice(params: any, emitBinary: any, emitJSON: any) {
         );
     }
     return contentType;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Clear isGenerating flag on error
     if (conversationId) {
       (ConversationService as any).setGenerating(
@@ -273,7 +270,7 @@ router.post(
         contentType = resultContentType;
       }
       res.end();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (!res.headersSent) {
         next(error);
       }
@@ -417,7 +414,7 @@ router.post(
             req.username,
           );
           audioRef = ref;
-        } catch (error: any) {
+        } catch (error: unknown) {
                     logger.error(`Failed to upload STT audio: ${(error as Error).message}`);
         }
         const messagesToAppend = [
@@ -472,7 +469,7 @@ router.post(
         totalTime: roundMs(totalSec),
         ...(traceId && { traceId }),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Clear isGenerating flag on error
       if (conversationId) {
         (ConversationService as any).setGenerating(

@@ -46,12 +46,6 @@ import {
 // ── Helpers ──────────────────────────────────────────────────
 
 // ── Provider ─────────────────────────────────────────────────
-
-/**
- * Factory: create a llama.cpp provider instance targeting a specific baseUrl.
-
-
- */
 export function createLlamaCppProvider(baseUrl: string, instanceId: string = "llama-cpp") {
   const getBaseUrl = () => baseUrl;
 
@@ -123,7 +117,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
         const result = { text, thinking, usage };
                 if (toolCalls) (result as any).toolCalls = toolCalls;
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("llama-cpp", (error as Error).message, 500, error);
       }
@@ -195,7 +189,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
             }
           },
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
                 if ((error as Error).name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("llama-cpp", (error as Error).message, 500, error);
@@ -249,7 +243,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
                     outputTokens: (data as any).usage?.completion_tokens || 0,
         };
         return { text, usage };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("llama-cpp", (error as Error).message, 500, error);
       }
@@ -279,7 +273,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
                     loaded_instances: [{ id: (m as any).id }], // llama.cpp models are always loaded
         }));
         return { models };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("llama-cpp", (error as Error).message, 500, error);
       }
@@ -305,7 +299,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
                     slotsIdle: (data as any).slots_idle ?? null,
                     slotsProcessing: (data as any).slots_processing ?? null,
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
                 return { ok: false, status: "unreachable", error: (error as Error).message };
       }
     },

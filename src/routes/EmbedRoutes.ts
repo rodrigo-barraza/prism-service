@@ -120,7 +120,7 @@ router.post(
       });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       next(error);
     }
   }),

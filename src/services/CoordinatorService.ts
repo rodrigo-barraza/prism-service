@@ -170,12 +170,6 @@ registerCleanup(async () => {
 // Shared by both spawnFromTool (single) and createTeam (batch).
 // Selects the least-busy instance and increments the reservation
 // counter synchronously so the next call sees the updated count.
-
-/**
- * Count active workers + pending reservations on an instance.
-
-
- */
 function getActiveOn(instanceId: any) {
   const reserved = instanceReservations.get(instanceId) || 0;
   const running = [...activeWorkers.values()].filter(
@@ -295,7 +289,7 @@ async function toolsApiPost(path: string, body: any) {
             return { error: (error as any).error || `API returned ${response.status}` };
     }
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
         return { error: `Failed to reach tools-api: ${(error as Error).message}` };
   }
 }
@@ -652,7 +646,7 @@ export default class CoordinatorService {
                 (prompt as any),
         (coordinatorCtx as any),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(
                 `[Coordinator] Worker ${agentId} loop error: ${(error as Error).message}`,
       );
@@ -694,12 +688,6 @@ export default class CoordinatorService {
     );
     return workerResult;
   }
-
-  /**
-   * Send a follow-up message to a running/idle worker.
-
-
-   */
   static async sendMessage(agentId: any, message: string, coordinatorCtx: any) {
     const worker = activeWorkers.get(agentId);
     if (!worker) {
@@ -745,12 +733,6 @@ export default class CoordinatorService {
       message: "Worker continued with follow-up.",
     };
   }
-
-  /**
-   * Stop a running worker and clean up its worktree.
-
-
-   */
   static async stopAgent(agentId: any) {
     const worker = activeWorkers.get(agentId);
     if (!worker) {
@@ -876,12 +858,6 @@ export default class CoordinatorService {
 
     return { stopped, alreadyStopped };
   }
-
-  /**
-   * Get the status of a specific worker.
-
-
-   */
   static getWorkerStatus(agentId: any) {
     const worker = activeWorkers.get(agentId);
     if (!worker) return null;
@@ -898,12 +874,6 @@ export default class CoordinatorService {
       error: worker.error,
     };
   }
-
-  /**
-   * List all active workers spawned via chat tools.
-
-
-   */
     static listWorkers({ parentAgentSessionId }: any = {}) {
     let workers = Array.from(activeWorkers.values());
     if (parentAgentSessionId) {
@@ -1129,12 +1099,6 @@ export default class CoordinatorService {
       members: memberResults,
     };
   }
-
-  /**
-   * Stop and remove all workers in a named team.
-
-
-   */
   static async deleteTeam(teamName: any) {
     if (!teamName || typeof teamName !== "string") {
       return { error: "'teamName' is required (string)" };
@@ -1557,7 +1521,7 @@ export default class CoordinatorService {
         emit: workerEmit,
                 signal: (worker as any).abortController.signal,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (
                 (error as Error).name === "AbortError" ||
                 (worker as any).abortController.signal.aborted
@@ -1671,7 +1635,7 @@ export default class CoordinatorService {
                 ),
               );
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
                     logger.warn(`[Coordinator] VRAM eviction error: ${(error as Error).message}`);
         }
       } else {
@@ -1685,10 +1649,6 @@ export default class CoordinatorService {
   // ══════════════════════════════════════════════════════════
   // Manual Panel Flow (decompose → execute → approve)
   // ══════════════════════════════════════════════════════════
-
-  /**
-   * Decompose a task into parallel sub-tasks using LLM.
-   */
   static async decompose({
     task,
     files,
@@ -1770,10 +1730,6 @@ export default class CoordinatorService {
       status: "planned",
     };
   }
-
-  /**
-   * Execute an approved plan — spawn workers in git worktrees.
-   */
   static async execute(plan: any, options: any = {}) {
     const { taskId, subTasks, repoPath } = plan;
 
@@ -1872,7 +1828,7 @@ export default class CoordinatorService {
         completedCount: completedWorkers.length,
         totalCount: taskState.workers.length,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       taskState.status = "error";
             logger.error(`[Coordinator] Task ${taskId} failed: ${(error as Error).message}`);
             return { error: (error as Error).message, taskId };
@@ -2034,7 +1990,7 @@ export default class CoordinatorService {
       logger.info(
         `[Coordinator] Panel worker ${worker.id} completed (${workerToolCalls.length} tool calls)`,
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       worker.status = "error";
             worker.error = (error as Error).message;
             onProgress?.({ status: "error", error: (error as Error).message });
@@ -2043,10 +1999,6 @@ export default class CoordinatorService {
       );
     }
   }
-
-  /**
-   * Approve and merge all completed worker branches.
-   */
   static async approveMerge(taskId: any) {
     const task = activeTasks.get(taskId);
     if (!task) return { error: "Task not found" };
@@ -2078,10 +2030,6 @@ export default class CoordinatorService {
     task.status = "merged";
     return { taskId, merged: results };
   }
-
-  /**
-   * Abort a running task — kill workers and clean up worktrees.
-   */
   static async abort(taskId: any) {
     const task = activeTasks.get(taskId);
     if (!task) return { error: "Task not found" };
@@ -2125,18 +2073,9 @@ export default class CoordinatorService {
     // Prune stale worktree references
     await cleanupWorktrees(repoPath);
   }
-
-  /**
-   * Get the current status of a coordinator task.
-   */
   static getStatus(taskId: any) {
     return activeTasks.get(taskId) || null;
   }
-
-  /**
-   * List all active coordinator tasks.
-
-   */
   static listTasks() {
     return Array.from(activeTasks.values()).map((t: any) => ({
       taskId: t.taskId,

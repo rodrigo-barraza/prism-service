@@ -20,10 +20,6 @@ import {
 } from "../utils/media.ts";
 
 import type { ToolSchema } from "../services/harnesses/types.ts";
-
-/**
- * Check if a model should use the Responses API.
- */
 function useResponsesAPI(model: string): boolean {
   const modelDef = getModelByName(model);
   return modelDef !== null && "responsesAPI" in modelDef && (modelDef as any).responsesAPI === true;
@@ -99,10 +95,6 @@ interface ErrorRecord {
 function asErrorRecord(error: any): ErrorRecord {
   return error as ErrorRecord;
 }
-
-/**
- * Convert messages with media to OpenAI multimodal content format (Chat Completions).
- */
 function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletionMessageParam[] {
   return messages.map((m: any): OpenAI.Chat.ChatCompletionMessageParam => {
     // Tool result messages — include tool_call_id for correlation
@@ -385,14 +377,10 @@ const openaiProvider = {
         return await this._generateTextResponses(messages, model, options);
       }
       return await this._generateTextChatCompletions(messages, model, options);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toProviderError(error);
     }
   },
-
-  /**
-   * Responses API path for GPT-5.2/5.4 models.
-   */
   async _generateTextResponses(messages: OpenAIMsg[], model: string, options: ProviderOptions) {
     const input = prepareResponsesInput(messages);
     const payload: OpenAI.Responses.ResponseCreateParamsNonStreaming & {
@@ -521,10 +509,6 @@ const openaiProvider = {
     if (rateLimits) result.rateLimits = rateLimits;
     return result;
   },
-
-  /**
-   * Chat Completions fallback for older models.
-   */
   async _generateTextChatCompletions(messages: OpenAIMsg[], model: string, options: ProviderOptions) {
     const modelDef = getModelByName(model);
     const isReasoning =
@@ -615,7 +599,7 @@ const openaiProvider = {
       }
       if (rateLimits) result.rateLimits = rateLimits;
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const err = asErrorRecord(error);
       // Retry once after stripping unsupported parameters (e.g. gpt-5-nano rejects temperature)
       if (err.status === 400 && err.message?.includes("Unsupported")) {
@@ -668,15 +652,11 @@ const openaiProvider = {
       } else {
         yield* this._streamChatCompletions(messages, model, options);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error && typeof error === "object" && "name" in error && (error as Error).name === "AbortError") return;
       toProviderError(error);
     }
   },
-
-  /**
-   * Streaming via the Responses API.
-   */
   async *_streamResponses(messages: OpenAIMsg[], model: string, options: ProviderOptions) {
     const input = prepareResponsesInput(messages);
     const payload: OpenAI.Responses.ResponseCreateParamsStreaming & {
@@ -863,10 +843,6 @@ const openaiProvider = {
       yield { type: "rateLimits", rateLimits };
     }
   },
-
-  /**
-   * Streaming via Chat Completions (fallback for older models).
-   */
   async *_streamChatCompletions(messages: OpenAIMsg[], model: string, options: ProviderOptions) {
     const modelDef = getModelByName(model);
     const isReasoning =
@@ -932,7 +908,7 @@ const openaiProvider = {
           .withResponse();
       stream = streamData;
             rateLimits = extractOpenAIRateLimits((rawStreamResponse as any), (model as any));
-    } catch (error: any) {
+    } catch (error: unknown) {
       const err = asErrorRecord(error);
       // Retry once after stripping unsupported parameters (e.g. gpt-5-nano rejects temperature)
       if (err.status === 400 && err.message?.includes("Unsupported")) {
@@ -1061,7 +1037,7 @@ const openaiProvider = {
       }
       const response = await getClient().audio.speech.create(payload);
       return { stream: response.body, contentType: "audio/mpeg" };
-    } catch (error: any) {
+    } catch (error: unknown) {
       toProviderError(error);
     }
   },
@@ -1128,7 +1104,7 @@ const openaiProvider = {
         mimeType: "image/png",
         text: response.data?.[0]?.revised_prompt || "",
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       toProviderError(error);
     }
   },
@@ -1163,7 +1139,7 @@ const openaiProvider = {
         outputTokens: response.usage?.completion_tokens || 0,
       };
       return { text: response.choices[0].message.content, usage };
-    } catch (error: any) {
+    } catch (error: unknown) {
       toProviderError(error);
     }
   },
@@ -1179,7 +1155,7 @@ const openaiProvider = {
         input: text,
       });
       return { embedding: response.data[0].embedding };
-    } catch (error: any) {
+    } catch (error: unknown) {
       toProviderError(error);
     }
   },
@@ -1221,7 +1197,7 @@ const openaiProvider = {
         text: response.text,
         usage,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       toProviderError(error);
     }
   },

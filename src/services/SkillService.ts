@@ -30,8 +30,8 @@ const SkillService = {
    * Create a new skill.
    */
   async create(data: Record<string, unknown>) {
-    const col = getCollection();
-    if (!col) throw new Error("Database not available");
+    const collection = getCollection();
+    if (!collection) throw new Error("Database not available");
 
     const {
       name,
@@ -59,7 +59,7 @@ const SkillService = {
       .replace(/^_+|_+$/g, "");
 
     // Check for duplicate
-    const existing = await col.findOne({ skillId });
+    const existing = await collection.findOne({ skillId });
     if (existing) {
       return {
         error: `Skill "${skillId}" already exists. Delete it first or use a different name.`,
@@ -85,7 +85,7 @@ const SkillService = {
       updatedAt: new Date().toISOString(),
     };
 
-    await col.insertOne(document);
+    await collection.insertOne(document);
     logger.info(`[SkillService] Created skill "${name}" (${skillId})`);
 
     return {
@@ -100,13 +100,13 @@ const SkillService = {
 
    */
     async list({ project, limit = 50 }: Record<string, unknown> = {}) {
-    const col = getCollection();
-    if (!col) return { skills: [], total: 0 };
+    const collection = getCollection();
+    if (!collection) return { skills: [], total: 0 };
 
     const filter: Record<string, unknown> = {};
         if (project) filter.project = project;
 
-    const skills = await col
+    const skills = await collection
       .find(filter)
       .sort({ usageCount: -1, name: 1 })
             .limit(Math.min((limit as any), 100))
@@ -124,9 +124,9 @@ const SkillService = {
 
    */
   async get(skillId: Record<string, unknown>) {
-    const col = getCollection();
-    if (!col) return null;
-    const document = await col.findOne({ skillId });
+    const collection = getCollection();
+    if (!collection) return null;
+    const document = await collection.findOne({ skillId });
     return document ? sanitize(document) : null;
   },
 
@@ -136,15 +136,15 @@ const SkillService = {
 
    */
   async delete(skillId: Record<string, unknown>) {
-    const col = getCollection();
-    if (!col) return { error: "Database not available" };
+    const collection = getCollection();
+    if (!collection) return { error: "Database not available" };
 
-    const document = await col.findOne({ skillId });
+    const document = await collection.findOne({ skillId });
     if (!document) {
       return { error: `Skill "${skillId}" not found` };
     }
 
-    await col.deleteOne({ skillId });
+    await collection.deleteOne({ skillId });
     logger.info(`[SkillService] Deleted skill "${document.name}" (${skillId})`);
 
     return { deleted: true, skillId, name: document.name };
@@ -158,10 +158,10 @@ const SkillService = {
    * running the agentic loop with the returned config.
    */
   async prepare(skillId: Record<string, unknown>, variables: Record<string, unknown> = {}) {
-    const col = getCollection();
-    if (!col) return { error: "Database not available" };
+    const collection = getCollection();
+    if (!collection) return { error: "Database not available" };
 
-    const document = await col.findOne({ skillId });
+    const document = await collection.findOne({ skillId });
     if (!document) {
       return {
         error: `Skill "${skillId}" not found. Use skill_list to see available skills.`,
@@ -184,7 +184,7 @@ const SkillService = {
       : [];
 
     // Increment usage counter
-    await col.updateOne(
+    await collection.updateOne(
       { skillId },
       {
         $inc: { usageCount: 1 },

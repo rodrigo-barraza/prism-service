@@ -49,9 +49,6 @@ function sanitizeMsg(m: any) {
   };
 }
 const RequestLogger = {
-  /**
-   * Log a text-to-text request to MongoDB (fire-and-forget).
-   */
   async log({
     requestId,
     endpoint,
@@ -142,7 +139,7 @@ const RequestLogger = {
         rateLimits,
       };
       await db.collection(COLLECTION).insertOne(document);
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error("RequestLogger: failed to save request", (error as Error).message);
     }
   },

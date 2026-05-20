@@ -21,10 +21,6 @@ const providers = {
  * wrapped with ActiveGenerationTracker increment/decrement.
  */
 const TRACKED_PREFIXES = ["generate", "transcribe"];
-
-/**
- * Check if a method name represents a tracked provider call.
- */
 function isTrackedMethod(name: any) {
   return (
     typeof name === "string" &&
@@ -65,7 +61,7 @@ function wrapProvider(provider: any) {
         let result: any;
         try {
           result = value.apply(target, args);
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Synchronous throw (rare but possible)
           ActiveGenerationTracker.decrement();
           throw error;

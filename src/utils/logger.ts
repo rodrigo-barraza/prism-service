@@ -2,10 +2,6 @@ import { createLogger } from "@rodrigo-barraza/utilities-library/node";
 import { getRequestContext } from "./RequestContext.ts";
 
 const base = createLogger("prism");
-
-/**
- * Build identity + IP tags from provided values or AsyncLocalStorage context.
- */
 function buildContextTags(project: any, username: string, clientIp: any) {
     const hasProject = project && project !== "any";
   const hasUser = username && username !== "any";

@@ -29,10 +29,6 @@ export function stripToolCallMarkup(text: any) {
       .replace(/<\|?result\|?>[\s\S]*$/gi, "")
   );
 }
-
-/**
- * Process a provider image chunk: upload to MinIO and track the ref.
- */
 export async function uploadImageChunk(
   chunk: any,
   project: any,
@@ -50,15 +46,11 @@ export async function uploadImageChunk(
       username,
     );
     return ref;
-  } catch (error: any) {
+  } catch (error: unknown) {
         logger.error(`[${logPrefix}] MinIO upload failed: ${(error as Error).message}`);
     return null;
   }
 }
-
-/**
- * Create an image ref string, preferring MinIO ref over inline base64.
- */
 export function imageRefOrInline(
   minioRef: any,
   data: any,
@@ -305,11 +297,6 @@ export async function dispatchChunk(
     }
   }
 }
-
-/**
- * Create a fresh state accumulator for stream chunk dispatching.
-
- */
 export function createStreamState() {
   return {
     usage: null,

@@ -60,10 +60,6 @@ export function setupWebSocket(wss: any) {
     }
   });
 }
-
-/**
- * WebSocket chat handler — delegates to handleConversation() from chat.js.
- */
 function handleWsChat(
   ws: any,
   project: any,
@@ -192,12 +188,6 @@ function handleWsLive(
             (ws as any).send(JSON.stringify(event));
     }
   }
-
-  /**
-   * Build a WAV from accumulated PCM chunks, upload to MinIO, and return the ref.
-
-
-   */
     async function buildAndUploadAudio(
         chunks: any = turnAudioChunks,
         sampleRate: any = audioSampleRate,
@@ -237,7 +227,7 @@ function handleWsLive(
         username,
       );
       return ref;
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`[Live API] Failed to build/upload WAV: ${(error as Error).message}`);
       return null;
     }
@@ -335,7 +325,7 @@ function handleWsLive(
           if (googleFormats) {
             tools.push(...googleFormats);
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
                     logger.error(`[Live API] Error loading tools: ${(error as Error).message}`);
         }
       }
@@ -521,7 +511,7 @@ function handleWsLive(
                           customToolMap.set(t.name, t);
                         }
                       }
-                    } catch (error: any) {
+                    } catch (error: unknown) {
                       logger.warn(
                                                 `Failed to fetch custom tools for Live API loop: ${(error as Error).message}`,
                       );
@@ -566,7 +556,7 @@ function handleWsLive(
                     }));
 
                                         (liveSession as any).sendToolResponse({ functionResponses });
-                  } catch (error: any) {
+                  } catch (error: unknown) {
                     logger.error(
                                             `[Live API] Error executing tools: ${(error as Error).message}`,
                     );
@@ -774,7 +764,7 @@ function handleWsLive(
             },
           },
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
                 logger.error(`[Live API] Failed to connect: ${(error as Error).message}`);
                 emit({ type: "error", message: `Failed to connect: ${(error as Error).message}` });
       }
@@ -822,7 +812,7 @@ function handleWsLive(
         (liveSession as any).sendRealtimeInput({ activityStart: {} });
         (liveSession as any).sendRealtimeInput({ text: data.text });
         (liveSession as any).sendRealtimeInput({ activityEnd: {} });
-      } catch (error: any) {
+      } catch (error: unknown) {
                 logger.error(`[Live API] Failed to send text: ${(error as Error).message}`);
         emit({
           type: "error",

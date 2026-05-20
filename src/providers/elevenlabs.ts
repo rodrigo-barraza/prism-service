@@ -53,17 +53,11 @@ const elevenlabsProvider = ({
       }
 
       return { stream: response.body, contentType: "audio/mpeg" };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
             throw new ProviderError("elevenlabs", (error as Error).message, 500, error);
     }
   },
-
-  /**
-   * Stream text to ElevenLabs via WebSocket and yield audio chunks.
-
-
-   */
   async *generateSpeechStream(
     textStream: any,
         voiceId: any = DEFAULT_VOICES.elevenlabs,
@@ -156,7 +150,7 @@ const elevenlabsProvider = ({
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ text: "" }));
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error sending to ElevenLabs WS:", error);
         ws.close();
       }

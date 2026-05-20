@@ -90,8 +90,8 @@ export async function reloadIfCustomToolsMutated(
     emit({ type: "status", message: "custom_tools_updated" });
     return true;
   } catch (error: unknown) {
-    const msg = error instanceof Error ? (error as Error).message : String(error);
-    logger.warn(`[ToolHotReloader] Failed to reload custom tools: ${msg}`);
+    const errorMessage = error instanceof Error ? (error as Error).message : String(error);
+    logger.warn(`[ToolHotReloader] Failed to reload custom tools: ${errorMessage}`);
     return false;
   }
 }

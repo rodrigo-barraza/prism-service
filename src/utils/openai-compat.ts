@@ -120,10 +120,6 @@ export function normalizeUsage(rawUsage: any) {
 
   return usage;
 }
-
-/**
- * The default empty usage object, used when no usage data is available.
- */
 export const EMPTY_USAGE = { inputTokens: 0, outputTokens: 0 };
 
 // ── Message Preparation ─────────────────────────────────────

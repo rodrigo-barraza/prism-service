@@ -29,9 +29,6 @@ interface MultimodalPart {
 }
 
 const EmbeddingService = {
-  /**
-   * Generate an embedding and log the request.
-   */
   async generate(content: string | MultimodalPart[], options: any = {}) {
     const requestId = crypto.randomUUID();
     const requestStart = performance.now();
@@ -62,7 +59,7 @@ const EmbeddingService = {
         resolvedModel,
         providerOptions,
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       success = false;
       errorMessage = (error as Error).message;
       throw error;

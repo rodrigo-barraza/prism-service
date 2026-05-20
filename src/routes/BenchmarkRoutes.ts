@@ -64,7 +64,7 @@ router.get(
       );
 
       res.json({ benchmarks: enriched, count: enriched.length });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`GET /benchmark error: ${(error as Error).message}`);
       next(error);
     }
@@ -234,7 +234,7 @@ router.get(
         totalModels: models.length,
         totalBenchmarks: benchmarks.length,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`GET /benchmark/stats error: ${(error as Error).message}`);
       next(error);
     }
@@ -354,7 +354,7 @@ router.post(
       );
 
       res.status(201).json(benchmark);
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`POST /benchmark error: ${(error as Error).message}`);
       next(error);
     }
@@ -381,7 +381,7 @@ router.get(
       );
 
       res.json({ ...benchmark, latestRun: latestRun || null });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`GET /benchmark/:id error: ${(error as Error).message}`);
       next(error);
     }
@@ -404,7 +404,7 @@ router.delete(
 
             await BenchmarkService.remove((req.params.id as any), (req.project as any));
       res.json({ deleted: true, id: req.params.id });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`DELETE /benchmark/:id error: ${(error as Error).message}`);
       next(error);
     }
@@ -569,7 +569,7 @@ router.post(
             send(("run_complete" as any), run);
       if (!clientClosed) res.end();
       cleanup();
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`POST /benchmark/:id/run error: ${(error as Error).message}`);
       if (res.headersSent) {
         try {
@@ -708,7 +708,7 @@ router.get(
 
             const runs = await BenchmarkService.getRuns(benchmark.id, (req.project as any));
       res.json({ runs, count: runs.length });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`GET /benchmark/:id/runs error: ${(error as Error).message}`);
       next(error);
     }
@@ -751,7 +751,7 @@ router.post(
       );
 
       res.json(run);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(
                 `POST /benchmark/:id/runs/:runId/rerun error: ${(error as Error).message}`,
       );

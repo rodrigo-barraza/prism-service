@@ -53,7 +53,7 @@ export default class AgentHooks extends EventEmitter {
         if (hookResult && typeof hookResult === "object") {
                     result = { ...result, ...hookResult };
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error(
                     `[AgentHooks] Hook "${name}" on "${event}" failed: ${(error as Error).message}`,
         );
@@ -62,12 +62,6 @@ export default class AgentHooks extends EventEmitter {
 
         return result;
   }
-
-  /**
-   * Check if any hooks are registered for an event.
-
-
-   */
   hasHooks(event: any) {
         return ((this as any)._hooks.get(event) || []).length > 0;
   }

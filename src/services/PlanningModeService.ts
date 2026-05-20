@@ -71,10 +71,6 @@ export default class PlanningModeService {
       );
     }
   }
-
-  /**
-   * Extract step descriptions from a plan for progress tracking.
-   */
   static extractSteps(planText: any) {
     const stepRegex = /^\d+\.\s+(.+)$/gm;
     const steps: any[] = [];

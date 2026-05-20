@@ -72,19 +72,13 @@ export default class SystemPromptAssembler {
             (this as any)._directoryCache = tree;
             (this as any)._directoryCacheTime = now;
       return tree;
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn(
                 `[SystemPromptAssembler] Directory fetch error: ${(error as Error).message}`,
       );
             return (this as any)._directoryCache || "";
     }
   }
-
-  /**
-   * Format directory listing into a readable tree string.
-
-
-   */
   _formatDirectoryTree(data: any) {
     if (!data || !data.entries) return "";
 
@@ -188,17 +182,13 @@ export default class SystemPromptAssembler {
         `[SystemPromptAssembler] Memory search returned ${memories.length} results for ${agent}`,
       );
             return MemoryService.formatForPrompt((memories as any));
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn(
                 `[SystemPromptAssembler] Memory fetch error: ${(error as Error).message}`,
       );
       return "";
     }
   }
-
-  /**
-   * Fetch enabled skills relevant to the user's query via embedding similarity.
-   */
     async fetchSkills(
     project: any,
     username: string,
@@ -242,7 +232,7 @@ export default class SystemPromptAssembler {
           agentSessionId: agentSessionId || null,
           agent: agent || null,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.warn(
                     `[SystemPromptAssembler] Query embedding failed: ${(error as Error).message} — returning all skills`,
         );
@@ -272,7 +262,7 @@ export default class SystemPromptAssembler {
       );
 
       return scored;
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn(
                 `[SystemPromptAssembler] Skills fetch error: ${(error as Error).message}`,
       );
@@ -531,7 +521,7 @@ export default class SystemPromptAssembler {
         logger.info(
           `[SystemPromptAssembler] Assembled ${systemPrompt.length} char system prompt for agent="${context.agent || "DIRECT"}" (${skillNames.length} skills)`,
         );
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error(
                     `[SystemPromptAssembler] Assembly failed: ${(error as Error).message}`,
         );

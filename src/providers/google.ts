@@ -66,10 +66,6 @@ function isSafetyBlockError(error: any): boolean {
     message.includes("response was blocked")
   );
 }
-
-/**
- * Add a WAV header to raw PCM audio data.
- */
 function addWavHeader(buffer: Buffer, sampleRate: number = 24000, numChannels: number = 1): Buffer {
   const headerLength = 44;
   const dataLength = buffer.length;
@@ -273,7 +269,7 @@ async function convertMessages(messages: ConversationMsg[]): Promise<Content[]> 
                     inlineData: { mimeType, data: base64Data },
                   });
                 }
-              } catch (fetchErr: any) {
+              } catch (fetchErr: unknown) {
                 logger.warn(
                   `[Google] Failed to fetch media URL for inline data: ${(fetchErr as Error).message}`,
                 );
@@ -382,7 +378,7 @@ const googleProvider = {
       if (toolCalls.length > 0) result.toolCalls = toolCalls;
       if (images.length > 0) result.images = images;
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Content safety blocks (PROHIBITED_CONTENT, SAFETY, IMAGE_SAFETY)
       // should return an empty result, not a 500. This lets consumers
       // handle "no image generated" gracefully and preserves the conversation.
@@ -493,7 +489,7 @@ const googleProvider = {
       } else {
         yield { type: "usage", usage: { inputTokens: 0, outputTokens: 0 } };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if ((error as Error).name === "AbortError") return;
       if (isSafetyBlockError(error)) {
         logger.error(
@@ -787,7 +783,7 @@ const googleProvider = {
           yield { type: "audio", data: item.data, mimeType: item.mimeType };
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if ((error as Error).name === "AbortError") return;
       if (error instanceof ProviderError) throw error;
       throw new ProviderError("google", (error as Error).message, 500, error);
@@ -857,7 +853,7 @@ const googleProvider = {
         outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
       };
       return { text: response.text, usage };
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw new ProviderError("google", (error as Error).message, 500, error);
     }
   },
@@ -926,7 +922,7 @@ const googleProvider = {
         }
       }
       throw new Error("No image data received from Google AI");
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
       throw new ProviderError("google", (error as Error).message, 500, error);
     }
@@ -982,7 +978,7 @@ const googleProvider = {
       } else {
         throw new Error("No audio content received from Google GenAI");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
       throw new ProviderError("google", (error as Error).message, 500, error);
     }
@@ -1029,7 +1025,7 @@ const googleProvider = {
           outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
         },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw new ProviderError("google", (error as Error).message, 500, error);
     }
   },
@@ -1089,7 +1085,7 @@ const googleProvider = {
         embedding: values,
         dimensions: values.length,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw new ProviderError(
         "google",
         (error as Error).message,

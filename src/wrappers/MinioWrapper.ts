@@ -13,11 +13,6 @@ import { MinioManager } from "@rodrigo-barraza/service-library/minio";
 import logger from "../utils/logger.ts";
 
 const MinioWrapper = {
-  /**
-   * Initialize the MinIO client with positional arguments (legacy Prism API).
-
-
-   */
   async init(endpoint: string, accessKey: string, secretKey: string, bucket: string) {
     return MinioManager.init({
       endpoint,

@@ -88,7 +88,7 @@ router.get(
       ]);
 
             res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /requests error: ${(error as Error).message}`);
       next(error);
     }
@@ -109,7 +109,7 @@ router.get(
       if (!document) return res.status(404).json({ error: "Request not found" });
 
       res.json(document);
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /requests/:id error: ${(error as Error).message}`);
       next(error);
     }
@@ -204,7 +204,7 @@ router.get(
       }
 
       res.json({ conversations, workflows, traces });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /requests/:id/associations error: ${(error as Error).message}`);
       next(error);
     }
@@ -316,7 +316,7 @@ router.get(
         agentCount,
         workspaceCount,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /stats error: ${(error as Error).message}`);
       next(error);
     }
@@ -446,7 +446,7 @@ router.get(
                     traceCount: traceMap[((r as string) as any)._id || "any"] || 0,
         })),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /stats/projects error: ${(error as Error).message}`);
       next(error);
     }
@@ -490,7 +490,7 @@ router.get(
           lastRequest: r.lastRequest,
         })),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /stats/users error: ${(error as Error).message}`);
       next(error);
     }
@@ -615,7 +615,7 @@ router.get(
           };
         }),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /stats/models error: ${(error as Error).message}`);
       next(error);
     }
@@ -719,7 +719,7 @@ router.get(
           };
         }),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /stats/tools error: ${(error as Error).message}`);
       next(error);
     }
@@ -774,7 +774,7 @@ router.get(
           successRate: r.successRate,
         })),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /stats/endpoints error: ${(error as Error).message}`);
       next(error);
     }
@@ -980,7 +980,7 @@ router.get(
           avgTokensPerSec: r.avgTokensPerSec,
         })),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /stats/costs error: ${(error as Error).message}`);
       next(error);
     }
@@ -1317,7 +1317,7 @@ router.get(
                         (r as any).requests > 0 ? Math.round(((r as any).successes / (r as any).requests) * 100) : 100,
         })),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /stats/timeline error: ${(error as Error).message}`);
       next(error);
     }
@@ -1536,7 +1536,7 @@ router.get(
       ]);
 
             res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /conversations error: ${(error as Error).message}`);
       next(error);
     }
@@ -1564,7 +1564,7 @@ router.get(
         projects: projects.filter(Boolean).sort(),
         usernames: usernames.filter(Boolean).sort(),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /conversations/filters error: ${(error as Error).message}`);
       next(error);
     }
@@ -1602,7 +1602,7 @@ router.get(
           ActiveGenerationTracker.count,
         recentCount,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /conversations/stats error: ${(error as Error).message}`);
       next(error);
     }
@@ -1671,7 +1671,7 @@ router.get(
           lastPayload = payload;
           res.write(`data: ${payload}\n\n`);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
                 logger.error(`SSE conversations/stream error: ${(error as Error).message}`);
       }
     };
@@ -1806,7 +1806,7 @@ router.get(
         return res.status(404).json({ error: "Conversation not found" });
 
       res.json(document);
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /conversations/:id error: ${(error as Error).message}`);
       next(error);
     }
@@ -1897,7 +1897,7 @@ router.get(
         requestsPerMinute: Math.round(requestsPerMinute * 100) / 100,
         activeCount: conversations.length,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /live error: ${(error as Error).message}`);
       next(error);
     }
@@ -1954,7 +1954,7 @@ router.get(
             const provider = getProvider(("lm-studio" as any));
       const data = await provider.listModels();
       res.json(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /lm-studio/models error: ${(error as Error).message}`);
       next(error);
     }
@@ -2005,7 +2005,7 @@ router.post(
       }
 
       res.json({ model, alreadyLoaded });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /lm-studio/load error: ${(error as Error).message}`);
       next(error);
     }
@@ -2031,7 +2031,7 @@ router.post(
             const provider = getProvider(("lm-studio" as any));
       const data = await provider.unloadModel(instance_id);
       res.json(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /lm-studio/unload error: ${(error as Error).message}`);
       next(error);
     }
@@ -2096,7 +2096,7 @@ router.post(
         archParams,
         totalLayers,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /lm-studio/estimate error: ${(error as Error).message}`);
       next(error);
     }
@@ -2104,10 +2104,6 @@ router.post(
 );
 
 // ─── admin read-only views (POST lives at /workflows) ───────
-
-/**
- * GET /admin/workflows — paginated workflow list
- */
 router.get(
   "/workflows",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
@@ -2189,16 +2185,12 @@ router.get(
       ]);
 
             res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin GET /workflows error: ${(error as Error).message}`);
       next(error);
     }
   }),
 );
-
-/**
- * GET /admin/workflows/:id — full workflow detail
- */
 router.get(
   "/workflows/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
@@ -2218,7 +2210,7 @@ router.get(
       if (!document) return res.status(404).json({ error: "Workflow not found" });
 
       res.json(document);
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin GET /workflows/:id error: ${(error as Error).message}`);
       next(error);
     }
@@ -2499,7 +2491,7 @@ router.get(
         projects: allProjects,
         usernames: allUsernames,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /media error: ${(error as Error).message}`);
       next(error);
     }
@@ -2600,7 +2592,7 @@ router.get(
       }));
 
             res.json({ data, total, page: parseInt((page as any), 10), limit: lim });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /text error: ${(error as Error).message}`);
       next(error);
     }
@@ -2787,7 +2779,7 @@ router.get(
       const total = countResult[0]?.total || 0;
 
             res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /traces error: ${(error as Error).message}`);
       next(error);
     }
@@ -2841,7 +2833,7 @@ router.get(
       };
 
       res.json(trace);
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /traces/:id error: ${(error as Error).message}`);
       next(error);
     }
@@ -2981,7 +2973,7 @@ router.get(
         createdAt,
         updatedAt,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /sessions/:id/stats error: ${(error as Error).message}`);
       next(error);
     }
@@ -3060,7 +3052,7 @@ router.get(
         total: requests.length,
         requests,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /sessions/:id/requests error: ${(error as Error).message}`);
       next(error);
     }
@@ -3112,7 +3104,7 @@ router.get(
       ]);
 
             res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /agent-sessions error: ${(error as Error).message}`);
       next(error);
     }
@@ -3135,7 +3127,7 @@ router.get(
         return res.status(404).json({ error: "Agent session not found" });
 
       res.json(document);
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Admin /agent-sessions/:id error: ${(error as Error).message}`);
       next(error);
     }

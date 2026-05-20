@@ -56,9 +56,6 @@ let _cache: SettingsData | null = null;
  * hot path (embedding generation, memory extraction).
  */
 const SettingsService = {
-  /**
-   * Get the current settings, merging with defaults for any missing keys.
-   */
   async get(): Promise<SettingsData> {
     if (_cache) return _cache;
 
@@ -78,18 +75,10 @@ const SettingsService = {
     _cache = deepMerge(DEFAULTS as unknown as Record<string, unknown>, (document.data || {}) as Record<string, unknown>) as unknown as SettingsData;
     return _cache;
   },
-
-  /**
-   * Get a specific section of settings (e.g. "memory").
-   */
   async getSection<K extends keyof SettingsData>(section: K): Promise<SettingsData[K]> {
     const settings = await this.get();
     return settings[section] || DEFAULTS[section];
   },
-
-  /**
-   * Update settings. Performs a deep merge with existing settings.
-   */
   async update(data: any) {
     const collection = MongoWrapper.getCollection(
       MONGO_DB_NAME,
@@ -137,17 +126,9 @@ const SettingsService = {
     }
     return { provider, model };
   },
-
-  /**
-   * Clear the in-memory cache (useful for testing).
-   */
   invalidateCache() {
     _cache = null;
   },
-
-  /**
-   * Return the compiled defaults for reference.
-   */
   getDefaults() {
     return { ...DEFAULTS };
   },

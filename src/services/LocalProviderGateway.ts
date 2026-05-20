@@ -161,12 +161,6 @@ const AUDIO_PATTERNS = [
 function matchesAny(nameLower: any, patterns: any) {
     return (patterns as any).some((p: any) => (nameLower as any).includes(p));
 }
-
-/**
- * Detect capabilities for a model based on its name and provider metadata.
-
-
- */
 function detectCapabilities(modelKey: any, providerMeta: any = {}) {
     const nameLower = (modelKey || "").toLowerCase();
 
@@ -548,12 +542,6 @@ class LocalProviderGateway {
       this.getProviderType(providerOrInstanceId) || providerOrInstanceId;
         return DEFAULT_THINKING_TYPES.has((type as any));
   }
-
-  /**
-   * Check whether a provider supports model management (load/unload).
-
-
-   */
   supportsModelManagement(providerOrInstanceId: any) {
     const type =
       this.getProviderType(providerOrInstanceId) || providerOrInstanceId;
@@ -574,49 +562,30 @@ class LocalProviderGateway {
   }
 
   // ── Instance Enumeration ────────────────────────────────────
-
-  /**
-   * Get all registered local provider instances.
-   */
   getInstances() {
-    return listInstances().map((inst: InstanceEntry) => ({
-      id: inst.id,
-      type: inst.type,
-      instanceNumber: inst.instanceNumber,
-      concurrency: inst.concurrency,
+    return listInstances().map(( instance: InstanceEntry) => ({
+      id: instance.id,
+      type: instance.type,
+      instanceNumber: instance.instanceNumber,
+      concurrency: instance.concurrency,
     }));
   }
-
-  /**
-   * Get instances of a specific provider type.
-
-
-   */
   getInstancesByType(type: any) {
         return getInstancesByType((type as any));
   }
-
-  /**
-   * Get all unique provider types that have at least one registered instance.
-
-   */
   getRegisteredTypes() {
     return listInstanceTypes();
   }
-
-  /**
-   * Get total concurrency capacity across all local instances.
-   */
   getConcurrencyCapacity() {
     const instances = listInstances();
     const byType: any = {};
     const byInstance: any = {};
     let total = 0;
 
-        for ( const inst of instances) {
-      total += inst.concurrency;
-            byType[inst.type] = (byType[inst.type] || 0) + inst.concurrency;
-            byInstance[inst.id] = inst.concurrency;
+        for ( const instance of instances) {
+      total += instance.concurrency;
+            byType[instance.type] = (byType[instance.type] || 0) + instance.concurrency;
+            byInstance[instance.id] = instance.concurrency;
     }
 
     return { total, byType, byInstance };
@@ -634,16 +603,16 @@ class LocalProviderGateway {
     const models: any = {};
 
     const results = await Promise.allSettled(
-            instances.map(async (inst: any) => {
+            instances.map(async ( instance: any) => {
         const fetched = await this._fetchModelsForInstance(
-          inst,
+          instance,
                     (timeoutMs as any),
           (enrich as any),
         );
         return {
-          id: inst.id,
-          type: inst.type,
-          instanceNumber: inst.instanceNumber,
+          id: instance.id,
+          type: instance.type,
+          instanceNumber: instance.instanceNumber,
           models: fetched,
         };
       }),
@@ -668,31 +637,25 @@ class LocalProviderGateway {
 
     return models;
   }
-
-  /**
-   * Discover models for a single instance.
-
-
-   */
   async discoverModelsForInstance(
     instanceId: any,
     { timeoutMs = 3000, enrich = true }: any = {},
   ) {
-        const inst = getInstance((instanceId as any));
-    if (!inst) {
+        const instance = getInstance((instanceId as any));
+    if (!instance) {
       logger.warn(`[LocalProviderGateway] Unknown instance: ${instanceId}`);
       return [];
     }
-        return this._fetchModelsForInstance((inst as any), (timeoutMs as any), (enrich as any));
+        return this._fetchModelsForInstance((instance as any), (timeoutMs as any), (enrich as any));
   }
 
   /**
    * Internal: Fetch, normalize, and optionally enrich models for an instance.
    * @private
    */
-  async _fetchModelsForInstance(inst: any, timeoutMs: any, enrich: any) {
+  async _fetchModelsForInstance( instance: any, timeoutMs: any, enrich: any) {
     try {
-            const provider = getProvider((inst.id as any));
+            const provider = getProvider((instance.id as any));
       if (!provider?.listModels) return [];
 
       const rawResult = (await withTimeoutFallback(
@@ -704,14 +667,14 @@ class LocalProviderGateway {
       const rawModels = rawResult?.models || rawResult?.data || [];
       if (!Array.isArray(rawModels) || rawModels.length === 0) return [];
 
-            const normalize = (NORMALIZER_BY_TYPE as any)[((inst as string) as any).type];
+            const normalize = (NORMALIZER_BY_TYPE as any)[((instance as string) as any).type];
       if (!normalize) return [];
 
       // Normalize all models
       let normalized = rawModels.map((raw: any) => normalize(raw));
 
       // HuggingFace enrichment for vLLM/llama.cpp (their model IDs are HF-style)
-            if (enrich && HF_ENRICHED_TYPES.has((inst.type as any))) {
+            if (enrich && HF_ENRICHED_TYPES.has((instance.type as any))) {
         const enriched = await Promise.allSettled(
           normalized.map((entry: any) =>
                         enrichWithHuggingFace(entry, (entry.name as any)),
@@ -723,19 +686,15 @@ class LocalProviderGateway {
       }
 
       return normalized;
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn(
-                `[LocalProviderGateway] Failed to discover models for ${inst.id}: ${(error as Error).message}`,
+                `[LocalProviderGateway] Failed to discover models for ${instance.id}: ${(error as Error).message}`,
       );
       return [];
     }
   }
 
   // ── Model Search & Filter ───────────────────────────────────
-
-  /**
-   * Search for models across all local providers matching a capability filter.
-   */
   async searchModels(filter: any = {}) {
     const allModels = await this.discoverModels();
     const results: any[] = [];
@@ -774,11 +733,6 @@ class LocalProviderGateway {
   }
 
   // ── Aggregate Statistics ────────────────────────────────────
-
-  /**
-   * Get aggregate statistics across all local providers.
-
-   */
   async getStats() {
     const allModels = await this.discoverModels({ enrich: false });
     const instances = listInstances();
@@ -799,8 +753,8 @@ class LocalProviderGateway {
 
         for ( const [instanceId, models] of Object.entries(allModels)) {
             modelsByInstance[instanceId] = (models as any).length;
-      const inst = getInstance(instanceId);
-      const type = inst?.type || "any";
+      const instance = getInstance(instanceId);
+      const type = instance?.type || "any";
             modelsByType[type] = (modelsByType[type] || 0) + (models as any).length;
 
             for ( const model of (models as any)) {
@@ -842,8 +796,8 @@ class LocalProviderGateway {
     const instances = listInstances();
 
     const checks = await Promise.allSettled(
-            instances.map(async (inst: any) => {
-                const provider = getProvider((inst.id as any));
+            instances.map(async ( instance: any) => {
+                const provider = getProvider((instance.id as any));
         if (!provider?.listModels) return null;
 
         const result = (await withTimeoutFallback(
@@ -856,17 +810,17 @@ class LocalProviderGateway {
           const key = m.key || m.id || m.model || m.name;
           return key === modelName;
         });
-        return found ? inst : null;
+        return found ? instance : null;
       }),
     );
 
         for ( const result of checks) {
       if (result.status === "fulfilled" && result.value) {
-        const inst = result.value;
+        const instance = result.value;
         return {
-          instanceId: inst.id,
-          type: inst.type,
-                    provider: getProvider((inst.id as any)),
+          instanceId: instance.id,
+          type: instance.type,
+                    provider: getProvider((instance.id as any)),
         };
       }
     }
@@ -888,8 +842,8 @@ class LocalProviderGateway {
     const health: any = {};
 
     const results = await Promise.allSettled(
-            instances.map(async (inst: any) => {
-                const provider = getProvider((inst.id as any));
+            instances.map(async ( instance: any) => {
+                const provider = getProvider((instance.id as any));
 
         // Prefer native health check if available
         if (provider?.checkHealth) {
@@ -899,8 +853,8 @@ class LocalProviderGateway {
             { ok: false, status: "timeout" },
           );
           return {
-            id: inst.id,
-            type: inst.type,
+            id: instance.id,
+            type: instance.type,
             ...result,
           };
         }
@@ -915,24 +869,24 @@ class LocalProviderGateway {
             )) as ListModelsResponse | null | undefined;
             if (!result) {
               return {
-                id: inst.id,
-                type: inst.type,
+                id: instance.id,
+                type: instance.type,
                 ok: false,
                 status: "timeout",
               };
             }
             const models = result.models || result.data || [];
             return {
-              id: inst.id,
-              type: inst.type,
+              id: instance.id,
+              type: instance.type,
               ok: true,
               status: "ok",
               models: models.length,
             };
-          } catch (error: any) {
+          } catch (error: unknown) {
             return {
-              id: inst.id,
-              type: inst.type,
+              id: instance.id,
+              type: instance.type,
               ok: false,
               status: "unreachable",
                             error: (error as Error).message,
@@ -940,7 +894,7 @@ class LocalProviderGateway {
           }
         }
 
-        return { id: inst.id, type: inst.type, ok: false, status: "no_probe" };
+        return { id: instance.id, type: instance.type, ok: false, status: "no_probe" };
       }),
     );
 
@@ -1046,10 +1000,6 @@ class LocalProviderGateway {
     }
     return provider.ensureModelLoaded(modelKey, options, signal, onStatus);
   }
-
-  /**
-   * Unload a model from a specific instance.
-   */
   async unloadModel(instanceId: any, modelInstanceId: any) {
     const provider = getProvider(instanceId);
     if (!provider?.unloadModel) {
@@ -1113,10 +1063,6 @@ class LocalProviderGateway {
     const provider = await this._getProviderForModel(model, instanceId);
     yield* provider.generateTextStream(messages, model, options);
   }
-
-  /**
-   * Generate an embedding via a local provider.
-   */
   async generateEmbedding(
     content: string,
     model: any,
@@ -1129,10 +1075,6 @@ class LocalProviderGateway {
     }
     return provider.generateEmbedding(content, model, options);
   }
-
-  /**
-   * Caption an image via a local provider.
-   */
   async captionImage(
     images: any,
     prompt: any,

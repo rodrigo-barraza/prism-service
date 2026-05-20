@@ -45,11 +45,6 @@ const PROVIDER_ARRAYS = {
 
 
 const registry = new Map<string, InstanceEntry>();
-
-/**
- * Register all instances for a provider type from its array.
-
- */
 function registerType(type: string, instances: ProviderInstanceConfig[]) {
     const factory = (FACTORIES as any)[type];
   if (!factory) return;
@@ -88,54 +83,21 @@ for ( const [type, instances] of Object.entries(PROVIDER_ARRAYS)) {
 }
 
 // ── Public API ──────────────────────────────────────────────
-
-/**
- * Get a provider instance by ID.
-
- */
 export function getInstanceProvider(id: string) {
   return registry.get(id)?.provider || null;
 }
-
-/**
- * Get full instance entry by ID.
-
-
- */
 export function getInstance(id: string): InstanceEntry | null {
   return registry.get(id) || null;
 }
-
-/**
- * Check if an ID belongs to a registered instance.
-
-
- */
 export function isInstance(id: string) {
   return registry.has(id);
 }
-
-/**
- * List all registered instances.
-
- */
 export function listInstances() {
   return [...registry.values()];
 }
-
-/**
- * Get all unique provider types that have at least one instance.
-
- */
 export function listInstanceTypes() {
   return [...new Set([...registry.values()].map((e: InstanceEntry) => e.type))];
 }
-
-/**
- * Get all instances of a given provider type.
-
-
- */
 export function getInstancesByType(type: string) {
   return [...registry.values()].filter((e: InstanceEntry) => e.type === type);
 }

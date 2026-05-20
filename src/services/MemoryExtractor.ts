@@ -114,9 +114,6 @@ interface ExtractedMemory {
  * Runs in the background (fire-and-forget) after the final response.
  */
 export default class MemoryExtractor {
-  /**
-   * Extract memories from a conversation and store in the unified memories collection.
-   */
   static async extractAndStore({
     project,
     username,
@@ -203,7 +200,7 @@ export default class MemoryExtractor {
           maxTokens: 1000,
           temperature: 0.1,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         success = false;
                 errorMessage = (error as Error).message;
         throw error;
@@ -319,7 +316,7 @@ export default class MemoryExtractor {
               `[MemoryExtractor] Skipped duplicate [${type}] "${mem.title.substring(0, 60)}"`,
             );
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
                     logger.error(`[MemoryExtractor] Storage failed: ${(error as Error).message}`);
         }
       }
@@ -360,7 +357,7 @@ export default class MemoryExtractor {
       }
 
       return stored;
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`[MemoryExtractor] Failed: ${(error as Error).message}`);
       return [];
     }

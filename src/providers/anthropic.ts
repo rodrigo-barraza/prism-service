@@ -37,10 +37,6 @@ const EFFORT_BUDGET_MAP = {
 // Retry config for transient Anthropic errors (overloaded, rate limit)
 const RETRY_DELAY_MS = 10_000;
 const MAX_RETRIES = 3;
-
-/**
- * Check if an Anthropic error is retryable (overloaded or 529).
- */
 function isRetryableError(error: any) {
   // SDK wraps the error body — check both the error type and HTTP status
   const err = error as any;
@@ -374,10 +370,6 @@ async function prepareMessages(messages: ChatMessage[]) {
 
   return { systemMessage, messages: merged };
 }
-
-/**
- * Build the tools array based on options.
- */
 function buildTools(options: ProviderOptions) {
   const tools: any[] = [];
   if (options.webSearch) {
@@ -412,10 +404,6 @@ function buildTools(options: ProviderOptions) {
   }
   return tools.length > 0 ? tools : undefined;
 }
-
-/**
- * Extract text, thinking, citations, and code results from a multi-block response.
- */
 function extractResponseContent(contentBlocks: AnthropicBlock[]) {
   let text = "";
   let thinking = null;
@@ -453,10 +441,6 @@ function extractResponseContent(contentBlocks: AnthropicBlock[]) {
 
   return { text, thinking, thinkingSignature, citations, toolCalls };
 }
-
-/**
- * Build the common usage object from an Anthropic response.
- */
 function buildUsage(responseUsage: Record<string, number> | null | undefined) {
   return {
     inputTokens: responseUsage?.input_tokens ?? 0,
@@ -546,7 +530,7 @@ const anthropicProvider = {
                 if (response.stop_reason) (result as any).stopReason = response.stop_reason;
                 if (response.stop_details) (result as any).stopDetails = response.stop_details;
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         lastError = error;
         if (isRetryableError(error) && attempt < MAX_RETRIES) {
           logger.warn(
@@ -571,12 +555,6 @@ const anthropicProvider = {
       lastError,
     );
   },
-
-  /**
-   * Caption / describe images (image-to-text).
-
-
-   */
   async captionImage(
     images: string[],
     prompt: string = "Describe this image.",
@@ -641,7 +619,7 @@ const anthropicProvider = {
         text,
         usage: buildUsage(response.usage),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw new ProviderError(
         "anthropic",
                 (error as Error).message,
@@ -925,7 +903,7 @@ const anthropicProvider = {
       if (rateLimits) {
         yield { type: "rateLimits", rateLimits };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
             if ((error as Error).name === "AbortError") return;
       // For streaming, retry overloaded errors with the same delay/attempts policy
       if (isRetryableError(error)) {

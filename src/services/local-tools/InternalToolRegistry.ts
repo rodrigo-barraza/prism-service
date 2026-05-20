@@ -13,11 +13,6 @@ import logger from "../../utils/logger.ts";
 
 /** @type {Map<string, { schema: object, domain: string, labels: string[], execute: Function }>} */
 const registry = new Map();
-
-/**
- * Register a tool with the internal registry.
-
- */
 function register(tool: any) {
   if (!tool.name || !tool.execute) {
     logger.warn(
@@ -65,20 +60,9 @@ init().catch((error: any) =>
 );
 
 export default class InternalToolRegistry {
-  /**
-   * Check if a tool name is handled by the internal registry.
-
-
-   */
   static has(name: string) {
     return registry.has(name);
   }
-
-  /**
-   * Execute an internal tool by name.
-
-
-   */
   static async execute(name: string, args: any, context: any = {}) {
     const tool = registry.get(name);
     if (!tool) {
@@ -86,19 +70,9 @@ export default class InternalToolRegistry {
     }
     return tool.execute(args, context);
   }
-
-  /**
-   * Get all internal tool schemas (for LLM consumption — no endpoint metadata).
-
-   */
   static getSchemas() {
     return [...registry.values()].map((t: any) => t.schema);
   }
-
-  /**
-   * Get all internal tool schemas with domain/labels (for client UI).
-
-   */
   static getClientSchemas() {
     return [...registry.values()].map((t: any) => ({
             ...t.schema,

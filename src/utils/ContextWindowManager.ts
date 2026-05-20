@@ -83,10 +83,6 @@ function estimateMessageTokens(message: string) {
 
   return tokens;
 }
-
-/**
- * Estimate total tokens across all messages.
- */
 function estimateTotalTokens(messages: any) {
     return (messages as any).reduce(
         (sum: any, message: string) => sum + estimateMessageTokens(message),
@@ -360,21 +356,9 @@ export default class ContextWindowManager {
       estimatedTokens: currentTokens,
     };
   }
-
-  /**
-   * Estimate token count for messages (exposed for diagnostics).
-
-
-   */
   static estimateTokens(messages: any) {
     return estimateTotalTokens(messages);
   }
-
-  /**
-   * Estimate tokens for a single message (exposed for diagnostics).
-
-
-   */
   static estimateMessageTokens(message: string) {
     return estimateMessageTokens(message);
   }

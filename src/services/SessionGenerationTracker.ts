@@ -64,9 +64,6 @@ const sessionIndex = new Map();
 const sessionAccumulators = new Map();
 
 const SessionGenerationTracker = ({
-  /**
-   * Register a new LLM request for tracking.
-   */
     register(
     agentSessionId: any,
     requestId: any,
@@ -188,16 +185,16 @@ const SessionGenerationTracker = ({
     }
 
     // Roll completed metrics into the session accumulator
-    const acc = sessionAccumulators.get(entry.agentSessionId);
-    if (acc) {
-      acc.completedOutputTokens += effectiveOutputTokens;
-      acc.completedInputTokens += entry.inputTokens;
+    const accumulator = sessionAccumulators.get(entry.agentSessionId);
+    if (accumulator) {
+      accumulator.completedOutputTokens += effectiveOutputTokens;
+      accumulator.completedInputTokens += entry.inputTokens;
       if (entry.ttft != null) {
-        acc.ttftSamples.push(entry.ttft);
+        accumulator.ttftSamples.push(entry.ttft);
       }
       // Persist tok/s so it survives across iteration boundaries
       if (requestTokPerSec != null) {
-        acc.completedTokPerSecSamples.push(requestTokPerSec);
+        accumulator.completedTokPerSecSamples.push(requestTokPerSec);
       }
     }
 
@@ -223,10 +220,10 @@ const SessionGenerationTracker = ({
    */
   getSessionStats(agentSessionId: any) {
     const requestIds = sessionIndex.get(agentSessionId);
-    const acc = sessionAccumulators.get(agentSessionId);
-    const completedOutputTokens = acc?.completedOutputTokens || 0;
-    const completedInputTokens = acc?.completedInputTokens || 0;
-    const ttftSamples = acc?.ttftSamples || [];
+    const accumulator = sessionAccumulators.get(agentSessionId);
+    const completedOutputTokens = accumulator?.completedOutputTokens || 0;
+    const completedInputTokens = accumulator?.completedInputTokens || 0;
+    const ttftSamples = accumulator?.ttftSamples || [];
 
     if (!requestIds || requestIds.size === 0) {
       const totalOut = completedOutputTokens;
@@ -237,7 +234,7 @@ const SessionGenerationTracker = ({
             ttftSamples.length
           : null;
       // Use the most recent completed tok/s (last iteration's rate)
-      const completedSamples = acc?.completedTokPerSecSamples || [];
+      const completedSamples = accumulator?.completedTokPerSecSamples || [];
       const lastTokPerSec =
         completedSamples.length > 0
           ? parseFloat(completedSamples[completedSamples.length - 1].toFixed(1))
@@ -316,7 +313,7 @@ const SessionGenerationTracker = ({
     if (generatingCount > 0) {
       tokPerSec = parseFloat(totalTokPerSec.toFixed(1));
     } else {
-      const completedSamples = acc?.completedTokPerSecSamples || [];
+      const completedSamples = accumulator?.completedTokPerSecSamples || [];
       if (completedSamples.length > 0) {
         tokPerSec = parseFloat(
           completedSamples[completedSamples.length - 1].toFixed(1),
@@ -334,10 +331,6 @@ const SessionGenerationTracker = ({
       avgTtft: avgTtft != null ? parseFloat(avgTtft.toFixed(3)) : null,
     };
   },
-
-  /**
-   * Clean up all tracking data for a session.
-   */
   cleanup(agentSessionId: any) {
     const requestIds = sessionIndex.get(agentSessionId);
     if (requestIds) {
@@ -348,10 +341,6 @@ const SessionGenerationTracker = ({
     }
     sessionAccumulators.delete(agentSessionId);
   },
-
-  /**
-   * Check if a session has any active requests.
-   */
   hasActiveRequests(agentSessionId: any) {
     const requestIds = sessionIndex.get(agentSessionId);
     return !!(requestIds && requestIds.size > 0);

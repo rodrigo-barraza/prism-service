@@ -21,10 +21,6 @@ const MATCH_MODES: any = {
   STARTS_WITH: "startsWith",
   REGEX: "regex",
 };
-/**
- * Evaluate whether a model response matches the expected value.
-
- */
 function evaluate(
   response: any,
   expected: any,
@@ -51,9 +47,6 @@ function evaluate(
       return norm(response).includes(norm(expected));
   }
 }
-/**
- * Evaluate a response against multiple assertions using AND/OR logic.
- */
 function evaluateAssertions(response: any, benchmark: any) {
   const assertions = benchmark.assertions;
     if (!assertions || (assertions as any).length === 0) {
@@ -72,9 +65,6 @@ function evaluateAssertions(response: any, benchmark: any) {
   );
 }
 // ─── behavioral assertions ──────────────────────────────────
-/**
- * Comparison operators for numeric agent assertions.
- */
 const COMPARATORS = {
   gte: (a: any, b: any) => a >= b,
   lte: (a: any, b: any) => a <= b,
@@ -82,9 +72,6 @@ const COMPARATORS = {
   lt: (a: any, b: any) => a < b,
   eq: (a: any, b: any) => a === b,
 };
-/**
- * Evaluate a single agent assertion against execution result data.
- */
 function evaluateSingleAgentAssertion(assertion: any, executionData: any) {
   const { type, operator, operand } = assertion;
   switch (type) {
@@ -115,9 +102,6 @@ function evaluateSingleAgentAssertion(assertion: any, executionData: any) {
       return false;
   }
 }
-/**
- * Evaluate all agent assertions against execution result data.
- */
 function evaluateAgentAssertions(benchmark: any, executionData: any) {
   const assertions = benchmark.agentAssertions;
     if (!assertions || (assertions as any).length === 0) {
@@ -397,7 +381,7 @@ async function runSingleModel(
       error: null,
       completedAt: new Date().toISOString(),
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     const latency = (performance.now() - start) / 1000;
         logger.error(`[benchmark]   💥 ${model.model} threw: ${(error as Error).message}`);
     return {
@@ -426,11 +410,6 @@ const BenchmarkService = {
   get activeGenerationCount() {
     return activeGenerationCount;
   },
-  /**
-   * Run a benchmark test against the specified models (or all available).
-
-
-   */
   async runBenchmark(
     benchmark: any,
     modelTargets: any,
@@ -443,11 +422,11 @@ const BenchmarkService = {
         if (modelTargets && (modelTargets as any).length > 0) {
       // Validate and enrich with labels
             models = (modelTargets as any).map((t: any) => {
-                const def = getModelByName((t.model as any));
+                const modelDefinition = getModelByName((t.model as any));
         return {
           provider: t.provider,
           model: t.model,
-          label: def?.label || t.display_name || t.model,
+          label: modelDefinition?.label || t.display_name || t.model,
           thinkingEnabled: t.thinkingEnabled || false,
           toolsEnabled: t.toolsEnabled || false,
                     ...(t.agent && { agent: t.agent }),

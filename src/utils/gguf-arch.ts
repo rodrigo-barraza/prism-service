@@ -155,10 +155,6 @@ const ARCH_DB = {
     { minB: 2, maxB: 5, layers: 28, kvHeads: 4, headDim: 80, attnRatio: 0.25 },
   ],
 };
-
-/**
- * Resolve architecture parameters for a GGUF model.
- */
 export function resolveArchParams(
   architecture: any,
   paramsString: any,

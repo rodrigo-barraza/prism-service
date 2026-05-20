@@ -103,10 +103,6 @@ export function extractAnthropicRateLimits(response: any, model: string) {
 
   return result;
 }
-
-/**
- * Safely parse a string to an integer, returning null on failure.
- */
 function safeInt(value: any) {
   if (value == null) return null;
   const parsed = parseInt(value, 10);

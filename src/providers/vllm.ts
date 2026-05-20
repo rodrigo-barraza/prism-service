@@ -16,12 +16,6 @@ import {
 // ── Helpers ──────────────────────────────────────────────────
 
 // ── Provider ─────────────────────────────────────────────────
-
-/**
- * Factory: create a vLLM provider instance targeting a specific baseUrl.
-
-
- */
 export function createVllmProvider(baseUrl: string, instanceId: string = "vllm") {
   const getBaseUrl = () => baseUrl;
 
@@ -83,7 +77,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         const result = { text, thinking, usage };
                 if (toolCalls) (result as any).toolCalls = toolCalls;
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("vllm", (error as Error).message, 500, error);
       }
@@ -148,7 +142,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
                     signal: options.signal,
                     thinkingEnabled: options.thinkingEnabled,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
                 if ((error as Error).name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("vllm", (error as Error).message, 500, error);
@@ -195,7 +189,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
                     outputTokens: (data as any).usage?.completion_tokens || 0,
         };
         return { text, usage };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("vllm", (error as Error).message, 500, error);
       }
@@ -236,7 +230,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           embedding,
           dimensions: embedding.length,
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("vllm", (error as Error).message, 500, error);
       }
@@ -269,7 +263,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
                     loaded_instances: [{ id: (m as any).id }], // vLLM models are always loaded
         }));
         return { models };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("vllm", (error as Error).message, 500, error);
       }

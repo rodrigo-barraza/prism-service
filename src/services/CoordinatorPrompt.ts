@@ -7,10 +7,6 @@
 // Adapted from Claude Code's getCoordinatorSystemPrompt() with
 // modifications for our git-worktree-isolated architecture.
 // ────────────────────────────────────────────────────────────
-
-/**
- * Build the coordinator system prompt addendum.
- */
 export function getCoordinatorPromptAddendum({ workerTools = [] }: Record<string, unknown> = {}) {
   const workerToolList =
         (workerTools as any).length > 0

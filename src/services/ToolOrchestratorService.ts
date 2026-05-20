@@ -120,12 +120,12 @@ async function fetchSchemas() {
                     cachedStaticRoots = (config as any).staticRoots;
         }
       }
-    } catch (cfgErr: any) {
+    } catch (cfgErr: unknown) {
       logger.warn(
                 `[ToolOrchestrator] Could not fetch workspace config: ${(cfgErr as Error).message}`,
       );
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.warn(
             `[ToolOrchestrator] Could not reach tools-api for schemas: ${(error as Error).message}`,
     );
@@ -287,7 +287,7 @@ async function fetchJson(url: string, extraHeaders: any = {}, signal: any) {
       }
     }
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
         if ((error as Error).name === "AbortError") {
       return { error: "Tool execution aborted" };
     }
@@ -321,7 +321,7 @@ async function fetchJsonPost(
       }
     }
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
         if ((error as Error).name === "AbortError") {
       return { error: "Tool execution aborted" };
     }
@@ -519,18 +519,12 @@ export default class ToolOrchestratorService {
                     cachedStaticRoots = (config as any).staticRoots;
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn(
                 `[ToolOrchestrator] refreshWorkspaceRoots failed: ${(error as Error).message}`,
       );
     }
   }
-
-  /**
-   * Update user-configured workspace roots via tools-api.
-
-
-   */
   static async updateWorkspaceRoots(roots: any) {
     const response = await fetch(`${TOOLS_SERVICE_URL}/admin/config/workspaces`, {
       method: "PUT",
@@ -551,12 +545,6 @@ export default class ToolOrchestratorService {
     }
     return result;
   }
-
-  /**
-   * Validate a single workspace path via tools-api.
-
-
-   */
   static async validateWorkspacePath(path: string) {
     const response = await fetch(
       `${TOOLS_SERVICE_URL}/admin/config/workspaces/validate`,
@@ -583,11 +571,6 @@ export default class ToolOrchestratorService {
     }
         return cachedWorkspaceRoots[0] || null;
   }
-
-  /**
-   * Get the active worktree state for a session, if any.
-
-   */
   static getWorktreeState(agentSessionId: any) {
     return activeWorktrees.get(agentSessionId) || null;
   }
@@ -721,7 +704,7 @@ export default class ToolOrchestratorService {
                     context.username,
         );
                 (result as any).image.minioRef = ref;
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.warn(
                     `[ToolOrchestrator] Image MinIO upload failed: ${(error as Error).message}`,
         );
@@ -741,7 +724,7 @@ export default class ToolOrchestratorService {
         );
                 (result as any).screenshotRef = ref;
                 delete (result as any).screenshot; // Don't send base64 downstream
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.warn(
                     `[ToolOrchestrator] Screenshot MinIO upload failed: ${(error as Error).message}`,
         );
@@ -816,11 +799,6 @@ export default class ToolOrchestratorService {
     }
     return MCPClientService.callTool(parsed.serverName, parsed.toolName, args);
   }
-
-  /**
-   * Get all tool schemas from connected MCP servers.
-
-   */
   static getMCPToolSchemas() {
     return MCPClientService.getToolSchemas();
   }
@@ -972,7 +950,7 @@ export default class ToolOrchestratorService {
         };
       }
       return finalResult || { error: "Stream ended without exit event" };
-    } catch (error: any) {
+    } catch (error: unknown) {
             return { error: `Streaming failed: ${(error as Error).message}` };
     }
   }
@@ -1017,7 +995,7 @@ export default class ToolOrchestratorService {
           }
         }
         return await response.json();
-      } catch (error: any) {
+      } catch (error: unknown) {
                 if ((error as Error).name === "AbortError" || (error as Error).name === "TimeoutError") {
           return { error: "Custom tool execution timed out (35s)" };
         }
@@ -1060,7 +1038,7 @@ export default class ToolOrchestratorService {
         return { error: `API returned ${response.status}: ${response.statusText}` };
       }
       return await response.json();
-    } catch (error: any) {
+    } catch (error: unknown) {
             return { error: `Failed to reach API: ${(error as Error).message}` };
     }
   }

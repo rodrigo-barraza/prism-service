@@ -63,7 +63,7 @@ function openStream(db: any, collectionName: string) {
             for ( const listener of listeners) {
         try {
                     (listener as any)(payload);
-        } catch (error: any) {
+        } catch (error: unknown) {
                     logger.error(`ChangeStream listener error: ${(error as Error).message}`);
         }
       }
@@ -92,9 +92,6 @@ function openStream(db: any, collectionName: string) {
 }
 
 const ChangeStreamService = {
-  /**
-   * Whether Change Streams are available (replica set detected).
-   */
   get available() {
     return available;
   },
@@ -116,7 +113,7 @@ const ChangeStreamService = {
       // If watch() succeeds without throwing, Change Streams are supported.
       // We need to close this test stream and open real ones.
       await testStream.close();
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn(
                 `Change Streams not available (${(error as Error).message}). ` +
           "Admin dashboard will fall back to polling. " +
@@ -163,26 +160,12 @@ const ChangeStreamService = {
       }
     }, CHANGE_STREAM_RECONNECT_MS);
   },
-
-  /**
-   * Register a listener for collection change events.
-
-   */
   subscribe(callback: any) {
     listeners.add(callback);
   },
-
-  /**
-   * Unregister a listener.
-
-   */
   unsubscribe(callback: any) {
     listeners.delete(callback);
   },
-
-  /**
-   * Close all Change Streams. Call on shutdown.
-   */
   async close() {
         for ( const [name, stream] of streams) {
       try {

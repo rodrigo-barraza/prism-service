@@ -11,11 +11,6 @@ import logger from "./logger.ts";
 
 // ── ffmpeg availability (cached per process) ────────────────
 let _ffmpegAvailable: any = null;
-
-/**
- * Probe whether ffmpeg is on the PATH. Result is cached after first call.
-
- */
 async function isFfmpegAvailable() {
     if (_ffmpegAvailable !== null) return _ffmpegAvailable;
   return new Promise((resolve: any) => {
@@ -144,7 +139,7 @@ export async function constrainImageDimensions(
     );
 
     return { data: resizedB64, mediaType: outputMime };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.warn(
       `[media] Dimension check failed (${error instanceof Error ? (error as Error).message : String(error)}), passing through`,
     );
@@ -341,32 +336,15 @@ async function compressWithSharp(base64Data: string, maxBytes: number) {
     mediaType: "image/jpeg",
   };
 }
-
-/**
- * Detect MIME type from a base64 data URL.
-
- */
 export function getDataUrlMimeType(dataUrl: string) {
   const match = dataUrl.match(/^data:([^;]+);base64,/);
   return match ? match[1] : null;
 }
-
-/**
- * Check if a string is a valid data: URL, HTTP(S) URL, or other ref type.
-
-
- */
 export function getUrlType(url: string) {
   if (url.startsWith("data:")) return "data";
   if (url.startsWith("http://") || url.startsWith("https://")) return "http";
   return "any";
 }
-
-/**
- * Infer MIME category from a URL's file extension.
-
-
- */
 export function inferMimeFromUrl(url: string) {
   try {
     const pathname = new URL(url).pathname.toLowerCase();

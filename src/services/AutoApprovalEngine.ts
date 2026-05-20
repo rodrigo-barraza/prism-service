@@ -105,30 +105,15 @@ export default class AutoApprovalEngine {
         (this as any).fullAuto = options.fullAuto || false;
         (this as any).tierOverrides = options.tierOverrides || {};
   }
-
-  /**
-   * Get the approval tier for a tool.
-
-   */
   getTier(toolName: any) {
         if ((this as any).tierOverrides[toolName] !== undefined) {
             return (this as any).tierOverrides[toolName];
     }
         return (DEFAULT_TIER_MAP as any)[(toolName as string)] ?? APPROVAL_TIERS.WRITE; // Unknown tools default to Tier 2
   }
-
-  /**
-   * Get the tier label for a tool.
-
-
-   */
   getTierLabel(toolName: any) {
     return TIER_LABELS[this.getTier(toolName)] || "write";
   }
-
-  /**
-   * Check whether a tool call should auto-execute.
-   */
   check(toolCall: any) {
         const tier = this.getTier((toolCall.name as any));
     const tierLabel = TIER_LABELS[tier] || "write";
@@ -146,10 +131,6 @@ export default class AutoApprovalEngine {
     // Tier 2 and 3: require approval
     return { approved: false, tier, tierLabel, reason: "requires_approval" };
   }
-
-  /**
-   * Check a batch of tool calls. Returns the ones needing approval.
-   */
   checkBatch(toolCalls: any) {
     const autoApproved: any[] = [];
     const needsApproval: any[] = [];
@@ -171,11 +152,6 @@ export default class AutoApprovalEngine {
 
     return { autoApproved, needsApproval };
   }
-
-  /**
-   * Create a beforeToolCall hook handler for AgentHooks.
-
-   */
   createHook() {
     return async (toolCall: any, _ctx: any) => {
       return this.check(toolCall);

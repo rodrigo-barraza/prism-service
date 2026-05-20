@@ -23,12 +23,6 @@ function prepareOllamaMessages(messages: ChatMessage[]) {
     return message;
   });
 }
-
-/**
- * Factory: create an Ollama provider instance targeting a specific baseUrl.
-
-
- */
 export function createOllamaProvider(baseUrl: string, instanceId: string = "ollama") {
   const getBaseUrl = () => baseUrl;
 
@@ -77,7 +71,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
                         outputTokens: (data as any).eval_count ?? 0,
           },
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("ollama", (error as Error).message, 500, error);
       }
@@ -117,7 +111,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
               }
             }
           }
-        } catch (unloadErr: any) {
+        } catch (unloadErr: unknown) {
           logger.warn(
                         `Ollama: could not check/unload models: ${(unloadErr as Error).message}`,
           );
@@ -212,7 +206,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
         } else {
           yield { type: "usage", usage: { inputTokens: 0, outputTokens: 0 } };
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
                 if ((error as Error).name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("ollama", (error as Error).message, 500, error);
@@ -273,7 +267,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
                     outputTokens: (data as any).eval_count || 0,
         };
         return { text, usage };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("ollama", (error as Error).message, 500, error);
       }
@@ -302,7 +296,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
         const data = await response.json();
         // Ollama returns { models: [{ name, model, size, ... }] }
                 return { models: (data as any).models || [] };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("ollama", (error as Error).message, 500, error);
       }

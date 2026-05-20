@@ -1,7 +1,3 @@
-/**
- * Type Index — barrel export for all domain types.
- */
-
 export type {
   ProviderOptions,
   GoogleGenerateConfig,

@@ -20,10 +20,6 @@ export function getTotalInputTokens(usage: any) {
     (usage.cacheCreationInputTokens || 0)
   );
 }
-
-/**
- * Create a fresh usage accumulator object with all token fields zeroed.
- */
 export function createUsageAccumulator() {
   return {
     inputTokens: 0,

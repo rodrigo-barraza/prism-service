@@ -163,11 +163,11 @@ router.get(
           await import("../wrappers/MongoWrapper.js");
                 const { MONGO_DB_NAME } = await import("../../config.js");
         const { COLLECTIONS } = await import("../constants.js");
-        const col = MongoWrapper.getCollection(
+        const collection = MongoWrapper.getCollection(
           MONGO_DB_NAME,
           COLLECTIONS.AGENT_SESSIONS,
         );
-        const session = await col.findOne(
+        const session = await collection.findOne(
           { id: agentSessionId },
           { projection: { workers: 1 } },
         );

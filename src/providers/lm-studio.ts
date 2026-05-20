@@ -291,11 +291,6 @@ function buildNativeInput(messages: ChatMessage[]) {
     typeof lastUser.content === "string" ? lastUser.content : "";
   return historyPrefix ? historyPrefix + currentText : currentText;
 }
-/**
- * Factory: create an LM Studio provider instance targeting a specific baseUrl.
-
-
- */
 export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm-studio") {
   const getBaseUrl = () => baseUrl;
   const MCP_SERVER_URL = DEFAULT_MCP_SERVER_URL;
@@ -349,7 +344,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         const result = { text, thinking, usage };
                 if (toolCalls) (result as any).toolCalls = toolCalls;
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("lm-studio", (error as Error).message, 500, error);
       }
@@ -652,7 +647,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
               }
             }
           }
-        } catch (loadCheckErr: any) {
+        } catch (loadCheckErr: unknown) {
           // If model load explicitly failed, re-throw so the generator exits
           // cleanly. runSingleModel will catch it and record an error result,
           // allowing the benchmark to continue to the next model.
@@ -824,7 +819,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         if (!nativeResponse.body) throw new Error("No response body");
         const nativeReader = nativeResponse.body.getReader();
         yield* parseNativeSSEStream((nativeReader as any), { signal: options.signal });
-      } catch (error: any) {
+      } catch (error: unknown) {
                 if ((error as Error).name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("lm-studio", (error as Error).message, 500, error);
@@ -949,7 +944,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           throw new Error("No embedding data in LM Studio response");
         }
         return { embedding, dimensions: embedding.length };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("lm-studio", (error as Error).message, 500, error);
       }
@@ -995,7 +990,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                     outputTokens: (data as any).usage?.completion_tokens || 0,
         };
         return { text, usage };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("lm-studio", (error as Error).message, 500, error);
       }
@@ -1086,14 +1081,11 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           }
         }
         return data;
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("lm-studio", (error as Error).message, 500, error);
       }
     },
-    /**
-     * Load a model into LM Studio memory.
-     */
     async loadModel(model: any, options: ProviderOptions = {}, signal: any) {
       const baseUrl = getBaseUrl();
             (logger.provider as any)(("LM Studio" as any), (`loadModel model=${model}` as any));
@@ -1118,7 +1110,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           throw new Error(`API error: ${response.status} ${errorText}`);
         }
         return response.json();
-      } catch (error: any) {
+      } catch (error: unknown) {
                 if ((error as Error).name === "AbortError") throw error; // Let AbortError propagate
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("lm-studio", (error as Error).message, 500, error);
@@ -1140,15 +1132,12 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
             await this.unloadModel(inst.id);
           }
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.warn(
                     `[LM-Studio] unloadModelByKey(${modelKey}) failed: ${(error as Error).message}`,
         );
       }
     },
-    /**
-     * Unload a model from LM Studio memory.
-     */
     async unloadModel(instanceId: string) {
       const baseUrl = getBaseUrl();
             (logger.provider as any)(("LM Studio" as any), (`unloadModel instanceId=${instanceId}` as any));
@@ -1163,7 +1152,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           throw new Error(`API error: ${response.status} ${errorText}`);
         }
         return response.json();
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
                 throw new ProviderError("lm-studio", (error as Error).message, 500, error);
       }

@@ -44,8 +44,4 @@ export type MongoFilter = Record<string, unknown>;
  * but semantically distinct for clarity.
  */
 export type MongoMatch = Record<string, unknown>;
-
-/**
- * Generic count map — used for `modelCounts`, `agentCounts`, etc.
- */
 export type CountMap = Record<string, number>;

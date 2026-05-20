@@ -231,25 +231,14 @@ function findStaleConversationalMemories(memories: any) {
 }
 
 // ─── Batch Building ──────────────────────────────────────────────────────────
-/**
- * Format a single coding-type memory into the text representation used in LLM input.
- */
 function formatMemoryEntry(m: any) {
     const age = daysSince((m.createdAt as any));
     return `- **ID**: ${m.id}\n  **Type**: ${m.type}\n  **Title**: ${m.title || (m.content ? (m.content as any).substring(0, 60) : "untitled")}\n  **Content**: ${m.content}\n  **Age**: ${age} days`;
 }
-
-/**
- * Format a conversational agent memory entry with source attribution.
- */
 function formatConversationalMemoryEntry(m: any) {
     const age = daysSince((m.createdAt as any));
   return `- **ID**: ${m.id}\n  **Category**: ${m.type}\n  **About**: ${m.aboutUsername || "any"} (${m.aboutUserId || "?"})\n  **Source**: ${m.sourceUsername || "any"} (${m.sourceUserId || "?"})\n  **Content**: ${m.content}\n  **Age**: ${age} days`;
 }
-
-/**
- * Build the LLM input for a conversational agent batch — includes observer/subject context.
- */
 function buildConversationalBatchInput(
   clusterBatch: any,
   staleBatch: any,
@@ -503,7 +492,7 @@ async function applyActions(
           `[MemoryConsolidation] Deleted "${action.id}" (${action.reason || ""})`,
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       results.errors++;
       logger.error(
                 `[MemoryConsolidation] Failed to apply action: ${(error as Error).message}`,
@@ -545,9 +534,6 @@ async function resetRunCount(project: any) {
   );
 }
 // ─── History & Cost Guard ────────────────────────────────────────────────────
-/**
- * Record a consolidation run for audit trail.
- */
 async function recordHistory(
   project: any,
   trigger: any,
@@ -665,7 +651,7 @@ async function processBatch(
       maxTokens: LLM_MAX_OUTPUT_TOKENS,
       temperature: 0.1,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     llmSuccess = false;
         llmError = (error as Error).message;
     logger.error(
@@ -1054,7 +1040,7 @@ const MemoryConsolidationService = {
           project,
           ...consolidationResult,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
                 logger.warn(`[MemoryConsolidation] Broadcast failed: ${(error as Error).message}`);
       }
     }
@@ -1096,15 +1082,12 @@ const MemoryConsolidationService = {
           ),
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(
                 `[MemoryConsolidation] checkAndRun failed: ${(error as Error).message}`,
       );
     }
   },
-  /**
-   * Get consolidation run history for a project.
-   */
     async getHistory(project: any, limit: any = 10) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return [];

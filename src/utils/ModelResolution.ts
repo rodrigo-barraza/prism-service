@@ -145,7 +145,7 @@ export async function resolveModelForInstances(modelKey: any, siblings: any) {
     );
 
     return { usable, modelOverrides };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.warn(
             `[ModelResolution] Model availability check failed: ${(error as Error).message}`,
     );

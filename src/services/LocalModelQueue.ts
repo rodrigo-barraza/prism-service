@@ -83,10 +83,6 @@ class LocalModelQueue {
     if (isInstance(provider)) return true;
     return false;
   }
-
-  /**
-   * Get or create the semaphore queue for an instance.
-   */
   _getQueue(instanceId: string): InstanceQueue {
     const existing = queues.get(instanceId);
     if (existing) return existing;

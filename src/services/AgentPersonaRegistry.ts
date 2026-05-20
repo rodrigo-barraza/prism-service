@@ -1212,11 +1212,6 @@ PERSONAS.set("MEEPO", {
 // ── Registry API ─────────────────────────────────────────────────
 
 const AgentPersonaRegistry = {
-  /**
-   * Get a persona by agent identifier.
-
-
-   */
   get(agentId: any) {
     if (!agentId) return null;
         const persona = PERSONAS.get((agentId as any).toUpperCase());
@@ -1226,10 +1221,6 @@ const AgentPersonaRegistry = {
     }
     return persona;
   },
-
-  /**
-   * List all registered personas.
-   */
   list() {
     return [...PERSONAS.values()]
             .sort((a: any, b: any) => (a.displayOrder ?? 100) - (b.displayOrder ?? 100))
@@ -1240,21 +1231,9 @@ const AgentPersonaRegistry = {
         ...(p.custom ? { custom: true } : {}),
       }));
   },
-
-  /**
-   * Check if a persona exists.
-
-
-   */
   has(agentId: any) {
         return PERSONAS.has((agentId || "").toUpperCase());
   },
-
-  /**
-   * Check if a project belongs to a registered agent.
-
-
-   */
   isAgentProject(project: any) {
     if (!project) return false;
         for ( const persona of PERSONAS.values()) {
@@ -1296,11 +1275,6 @@ const AgentPersonaRegistry = {
       `[AgentPersonaRegistry] Registered custom agent: "${document.name}" (${document.agentId}) with ${persona.enabledTools.length} tools`,
     );
   },
-
-  /**
-   * Unregister a persona by agent ID (only custom agents should be removed).
-
-   */
   unregister(agentId: any) {
     if (!agentId) return;
         const key = (agentId as any).toUpperCase();
@@ -1333,7 +1307,7 @@ const AgentPersonaRegistry = {
       logger.info(
         `[AgentPersonaRegistry] Loaded ${agents.length} custom agent(s) from database`,
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn(
                 `[AgentPersonaRegistry] Failed to load custom agents: ${(error as Error).message}`,
       );

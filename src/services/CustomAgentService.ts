@@ -32,50 +32,29 @@ function getCollection() {
 }
 
 const CustomAgentService = {
-  /**
-   * List all custom agents.
-
-   */
   async list() {
-    const col = getCollection();
-    if (!col) return [];
-    return col.find({}).sort({ createdAt: -1 }).toArray();
+    const collection = getCollection();
+    if (!collection) return [];
+    return collection.find({}).sort({ createdAt: -1 }).toArray();
   },
-
-  /**
-   * Get a single custom agent by MongoDB _id.
-
-
-   */
   async get(id: string) {
-    const col = getCollection();
-    if (!col) return null;
-    return col.findOne({ _id: new ObjectId(id) });
+    const collection = getCollection();
+    if (!collection) return null;
+    return collection.findOne({ _id: new ObjectId(id) });
   },
-
-  /**
-   * Get a custom agent by its derived agentId.
-
-
-   */
   async getByAgentId(agentId: Record<string, unknown>) {
-    const col = getCollection();
-    if (!col) return null;
-    return col.findOne({ agentId });
+    const collection = getCollection();
+    if (!collection) return null;
+    return collection.findOne({ agentId });
   },
-
-  /**
-   * Create a new custom agent.
-
-   */
   async create(data: Record<string, unknown>) {
-    const col = getCollection();
-    if (!col) throw new Error("Database not available");
+    const collection = getCollection();
+    if (!collection) throw new Error("Database not available");
 
         const agentId = deriveAgentId((data.name as any));
 
     // Check for duplicate agentId
-    const existing = await col.findOne({ agentId });
+    const existing = await collection.findOne({ agentId });
     if (existing) {
       throw new Error(`Agent with ID "${agentId}" already exists`);
     }
@@ -99,21 +78,15 @@ const CustomAgentService = {
       updatedAt: new Date().toISOString(),
     };
 
-    const result = await col.insertOne(document);
+    const result = await collection.insertOne(document);
     logger.info(
       `[CustomAgentService] Created agent "${document.name}" (${document.agentId})`,
     );
     return { ...document, _id: result.insertedId };
   },
-
-  /**
-   * Update an existing custom agent.
-
-
-   */
   async update(id: string, updates: Record<string, unknown>) {
-    const col = getCollection();
-    if (!col) throw new Error("Database not available");
+    const collection = getCollection();
+    if (!collection) throw new Error("Database not available");
 
     // If name changed, re-derive agentId
     const setFields = { ...updates, updatedAt: new Date().toISOString() };
@@ -124,26 +97,20 @@ const CustomAgentService = {
     // Remove _id from $set if present
         delete (setFields as any)._id;
 
-    await col.updateOne({ _id: new ObjectId(id) }, { $set: setFields });
+    await collection.updateOne({ _id: new ObjectId(id) }, { $set: setFields });
 
-    const updated = await col.findOne({ _id: new ObjectId(id) });
+    const updated = await collection.findOne({ _id: new ObjectId(id) });
     logger.info(
       `[CustomAgentService] Updated agent "${updated?.name}" (${updated?.agentId})`,
     );
     return updated;
   },
-
-  /**
-   * Delete a custom agent.
-
-
-   */
   async delete(id: string) {
-    const col = getCollection();
-    if (!col) throw new Error("Database not available");
+    const collection = getCollection();
+    if (!collection) throw new Error("Database not available");
 
-    const document = await col.findOne({ _id: new ObjectId(id) });
-    const result = await col.deleteOne({ _id: new ObjectId(id) });
+    const document = await collection.findOne({ _id: new ObjectId(id) });
+    const result = await collection.deleteOne({ _id: new ObjectId(id) });
     if (document) {
       logger.info(
         `[CustomAgentService] Deleted agent "${document.name}" (${document.agentId})`,

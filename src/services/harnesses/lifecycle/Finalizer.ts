@@ -183,7 +183,7 @@ export async function finalizeTextGeneration(
         username,
       );
       audioRef = ref;
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(
                 `[chat] Failed to build/upload Live API audio WAV: ${(error as Error).message}`,
       );

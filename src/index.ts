@@ -263,7 +263,7 @@ setupWebSocket((wss as any));
       ]);
       logger.success("Database indexes ensured");
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
         logger.error(`Failed to ensure indexes: ${(error as Error).message}`);
   }
 
@@ -289,7 +289,7 @@ setupWebSocket((wss as any));
         );
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
         logger.error(`Failed to clear stale isGenerating flags: ${(error as Error).message}`);
   }
 
@@ -326,7 +326,7 @@ setupWebSocket((wss as any));
         );
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
         logger.error(`Agent session migration failed: ${(error as Error).message}`);
   }
 
@@ -335,7 +335,7 @@ setupWebSocket((wss as any));
     const { default: AgentPersonaRegistryCustom } =
       await import("./services/AgentPersonaRegistry.js");
     await AgentPersonaRegistryCustom.loadCustomAgents();
-  } catch (error: any) {
+  } catch (error: unknown) {
         logger.warn(`Custom agent loading failed: ${(error as Error).message}`);
   }
 
@@ -354,7 +354,7 @@ setupWebSocket((wss as any));
     if (mcpDb) {
             await MCPClientService.connectAllFromDB((mcpDb as any), codingProject, "admin");
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
         logger.warn(`MCP auto-connect failed: ${(error as Error).message}`);
   }
 
@@ -396,14 +396,14 @@ setupWebSocket((wss as any));
               username: "system",
               trigger: "scheduled",
             });
-          } catch (error: any) {
+          } catch (error: unknown) {
             logger.error(
                             `[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${(error as Error).message}`,
             );
           }
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(
                 `[AutoDream] Scheduled consolidation sweep failed: ${(error as Error).message}`,
       );

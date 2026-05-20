@@ -46,7 +46,7 @@ export default class AgenticToolResolver {
           `[AgenticToolResolver] Loaded ${customToolsData.length} custom tool(s) from MongoDB: [${customToolsData.map((t: any) => t.name).join(", ")}]`,
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.warn(`Failed to fetch custom tools for loop: ${(error as Error).message}`);
     }
 

@@ -635,9 +635,9 @@ export default class BaseAgenticHarness {
             `[AgenticLoop] Persisted ${workers.length} worker(s) to session ${agentSessionId}`,
           );
         }
-      } catch (error: any) {
-        const msg = error instanceof Error ? (error as Error).message : String(error);
-        logger.error(`[AgenticLoop] Failed to persist workers: ${msg}`);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? (error as Error).message : String(error);
+        logger.error(`[AgenticLoop] Failed to persist workers: ${errorMessage}`);
       }
     }
 
@@ -708,9 +708,9 @@ export default class BaseAgenticHarness {
           username,
         );
         minioRef = ref;
-      } catch (error: any) {
-        const msg = error instanceof Error ? (error as Error).message : String(error);
-        logger.error(`MinIO upload failed: ${msg}`);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? (error as Error).message : String(error);
+        logger.error(`MinIO upload failed: ${errorMessage}`);
       }
       const imgRef =
         minioRef ||

@@ -22,9 +22,6 @@ async function getExtractionConfig() {
  * this are considered duplicates and the newer one is skipped.
  */
 const DUPLICATE_THRESHOLD = 0.92;
-/**
- * Minimum cosine similarity for a memory to be considered relevant during search.
- */
 const RELEVANCE_THRESHOLD = 0.3;
 /**
  * Valid memory types — inspired by Claude Code's memdir taxonomy.
@@ -35,17 +32,9 @@ const RELEVANCE_THRESHOLD = 0.3;
  */
 export const CODING_MEMORY_TYPES = ["user", "feedback", "project", "reference"];
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-/**
- * Generate an embedding for text via EmbeddingService.
-
-
- */
 async function generateEmbedding(text: any, options: any = {}) {
   return EmbeddingService.embed(text, { source: "memory", ...options });
 }
-/**
- * Calculate days elapsed since a timestamp.
- */
 function memoryAgeDays(createdAt: any) {
     return daysSinceIso((createdAt as any));
 }
@@ -143,7 +132,7 @@ ${participantList}`;
       maxTokens: 1000,
       temperature: 0.1,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     success = false;
         errorMessage = (error as Error).message;
     throw error;
@@ -196,9 +185,6 @@ ${participantList}`;
  */
 const MemoryService = {
   // ── Store ──────────────────────────────────────────────────────────────────
-  /**
-   * Store a single memory with embedding generation and duplicate detection.
-   */
   async store({
     agent,
     project,
@@ -275,9 +261,6 @@ const MemoryService = {
     return memory;
   },
   // ── LUPOS: Extract & Store ─────────────────────────────────────────────────
-  /**
-   * Extract and store LUPOS memories from a Discord conversation chunk.
-   */
   async extractAndStore({
     guildId,
     channelId,
@@ -338,7 +321,7 @@ const MemoryService = {
             `[MemoryService] Stored: "${fact.fact.substring(0, 60)}..." (about: ${fact.aboutUsername})`,
           );
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
                 logger.error(`[MemoryService] Failed to store fact: ${(error as Error).message}`);
       }
     }
@@ -421,9 +404,6 @@ const MemoryService = {
     return scored;
   },
   // ── List ────────────────────────────────────────────────────────────────────
-  /**
-   * List memories for a specific agent, optionally filtered by project/guild/user.
-   */
   async list({ agent, project, guildId, userId, limit = 50, skip = 0 }: any) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     const filter: any = {};
@@ -470,24 +450,15 @@ const MemoryService = {
       .toArray();
   },
   // ── Delete / Remove ────────────────────────────────────────────────────────
-  /**
-   * Delete a specific memory by its id field.
-   */
   async delete(memoryId: any) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     const result = await collection.deleteOne({ id: memoryId });
     return result.deletedCount > 0;
   },
-  /**
-   * Alias for delete — used by callers that preferred the AgentMemoryService naming.
-   */
   async remove(memoryId: any) {
     return this.delete(memoryId);
   },
   // ── Update ─────────────────────────────────────────────────────────────────
-  /**
-   * Update an existing memory.
-   */
   async update(memoryId: any, { title, content, type }: any) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     const $set = { updatedAt: new Date().toISOString() };
@@ -526,9 +497,6 @@ const MemoryService = {
       .join("\n");
   },
   // ── Indexes ────────────────────────────────────────────────────────────────
-  /**
-   * Ensure indexes exist on the unified memories collection.
-   */
   async ensureIndexes() {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return;

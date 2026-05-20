@@ -116,10 +116,6 @@ class MutationQueue {
       handle.release();
     }
   }
-
-  /**
-   * Get the current lock status for debugging.
-   */
   getStatus() {
     const entries: Array<{
       filePath: string;
@@ -135,10 +131,6 @@ class MutationQueue {
     }
     return entries;
   }
-
-  /**
-   * Force-release all locks. Use for cleanup on abort/shutdown.
-   */
   releaseAll(): void {
     for (const [filePath] of this._locks) {
       this.release(filePath);

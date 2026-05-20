@@ -1,10 +1,6 @@
 import crypto from "crypto";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import logger from "../utils/logger.ts";
-
-/**
- * MIME type → file extension map for common file types.
- */
 const MIME_TO_EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
@@ -49,22 +45,15 @@ export interface FileServiceInterface {
  * FileService — abstracts file storage with MinIO primary / MongoDB inline fallback.
  *
  * When MinIO is available, files are uploaded to the bucket and a lightweight
- * reference string `minio://files/<uuid>.<ext>` is returned.
+ * reference string `minio://files/<uuid>.<fileExtension>` is returned.
  *
  * When MinIO is unavailable, the original base64 data URL is returned unchanged,
  * so it continues to be stored inline in MongoDB.
  */
 const FileService: FileServiceInterface = {
-  /**
-   * Whether external (MinIO) storage is active.
-   */
   isExternalStorage(): boolean {
     return MinioWrapper.isAvailable();
   },
-
-  /**
-   * Upload a file from a base64 data URL.
-   */
   async uploadFile(
     dataUrl: string,
     category = "uploads",
@@ -87,10 +76,10 @@ const FileService: FileServiceInterface = {
     const contentType = match[1];
     const base64Data = match[2];
     const buffer = Buffer.from(base64Data, "base64");
-    const ext = MIME_TO_EXT[contentType] || "bin";
+    const fileExtension = MIME_TO_EXT[contentType] || "bin";
 
-    // Build path: projects/{project}/{username}/{category}/{uuid}.{ext}
-    // Falls back to flat {category}/{uuid}.{ext} when project/username not provided
+    // Build path: projects/{project}/{username}/{category}/{uuid}.{fileExtension}
+    // Falls back to flat {category}/{uuid}.{fileExtension} when project/username not provided
     let key: string;
     if (project && username) {
       // Sanitize: never use raw IP addresses as path segments — they cause
@@ -99,9 +88,9 @@ const FileService: FileServiceInterface = {
         /^\d{1,3}(\.\d{1,3}){3}$/.test(username) || username.includes(":")
           ? "anonymous"
           : username;
-      key = `projects/${project}/${safeUsername}/${category}/${crypto.randomUUID()}.${ext}`;
+      key = `projects/${project}/${safeUsername}/${category}/${crypto.randomUUID()}.${fileExtension}`;
     } else {
-      key = `${category}/${crypto.randomUUID()}.${ext}`;
+      key = `${category}/${crypto.randomUUID()}.${fileExtension}`;
     }
 
     await MinioWrapper.upload(key, buffer, contentType);
@@ -115,10 +104,6 @@ const FileService: FileServiceInterface = {
       contentType,
     };
   },
-
-  /**
-   * Get a file stream from a MinIO reference.
-   */
   async getFile(key: string): Promise<{ stream: any; contentType: string } | null> {
     if (!MinioWrapper.isAvailable()) return null;
 
@@ -140,17 +125,9 @@ const FileService: FileServiceInterface = {
       return null;
     }
   },
-
-  /**
-   * Check if a string is a MinIO reference.
-   */
   isMinioRef(ref: any): ref is string {
     return typeof ref === "string" && ref.startsWith("minio://");
   },
-
-  /**
-   * Extract the object key from a MinIO reference.
-   */
   extractKey(ref: string): string {
     return ref.replace("minio://", "");
   },

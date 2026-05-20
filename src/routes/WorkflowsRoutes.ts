@@ -35,7 +35,7 @@ async function uploadIfDataUrl(
         username,
       );
       return ref;
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`Workflow file upload failed: ${(error as Error).message}`);
       return value;
     }
@@ -264,10 +264,6 @@ function resolveWorkflowFileRefs(workflow: any, baseUrl: any) {
 
   return workflow;
 }
-
-/**
- * Build the external base URL from the request (handles proxies, HTTPS, etc.).
- */
 function getBaseUrl(req: any) {
     const proto = (req as any).headers["x-forwarded-proto"] || req.protocol || "http";
     const host = (req as any).headers["x-forwarded-host"] || (req as any).get("host");
@@ -321,7 +317,7 @@ router.get(
         .toArray();
 
       res.json(workflows);
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`GET /workflows error: ${(error as Error).message}`);
       next(error);
     }
@@ -353,7 +349,7 @@ router.get(
             resolveWorkflowFileRefs(workflow, (baseUrl as any));
 
       res.json(workflow);
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`GET /workflows/:id error: ${(error as Error).message}`);
       next(error);
     }
@@ -440,7 +436,7 @@ router.post(
 
       const result = await db.collection(WORKFLOWS_COL).insertOne(workflow);
       res.json({ success: true, id: result.insertedId.toString() });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`POST /workflows error: ${(error as Error).message}`);
       next(error);
     }
@@ -497,7 +493,7 @@ router.put(
         return res.status(404).json({ error: "Workflow not found" });
 
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`PUT /workflows/:id error: ${(error as Error).message}`);
       next(error);
     }
@@ -557,7 +553,7 @@ router.patch(
       }
 
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(
                 `PATCH /workflows/:id/conversations error: ${(error as Error).message}`,
       );
@@ -585,7 +581,7 @@ router.delete(
 
       await db.collection(WORKFLOWS_COL).deleteOne(filter);
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.error(`DELETE /workflows/:id error: ${(error as Error).message}`);
       next(error);
     }

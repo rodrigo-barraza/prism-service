@@ -40,7 +40,7 @@ async function* parseNdjsonStream(body: any) {
           if (chunk.result) {
             yield chunk.result;
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
                     logger.warn(`[Inworld] NDJSON parse error: ${(error as Error).message}`);
         }
       }
@@ -105,7 +105,7 @@ const inworldProvider = ({
 
       const stream = Readable.from(audioChunks());
       return { stream, contentType: "audio/mpeg" };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
             throw new ProviderError("inworld", (error as Error).message, 500, error);
     }
@@ -177,7 +177,7 @@ const inworldProvider = ({
           yield Buffer.from(result.audioContent, "base64");
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
             if ((error as Error).name === "AbortError") return;
       if (error instanceof ProviderError) throw error;
             throw new ProviderError("inworld", (error as Error).message, 500, error);
