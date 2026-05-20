@@ -444,16 +444,15 @@ export default class SystemPromptAssembler {
     if (!isDirectMode && (codingFallback || persona?.usesCodingGuidelines)) {
             const enabledSet = context.enabledTools ? new Set(context.enabledTools) : null;
       const coordinatorAvailable = enabledSet
-                ? COORDINATOR_ONLY_TOOLS.some(((t: any) => enabledSet.has(t) as any as (value: string, index: number, array: string[]) => any))
+        ? COORDINATOR_ONLY_TOOLS.some((t: string) => enabledSet.has(t))
         : true; // No filter = all tools available including coordinator
 
       if (coordinatorAvailable) {
         const allSchemas = ToolOrchestratorService.getToolSchemas();
         const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
         const workerTools = allSchemas
-                    .map(((t: any) => t.name as any as (value: any, index: number, array: any[]) => any))
-                    // @ts-ignore - TODO: strict typing
-                    .filter((name: string) => !coordinatorSet.has(name));
+          .map((t: any) => t.name as string)
+          .filter((name: string) => !coordinatorSet.has(name));
                 sections.push((getCoordinatorPromptAddendum as any)({ workerTools }));
       }
     }

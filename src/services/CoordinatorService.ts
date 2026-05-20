@@ -35,7 +35,7 @@ import { resolveModelForInstances } from "../utils/ModelResolution.ts";
 //      Called when the LLM invokes team_create / send_message / stop_agent
 // ────────────────────────────────────────────────────────────
 
-function getDefaultWorkspaceRoot(overrideRoot: any) {
+function getDefaultWorkspaceRoot(overrideRoot?: any) {
   return (
     overrideRoot ||
     ToolOrchestratorService.getWorkspaceRoot() ||
@@ -621,8 +621,8 @@ export default class CoordinatorService {
       status: "running",
       output: "",
       toolCalls: [],
-      diff: null,
-      error: null,
+      diff: null as any,
+      error: null as string | null,
       startedAt: Date.now(),
       durationMs: 0,
       totalCost: null,
@@ -671,8 +671,7 @@ export default class CoordinatorService {
                 `[Coordinator] Worker ${agentId} loop error: ${(error as Error).message}`,
       );
       workerState.status = "failed";
-            // @ts-ignore - TODO: strict typing
-            workerState.error = (error as Error).message;
+      workerState.error = (error as Error).message;
       workerState.durationMs = Date.now() - workerState.startedAt;
 
       // Clean up worktree on failure to prevent orphaned branches
@@ -1027,8 +1026,7 @@ export default class CoordinatorService {
             let siblings = getInstancesByType((providerType as any));
 
       logger.info(
-                // @ts-ignore - TODO: strict typing
-                `[Coordinator] Team "${name}": providerName=${providerName}, providerType=${providerType}, siblings=${siblings.length} [${siblings.map(((s: any) => `${s.id}(c=${s.concurrency})` as any as (value: InstanceEntry, index: number, array: InstanceEntry[]) => string)).join(", ")}]`,
+        `[Coordinator] Team "${name}": providerName=${providerName}, providerType=${providerType}, siblings=${siblings.length} [${siblings.map((s: any) => `${s.id}(c=${s.concurrency})`).join(", ")}]`,
       );
 
       // Run model availability checks once for the entire team
@@ -1094,43 +1092,38 @@ export default class CoordinatorService {
       }
     }
 
-    // Spawn all members in parallel — with pre-assigned instances
     const results = await Promise.allSettled(
-            members.map((member: any, i: any) =>
+      members.map((member: any, i: number) =>
         CoordinatorService.spawnFromTool({
           description: `[${name}] ${member.description}`,
           prompt: member.prompt,
           files: member.files,
           // For local providers, don't pass the LLM's model — the pre-assignment
           // already resolved the correct GGUF model identifier.
-                    model: localModelQueue.isLocal((providerName as any))
+          model: localModelQueue.isLocal((providerName as any))
             ? undefined
             : member.model,
-                    // @ts-ignore - TODO: strict typing
-                    assignedProvider: assignments[(i as string)]?.provider || undefined,
-                    // @ts-ignore - TODO: strict typing
-                    assignedModel: assignments[(i as string)]?.model || undefined,
+          assignedProvider: assignments[i]?.provider || undefined,
+          assignedModel: assignments[i]?.model || undefined,
           coordinatorCtx,
         }),
       ),
     );
 
     // Collect agentIds and results
-        const memberResults = results.map((r: any, i: any) => {
+    const memberResults = results.map((r: any, i: number) => {
       if (r.status === "fulfilled") {
         return {
           index: i,
-                    // @ts-ignore - TODO: strict typing
-                    description: members[(i as string)].description,
-                    ...r.value,
+          description: members[i].description,
+          ...r.value,
         };
       }
       return {
         index: i,
-                // @ts-ignore - TODO: strict typing
-                description: members[(i as string)].description,
+        description: members[i].description,
         status: "failed",
-                error: (r.reason as any)?.message || "Unknown error",
+        error: (r.reason as any)?.message || "Unknown error",
       };
     });
 
@@ -1552,10 +1545,9 @@ export default class CoordinatorService {
       // Default: all tools minus coordinator-only (for coding agents)
       const allSchemas = ToolOrchestratorService.getToolSchemas();
       const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
-            workerEnabledTools = allSchemas
-                .map(((t: any) => t.name as any as (value: any, index: number, array: any[]) => any))
-                // @ts-ignore - TODO: strict typing
-                .filter((name: string) => !coordinatorSet.has(name));
+      workerEnabledTools = allSchemas
+        .map((t: any) => t.name as string)
+        .filter((name: string) => !coordinatorSet.has(name));
     }
 
         const workerProvider = getProvider((worker.providerName as any));
@@ -1803,8 +1795,7 @@ export default class CoordinatorService {
     return {
       taskId: crypto.randomUUID(),
       task,
-            // @ts-ignore - TODO: strict typing
-            repoPath: repoPath || getDefaultWorkspaceRoot(),
+      repoPath: repoPath || getDefaultWorkspaceRoot(),
       subTasks,
       summary: parsed.summary || `Decomposed into ${subTasks.length} sub-tasks`,
       status: "planned",
@@ -1981,9 +1972,8 @@ export default class CoordinatorService {
       const allSchemas = ToolOrchestratorService.getToolSchemas();
       const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
       const workerEnabledTools = allSchemas
-                .map(((t: any) => t.name as any as (value: any, index: number, array: any[]) => any))
-                // @ts-ignore - TODO: strict typing
-                .filter((name: string) => !coordinatorSet.has(name));
+        .map((t: any) => t.name as string)
+        .filter((name: string) => !coordinatorSet.has(name));
 
       let resolvedProviderName = providerName || DECOMPOSITION_PROVIDER;
       let resolvedModel = model || COORDINATOR_DECOMPOSITION_MODEL;
@@ -2049,7 +2039,6 @@ export default class CoordinatorService {
         options: {
           autoApprove: true,
           agenticLoopEnabled: true,
-                    // @ts-ignore - TODO: strict typing
                     enabledTools: workerEnabledTools,
           maxIterations: MAX_WORKER_ITERATIONS,
           maxTokens: 8192,
@@ -2109,8 +2098,7 @@ export default class CoordinatorService {
 
         for ( const worker of completedWorkers) {
       const mergeResult = await mergeWorktree(
-                // @ts-ignore - TODO: strict typing
-                task.repoPath || getDefaultWorkspaceRoot(),
+        task.repoPath || getDefaultWorkspaceRoot(),
         worker.branchName,
         `[coordinator] ${worker.id}: ${worker.instruction.slice(0, 80)}`,
       );
@@ -2166,8 +2154,7 @@ export default class CoordinatorService {
     const task = activeTasks.get(taskId);
     if (!task) return;
 
-        // @ts-ignore - TODO: strict typing
-        const repoPath = task.repoPath || getDefaultWorkspaceRoot();
+    const repoPath = task.repoPath || getDefaultWorkspaceRoot();
 
         for ( const worker of task.workers) {
       if (worker.worktreePath) {

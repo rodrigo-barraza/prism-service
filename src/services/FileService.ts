@@ -32,6 +32,19 @@ interface MinioStatResult {
   etag?: string;
 }
 
+export interface FileServiceInterface {
+  isExternalStorage(): boolean;
+  uploadFile(
+    dataUrl: string,
+    category?: string,
+    project?: string | null,
+    username?: string | null,
+  ): Promise<{ ref: string; size: number; contentType: string }>;
+  getFile(key: string): Promise<{ stream: any; contentType: string } | null>;
+  isMinioRef(ref: any): ref is string;
+  extractKey(ref: string): string;
+}
+
 /**
  * FileService — abstracts file storage with MinIO primary / MongoDB inline fallback.
  *
@@ -41,7 +54,7 @@ interface MinioStatResult {
  * When MinIO is unavailable, the original base64 data URL is returned unchanged,
  * so it continues to be stored inline in MongoDB.
  */
-const FileService = ({
+const FileService: FileServiceInterface = {
   /**
    * Whether external (MinIO) storage is active.
    */
@@ -126,7 +139,7 @@ const FileService = ({
     };
 
     try {
-            return await tryKey(key);
+      return await tryKey(key);
     } catch {
       logger.error(`FileService: failed to get ${key}`);
       return null;
@@ -148,6 +161,6 @@ const FileService = ({
   extractKey(ref: string): string {
     return ref.replace("minio://", "");
   },
-} as any as { stream: any; contentType: string; });
+};
 
 export default FileService;

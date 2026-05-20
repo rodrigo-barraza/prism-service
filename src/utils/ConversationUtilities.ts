@@ -6,25 +6,22 @@ import logger from "./logger.ts";
 /**
  * Mark a conversation as generating (or not). Fire-and-forget with
  * error logging — the caller should not await or chain on this.
- *
-
-
  */
 export function markGenerating(
-  conversationId: Record<string, unknown>,
-  project: Record<string, unknown>,
+  conversationId: string | null | undefined,
+  project: string,
   username: string,
-  generating: Record<string, unknown>,
-  opts: Record<string, unknown>,
-) {
+  generating: boolean,
+  opts: { collection?: string; agent?: string } = {},
+): void {
   if (!conversationId) return;
-  (ConversationService as any).setGenerating(
+  ConversationService.setGenerating(
     conversationId,
     project,
     username,
     generating,
     opts,
-  ).catch((error: Record<string, unknown>) =>
+  ).catch((error: any) =>
     logger.error(
       `Failed to ${generating ? "set" : "clear"} isGenerating: ${error.message}`,
     ),
@@ -38,21 +35,18 @@ export function markGenerating(
  * IMPORTANT: isGenerating is always cleared, even when appendMessages
  * fails — preventing sessions from being permanently stuck as
  * "generating" when the $push operation encounters errors.
- *
-
-
  */
 export function appendAndFinalize(
-  conversationId: Record<string, unknown>,
-  project: Record<string, unknown>,
+  conversationId: string | null | undefined,
+  project: string,
   username: string,
-  messagesToAppend: Record<string, unknown>,
-  meta: Record<string, unknown>,
-  opts: Record<string, unknown>,
-) {
+  messagesToAppend: any[],
+  meta: any,
+  opts: { collection?: string } = {},
+): void {
   if (!conversationId) return;
 
-  (ConversationService as any).appendMessages(
+  ConversationService.appendMessages(
     conversationId,
     project,
     username,
@@ -61,15 +55,15 @@ export function appendAndFinalize(
     opts,
   )
     .then(() =>
-      (ConversationService as any).setGenerating(
+      ConversationService.setGenerating(
         conversationId,
         project,
         username,
-                (false as any),
+        false,
         opts,
       ),
     )
-    .catch((error: Record<string, unknown>) => {
+    .catch((error: any) => {
       logger.error(
         `Failed to append ${messagesToAppend?.length ?? 0} messages to ${conversationId} ` +
           `(project=${project}, collection=${opts?.collection || "conversations"}): ${error.message}`,
@@ -77,13 +71,13 @@ export function appendAndFinalize(
 
       // Always clear isGenerating even on failure — prevents sessions
       // from being permanently stuck as "generating" on the next page load.
-      (ConversationService as any).setGenerating(
+      ConversationService.setGenerating(
         conversationId,
         project,
         username,
-                (false as any),
+        false,
         opts,
-      ).catch((clearErr: Record<string, unknown>) =>
+      ).catch((clearErr: any) =>
         logger.error(
           `Failed to clear isGenerating after append failure: ${clearErr.message}`,
         ),

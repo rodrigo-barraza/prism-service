@@ -42,6 +42,7 @@ import {
   appendAndFinalize,
 } from "../utils/ConversationUtilities.ts";
 import { handleSseRequest, handleJsonRequest } from "../utils/SseUtilities.ts";
+import { SseEvent } from "../types/SseTypes.ts";
 import { ChatRequestSchema } from "../types/index.ts";
 
 const router = express.Router();
@@ -58,28 +59,26 @@ const router = express.Router();
  *  - minio://...       → download from MinIO (original unchanged), provider gets data URL
  *  - http(s)://...     → fetch (original unchanged), provider gets data URL
  */
-async function resolveImageRefs(messages: any, project: any, username: string) {
+async function resolveImageRefs(messages: any[], project: any, username: string) {
   // Deep copy for the provider — images will be data URLs
-    const providerMessages = (messages as any).map((m: any) => ({ ...m }));
-    for (let i = 0; i < (messages as any).length; i++) {
+  const providerMessages = messages.map((m: any) => ({ ...m }));
+  for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
     // ── Resolve media array fields: images, audio, video, pdf ──
-        for ( const field of ["images", "audio", "video", "pdf"]) {
-            const array = (message as any)[field];
+    for (const field of ["images", "audio", "video", "pdf"]) {
+      const array = (message as any)[field];
       if (array && Array.isArray(array) && array.length > 0) {
-                const providerArr: any[] = [];
-                const storageArr: any[] = [];
+        const providerArr: any[] = [];
+        const storageArr: any[] = [];
         await Promise.all(
-                    array.map(async (ref: any, j: any) => {
+          array.map(async (ref: any, j: number) => {
             const resolved = await resolveMediaRef(ref, project, username);
-                        // @ts-ignore - TODO: strict typing
-                        providerArr[(j as string)] = resolved.providerRef;
-                        // @ts-ignore - TODO: strict typing
-                        storageArr[(j as string)] = resolved.storageRef;
+            providerArr[j] = resolved.providerRef;
+            storageArr[j] = resolved.storageRef;
           }),
         );
-                providerMessages[i][field] = providerArr;
-                (messages as any)[i][field] = storageArr;
+        providerMessages[i][field] = providerArr;
+        message[field] = storageArr;
       }
     }
   }
@@ -437,8 +436,7 @@ async function prepareGenerationContext(
         }
         logger.info(
           `[chat] ⚖️ Load balance: ${providerName} → ${bestId} ` +
-                        // @ts-ignore - TODO: strict typing
-                        `(model="${resolvedModel}", ${siblings.map(((s: any) => `${s.id}:${(s as any).concurrency - localModelQueue._getQueue((s.id as any)).activeCount}free` as any as (value: InstanceEntry, index: number, array: InstanceEntry[]) => string)).join(", ")})`,
+          `(model="${resolvedModel}", ${siblings.map((s: any) => `${s.id}:${s.concurrency - localModelQueue._getQueue(s.id).activeCount}free`).join(", ")})`,
         );
         providerName = bestId;
       }
@@ -627,19 +625,19 @@ export async function handleConversation(
     } finally {
       if (localRelease) {
                 localRelease();
+        localRelease();
         logger.info(`[chat] 🔓 Released local GPU lock for ${resolvedModel}`);
       }
     }
   } catch (error: any) {
     markGenerating(
-            (conversationId as any),
-      (project as any),
-      (username as any),
-      // @ts-ignore - TODO: strict typing
+      conversationId,
+      project,
+      username,
       false,
-            getCollectionOpts((project as any)),
+      getCollectionOpts(project),
     );
-        const totalSec = (performance.now() - (requestStart as any)) / 1000;
+    const totalSec = (performance.now() - requestStart) / 1000;
     RequestLogger.logChatGeneration({
       requestId,
       endpoint: "/chat",
@@ -667,8 +665,7 @@ export async function handleConversation(
  *
  * Used exclusively by the /agent route.
  */
-// @ts-ignore - TODO: strict typing
-export async function handleAgent(params: any, emit: (event: import("../utils/SseUtilities.ts").SseEvent) => void, { signal }: { signal?: AbortSignal } = {}) {
+export async function handleAgent(params: any, emit: (event: SseEvent) => void, { signal }: { signal?: AbortSignal } = {}) {
   let context: any;
   try {
     context = await prepareGenerationContext(params, emit, { signal });
@@ -703,12 +700,11 @@ export async function handleAgent(params: any, emit: (event: import("../utils/Ss
   // GET /agent-sessions/:id never 404s while the loop is running
   // (e.g. when the user switches away and back during generation).
   markGenerating(
-        (agentSessionId as any),
-    (project as any),
-    (username as any),
-    // @ts-ignore - TODO: strict typing
+    agentSessionId,
+    project,
+    username,
     true,
-        { ...getCollectionOpts((project as any)), agent },
+    { ...getCollectionOpts(project), agent },
   );
   try {
     try {
@@ -762,12 +758,11 @@ export async function handleAgent(params: any, emit: (event: import("../utils/Ss
     }
   } catch (error: any) {
     markGenerating(
-            (agentSessionId as any),
-      (project as any),
-      (username as any),
-      // @ts-ignore - TODO: strict typing
+      agentSessionId,
+      project,
+      username,
       false,
-            getCollectionOpts((project as any)),
+      getCollectionOpts(project),
     );
         const totalSec = (performance.now() - (requestStart as any)) / 1000;
     RequestLogger.logChatGeneration({
@@ -812,12 +807,11 @@ async function handleImageAPIModel(context: any) {
   } = context;
   // Mark conversation as generating
   markGenerating(
-        (conversationId as any),
-    (project as any),
-    (username as any),
-    // @ts-ignore - TODO: strict typing
+    conversationId,
+    project,
+    username,
     true,
-        getCollectionOpts((project as any)),
+    getCollectionOpts(project),
   );
     const lastUserMsg = (messages as any).filter((m: any) => m.role === "user").pop();
   const prompt = lastUserMsg?.content || "";
@@ -947,13 +941,12 @@ async function handleImageAPIModel(context: any) {
         }
       : undefined;
     appendAndFinalize(
-            (conversationId as any),
-      (project as any),
-      (username as any),
-      // @ts-ignore - TODO: strict typing
+      conversationId,
+      project,
+      username,
       messagesToAppend,
       meta,
-            getCollectionOpts((project as any)),
+      getCollectionOpts(project),
     );
   }
 }
@@ -979,12 +972,11 @@ async function handleStreamingText(context: any) {
   } = context;
   // Mark conversation as generating
   markGenerating(
-        (conversationId as any),
-    (project as any),
-    (username as any),
-    // @ts-ignore - TODO: strict typing
+    conversationId,
+    project,
+    username,
     true,
-        getCollectionOpts((project as any)),
+    getCollectionOpts(project),
   );
   const stream =
         (modelDef as any)?.liveAPI && (provider as any).generateTextStreamLive
@@ -1138,10 +1130,9 @@ async function handleStreamingText(context: any) {
     // Emit intermediate usage update so the frontend has authoritative
     // per-iteration token counts instead of relying on chunk heuristics
     if (ss.usage) {
-            (emit as any)({
+      emit({
         type: "usage_update",
-                // @ts-ignore - TODO: strict typing
-                usage: { ...ss.usage, requests: fcIteration + 1 },
+        usage: { ...(ss.usage as any), requests: fcIteration + 1 },
       });
     }
     // Update messages ref for potential next iteration
@@ -1185,12 +1176,11 @@ async function handleNonStreamingText(context: any) {
   } = context;
   // Mark conversation as generating
   markGenerating(
-        (conversationId as any),
-    (project as any),
-    (username as any),
-    // @ts-ignore - TODO: strict typing
+    conversationId,
+    project,
+    username,
     true,
-        getCollectionOpts((project as any)),
+    getCollectionOpts(project),
   );
   // Track this sub-request in SessionGenerationTracker if it belongs
   // to an active agent session (e.g., tools-api calling /chat?stream=false

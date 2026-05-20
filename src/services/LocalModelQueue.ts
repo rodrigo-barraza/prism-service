@@ -7,20 +7,20 @@ import { LOCAL_PROVIDER_TYPES } from "./LocalProviderGateway.ts";
 // Providers that hit the local GPU — sourced from LocalProviderGateway
 const LOCAL_PROVIDERS = LOCAL_PROVIDER_TYPES;
 
-/** @type {Map<string, InstanceQueue>} Per-instance semaphore queues */
-const queues = new Map();
+/** Per-instance semaphore queues */
+const queues = new Map<string, InstanceQueue>();
 
 /** Default concurrency for instances not in the registry. */
 const DEFAULT_CONCURRENCY = 1;
 
 class InstanceQueue {
-  instanceId: any;
-  maxConcurrency: any;
+  instanceId: string;
+  maxConcurrency: number;
   _queue: (() => void)[];
   _activeCount: number;
   _totalProcessed: number;
 
-  constructor(instanceId: any, maxConcurrency: any) {
+  constructor(instanceId: string, maxConcurrency: number) {
     this.instanceId = instanceId;
     this.maxConcurrency = maxConcurrency;
     this._queue = [];
@@ -28,8 +28,8 @@ class InstanceQueue {
     this._totalProcessed = 0;
   }
 
-  acquire() {
-    return new Promise((resolve: any) => {
+  acquire(): Promise<() => void> {
+    return new Promise((resolve) => {
       const release = () => {
         this._activeCount--;
         this._totalProcessed++;
@@ -52,16 +52,16 @@ class InstanceQueue {
     });
   }
 
-  get pending() {
+  get pending(): number {
     return this._queue.length;
   }
-  get busy() {
+  get busy(): boolean {
     return this._activeCount >= this.maxConcurrency;
   }
-  get activeCount() {
+  get activeCount(): number {
     return this._activeCount;
   }
-  get totalProcessed() {
+  get totalProcessed(): number {
     return this._totalProcessed;
   }
 }
@@ -76,29 +76,26 @@ class LocalModelQueue {
   /**
    * Check whether a provider requires the local GPU lock.
    * Checks both base provider types and instance IDs.
-
-
    */
-  isLocal(provider: any) {
-        if (LOCAL_PROVIDERS.has((provider as any))) return true;
+  isLocal(provider: string): boolean {
+    if (LOCAL_PROVIDERS.has(provider)) return true;
     // Check if it's a multi-instance ID (e.g. "lm-studio-2")
-        if (isInstance((provider as any))) return true;
+    if (isInstance(provider)) return true;
     return false;
   }
 
   /**
    * Get or create the semaphore queue for an instance.
-
-
    */
-  _getQueue(instanceId: any) {
-    if (queues.has(instanceId)) return queues.get(instanceId);
+  _getQueue(instanceId: string): InstanceQueue {
+    const existing = queues.get(instanceId);
+    if (existing) return existing;
 
     // Look up concurrency from instance registry
-        const instance = getInstance((instanceId as any));
+    const instance = getInstance(instanceId);
     const concurrency = instance?.concurrency || DEFAULT_CONCURRENCY;
 
-        const queue = new InstanceQueue(instanceId, (concurrency as any));
+    const queue = new InstanceQueue(instanceId, concurrency);
     queues.set(instanceId, queue);
     logger.info(
       `[LocalModelQueue] Created queue for "${instanceId}" (concurrency: ${concurrency})`,
@@ -110,41 +107,39 @@ class LocalModelQueue {
    * Acquire a semaphore slot for an instance. Resolves immediately if a
    * slot is available, otherwise enqueues and waits (FIFO order).
    *
-
-   *   default queue (backward compat for callers that don't pass an ID).
    * @returns {Promise<() => void>} A release function — MUST be called
    *   when inference is complete (use try/finally).
    */
-    acquire(instanceId: any = "_default") {
+  acquire(instanceId: string = "_default"): Promise<() => void> {
     return this._getQueue(instanceId).acquire();
   }
 
   /** Number of requests waiting for a specific instance. */
-    pending(instanceId: any = "_default") {
+  pending(instanceId: string = "_default"): number {
     return queues.get(instanceId)?.pending || 0;
   }
 
   /** Whether all slots are in use for a specific instance. */
-    busy(instanceId: any = "_default") {
+  busy(instanceId: string = "_default"): boolean {
     return queues.get(instanceId)?.busy || false;
   }
 
   /** Number of active slots for a specific instance. */
-  get activeCount() {
+  get activeCount(): number {
     let total = 0;
-        for ( const q of queues.values()) total += q.activeCount;
+    for (const q of queues.values()) total += q.activeCount;
     return total;
   }
 
   /** Max concurrency for a specific instance (or default). */
-    maxConcurrency(instanceId: any = "_default") {
+  maxConcurrency(instanceId: string = "_default"): number {
     return queues.get(instanceId)?.maxConcurrency || DEFAULT_CONCURRENCY;
   }
 
   /** Total requests processed across all instances. */
-  get totalProcessed() {
+  get totalProcessed(): number {
     let total = 0;
-        for ( const q of queues.values()) total += q.totalProcessed;
+    for (const q of queues.values()) total += q.totalProcessed;
     return total;
   }
 }

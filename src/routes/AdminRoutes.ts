@@ -80,8 +80,7 @@ router.get(
           .find(filter, {
             projection: { requestPayload: 0, responsePayload: 0 },
           })
-                    // @ts-ignore - TODO: strict typing
-                    .sort({ [sort]: sortDir })
+                    .sort({ [sort as string]: sortDir as 1 | -1 })
           .skip(skip)
           .limit(lim)
           .toArray(),
@@ -286,18 +285,17 @@ router.get(
       const agentCount = AgentPersonaRegistry.list().length;
       const workspaceCount = ToolOrchestratorService.getWorkspaceRoots().length;
 
-      const [result, toolCallResult, traceResult, conversationCount] =
+      const [resultDocs, toolCallResult, traceResult, conversationCount] =
         await Promise.all([
           db
             .collection(REQUESTS_COL)
             .aggregate(pipeline)
-            .toArray()
-                        // @ts-ignore - TODO: strict typing
-                        .then(((r: any) => r[0] as any as (value: Document[]) => any)),
+            .toArray(),
           db.collection(REQUESTS_COL).aggregate(toolCallPipeline).toArray(),
           db.collection(REQUESTS_COL).aggregate(traceCountPipeline).toArray(),
           db.collection(CONVERSATIONS_COL).countDocuments(convMatch),
         ]);
+      const result = (resultDocs[0] || {}) as Record<string, any>;
       const traceCount = traceResult[0]?.total || 0;
       const totalToolCalls = toolCallResult[0]?.total || 0;
 
@@ -684,26 +682,24 @@ router.get(
       res.json(
         results.map((r: any) => {
           // Count top models
-          const modelCounts: any = {};
-                    for ( const m of r._models || []) {
-                        if (m) modelCounts[m] = (modelCounts[m] || 0) + 1;
+          const modelCounts: Record<string, number> = {};
+          for ( const m of r._models || []) {
+            if (m) modelCounts[m] = (modelCounts[m] || 0) + 1;
           }
           const topModels = Object.entries(modelCounts)
-                        // @ts-ignore - TODO: strict typing
-                        .sort(((a: any, b: any) => (b as any)[1] - (a as any)[1] as any as (a: [string, any], b: [string, any]) => number))
+            .sort((a, b) => b[1] - a[1])
             .slice(0, 5)
-                        .map((([model, count]: any) => ({ model, count }) as any as (value: [string, any], index: number, array: [string, any][]) => { model: any; count: any; }));
+            .map(([model, count]) => ({ model, count }));
 
           // Count top agents
-          const agentCounts: any = {};
-                    for ( const a of r._agents || []) {
-                        if (a) agentCounts[a] = (agentCounts[a] || 0) + 1;
+          const agentCounts: Record<string, number> = {};
+          for ( const a of r._agents || []) {
+            if (a) agentCounts[a] = (agentCounts[a] || 0) + 1;
           }
           const topAgents = Object.entries(agentCounts)
-                        // @ts-ignore - TODO: strict typing
-                        .sort(((a: any, b: any) => (b as any)[1] - (a as any)[1] as any as (a: [string, any], b: [string, any]) => number))
+            .sort((a, b) => b[1] - a[1])
             .slice(0, 5)
-                        .map((([agent, count]: any) => ({ agent, count }) as any as (value: [string, any], index: number, array: [string, any][]) => { agent: any; count: any; }));
+            .map(([agent, count]) => ({ agent, count }));
 
           return {
             tool: r._id,
@@ -1001,19 +997,18 @@ router.get(
 
       const { hours = 24, from, to, project } = req.query;
 
-      let sinceDate: any, untilDate: any;
-      if (from) {
-                // @ts-ignore - TODO: strict typing
-                sinceDate = new Date(from);
+      let sinceDate: Date;
+      let untilDate: Date | undefined;
+      if (typeof from === "string") {
+        sinceDate = new Date(from);
       } else {
-                sinceDate = new Date(Date.now() - hoursToMs(parseInt((hours as any), 10)));
+        sinceDate = new Date(Date.now() - hoursToMs(parseInt((hours as any), 10)));
       }
-      if (to) {
-                // @ts-ignore - TODO: strict typing
-                untilDate = new Date(to);
+      if (typeof to === "string") {
+        untilDate = new Date(to);
       }
 
-            const spanMs = (untilDate || new Date()) - sinceDate;
+      const spanMs = (untilDate ? untilDate.getTime() : Date.now()) - sinceDate.getTime();
       const spanMinutes = spanMs / (1000 * 60);
       const spanHours = spanMinutes / 60;
       const spanDays = spanHours / 24;
@@ -1352,13 +1347,13 @@ router.get(
         order = "desc",
       } = req.query;
 
-      const filter: any = {};
+       const filter: any = {};
             if (trace) filter.traceId = trace;
             if (project) filter.project = project;
             if (username) filter.username = username;
-      if (search) {
+       if (search) {
         const regex = { $regex: search, $options: "i" };
-        const orClauses = [
+        const orClauses: Record<string, any>[] = [
           { title: regex },
           { project: regex },
           { username: regex },
@@ -1371,7 +1366,6 @@ router.get(
             .collection(REQUESTS_COL)
             .distinct("conversationId", { clientIp: regex });
           if (matchingConvIds.length > 0) {
-                        // @ts-ignore - TODO: strict typing
                         orClauses.push({ id: { $in: matchingConvIds } });
           }
         }
@@ -1392,8 +1386,7 @@ router.get(
 
       const pipeline: any[] = [
         ...(Object.keys(filter).length ? [{ $match: filter }] : []),
-                // @ts-ignore - TODO: strict typing
-                { $sort: { [sort]: sortDir } },
+                { $sort: { [sort as string]: sortDir as 1 | -1 } },
         {
           $project: {
             id: 1,
@@ -2188,8 +2181,7 @@ router.get(
             createdAt: 1,
             updatedAt: 1,
           })
-                    // @ts-ignore - TODO: strict typing
-                    .sort({ [sort]: sortDir })
+                    .sort({ [sort as string]: sortDir as 1 | -1 })
           .skip(skip)
           .limit(lim)
           .toArray(),
@@ -2217,8 +2209,7 @@ router.get(
       const { ObjectId } = await import("mongodb");
       let objectId: any;
       try {
-                // @ts-ignore - TODO: strict typing
-                objectId = new ObjectId(req.params.id);
+                objectId = new (ObjectId as any)(req.params.id);
       } catch {
         return res.status(400).json({ error: "Invalid workflow ID" });
       }
@@ -2780,8 +2771,7 @@ router.get(
             _requests: 0,
           },
         },
-                // @ts-ignore - TODO: strict typing
-                { $sort: { [sort]: sortDir } },
+                { $sort: { [sort as string]: sortDir as 1 | -1 } },
       ];
 
       // Count total matching traces
@@ -3114,8 +3104,7 @@ router.get(
             // Exclude full message history for the list view — too heavy
             projection: { messages: 0 },
           })
-                    // @ts-ignore - TODO: strict typing
-                    .sort({ [sort]: sortDir })
+          .sort({ [sort as string]: sortDir })
           .skip(skip)
           .limit(lim)
           .toArray(),

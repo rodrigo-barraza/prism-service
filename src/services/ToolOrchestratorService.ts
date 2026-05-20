@@ -153,12 +153,13 @@ function buildUrlFromEndpoint(endpoint: any, args: any = {}) {
   }
 
     const pathParams = new Set(endpoint.pathParams || []);
-    for ( const param of pathParams) {
-        // @ts-ignore - TODO: strict typing
-        if (args[(param as string)] !== (undefined as string) && args[(param as string)] !== null) {
-            path = (path as any).replace(`:${(param as string)}`, encodeURIComponent(String(args[(param as string)])));
+    for (const param of pathParams) {
+      const pKey = param as string;
+      const pVal = args[pKey];
+      if (pVal !== undefined && pVal !== null) {
+        path = (path as string).replace(`:${pKey}`, encodeURIComponent(String(pVal)));
+      }
     }
-  }
 
   const params = new URLSearchParams();
 
@@ -838,7 +839,7 @@ export default class ToolOrchestratorService {
    * Map of tool names to their streaming SSE endpoint paths.
    * Only process-based tools that spawn subprocesses benefit from streaming.
    */
-  static STREAMABLE_TOOLS = {
+  static STREAMABLE_TOOLS: Record<string, string> = {
     execute_shell: "/compute/shell/stream",
     execute_python: "/utility/python/stream",
     execute_javascript: "/compute/js/stream",
@@ -864,7 +865,6 @@ export default class ToolOrchestratorService {
     onChunk: any,
     context: any = {},
   ) {
-        // @ts-ignore - TODO: strict typing
         const streamPath = ToolOrchestratorService.STREAMABLE_TOOLS[name];
     if (!streamPath) {
       return ToolOrchestratorService.executeTool(name, args, context);
@@ -923,8 +923,10 @@ export default class ToolOrchestratorService {
       // Parse the SSE stream — accumulate stdout/stderr so the final result
       // includes the full output for persistence (TerminalRenderer reads
       // result.stdout after page refresh when streamingOutput is gone).
-            // @ts-ignore - TODO: strict typing
-            const reader = response.body.getReader();
+      if (!response.body) {
+        return { error: "Response body is not readable" };
+      }
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
       let finalResult = null;
@@ -937,8 +939,7 @@ export default class ToolOrchestratorService {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-                // @ts-ignore - TODO: strict typing
-                buffer = lines.pop(); // keep incomplete line in buffer
+        buffer = lines.pop() || ""; // keep incomplete line in buffer
 
                 for ( const line of lines) {
           if (!line.startsWith("data: ")) continue;
