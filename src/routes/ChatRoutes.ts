@@ -42,6 +42,7 @@ import {
   appendAndFinalize,
 } from "../utils/ConversationUtilities.ts";
 import { handleSseRequest, handleJsonRequest } from "../utils/SseUtilities.ts";
+import { ChatRequestSchema } from "../types/index.ts";
 
 const router = express.Router();
 // ─── converts refs for providers & storage ──────────────────
@@ -238,6 +239,32 @@ async function prepareGenerationContext(
 ) {
   const requestStart = performance.now();
   const requestId = crypto.randomUUID();
+
+  const parseResult = ChatRequestSchema.safeParse(params);
+  if (!parseResult.success) {
+    // Custom error mappings to match the exact ones expected by existing consumers and test cases
+    if (!params || !("provider" in params) || params.provider === undefined || params.provider === null) {
+      throw new ProviderError("server", "Missing required field: provider", 400);
+    }
+    if (!params || !("messages" in params) || !Array.isArray(params.messages)) {
+      throw new ProviderError(
+        "server",
+        "Missing or invalid field: messages (must be an array)",
+        400,
+      );
+    }
+    const issueMessages = parseResult.error.issues.map(
+      (issue) => `${issue.path.join(".")}: ${issue.message}`
+    );
+    throw new ProviderError(
+      "server",
+      `Validation failed: ${issueMessages.join("; ")}`,
+      400
+    );
+  }
+
+  const validatedParams = parseResult.data as any;
+
   const {
     provider: _providerName,
     model: requestedModel,
@@ -246,10 +273,10 @@ async function prepareGenerationContext(
     agentSessionId: incomingAgentSessionId,
     conversationMeta: incomingConversationMeta,
     traceId: incomingTraceId,
-    project = "any",
-    username = "any",
-    clientIp = null,
-    agent = null,
+    project,
+    username,
+    clientIp,
+    agent,
     // Generation options — flat at top-level (OpenAI-style)
     tools,
     temperature,
@@ -288,75 +315,65 @@ async function prepareGenerationContext(
     maxWorkerIterations,
     agentContext,
     // Multi-workspace: user-selected workspace root path (absolute fs path).
-    // Flows from x-workspace-root header → AuthMiddleware → agent route → here.
     workspaceRoot,
     ...extraParams
-  } = params;
+  } = validatedParams;
+
   let providerName = _providerName;
   // Build the internal options object that providers expect
   const options = {
-        ...(tools && { tools }),
-    ...(temperature !== undefined && { temperature }),
-    ...(maxTokens !== undefined && { maxTokens }),
-    ...(topP !== undefined && { topP }),
-    ...(topK !== undefined && { topK }),
-    ...(frequencyPenalty !== undefined && { frequencyPenalty }),
-    ...(presencePenalty !== undefined && { presencePenalty }),
-        ...(stopSequences && { stopSequences }),
-    ...(seed !== undefined && seed !== "" && { seed }),
-    ...(minP !== undefined && { minP }),
-    ...(repeatPenalty !== undefined && { repeatPenalty }),
-    ...(thinkingEnabled !== undefined && { thinkingEnabled }),
-        ...(reasoningEffort && { reasoningEffort }),
-        ...(thinkingLevel && { thinkingLevel }),
-        ...(thinkingBudget && { thinkingBudget }),
-        ...(webSearch && { webSearch }),
-        ...(webFetch && { webFetch }),
-        ...(codeExecution && { codeExecution }),
-        ...(urlContext && { urlContext }),
-        ...(verbosity && { verbosity }),
-        ...(reasoningSummary && { reasoningSummary }),
-    ...(functionCallingEnabled !== undefined && { functionCallingEnabled }),
-    ...(agenticLoopEnabled !== undefined && { agenticLoopEnabled }),
-        ...(enabledTools && { enabledTools }),
-        ...(disabledBuiltIns && { disabledBuiltIns }),
-        ...(minContextLength && { minContextLength }),
-        ...(forceImageGeneration && { forceImageGeneration }),
-        ...(responseFormat && { responseFormat }),
-        ...(serviceTier && { serviceTier }),
-        ...(textOnly && { textOnly }),
-        ...(autoApprove && { autoApprove }),
-        ...(planFirst && { planFirst }),
-    ...(maxIterations !== undefined && { maxIterations }),
-    ...(maxWorkerIterations !== undefined && { maxWorkerIterations }),
-        ...(agentContext && { agentContext }),
-        ...(extraParams.systemPrompt && { systemPrompt: extraParams.systemPrompt }),
+    ...(tools && { tools }),
+    ...(temperature !== undefined && temperature !== null && { temperature }),
+    ...(maxTokens !== undefined && maxTokens !== null && { maxTokens }),
+    ...(topP !== undefined && topP !== null && { topP }),
+    ...(topK !== undefined && topK !== null && { topK }),
+    ...(frequencyPenalty !== undefined && frequencyPenalty !== null && { frequencyPenalty }),
+    ...(presencePenalty !== undefined && presencePenalty !== null && { presencePenalty }),
+    ...(stopSequences && { stopSequences }),
+    ...(seed !== undefined && seed !== null && seed !== "" && { seed }),
+    ...(minP !== undefined && minP !== null && { minP }),
+    ...(repeatPenalty !== undefined && repeatPenalty !== null && { repeatPenalty }),
+    ...(thinkingEnabled !== undefined && thinkingEnabled !== null && { thinkingEnabled }),
+    ...(reasoningEffort && { reasoningEffort }),
+    ...(thinkingLevel && { thinkingLevel }),
+    ...(thinkingBudget !== undefined && thinkingBudget !== null && { thinkingBudget }),
+    ...(webSearch !== undefined && webSearch !== null && { webSearch }),
+    ...(webFetch !== undefined && webFetch !== null && { webFetch }),
+    ...(codeExecution !== undefined && codeExecution !== null && { codeExecution }),
+    ...(urlContext !== undefined && urlContext !== null && { urlContext }),
+    ...(verbosity && { verbosity }),
+    ...(reasoningSummary && { reasoningSummary }),
+    ...(functionCallingEnabled !== undefined && functionCallingEnabled !== null && { functionCallingEnabled }),
+    ...(agenticLoopEnabled !== undefined && agenticLoopEnabled !== null && { agenticLoopEnabled }),
+    ...(enabledTools && { enabledTools }),
+    ...(disabledBuiltIns && { disabledBuiltIns }),
+    ...(minContextLength && { minContextLength }),
+    ...(forceImageGeneration !== undefined && forceImageGeneration !== null && { forceImageGeneration }),
+    ...(responseFormat && { responseFormat }),
+    ...(serviceTier && { serviceTier }),
+    ...(textOnly !== undefined && textOnly !== null && { textOnly }),
+    ...(autoApprove !== undefined && autoApprove !== null && { autoApprove }),
+    ...(planFirst !== undefined && planFirst !== null && { planFirst }),
+    ...(maxIterations !== undefined && maxIterations !== null && { maxIterations }),
+    ...(maxWorkerIterations !== undefined && maxWorkerIterations !== null && { maxWorkerIterations }),
+    ...(agentContext && { agentContext }),
+    ...(extraParams.systemPrompt && { systemPrompt: extraParams.systemPrompt }),
   };
   // When thinking is explicitly disabled, strip all thinking sub-params
   // so providers don't inadvertently enable thinking by detecting them.
   if (thinkingEnabled === false) {
-    delete options.reasoningEffort;
-    delete options.thinkingLevel;
-    delete options.thinkingBudget;
+    delete (options as any).reasoningEffort;
+    delete (options as any).thinkingLevel;
+    delete (options as any).thinkingBudget;
   }
   // Local models emit thinking tokens (<think> tags) by default. Default
   // thinkingEnabled ON only when the client didn't send a value (undefined).
   // When the client explicitly sends false (thinking toggle off), respect it
   // — models can use tools without thinking.
-    LocalProviderGateway.applyLocalDefaults((providerName as any), options, {
-    thinkingEnabled,
+  LocalProviderGateway.applyLocalDefaults((providerName as any), options, {
+    thinkingEnabled: thinkingEnabled ?? undefined,
   });
-  // ── Validation ──────────────────────────────────────────────
-  if (!providerName) {
-    throw new ProviderError("server", "Missing required field: provider", 400);
-  }
-  if (!messages || !Array.isArray(messages)) {
-    throw new ProviderError(
-      "server",
-      "Missing or invalid field: messages (must be an array)",
-      400,
-    );
-  }
+
   // ── Strip soft-deleted messages ──────────────────────────────
   const activeMessages = messages.filter((m: any) => !m.deleted);
   // ── Resolve image refs ─────────────────────────────────────

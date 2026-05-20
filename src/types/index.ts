@@ -28,3 +28,13 @@ export type {
   MongoMatch,
   CountMap,
 } from "./express.ts";
+
+export {
+  ToolSchemaSchema,
+  ChatMessageContentSchema,
+  ChatMessageSchema,
+  ChatRequestSchema,
+} from "./schemas.ts";
+
+export type { ChatRequest } from "./schemas.ts";
+
