@@ -1,7 +1,5 @@
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
-// @ts-ignore
 import { deepMerge } from "@rodrigo-barraza/utilities-library";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
@@ -28,8 +26,7 @@ const DEFAULTS = {
 // Hot path: MemoryService + EmbeddingService read these on every call.
 // Cache is invalidated on update() and lazily populated on first get().
 
-// @ts-ignore
-let _cache = null;
+let _cache: any = null;
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
@@ -46,8 +43,7 @@ const SettingsService = {
 
    */
   async get() {
-    // @ts-ignore
-    if (_cache) return _cache;
+        if (_cache) return _cache;
 
     const collection = MongoWrapper.getCollection(
       MONGO_DB_NAME,
@@ -71,10 +67,9 @@ const SettingsService = {
 
 
    */
-  async getSection(section: Record<string, unknown>) {
+  async getSection(section: any) {
     const settings = await this.get();
-    // @ts-ignore
-    return settings[section] || DEFAULTS[section] || {};
+        return (settings as any)[(section as string)] || DEFAULTS[(section as string)] || {};
   },
 
   /**
@@ -82,7 +77,7 @@ const SettingsService = {
 
    * @returns {Promise<object>} The full settings after merge
    */
-  async update(data: Record<string, unknown>) {
+  async update(data: any) {
     const collection = MongoWrapper.getCollection(
       MONGO_DB_NAME,
       COLLECTIONS.SETTINGS,
@@ -90,7 +85,7 @@ const SettingsService = {
     if (!collection) throw new Error("Database not available");
 
     const current = await this.get();
-    const merged = deepMerge(current, data);
+    const merged = deepMerge((current as any), data);
 
     await collection.updateOne(
       { _key: "global" },
@@ -122,8 +117,7 @@ const SettingsService = {
    * @returns {Promise<{ provider: string, model: string }>}
    */
   async getMemoryModelConfig(role: string) {
-    // @ts-ignore - TODO: strict typing
-    const mem = await this.getSection("memory");
+        const mem = await this.getSection(("memory" as any));
     const provider = mem[`${role}Provider`];
     const model = mem[`${role}Model`];
     if (!provider || !model) {

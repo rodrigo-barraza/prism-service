@@ -1,6 +1,4 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-// @ts-ignore
 import { formatCostTag, roundMs } from "@rodrigo-barraza/utilities-library";
 import express, { Request, Response, NextFunction } from "express";
 import {
@@ -59,37 +57,26 @@ const router = express.Router();
  *  - minio://...       → download from MinIO (original unchanged), provider gets data URL
  *  - http(s)://...     → fetch (original unchanged), provider gets data URL
  */
-async function resolveImageRefs(messages: Record<string, unknown>, project: Record<string, unknown>, username: string) {
+async function resolveImageRefs(messages: any, project: any, username: string) {
   // Deep copy for the provider — images will be data URLs
-  // @ts-ignore - TODO: strict typing
-  const providerMessages = messages.map((m: Record<string, unknown>) => ({ ...m }));
-  // @ts-ignore - TODO: strict typing
-  for (let i = 0; i < messages.length; i++) {
+    const providerMessages = (messages as any).map((m: any) => ({ ...m }));
+    for (let i = 0; i < (messages as any).length; i++) {
     const message = messages[i];
     // ── Resolve media array fields: images, audio, video, pdf ──
-    // @ts-ignore
-    for ( const field of ["images", "audio", "video", "pdf"]) {
-      // @ts-ignore - TODO: strict typing
-      const array = message[field];
+        for ( const field of ["images", "audio", "video", "pdf"]) {
+            const array = (message as any)[field];
       if (array && Array.isArray(array) && array.length > 0) {
-        // @ts-ignore
-        const providerArr: Record<string, unknown>[] = [];
-        // @ts-ignore
-        const storageArr: Record<string, unknown>[] = [];
+                const providerArr: any[] = [];
+                const storageArr: any[] = [];
         await Promise.all(
-          // @ts-ignore - TODO: strict typing
-          array.map(async (ref: Record<string, unknown>, j: Record<string, unknown>) => {
+                    array.map(async (ref: any, j: any) => {
             const resolved = await resolveMediaRef(ref, project, username);
-            // @ts-ignore - TODO: strict typing
-            providerArr[j] = resolved.providerRef;
-            // @ts-ignore - TODO: strict typing
-            storageArr[j] = resolved.storageRef;
+                        providerArr[(j as string)] = resolved.providerRef;
+                        storageArr[(j as string)] = resolved.storageRef;
           }),
         );
-        // @ts-ignore
-        providerMessages[i][field] = providerArr;
-        // @ts-ignore
-        messages[i][field] = storageArr;
+                providerMessages[i][field] = providerArr;
+                (messages as any)[i][field] = storageArr;
       }
     }
   }
@@ -102,9 +89,8 @@ async function resolveImageRefs(messages: Record<string, unknown>, project: Reco
 
  * @returns {Promise<string>} - Possibly compressed data URL
  */
-async function compressDataUrlIfOversized(dataUrl: Record<string, unknown>) {
-  // @ts-ignore - TODO: strict typing
-  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+async function compressDataUrlIfOversized(dataUrl: any) {
+    const match = (dataUrl as any).match(/^data:([^;]+);base64,(.+)$/);
   if (!match) return dataUrl;
   let mimeType = match[1];
   if (!mimeType.startsWith("image/")) return dataUrl;
@@ -119,9 +105,8 @@ async function compressDataUrlIfOversized(dataUrl: Record<string, unknown>) {
         `[chat] Dimension-constrained image: now ${(base64Data.length / 1024 / 1024).toFixed(2)} MB b64 (${mimeType})`,
       );
     }
-  } catch (error: unknown) {
-    // @ts-ignore - TODO: strict typing
-    logger.warn(`[chat] Dimension constraint failed: ${error.message}`);
+  } catch (error: any) {
+        logger.warn(`[chat] Dimension constraint failed: ${(error as Error).message}`);
   }
   // Step 2: enforce byte-size limit
   const b64Len = base64Data.length; // Anthropic checks base64 STRING length
@@ -141,10 +126,9 @@ async function compressDataUrlIfOversized(dataUrl: Record<string, unknown>) {
       `[chat] Compressed: ${(b64Len / 1024 / 1024).toFixed(2)} MB → ${(newLen / 1024 / 1024).toFixed(2)} MB b64 (${result.mediaType})`,
     );
     return newUrl;
-  } catch (error: unknown) {
+  } catch (error: any) {
     logger.error(
-      // @ts-ignore - TODO: strict typing
-      `[chat] Image compression failed: ${error.message}. Sending original.`,
+            `[chat] Image compression failed: ${(error as Error).message}. Sending original.`,
     );
     return `data:${mimeType};base64,${base64Data}`;
   }
@@ -153,70 +137,59 @@ async function compressDataUrlIfOversized(dataUrl: Record<string, unknown>) {
  * Resolve a single media reference for both provider and storage use.
  * @returns {{ providerRef: string, storageRef: string }}
  */
-async function resolveMediaRef(ref: Record<string, unknown>, project: Record<string, unknown>, username: string) {
+async function resolveMediaRef(ref: any, project: any, username: string) {
   // Already a base64 data URL — compress if oversized, upload to MinIO for storage
-  // @ts-ignore - TODO: strict typing
-  if (ref.startsWith("data:")) {
+    if ((ref as any).startsWith("data:")) {
     let providerRef = ref;
     // Compress oversized images before they reach any provider
-    // @ts-ignore - TODO: strict typing
-    providerRef = await compressDataUrlIfOversized(providerRef);
+        providerRef = await compressDataUrlIfOversized(providerRef);
     let storageRef = providerRef;
     try {
-      const { ref: minioRef } = await FileService.uploadFile(
-        // @ts-ignore - TODO: strict typing
-        ref, // Upload original to MinIO
+      const { ref: minioRef } = await (FileService as any).uploadFile(
+                (ref as any), // Upload original to MinIO
         "uploads",
         project,
         username,
       );
-      // @ts-ignore - TODO: strict typing
-      storageRef = minioRef;
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[chat] Failed to upload media to MinIO: ${error.message}`);
+            storageRef = minioRef;
+    } catch (error: any) {
+            logger.error(`[chat] Failed to upload media to MinIO: ${(error as Error).message}`);
     }
     return { providerRef, storageRef };
   }
   // MinIO reference — download for provider, keep ref for storage
-  if (FileService.isMinioRef(ref)) {
+  if ((FileService as any).isMinioRef(ref)) {
     try {
-      const key = FileService.extractKey(ref);
-      const file = await FileService.getFile(key);
+      const key = (FileService as any).extractKey(ref);
+      const file = await (FileService as any).getFile(key);
       if (!file) {
         logger.warn(`[chat] Could not resolve MinIO ref: ${ref}`);
         return { providerRef: ref, storageRef: ref };
       }
-      const chunks: Record<string, unknown>[] = [];
-      // @ts-ignore
-      for await ( const chunk of file.stream) {
+      const chunks: any[] = [];
+            for await ( const chunk of file.stream) {
         chunks.push(chunk);
       }
-      // @ts-ignore - TODO: strict typing
-      const buffer = Buffer.concat(chunks);
+            const buffer = Buffer.concat((chunks as any as readonly Uint8Array<ArrayBufferLike>[]));
       const base64 = buffer.toString("base64");
       let providerRef = `data:${file.contentType};base64,${base64}`;
       // Constrain dimensions + compress oversized images before they reach any provider
-      // @ts-ignore - TODO: strict typing
-      providerRef = await compressDataUrlIfOversized(providerRef);
+            providerRef = await compressDataUrlIfOversized((providerRef as any));
       return {
         providerRef,
         storageRef: ref,
       };
-    } catch (error: unknown) {
+    } catch (error: any) {
       logger.error(
-        // @ts-ignore - TODO: strict typing
-        `[chat] Failed to resolve MinIO ref ${ref}: ${error.message}`,
+                `[chat] Failed to resolve MinIO ref ${ref}: ${(error as Error).message}`,
       );
       return { providerRef: ref, storageRef: ref };
     }
   }
   // HTTP(S) URL — fetch for provider, keep URL for storage
-  // @ts-ignore - TODO: strict typing
-  if (ref.startsWith("http://") || ref.startsWith("https://")) {
+    if ((ref as any).startsWith("http://") || (ref as any).startsWith("https://")) {
     try {
-      // @ts-ignore - TODO: strict typing
-      const response = await fetch(ref);
+            const response = await fetch((ref as any | URL | Request));
       if (!response.ok) {
         logger.warn(
           `[chat] Failed to fetch media URL (${response.status}): ${ref}`,
@@ -229,15 +202,13 @@ async function resolveMediaRef(ref: Record<string, unknown>, project: Record<str
       const base64 = Buffer.from(arrayBuffer).toString("base64");
       let providerRef = `data:${contentType};base64,${base64}`;
       // Compress oversized images before they reach any provider
-      // @ts-ignore - TODO: strict typing
-      providerRef = await compressDataUrlIfOversized(providerRef);
+            providerRef = await compressDataUrlIfOversized((providerRef as any));
       return {
         providerRef,
         storageRef: ref,
       };
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[chat] Failed to fetch media URL ${ref}: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`[chat] Failed to fetch media URL ${ref}: ${(error as Error).message}`);
       return { providerRef: ref, storageRef: ref };
     }
   }
@@ -258,12 +229,10 @@ async function resolveMediaRef(ref: Record<string, unknown>, project: Record<str
 
  * @returns {Promise<Object>} Prepared generation context
  */
-// @ts-ignore
 async function prepareGenerationContext(
-  params: Record<string, unknown>,
-  emit: Record<string, unknown>,
-  // @ts-ignore
-  { signal }: Record<string, unknown> = {},
+  params: any,
+  emit: any,
+    { signal }: any = {},
 ) {
   const requestStart = performance.now();
   const requestId = crypto.randomUUID();
@@ -275,8 +244,8 @@ async function prepareGenerationContext(
     agentSessionId: incomingAgentSessionId,
     conversationMeta: incomingConversationMeta,
     traceId: incomingTraceId,
-    project = "unknown",
-    username = "unknown",
+    project = "any",
+    username = "any",
     clientIp = null,
     agent = null,
     // Generation options — flat at top-level (OpenAI-style)
@@ -324,64 +293,42 @@ async function prepareGenerationContext(
   let providerName = _providerName;
   // Build the internal options object that providers expect
   const options = {
-    // @ts-ignore - TODO: strict typing
-    ...(tools && { tools }),
+        ...(tools && { tools }),
     ...(temperature !== undefined && { temperature }),
     ...(maxTokens !== undefined && { maxTokens }),
     ...(topP !== undefined && { topP }),
     ...(topK !== undefined && { topK }),
     ...(frequencyPenalty !== undefined && { frequencyPenalty }),
     ...(presencePenalty !== undefined && { presencePenalty }),
-    // @ts-ignore - TODO: strict typing
-    ...(stopSequences && { stopSequences }),
+        ...(stopSequences && { stopSequences }),
     ...(seed !== undefined && seed !== "" && { seed }),
     ...(minP !== undefined && { minP }),
     ...(repeatPenalty !== undefined && { repeatPenalty }),
     ...(thinkingEnabled !== undefined && { thinkingEnabled }),
-    // @ts-ignore - TODO: strict typing
-    ...(reasoningEffort && { reasoningEffort }),
-    // @ts-ignore - TODO: strict typing
-    ...(thinkingLevel && { thinkingLevel }),
-    // @ts-ignore - TODO: strict typing
-    ...(thinkingBudget && { thinkingBudget }),
-    // @ts-ignore - TODO: strict typing
-    ...(webSearch && { webSearch }),
-    // @ts-ignore - TODO: strict typing
-    ...(webFetch && { webFetch }),
-    // @ts-ignore - TODO: strict typing
-    ...(codeExecution && { codeExecution }),
-    // @ts-ignore - TODO: strict typing
-    ...(urlContext && { urlContext }),
-    // @ts-ignore - TODO: strict typing
-    ...(verbosity && { verbosity }),
-    // @ts-ignore - TODO: strict typing
-    ...(reasoningSummary && { reasoningSummary }),
+        ...(reasoningEffort && { reasoningEffort }),
+        ...(thinkingLevel && { thinkingLevel }),
+        ...(thinkingBudget && { thinkingBudget }),
+        ...(webSearch && { webSearch }),
+        ...(webFetch && { webFetch }),
+        ...(codeExecution && { codeExecution }),
+        ...(urlContext && { urlContext }),
+        ...(verbosity && { verbosity }),
+        ...(reasoningSummary && { reasoningSummary }),
     ...(functionCallingEnabled !== undefined && { functionCallingEnabled }),
     ...(agenticLoopEnabled !== undefined && { agenticLoopEnabled }),
-    // @ts-ignore - TODO: strict typing
-    ...(enabledTools && { enabledTools }),
-    // @ts-ignore - TODO: strict typing
-    ...(disabledBuiltIns && { disabledBuiltIns }),
-    // @ts-ignore - TODO: strict typing
-    ...(minContextLength && { minContextLength }),
-    // @ts-ignore - TODO: strict typing
-    ...(forceImageGeneration && { forceImageGeneration }),
-    // @ts-ignore - TODO: strict typing
-    ...(responseFormat && { responseFormat }),
-    // @ts-ignore - TODO: strict typing
-    ...(serviceTier && { serviceTier }),
-    // @ts-ignore - TODO: strict typing
-    ...(textOnly && { textOnly }),
-    // @ts-ignore - TODO: strict typing
-    ...(autoApprove && { autoApprove }),
-    // @ts-ignore - TODO: strict typing
-    ...(planFirst && { planFirst }),
+        ...(enabledTools && { enabledTools }),
+        ...(disabledBuiltIns && { disabledBuiltIns }),
+        ...(minContextLength && { minContextLength }),
+        ...(forceImageGeneration && { forceImageGeneration }),
+        ...(responseFormat && { responseFormat }),
+        ...(serviceTier && { serviceTier }),
+        ...(textOnly && { textOnly }),
+        ...(autoApprove && { autoApprove }),
+        ...(planFirst && { planFirst }),
     ...(maxIterations !== undefined && { maxIterations }),
     ...(maxWorkerIterations !== undefined && { maxWorkerIterations }),
-    // @ts-ignore - TODO: strict typing
-    ...(agentContext && { agentContext }),
-    // @ts-ignore - TODO: strict typing
-    ...(extraParams.systemPrompt && { systemPrompt: extraParams.systemPrompt }),
+        ...(agentContext && { agentContext }),
+        ...(extraParams.systemPrompt && { systemPrompt: extraParams.systemPrompt }),
   };
   // When thinking is explicitly disabled, strip all thinking sub-params
   // so providers don't inadvertently enable thinking by detecting them.
@@ -394,8 +341,7 @@ async function prepareGenerationContext(
   // thinkingEnabled ON only when the client didn't send a value (undefined).
   // When the client explicitly sends false (thinking toggle off), respect it
   // — models can use tools without thinking.
-  // @ts-ignore - TODO: strict typing
-  LocalProviderGateway.applyLocalDefaults(providerName, options, {
+    LocalProviderGateway.applyLocalDefaults((providerName as any), options, {
     thinkingEnabled,
   });
   // ── Validation ──────────────────────────────────────────────
@@ -410,13 +356,12 @@ async function prepareGenerationContext(
     );
   }
   // ── Strip soft-deleted messages ──────────────────────────────
-  const activeMessages = messages.filter((m: Record<string, unknown>) => !m.deleted);
+  const activeMessages = messages.filter((m: any) => !m.deleted);
   // ── Resolve image refs ─────────────────────────────────────
   const providerMessages = await resolveImageRefs(
-    // @ts-ignore - TODO: strict typing
-    activeMessages,
-    project,
-    username,
+        (activeMessages as any),
+    (project as any),
+    (username as any),
   );
   // ── Multi-instance load balancing ─────────────────────────
   // When the caller sends a base provider type (e.g. "lm-studio") and
@@ -424,25 +369,19 @@ async function prepareGenerationContext(
   // each instance (with quant-level fallback) and pick the least-busy
   // usable instance. Same model resolution logic as CoordinatorService.
   let resolvedModel =
-    // @ts-ignore
-    requestedModel || getDefaultModels(TYPES.TEXT, TYPES.TEXT)[providerName];
-  // @ts-ignore - TODO: strict typing
-  if (localModelQueue.isLocal(providerName)) {
-    // @ts-ignore - TODO: strict typing
-    let siblings = getInstancesByType(providerName);
+        requestedModel || getDefaultModels(TYPES.TEXT, TYPES.TEXT)[(providerName as string)];
+    if (localModelQueue.isLocal((providerName as any))) {
+        let siblings = getInstancesByType((providerName as any));
     // ── Model resolution (always) ──────────────────────────────
     // Resolve model availability across instances with quant-level
     // fallback. Also handles @quant syntax (e.g. "qwen3-32b@q4_k_m")
     // by mapping it to the actual LM Studio model key.
     const { usable, modelOverrides } = await resolveModelForInstances(
-      resolvedModel,
-      // @ts-ignore - TODO: strict typing
-      siblings,
+      (resolvedModel as any),
+            (siblings as any),
     );
-    // @ts-ignore - TODO: strict typing
-    if (usable.length > 0) {
-      // @ts-ignore - TODO: strict typing
-      siblings = usable;
+        if ((usable as any).length > 0) {
+            siblings = usable;
       // For single instance, apply model override directly
       if (siblings.length === 1) {
         const override = modelOverrides.get(siblings[0].id);
@@ -463,10 +402,8 @@ async function prepareGenerationContext(
       // Least-busy: pick the instance with the most available slots
       let bestId = providerName;
       let bestAvailable = -Infinity;
-      // @ts-ignore
-      for ( const inst of siblings) {
-        // @ts-ignore - TODO: strict typing
-        const queueState = localModelQueue._getQueue(inst.id);
+            for ( const inst of siblings) {
+                const queueState = localModelQueue._getQueue((inst.id as any));
         const available = inst.concurrency - queueState.activeCount;
         if (available > bestAvailable) {
           bestAvailable = available;
@@ -481,29 +418,23 @@ async function prepareGenerationContext(
         }
         logger.info(
           `[chat] ⚖️ Load balance: ${providerName} → ${bestId} ` +
-            // @ts-ignore - TODO: strict typing
-            `(model="${resolvedModel}", ${siblings.map((s: Record<string, unknown>) => `${s.id}:${s.concurrency - localModelQueue._getQueue(s.id).activeCount}free`).join(", ")})`,
+                        `(model="${resolvedModel}", ${siblings.map(((s: any) => `${s.id}:${(s as any).concurrency - localModelQueue._getQueue((s.id as any)).activeCount}free` as any as (value: InstanceEntry, index: number, array: InstanceEntry[]) => string)).join(", ")})`,
         );
         providerName = bestId;
       }
     }
   }
-  // @ts-ignore - TODO: strict typing
-  const provider = getProvider(providerName);
+    const provider = getProvider((providerName as any));
   // ── Resolve model ─────────────────────────────────────────
   // resolvedModel is set earlier (before load balancing) and may have
   // been updated to a quant variant by the model availability check.
-  const modelDef = getModelByName(resolvedModel);
-  // @ts-ignore
-  const isImageAPIModel = modelDef?.imageAPI && provider.generateImage;
+  const modelDef = getModelByName((resolvedModel as any));
+    const isImageAPIModel = (modelDef as any)?.imageAPI && provider.generateImage;
   // ── Local GPU mutex ──────────────────────────────────────
-  let localRelease: Record<string, unknown>;
-  // @ts-ignore - TODO: strict typing
-  if (localModelQueue.isLocal(providerName)) {
-    // @ts-ignore - TODO: strict typing
-    localRelease = await localModelQueue.acquire(providerName);
-    // @ts-ignore - TODO: strict typing
-    const queueState = localModelQueue._getQueue(providerName);
+  let localRelease: any;
+    if (localModelQueue.isLocal((providerName as any))) {
+        localRelease = await localModelQueue.acquire((providerName as any | undefined));
+        const queueState = localModelQueue._getQueue((providerName as any));
     logger.info(
       `[chat] 🔒 Acquired local GPU slot for ${resolvedModel} (${providerName}) ` +
         `(${queueState.activeCount}/${queueState.maxConcurrency} active` +
@@ -512,7 +443,7 @@ async function prepareGenerationContext(
   }
   // Derive userMessage from the last user message
   const userMessage =
-    messages?.filter((m: Record<string, unknown>) => m.role === "user").pop() || null;
+    messages?.filter((m: any) => m.role === "user").pop() || null;
   return {
     provider,
     providerName,
@@ -543,8 +474,7 @@ async function prepareGenerationContext(
     // Control
     emit,
     signal,
-    // @ts-ignore - TODO: strict typing
-    localRelease,
+        localRelease,
   };
 }
 // ─── Chat / Conversation persistence path ───────────────────
@@ -554,19 +484,16 @@ async function prepareGenerationContext(
  *
  * Used by the /chat route and any non-agent callers.
  */
-// @ts-ignore
 export async function handleConversation(
-  params: Record<string, unknown>,
-  emit: Record<string, unknown>,
-  // @ts-ignore
-  { signal }: Record<string, unknown> = {},
+  params: any,
+  emit: any,
+    { signal }: any = {},
 ) {
-  let context: Record<string, unknown>;
+  let context: any;
   try {
     context = await prepareGenerationContext(params, emit, { signal });
-  } catch (error: unknown) {
-    // @ts-ignore - TODO: strict typing
-    emit({ type: "error", message: error.message });
+  } catch (error: any) {
+        emit({ type: "error", message: (error as Error).message });
     return;
   }
   const {
@@ -590,9 +517,8 @@ export async function handleConversation(
   let conversationMeta = skipConversation ? null : incomingConversationMeta;
   if (!skipConversation && !conversationId) {
     conversationId = crypto.randomUUID();
-    const firstUserMsg = context.rawMessages
-      // @ts-ignore - TODO: strict typing
-      ?.filter((m: Record<string, unknown>) => m.role === "user")
+    const firstUserMsg = (context.rawMessages as any)
+            ?.filter((m: any) => m.role === "user")
       .pop();
     const titleSnippet =
       (firstUserMsg?.content || "").slice(0, 100).trim() || "New Conversation";
@@ -600,8 +526,7 @@ export async function handleConversation(
   }
   const traceId = incomingTraceId || null;
   if (traceId && conversationMeta) {
-    // @ts-ignore - TODO: strict typing
-    conversationMeta.traceId = traceId;
+        (conversationMeta as any).traceId = traceId;
   } else if (traceId) {
     conversationMeta = { traceId };
   }
@@ -613,92 +538,64 @@ export async function handleConversation(
         await handleImageAPIModel(fullCtx);
         return;
       }
-      // @ts-ignore - TODO: strict typing
-      if (!context.provider.generateTextStream && !context.provider.generateText) {
+            if (!(context as any).provider.generateTextStream && !(context as any).provider.generateText) {
         throw new ProviderError(
-          // @ts-ignore - TODO: strict typing
-          providerName,
+                    (providerName as any),
           `Provider "${providerName}" does not support text generation`,
           400,
         );
       }
       const useStreaming =
-        // @ts-ignore - TODO: strict typing
-        context.provider.generateTextStream && context.modelDef?.streaming !== false;
+                (context as any).provider.generateTextStream && (context.modelDef as any)?.streaming !== false;
       if (useStreaming) {
         // Native MCP tool execution — provider handles tool calling internally
         const useNativeMcp =
-          // @ts-ignore - TODO: strict typing
-          LocalProviderGateway.isNativeMCP(providerName) &&
-          // @ts-ignore - TODO: strict typing
-          !options.agenticLoopEnabled;
-        // @ts-ignore - TODO: strict typing
-        if (useNativeMcp && options.functionCallingEnabled) {
+                    LocalProviderGateway.isNativeMCP((providerName as any)) &&
+                    !(options as any).agenticLoopEnabled;
+                if (useNativeMcp && (options as any).functionCallingEnabled) {
           const builtInTools = ToolOrchestratorService.getToolSchemas();
           let tools = builtInTools;
-          // @ts-ignore - TODO: strict typing
-          if (options.enabledTools && Array.isArray(options.enabledTools)) {
-            // @ts-ignore - TODO: strict typing
-            const enabledSet = new Set(options.enabledTools);
-            // @ts-ignore - TODO: strict typing
-            tools = tools.filter((t: Record<string, unknown>) => enabledSet.has(t.name));
+                    if ((options as any).enabledTools && Array.isArray((options as any).enabledTools)) {
+                        const enabledSet = new Set((options as any).enabledTools);
+                        tools = tools.filter((t: any) => enabledSet.has(t.name));
           } else if (
-            // @ts-ignore - TODO: strict typing
-            options.disabledBuiltIns &&
-            // @ts-ignore - TODO: strict typing
-            Array.isArray(options.disabledBuiltIns)
+                        (options as any).disabledBuiltIns &&
+                        Array.isArray((options as any).disabledBuiltIns)
           ) {
-            // @ts-ignore - TODO: strict typing
-            const disabledSet = new Set(options.disabledBuiltIns);
-            // @ts-ignore - TODO: strict typing
-            tools = tools.filter((t: Record<string, unknown>) => !disabledSet.has(t.name));
+                        const disabledSet = new Set((options as any).disabledBuiltIns);
+                        tools = tools.filter((t: any) => !disabledSet.has(t.name));
           }
-          // @ts-ignore - TODO: strict typing
-          options.tools = tools;
-          // @ts-ignore - TODO: strict typing
-          if (context.modelDef?.contextLength) {
-            // @ts-ignore - TODO: strict typing
-            options.contextLength = context.modelDef.contextLength;
+                    (options as any).tools = tools;
+                    if ((context.modelDef as any)?.contextLength) {
+                        (options as any).contextLength = (context as any).modelDef.contextLength;
           }
           logger.info(
-            // @ts-ignore - TODO: strict typing
-            `[chat] Native MCP (${providerName}): ${tools.length} tools enabled, enabledTools=${(options.enabledTools || []).length}, builtIn=${builtInTools.length}, contextLength=${options.contextLength || "unset"}`,
+                        `[chat] Native MCP (${providerName}): ${tools.length} tools enabled, enabledTools=${((options as any).enabledTools || []).length}, builtIn=${builtInTools.length}, contextLength=${(options as any).contextLength || "unset"}`,
           );
         } else if (useNativeMcp) {
           logger.warn(
-            // @ts-ignore - TODO: strict typing
-            `[chat] Native MCP SKIPPED (${providerName}): functionCallingEnabled=${options.functionCallingEnabled}, useNativeMcp=${useNativeMcp}`,
+                        `[chat] Native MCP SKIPPED (${providerName}): functionCallingEnabled=${(options as any).functionCallingEnabled}, useNativeMcp=${useNativeMcp}`,
           );
         }
         // Non-LM-Studio FC on /chat path
         if (
           !useNativeMcp &&
-          // @ts-ignore - TODO: strict typing
-          !options.agenticLoopEnabled &&
-          // @ts-ignore - TODO: strict typing
-          options.functionCallingEnabled
+                    !(options as any).agenticLoopEnabled &&
+                    (options as any).functionCallingEnabled
         ) {
           const builtInTools = ToolOrchestratorService.getToolSchemas();
           let tools = builtInTools;
-          // @ts-ignore - TODO: strict typing
-          if (options.enabledTools && Array.isArray(options.enabledTools)) {
-            // @ts-ignore - TODO: strict typing
-            const enabledSet = new Set(options.enabledTools);
-            // @ts-ignore - TODO: strict typing
-            tools = tools.filter((t: Record<string, unknown>) => enabledSet.has(t.name));
+                    if ((options as any).enabledTools && Array.isArray((options as any).enabledTools)) {
+                        const enabledSet = new Set((options as any).enabledTools);
+                        tools = tools.filter((t: any) => enabledSet.has(t.name));
           } else if (
-            // @ts-ignore - TODO: strict typing
-            options.disabledBuiltIns &&
-            // @ts-ignore - TODO: strict typing
-            Array.isArray(options.disabledBuiltIns)
+                        (options as any).disabledBuiltIns &&
+                        Array.isArray((options as any).disabledBuiltIns)
           ) {
-            // @ts-ignore - TODO: strict typing
-            const disabledSet = new Set(options.disabledBuiltIns);
-            // @ts-ignore - TODO: strict typing
-            tools = tools.filter((t: Record<string, unknown>) => !disabledSet.has(t.name));
+                        const disabledSet = new Set((options as any).disabledBuiltIns);
+                        tools = tools.filter((t: any) => !disabledSet.has(t.name));
           }
-          // @ts-ignore - TODO: strict typing
-          options.tools = tools;
+                    (options as any).tools = tools;
           logger.info(
             `[chat] FC tools injected: ${tools.length} tools enabled for ${providerName} ${resolvedModel}`,
           );
@@ -709,23 +606,19 @@ export async function handleConversation(
       }
     } finally {
       if (localRelease) {
-        // @ts-ignore - TODO: strict typing
-        localRelease();
+                localRelease();
         logger.info(`[chat] 🔓 Released local GPU lock for ${resolvedModel}`);
       }
     }
-  } catch (error: unknown) {
+  } catch (error: any) {
     markGenerating(
-      // @ts-ignore - TODO: strict typing
-      conversationId,
-      project,
-      username,
+            (conversationId as any),
+      (project as any),
+      (username as any),
       false,
-      // @ts-ignore - TODO: strict typing
-      getCollectionOpts(project),
+            getCollectionOpts((project as any)),
     );
-    // @ts-ignore - TODO: strict typing
-    const totalSec = (performance.now() - requestStart) / 1000;
+        const totalSec = (performance.now() - (requestStart as any)) / 1000;
     RequestLogger.logChatGeneration({
       requestId,
       endpoint: "/chat",
@@ -734,18 +627,16 @@ export async function handleConversation(
       username,
       clientIp,
       provider: providerName,
-      model: resolvedModel || requestedModel || "unknown",
+      model: resolvedModel || requestedModel || "any",
       conversationId: conversationId || null,
       traceId: traceId || null,
       success: false,
-      // @ts-ignore - TODO: strict typing
-      errorMessage: error.message,
+            errorMessage: (error as Error).message,
       totalSec,
       messages: context.rawMessages || [],
       options: {},
     });
-    // @ts-ignore - TODO: strict typing
-    emit({ type: "error", message: error.message });
+        emit({ type: "error", message: (error as Error).message });
   }
 }
 // ─── Agent session path (agentSessionId, no conversationId) ─
@@ -755,14 +646,12 @@ export async function handleConversation(
  *
  * Used exclusively by the /agent route.
  */
-// @ts-ignore
-export async function handleAgent(params: Record<string, unknown>, emit: Record<string, unknown>, { signal }: Record<string, unknown> = {}) {
-  let context: Record<string, unknown>;
+export async function handleAgent(params: any, emit: (event: import("../utils/SseUtilities.ts").SseEvent) => void, { signal }: { signal?: AbortSignal } = {}) {
+  let context: any;
   try {
     context = await prepareGenerationContext(params, emit, { signal });
-  } catch (error: unknown) {
-    // @ts-ignore - TODO: strict typing
-    emit({ type: "error", message: error.message });
+  } catch (error: any) {
+        emit({ type: "error", message: (error as Error).message });
     return;
   }
   const {
@@ -792,21 +681,17 @@ export async function handleAgent(params: Record<string, unknown>, emit: Record<
   // GET /agent-sessions/:id never 404s while the loop is running
   // (e.g. when the user switches away and back during generation).
   markGenerating(
-    // @ts-ignore - TODO: strict typing
-    agentSessionId,
-    project,
-    username,
+        (agentSessionId as any),
+    (project as any),
+    (username as any),
     true,
-    // @ts-ignore - TODO: strict typing
-    { ...getCollectionOpts(project), agent },
+        { ...getCollectionOpts((project as any)), agent },
   );
   try {
     try {
-      // @ts-ignore - TODO: strict typing
-      if (!context.provider.generateTextStream && !context.provider.generateText) {
+            if (!(context as any).provider.generateTextStream && !(context as any).provider.generateText) {
         throw new ProviderError(
-          // @ts-ignore - TODO: strict typing
-          providerName,
+                    (providerName as any),
           `Provider "${providerName}" does not support text generation`,
           400,
         );
@@ -814,80 +699,53 @@ export async function handleAgent(params: Record<string, unknown>, emit: Record<
       const { default: AgenticLoopService } =
         await import("../services/AgenticLoopService.js");
       await AgenticLoopService.runAgenticLoop({
-        // @ts-ignore - TODO: strict typing
-        provider: context.provider,
-        // @ts-ignore - TODO: strict typing
-        providerName,
-        // @ts-ignore - TODO: strict typing
-        resolvedModel,
-        // @ts-ignore - TODO: strict typing
-        modelDef: context.modelDef,
-        // @ts-ignore - TODO: strict typing
-        messages: context.messages,
-        // @ts-ignore - TODO: strict typing
-        originalMessages: context.originalMessages,
-        // @ts-ignore - TODO: strict typing
-        options,
-        // @ts-ignore - TODO: strict typing
-        agentSessionId,
-        // @ts-ignore - TODO: strict typing
-        userMessage: context.userMessage,
-        // @ts-ignore - TODO: strict typing
-        conversationMeta,
-        // @ts-ignore - TODO: strict typing
-        traceId,
-        // @ts-ignore - TODO: strict typing
-        project,
-        // @ts-ignore - TODO: strict typing
-        username,
-        // @ts-ignore - TODO: strict typing
-        clientIp,
-        // @ts-ignore - TODO: strict typing
-        agent,
-        // @ts-ignore - TODO: strict typing
-        workspaceRoot: context.workspaceRoot,
-        // @ts-ignore - TODO: strict typing
-        requestId,
-        // @ts-ignore - TODO: strict typing
-        requestStart,
-        // @ts-ignore - TODO: strict typing
-        emit,
-        // @ts-ignore - TODO: strict typing
-        signal,
+                provider: context.provider,
+                providerName,
+                resolvedModel,
+                modelDef: context.modelDef,
+                messages: context.messages,
+                originalMessages: context.originalMessages,
+                options,
+                agentSessionId,
+                userMessage: context.userMessage,
+                conversationMeta,
+                traceId,
+                project,
+                username,
+                clientIp,
+                agent,
+                workspaceRoot: context.workspaceRoot,
+                requestId,
+                requestStart,
+                emit,
+                signal,
       });
     } finally {
       if (localRelease) {
-        // @ts-ignore - TODO: strict typing
-        localRelease();
+                localRelease();
         logger.info(`[agent] 🔓 Released local GPU lock for ${resolvedModel}`);
       }
       // When the SSE connection is severed (user pressed stop), abort any
       // spawned workers that are still running under this coordinator session.
-      // @ts-ignore - TODO: strict typing
-      if (signal?.aborted) {
+            if ((signal as any)?.aborted) {
         try {
           const { default: CoordinatorService } =
             await import("../services/CoordinatorService.js");
-          // @ts-ignore - TODO: strict typing
-          await CoordinatorService.abortWorkersBySession(agentSessionId);
-        } catch (cleanupErr: unknown) {
-          // @ts-ignore - TODO: strict typing
-          logger.warn(`[agent] Worker cleanup failed: ${cleanupErr.message}`);
+                    await CoordinatorService.abortWorkersBySession((agentSessionId as any));
+        } catch (cleanupErr: any) {
+                    logger.warn(`[agent] Worker cleanup failed: ${(cleanupErr as Error).message}`);
         }
       }
     }
-  } catch (error: unknown) {
+  } catch (error: any) {
     markGenerating(
-      // @ts-ignore - TODO: strict typing
-      agentSessionId,
-      project,
-      username,
+            (agentSessionId as any),
+      (project as any),
+      (username as any),
       false,
-      // @ts-ignore - TODO: strict typing
-      getCollectionOpts(project),
+            getCollectionOpts((project as any)),
     );
-    // @ts-ignore - TODO: strict typing
-    const totalSec = (performance.now() - requestStart) / 1000;
+        const totalSec = (performance.now() - (requestStart as any)) / 1000;
     RequestLogger.logChatGeneration({
       requestId,
       endpoint: "/agent",
@@ -896,22 +754,20 @@ export async function handleAgent(params: Record<string, unknown>, emit: Record<
       username,
       clientIp,
       provider: providerName,
-      model: resolvedModel || requestedModel || "unknown",
+      model: resolvedModel || requestedModel || "any",
       agentSessionId,
       traceId: traceId || null,
       success: false,
-      // @ts-ignore - TODO: strict typing
-      errorMessage: error.message,
+            errorMessage: (error as Error).message,
       totalSec,
       messages: context.rawMessages || [],
       options: {},
     });
-    // @ts-ignore - TODO: strict typing
-    emit({ type: "error", message: error.message });
+        emit({ type: "error", message: (error as Error).message });
   }
 }
 // ─── Dispatch: Image API models (e.g. GPT Image 1.5, OpenAI images) ─
-async function handleImageAPIModel(context: Record<string, unknown>) {
+async function handleImageAPIModel(context: any) {
   const {
     provider,
     providerName,
@@ -932,54 +788,43 @@ async function handleImageAPIModel(context: Record<string, unknown>) {
   } = context;
   // Mark conversation as generating
   markGenerating(
-    // @ts-ignore - TODO: strict typing
-    conversationId,
-    project,
-    username,
+        (conversationId as any),
+    (project as any),
+    (username as any),
     true,
-    // @ts-ignore - TODO: strict typing
-    getCollectionOpts(project),
+        getCollectionOpts((project as any)),
   );
-  // @ts-ignore - TODO: strict typing
-  const lastUserMsg = messages.filter((m: Record<string, unknown>) => m.role === "user").pop();
+    const lastUserMsg = (messages as any).filter((m: any) => m.role === "user").pop();
   const prompt = lastUserMsg?.content || "";
   // Collect all images from the conversation
-  const allImages: Record<string, unknown>[] = [];
-  // @ts-ignore
-  for ( const message of messages) {
+  const allImages: any[] = [];
+    for ( const message of (messages as any)) {
     if (message.images && message.images.length > 0) {
       allImages.push(...message.images);
     }
   }
-  // @ts-ignore - TODO: strict typing
-  const result = await provider.generateImage(
+    const result = await (provider as any).generateImage(
     prompt,
     allImages,
     resolvedModel,
-    // @ts-ignore - TODO: strict typing
-    options?.systemPrompt,
+        (options as any)?.systemPrompt,
   );
-  // @ts-ignore - TODO: strict typing
-  const totalSec = (performance.now() - requestStart) / 1000;
+    const totalSec = (performance.now() - (requestStart as any)) / 1000;
   // Cost calculation
   const imgPricing =
-    // @ts-ignore
-    getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel] || modelDef?.pricing;
+        getPricing(TYPES.TEXT, TYPES.IMAGE)[(resolvedModel as string)] || (modelDef as any)?.pricing;
   const outputImgTokens =
-    // @ts-ignore - TODO: strict typing
-    modelDef?.imageTokensPerImage || (providerName === "openai" ? 1056 : 1120);
+        (modelDef as any)?.imageTokensPerImage || (providerName === "openai" ? 1056 : 1120);
   const estimatedCost = calculateImageCost(
     prompt,
     imgPricing,
-    // @ts-ignore - TODO: strict typing
-    allImages.length,
-    outputImgTokens,
+        (allImages.length as any),
+    (outputImgTokens as any),
   );
   logger.request(
-    // @ts-ignore - TODO: strict typing
-    project,
-    username,
-    clientIp,
+        (project as any),
+    (username as any),
+    (clientIp as any),
     `[chat/image-api] ${providerName} ${resolvedModel} — ` +
       `total: ${totalSec.toFixed(2)}s` +
       formatCostTag(estimatedCost),
@@ -990,26 +835,23 @@ async function handleImageAPIModel(context: Record<string, unknown>) {
     try {
       const mimeType = result.mimeType || "image/png";
       const dataUrl = `data:${mimeType};base64,${result.imageData}`;
-      const { ref } = await FileService.uploadFile(
+      const { ref } = await (FileService as any).uploadFile(
         dataUrl,
         "generations",
-        // @ts-ignore - TODO: strict typing
-        project,
+                (project as any | null | undefined),
         username,
       );
       minioRef = ref;
-    } catch (uploadErr: unknown) {
+    } catch (uploadErr: any) {
       logger.error(
-        // @ts-ignore - TODO: strict typing
-        `[chat/image-api] MinIO upload failed: ${uploadErr.message}`,
+                `[chat/image-api] MinIO upload failed: ${(uploadErr as Error).message}`,
       );
     }
   }
   // Estimate token counts for tracking
   const estimatedInputTokens =
     estimateTokens(prompt) +
-    // @ts-ignore - TODO: strict typing
-    allImages.length * (modelDef?.imageTokensPerImage || 1120);
+        allImages.length * ((modelDef as any)?.imageTokensPerImage || 1120);
   RequestLogger.log({
     requestId,
     endpoint: "/chat",
@@ -1031,31 +873,26 @@ async function handleImageAPIModel(context: Record<string, unknown>) {
   });
   // Emit events
   if (result.text) {
-    // @ts-ignore - TODO: strict typing
-    emit({ type: "chunk", content: result.text });
+        (emit as any)({ type: "chunk", content: result.text });
   }
-  // @ts-ignore - TODO: strict typing
-  emit({
+    (emit as any)({
     type: "image",
     data: result.imageData,
     mimeType: result.mimeType || "image/png",
     minioRef,
   });
-  // @ts-ignore - TODO: strict typing
-  emit({
+    (emit as any)({
     type: "done",
     usage: result.usage || null,
     estimatedCost,
     totalTime: totalSec,
-    // @ts-ignore - TODO: strict typing
-    ...(traceId && { traceId }),
-    // @ts-ignore - TODO: strict typing
-    ...(conversationId && { conversationId }),
+        ...(traceId && { traceId }),
+        ...(conversationId && { conversationId }),
   });
   // Link conversation to session
   // Auto-append to conversation
   if (conversationId) {
-    const messagesToAppend: Record<string, unknown>[] = [];
+    const messagesToAppend: any[] = [];
     // Only append the user message on the first call for this turn
     // (indicated by conversationMeta). Follow-up tool iterations reuse
     // the same conversationId but omit conversationMeta, so the user
@@ -1064,8 +901,7 @@ async function handleImageAPIModel(context: Record<string, unknown>) {
       messagesToAppend.push({
         role: "user",
         ...userMessage,
-        // @ts-ignore - TODO: strict typing
-        timestamp: userMessage.timestamp || new Date().toISOString(),
+                timestamp: (userMessage as any).timestamp || new Date().toISOString(),
       });
     }
     const assistantImages = minioRef ? [minioRef] : [];
@@ -1086,14 +922,12 @@ async function handleImageAPIModel(context: Record<string, unknown>) {
         }
       : undefined;
     appendAndFinalize(
-      // @ts-ignore - TODO: strict typing
-      conversationId,
-      project,
-      username,
+            (conversationId as any),
+      (project as any),
+      (username as any),
       messagesToAppend,
       meta,
-      // @ts-ignore - TODO: strict typing
-      getCollectionOpts(project),
+            getCollectionOpts((project as any)),
     );
   }
 }
@@ -1102,7 +936,7 @@ async function handleImageAPIModel(context: Record<string, unknown>) {
 // Imported at the top of this file via:
 //   import { finalizeTextGeneration, getCollectionOpts } from "../services/harnesses/lifecycle/Finalizer.ts";
 
-async function handleStreamingText(context: Record<string, unknown>) {
+async function handleStreamingText(context: any) {
   const {
     provider,
     providerName,
@@ -1119,37 +953,27 @@ async function handleStreamingText(context: Record<string, unknown>) {
   } = context;
   // Mark conversation as generating
   markGenerating(
-    // @ts-ignore - TODO: strict typing
-    conversationId,
-    project,
-    username,
+        (conversationId as any),
+    (project as any),
+    (username as any),
     true,
-    // @ts-ignore - TODO: strict typing
-    getCollectionOpts(project),
+        getCollectionOpts((project as any)),
   );
   const stream =
-    // @ts-ignore - TODO: strict typing
-    modelDef?.liveAPI && provider.generateTextStreamLive
-      // @ts-ignore - TODO: strict typing
-      ? provider.generateTextStreamLive(messages, resolvedModel, {
-          // @ts-ignore - TODO: strict typing
-          ...options,
+        (modelDef as any)?.liveAPI && (provider as any).generateTextStreamLive
+            ? (provider as any).generateTextStreamLive(messages, resolvedModel, {
+                    ...options,
           signal,
         })
-      // @ts-ignore - TODO: strict typing
-      : provider.generateTextStream(messages, resolvedModel, {
-          // @ts-ignore - TODO: strict typing
-          ...options,
+            : (provider as any).generateTextStream(messages, resolvedModel, {
+                    ...options,
           signal,
         });
   const ss = createStreamState();
-  // @ts-ignore - TODO: strict typing
-  ss.requestStart = requestStart;
-  // @ts-ignore
-  for await ( const chunk of stream) {
+    ss.requestStart = requestStart;
+    for await ( const chunk of stream) {
     // Client disconnected — abort the upstream provider stream
-    // @ts-ignore - TODO: strict typing
-    if (signal?.aborted) {
+        if ((signal as any)?.aborted) {
       if (typeof stream.return === "function") stream.return();
       logger.info(
         `[chat] Client disconnected, aborting stream for ${providerName} ${resolvedModel}`,
@@ -1171,80 +995,56 @@ async function handleStreamingText(context: Record<string, unknown>) {
   const MAX_FC_ITERATIONS = 10;
   let fcIteration = 0;
   while (
-    // @ts-ignore - TODO: strict typing
-    options.functionCallingEnabled &&
+        (options as any).functionCallingEnabled &&
     ss.toolCalls.length > 0 &&
     ss.toolCalls.some(
-      (tc: Record<string, unknown>) => !tc.result && tc.status !== "done" && tc.status !== "error",
+      (tc: any) => !tc.result && tc.status !== "done" && tc.status !== "error",
     ) &&
     fcIteration < MAX_FC_ITERATIONS &&
-    // @ts-ignore - TODO: strict typing
-    !signal?.aborted
+        !(signal as any)?.aborted
   ) {
     fcIteration++;
     const pendingCalls = ss.toolCalls.filter(
-      (tc: Record<string, unknown>) => !tc.result && tc.status !== "done" && tc.status !== "error",
+      (tc: any) => !tc.result && tc.status !== "done" && tc.status !== "error",
     );
     if (pendingCalls.length === 0) break;
     logger.info(
       `[chat/FC] Iteration ${fcIteration}: executing ${pendingCalls.length} tool call(s)`,
     );
     // Execute all pending tool calls
-    // @ts-ignore
-    for ( const tc of pendingCalls) {
-      // @ts-ignore
-      emit({
+        for ( const tc of pendingCalls) {
+            (emit as any)({
         type: "toolCall",
-        // @ts-ignore
-        id: tc.id,
-        // @ts-ignore
-        name: tc.name,
-        // @ts-ignore
-        args: tc.args,
+                id: (tc as any).id,
+                name: (tc as any).name,
+                args: (tc as any).args,
         status: "calling",
       });
       try {
-        // @ts-ignore
-        const result = await ToolOrchestratorService.executeTool(
-          // @ts-ignore
-          tc.name,
-          // @ts-ignore
-          tc.args,
+                const result = await ToolOrchestratorService.executeTool(
+                    (tc as any).name,
+                    (tc as any).args,
           { project, username },
         );
-        // @ts-ignore
-        tc.result = result;
-        // @ts-ignore
-        tc.status = result?.error ? "error" : "done";
-        // @ts-ignore
-        emit({
+                (tc as any).result = result;
+                (tc as any).status = result?.error ? "error" : "done";
+                (emit as any)({
           type: "toolCall",
-          // @ts-ignore
-          id: tc.id,
-          // @ts-ignore
-          name: tc.name,
-          // @ts-ignore
-          args: tc.args,
+                    id: (tc as any).id,
+                    name: (tc as any).name,
+                    args: (tc as any).args,
           result,
-          // @ts-ignore
-          status: tc.status,
+                    status: (tc as any).status,
         });
-      } catch (error: unknown) {
-        // @ts-ignore
-        tc.result = { error: error.message };
-        // @ts-ignore
-        tc.status = "error";
-        // @ts-ignore
-        emit({
+      } catch (error: any) {
+                (tc as any).result = { error: (error as Error).message };
+                (tc as any).status = "error";
+                (emit as any)({
           type: "toolCall",
-          // @ts-ignore
-          id: tc.id,
-          // @ts-ignore
-          name: tc.name,
-          // @ts-ignore
-          args: tc.args,
-          // @ts-ignore
-          result: tc.result,
+                    id: (tc as any).id,
+                    name: (tc as any).name,
+                    args: (tc as any).args,
+                    result: (tc as any).result,
           status: "error",
         });
       }
@@ -1253,7 +1053,7 @@ async function handleStreamingText(context: Record<string, unknown>) {
     const assistantToolMsg = {
       role: "assistant",
       content: ss.text || "",
-      toolCalls: ss.toolCalls.map((tc: Record<string, unknown>) => ({
+      toolCalls: ss.toolCalls.map((tc: any) => ({
         id: tc.id,
         name: tc.name,
         args: tc.args,
@@ -1264,8 +1064,8 @@ async function handleStreamingText(context: Record<string, unknown>) {
         : {}),
     };
     const toolResultMsgs = ss.toolCalls
-      .filter((tc: Record<string, unknown>) => tc.result)
-      .map((tc: Record<string, unknown>) => ({
+      .filter((tc: any) => tc.result)
+      .map((tc: any) => ({
         role: "tool",
         tool_call_id: tc.id,
         name: tc.name,
@@ -1273,36 +1073,30 @@ async function handleStreamingText(context: Record<string, unknown>) {
           typeof tc.result === "string" ? tc.result : JSON.stringify(tc.result),
       }));
     // Re-call provider with tool results appended
-    // @ts-ignore - TODO: strict typing
-    const updatedMessages = [...messages, assistantToolMsg, ...toolResultMsgs];
+        const updatedMessages = [...messages, assistantToolMsg, ...toolResultMsgs];
     // Reset accumulators for the follow-up stream
     ss.text = "";
     ss.thinking = "";
     ss.thinkingSignature = "";
     ss.toolCalls.length = 0;
-    // @ts-ignore - TODO: strict typing
-    const followUpStream = provider.generateTextStream(
+        const followUpStream = (provider as any).generateTextStream(
       updatedMessages,
       resolvedModel,
       {
-        // @ts-ignore - TODO: strict typing
-        ...options,
+                ...options,
         signal,
       },
     );
     // Use dispatchChunk with a custom usage merger for follow-up iteration
-    const usageMerger = (followUpUsage: Record<string, unknown>) => {
+    const usageMerger = (followUpUsage: any) => {
       if (ss.usage) {
         mergeUsage(ss.usage, followUpUsage);
       } else {
-        // @ts-ignore - TODO: strict typing
-        ss.usage = followUpUsage;
+                ss.usage = followUpUsage;
       }
     };
-    // @ts-ignore
-    for await ( const chunk of followUpStream) {
-      // @ts-ignore - TODO: strict typing
-      if (signal?.aborted) {
+        for await ( const chunk of followUpStream) {
+            if ((signal as any)?.aborted) {
         if (typeof followUpStream.return === "function")
           followUpStream.return();
         break;
@@ -1317,16 +1111,13 @@ async function handleStreamingText(context: Record<string, unknown>) {
     // Emit intermediate usage update so the frontend has authoritative
     // per-iteration token counts instead of relying on chunk heuristics
     if (ss.usage) {
-      // @ts-ignore - TODO: strict typing
-      emit({
+            (emit as any)({
         type: "usage_update",
-        // @ts-ignore
-        usage: { ...ss.usage, requests: fcIteration + 1 },
+                usage: { ...ss.usage, requests: fcIteration + 1 },
       });
     }
     // Update messages ref for potential next iteration
-    // @ts-ignore - TODO: strict typing
-    messages.push(assistantToolMsg, ...toolResultMsgs);
+        (messages as any).push(assistantToolMsg, ...toolResultMsgs);
   }
   // Build normalized result for shared finalization
   const now = performance.now();
@@ -1341,20 +1132,18 @@ async function handleStreamingText(context: Record<string, unknown>) {
     usage: ss.usage,
     outputCharacters: ss.outputCharacters,
     timeToGenerationSec: ss.firstTokenTime
-      // @ts-ignore - TODO: strict typing
-      ? (ss.firstTokenTime - requestStart) / 1000
+            ? (ss.firstTokenTime - (requestStart as any)) / 1000
       : null,
     generationSec:
       ss.firstTokenTime && ss.generationEnd
         ? (ss.generationEnd - ss.firstTokenTime) / 1000
         : null,
-    // @ts-ignore - TODO: strict typing
-    totalSec: (now - requestStart) / 1000,
+        totalSec: (now - (requestStart as any)) / 1000,
     rateLimits: ss.rateLimits,
   });
 }
 // ─── Dispatch: Non-streaming text generation (fallback) ─────
-async function handleNonStreamingText(context: Record<string, unknown>) {
+async function handleNonStreamingText(context: any) {
   const {
     provider,
     resolvedModel,
@@ -1368,13 +1157,11 @@ async function handleNonStreamingText(context: Record<string, unknown>) {
   } = context;
   // Mark conversation as generating
   markGenerating(
-    // @ts-ignore - TODO: strict typing
-    conversationId,
-    project,
-    username,
+        (conversationId as any),
+    (project as any),
+    (username as any),
     true,
-    // @ts-ignore - TODO: strict typing
-    getCollectionOpts(project),
+        getCollectionOpts((project as any)),
   );
   // Track this sub-request in SessionGenerationTracker if it belongs
   // to an active agent session (e.g., tools-api calling /chat?stream=false
@@ -1383,17 +1170,14 @@ async function handleNonStreamingText(context: Record<string, unknown>) {
     ? `sub-${context.requestId || crypto.randomUUID()}`
     : null;
   if (subRequestId && context.agentSessionId) {
-    // @ts-ignore - TODO: strict typing
-    SessionGenerationTracker.register(context.agentSessionId, subRequestId, {
-      // @ts-ignore
-      provider: context.providerName,
+        (SessionGenerationTracker as any).register((context.agentSessionId as any), subRequestId, {
+            provider: context.providerName,
       model: resolvedModel,
       source: "tool-sub-request",
     });
   }
   const generationStart = performance.now();
-  // @ts-ignore - TODO: strict typing
-  const genResult = await provider.generateText(
+    const genResult = await (provider as any).generateText(
     messages,
     resolvedModel,
     options,
@@ -1403,28 +1187,22 @@ async function handleNonStreamingText(context: Record<string, unknown>) {
   if (subRequestId && context.agentSessionId) {
     const outTokens = genResult.usage?.outputTokens || 0;
     if (outTokens > 0) {
-      // @ts-ignore - TODO: strict typing
-      SessionGenerationTracker.update(subRequestId, {
+            (SessionGenerationTracker as any).update((subRequestId as any), {
         outputTokens: outTokens,
       });
     }
-    // @ts-ignore - TODO: strict typing
-    SessionGenerationTracker.complete(subRequestId);
+        (SessionGenerationTracker as any).complete((subRequestId as any));
   }
   // Emit chunk/thinking/toolCall events before finalization
   if (genResult.text) {
-    // @ts-ignore - TODO: strict typing
-    emit({ type: "chunk", content: genResult.text });
+        (emit as any)({ type: "chunk", content: genResult.text });
   }
   if (genResult.thinking) {
-    // @ts-ignore - TODO: strict typing
-    emit({ type: "thinking", content: genResult.thinking });
+        (emit as any)({ type: "thinking", content: genResult.thinking });
   }
   if (genResult.toolCalls && genResult.toolCalls.length > 0) {
-    // @ts-ignore
-    for ( const tc of genResult.toolCalls) {
-      // @ts-ignore - TODO: strict typing
-      emit({
+        for ( const tc of genResult.toolCalls) {
+            (emit as any)({
         type: "toolCall",
         id: tc.id || null,
         name: tc.name,
@@ -1434,36 +1212,31 @@ async function handleNonStreamingText(context: Record<string, unknown>) {
     }
   }
   // Handle images from the generation result (e.g. Gemini image models)
-  const images: Record<string, unknown>[] = [];
+  const images: any[] = [];
   if (genResult.images && genResult.images.length > 0) {
-    // @ts-ignore
-    for ( const image of genResult.images) {
+        for ( const image of genResult.images) {
       let minioRef = null;
       if (image.data) {
         try {
           const mimeType = image.mimeType || "image/png";
           const dataUrl = `data:${mimeType};base64,${image.data}`;
-          const { ref } = await FileService.uploadFile(
+          const { ref } = await (FileService as any).uploadFile(
             dataUrl,
             "generations",
-            // @ts-ignore - TODO: strict typing
-            project,
+                        (project as any | null | undefined),
             username,
           );
           minioRef = ref;
-        } catch (uploadErr: unknown) {
+        } catch (uploadErr: any) {
           logger.error(
-            // @ts-ignore - TODO: strict typing
-            `[chat/non-stream] MinIO upload failed: ${uploadErr.message}`,
+                        `[chat/non-stream] MinIO upload failed: ${(uploadErr as Error).message}`,
           );
         }
         images.push(
-          // @ts-ignore - TODO: strict typing
-          minioRef || `data:${image.mimeType || "image/png"};base64,${image.data}`,
+                    (minioRef || `data:${image.mimeType || "image/png"};base64,${image.data}` as any),
         );
       }
-      // @ts-ignore - TODO: strict typing
-      emit({
+            (emit as any)({
         type: "image",
         data: image.data,
         mimeType: image.mimeType,
@@ -1477,7 +1250,7 @@ async function handleNonStreamingText(context: Record<string, unknown>) {
     thinking: genResult.thinking || "",
     images,
     toolCalls:
-      genResult.toolCalls?.map((tc: Record<string, unknown>) => ({
+      genResult.toolCalls?.map((tc: any) => ({
         id: tc.id || null,
         name: tc.name,
         args: tc.args || {},
@@ -1487,11 +1260,9 @@ async function handleNonStreamingText(context: Record<string, unknown>) {
     audioSampleRate: 24000,
     usage: genResult.usage || { inputTokens: 0, outputTokens: 0 },
     outputCharacters: genResult.text ? genResult.text.length : 0,
-    // @ts-ignore - TODO: strict typing
-    timeToGenerationSec: (generationStart - requestStart) / 1000,
+        timeToGenerationSec: (generationStart - (requestStart as any)) / 1000,
     generationSec: (now - generationStart) / 1000,
-    // @ts-ignore - TODO: strict typing
-    totalSec: (now - requestStart) / 1000,
+        totalSec: (now - (requestStart as any)) / 1000,
     rateLimits: genResult.rateLimits || null,
   });
 }

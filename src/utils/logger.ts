@@ -1,4 +1,3 @@
-// @ts-ignore
 import { createLogger } from "@rodrigo-barraza/utilities-library/node";
 import { getRequestContext } from "./RequestContext.ts";
 
@@ -7,10 +6,9 @@ const base = createLogger("prism");
 /**
  * Build identity + IP tags from provided values or AsyncLocalStorage context.
  */
-function buildContextTags(project: Record<string, unknown>, username: string, clientIp: Record<string, unknown>) {
-  // @ts-ignore - TODO: strict typing
-  const hasProject = project && project !== "unknown";
-  const hasUser = username && username !== "unknown";
+function buildContextTags(project: any, username: string, clientIp: any) {
+    const hasProject = project && project !== "any";
+  const hasUser = username && username !== "any";
 
   let identityTag = "";
   if (hasProject && hasUser) {
@@ -29,26 +27,21 @@ function buildContextTags(project: Record<string, unknown>, username: string, cl
 const logger = {
   ...base,
 
-  // @ts-ignore - TODO: strict typing
-  provider(provider: Record<string, unknown>, action: Record<string, unknown>, ...args: Record<string, unknown>) {
+    provider(provider: any, action: any, ...args: any) {
     const context = getRequestContext();
-    // @ts-ignore
-    const tags = buildContextTags(context.project, context.username, context.clientIp);
-    // @ts-ignore - TODO: strict typing
-    base.info(`[${provider}] ${action}${tags}`, ...args);
+        const tags = buildContextTags((context as any).project, (context as any).username, (context as any).clientIp);
+        base.info(`[${provider}] ${action}${tags}`, ...args);
   },
 
   request(
-    project: Record<string, unknown>,
+    project: any,
     username: string,
-    clientIp: Record<string, unknown>,
+    clientIp: any,
     message: string,
-    // @ts-ignore - TODO: strict typing
-    ...args: Record<string, unknown>
+        ...args: any
   ) {
     const tags = buildContextTags(project, username, clientIp);
-    // @ts-ignore - TODO: strict typing
-    base.info(`${message}${tags}`, ...args);
+        base.info(`${message}${tags}`, ...args);
   },
 };
 

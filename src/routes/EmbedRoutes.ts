@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import { ProviderError } from "../utils/errors.ts";
@@ -65,17 +64,15 @@ router.post(
       if (!isMultimodal && text) {
         content = text;
       } else {
-        const parts: Record<string, unknown>[] = [];
+        const parts: any[] = [];
 
         if (text) {
           parts.push({ text });
         }
 
-        const parseDataUrl = (data: Record<string, unknown>, fallbackMime: Record<string, unknown>) => {
-          // @ts-ignore - TODO: strict typing
-          if (typeof data === "string" && data.includes(";base64,")) {
-            // @ts-ignore - TODO: strict typing
-            const segments = data.split(";base64,");
+        const parseDataUrl = (data: any, fallbackMime: any) => {
+                    if (typeof data === "string" && (data as any).includes(";base64,")) {
+                        const segments = (data as any).split(";base64,");
             return {
               data: segments[1],
               mimeType: segments[0].replace("data:", ""),
@@ -85,34 +82,28 @@ router.post(
         };
 
         if (images && images.length > 0) {
-          // @ts-ignore
-          for ( const image of images) {
-            // @ts-ignore - TODO: strict typing
-            const { data, mimeType } = parseDataUrl(image, "image/jpeg");
+                    for ( const image of images) {
+                        const { data, mimeType } = parseDataUrl(image, ("image/jpeg" as any));
             parts.push({ inlineData: { data, mimeType } });
           }
         }
 
         if (audio) {
-          // @ts-ignore - TODO: strict typing
-          const { data, mimeType } = parseDataUrl(audio, "audio/mpeg");
+                    const { data, mimeType } = parseDataUrl(audio, ("audio/mpeg" as any));
           parts.push({ inlineData: { data, mimeType } });
         }
 
         if (video) {
-          // @ts-ignore - TODO: strict typing
-          const { data, mimeType } = parseDataUrl(video, "video/mp4");
+                    const { data, mimeType } = parseDataUrl(video, ("video/mp4" as any));
           parts.push({ inlineData: { data, mimeType } });
         }
 
         if (pdf) {
-          // @ts-ignore - TODO: strict typing
-          const { data, mimeType } = parseDataUrl(pdf, "application/pdf");
+                    const { data, mimeType } = parseDataUrl(pdf, ("application/pdf" as any));
           parts.push({ inlineData: { data, mimeType } });
         }
 
-        // @ts-ignore - TODO: strict typing
-        content = parts;
+                content = parts;
       }
 
       const result = await EmbeddingService.generate(content, {
@@ -129,7 +120,7 @@ router.post(
       });
 
       res.json(result);
-    } catch (error: unknown) {
+    } catch (error: any) {
       next(error);
     }
   }),

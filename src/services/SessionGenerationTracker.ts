@@ -65,7 +65,7 @@ const sessionIndex = new Map();
 /** @type {Map<string, SessionAccumulator>} agentSessionId → cumulative session counters */
 const sessionAccumulators = new Map();
 
-const SessionGenerationTracker = {
+const SessionGenerationTracker = ({
   /**
    * Register a new LLM request for tracking.
    *
@@ -76,12 +76,10 @@ const SessionGenerationTracker = {
 
 
    */
-  // @ts-ignore
-  register(
-    agentSessionId: Record<string, unknown>,
-    requestId: Record<string, unknown>,
-    // @ts-ignore
-    { provider, model, source = "orchestrator", workerId = null }: Record<string, unknown> = {},
+    register(
+    agentSessionId: any,
+    requestId: any,
+        { provider, model, source = "orchestrator", workerId = null }: any = {},
   ) {
     if (!agentSessionId || !requestId) return;
 
@@ -96,8 +94,8 @@ const SessionGenerationTracker = {
       outputCharacters: 0,
       inputTokens: 0,
       ttft: null,
-      provider: provider || "unknown",
-      model: model || "unknown",
+      provider: provider || "any",
+      model: model || "any",
       source,
       workerId,
     };
@@ -128,8 +126,7 @@ const SessionGenerationTracker = {
 
 
    */
-  // @ts-ignore
-  update(requestId: Record<string, unknown>, { outputTokens, inputTokens, ttft }: Record<string, unknown> = {}) {
+    update(requestId: any, { outputTokens, inputTokens, ttft }: any = {}) {
     const entry = activeRequests.get(requestId);
     if (!entry) return;
 
@@ -161,8 +158,7 @@ const SessionGenerationTracker = {
 
 
    */
-  // @ts-ignore - TODO: strict typing
-  recordChunkTiming(requestId: Record<string, unknown>, charCount: Record<string, unknown> = 0) {
+    recordChunkTiming(requestId: any, charCount: any = 0) {
     const entry = activeRequests.get(requestId);
     if (!entry) return;
     const now = performance.now();
@@ -180,7 +176,7 @@ const SessionGenerationTracker = {
    *
 
    */
-  complete(requestId: Record<string, unknown>) {
+  complete(requestId: any) {
     const entry = activeRequests.get(requestId);
     if (!entry) return;
 
@@ -249,7 +245,7 @@ const SessionGenerationTracker = {
    *   avgTtft: number|null,
    * }}
    */
-  getSessionStats(agentSessionId: Record<string, unknown>) {
+  getSessionStats(agentSessionId: any) {
     const requestIds = sessionIndex.get(agentSessionId);
     const acc = sessionAccumulators.get(agentSessionId);
     const completedOutputTokens = acc?.completedOutputTokens || 0;
@@ -261,8 +257,7 @@ const SessionGenerationTracker = {
       const totalIn = completedInputTokens;
       const avgTtft =
         ttftSamples.length > 0
-          // @ts-ignore - TODO: strict typing
-          ? ttftSamples.reduce((a: Record<string, unknown>, b: Record<string, unknown>) => a + b, 0) /
+                    ? ttftSamples.reduce((a: any, b: any) => a + b, 0) /
             ttftSamples.length
           : null;
       // Use the most recent completed tok/s (last iteration's rate)
@@ -288,8 +283,7 @@ const SessionGenerationTracker = {
     let activeTtftSum = 0;
     let activeTtftCount = 0;
 
-    // @ts-ignore
-    for ( const rid of requestIds) {
+        for ( const rid of requestIds) {
       const req = activeRequests.get(rid);
       if (!req) continue;
 
@@ -335,8 +329,7 @@ const SessionGenerationTracker = {
 
     // Average TTFT across completed + active samples
     const allTtftSum =
-      // @ts-ignore - TODO: strict typing
-      ttftSamples.reduce((a: Record<string, unknown>, b: Record<string, unknown>) => a + b, 0) + activeTtftSum;
+            ttftSamples.reduce((a: any, b: any) => a + b, 0) + activeTtftSum;
     const allTtftCount = ttftSamples.length + activeTtftCount;
     const avgTtft = allTtftCount > 0 ? allTtftSum / allTtftCount : null;
 
@@ -371,11 +364,10 @@ const SessionGenerationTracker = {
    *
 
    */
-  cleanup(agentSessionId: Record<string, unknown>) {
+  cleanup(agentSessionId: any) {
     const requestIds = sessionIndex.get(agentSessionId);
     if (requestIds) {
-      // @ts-ignore
-      for ( const rid of requestIds) {
+            for ( const rid of requestIds) {
         activeRequests.delete(rid);
       }
       sessionIndex.delete(agentSessionId);
@@ -384,12 +376,12 @@ const SessionGenerationTracker = {
   },
 
   /**
-   * Check if a session has Record<string, unknown> active requests.
+   * Check if a session has any active requests.
    *
 
 
    */
-  hasActiveRequests(agentSessionId: Record<string, unknown>) {
+  hasActiveRequests(agentSessionId: any) {
     const requestIds = sessionIndex.get(agentSessionId);
     return !!(requestIds && requestIds.size > 0);
   },
@@ -398,6 +390,6 @@ const SessionGenerationTracker = {
   get totalActiveRequests() {
     return activeRequests.size;
   },
-};
+} as any);
 
 export default SessionGenerationTracker;

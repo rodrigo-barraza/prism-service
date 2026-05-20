@@ -1,5 +1,4 @@
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS, CHANGE_STREAM_RECONNECT_MS, CHANGE_STREAM_RETRY_MS } from "../constants.ts";
@@ -21,8 +20,7 @@ const listeners = new Set();
 const streams = new Map();
 
 let available = false;
-// @ts-ignore
-let staleGeneratingInterval = null;
+let staleGeneratingInterval: any = null;
 
 // Collections to watch
 const WATCHED_COLLECTIONS = [COLLECTIONS.CONVERSATIONS, COLLECTIONS.REQUESTS];
@@ -31,25 +29,20 @@ const WATCHED_COLLECTIONS = [COLLECTIONS.CONVERSATIONS, COLLECTIONS.REQUESTS];
  * Attempt to open a Change Stream on a single collection.
  * Returns the stream if successful, null otherwise.
  */
-function openStream(db: Record<string, unknown>, collectionName: string) {
+function openStream(db: any, collectionName: string) {
   try {
-    // @ts-ignore - TODO: strict typing
-    const collection = db.collection(collectionName);
+        const collection = (db as any).collection(collectionName);
     const stream = collection.watch([], { fullDocument: "updateLookup" });
 
-    stream.on("change", (event: Record<string, unknown>) => {
+    stream.on("change", (event: any) => {
       const payload = {
         collection: collectionName,
         operationType: event.operationType,
-        // @ts-ignore - TODO: strict typing
-        documentId: event.documentKey?._id?.toString() || null,
+                documentId: (event.documentKey as any)?._id?.toString() || null,
         // For inserts/updates, include the document ID field if available
-        // @ts-ignore - TODO: strict typing
-        id: event.fullDocument?.id || null,
-        // @ts-ignore - TODO: strict typing
-        updatedFields: event.updateDescription?.updatedFields
-          // @ts-ignore - TODO: strict typing
-          ? Object.keys(event.updateDescription.updatedFields)
+                id: (event.fullDocument as any)?.id || null,
+                updatedFields: (event.updateDescription as any)?.updatedFields
+                    ? Object.keys((event.updateDescription as any).updatedFields)
           : null,
         timestamp: new Date().toISOString(),
       };
@@ -57,42 +50,33 @@ function openStream(db: Record<string, unknown>, collectionName: string) {
       // Enrich with isGenerating state for conversations
       if (collectionName === COLLECTIONS.CONVERSATIONS) {
         if (
-          // @ts-ignore - TODO: strict typing
-          event.updateDescription?.updatedFields?.isGenerating !== undefined
+                    (event.updateDescription as any)?.updatedFields?.isGenerating !== undefined
         ) {
-          // @ts-ignore
-          payload.isGenerating =
-            // @ts-ignore - TODO: strict typing
-            event.updateDescription.updatedFields.isGenerating;
-        // @ts-ignore - TODO: strict typing
-        } else if (event.fullDocument?.isGenerating !== undefined) {
-          // @ts-ignore
-          payload.isGenerating = event.fullDocument.isGenerating;
+                    (payload as any).isGenerating =
+                        (event.updateDescription as any).updatedFields.isGenerating;
+                } else if ((event.fullDocument as any)?.isGenerating !== undefined) {
+                    (payload as any).isGenerating = (event as any).fullDocument.isGenerating;
         }
       }
 
       // Broadcast to all registered listeners
-      // @ts-ignore
-      for ( const listener of listeners) {
+            for ( const listener of listeners) {
         try {
-          // @ts-ignore
-          listener(payload);
-        } catch (error: unknown) {
-          // @ts-ignore - TODO: strict typing
-          logger.error(`ChangeStream listener error: ${error.message}`);
+                    (listener as any)(payload);
+        } catch (error: any) {
+                    logger.error(`ChangeStream listener error: ${(error as Error).message}`);
         }
       }
     });
 
-    stream.on("error", (error: Record<string, unknown>) => {
+    stream.on("error", (error: any) => {
       logger.error(`ChangeStream error on ${collectionName}: ${error.message}`);
       // Attempt to re-open after a delay
       streams.delete(collectionName);
       setTimeout(() => {
         const db = MongoWrapper.getDb(MONGO_DB_NAME);
         if (db) {
-          // @ts-ignore - TODO: strict typing
-          const reopened = openStream(db, collectionName);
+                    const reopened = openStream((db as any), collectionName);
           if (reopened) {
             streams.set(collectionName, reopened);
             logger.info(`ChangeStream re-opened on ${collectionName}`);
@@ -132,10 +116,9 @@ const ChangeStreamService = {
       // If watch() succeeds without throwing, Change Streams are supported.
       // We need to close this test stream and open real ones.
       await testStream.close();
-    } catch (error: unknown) {
+    } catch (error: any) {
       logger.warn(
-        // @ts-ignore - TODO: strict typing
-        `Change Streams not available (${error.message}). ` +
+                `Change Streams not available (${(error as Error).message}). ` +
           "Admin dashboard will fall back to polling. " +
           "To enable Change Streams, configure MongoDB as a replica set.",
       );
@@ -144,10 +127,8 @@ const ChangeStreamService = {
     }
 
     // Open streams on all watched collections
-    // @ts-ignore
-    for ( const col of WATCHED_COLLECTIONS) {
-      // @ts-ignore - TODO: strict typing
-      const stream = openStream(db, col);
+        for ( const col of WATCHED_COLLECTIONS) {
+            const stream = openStream((db as any), col);
       if (stream) {
         streams.set(col, stream);
         logger.info(`ChangeStream active: ${col}`);
@@ -187,7 +168,7 @@ const ChangeStreamService = {
    * Register a listener for collection change events.
 
    */
-  subscribe(callback: Record<string, unknown>) {
+  subscribe(callback: any) {
     listeners.add(callback);
   },
 
@@ -195,7 +176,7 @@ const ChangeStreamService = {
    * Unregister a listener.
 
    */
-  unsubscribe(callback: Record<string, unknown>) {
+  unsubscribe(callback: any) {
     listeners.delete(callback);
   },
 
@@ -203,8 +184,7 @@ const ChangeStreamService = {
    * Close all Change Streams. Call on shutdown.
    */
   async close() {
-    // @ts-ignore
-    for ( const [name, stream] of streams) {
+        for ( const [name, stream] of streams) {
       try {
         await stream.close();
         logger.info(`ChangeStream closed: ${name}`);
@@ -214,9 +194,8 @@ const ChangeStreamService = {
     }
     streams.clear();
     listeners.clear();
-    // @ts-ignore
-    if (staleGeneratingInterval) {
-      clearInterval(staleGeneratingInterval);
+        if (staleGeneratingInterval) {
+      clearInterval((staleGeneratingInterval as any | number | Timeout | undefined));
       staleGeneratingInterval = null;
     }
     available = false;

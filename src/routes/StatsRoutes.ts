@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response, NextFunction } from "express";
 import logger from "../utils/logger.ts";
@@ -21,11 +20,10 @@ router.get(
   "/models",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db, username } = req;
+            const { db, username } = req;
       if (!username) return res.json([]);
 
-      const pipeline = [
+      const pipeline: any[] = [
         { $match: { username } },
         {
           $group: {
@@ -63,11 +61,9 @@ router.get(
         .toArray();
 
       res.json(
-        results.map((r: Record<string, unknown>) => ({
-          // @ts-ignore - TODO: strict typing
-          model: r._id.model,
-          // @ts-ignore - TODO: strict typing
-          provider: r._id.provider,
+        results.map((r: any) => ({
+                    model: (r as any)._id.model,
+                    provider: (r as any)._id.provider,
           totalRequests: r.totalRequests,
           totalInputTokens: r.totalInputTokens,
           totalOutputTokens: r.totalOutputTokens,
@@ -81,9 +77,8 @@ router.get(
           errorCount: r.errorCount,
         })),
       );
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`GET /stats/models error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`GET /stats/models error: ${(error as Error).message}`);
       next(error);
     }
   }),

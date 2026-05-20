@@ -1,6 +1,4 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-// @ts-ignore
 import { sleep } from "@rodrigo-barraza/utilities-library";
 import express, { Request, Response, NextFunction } from "express";
 import { getProvider } from "../providers/index.ts";
@@ -12,8 +10,7 @@ import { initSseResponse } from "../utils/SseUtilities.ts";
 const router = express.Router();
 /** Resolve instance ID from request — supports ?instance=lm-studio-2 */
 function resolveInstanceId(req: Record<string, unknown>) {
-  // @ts-ignore - TODO: strict typing
-  const id = req.query.instance || req.body?.instance || "lm-studio";
+    const id = (req as any).query.instance || (req.body as any)?.instance || "lm-studio";
   // Validate it's actually a registered instance
   if (!isInstance(id)) return "lm-studio";
   return id;
@@ -26,14 +23,12 @@ router.get(
   "/models",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const instanceId = resolveInstanceId(req);
+            const instanceId = resolveInstanceId((req as any));
       const provider = getProvider(instanceId);
       const data = await provider.listModels();
       res.json(data);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`GET /lm-studio/models error: ${error.message}`);
+            logger.error(`GET /lm-studio/models error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -59,25 +54,17 @@ router.post(
           .status(400)
           .json({ error: "Missing 'model' in request body" });
       }
-      // @ts-ignore - TODO: strict typing
-      const instanceId = resolveInstanceId(req);
+            const instanceId = resolveInstanceId((req as any));
       const provider = getProvider(instanceId);
       // Build load options from request body
-      const loadOptions = {};
-      // @ts-ignore
-      if (context_length != null) loadOptions.context_length = context_length;
-      // @ts-ignore
-      if (flash_attention != null)
-        // @ts-ignore
-        loadOptions.flash_attention = flash_attention;
-      // @ts-ignore
-      if (offload_kv_cache_to_gpu != null)
-        // @ts-ignore
-        loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
-      // @ts-ignore
-      if (eval_batch_size != null)
-        // @ts-ignore
-        loadOptions.eval_batch_size = eval_batch_size;
+      const loadOptions: Record<string, unknown> = {};
+            if (context_length != null) loadOptions.context_length = context_length;
+            if (flash_attention != null)
+                loadOptions.flash_attention = flash_attention;
+            if (offload_kv_cache_to_gpu != null)
+                loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
+            if (eval_batch_size != null)
+                loadOptions.eval_batch_size = eval_batch_size;
       // ensureModelLoaded handles: skip if already loaded, unload others, then load
       const { alreadyLoaded } = await provider.ensureModelLoaded(
         model,
@@ -91,8 +78,7 @@ router.post(
       }
       res.json({ model, alreadyLoaded: false });
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`POST /lm-studio/load error: ${error.message}`);
+            logger.error(`POST /lm-studio/load error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -135,26 +121,18 @@ router.post(
       aborted = true;
     });
     try {
-      // @ts-ignore - TODO: strict typing
-      const instanceId = resolveInstanceId(req);
+            const instanceId = resolveInstanceId((req as any));
       const provider = getProvider(instanceId);
       send({ type: "start", model });
       // Build load options
-      const loadOptions = {};
-      // @ts-ignore
-      if (context_length != null) loadOptions.context_length = context_length;
-      // @ts-ignore
-      if (flash_attention != null)
-        // @ts-ignore
-        loadOptions.flash_attention = flash_attention;
-      // @ts-ignore
-      if (offload_kv_cache_to_gpu != null)
-        // @ts-ignore
-        loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
-      // @ts-ignore
-      if (eval_batch_size != null)
-        // @ts-ignore
-        loadOptions.eval_batch_size = eval_batch_size;
+      const loadOptions: Record<string, unknown> = {};
+            if (context_length != null) loadOptions.context_length = context_length;
+            if (flash_attention != null)
+                loadOptions.flash_attention = flash_attention;
+            if (offload_kv_cache_to_gpu != null)
+                loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
+            if (eval_batch_size != null)
+                loadOptions.eval_batch_size = eval_batch_size;
       if (aborted) return res.end();
       // Check if model is already loaded and unload others if needed
       // (non-streaming part — quick check + unload)
@@ -171,10 +149,8 @@ router.post(
           needsLoad = false;
         } else {
           // Unload any other loaded models first (single-model enforcement)
-          // @ts-ignore
-          for ( const m of models || []) {
-            // @ts-ignore
-            for ( const inst of m.loaded_instances || []) {
+                    for ( const m of models || []) {
+                        for ( const inst of m.loaded_instances || []) {
               send({ type: "unloading", model: m.key });
               logger.info(
                 `[load-stream] Auto-unloading ${inst.id} before loading ${model}`,
@@ -185,8 +161,7 @@ router.post(
         }
       } catch (listErr: unknown) {
         logger.warn(
-          // @ts-ignore - TODO: strict typing
-          `[load-stream] Could not check models before loading: ${listErr.message}`,
+                    `[load-stream] Could not check models before loading: ${(listErr as Error).message}`,
         );
       }
       if (!needsLoad || aborted) {
@@ -221,20 +196,16 @@ router.post(
       await loadPromise;
       if (aborted) return res.end();
       if (loadError) {
-        // @ts-ignore
-        logger.error(`[load-stream] loadModel failed: ${loadError.message}`);
-        // @ts-ignore
-        send({ type: "error", message: loadError.message });
+                logger.error(`[load-stream] loadModel failed: ${(loadError as any).message}`);
+                send({ type: "error", message: (loadError as any).message });
       } else {
         send({ type: "progress", progress: 1 });
         send({ type: "complete" });
         logger.info(`[load-stream] Model ${model} loaded successfully`);
       }
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`POST /lm-studio/load-stream error: ${error.message}`);
-      // @ts-ignore - TODO: strict typing
-      send({ type: "error", message: error.message });
+            logger.error(`POST /lm-studio/load-stream error: ${(error as Error).message}`);
+            send({ type: "error", message: (error as Error).message });
     } finally {
       if (!res.writableEnded) res.end();
     }
@@ -255,14 +226,12 @@ router.post(
           error: "Missing 'instance_id' in request body",
         });
       }
-      // @ts-ignore - TODO: strict typing
-      const instanceId = resolveInstanceId(req);
+            const instanceId = resolveInstanceId((req as any));
       const provider = getProvider(instanceId);
       const data = await provider.unloadModel(instance_id);
       res.json(data);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`POST /lm-studio/unload error: ${error.message}`);
+            logger.error(`POST /lm-studio/unload error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -291,8 +260,7 @@ router.post(
       // Delegate to gateway — it handles the full fetch → estimate pipeline.
       // Fall back to direct gguf-arch if we need raw model data (e.g. for
       // custom gpuLayers values from the slider).
-      // @ts-ignore - TODO: strict typing
-      const instanceId = resolveInstanceId(req);
+            const instanceId = resolveInstanceId((req as any));
       const provider = getProvider(instanceId);
       const result = await provider.listModels();
       const allModels = result?.data || result?.models || [];
@@ -315,8 +283,7 @@ router.post(
       }
       res.json(estimate);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`POST /lm-studio/estimate error: ${error.message}`);
+            logger.error(`POST /lm-studio/estimate error: ${(error as Error).message}`);
       next(error);
     }
   }),

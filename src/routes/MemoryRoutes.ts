@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import MemoryService from "../services/MemoryService.ts";
@@ -43,8 +42,7 @@ router.post(
 
       res.json({ memories, count: memories.length });
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[memory/extract] ${error.message}`);
+            logger.error(`[memory/extract] ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -80,8 +78,7 @@ router.post(
 
       res.json({ memories, count: memories.length });
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[memory/search] ${error.message}`);
+            logger.error(`[memory/search] ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -96,10 +93,8 @@ router.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId, userId } = req.params;
-      // @ts-ignore - TODO: strict typing
-      const limit = parseInt(req.query.limit) || 50;
-      // @ts-ignore - TODO: strict typing
-      const skip = parseInt(req.query.skip) || 0;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const skip = parseInt(req.query.skip as string) || 0;
 
       const result = await MemoryService.list({
         agent: "LUPOS",
@@ -110,8 +105,7 @@ router.get(
       });
       res.json(result);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[memory/list] ${error.message}`);
+            logger.error(`[memory/list] ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -125,12 +119,10 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const deleted = await MemoryService.delete(req.params.id);
+            const deleted = await MemoryService.delete((req.params.id as any));
       res.json({ deleted });
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[memory/delete] ${error.message}`);
+            logger.error(`[memory/delete] ${(error as Error).message}`);
       next(error);
     }
   }),

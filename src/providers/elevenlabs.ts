@@ -2,7 +2,6 @@ import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
 import WebSocket from "ws";
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
-// @ts-ignore
 import { ELEVENLABS_API_KEY } from "../../config.ts";
 import { TYPES, DEFAULT_VOICES, getDefaultModels } from "../config.ts";
 
@@ -13,17 +12,15 @@ function getApiKey() {
   return ELEVENLABS_API_KEY;
 }
 
-const elevenlabsProvider = {
+const elevenlabsProvider = ({
   name: "elevenlabs",
 
   async generateSpeech(
-    text: Record<string, unknown>,
-    // @ts-ignore - TODO: strict typing
-    voiceId: Record<string, unknown> = DEFAULT_VOICES.elevenlabs,
+    text: any,
+        voiceId: any = DEFAULT_VOICES.elevenlabs,
     options: ProviderOptions = {},
   ) {
-    // @ts-ignore - TODO: strict typing
-    logger.provider("ElevenLabs", `generateSpeech voiceId=${voiceId}`);
+        (logger.provider as any)(("ElevenLabs" as any), (`generateSpeech voiceId=${voiceId}` as any));
     try {
       const apiKey = getApiKey();
       const response = await fetch(
@@ -38,15 +35,11 @@ const elevenlabsProvider = {
           body: JSON.stringify({
             text,
             model_id:
-              // @ts-ignore
-              options.modelId ||
-              // @ts-ignore
-              getDefaultModels(TYPES.TEXT, TYPES.AUDIO).elevenlabs,
+                            options.modelId ||
+                            getDefaultModels(TYPES.TEXT, TYPES.AUDIO).elevenlabs,
             voice_settings: {
-              // @ts-ignore
-              stability: options.stability || 0.5,
-              // @ts-ignore
-              similarity_boost: options.similarityBoost || 0.8,
+                            stability: options.stability || 0.5,
+                            similarity_boost: options.similarityBoost || 0.8,
             },
           }),
         },
@@ -60,10 +53,9 @@ const elevenlabsProvider = {
       }
 
       return { stream: response.body, contentType: "audio/mpeg" };
-    } catch (error: unknown) {
+    } catch (error: any) {
       if (error instanceof ProviderError) throw error;
-      // @ts-ignore - TODO: strict typing
-      throw new ProviderError("elevenlabs", error.message, 500, error);
+            throw new ProviderError("elevenlabs", (error as Error).message, 500, error);
     }
   },
 
@@ -74,17 +66,14 @@ const elevenlabsProvider = {
    * @returns {AsyncGenerator<Buffer>} Audio chunks.
    */
   async *generateSpeechStream(
-    textStream: Record<string, unknown>,
-    // @ts-ignore - TODO: strict typing
-    voiceId: Record<string, unknown> = DEFAULT_VOICES.elevenlabs,
+    textStream: any,
+        voiceId: any = DEFAULT_VOICES.elevenlabs,
     options: ProviderOptions = {},
   ) {
-    // @ts-ignore - TODO: strict typing
-    logger.provider("ElevenLabs", `generateSpeechStream voiceId=${voiceId}`);
+        (logger.provider as any)(("ElevenLabs" as any), (`generateSpeechStream voiceId=${voiceId}` as any));
     const apiKey = getApiKey();
     const modelId =
-      // @ts-ignore
-      options.modelId || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).elevenlabs;
+            options.modelId || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).elevenlabs;
     const wsUrl = `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input?model_id=${modelId}`;
 
     const ws = new WebSocket(wsUrl, {
@@ -92,12 +81,9 @@ const elevenlabsProvider = {
     });
 
     // Wait for connection
-    // @ts-ignore - TODO: strict typing
-    await new Promise((resolve: Record<string, unknown>, reject: Record<string, unknown>) => {
-      // @ts-ignore - TODO: strict typing
-      ws.on("open", resolve);
-      // @ts-ignore - TODO: strict typing
-      ws.on("error", reject);
+        await new Promise((resolve: any, reject: any) => {
+            ws.on("open", resolve);
+            ws.on("error", reject);
     });
 
     // Send initial config
@@ -105,29 +91,23 @@ const elevenlabsProvider = {
       JSON.stringify({
         text: " ",
         voice_settings: {
-          // @ts-ignore
-          stability: options.stability || 0.5,
-          // @ts-ignore
-          similarity_boost: options.similarityBoost || 0.8,
+                    stability: options.stability || 0.5,
+                    similarity_boost: options.similarityBoost || 0.8,
         },
         xi_api_key: apiKey,
       }),
     );
 
     // Message queue for yielding in order
-    // @ts-ignore
-    const messageQueue: Record<string, unknown>[] = [];
-    // @ts-ignore
-    let resolveMessage = null;
+        const messageQueue: any[] = [];
+        let resolveMessage: any = null;
     let ended = false;
     let error = null;
 
-    ws.on("message", (data: Record<string, unknown>) => {
-      // @ts-ignore - TODO: strict typing
-      const response = JSON.parse(data);
+    ws.on("message", (data: any) => {
+            const response = JSON.parse((data as any));
       messageQueue.push(response);
-      // @ts-ignore
-      if (resolveMessage) {
+            if (resolveMessage) {
         const resolve = resolveMessage;
         resolveMessage = null;
         resolve();
@@ -136,28 +116,23 @@ const elevenlabsProvider = {
 
     ws.on("close", () => {
       ended = true;
-      // @ts-ignore
-      if (resolveMessage) resolveMessage();
+            if (resolveMessage) resolveMessage();
     });
 
-    ws.on("error", (wsError: Record<string, unknown>) => {
+    ws.on("error", (wsError: any) => {
       error = wsError;
-      // @ts-ignore
-      if (resolveMessage) resolveMessage();
+            if (resolveMessage) resolveMessage();
     });
 
     // Send text in background
     (async () => {
       try {
         let buffer = "";
-        // @ts-ignore
-        for await ( const chunk of textStream) {
+                for await ( const chunk of textStream) {
           buffer += chunk;
-          let match: Record<string, unknown>;
-          // @ts-ignore - TODO: strict typing
-          while ((match = buffer.match(/([.!?]+)\s/))) {
-            // @ts-ignore - TODO: strict typing
-            const cutIndex = match.index + match[0].length;
+          let match: any;
+                    while ((match = buffer.match(/([.!?]+)\s/))) {
+                        const cutIndex = match.index + (match as any)[0].length;
             const sentence = buffer.slice(0, cutIndex);
             buffer = buffer.slice(cutIndex);
             if (ws.readyState === WebSocket.OPEN) {
@@ -182,7 +157,7 @@ const elevenlabsProvider = {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ text: "" }));
         }
-      } catch (error: unknown) {
+      } catch (error: any) {
         logger.error("Error sending to ElevenLabs WS:", error);
         ws.close();
       }
@@ -192,24 +167,18 @@ const elevenlabsProvider = {
     try {
       while (true) {
         if (messageQueue.length > 0) {
-          // @ts-ignore
-          const message = messageQueue.shift();
-          // @ts-ignore - TODO: strict typing
-          if (message.audio) {
-            // @ts-ignore - TODO: strict typing
-            yield Buffer.from(message.audio, "base64");
+                    const message = messageQueue.shift();
+                    if (message.audio) {
+                        yield Buffer.from(message.audio, "base64");
           }
-          // @ts-ignore - TODO: strict typing
-          if (message.isFinal) {
+                    if (message.isFinal) {
             break;
           }
         } else {
           if (error)
-            // @ts-ignore
-            throw new ProviderError("elevenlabs", error.message, 500, error);
+                        throw new ProviderError("elevenlabs", (error as any).message, 500, error);
           if (ended) break;
-          // @ts-ignore - TODO: strict typing
-          await new Promise((r: Record<string, unknown>) => (resolveMessage = r));
+                    await new Promise(((r: any) => (resolveMessage = r) as any as (resolve: (value: any) => void, reject: (reason?: any) => void) => void));
         }
       }
     } finally {
@@ -218,6 +187,6 @@ const elevenlabsProvider = {
       }
     }
   },
-};
+} as any);
 
 export default elevenlabsProvider;

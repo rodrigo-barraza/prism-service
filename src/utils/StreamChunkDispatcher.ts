@@ -18,10 +18,9 @@ import logger from "./logger.ts";
 
 
  */
-export function stripToolCallMarkup(text: Record<string, unknown>) {
+export function stripToolCallMarkup(text: any) {
   return (
-    // @ts-ignore - TODO: strict typing
-    text
+        (text as any)
       // Completed tag pairs
       .replace(/<\|?tool_call\|?>[\s\S]*?<\/?\|?tool_call\|?>/gi, "")
       .replace(/<\|?tool_response\|?>[\s\S]*?<\/?\|?tool_response\|?>/gi, "")
@@ -42,27 +41,24 @@ export function stripToolCallMarkup(text: Record<string, unknown>) {
  * @returns {Promise<string|null>} MinIO ref, or null on failure
  */
 export async function uploadImageChunk(
-  chunk: Record<string, unknown>,
-  project: Record<string, unknown>,
+  chunk: any,
+  project: any,
   username: string,
-  // @ts-ignore - TODO: strict typing
-  logPrefix: Record<string, unknown> = "stream",
+    logPrefix: any = "stream",
 ) {
   if (!chunk.data) return null;
   try {
     const mimeType = chunk.mimeType || "image/png";
     const dataUrl = `data:${mimeType};base64,${chunk.data}`;
-    const { ref } = await FileService.uploadFile(
+    const { ref } = await (FileService as any).uploadFile(
       dataUrl,
       "generations",
-      // @ts-ignore - TODO: strict typing
-      project,
+            (project as any),
       username,
     );
     return ref;
-  } catch (error: unknown) {
-    // @ts-ignore - TODO: strict typing
-    logger.error(`[${logPrefix}] MinIO upload failed: ${error.message}`);
+  } catch (error: any) {
+        logger.error(`[${logPrefix}] MinIO upload failed: ${(error as Error).message}`);
     return null;
   }
 }
@@ -74,10 +70,9 @@ export async function uploadImageChunk(
 
  */
 export function imageRefOrInline(
-  minioRef: Record<string, unknown>,
-  data: Record<string, unknown>,
-  // @ts-ignore - TODO: strict typing
-  mimeType: Record<string, unknown> = "image/png",
+  minioRef: any,
+  data: any,
+    mimeType: any = "image/png",
 ) {
   return minioRef || `data:${mimeType};base64,${data}`;
 }
@@ -110,26 +105,23 @@ export function imageRefOrInline(
  * @returns {Promise<boolean>} true if chunk was handled, false if unrecognised
  */
 export async function dispatchChunk(
-  chunk: Record<string, unknown>,
-  state: Record<string, unknown>,
-  context: Record<string, unknown>,
-  options: Record<string, unknown> = {},
+  chunk: any,
+  state: any,
+  context: any,
+  options: any = {},
 ) {
   const { emit, project, username } = context;
-  // @ts-ignore
-  const logPrefix = options.logPrefix || "stream";
+    const logPrefix = options.logPrefix || "stream";
 
   // Non-object chunks are treated as text (raw string from provider)
   if (!chunk || typeof chunk !== "object") {
     if (!state.firstTokenTime) {
       state.firstTokenTime = performance.now();
       if (state.requestStart) {
-        // @ts-ignore - TODO: strict typing
-        emit({
+                (emit as any)({
           type: "status",
           message: "generation_started",
-          // @ts-ignore - TODO: strict typing
-          timeToFirstToken: (state.firstTokenTime - state.requestStart) / 1000,
+                    timeToFirstToken: ((state as any).firstTokenTime - state.requestStart) / 1000,
         });
       }
     }
@@ -137,13 +129,11 @@ export async function dispatchChunk(
     const rawStr = typeof chunk === "string" ? chunk : "";
     state.text += rawStr;
     // Strip tool call XML markup leaked by some local models (Gemma 4)
-    // @ts-ignore - TODO: strict typing
-    const cleanText = stripToolCallMarkup(state.text);
+        const cleanText = stripToolCallMarkup((state.text as any));
     const chunkStr = cleanText.slice(state.outputCharacters);
     state.outputCharacters = cleanText.length;
     if (chunkStr)
-      // @ts-ignore - TODO: strict typing
-      emit({
+            (emit as any)({
         type: "chunk",
         content: chunkStr,
         outputCharacters: state.outputCharacters,
@@ -153,10 +143,8 @@ export async function dispatchChunk(
 
   switch (chunk.type) {
     case "usage":
-      // @ts-ignore
-      if (options.onUsage) {
-        // @ts-ignore
-        options.onUsage(chunk.usage);
+            if (options.onUsage) {
+                options.onUsage(chunk.usage);
       } else {
         state.usage = chunk.usage;
       }
@@ -170,23 +158,18 @@ export async function dispatchChunk(
       if (!state.firstTokenTime) {
         state.firstTokenTime = performance.now();
         if (state.requestStart) {
-          // @ts-ignore - TODO: strict typing
-          emit({
+                    (emit as any)({
             type: "status",
             message: "generation_started",
             timeToFirstToken:
-              // @ts-ignore - TODO: strict typing
-              (state.firstTokenTime - state.requestStart) / 1000,
+                            ((state as any).firstTokenTime - state.requestStart) / 1000,
           });
         }
       }
       state.generationEnd = performance.now();
-      // @ts-ignore - TODO: strict typing
-      state.thinking += chunk.content;
-      // @ts-ignore - TODO: strict typing
-      state.outputCharacters += (chunk.content || "").length;
-      // @ts-ignore - TODO: strict typing
-      emit({
+            (state as any).thinking += (chunk as any).content;
+            (state as any).outputCharacters += ((chunk.content || "") as any).length;
+            (emit as any)({
         type: "thinking",
         content: chunk.content,
         outputCharacters: state.outputCharacters,
@@ -200,20 +183,16 @@ export async function dispatchChunk(
     case "image": {
       const minioRef = await uploadImageChunk(
         chunk,
-        // @ts-ignore - TODO: strict typing
-        project,
-        username,
-        logPrefix,
+                (project as any),
+        (username as any),
+        (logPrefix as any),
       );
       if (chunk.data) {
-        // @ts-ignore - TODO: strict typing
-        state.images.push(
-          // @ts-ignore - TODO: strict typing
-          imageRefOrInline(minioRef, chunk.data, chunk.mimeType),
+                (state as any).images.push(
+                    imageRefOrInline((minioRef as any), (chunk.data as any), (chunk.mimeType as any | undefined)),
         );
       }
-      // @ts-ignore - TODO: strict typing
-      emit({
+            (emit as any)({
         type: "image",
         data: chunk.data,
         mimeType: chunk.mimeType,
@@ -223,8 +202,7 @@ export async function dispatchChunk(
     }
 
     case "executableCode":
-      // @ts-ignore - TODO: strict typing
-      emit({
+            (emit as any)({
         type: "executableCode",
         code: chunk.code,
         language: chunk.language,
@@ -232,8 +210,7 @@ export async function dispatchChunk(
       return true;
 
     case "codeExecutionResult":
-      // @ts-ignore - TODO: strict typing
-      emit({
+            (emit as any)({
         type: "codeExecutionResult",
         output: chunk.output,
         outcome: chunk.outcome,
@@ -241,18 +218,14 @@ export async function dispatchChunk(
       return true;
 
     case "webSearchResult":
-      // @ts-ignore - TODO: strict typing
-      emit({ type: "webSearchResult", results: chunk.results });
+            (emit as any)({ type: "webSearchResult", results: chunk.results });
       return true;
 
     case "audio":
-      // @ts-ignore - TODO: strict typing
-      emit({ type: "audio", data: chunk.data, mimeType: chunk.mimeType });
-      // @ts-ignore - TODO: strict typing
-      if (chunk.data) state.audioChunks.push(chunk.data);
+            (emit as any)({ type: "audio", data: chunk.data, mimeType: chunk.mimeType });
+            if (chunk.data) (state as any).audioChunks.push(chunk.data);
       if (chunk.mimeType) {
-        // @ts-ignore - TODO: strict typing
-        const rateMatch = chunk.mimeType.match(/rate=(\d+)/);
+                const rateMatch = (chunk.mimeType as any).match(/rate=(\d+)/);
         if (rateMatch) state.audioSampleRate = parseInt(rateMatch[1], 10);
       }
       return true;
@@ -262,22 +235,19 @@ export async function dispatchChunk(
       if (!state.firstTokenTime) {
         state.firstTokenTime = performance.now();
         if (state.requestStart) {
-          // @ts-ignore - TODO: strict typing
-          emit({
+                    (emit as any)({
             type: "status",
             message: "generation_started",
             timeToFirstToken:
-              // @ts-ignore - TODO: strict typing
-              (state.firstTokenTime - state.requestStart) / 1000,
+                            ((state as any).firstTokenTime - state.requestStart) / 1000,
           });
         }
       }
       state.generationEnd = performance.now();
 
       if (chunk.status === "done" || chunk.status === "error") {
-        // @ts-ignore - TODO: strict typing
-        const existing = state.toolCalls.find(
-          (tc: Record<string, unknown>) =>
+                const existing = (state as any).toolCalls.find(
+          (tc: any) =>
             (chunk.id && tc.id === chunk.id) ||
             (!chunk.id && tc.name === chunk.name && !tc.result),
         );
@@ -289,8 +259,7 @@ export async function dispatchChunk(
           }
         }
       } else {
-        // @ts-ignore - TODO: strict typing
-        state.toolCalls.push({
+                (state as any).toolCalls.push({
           id: chunk.id || null,
           name: chunk.name,
           args: chunk.args || {},
@@ -299,8 +268,7 @@ export async function dispatchChunk(
           thoughtSignature: chunk.thoughtSignature || undefined,
         });
       }
-      // @ts-ignore - TODO: strict typing
-      emit({
+            (emit as any)({
         type: "toolCall",
         id: chunk.id || null,
         name: chunk.name,
@@ -317,24 +285,20 @@ export async function dispatchChunk(
       if (!state.firstTokenTime) {
         state.firstTokenTime = performance.now();
         if (state.requestStart) {
-          // @ts-ignore - TODO: strict typing
-          emit({
+                    (emit as any)({
             type: "status",
             message: "generation_started",
             timeToFirstToken:
-              // @ts-ignore - TODO: strict typing
-              (state.firstTokenTime - state.requestStart) / 1000,
+                            ((state as any).firstTokenTime - state.requestStart) / 1000,
           });
         }
       }
       state.generationEnd = performance.now();
-      // @ts-ignore - TODO: strict typing
-      state.outputCharacters += Math.ceil((chunk.characters || 0) / 4);
+            (state as any).outputCharacters += Math.ceil((chunk.characters || 0) / 4);
       return true;
 
     case "status":
-      // @ts-ignore - TODO: strict typing
-      emit({
+            (emit as any)({
         type: "status",
         message: chunk.message,
         phase: chunk.phase,
@@ -347,13 +311,11 @@ export async function dispatchChunk(
       if (!state.firstTokenTime) {
         state.firstTokenTime = performance.now();
         if (state.requestStart) {
-          // @ts-ignore - TODO: strict typing
-          emit({
+                    (emit as any)({
             type: "status",
             message: "generation_started",
             timeToFirstToken:
-              // @ts-ignore - TODO: strict typing
-              (state.firstTokenTime - state.requestStart) / 1000,
+                            ((state as any).firstTokenTime - state.requestStart) / 1000,
           });
         }
       }
@@ -361,13 +323,11 @@ export async function dispatchChunk(
       const rawStr = typeof chunk === "string" ? chunk : "";
       state.text += rawStr;
       // Strip tool call XML markup leaked by some local models (Gemma 4)
-      // @ts-ignore - TODO: strict typing
-      const cleanText = stripToolCallMarkup(state.text);
+            const cleanText = stripToolCallMarkup((state.text as any));
       const chunkStr = cleanText.slice(state.outputCharacters);
       state.outputCharacters = cleanText.length;
       if (chunkStr)
-        // @ts-ignore - TODO: strict typing
-        emit({
+                (emit as any)({
           type: "chunk",
           content: chunkStr,
           outputCharacters: state.outputCharacters,

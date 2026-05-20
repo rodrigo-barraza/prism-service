@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import FileService from "../services/FileService.ts";
@@ -21,11 +20,10 @@ router.post(
         return res.status(400).json({ error: "Missing required field: data" });
       }
 
-      const result = await FileService.uploadFile(data);
+      const result = await (FileService as any).uploadFile(data);
       res.json(result);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`File upload error: ${error.message}`);
+            logger.error(`File upload error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -47,18 +45,16 @@ router.get(
         return res.status(400).json({ error: "Missing file key" });
       }
 
-      const result = await FileService.getFile(key);
+      const result = await (FileService as any).getFile(key);
       if (!result) {
         return res.status(404).json({ error: "File not found" });
       }
 
       res.setHeader("Content-Type", result.contentType);
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-      // @ts-ignore - TODO: strict typing
-      result.stream.pipe(res);
+            (result as any).stream.pipe(res);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`File retrieval error: ${error.message}`);
+            logger.error(`File retrieval error: ${(error as Error).message}`);
       next(error);
     }
   }),

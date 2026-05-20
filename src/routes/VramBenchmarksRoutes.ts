@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response, NextFunction } from "express";
 import logger from "../utils/logger.ts";
@@ -25,30 +24,24 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
       const filter = { error: null };
 
       if (req.query.settings) {
-        // @ts-ignore
-        filter["settings.label"] = req.query.settings;
+                (filter as any)["settings.label"] = req.query.settings;
       }
       if (req.query.hostname) {
-        // @ts-ignore
-        filter["system.hostname"] = req.query.hostname;
+                (filter as any)["system.hostname"] = req.query.hostname;
       }
       if (req.query.ctx) {
-        // @ts-ignore
-        filter.contextLength = parseInt(req.query.ctx);
+                (filter as any).contextLength = parseInt((req.query.ctx as any));
       }
       if (req.query.provider) {
-        // @ts-ignore
-        filter.provider = req.query.provider;
+                (filter as any).provider = req.query.provider;
       }
 
-      // @ts-ignore - TODO: strict typing
-      const limit = Math.min(parseInt(req.query.limit) || 2000, 10000);
+            const limit = Math.min(parseInt((req.query.limit as any)) || 2000, 10000);
 
       // Full projection — includes all measurement fields from the benchmark script
       const projection = {
@@ -116,9 +109,8 @@ router.get(
         .toArray();
 
       res.json({ count: docs.length, data: docs });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`GET /vram-benchmarks error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`GET /vram-benchmarks error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -132,10 +124,9 @@ router.get(
   "/machines",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
-      const pipeline = [
+      const pipeline: any[] = [
         { $match: { "system.hostname": { $exists: true } } },
         {
           $group: {
@@ -163,11 +154,10 @@ router.get(
         .toArray();
 
       res.json(
-        machines.map((m: Record<string, unknown>) => ({
+        machines.map((m: any) => ({
           hostname: m._id,
           gpu: m.gpu,
-          // @ts-ignore - TODO: strict typing
-          gpuVramGB: m.gpuVramMiB ? Math.round(m.gpuVramMiB / 1024) : null,
+                    gpuVramGB: m.gpuVramMiB ? Math.round(m.gpuVramMiB / 1024) : null,
           gpuVendor: m.gpuVendor || null,
           gpuDriver: m.gpuDriver || null,
           cpu: m.cpu,
@@ -180,9 +170,8 @@ router.get(
           lastRun: m.lastRun,
         })),
       );
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`GET /vram-benchmarks/machines error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`GET /vram-benchmarks/machines error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -196,27 +185,22 @@ router.get(
   "/settings",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
       const labels = await db
         .collection(COLLECTION)
         .distinct("settings.label", { error: null });
 
       // Sort with "default" first, then alphabetically
-      labels.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
-        // @ts-ignore - TODO: strict typing
-        if (a === "default") return -1;
-        // @ts-ignore - TODO: strict typing
-        if (b === "default") return 1;
-        // @ts-ignore - TODO: strict typing
-        return a.localeCompare(b);
+      labels.sort((a: any, b: any) => {
+                if (a === "default") return -1;
+                if (b === "default") return 1;
+                return (a as any).localeCompare(b);
       });
 
       res.json(labels);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`GET /vram-benchmarks/settings error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`GET /vram-benchmarks/settings error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -230,26 +214,22 @@ router.get(
   "/contexts",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
       const filter = { error: null };
       if (req.query.settings) {
-        // @ts-ignore
-        filter["settings.label"] = req.query.settings;
+                (filter as any)["settings.label"] = req.query.settings;
       }
 
       const contexts = await db
         .collection(COLLECTION)
         .distinct("contextLength", filter);
 
-      // @ts-ignore - TODO: strict typing
-      contexts.sort((a: Record<string, unknown>, b: Record<string, unknown>) => a - b);
+            contexts.sort((a: any, b: any) => a - b);
 
       res.json(contexts);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`GET /vram-benchmarks/contexts error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`GET /vram-benchmarks/contexts error: ${(error as Error).message}`);
       next(error);
     }
   }),

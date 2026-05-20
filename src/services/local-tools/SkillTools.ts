@@ -57,7 +57,7 @@ const skillCreate = {
   },
   domain: "Agentic: Skills",
   labels: ["coding", "automation"],
-  async execute(args: Record<string, unknown>) {
+  async execute(args: any) {
     const { default: SkillService } = await import("../SkillService.js");
     return SkillService.create(args);
   },
@@ -89,12 +89,11 @@ const skillExecute = {
   },
   domain: "Agentic: Skills",
   labels: ["coding", "automation"],
-  async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
+  async execute(args: any, context: any) {
     const { default: SkillService } = await import("../SkillService.js");
     const prepared = await SkillService.prepare(
-      // @ts-ignore - TODO: strict typing
-      args.skillId,
-      args.variables || {},
+            (args.skillId as any),
+      (args.variables || {} as any),
     );
     if (prepared.error) return prepared;
 
@@ -112,8 +111,7 @@ const skillExecute = {
           {
             description: `Skill: ${prepared.name}`,
             prompt: prepared.prompt,
-            // @ts-ignore
-            model: prepared.config.model || undefined,
+                        model: prepared.config.model || undefined,
           },
         ],
       },
@@ -141,10 +139,9 @@ const skillList = {
   },
   domain: "Agentic: Skills",
   labels: ["coding", "automation"],
-  async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
+  async execute(args: any, context: any) {
     const { default: SkillService } = await import("../SkillService.js");
-    // @ts-ignore
-    return SkillService.list({ project: args.project || context.project });
+        return SkillService.list({ project: args.project || context.project });
   },
 };
 
@@ -163,10 +160,9 @@ const skillDelete = {
   },
   domain: "Agentic: Skills",
   labels: ["coding", "automation"],
-  async execute(args: Record<string, unknown>) {
+  async execute(args: any) {
     const { default: SkillService } = await import("../SkillService.js");
-    // @ts-ignore - TODO: strict typing
-    return SkillService.delete(args.skillId);
+        return SkillService.delete((args.skillId as any));
   },
 };
 

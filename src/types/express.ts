@@ -34,8 +34,7 @@ export type RouteHandler = (
 
 /**
  * MongoDB filter object — used for building query filters dynamically.
- * Replaces `const filter = {}; // @ts-ignore filter.project = X;`
- */
+ * Replaces `const filter = {};  */
 export type MongoFilter = Record<string, unknown>;
 
 /**

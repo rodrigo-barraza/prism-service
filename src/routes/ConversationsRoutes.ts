@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
@@ -27,11 +26,9 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const limit = Math.min(
-        // @ts-ignore - TODO: strict typing
-        Math.max(parseInt(req.query.limit, 10) || 50, 1),
+                Math.max(parseInt((req.query.limit as any), 10) || 50, 1),
         200,
       );
       const cursor = req.query.cursor || null;
@@ -40,8 +37,7 @@ router.get(
       if (cursor) {
         // updatedAt is stored as ISO-8601 strings — compare string-to-string
         // to match BSON type and allow index range scan
-        // @ts-ignore
-        filter.updatedAt = { $lt: cursor };
+                (filter as any).updatedAt = { $lt: cursor };
       }
 
       // Fetch limit + 1 to detect if there's a next page
@@ -71,9 +67,8 @@ router.get(
       const nextCursor = hasMore ? items[items.length - 1].updatedAt : null;
 
       res.json({ items, nextCursor, hasMore });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error fetching conversations: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error fetching conversations: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -87,8 +82,7 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const conversation = await db
         .collection(COLLECTION)
         .findOne({ id: req.params.id, project, username });
@@ -98,9 +92,8 @@ router.get(
       }
 
       res.json(conversation);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error fetching conversation: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error fetching conversation: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -114,8 +107,7 @@ router.get(
   "/:id/workflows",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
       const workflows = await db
         .collection("workflows")
@@ -124,9 +116,8 @@ router.get(
         .toArray();
 
       res.json(workflows);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error fetching conversation workflows: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error fetching conversation workflows: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -149,9 +140,8 @@ router.post(
           .json({ error: "messages must be a non-empty array" });
       }
 
-      const conversation = await ConversationService.appendMessages(
-        // @ts-ignore - TODO: strict typing
-        req.params.id,
+      const conversation = await (ConversationService as any).appendMessages(
+                (req.params.id as any),
         project,
         username,
         messages,
@@ -159,9 +149,8 @@ router.post(
       );
 
       res.json(conversation);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error appending messages: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error appending messages: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -176,8 +165,7 @@ router.patch(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const setFields = buildConversationPatchFields(req.body);
 
       const result = await db
@@ -196,9 +184,8 @@ router.patch(
         .findOne({ id: req.params.id, project, username });
 
       res.json(conversation);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error patching conversation: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error patching conversation: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -212,8 +199,7 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const result = await db
         .collection(COLLECTION)
         .deleteOne({ id: req.params.id, project, username });
@@ -223,9 +209,8 @@ router.delete(
       }
 
       res.json({ success: true, id: req.params.id });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error deleting conversation: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error deleting conversation: ${(error as Error).message}`);
       next(error);
     }
   }),

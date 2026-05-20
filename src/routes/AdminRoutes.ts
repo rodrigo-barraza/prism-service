@@ -1,8 +1,6 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.ts";
 import { getProvider } from "../providers/index.ts";
 import ChangeStreamService from "../services/ChangeStreamService.ts";
@@ -19,13 +17,11 @@ import {
 } from "../constants.ts";
 import AgentPersonaRegistry from "../services/AgentPersonaRegistry.ts";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
-// @ts-ignore
 import {
   MS_PER_MINUTE,
   MS_PER_HOUR,
   hours as hoursToMs,
   minutes,
-// @ts-ignore
 } from "@rodrigo-barraza/utilities-library";
 import os from "os";
 
@@ -60,34 +56,22 @@ router.get(
         order = "desc",
       } = req.query;
 
-      const filter = {};
-      // @ts-ignore
-      if (project) filter.project = project;
-      // @ts-ignore
-      if (username) filter.username = username;
-      // @ts-ignore
-      if (provider) filter.provider = provider;
-      // @ts-ignore
-      if (model) filter.model = model;
-      // @ts-ignore
-      if (endpoint) filter.endpoint = endpoint;
-      // @ts-ignore
-      if (operation) filter.operation = operation;
-      // @ts-ignore
-      if (success !== undefined) filter.success = success === "true";
+      const filter: any = {};
+            if (project) filter.project = project;
+            if (username) filter.username = username;
+            if (provider) filter.provider = provider;
+            if (model) filter.model = model;
+            if (endpoint) filter.endpoint = endpoint;
+            if (operation) filter.operation = operation;
+            if (success !== undefined) filter.success = success === "true";
       if (from || to) {
-        // @ts-ignore
-        filter.timestamp = {};
-        // @ts-ignore
-        if (from) filter.timestamp.$gte = from;
-        // @ts-ignore
-        if (to) filter.timestamp.$lte = to;
+                filter.timestamp = {};
+                if (from) (filter as any).timestamp.$gte = from;
+                if (to) (filter as any).timestamp.$lte = to;
       }
 
-      // @ts-ignore - TODO: strict typing
-      const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-      // @ts-ignore - TODO: strict typing
-      const lim = parseInt(limit, 10);
+            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
+            const lim = parseInt((limit as any), 10);
       const sortDir = order === "asc" ? 1 : -1;
 
       const [docs, total] = await Promise.all([
@@ -96,19 +80,16 @@ router.get(
           .find(filter, {
             projection: { requestPayload: 0, responsePayload: 0 },
           })
-          // @ts-ignore - TODO: strict typing
-          .sort({ [sort]: sortDir })
+                    .sort({ [sort]: sortDir })
           .skip(skip)
           .limit(lim)
           .toArray(),
         db.collection(REQUESTS_COL).countDocuments(filter),
       ]);
 
-      // @ts-ignore - TODO: strict typing
-      res.json({ data: docs, total, page: parseInt(page, 10), limit: lim });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /requests error: ${error.message}`);
+            res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
+    } catch (error: any) {
+            logger.error(`Admin /requests error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -128,9 +109,8 @@ router.get(
       if (!document) return res.status(404).json({ error: "Request not found" });
 
       res.json(document);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /requests/:id error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /requests/:id error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -149,9 +129,9 @@ router.get(
         .findOne({ requestId: req.params.id });
       if (!request) return res.status(404).json({ error: "Request not found" });
 
-      let conversations: Record<string, unknown>[] = [];
-      let workflows: Record<string, unknown>[] = [];
-      let traces: Record<string, unknown>[] = [];
+      let conversations: any[] = [];
+      let workflows: any[] = [];
+      let traces: any[] = [];
 
       if (request.conversationId) {
         // Find conversations matching this conversationId
@@ -181,9 +161,8 @@ router.get(
           .toArray();
 
         // Normalize _id to string id
-        workflows = workflows.map((w: Record<string, unknown>) => ({
-          // @ts-ignore - TODO: strict typing
-          id: w._id.toString(),
+        workflows = workflows.map((w: any) => ({
+                    id: (w as any)._id.toString(),
           name: w.name || "Untitled Workflow",
           nodeCount: w.nodeCount || 0,
           edgeCount: w.edgeCount || 0,
@@ -192,8 +171,7 @@ router.get(
 
         // Derive traces from requests — traces are no longer a collection
         const traceIds = new Set();
-        // @ts-ignore
-        for ( const c of conversations) {
+                for ( const c of conversations) {
           if (c.traceId) traceIds.add(c.traceId);
         }
         if (traceIds.size > 0) {
@@ -214,7 +192,7 @@ router.get(
               },
             ])
             .toArray();
-          traces = traceAgg.map((s: Record<string, unknown>) => ({
+          traces = traceAgg.map((s: any) => ({
             id: s._id,
             project: s.project,
             username: s.username,
@@ -226,9 +204,8 @@ router.get(
       }
 
       res.json({ conversations, workflows, traces });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /requests/:id/associations error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /requests/:id/associations error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -243,19 +220,15 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { from, to, project } = req.query;
-      const match = {};
-      // @ts-ignore
-      if (project) match.project = project;
+      const match: any = {};
+            if (project) match.project = project;
       if (from || to) {
-        // @ts-ignore
-        match.timestamp = {};
-        // @ts-ignore
-        if (from) match.timestamp.$gte = from;
-        // @ts-ignore
-        if (to) match.timestamp.$lte = to;
+                match.timestamp = {};
+                if (from) match.timestamp.$gte = from;
+                if (to) match.timestamp.$lte = to;
       }
 
-      const pipeline = [
+      const pipeline: any[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
         {
           $group: {
@@ -278,7 +251,7 @@ router.get(
       ];
 
       // Tool call count: sum the lengths of toolApiNames arrays across all matching requests
-      const toolCallPipeline = [
+      const toolCallPipeline: any[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
         { $match: { toolApiNames: { $exists: true, $ne: [] } } },
         { $unwind: "$toolApiNames" },
@@ -286,31 +259,23 @@ router.get(
       ];
 
       // Count total traces and conversations (respecting date + project filters)
-      const convMatch = {};
-      // @ts-ignore
-      if (project) convMatch.project = project;
+      const convMatch: any = {};
+            if (project) convMatch.project = project;
       if (from || to) {
-        // @ts-ignore
-        convMatch.createdAt = {};
-        // @ts-ignore
-        if (from) convMatch.createdAt.$gte = from;
-        // @ts-ignore
-        if (to) convMatch.createdAt.$lte = to;
+                convMatch.createdAt = {};
+                if (from) convMatch.createdAt.$gte = from;
+                if (to) convMatch.createdAt.$lte = to;
       }
 
       // Traces: count distinct traceIds from requests that match filters
-      const traceMatch = { traceId: { $ne: null } };
-      // @ts-ignore
-      if (project) traceMatch.project = project;
+      const traceMatch: any = { traceId: { $ne: null } };
+            if (project) traceMatch.project = project;
       if (from || to) {
-        // @ts-ignore
-        traceMatch.timestamp = {};
-        // @ts-ignore
-        if (from) traceMatch.timestamp.$gte = from;
-        // @ts-ignore
-        if (to) traceMatch.timestamp.$lte = to;
+                traceMatch.timestamp = {};
+                if (from) traceMatch.timestamp.$gte = from;
+                if (to) traceMatch.timestamp.$lte = to;
       }
-      const traceCountPipeline = [
+      const traceCountPipeline: any[] = [
         { $match: traceMatch },
         { $group: { _id: "$traceId" } },
         { $count: "total" },
@@ -326,8 +291,7 @@ router.get(
             .collection(REQUESTS_COL)
             .aggregate(pipeline)
             .toArray()
-            // @ts-ignore - TODO: strict typing
-            .then((r: Record<string, unknown>) => r[0]),
+                        .then(((r: any) => r[0] as any as (value: Document[]) => any)),
           db.collection(REQUESTS_COL).aggregate(toolCallPipeline).toArray(),
           db.collection(REQUESTS_COL).aggregate(traceCountPipeline).toArray(),
           db.collection(CONVERSATIONS_COL).countDocuments(convMatch),
@@ -345,17 +309,15 @@ router.get(
         totalDuration: 0,
         successCount: 0,
         errorCount: 0,
-        // @ts-ignore - TODO: strict typing
-        ...result,
+                ...result,
         traceCount,
         conversationCount,
         totalToolCalls,
         agentCount,
         workspaceCount,
       });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /stats error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /stats error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -370,19 +332,15 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { from, to, project } = req.query;
-      const match = {};
-      // @ts-ignore
-      if (project) match.project = project;
+      const match: any = {};
+            if (project) match.project = project;
       if (from || to) {
-        // @ts-ignore
-        match.timestamp = {};
-        // @ts-ignore
-        if (from) match.timestamp.$gte = from;
-        // @ts-ignore
-        if (to) match.timestamp.$lte = to;
+                match.timestamp = {};
+                if (from) match.timestamp.$gte = from;
+                if (to) match.timestamp.$lte = to;
       }
 
-      const pipeline = [
+      const pipeline: any[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
         {
           $group: {
@@ -409,7 +367,7 @@ router.get(
       ];
 
       // Count workflows per project via conversationIds → conversations.project
-      const workflowPipeline = [
+      const workflowPipeline: any[] = [
         { $match: { conversationIds: { $exists: true, $ne: [] } } },
         {
           $lookup: {
@@ -431,12 +389,12 @@ router.get(
       ];
 
       // Count conversations per project
-      const convPipeline = [
+      const convPipeline: any[] = [
         { $group: { _id: "$project", conversationCount: { $sum: 1 } } },
       ];
 
       // Count traces per project — derived from requests
-      const tracePipeline = [
+      const tracePipeline: any[] = [
         { $match: { traceId: { $ne: null } } },
         { $group: { _id: { project: "$project", traceId: "$traceId" } } },
         { $group: { _id: "$_id.project", traceCount: { $sum: 1 } } },
@@ -451,32 +409,26 @@ router.get(
         ]);
 
       // Build a project → workflowCount map
-      const wfMap = {};
-      // @ts-ignore
-      for ( const wc of workflowCounts) {
-        // @ts-ignore
-        wfMap[wc._id || "unknown"] = wc.workflowCount;
+      const wfMap: any = {};
+            for ( const wc of workflowCounts) {
+                wfMap[wc._id || "any"] = wc.workflowCount;
       }
 
       // Build a project → conversationCount map
-      const convMap = {};
-      // @ts-ignore
-      for ( const cc of convCounts) {
-        // @ts-ignore
-        convMap[cc._id || "unknown"] = cc.conversationCount;
+      const convMap: any = {};
+            for ( const cc of convCounts) {
+                convMap[cc._id || "any"] = cc.conversationCount;
       }
 
       // Build a project → traceCount map
-      const traceMap = {};
-      // @ts-ignore
-      for ( const tc of traceCounts) {
-        // @ts-ignore
-        traceMap[tc._id || "unknown"] = tc.traceCount;
+      const traceMap: any = {};
+            for ( const tc of traceCounts) {
+                traceMap[tc._id || "any"] = tc.traceCount;
       }
 
       res.json(
-        results.map((r: Record<string, unknown>) => ({
-          project: r._id || "unknown",
+        results.map((r: any) => ({
+          project: r._id || "any",
           totalRequests: r.totalRequests,
           totalInputTokens: r.totalInputTokens,
           totalOutputTokens: r.totalOutputTokens,
@@ -487,21 +439,15 @@ router.get(
           lastRequest: r.lastRequest,
           modelCount: r.modelCount,
           providerCount: r.providerCount,
-          // @ts-ignore - TODO: strict typing
-          models: (r._models || []).filter(Boolean),
-          // @ts-ignore - TODO: strict typing
-          providers: (r._providers || []).filter(Boolean),
-          // @ts-ignore
-          workflowCount: wfMap[r._id || "unknown"] || 0,
-          // @ts-ignore
-          conversationCount: convMap[r._id || "unknown"] || 0,
-          // @ts-ignore
-          traceCount: traceMap[r._id || "unknown"] || 0,
+                    models: ((r._models || []) as any).filter(Boolean),
+                    providers: ((r._providers || []) as any).filter(Boolean),
+                    workflowCount: wfMap[((r as string) as any)._id || "any"] || 0,
+                    conversationCount: convMap[((r as string) as any)._id || "any"] || 0,
+                    traceCount: traceMap[((r as string) as any)._id || "any"] || 0,
         })),
       );
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /stats/projects error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /stats/projects error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -515,7 +461,7 @@ router.get(
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
       if (!db) return res.status(503).json({ error: "Database not available" });
 
-      const pipeline = [
+      const pipeline: any[] = [
         {
           $group: {
             _id: "$username",
@@ -535,8 +481,8 @@ router.get(
         .toArray();
 
       res.json(
-        results.map((r: Record<string, unknown>) => ({
-          username: r._id || "unknown",
+        results.map((r: any) => ({
+          username: r._id || "any",
           totalRequests: r.totalRequests,
           totalTokens: r.totalTokens,
           totalCost: r.totalCost,
@@ -544,9 +490,8 @@ router.get(
           lastRequest: r.lastRequest,
         })),
       );
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /stats/users error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /stats/users error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -561,19 +506,15 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { from, to, project } = req.query;
-      const match = {};
-      // @ts-ignore
-      if (project) match.project = project;
+      const match: any = {};
+            if (project) match.project = project;
       if (from || to) {
-        // @ts-ignore
-        match.timestamp = {};
-        // @ts-ignore
-        if (from) match.timestamp.$gte = from;
-        // @ts-ignore
-        if (to) match.timestamp.$lte = to;
+                match.timestamp = {};
+                if (from) match.timestamp.$gte = from;
+                if (to) match.timestamp.$lte = to;
       }
 
-      const pipeline = [
+      const pipeline: any[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
         {
           $group: {
@@ -601,16 +542,14 @@ router.get(
 
       // Collect all distinct conversationIds to look up workflow links
       const allConvIds = new Set();
-      // @ts-ignore
-      for ( const r of results) {
-        // @ts-ignore
-        for ( const cid of r._convIds || []) {
+            for ( const r of results) {
+                for ( const cid of r._convIds || []) {
           if (cid) allConvIds.add(cid);
         }
       }
 
       // Count workflows per conversationId
-      const wfByConv = {};
+      const wfByConv: any = {};
       if (allConvIds.size > 0) {
         const wfResults = await db
           .collection(WORKFLOWS_COL)
@@ -628,15 +567,13 @@ router.get(
             { $project: { _id: 1, workflowCount: { $size: "$wfIds" } } },
           ])
           .toArray();
-        // @ts-ignore
-        for ( const w of wfResults) {
-          // @ts-ignore
-          wfByConv[w._id] = w.workflowCount;
+                for ( const w of wfResults) {
+                    wfByConv[w._id] = w.workflowCount;
         }
       }
 
       // Map conversationId → traceId for trace counting
-      const traceByConv = {};
+      const traceByConv: any = {};
       if (allConvIds.size > 0) {
         const convDocs = await db
           .collection(CONVERSATIONS_COL)
@@ -646,32 +583,24 @@ router.get(
           })
           .project({ id: 1, traceId: 1 })
           .toArray();
-        // @ts-ignore
-        for ( const c of convDocs) {
-          // @ts-ignore
-          traceByConv[c.id] = c.traceId;
+                for ( const c of convDocs) {
+                    traceByConv[c.id] = c.traceId;
         }
       }
 
       res.json(
-        results.map((r: Record<string, unknown>) => {
-          // @ts-ignore - TODO: strict typing
-          const convIds = (r._convIds || []).filter(Boolean);
+        results.map((r: any) => {
+                    const convIds = ((r._convIds || []) as any).filter(Boolean);
           const conversationCount = convIds.length;
           let workflowCount = 0;
           const traceSet = new Set();
-          // @ts-ignore
-          for ( const cid of convIds) {
-            // @ts-ignore
-            workflowCount += wfByConv[cid] || 0;
-            // @ts-ignore
-            if (traceByConv[cid]) traceSet.add(traceByConv[cid]);
+                    for ( const cid of convIds) {
+                        workflowCount += wfByConv[cid] || 0;
+                        if (traceByConv[cid]) traceSet.add(traceByConv[cid]);
           }
           return {
-            // @ts-ignore - TODO: strict typing
-            model: r._id.model,
-            // @ts-ignore - TODO: strict typing
-            provider: r._id.provider,
+                        model: (r as any)._id.model,
+                        provider: (r as any)._id.provider,
             totalRequests: r.totalRequests,
             totalInputTokens: r.totalInputTokens,
             totalOutputTokens: r.totalOutputTokens,
@@ -686,9 +615,8 @@ router.get(
           };
         }),
       );
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /stats/models error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /stats/models error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -703,19 +631,15 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { from, to, project, tool } = req.query;
-      const match = { toolApiNames: { $exists: true, $ne: [] } };
-      // @ts-ignore
-      if (project) match.project = project;
+      const match: any = { toolApiNames: { $exists: true, $ne: [] } };
+            if (project) match.project = project;
       if (from || to) {
-        // @ts-ignore
-        match.timestamp = {};
-        // @ts-ignore
-        if (from) match.timestamp.$gte = from;
-        // @ts-ignore
-        if (to) match.timestamp.$lte = to;
+                match.timestamp = {};
+                if (from) match.timestamp.$gte = from;
+                if (to) match.timestamp.$lte = to;
       }
 
-      const pipeline = [
+      const pipeline: any[] = [
         { $match: match },
         { $unwind: "$toolApiNames" },
         // Optional: filter to a single tool
@@ -756,34 +680,26 @@ router.get(
         .toArray();
 
       res.json(
-        results.map((r: Record<string, unknown>) => {
+        results.map((r: any) => {
           // Count top models
-          const modelCounts = {};
-          // @ts-ignore
-          for ( const m of r._models || []) {
-            // @ts-ignore
-            if (m) modelCounts[m] = (modelCounts[m] || 0) + 1;
+          const modelCounts: any = {};
+                    for ( const m of r._models || []) {
+                        if (m) modelCounts[m] = (modelCounts[m] || 0) + 1;
           }
           const topModels = Object.entries(modelCounts)
-            // @ts-ignore - TODO: strict typing
-            .sort((a: Record<string, unknown>, b: Record<string, unknown>) => b[1] - a[1])
+                        .sort(((a: any, b: any) => (b as any)[1] - (a as any)[1] as any as (a: [string, any], b: [string, any]) => number))
             .slice(0, 5)
-            // @ts-ignore - TODO: strict typing
-            .map(([model, count]: Record<string, unknown>) => ({ model, count }));
+                        .map((([model, count]: any) => ({ model, count }) as any as (value: [string, any], index: number, array: [string, any][]) => { model: any; count: any; }));
 
           // Count top agents
-          const agentCounts = {};
-          // @ts-ignore
-          for ( const a of r._agents || []) {
-            // @ts-ignore
-            if (a) agentCounts[a] = (agentCounts[a] || 0) + 1;
+          const agentCounts: any = {};
+                    for ( const a of r._agents || []) {
+                        if (a) agentCounts[a] = (agentCounts[a] || 0) + 1;
           }
           const topAgents = Object.entries(agentCounts)
-            // @ts-ignore - TODO: strict typing
-            .sort((a: Record<string, unknown>, b: Record<string, unknown>) => b[1] - a[1])
+                        .sort(((a: any, b: any) => (b as any)[1] - (a as any)[1] as any as (a: [string, any], b: [string, any]) => number))
             .slice(0, 5)
-            // @ts-ignore - TODO: strict typing
-            .map(([agent, count]: Record<string, unknown>) => ({ agent, count }));
+                        .map((([agent, count]: any) => ({ agent, count }) as any as (value: [string, any], index: number, array: [string, any][]) => { agent: any; count: any; }));
 
           return {
             tool: r._id,
@@ -795,8 +711,7 @@ router.get(
             avgLatency: r.avgLatency,
             firstUsed: r.firstUsed,
             lastUsed: r.lastUsed,
-            // @ts-ignore - TODO: strict typing
-            providers: r._providers?.filter(Boolean) || [],
+                        providers: (r._providers as any)?.filter(Boolean) || [],
             topModels,
             topAgents,
             successCount: r.successCount,
@@ -804,9 +719,8 @@ router.get(
           };
         }),
       );
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /stats/tools error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /stats/tools error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -821,17 +735,14 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { from, to } = req.query;
-      const match = {};
+      const match: any = {};
       if (from || to) {
-        // @ts-ignore
-        match.timestamp = {};
-        // @ts-ignore
-        if (from) match.timestamp.$gte = from;
-        // @ts-ignore
-        if (to) match.timestamp.$lte = to;
+                match.timestamp = {};
+                if (from) match.timestamp.$gte = from;
+                if (to) match.timestamp.$lte = to;
       }
 
-      const pipeline = [
+      const pipeline: any[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
         {
           $group: {
@@ -854,8 +765,8 @@ router.get(
         .toArray();
 
       res.json(
-        results.map((r: Record<string, unknown>) => ({
-          endpoint: r._id || "unknown",
+        results.map((r: any) => ({
+          endpoint: r._id || "any",
           totalRequests: r.totalRequests,
           totalTokens: r.totalTokens,
           totalCost: r.totalCost,
@@ -863,9 +774,8 @@ router.get(
           successRate: r.successRate,
         })),
       );
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /stats/endpoints error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /stats/endpoints error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -880,14 +790,11 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { from, to } = req.query;
-      const match = {};
+      const match: any = {};
       if (from || to) {
-        // @ts-ignore
-        match.timestamp = {};
-        // @ts-ignore
-        if (from) match.timestamp.$gte = from;
-        // @ts-ignore
-        if (to) match.timestamp.$lte = to;
+                match.timestamp = {};
+                if (from) match.timestamp.$gte = from;
+                if (to) match.timestamp.$lte = to;
       }
       const matchStage = Object.keys(match).length ? [{ $match: match }] : [];
 
@@ -977,15 +884,12 @@ router.get(
       } = result;
 
       // Nest provider breakdown under each project
-      const providersByProject = {};
-      // @ts-ignore
-      for ( const row of byProjectProvider) {
-        const proj = row._id.project || "unknown";
-        // @ts-ignore
-        if (!providersByProject[proj]) providersByProject[proj] = [];
-        // @ts-ignore
-        providersByProject[proj].push({
-          provider: row._id.provider || "unknown",
+      const providersByProject: any = {};
+            for ( const row of byProjectProvider) {
+        const proj = row._id.project || "any";
+                if (!providersByProject[proj]) providersByProject[proj] = [];
+                (providersByProject as any)[proj].push({
+          provider: row._id.provider || "any",
           totalCost: row.totalCost,
           totalInputTokens: row.totalInputTokens,
           totalOutputTokens: row.totalOutputTokens,
@@ -995,15 +899,12 @@ router.get(
       }
 
       // Nest endpoint breakdown under each project
-      const endpointsByProject = {};
-      // @ts-ignore
-      for ( const row of byProjectEndpoint) {
-        const proj = row._id.project || "unknown";
-        // @ts-ignore
-        if (!endpointsByProject[proj]) endpointsByProject[proj] = [];
-        // @ts-ignore
-        endpointsByProject[proj].push({
-          endpoint: row._id.endpoint || "unknown",
+      const endpointsByProject: any = {};
+            for ( const row of byProjectEndpoint) {
+        const proj = row._id.project || "any";
+                if (!endpointsByProject[proj]) endpointsByProject[proj] = [];
+                (endpointsByProject as any)[proj].push({
+          endpoint: row._id.endpoint || "any",
           totalCost: row.totalCost,
           totalInputTokens: row.totalInputTokens,
           totalOutputTokens: row.totalOutputTokens,
@@ -1013,16 +914,13 @@ router.get(
       }
 
       // Nest model breakdown under each project
-      const modelsByProject = {};
-      // @ts-ignore
-      for ( const row of byProjectModel) {
-        const proj = row._id.project || "unknown";
-        // @ts-ignore
-        if (!modelsByProject[proj]) modelsByProject[proj] = [];
-        // @ts-ignore
-        modelsByProject[proj].push({
-          model: row._id.model || "unknown",
-          provider: row._id.provider || "unknown",
+      const modelsByProject: any = {};
+            for ( const row of byProjectModel) {
+        const proj = row._id.project || "any";
+                if (!modelsByProject[proj]) modelsByProject[proj] = [];
+                (modelsByProject as any)[proj].push({
+          model: row._id.model || "any",
+          provider: row._id.provider || "any",
           totalCost: row.totalCost,
           totalInputTokens: row.totalInputTokens,
           totalOutputTokens: row.totalOutputTokens,
@@ -1046,40 +944,35 @@ router.get(
           totalRequests: t.totalRequests,
           avgTokensPerSec: t.avgTokensPerSec,
         },
-        byProject: byProject.map((r: Record<string, unknown>) => ({
-          project: r._id || "unknown",
+        byProject: byProject.map((r: any) => ({
+          project: r._id || "any",
           totalCost: r.totalCost,
           totalInputTokens: r.totalInputTokens,
           totalOutputTokens: r.totalOutputTokens,
           totalRequests: r.totalRequests,
           avgTokensPerSec: r.avgTokensPerSec,
-          // @ts-ignore
-          byProvider: providersByProject[r._id || "unknown"] || [],
-          // @ts-ignore
-          byEndpoint: endpointsByProject[r._id || "unknown"] || [],
-          // @ts-ignore
-          byModel: modelsByProject[r._id || "unknown"] || [],
+                    byProvider: providersByProject[((r as string) as any)._id || "any"] || [],
+                    byEndpoint: endpointsByProject[((r as string) as any)._id || "any"] || [],
+                    byModel: modelsByProject[((r as string) as any)._id || "any"] || [],
         })),
-        byProvider: byProvider.map((r: Record<string, unknown>) => ({
-          provider: r._id || "unknown",
+        byProvider: byProvider.map((r: any) => ({
+          provider: r._id || "any",
           totalCost: r.totalCost,
           totalInputTokens: r.totalInputTokens,
           totalOutputTokens: r.totalOutputTokens,
           totalRequests: r.totalRequests,
         })),
-        byModel: byModel.map((r: Record<string, unknown>) => ({
-          // @ts-ignore - TODO: strict typing
-          model: r._id.model || "unknown",
-          // @ts-ignore - TODO: strict typing
-          provider: r._id.provider || "unknown",
+        byModel: byModel.map((r: any) => ({
+                    model: (r as any)._id.model || "any",
+                    provider: (r as any)._id.provider || "any",
           totalCost: r.totalCost,
           totalInputTokens: r.totalInputTokens,
           totalOutputTokens: r.totalOutputTokens,
           totalRequests: r.totalRequests,
           avgTokensPerSec: r.avgTokensPerSec,
         })),
-        byEndpoint: byEndpoint.map((r: Record<string, unknown>) => ({
-          endpoint: r._id || "unknown",
+        byEndpoint: byEndpoint.map((r: any) => ({
+          endpoint: r._id || "any",
           totalCost: r.totalCost,
           totalInputTokens: r.totalInputTokens,
           totalOutputTokens: r.totalOutputTokens,
@@ -1087,9 +980,8 @@ router.get(
           avgTokensPerSec: r.avgTokensPerSec,
         })),
       });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /stats/costs error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /stats/costs error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -1105,32 +997,27 @@ router.get(
 
       const { hours = 24, from, to, project } = req.query;
 
-      let sinceDate: Record<string, unknown>, untilDate: Record<string, unknown>;
+      let sinceDate: any, untilDate: any;
       if (from) {
-        // @ts-ignore - TODO: strict typing
-        sinceDate = new Date(from);
+                sinceDate = new Date(from);
       } else {
-        // @ts-ignore - TODO: strict typing
-        sinceDate = new Date(Date.now() - hoursToMs(parseInt(hours, 10)));
+                sinceDate = new Date(Date.now() - hoursToMs(parseInt((hours as any), 10)));
       }
       if (to) {
-        // @ts-ignore - TODO: strict typing
-        untilDate = new Date(to);
+                untilDate = new Date(to);
       }
 
-      // @ts-ignore - TODO: strict typing
-      const spanMs = (untilDate || new Date()) - sinceDate;
+            const spanMs = (untilDate || new Date()) - sinceDate;
       const spanMinutes = spanMs / (1000 * 60);
       const spanHours = spanMinutes / 60;
       const spanDays = spanHours / 24;
 
       // Eight-tier granularity — targets ~200 data points for every time range.
       // Each tier boundary is chosen so the maximum bin count stays in the 120–288 range.
-      let granularity: Record<string, unknown>, groupId: Record<string, unknown>;
+      let granularity: any, groupId: any;
       if (spanMinutes <= 2) {
         // ≤ 2 minutes → 1-second bins  (max 120 pts)  "2026-04-02T22:05:31"
-        // @ts-ignore - TODO: strict typing
-        granularity = "1s";
+                granularity = "1s";
         groupId = {
           $dateToString: {
             format: "%Y-%m-%dT%H:%M:%S",
@@ -1140,8 +1027,7 @@ router.get(
         };
       } else if (spanMinutes <= 10) {
         // ≤ 10 minutes → 5-second bins  (max 120 pts)  "2026-04-02T22:05:05"
-        // @ts-ignore - TODO: strict typing
-        granularity = "5s";
+                granularity = "5s";
         groupId = {
           $concat: [
             {
@@ -1209,8 +1095,7 @@ router.get(
         };
       } else if (spanHours <= 1) {
         // ≤ 1 hour → 15-second bins  (max 240 pts)  "2026-04-02T22:05:15"
-        // @ts-ignore - TODO: strict typing
-        granularity = "15s";
+                granularity = "15s";
         groupId = {
           $concat: [
             {
@@ -1278,8 +1163,7 @@ router.get(
         };
       } else if (spanHours <= 4) {
         // ≤ 4 hours → 1-minute bins  (max 240 pts)  "2026-04-02T22:05"
-        // @ts-ignore - TODO: strict typing
-        granularity = "1min";
+                granularity = "1min";
         groupId = {
           $dateToString: {
             format: "%Y-%m-%dT%H:%M",
@@ -1289,8 +1173,7 @@ router.get(
         };
       } else if (spanDays <= 1) {
         // ≤ 24 hours → 5-minute bins  (max 288 pts)
-        // @ts-ignore - TODO: strict typing
-        granularity = "5min";
+                granularity = "5min";
         groupId = {
           $concat: [
             { $substr: ["$timestamp", 0, 14] },
@@ -1313,13 +1196,11 @@ router.get(
         };
       } else if (spanDays <= 7) {
         // 1–7 days → hourly bins  (max 168 pts)
-        // @ts-ignore - TODO: strict typing
-        granularity = "hour";
+                granularity = "hour";
         groupId = { $substr: ["$timestamp", 0, 13] }; // "2026-03-21T14"
       } else if (spanDays <= 60) {
         // 7–60 days → 6-hour bins  (max 240 pts)
-        // @ts-ignore - TODO: strict typing
-        granularity = "6h";
+                granularity = "6h";
         groupId = {
           $concat: [
             {
@@ -1384,21 +1265,17 @@ router.get(
         };
       } else {
         // > 60 days → daily bins
-        // @ts-ignore - TODO: strict typing
-        granularity = "day";
+                granularity = "day";
         groupId = { $substr: ["$timestamp", 0, 10] }; // "2026-03-21"
       }
 
-      // @ts-ignore - TODO: strict typing
-      const timeMatch = { $gte: sinceDate.toISOString() };
-      // @ts-ignore
-      if (untilDate) timeMatch.$lte = untilDate.toISOString();
+            const timeMatch: any = { $gte: (sinceDate as any).toISOString() };
+            if (untilDate) timeMatch.$lte = (untilDate as any).toISOString();
 
-      const matchFilter = { timestamp: timeMatch };
-      // @ts-ignore
-      if (project) matchFilter.project = project;
+      const matchFilter: any = { timestamp: timeMatch };
+            if (project) matchFilter.project = project;
 
-      const pipeline = [
+      const pipeline: any[] = [
         { $match: matchFilter },
         {
           $group: {
@@ -1429,21 +1306,18 @@ router.get(
 
       res.json({
         granularity,
-        data: results.map((r: Record<string, unknown>) => ({
+        data: results.map((r: any) => ({
           hour: r._id,
           requests: r.requests,
           tokens: r.tokens,
           cost: r.cost,
-          // @ts-ignore - TODO: strict typing
-          avgLatency: r.avgLatency ? Math.round(r.avgLatency) : 0,
+                    avgLatency: r.avgLatency ? Math.round((r.avgLatency as any)) : 0,
           successRate:
-            // @ts-ignore - TODO: strict typing
-            r.requests > 0 ? Math.round((r.successes / r.requests) * 100) : 100,
+                        (r as any).requests > 0 ? Math.round(((r as any).successes / (r as any).requests) * 100) : 100,
         })),
       });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /stats/timeline error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /stats/timeline error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -1472,13 +1346,10 @@ router.get(
         order = "desc",
       } = req.query;
 
-      const filter = {};
-      // @ts-ignore
-      if (trace) filter.traceId = trace;
-      // @ts-ignore
-      if (project) filter.project = project;
-      // @ts-ignore
-      if (username) filter.username = username;
+      const filter: any = {};
+            if (trace) filter.traceId = trace;
+            if (project) filter.project = project;
+            if (username) filter.username = username;
       if (search) {
         const regex = { $regex: search, $options: "i" };
         const orClauses = [
@@ -1489,43 +1360,32 @@ router.get(
 
         // IP lives on requests, not conversations — resolve matching
         // conversationIds first, then fold them into the $or filter.
-        // @ts-ignore - TODO: strict typing
-        if (/^[\d.:a-f]+$/i.test(search.trim())) {
+                if (/^[\d.:a-f]+$/i.test((search as any).trim())) {
           const matchingConvIds = await db
             .collection(REQUESTS_COL)
             .distinct("conversationId", { clientIp: regex });
           if (matchingConvIds.length > 0) {
-            // @ts-ignore
-            orClauses.push({ id: { $in: matchingConvIds } });
+                        orClauses.push({ id: { $in: matchingConvIds } });
           }
         }
 
-        // @ts-ignore
-        filter.$or = orClauses;
+                filter.$or = orClauses;
       }
-      // @ts-ignore
-      if (provider) filter.providers = provider;
-      // @ts-ignore
-      if (model) filter["messages.model"] = model;
+            if (provider) filter.providers = provider;
+            if (model) filter["messages.model"] = model;
       if (from || to) {
-        // @ts-ignore
-        filter.updatedAt = {};
-        // @ts-ignore
-        if (from) filter.updatedAt.$gte = from;
-        // @ts-ignore
-        if (to) filter.updatedAt.$lte = to;
+                filter.updatedAt = {};
+                if (from) (filter as any).updatedAt.$gte = from;
+                if (to) (filter as any).updatedAt.$lte = to;
       }
 
-      // @ts-ignore - TODO: strict typing
-      const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-      // @ts-ignore - TODO: strict typing
-      const lim = parseInt(limit, 10);
+            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
+            const lim = parseInt((limit as any), 10);
       const sortDir = order === "asc" ? 1 : -1;
 
-      const pipeline = [
+      const pipeline: any[] = [
         ...(Object.keys(filter).length ? [{ $match: filter }] : []),
-        // @ts-ignore - TODO: strict typing
-        { $sort: { [sort]: sortDir } },
+                { $sort: { [sort]: sortDir } },
         {
           $project: {
             id: 1,
@@ -1674,11 +1534,9 @@ router.get(
         db.collection(CONVERSATIONS_COL).countDocuments(filter),
       ]);
 
-      // @ts-ignore - TODO: strict typing
-      res.json({ data: docs, total, page: parseInt(page, 10), limit: lim });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /conversations error: ${error.message}`);
+            res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
+    } catch (error: any) {
+            logger.error(`Admin /conversations error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -1705,9 +1563,8 @@ router.get(
         projects: projects.filter(Boolean).sort(),
         usernames: usernames.filter(Boolean).sort(),
       });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /conversations/filters error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /conversations/filters error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -1744,9 +1601,8 @@ router.get(
           ActiveGenerationTracker.count,
         recentCount,
       });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /conversations/stats error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /conversations/stats error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -1794,10 +1650,8 @@ router.get(
             { isGenerating: true, updatedAt: { $lt: fiveMinAgo } },
             { $set: { isGenerating: false } },
           )
-          // @ts-ignore - TODO: strict typing
-          .then(({ modifiedCount }: Record<string, unknown>) => {
-            // @ts-ignore - TODO: strict typing
-            if (modifiedCount > 0)
+                    .then(({ modifiedCount }: any) => {
+                        if ((modifiedCount as any) > 0)
               logger.info(
                 `Auto-cleared ${modifiedCount} stale isGenerating flag(s)`,
               );
@@ -1816,9 +1670,8 @@ router.get(
           lastPayload = payload;
           res.write(`data: ${payload}\n\n`);
         }
-      } catch (error: unknown) {
-        // @ts-ignore - TODO: strict typing
-        logger.error(`SSE conversations/stream error: ${error.message}`);
+      } catch (error: any) {
+                logger.error(`SSE conversations/stream error: ${(error as Error).message}`);
       }
     };
 
@@ -1827,13 +1680,12 @@ router.get(
 
     if (ChangeStreamService.available) {
       // Change Stream-driven: re-query stats only when conversations change
-      const onEvent = (event: Record<string, unknown>) => {
+      const onEvent = (event: any) => {
         if (event.collection === "conversations") {
           sendStats();
         }
       };
-      // @ts-ignore - TODO: strict typing
-      ChangeStreamService.subscribe(onEvent);
+            ChangeStreamService.subscribe((onEvent as any));
 
       // Secondary poll: catch generation activity not tracked via Change
       // Streams (benchmarks skip conversation persistence, and provider
@@ -1857,8 +1709,7 @@ router.get(
       }, SSE_KEEPALIVE_INTERVAL_MS);
 
       req.on("close", () => {
-        // @ts-ignore - TODO: strict typing
-        ChangeStreamService.unsubscribe(onEvent);
+                ChangeStreamService.unsubscribe((onEvent as any));
         clearInterval(generationPoll);
         clearInterval(keepAlive);
       });
@@ -1895,7 +1746,7 @@ router.get(
 
     if (ChangeStreamService.available) {
       // Push change events as they arrive from MongoDB
-      const onEvent = (event: Record<string, unknown>) => {
+      const onEvent = (event: any) => {
         try {
           res.write(
             `data: ${JSON.stringify({ type: "change", ...event })}\n\n`,
@@ -1905,8 +1756,7 @@ router.get(
         }
       };
 
-      // @ts-ignore - TODO: strict typing
-      ChangeStreamService.subscribe(onEvent);
+            ChangeStreamService.subscribe((onEvent as any));
 
       // Keep-alive ping every 30s
       const keepAlive = setInterval(() => {
@@ -1918,8 +1768,7 @@ router.get(
       }, SSE_KEEPALIVE_INTERVAL_MS);
 
       req.on("close", () => {
-        // @ts-ignore - TODO: strict typing
-        ChangeStreamService.unsubscribe(onEvent);
+                ChangeStreamService.unsubscribe((onEvent as any));
         clearInterval(keepAlive);
       });
     } else {
@@ -1956,9 +1805,8 @@ router.get(
         return res.status(404).json({ error: "Conversation not found" });
 
       res.json(document);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /conversations/:id error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /conversations/:id error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -1974,8 +1822,7 @@ router.get(
 
       const { minutes: minParam = 5 } = req.query;
       const since = new Date(
-        // @ts-ignore - TODO: strict typing
-        Date.now() - parseInt(minParam, 10) * MS_PER_MINUTE,
+                Date.now() - parseInt((minParam as any), 10) * MS_PER_MINUTE,
       ).toISOString();
 
       const [rawConversations, recentRequests] = await Promise.all([
@@ -2004,35 +1851,32 @@ router.get(
       ]);
 
       // Enrich conversations with lastMessage info and remap fields
-      const conversations = rawConversations.map((c: Record<string, unknown>) => {
+      const conversations = rawConversations.map((c: any) => {
         const msgs = c.messages || [];
-        // @ts-ignore - TODO: strict typing
-        const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+                const lastMsg = (msgs as any).length > 0 ? (msgs as any)[(msgs as any).length - 1] : null;
         let lastMessageText = null;
         if (lastMsg) {
-          const content = lastMsg.content;
+          const content = (lastMsg as any).content;
           if (typeof content === "string") {
             lastMessageText = content;
           } else if (Array.isArray(content)) {
-            const textPart = content.find((p: Record<string, unknown>) => p.type === "text");
+            const textPart = content.find((p: any) => p.type === "text");
             lastMessageText = textPart?.text || null;
           }
         }
         // Compute totalCost from messages (covers docs saved before totalCost field existed)
         const totalCost =
           c.totalCost ||
-          // @ts-ignore - TODO: strict typing
-          msgs.reduce((sum: Record<string, unknown>, m: Record<string, unknown>) => sum + (m.estimatedCost || 0), 0);
+                    (msgs as any).reduce((sum: any, m: any) => sum + (m.estimatedCost || 0), 0);
         return {
           id: c.id,
           project: c.project,
           username: c.username,
           title: c.title,
           lastActivity: c.updatedAt,
-          // @ts-ignore - TODO: strict typing
-          messageCount: msgs.length,
+                    messageCount: (msgs as any).length,
           lastMessage: lastMessageText,
-          lastMessageRole: lastMsg?.role || null,
+          lastMessageRole: (lastMsg as any)?.role || null,
           isGenerating: c.isGenerating || false,
           modalities: c.modalities || null,
           providers: c.providers || [],
@@ -2044,8 +1888,7 @@ router.get(
       const totalRecent = await db
         .collection(REQUESTS_COL)
         .countDocuments({ timestamp: { $gte: since } });
-      // @ts-ignore - TODO: strict typing
-      const requestsPerMinute = totalRecent / parseInt(minParam, 10);
+            const requestsPerMinute = totalRecent / parseInt((minParam as any), 10);
 
       res.json({
         conversations,
@@ -2053,9 +1896,8 @@ router.get(
         requestsPerMinute: Math.round(requestsPerMinute * 100) / 100,
         activeCount: conversations.length,
       });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /live error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /live error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -2108,13 +1950,11 @@ router.get(
   "/lm-studio/models",
   asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const provider = getProvider("lm-studio");
+            const provider = getProvider(("lm-studio" as any));
       const data = await provider.listModels();
       res.json(data);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /lm-studio/models error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /lm-studio/models error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -2142,21 +1982,15 @@ router.post(
           .json({ error: "Missing 'model' in request body" });
       }
 
-      // @ts-ignore - TODO: strict typing
-      const provider = getProvider("lm-studio");
+            const provider = getProvider(("lm-studio" as any));
 
       // Build load options from request body
-      const loadOptions = {};
-      // @ts-ignore
-      if (context_length != null) loadOptions.context_length = context_length;
-      // @ts-ignore
-      if (flash_attention != null)
-        // @ts-ignore
-        loadOptions.flash_attention = flash_attention;
-      // @ts-ignore
-      if (offload_kv_cache_to_gpu != null)
-        // @ts-ignore
-        loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
+      const loadOptions: any = {};
+            if (context_length != null) loadOptions.context_length = context_length;
+            if (flash_attention != null)
+                loadOptions.flash_attention = flash_attention;
+            if (offload_kv_cache_to_gpu != null)
+                loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
 
       // ensureModelLoaded handles: skip if already loaded, unload others, then load
       const { alreadyLoaded } = await provider.ensureModelLoaded(
@@ -2170,9 +2004,8 @@ router.post(
       }
 
       res.json({ model, alreadyLoaded });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /lm-studio/load error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /lm-studio/load error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -2194,13 +2027,11 @@ router.post(
         });
       }
 
-      // @ts-ignore - TODO: strict typing
-      const provider = getProvider("lm-studio");
+            const provider = getProvider(("lm-studio" as any));
       const data = await provider.unloadModel(instance_id);
       res.json(data);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /lm-studio/unload error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /lm-studio/unload error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -2228,12 +2059,11 @@ router.post(
           .json({ error: "Missing 'model' in request body" });
       }
 
-      // @ts-ignore - TODO: strict typing
-      const provider = getProvider("lm-studio");
+            const provider = getProvider(("lm-studio" as any));
       const result = await provider.listModels();
       const allModels = result?.data || result?.models || [];
       const modelData = allModels.find(
-        (m: Record<string, unknown>) => m.id === model || m.path === model || m.key === model,
+        (m: any) => m.id === model || m.path === model || m.key === model,
       );
 
       if (!modelData) {
@@ -2265,9 +2095,8 @@ router.post(
         archParams,
         totalLayers,
       });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /lm-studio/estimate error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /lm-studio/estimate error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -2300,43 +2129,31 @@ router.get(
         order = "desc",
       } = req.query;
 
-      const filter = {};
-      // @ts-ignore
-      if (guildId) filter.guildId = guildId;
-      // @ts-ignore
-      if (userId) filter.userId = userId;
-      // @ts-ignore
-      if (userName) filter.userName = { $regex: userName, $options: "i" };
+      const filter: any = {};
+            if (guildId) filter.guildId = guildId;
+            if (userId) filter.userId = userId;
+            if (userName) filter.userName = { $regex: userName, $options: "i" };
       if (from || to) {
-        // @ts-ignore
-        filter.createdAt = {};
-        // @ts-ignore
-        if (from) filter.createdAt.$gte = from;
-        // @ts-ignore
-        if (to) filter.createdAt.$lte = to;
+                filter.createdAt = {};
+                if (from) (filter as any).createdAt.$gte = from;
+                if (to) (filter as any).createdAt.$lte = to;
       }
 
       // If project, provider, or model is specified, find matching conversation IDs
       // and filter workflows that reference those conversations
       if (project || provider || model) {
-        const convFilter = {};
-        // @ts-ignore
-        if (project) convFilter.project = project;
-        // @ts-ignore
-        if (provider) convFilter.providers = provider;
-        // @ts-ignore
-        if (model) convFilter["messages.model"] = model;
+        const convFilter: any = {};
+                if (project) convFilter.project = project;
+                if (provider) convFilter.providers = provider;
+                if (model) convFilter["messages.model"] = model;
         const convIds = await db
           .collection(CONVERSATIONS_COL)
           .distinct("id", convFilter);
-        // @ts-ignore
-        filter.conversationIds = { $elemMatch: { $in: convIds } };
+                filter.conversationIds = { $elemMatch: { $in: convIds } };
       }
 
-      // @ts-ignore - TODO: strict typing
-      const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-      // @ts-ignore - TODO: strict typing
-      const lim = parseInt(limit, 10);
+            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
+            const lim = parseInt((limit as any), 10);
       const sortDir = order === "asc" ? 1 : -1;
 
       const [docs, total] = await Promise.all([
@@ -2363,19 +2180,16 @@ router.get(
             createdAt: 1,
             updatedAt: 1,
           })
-          // @ts-ignore - TODO: strict typing
-          .sort({ [sort]: sortDir })
+                    .sort({ [sort]: sortDir })
           .skip(skip)
           .limit(lim)
           .toArray(),
         db.collection(WORKFLOWS_COL).countDocuments(filter),
       ]);
 
-      // @ts-ignore - TODO: strict typing
-      res.json({ data: docs, total, page: parseInt(page, 10), limit: lim });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin GET /workflows error: ${error.message}`);
+            res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
+    } catch (error: any) {
+            logger.error(`Admin GET /workflows error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -2392,10 +2206,9 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { ObjectId } = await import("mongodb");
-      let objectId: Record<string, unknown>;
+      let objectId: any;
       try {
-        // @ts-ignore - TODO: strict typing
-        objectId = new ObjectId(req.params.id);
+                objectId = new ObjectId(req.params.id);
       } catch {
         return res.status(400).json({ error: "Invalid workflow ID" });
       }
@@ -2404,9 +2217,8 @@ router.get(
       if (!document) return res.status(404).json({ error: "Workflow not found" });
 
       res.json(document);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin GET /workflows/:id error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin GET /workflows/:id error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -2431,10 +2243,8 @@ router.get(
         from,
         to,
       } = req.query;
-      // @ts-ignore - TODO: strict typing
-      const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-      // @ts-ignore - TODO: strict typing
-      const lim = parseInt(limit, 10);
+            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
+            const lim = parseInt((limit as any), 10);
 
       // Get distinct projects and usernames for filter dropdowns
       const [convProjects, convUsernames, reqProjects, reqUsernames] =
@@ -2460,21 +2270,16 @@ router.get(
         .sort();
 
       // Use aggregation to unwind messages and extract media in one query
-      const preMatch = {};
-      // @ts-ignore
-      if (project) preMatch.project = project;
-      // @ts-ignore
-      if (username) preMatch.username = username;
+      const preMatch: any = {};
+            if (project) preMatch.project = project;
+            if (username) preMatch.username = username;
       if (from || to) {
-        // @ts-ignore
-        preMatch.updatedAt = {};
-        // @ts-ignore
-        if (from) preMatch.updatedAt.$gte = from;
-        // @ts-ignore
-        if (to) preMatch.updatedAt.$lte = to;
+                preMatch.updatedAt = {};
+                if (from) preMatch.updatedAt.$gte = from;
+                if (to) preMatch.updatedAt.$lte = to;
       }
 
-      const pipeline = [
+      const pipeline: any[] = [
         ...(Object.keys(preMatch).length ? [{ $match: preMatch }] : []),
         { $unwind: "$messages" },
         {
@@ -2597,35 +2402,29 @@ router.get(
         .toArray();
 
       // ── Agent-generated images from requests (captures skipConversation callers) ──
-      let requestGenItems: Record<string, unknown>[] = [];
+      let requestGenItems: any[] = [];
       if (!type || type === "image") {
         if (origin !== "user") {
-          const reqMatch = {
+          const reqMatch: any = {
             operation: { $in: ["agent:image", "agent:iteration"] },
             success: true,
             "responsePayload.images": { $exists: true, $ne: [] },
           };
-          // @ts-ignore
-          if (project) reqMatch.project = project;
-          // @ts-ignore
-          if (username) reqMatch.username = username;
+                    if (project) reqMatch.project = project;
+                    if (username) reqMatch.username = username;
           if (from || to) {
-            // @ts-ignore
-            reqMatch.timestamp = {};
-            // @ts-ignore
-            if (from) reqMatch.timestamp.$gte = from;
-            // @ts-ignore
-            if (to) reqMatch.timestamp.$lte = to;
+                        reqMatch.timestamp = {};
+                        if (from) reqMatch.timestamp.$gte = from;
+                        if (to) reqMatch.timestamp.$lte = to;
           }
           if (search) {
-            // @ts-ignore
-            reqMatch["requestPayload.messages.content"] = {
+                        reqMatch["requestPayload.messages.content"] = {
               $regex: search,
               $options: "i",
             };
           }
 
-          const reqPipeline = [
+          const reqPipeline: any[] = [
             { $match: reqMatch },
             { $unwind: "$responsePayload.images" },
             {
@@ -2660,17 +2459,16 @@ router.get(
       }
 
       // ── Merge and deduplicate ──────────────────────────────────
-      const seenUrls = new Set(convItems.map((i: Record<string, unknown>) => i.url));
+      const seenUrls = new Set(convItems.map((i: any) => i.url));
       const mergedItems = [...convItems];
-      // @ts-ignore
-      for ( const item of requestGenItems) {
+            for ( const item of requestGenItems) {
         if (!seenUrls.has(item.url)) {
           seenUrls.add(item.url);
           mergedItems.push(item);
         }
       }
 
-      mergedItems.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+      mergedItems.sort((a: any, b: any) => {
         const ta = a.timestamp || "";
         const tb = b.timestamp || "";
         return ta < tb ? 1 : ta > tb ? -1 : 0;
@@ -2679,7 +2477,7 @@ router.get(
       const total = mergedItems.length;
       const paginatedItems = mergedItems.slice(skip, skip + lim);
 
-      const data = paginatedItems.map((item: Record<string, unknown>) => ({
+      const data = paginatedItems.map((item: any) => ({
         url: item.url,
         mediaType: item.mediaType,
         origin: item.role === "assistant" ? "ai" : "user",
@@ -2689,22 +2487,19 @@ router.get(
         username: item.username,
         model: item.model,
         timestamp: item.timestamp,
-        // @ts-ignore - TODO: strict typing
-        ...(item.agent && { agent: item.agent }),
+                ...(item.agent && { agent: item.agent }),
       }));
 
       res.json({
         data,
         total,
-        // @ts-ignore - TODO: strict typing
-        page: parseInt(page, 10),
+                page: parseInt((page as any), 10),
         limit: lim,
         projects: allProjects,
         usernames: allUsernames,
       });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /media error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /media error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -2727,24 +2522,18 @@ router.get(
         from,
         to,
       } = req.query;
-      // @ts-ignore - TODO: strict typing
-      const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-      // @ts-ignore - TODO: strict typing
-      const lim = parseInt(limit, 10);
+            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
+            const lim = parseInt((limit as any), 10);
 
-      const preMatch = {};
-      // @ts-ignore
-      if (project) preMatch.project = project;
+      const preMatch: any = {};
+            if (project) preMatch.project = project;
       if (from || to) {
-        // @ts-ignore
-        preMatch.updatedAt = {};
-        // @ts-ignore
-        if (from) preMatch.updatedAt.$gte = from;
-        // @ts-ignore
-        if (to) preMatch.updatedAt.$lte = to;
+                preMatch.updatedAt = {};
+                if (from) preMatch.updatedAt.$gte = from;
+                if (to) preMatch.updatedAt.$lte = to;
       }
 
-      const pipeline = [
+      const pipeline: any[] = [
         ...(Object.keys(preMatch).length ? [{ $match: preMatch }] : []),
         { $unwind: "$messages" },
         {
@@ -2781,22 +2570,21 @@ router.get(
         });
       }
 
-      const countPipeline = [...pipeline, { $count: "total" }];
+      const countPipeline: any[] = [...pipeline, { $count: "total" }];
       const [countResult] = await db
         .collection(CONVERSATIONS_COL)
         .aggregate(countPipeline)
         .toArray();
       const total = countResult?.total || 0;
 
-      // @ts-ignore
-      pipeline.push({ $skip: skip }, { $limit: lim });
+            pipeline.push({ $skip: skip }, { $limit: lim });
 
       const items = await db
         .collection(CONVERSATIONS_COL)
         .aggregate(pipeline)
         .toArray();
 
-      const data = items.map((item: Record<string, unknown>) => ({
+      const data = items.map((item: any) => ({
         content: item.content,
         origin: item.role === "assistant" ? "ai" : "user",
         role: item.role,
@@ -2806,16 +2594,13 @@ router.get(
         username: item.username,
         model: item.model,
         estimatedCost: item.estimatedCost,
-        // @ts-ignore - TODO: strict typing
-        hasImages: item.images > 0,
+                hasImages: (item as any).images > 0,
         timestamp: item.timestamp,
       }));
 
-      // @ts-ignore - TODO: strict typing
-      res.json({ data, total, page: parseInt(page, 10), limit: lim });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /text error: ${error.message}`);
+            res.json({ data, total, page: parseInt((page as any), 10), limit: lim });
+    } catch (error: any) {
+            logger.error(`Admin /text error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -2840,27 +2625,20 @@ router.get(
       } = req.query;
 
       // Base filter: only requests with a traceId
-      const match = { traceId: { $ne: null } };
-      // @ts-ignore
-      if (project) match.project = project;
-      // @ts-ignore
-      if (username) match.username = username;
+      const match: any = { traceId: { $ne: null } };
+            if (project) match.project = project;
+            if (username) match.username = username;
       if (from || to) {
-        // @ts-ignore
-        match.timestamp = {};
-        // @ts-ignore
-        if (from) match.timestamp.$gte = from;
-        // @ts-ignore
-        if (to) match.timestamp.$lte = to;
+                match.timestamp = {};
+                if (from) match.timestamp.$gte = from;
+                if (to) match.timestamp.$lte = to;
       }
 
-      // @ts-ignore - TODO: strict typing
-      const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-      // @ts-ignore - TODO: strict typing
-      const lim = parseInt(limit, 10);
+            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
+            const lim = parseInt((limit as any), 10);
       const sortDir = order === "asc" ? 1 : -1;
 
-      const pipeline = [
+      const pipeline: any[] = [
         { $match: match },
         // Group all requests by traceId
         {
@@ -2992,16 +2770,14 @@ router.get(
             _requests: 0,
           },
         },
-        // @ts-ignore - TODO: strict typing
-        { $sort: { [sort]: sortDir } },
+                { $sort: { [sort]: sortDir } },
       ];
 
       // Count total matching traces
-      const countPipeline = [...pipeline, { $count: "total" }];
+      const countPipeline: any[] = [...pipeline, { $count: "total" }];
 
       // Add pagination to the data pipeline
-      // @ts-ignore
-      pipeline.push({ $skip: skip }, { $limit: lim });
+            pipeline.push({ $skip: skip }, { $limit: lim });
 
       const [docs, countResult] = await Promise.all([
         db.collection(REQUESTS_COL).aggregate(pipeline).toArray(),
@@ -3009,11 +2785,9 @@ router.get(
       ]);
       const total = countResult[0]?.total || 0;
 
-      // @ts-ignore - TODO: strict typing
-      res.json({ data: docs, total, page: parseInt(page, 10), limit: lim });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /traces error: ${error.message}`);
+            res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
+    } catch (error: any) {
+            logger.error(`Admin /traces error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -3043,40 +2817,31 @@ router.get(
         username: requests[0].username,
         requestCount: requests.length,
         totalCost: requests.reduce(
-          // @ts-ignore - TODO: strict typing
-          (sum: Record<string, unknown>, r: Record<string, unknown>) => sum + (r.estimatedCost || 0),
-          // @ts-ignore - TODO: strict typing
-          0,
+                    (sum: any, r: any) => sum + (r.estimatedCost || 0),
+                    0,
         ),
         totalInputTokens: requests.reduce(
-          // @ts-ignore - TODO: strict typing
-          (sum: Record<string, unknown>, r: Record<string, unknown>) => sum + (r.inputTokens || 0),
-          // @ts-ignore - TODO: strict typing
-          0,
+                    (sum: any, r: any) => sum + (r.inputTokens || 0),
+                    0,
         ),
         totalOutputTokens: requests.reduce(
-          // @ts-ignore - TODO: strict typing
-          (sum: Record<string, unknown>, r: Record<string, unknown>) => sum + (r.outputTokens || 0),
-          // @ts-ignore - TODO: strict typing
-          0,
+                    (sum: any, r: any) => sum + (r.outputTokens || 0),
+                    0,
         ),
         createdAt: requests.reduce(
-          // @ts-ignore - TODO: strict typing
-          (min: Record<string, unknown>, r: Record<string, unknown>) => (!min || r.timestamp < min ? r.timestamp : min),
+                    (min: any, r: any) => (!min || (r as any).timestamp < min ? r.timestamp : min),
           null,
         ),
         updatedAt: requests.reduce(
-          // @ts-ignore - TODO: strict typing
-          (max: Record<string, unknown>, r: Record<string, unknown>) => (!max || r.timestamp > max ? r.timestamp : max),
+                    (max: any, r: any) => (!max || (r as any).timestamp > max ? r.timestamp : max),
           null,
         ),
         requests,
       };
 
       res.json(trace);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /traces/:id error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /traces/:id error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -3103,8 +2868,7 @@ router.get(
           });
         if (childIds.length === 0) break;
         const newIds = childIds.filter(Boolean);
-        // @ts-ignore
-        for ( const id of newIds) allSessionIds.add(id);
+                for ( const id of newIds) allSessionIds.add(id);
         frontier = newIds;
       }
 
@@ -3146,11 +2910,10 @@ router.get(
       let totalCacheReadInputTokens = 0;
       let totalCacheCreationInputTokens = 0;
       let totalReasoningOutputTokens = 0;
-      const mergedModalities = {};
-      const toolCounts = {};
+      const mergedModalities: any = {};
+      const toolCounts: any = {};
 
-      // @ts-ignore
-      for ( const r of requests) {
+            for ( const r of requests) {
         totalCost += r.estimatedCost || 0;
         totalInputTokens += r.inputTokens || 0;
         totalOutputTokens += r.outputTokens || 0;
@@ -3162,34 +2925,28 @@ router.get(
         if (r.operation) operations.add(r.operation);
         // Merge modalities
         if (r.modalities) {
-          // @ts-ignore
-          for ( const [k, v] of Object.entries(r.modalities)) {
-            // @ts-ignore
-            if (v) mergedModalities[k] = true;
+                    for ( const [k, v] of Object.entries(r.modalities)) {
+                        if (v) mergedModalities[k] = true;
           }
         }
         // Count tool usage
         if (r.toolApiNames?.length > 0) {
-          // @ts-ignore
-          for ( const name of r.toolApiNames) {
-            // @ts-ignore
-            toolCounts[name] = (toolCounts[name] || 0) + 1;
+                    for ( const name of r.toolApiNames) {
+                        toolCounts[name] = (toolCounts[name] || 0) + 1;
           }
         }
       }
 
       const workerRequestCount = requests.filter(
-        (r: Record<string, unknown>) => r.agentSessionId !== sessionId,
+        (r: any) => r.agentSessionId !== sessionId,
       ).length;
 
       const createdAt = requests.reduce(
-        // @ts-ignore - TODO: strict typing
-        (min: Record<string, unknown>, r: Record<string, unknown>) => (!min || r.timestamp < min ? r.timestamp : min),
+                (min: any, r: any) => (!min || (r as any).timestamp < min ? r.timestamp : min),
         null,
       );
       const updatedAt = requests.reduce(
-        // @ts-ignore - TODO: strict typing
-        (max: Record<string, unknown>, r: Record<string, unknown>) => (!max || r.timestamp > max ? r.timestamp : max),
+                (max: any, r: any) => (!max || (r as any).timestamp > max ? r.timestamp : max),
         null,
       );
 
@@ -3198,8 +2955,7 @@ router.get(
         createdAt && updatedAt
           ? Math.max(
               0,
-              // @ts-ignore - TODO: strict typing
-              (new Date(updatedAt).getTime() - new Date(createdAt).getTime()) /
+                            (new Date(updatedAt).getTime() - new Date(createdAt).getTime()) /
                 1000,
             )
           : 0;
@@ -3224,9 +2980,8 @@ router.get(
         createdAt,
         updatedAt,
       });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /sessions/:id/stats error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /sessions/:id/stats error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -3261,8 +3016,7 @@ router.get(
         if (childRequests.length === 0) break;
 
         const newIds = childRequests.filter(Boolean);
-        // @ts-ignore
-        for ( const id of newIds) allSessionIds.add(id);
+                for ( const id of newIds) allSessionIds.add(id);
         frontier = newIds;
       }
 
@@ -3305,9 +3059,8 @@ router.get(
         total: requests.length,
         requests,
       });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /sessions/:id/requests error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /sessions/:id/requests error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -3331,22 +3084,16 @@ router.get(
         order = "desc",
       } = req.query;
 
-      const filter = {};
-      // @ts-ignore
-      if (project) filter.project = project;
+      const filter: any = {};
+            if (project) filter.project = project;
       if (from || to) {
-        // @ts-ignore
-        filter.updatedAt = {};
-        // @ts-ignore
-        if (from) filter.updatedAt.$gte = from;
-        // @ts-ignore
-        if (to) filter.updatedAt.$lte = to;
+                filter.updatedAt = {};
+                if (from) (filter as any).updatedAt.$gte = from;
+                if (to) (filter as any).updatedAt.$lte = to;
       }
 
-      // @ts-ignore - TODO: strict typing
-      const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-      // @ts-ignore - TODO: strict typing
-      const lim = parseInt(limit, 10);
+            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
+            const lim = parseInt((limit as any), 10);
       const sortDir = order === "asc" ? 1 : -1;
 
       const [docs, total] = await Promise.all([
@@ -3356,19 +3103,16 @@ router.get(
             // Exclude full message history for the list view — too heavy
             projection: { messages: 0 },
           })
-          // @ts-ignore - TODO: strict typing
-          .sort({ [sort]: sortDir })
+                    .sort({ [sort]: sortDir })
           .skip(skip)
           .limit(lim)
           .toArray(),
         db.collection(COLLECTIONS.AGENT_SESSIONS).countDocuments(filter),
       ]);
 
-      // @ts-ignore - TODO: strict typing
-      res.json({ data: docs, total, page: parseInt(page, 10), limit: lim });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /agent-sessions error: ${error.message}`);
+            res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
+    } catch (error: any) {
+            logger.error(`Admin /agent-sessions error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -3390,9 +3134,8 @@ router.get(
         return res.status(404).json({ error: "Agent session not found" });
 
       res.json(document);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Admin /agent-sessions/:id error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Admin /agent-sessions/:id error: ${(error as Error).message}`);
       next(error);
     }
   }),

@@ -1,7 +1,5 @@
-// @ts-ignore
 import { roundMs } from "@rodrigo-barraza/utilities-library";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import {
@@ -33,11 +31,10 @@ const API_TO_CANONICAL = {
   imageGeneration: "Image Generation",
   image_generation: "Image Generation",
 };
-function sanitizeMsg(m: Record<string, unknown>) {
-  const sanitizeStr = (s: Record<string, unknown>) =>
-    // @ts-ignore - TODO: strict typing
-    typeof s === "string" && s.startsWith("data:") ? `[base64 data]` : s;
-  const sanitizeMedia = (value: Record<string, unknown>) => {
+function sanitizeMsg(m: any) {
+  const sanitizeStr = (s: any) =>
+        typeof s === "string" && (s as any).startsWith("data:") ? `[base64 data]` : s;
+  const sanitizeMedia = (value: any) => {
     if (Array.isArray(value)) return value.map(sanitizeStr);
     if (typeof value === "string") return sanitizeStr(value);
     return value;
@@ -45,14 +42,10 @@ function sanitizeMsg(m: Record<string, unknown>) {
   return {
     role: m.role,
     content: typeof m.content === "string" ? m.content : m.content,
-    // @ts-ignore - TODO: strict typing
-    ...(m.images?.length ? { images: sanitizeMedia(m.images) } : {}),
-    // @ts-ignore - TODO: strict typing
-    ...(m.audio ? { audio: sanitizeMedia(m.audio) } : {}),
-    // @ts-ignore - TODO: strict typing
-    ...(m.video?.length ? { video: sanitizeMedia(m.video) } : {}),
-    // @ts-ignore - TODO: strict typing
-    ...(m.pdf?.length ? { pdf: sanitizeMedia(m.pdf) } : {}),
+        ...((m.images as any)?.length ? { images: sanitizeMedia((m.images as any)) } : {}),
+        ...(m.audio ? { audio: sanitizeMedia((m.audio as any)) } : {}),
+        ...((m.video as any)?.length ? { video: sanitizeMedia((m.video as any)) } : {}),
+        ...((m.pdf as any)?.length ? { pdf: sanitizeMedia((m.pdf as any)) } : {}),
   };
 }
 const RequestLogger = {
@@ -99,7 +92,7 @@ const RequestLogger = {
     responsePayload = null,
     modalities = null,
     rateLimits = null,
-  }: Record<string, unknown>) {
+  }: any) {
     try {
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
       if (!db) {
@@ -120,8 +113,7 @@ const RequestLogger = {
         conversationId,
         traceId,
         agentSessionId,
-        // @ts-ignore - TODO: strict typing
-        ...(parentAgentSessionId && { parentAgentSessionId }),
+                ...(parentAgentSessionId && { parentAgentSessionId }),
         toolsUsed,
         toolDisplayNames,
         toolApiNames,
@@ -150,9 +142,8 @@ const RequestLogger = {
         rateLimits,
       };
       await db.collection(COLLECTION).insertOne(document);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error("RequestLogger: failed to save request", error.message);
+    } catch (error: any) {
+            logger.error("RequestLogger: failed to save request", (error as Error).message);
     }
   },
   /**
@@ -195,34 +186,25 @@ const RequestLogger = {
     // Optional
     agenticIteration = null,
     rateLimits = null,
-  }: Record<string, unknown>) {
-    // @ts-ignore - TODO: strict typing
-    const inputTokens = usage ? getTotalInputTokens(usage) : 0;
-    // @ts-ignore - TODO: strict typing
-    const outputTokens = usage ? usage.outputTokens || 0 : 0;
-    // @ts-ignore - TODO: strict typing
-    const cacheReadInputTokens = usage?.cacheReadInputTokens || 0;
-    // @ts-ignore - TODO: strict typing
-    const cacheCreationInputTokens = usage?.cacheCreationInputTokens || 0;
-    // @ts-ignore - TODO: strict typing
-    const reasoningOutputTokens = usage?.reasoningOutputTokens || 0;
+  }: any) {
+        const inputTokens = usage ? getTotalInputTokens((usage as any)) : 0;
+        const outputTokens = usage ? (usage as any).outputTokens || 0 : 0;
+        const cacheReadInputTokens = (usage as any)?.cacheReadInputTokens || 0;
+        const cacheCreationInputTokens = (usage as any)?.cacheCreationInputTokens || 0;
+        const reasoningOutputTokens = (usage as any)?.reasoningOutputTokens || 0;
     // Build synthetic message array for computeModalities (same function used by conversations)
     const syntheticMessages = [
-      // @ts-ignore - TODO: strict typing
-      ...messages,
+            ...messages,
       {
         role: "assistant",
         content: text || null,
-        // @ts-ignore - TODO: strict typing
-        ...(images && images.length > 0 ? { images } : {}),
+                ...(images && (images as any).length > 0 ? { images } : {}),
         ...(audioRef ? { audio: audioRef } : {}),
-        // @ts-ignore - TODO: strict typing
-        ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
+                ...(toolCalls && (toolCalls as any).length > 0 ? { toolCalls } : {}),
         ...(thinking ? { thinking } : {}),
       },
     ];
-    // @ts-ignore - TODO: strict typing
-    const modalities = computeModalities(syntheticMessages);
+        const modalities = computeModalities((syntheticMessages as any));
     return this.log({
       requestId,
       endpoint,
@@ -237,27 +219,20 @@ const RequestLogger = {
       traceId,
       agentSessionId,
       parentAgentSessionId,
-      // @ts-ignore - TODO: strict typing
-      toolsUsed: toolCalls && toolCalls.length > 0,
-      // @ts-ignore
-      toolDisplayNames:
-        // @ts-ignore - TODO: strict typing
-        toolCalls && toolCalls.length > 0
+            toolsUsed: toolCalls && (toolCalls as any).length > 0,
+            toolDisplayNames:
+                toolCalls && (toolCalls as any).length > 0
           ? [
               ...new Set(
-                // @ts-ignore - TODO: strict typing
-                toolCalls.map(
-                  // @ts-ignore
-                  (tc: Record<string, unknown>) => API_TO_CANONICAL[tc.name] || tc.name,
+                                (toolCalls as any).map(
+                                    (tc: any) => (API_TO_CANONICAL as any)[((tc as string) as any).name] || tc.name,
                 ),
               ),
             ]
           : [],
       toolApiNames:
-        // @ts-ignore - TODO: strict typing
-        toolCalls && toolCalls.length > 0
-          // @ts-ignore - TODO: strict typing
-          ? [...new Set(toolCalls.map((tc: Record<string, unknown>) => tc.name))]
+                toolCalls && (toolCalls as any).length > 0
+                    ? [...new Set((toolCalls as any).map((tc: any) => tc.name))]
           : [],
       success,
       errorMessage,
@@ -268,60 +243,39 @@ const RequestLogger = {
       ...(reasoningOutputTokens > 0 && { reasoningOutputTokens }),
       estimatedCost,
       tokensPerSec,
-      // @ts-ignore - TODO: strict typing
-      temperature: options?.temperature ?? null,
-      // @ts-ignore - TODO: strict typing
-      maxTokens: options?.maxTokens ?? null,
-      // @ts-ignore - TODO: strict typing
-      topP: options?.topP ?? null,
-      // @ts-ignore - TODO: strict typing
-      topK: options?.topK ?? null,
-      // @ts-ignore - TODO: strict typing
-      frequencyPenalty: options?.frequencyPenalty ?? null,
-      // @ts-ignore - TODO: strict typing
-      presencePenalty: options?.presencePenalty ?? null,
-      // @ts-ignore - TODO: strict typing
-      stopSequences: options?.stopSequences ?? null,
-      // @ts-ignore - TODO: strict typing
-      messageCount: messages.length,
-      // @ts-ignore - TODO: strict typing
-      inputCharacters: messages.reduce(
-        (sum: Record<string, unknown>, m: Record<string, unknown>) =>
-          // @ts-ignore - TODO: strict typing
-          sum + (typeof m.content === "string" ? m.content.length : 0),
+            temperature: (options as any)?.temperature ?? null,
+            maxTokens: (options as any)?.maxTokens ?? null,
+            topP: (options as any)?.topP ?? null,
+            topK: (options as any)?.topK ?? null,
+            frequencyPenalty: (options as any)?.frequencyPenalty ?? null,
+            presencePenalty: (options as any)?.presencePenalty ?? null,
+            stopSequences: (options as any)?.stopSequences ?? null,
+            messageCount: (messages as any).length,
+            inputCharacters: (messages as any).reduce(
+        (sum: any, m: any) =>
+                    sum + (typeof m.content === "string" ? m.content.length : 0),
         0,
       ),
       outputCharacters,
       timeToGeneration:
-        // @ts-ignore - TODO: strict typing
-        timeToGenerationSec !== null ? roundMs(timeToGenerationSec) : null,
-      // @ts-ignore - TODO: strict typing
-      generationTime: generationSec !== null ? roundMs(generationSec) : null,
-      // @ts-ignore - TODO: strict typing
-      totalTime: totalSec !== null ? roundMs(totalSec) : null,
+                timeToGenerationSec !== null ? roundMs((timeToGenerationSec as any)) : null,
+            generationTime: generationSec !== null ? roundMs((generationSec as any)) : null,
+            totalTime: totalSec !== null ? roundMs((totalSec as any)) : null,
       requestPayload: {
-        // @ts-ignore - TODO: strict typing
-        messages: messages.map(sanitizeMsg),
-        // @ts-ignore - TODO: strict typing
-        ...(options?.tools
-          // @ts-ignore - TODO: strict typing
-          ? { tools: options.tools.map((t: Record<string, unknown>) => t.name || t.function?.name) }
+                messages: (messages as any).map(sanitizeMsg),
+                ...((options as any)?.tools
+                    ? { tools: (options as any).tools.map((t: any) => t.name || (t.function as any)?.name) }
           : {}),
         ...(agenticIteration !== null ? { agenticIteration } : {}),
       },
       responsePayload: {
         text: text || null,
         thinking: thinking || null,
-        // @ts-ignore - TODO: strict typing
-        ...(images && images.length > 0 ? { images } : {}),
-        // @ts-ignore
-        toolCalls:
-          // @ts-ignore - TODO: strict typing
-          toolCalls && toolCalls.length > 0
-            // @ts-ignore - TODO: strict typing
-            ? toolCalls.map((tc: Record<string, unknown>) => ({
-                // @ts-ignore
-                name: API_TO_CANONICAL[tc.name] || tc.name,
+                ...(images && (images as any).length > 0 ? { images } : {}),
+                toolCalls:
+                    toolCalls && (toolCalls as any).length > 0
+                        ? (toolCalls as any).map((tc: any) => ({
+                                name: (API_TO_CANONICAL as any)[((tc as string) as any).name] || tc.name,
                 id: tc.id,
                 args: tc.args,
               }))
@@ -361,37 +315,28 @@ const RequestLogger = {
     requestStartMs,
     extraRequestPayload,
     extraResponsePayload,
-  }: Record<string, unknown>) {
-    // @ts-ignore - TODO: strict typing
-    const totalSec = (performance.now() - requestStartMs) / 1000;
-    // @ts-ignore - TODO: strict typing
-    const inputText = aiMessages.map((m: Record<string, unknown>) => m.content).join("\n");
+  }: any) {
+        const totalSec = (performance.now() - (requestStartMs as any)) / 1000;
+        const inputText = (aiMessages as any).map((m: any) => m.content).join("\n");
 
     // Prefer real API-reported usage over the ~4 chars/token heuristic.
     // The heuristic remains as fallback for callers that don't pass usage.
     const inputTokens = apiUsage
-      // @ts-ignore - TODO: strict typing
-      ? getTotalInputTokens(apiUsage)
+            ? getTotalInputTokens((apiUsage as any))
       : estimateTokens(inputText);
     const outputTokens = apiUsage
-      // @ts-ignore - TODO: strict typing
-      ? apiUsage.outputTokens || 0
+            ? (apiUsage as any).outputTokens || 0
       : resultText
-        // @ts-ignore - TODO: strict typing
-        ? estimateTokens(resultText)
+                ? estimateTokens((resultText as any))
         : 0;
-    // @ts-ignore - TODO: strict typing
-    const cacheReadInputTokens = apiUsage?.cacheReadInputTokens || 0;
-    // @ts-ignore - TODO: strict typing
-    const cacheCreationInputTokens = apiUsage?.cacheCreationInputTokens || 0;
+        const cacheReadInputTokens = (apiUsage as any)?.cacheReadInputTokens || 0;
+        const cacheCreationInputTokens = (apiUsage as any)?.cacheCreationInputTokens || 0;
 
-    // @ts-ignore
-    const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[model];
+        const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[(model as string)];
     let estimatedCost = null;
     if (pricing) {
       estimatedCost = calculateTextCost(
-        // @ts-ignore - TODO: strict typing
-        apiUsage || { inputTokens, outputTokens },
+                (apiUsage || { inputTokens, outputTokens } as any),
         pricing,
       );
     }
@@ -414,22 +359,18 @@ const RequestLogger = {
       outputTokens,
       ...(cacheReadInputTokens > 0 && { cacheReadInputTokens }),
       ...(cacheCreationInputTokens > 0 && { cacheCreationInputTokens }),
-      // @ts-ignore - TODO: strict typing
-      tokensPerSec: calculateTokensPerSec(outputTokens, totalSec),
+            tokensPerSec: calculateTokensPerSec((outputTokens as any), (totalSec as any)),
       inputCharacters: inputText.length,
       totalTime: roundMs(totalSec),
       modalities: { textIn: true, textOut: true },
       requestPayload: {
         operation,
-        // @ts-ignore - TODO: strict typing
-        ...extraRequestPayload,
+                ...extraRequestPayload,
       },
       responsePayload: success
         ? {
-            // @ts-ignore - TODO: strict typing
-            textPreview: (resultText || "").slice(0, 200),
-            // @ts-ignore - TODO: strict typing
-            ...extraResponsePayload,
+                        textPreview: ((resultText || "") as any).slice(0, 200),
+                        ...extraResponsePayload,
           }
         : { error: errorMessage },
     });

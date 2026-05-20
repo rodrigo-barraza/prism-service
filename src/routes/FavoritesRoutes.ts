@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
@@ -18,11 +17,9 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const filter = { project, username };
-      // @ts-ignore
-      if (req.query.type) filter.type = req.query.type;
+            if (req.query.type) (filter as any).type = req.query.type;
 
       const favorites = await db
         .collection(COLLECTION)
@@ -31,9 +28,8 @@ router.get(
         .toArray();
 
       res.json(favorites);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error fetching favorites: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error fetching favorites: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -50,8 +46,7 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const { type, key, meta } = req.body;
 
       if (!type || !key) {
@@ -77,9 +72,8 @@ router.post(
         );
 
       res.json({ success: true, favorite: document });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error adding favorite: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error adding favorite: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -93,8 +87,7 @@ router.delete(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const { type, key } = req.query;
 
       if (!type || !key) {
@@ -108,9 +101,8 @@ router.delete(
         .deleteOne({ project, username, type, key });
 
       res.json({ success: true, deleted: result.deletedCount });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error removing favorite: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error removing favorite: ${(error as Error).message}`);
       next(error);
     }
   }),

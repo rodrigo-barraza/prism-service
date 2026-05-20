@@ -4,10 +4,8 @@ import logger from "../utils/logger.ts";
 import { extractAnthropicRateLimits } from "../utils/rateLimits.ts";
 import { compressImageForSizeLimit } from "../utils/media.ts";
 import { EMPTY_USAGE } from "../utils/openai-compat.ts";
-// @ts-ignore
 import { ANTHROPIC_API_KEY } from "../../config.ts";
 import { TYPES, getDefaultModels } from "../config.ts";
-// @ts-ignore
 import { sleep } from "@rodrigo-barraza/utilities-library";
 
 import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
@@ -20,7 +18,7 @@ export interface AnthropicBlock {
   source?: { type: string; media_type?: string; data?: string; url?: string };
   id?: string;
   name?: string;
-  input?: Record<string, unknown>;
+  input?: any;
   tool_use_id?: string;
   content?: string | AnthropicBlock[];
   citations?: Array<{ type: string; url?: string; title?: string; cited_text?: string }>;
@@ -43,21 +41,19 @@ const MAX_RETRIES = 3;
 /**
  * Check if an Anthropic error is retryable (overloaded or 529).
  */
-function isRetryableError(error: unknown) {
+function isRetryableError(error: any) {
   // SDK wraps the error body — check both the error type and HTTP status
-  const err = error as Record<string, unknown>;
-  const errorType = (err?.error as Record<string, unknown>)?.type || err?.type;
+  const err = error as any;
+  const errorType = (err?.error as any)?.type || err?.type;
   if (errorType === "overloaded_error") return true;
   if (err.status === 529) return true;
   return false;
 }
 
-// @ts-ignore
-let client = null;
+let client: any = null;
 
 function getClient() {
-  // @ts-ignore
-  if (!client) {
+    if (!client) {
     if (!ANTHROPIC_API_KEY) {
       throw new ProviderError("anthropic", "ANTHROPIC_API_KEY is not set", 401);
     }
@@ -73,11 +69,9 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
  * base64 image that exceeds 5 MB. Mutates the messages array in-place.
  */
 async function enforceImageSizeLimits(messages: ChatMessage[]) {
-  // @ts-ignore
-  for ( const message of messages) {
+    for ( const message of messages) {
     if (!Array.isArray(message.content)) continue;
-    // @ts-ignore
-    for ( const block of message.content as AnthropicBlock[]) {
+        for ( const block of message.content as AnthropicBlock[]) {
       if (block.type !== "image" || block.source?.type !== "base64") continue;
       const data = block.source.data;
       if (!data) continue;
@@ -90,8 +84,7 @@ async function enforceImageSizeLimits(messages: ChatMessage[]) {
         `[anthropic] SAFETY NET: image still ${(size / 1024 / 1024).toFixed(2)} MB after prepareMessages. Compressing now...`,
       );
       const result = await compressImageForSizeLimit(
-        // @ts-ignore - TODO: strict typing
-        block.source.data,
+                (block.source.data as any),
         block.source.media_type || "image/png",
       );
       block.source.data = result.data;
@@ -136,8 +129,7 @@ async function prepareMessages(messages: ChatMessage[]) {
             content: [
               {
                 type: "tool_result",
-                // @ts-ignore - TODO: strict typing
-                tool_use_id: (m as Record<string, unknown>).tool_call_id || m.id || m.name || "unknown",
+                                tool_use_id: (m as any).tool_call_id || (m as any).id || m.name || "any",
                 content:
                   typeof m.content === "string"
                     ? m.content
@@ -148,8 +140,7 @@ async function prepareMessages(messages: ChatMessage[]) {
         }
 
         // Convert assistant messages with toolCalls to multi-part content
-        // @ts-ignore - TODO: strict typing
-        if (m.role === "assistant" && m.toolCalls?.length > 0) {
+                if (m.role === "assistant" && m.toolCalls?.length > 0) {
           const contentBlocks: AnthropicBlock[] = [];
           // Preserve thinking blocks for multi-step reasoning continuity.
           // The signature field is REQUIRED by Anthropic's API for multi-turn
@@ -166,8 +157,7 @@ async function prepareMessages(messages: ChatMessage[]) {
           if (typeof m.content === "string" && m.content.trim()) {
             contentBlocks.push({ type: "text", text: m.content });
           }
-          // @ts-ignore
-          for ( const tc of m.toolCalls) {
+                    for ( const tc of m.toolCalls) {
             contentBlocks.push({
               type: "tool_use",
               id: tc.id || tc.name || `tc-${Date.now()}`,
@@ -185,8 +175,7 @@ async function prepareMessages(messages: ChatMessage[]) {
         const images = m.images;
         if (images && images.length > 0) {
           const contentBlocks: AnthropicBlock[] = [];
-          // @ts-ignore
-          for ( const dataUrl of images) {
+                    for ( const dataUrl of images) {
             const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
             if (!match) continue;
             const mimeType = match[1];
@@ -247,8 +236,7 @@ async function prepareMessages(messages: ChatMessage[]) {
             // Other MIME types (audio, video) are not supported by Anthropic — skip
           }
           if (m.content) {
-            // @ts-ignore - TODO: strict typing
-            contentBlocks.push({ type: "text", text: m.content });
+                        contentBlocks.push({ type: "text", text: m.content });
           }
           return {
             role: m.role,
@@ -324,8 +312,7 @@ async function prepareMessages(messages: ChatMessage[]) {
   // The frontend may send both inline results (from assistant.toolCalls
   // expansion) and standalone tool-role messages with the same ID,
   // which after merging creates duplicate tool_result blocks.
-  // @ts-ignore
-  for ( const message of merged) {
+    for ( const message of merged) {
     if (message.role !== "user" || !Array.isArray(message.content)) continue;
     const seenToolResultIds = new Set();
     message.content = (message.content as AnthropicBlock[]).filter((block: AnthropicBlock) => {
@@ -369,14 +356,12 @@ async function prepareMessages(messages: ChatMessage[]) {
   // Anthropic rejects requests where the final assistant message content ends
   // with trailing whitespace (400: "final assistant content cannot end with
   // trailing whitespace"). Sanitize all assistant text blocks to be safe.
-  // @ts-ignore
-  for ( const message of merged) {
+    for ( const message of merged) {
     if (message.role !== "assistant") continue;
     if (typeof message.content === "string") {
       message.content = message.content.trimEnd() || " ";
     } else if (Array.isArray(message.content)) {
-      // @ts-ignore
-      for ( const block of message.content) {
+            for ( const block of message.content) {
         if (block.type === "text" && typeof block.text === "string") {
           block.text = block.text.trimEnd() || " ";
         }
@@ -391,7 +376,7 @@ async function prepareMessages(messages: ChatMessage[]) {
  * Build the tools array based on options.
  */
 function buildTools(options: ProviderOptions) {
-  const tools: Record<string, unknown>[] = [];
+  const tools: any[] = [];
   if (options.webSearch) {
     tools.push({
       type: "web_search_20260209",
@@ -414,8 +399,7 @@ function buildTools(options: ProviderOptions) {
   }
   // Custom function calling tools
   if (options.tools && Array.isArray(options.tools)) {
-    // @ts-ignore
-    for ( const t of options.tools) {
+        for ( const t of options.tools) {
       tools.push({
         name: t.name,
         description: t.description || "",
@@ -433,17 +417,15 @@ function extractResponseContent(contentBlocks: AnthropicBlock[]) {
   let text = "";
   let thinking = null;
   let thinkingSignature = null;
-  const citations: Record<string, unknown>[] = [];
-  const toolCalls: Record<string, unknown>[] = [];
+  const citations: any[] = [];
+  const toolCalls: any[] = [];
 
-  // @ts-ignore
-  for ( const block of contentBlocks || []) {
+    for ( const block of contentBlocks || []) {
     if (block.type === "text") {
       text += block.text || "";
       // Collect inline citations from this text block
       if (block.citations) {
-        // @ts-ignore
-        for ( const cite of block.citations) {
+                for ( const cite of block.citations) {
           if (cite.type === "web_search_result_location") {
             citations.push({
               url: cite.url,
@@ -486,66 +468,47 @@ const anthropicProvider = {
 
   async generateText(
     messages: ChatMessage[],
-    // @ts-ignore
-    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
+        model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
     options: ProviderOptions = {},
   ) {
-    // @ts-ignore - TODO: strict typing
-    logger.provider("Anthropic", `generateText model=${model}`);
+        (logger.provider as any)(("Anthropic" as any), (`generateText model=${model}` as any));
 
     const prepared = await prepareMessages(messages);
-    const payload: Record<string, unknown> = {
+    const payload: any = {
       cache_control: { type: "ephemeral" },
       system: prepared.systemMessage,
       model,
       messages: prepared.messages,
-      // @ts-ignore
-      max_tokens: options.maxTokens || 1000,
+            max_tokens: options.maxTokens || 1000,
       temperature:
-        // @ts-ignore
-        options.temperature !== undefined
-          // @ts-ignore
-          ? Math.min(options.temperature, 1)
+                options.temperature !== undefined
+                    ? Math.min(options.temperature, 1)
           : undefined,
       top_p:
-        // @ts-ignore
-        options.temperature === undefined && options.topP !== undefined
-          ? // @ts-ignore
-            options.topP
+                options.temperature === undefined && options.topP !== undefined
+          ?             options.topP
           : undefined,
-      // @ts-ignore
-      top_k: options.topK !== undefined ? options.topK : undefined,
+            top_k: options.topK !== undefined ? options.topK : undefined,
       stop_sequences:
-        // @ts-ignore
-        options.stopSequences !== undefined
-          ? // @ts-ignore
-            options.stopSequences
+                options.stopSequences !== undefined
+          ?             options.stopSequences
           : undefined,
-      // @ts-ignore
-      ...(options.serviceTier && { service_tier: options.serviceTier }),
+            ...(options.serviceTier && { service_tier: options.serviceTier }),
     };
 
     // Server tools
     const tools = buildTools(options);
     if (tools) payload.tools = tools;
 
-    // @ts-ignore
-    if (
-      // @ts-ignore
-      options.thinkingEnabled !== false &&
-      // @ts-ignore
-      (options.thinkingEnabled === true ||
-        // @ts-ignore
-        options.thinkingBudget ||
-        // @ts-ignore
-        options.reasoningEffort)
+        if (
+            options.thinkingEnabled !== false &&
+            (options.thinkingEnabled === true ||
+                options.thinkingBudget ||
+                options.reasoningEffort)
     ) {
-      // @ts-ignore
-      const budget = options.thinkingBudget
-        ? // @ts-ignore
-          parseInt(options.thinkingBudget)
-        : // @ts-ignore
-          EFFORT_BUDGET_MAP[options.reasoningEffort] || EFFORT_BUDGET_MAP.high;
+            const budget = options.thinkingBudget
+        ?           parseInt((options.thinkingBudget as any))
+        :           (EFFORT_BUDGET_MAP as any)[((options as string) as any).reasoningEffort] || EFFORT_BUDGET_MAP.high;
       payload.thinking = { type: "enabled", budget_tokens: budget };
       if ((payload.max_tokens as number) <= budget) {
         payload.max_tokens = budget + 1024;
@@ -556,14 +519,13 @@ const anthropicProvider = {
       delete payload.top_k;
     }
 
-    let lastError: unknown;
+    let lastError: any;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const { data: response, response: rawResponse } = await getClient()
+        const { data: response, response: rawResponse } = await (getClient as any)()
           .messages.create(payload)
           .withResponse();
-        // @ts-ignore - TODO: strict typing
-        const rateLimits = extractAnthropicRateLimits(rawResponse, model);
+                const rateLimits = extractAnthropicRateLimits(rawResponse, (model as any));
 
         const { text, thinking, thinkingSignature, citations, toolCalls } =
           extractResponseContent(response.content);
@@ -571,23 +533,16 @@ const anthropicProvider = {
           text,
           usage: buildUsage(response.usage),
         };
-        // @ts-ignore
-        if (thinking) result.thinking = thinking;
-        // @ts-ignore
-        if (thinkingSignature) result.thinkingSignature = thinkingSignature;
-        // @ts-ignore
-        if (citations.length > 0) result.citations = citations;
-        // @ts-ignore
-        if (toolCalls.length > 0) result.toolCalls = toolCalls;
-        // @ts-ignore
-        if (rateLimits) result.rateLimits = rateLimits;
+                if (thinking) (result as any).thinking = thinking;
+                if (thinkingSignature) (result as any).thinkingSignature = thinkingSignature;
+                if (citations.length > 0) (result as any).citations = citations;
+                if (toolCalls.length > 0) (result as any).toolCalls = toolCalls;
+                if (rateLimits) (result as any).rateLimits = rateLimits;
         // Forward structured stop details for observability (SDK 0.82+)
-        // @ts-ignore
-        if (response.stop_reason) result.stopReason = response.stop_reason;
-        // @ts-ignore
-        if (response.stop_details) result.stopDetails = response.stop_details;
+                if (response.stop_reason) (result as any).stopReason = response.stop_reason;
+                if (response.stop_details) (result as any).stopDetails = response.stop_details;
         return result;
-      } catch (error: unknown) {
+      } catch (error: any) {
         lastError = error;
         if (isRetryableError(error) && attempt < MAX_RETRIES) {
           logger.warn(
@@ -598,8 +553,8 @@ const anthropicProvider = {
         }
         throw new ProviderError(
           "anthropic",
-          error instanceof Error ? error.message : (error as Record<string, unknown>)?.message as string || String(error),
-          ((error as Record<string, unknown>)?.status as number) || 500,
+          error instanceof Error ? (error as Error).message : (error as any)?.message as string || String(error),
+          ((error as any)?.status as number) || 500,
           error,
         );
       }
@@ -607,8 +562,8 @@ const anthropicProvider = {
     // Should never reach here, but safety net
     throw new ProviderError(
       "anthropic",
-      (lastError as Record<string, unknown>)?.message as string || "Max retries exceeded",
-      ((lastError as Record<string, unknown>)?.status as number) || 500,
+      (lastError as any)?.message as string || "Max retries exceeded",
+      ((lastError as any)?.status as number) || 500,
       lastError,
     );
   },
@@ -622,17 +577,14 @@ const anthropicProvider = {
   async captionImage(
     images: string[],
     prompt: string = "Describe this image.",
-    // @ts-ignore
-    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
+        model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
     systemPrompt?: string,
   ) {
-    // @ts-ignore - TODO: strict typing
-    logger.provider("Anthropic", `captionImage model=${model}`);
+        (logger.provider as any)(("Anthropic" as any), (`captionImage model=${model}` as any));
     try {
       const contentBlocks: AnthropicBlock[] = [];
 
-      // @ts-ignore
-      for ( const imageUrlOrBase64 of images) {
+            for ( const imageUrlOrBase64 of images) {
         const match = imageUrlOrBase64.match(/^data:([^;]+);base64,(.+)$/);
         if (match) {
           let mediaType = match[1];
@@ -676,92 +628,69 @@ const anthropicProvider = {
         max_tokens: 1000,
       };
       if (systemPrompt) {
-        // @ts-ignore
-        payload.system = systemPrompt;
+                (payload as any).system = systemPrompt;
       }
 
-      const response = await getClient().messages.create(payload);
+      const response = await (getClient as any)().messages.create(payload);
 
       const { text } = extractResponseContent(response.content);
       return {
         text,
         usage: buildUsage(response.usage),
       };
-    } catch (error: unknown) {
+    } catch (error: any) {
       throw new ProviderError(
         "anthropic",
-        // @ts-ignore - TODO: strict typing
-        error.message,
-        // @ts-ignore - TODO: strict typing
-        error.status || 500,
+                (error as Error).message,
+                ((error as Error) as any).status || 500,
         error,
       );
     }
   },
 
-  // @ts-ignore
-  async *generateTextStream(
+    async *generateTextStream(
     messages: ChatMessage[],
-    // @ts-ignore
-    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
+        model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
     options: ProviderOptions = {},
   ) {
-    // @ts-ignore - TODO: strict typing
-    logger.provider("Anthropic", `generateTextStream model=${model}`);
+        (logger.provider as any)(("Anthropic" as any), (`generateTextStream model=${model}` as any));
     try {
       const prepared = await prepareMessages(messages);
-      const streamPayload: Record<string, unknown> = {
+      const streamPayload: any = {
         cache_control: { type: "ephemeral" },
         system: prepared.systemMessage,
         model,
         messages: prepared.messages,
-        // @ts-ignore
-        max_tokens: options.maxTokens || 1000,
+                max_tokens: options.maxTokens || 1000,
         temperature:
-          // @ts-ignore
-          options.temperature !== undefined
-            // @ts-ignore
-            ? Math.min(options.temperature, 1)
+                    options.temperature !== undefined
+                        ? Math.min(options.temperature, 1)
             : undefined,
         top_p:
-          // @ts-ignore
-          options.temperature === undefined && options.topP !== undefined
-            ? // @ts-ignore
-              options.topP
+                    options.temperature === undefined && options.topP !== undefined
+            ?               options.topP
             : undefined,
-        // @ts-ignore
-        top_k: options.topK !== undefined ? options.topK : undefined,
+                top_k: options.topK !== undefined ? options.topK : undefined,
         stop_sequences:
-          // @ts-ignore
-          options.stopSequences !== undefined
-            ? // @ts-ignore
-              options.stopSequences
+                    options.stopSequences !== undefined
+            ?               options.stopSequences
             : undefined,
-        // @ts-ignore
-        ...(options.serviceTier && { service_tier: options.serviceTier }),
+                ...(options.serviceTier && { service_tier: options.serviceTier }),
       };
 
       // Server tools
       const tools = buildTools(options);
       if (tools) streamPayload.tools = tools;
 
-      // @ts-ignore
-      if (
-        // @ts-ignore
-        options.thinkingEnabled !== false &&
-        // @ts-ignore
-        (options.thinkingEnabled === true ||
-          // @ts-ignore
-          options.thinkingBudget ||
-          // @ts-ignore
-          options.reasoningEffort)
+            if (
+                options.thinkingEnabled !== false &&
+                (options.thinkingEnabled === true ||
+                    options.thinkingBudget ||
+                    options.reasoningEffort)
       ) {
-        // @ts-ignore
-        const budget = options.thinkingBudget
-          ? // @ts-ignore
-            parseInt(options.thinkingBudget)
-          : // @ts-ignore
-            EFFORT_BUDGET_MAP[options.reasoningEffort] ||
+                const budget = options.thinkingBudget
+          ?             parseInt((options.thinkingBudget as any))
+          :             (EFFORT_BUDGET_MAP as any)[((options as string) as any).reasoningEffort] ||
             EFFORT_BUDGET_MAP.high;
         streamPayload.thinking = { type: "enabled", budget_tokens: budget };
         if ((streamPayload.max_tokens as number) <= budget) {
@@ -775,9 +704,8 @@ const anthropicProvider = {
 
       await enforceImageSizeLimits(streamPayload.messages as ChatMessage[]);
 
-      const stream = getClient().messages.stream(streamPayload, {
-        // @ts-ignore
-        ...(options.signal && { signal: options.signal }),
+      const stream = (getClient as any)().messages.stream(streamPayload, {
+                ...(options.signal && { signal: options.signal }),
       });
 
       // Track current content block type for server tool response processing
@@ -789,10 +717,8 @@ const anthropicProvider = {
       let messageStartUsage = null;
       let rateLimits = null;
 
-      // @ts-ignore
-      for await ( const chunk of stream) {
-        // @ts-ignore
-        if (options.signal?.aborted) {
+            for await ( const chunk of stream) {
+                if (options.signal?.aborted) {
           stream.abort();
           break;
         }
@@ -803,8 +729,7 @@ const anthropicProvider = {
           messageStartUsage = chunk.message.usage;
           // Capture rate-limit headers from the stream's initial response
           if (!rateLimits && stream.response) {
-            // @ts-ignore - TODO: strict typing
-            rateLimits = extractAnthropicRateLimits(stream.response, model);
+                        rateLimits = extractAnthropicRateLimits(stream.response, (model as any));
           }
           continue;
         }
@@ -995,14 +920,12 @@ const anthropicProvider = {
       if (rateLimits) {
         yield { type: "rateLimits", rateLimits };
       }
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      if (error.name === "AbortError") return;
+    } catch (error: any) {
+            if ((error as Error).name === "AbortError") return;
       // For streaming, retry overloaded errors with the same delay/attempts policy
       if (isRetryableError(error)) {
         // Recursive retry with attempt tracking via options._retryAttempt
-        // @ts-ignore
-        const attempt = options._retryAttempt || 1;
+                const attempt = options._retryAttempt || 1;
         if (attempt < MAX_RETRIES) {
           logger.warn(
             `[anthropic] Overloaded on attempt ${attempt}/${MAX_RETRIES} for generateTextStream model=${model}. Retrying in ${RETRY_DELAY_MS / 1000}s...`,
@@ -1017,10 +940,8 @@ const anthropicProvider = {
       }
       throw new ProviderError(
         "anthropic",
-        // @ts-ignore - TODO: strict typing
-        error.message,
-        // @ts-ignore - TODO: strict typing
-        error.status || 500,
+                (error as Error).message,
+                ((error as Error) as any).status || 500,
         error,
       );
     }

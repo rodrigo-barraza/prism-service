@@ -12,7 +12,6 @@ import SessionGenerationTracker from "../SessionGenerationTracker.ts";
 import RequestLogger from "../RequestLogger.ts";
 import FileService from "../FileService.ts";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-// @ts-ignore — root-level config export
 import { MONGO_DB_NAME } from "../../../config.ts";
 import { COLLECTIONS } from "../../constants.ts";
 import { finalizeTextGeneration } from "./lifecycle/Finalizer.ts";
@@ -84,9 +83,8 @@ export default class BaseAgenticHarness {
   emitGenerationProgress(): void {
     const { emit } = this.ctx;
     const state = this.state;
-    const stats = SessionGenerationTracker.getSessionStats(
-      // @ts-ignore - TODO: strict typing
-      this.trackerSessionId,
+    const stats = (SessionGenerationTracker as any).getSessionStats(
+            (this.trackerSessionId as any),
     );
     if (stats.activeRequests > 0 || stats.totalOutputTokens > 0) {
       state.hwmOutputTokens = Math.max(
@@ -139,8 +137,7 @@ export default class BaseAgenticHarness {
     toolCount: number,
   ): ConversationMessage[] {
     const { modelDef, options, emit } = this.ctx;
-    // @ts-ignore - TODO: strict typing
-    const contextResult = ContextWindowManager.enforce(messages, {
+        const contextResult = ContextWindowManager.enforce((messages as any), {
       maxInputTokens: modelDef?.maxInputTokens || 128_000,
       maxOutputTokens: options.maxTokens || 8192,
       toolCount,
@@ -165,11 +162,10 @@ export default class BaseAgenticHarness {
    */
   createProviderStream(
     messages: ConversationMessage[],
-    passOptions: Record<string, unknown>,
-  ): AsyncIterable<unknown> {
+    passOptions: any,
+  ): AsyncIterable<any> {
     const { provider, resolvedModel, modelDef, signal } = this.ctx;
-    // @ts-ignore - TODO: strict typing
-    const expandedMessages = expandMessagesForFC(messages, {
+        const expandedMessages = expandMessagesForFC((messages as any), {
       filterDeleted: false,
     });
     return modelDef?.liveAPI && provider.generateTextStreamLive
@@ -190,14 +186,14 @@ export default class BaseAgenticHarness {
    * Handles abort signals and stream teardown.
    */
   public async consumeStream(
-    stream: AsyncIterable<unknown>,
+    stream: AsyncIterable<any>,
     pass: PassState,
     allowedToolNames: Set<string>,
   ): Promise<void> {
     for await (const chunk of stream) {
       const result = await this.processStreamChunk(chunk, pass, allowedToolNames);
       if (result.action === "break") {
-        const returnable = stream as AsyncGenerator<unknown>;
+        const returnable = stream as AsyncGenerator<any>;
         if (typeof returnable.return === "function") returnable.return(undefined);
         break;
       }
@@ -210,8 +206,7 @@ export default class BaseAgenticHarness {
   registerTrackerRequest(passRequestId: string): void {
     const { providerName, resolvedModel, parentAgentSessionId, agentSessionId } =
       this.ctx;
-    // @ts-ignore - TODO: strict typing
-    SessionGenerationTracker.register(this.trackerSessionId, passRequestId, {
+        (SessionGenerationTracker as any).register((this.trackerSessionId as any), passRequestId, {
       provider: providerName,
       model: resolvedModel,
       source: parentAgentSessionId ? "worker" : "orchestrator",
@@ -230,28 +225,25 @@ export default class BaseAgenticHarness {
    *   `break`    — abort signal received
    */
   processStreamChunk(
-    chunk: unknown,
+    chunk: any,
     pass: PassState,
     allowedToolNames: Set<string>,
   ): ChunkAction | Promise<ChunkAction> {
     const { emit, signal } = this.ctx;
     const state = this.state;
-    const c = chunk as Record<string, any>;
+    const c = chunk as any;
 
     // Abort check
     if (signal?.aborted) return { action: "break" };
 
     // ── Usage event ──────────────────────────────────────
     if (c?.type === "usage") {
-      // @ts-ignore - TODO: strict typing
-      mergeUsage(state.overallUsage, c.usage);
-      // @ts-ignore - TODO: strict typing
-      mergeUsage(pass.usage, c.usage);
+            mergeUsage((state.overallUsage as any), c.usage);
+            mergeUsage((pass.usage as any), c.usage);
       const reportedInput =
         c.usage?.inputTokens || c.usage?.promptTokens || 0;
       if (reportedInput > 0) {
-        // @ts-ignore - TODO: strict typing
-        SessionGenerationTracker.update(pass.requestId, {
+                (SessionGenerationTracker as any).update((pass.requestId as any), {
           inputTokens: reportedInput,
         });
       }
@@ -283,9 +275,8 @@ export default class BaseAgenticHarness {
         state.displayThinkingFragments.length - 1
       ] += c.content;
       state.overallOutputCharacters += c.content.length;
-      SessionGenerationTracker.recordChunkTiming(
-        // @ts-ignore - TODO: strict typing
-        pass.requestId,
+      (SessionGenerationTracker as any).recordChunkTiming(
+                (pass.requestId as any),
         c.content.length,
       );
       emit({
@@ -308,9 +299,8 @@ export default class BaseAgenticHarness {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
       state.overallOutputCharacters += c.characters;
-      SessionGenerationTracker.recordChunkTiming(
-        // @ts-ignore - TODO: strict typing
-        pass.requestId,
+      (SessionGenerationTracker as any).recordChunkTiming(
+                (pass.requestId as any),
         c.characters,
       );
       this.maybeEmitProgress();
@@ -321,9 +311,8 @@ export default class BaseAgenticHarness {
     if (c?.type === "toolCall") {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
-      SessionGenerationTracker.recordChunkTiming(
-        // @ts-ignore - TODO: strict typing
-        pass.requestId,
+      (SessionGenerationTracker as any).recordChunkTiming(
+                (pass.requestId as any),
         JSON.stringify(c.args || {}).length,
       );
       this.maybeEmitProgress();
@@ -340,9 +329,9 @@ export default class BaseAgenticHarness {
           this._trackToolDisplaySegment(tcId);
         } else if (c.status === "done" || c.status === "error") {
           const existing = state.streamedToolCalls.find(
-            (tc) =>
-              (c.id && tc.id === c.id) ||
-              (!c.id && tc.name === c.name),
+            (tc: any) =>
+              (c.id && (tc as any).id === c.id) ||
+              (!c.id && (tc as any).name === c.name),
           );
           if (existing) {
             existing.result = c.result;
@@ -438,8 +427,7 @@ export default class BaseAgenticHarness {
     pass.outputCharacters += rawChunkStr.length;
     pass.streamedText += rawChunkStr;
     // Strip tool call XML markup leaked by some local models
-    // @ts-ignore - TODO: strict typing
-    const cleanedPassText = stripToolCallMarkup(pass.streamedText);
+        const cleanedPassText = stripToolCallMarkup((pass.streamedText as any));
     const chunkStr = cleanedPassText.slice(state.finalStreamedText.length);
     state.finalStreamedText = cleanedPassText;
     if (state.planModeActive) state.planModeText += chunkStr;
@@ -454,9 +442,8 @@ export default class BaseAgenticHarness {
     }
     state.displayTextFragments[state.displayTextFragments.length - 1] +=
       chunkStr;
-    SessionGenerationTracker.recordChunkTiming(
-      // @ts-ignore - TODO: strict typing
-      pass.requestId,
+    (SessionGenerationTracker as any).recordChunkTiming(
+            (pass.requestId as any),
       rawChunkStr.length,
     );
     if (chunkStr)
@@ -492,12 +479,10 @@ export default class BaseAgenticHarness {
         ? (pass.generationEnd - pass.firstTokenTime) / 1000
         : null;
     const passTokensPerSec = calculateTokensPerSec(
-      // @ts-ignore - TODO: strict typing
-      pass.usage.outputTokens,
-      passGenerationSec,
+            (pass.usage.outputTokens as any),
+      (passGenerationSec as any),
     );
-    // @ts-ignore - TODO: strict typing
-    const passEstimatedCost = calculateTextCost(pass.usage, pricing);
+        const passEstimatedCost = calculateTextCost((pass.usage as any), pricing);
 
     RequestLogger.logChatGeneration({
       requestId: `${this.ctx.requestId}-${state.iterations}`,
@@ -539,7 +524,7 @@ export default class BaseAgenticHarness {
   // ── Per-iteration pass state factory ──────────────────────
 
   /** Create a fresh per-iteration pass state object. */
-  createPassState(passOptions: Record<string, unknown>): PassState {
+  createPassState(passOptions: any): PassState {
     return {
       streamedText: "",
       streamedThinking: "",
@@ -588,7 +573,7 @@ export default class BaseAgenticHarness {
       `[AgenticLoop] finalize: session=${agentSessionId} project=${project} ` +
         `originalMsgCount=${state.originalMessageCount} currentMsgs=${currentMessages.length} ` +
         `newTurnMsgs=${newTurnMessages.length} ` +
-        `roles=[${newTurnMessages.map((message) => message.role).join(",")}] ` +
+        `roles=[${newTurnMessages.map((message: any) => (message as any).role).join(",")}] ` +
         `text=${(state.finalStreamedText || "").length}chars`,
     );
 
@@ -616,13 +601,12 @@ export default class BaseAgenticHarness {
         textFragments: cleanTextFragments,
         thinkingFragments: cleanThinkingFragments,
       },
-      // @ts-ignore - TODO: strict typing
-      newTurnMessages,
+            (newTurnMessages as any),
     );
 
     // Persist worker snapshots for coordinator sessions
     if (
-      state.streamedToolCalls.some((tc) => tc.name === "team_create") &&
+      state.streamedToolCalls.some((tc: any) => (tc as any).name === "team_create") &&
       agentSessionId
     ) {
       try {
@@ -649,16 +633,15 @@ export default class BaseAgenticHarness {
             `[AgenticLoop] Persisted ${workers.length} worker(s) to session ${agentSessionId}`,
           );
         }
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
+      } catch (error: any) {
+        const msg = error instanceof Error ? (error as Error).message : String(error);
         logger.error(`[AgenticLoop] Failed to persist workers: ${msg}`);
       }
     }
 
     // afterResponse hook (fire-and-forget)
     hooks
-      // @ts-ignore - TODO: strict typing
-      .run("afterResponse", context, {
+            .run(("afterResponse" as any), (context as any), {
         text: state.finalStreamedText,
         thinking: state.streamedThinking,
         toolCalls: state.streamedToolCalls,
@@ -680,8 +663,7 @@ export default class BaseAgenticHarness {
     if (!pass.firstTokenTime) {
       pass.firstTokenTime = performance.now();
       const ttftSec = (pass.firstTokenTime - pass.start) / 1000;
-      // @ts-ignore - TODO: strict typing
-      SessionGenerationTracker.update(pass.requestId, { ttft: ttftSec });
+            (SessionGenerationTracker as any).update((pass.requestId as any), { ttft: ttftSec });
       this.ctx.emit({
         type: "status",
         message: "generation_started",
@@ -707,7 +689,7 @@ export default class BaseAgenticHarness {
   }
 
   private async _handleImageChunk(
-    chunk: Record<string, any>,
+    chunk: any,
     pass: PassState,
   ): Promise<ChunkAction> {
     const { emit, project, username } = this.ctx;
@@ -717,15 +699,15 @@ export default class BaseAgenticHarness {
       try {
         const mimeType = chunk.mimeType || "image/png";
         const dataUrl = `data:${mimeType};base64,${chunk.data}`;
-        const { ref } = await FileService.uploadFile(
+        const { ref } = await (FileService as any).uploadFile(
           dataUrl,
           "generations",
           project,
           username,
         );
         minioRef = ref;
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
+      } catch (error: any) {
+        const msg = error instanceof Error ? (error as Error).message : String(error);
         logger.error(`MinIO upload failed: ${msg}`);
       }
       const imgRef =

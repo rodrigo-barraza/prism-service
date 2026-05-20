@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
@@ -18,8 +17,7 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const runs = await db
         .collection(COLLECTION)
         .find({ project, username })
@@ -27,9 +25,8 @@ router.get(
         .toArray();
 
       res.json(runs);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error fetching synthesis runs: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error fetching synthesis runs: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -43,8 +40,7 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const run = await db
         .collection(COLLECTION)
         .findOne({ id: req.params.id, project, username });
@@ -54,9 +50,8 @@ router.get(
       }
 
       res.json(run);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error fetching synthesis run: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error fetching synthesis run: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -70,8 +65,7 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const {
         id,
         title,
@@ -109,9 +103,8 @@ router.post(
       await db.collection(COLLECTION).insertOne(document);
 
       res.json(document);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error creating synthesis run: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error creating synthesis run: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -125,8 +118,7 @@ router.patch(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const allowedFields = [
         "title",
         "systemPrompt",
@@ -140,11 +132,9 @@ router.patch(
       ];
 
       const setFields = { updatedAt: new Date().toISOString() };
-      // @ts-ignore
-      for ( const field of allowedFields) {
+            for ( const field of allowedFields) {
         if (req.body[field] !== undefined) {
-          // @ts-ignore
-          setFields[field] = req.body[field];
+                    (setFields as any)[field] = req.body[field];
         }
       }
 
@@ -164,9 +154,8 @@ router.patch(
         .findOne({ id: req.params.id, project, username });
 
       res.json(updated);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error patching synthesis run: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error patching synthesis run: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -180,8 +169,7 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const result = await db
         .collection(COLLECTION)
         .deleteOne({ id: req.params.id, project, username });
@@ -191,9 +179,8 @@ router.delete(
       }
 
       res.json({ success: true, id: req.params.id });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error deleting synthesis run: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error deleting synthesis run: ${(error as Error).message}`);
       next(error);
     }
   }),

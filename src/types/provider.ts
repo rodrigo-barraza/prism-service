@@ -72,7 +72,7 @@ export interface ProviderOptions {
   language?: string;
 
   // ── Extensible ───────────────────────────────────────────
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 // ── Google GenAI Config ─────────────────────────────────────
@@ -95,7 +95,7 @@ export interface GoogleGenerateConfig {
   tools?: Record<string, unknown>[];
   responseModalities?: string[];
   systemInstruction?: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 // ── LM Studio Config ────────────────────────────────────────
@@ -107,7 +107,7 @@ export interface LmStudioLoadConfig {
   flash_attention?: boolean;
   offload_kv_cache_to_gpu?: boolean;
   eval_batch_size?: number;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 export interface LmStudioModelMeta {
@@ -119,7 +119,7 @@ export interface LmStudioModelMeta {
   signal?: AbortSignal;
   thinkingEnabled?: boolean;
   tools?: ToolSchema[];
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 export interface LmStudioResponsesBody {
@@ -131,7 +131,7 @@ export interface LmStudioResponsesBody {
   max_output_tokens?: number;
   repeat_penalty?: number;
   tools?: ToolSchema[];
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 // ── Streaming Chunk Types ───────────────────────────────────

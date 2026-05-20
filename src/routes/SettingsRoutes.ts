@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import SettingsService from "../services/SettingsService.ts";
@@ -17,8 +16,7 @@ router.get(
       const settings = await SettingsService.get();
       res.json(settings);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`GET /settings error: ${error.message}`);
+            logger.error(`GET /settings error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -42,8 +40,7 @@ router.put(
       const updated = await SettingsService.update(data);
       res.json(updated);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`PUT /settings error: ${error.message}`);
+            logger.error(`PUT /settings error: ${(error as Error).message}`);
       next(error);
     }
   }),

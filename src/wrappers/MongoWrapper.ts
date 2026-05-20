@@ -12,13 +12,11 @@
 //   closeClient(name)       → MongoManager.disconnect(name)
 // ─────────────────────────────────────────────────────────────────────
 
-// @ts-ignore
 import {
   connectDB,
   getDB,
   getCollection,
   disconnectDB,
-// @ts-ignore
 } from "@rodrigo-barraza/service-library/mongo";
 import logger from "../utils/logger.ts";
 

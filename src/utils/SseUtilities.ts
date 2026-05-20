@@ -65,7 +65,7 @@ export function createSseEmitter(res: Response, signal: AbortSignal) {
 
  * @returns {{ error?: object, response?: object }}
  */
-export function buildJsonResponseFromEvents(events: SseEvent[], reqBody: Record<string, any>) {
+export function buildJsonResponseFromEvents(events: SseEvent[], reqBody: any) {
   const errorEvent = events.find((e: SseEvent) => e.type === "error");
   if (errorEvent) {
     return { error: new ProviderError("server", errorEvent.message || "Unknown error", 500) };
@@ -123,9 +123,8 @@ export function buildJsonResponseFromEvents(events: SseEvent[], reqBody: Record<
 export async function handleSseRequest(
   req: Request,
   res: Response,
-  params: Record<string, any>,
-  // @ts-ignore - TODO: strict typing
-  handler: (params: Record<string, any>, onEvent: (event: SseEvent) => void, context: { signal: AbortSignal }) => Promise<void> = handleConversation,
+  params: any,
+    handler: (params: any, onEvent: (event: SseEvent) => void, context: { signal: AbortSignal }) => Promise<void> = handleConversation,
 ) {
   initSseResponse(res);
 
@@ -152,16 +151,13 @@ export async function handleJsonRequest(
   req: Request,
   res: Response,
   next: NextFunction,
-  params: Record<string, any>,
-  // @ts-ignore - TODO: strict typing
-  handler: (params: Record<string, any>, onEvent: (event: SseEvent) => void) => Promise<void> = handleConversation,
+  params: any,
+    handler: (params: any, onEvent: (event: SseEvent) => void) => Promise<void> = handleConversation,
 ) {
-  // @ts-ignore
-  const events: SseEvent[] = [];
+    const events: SseEvent[] = [];
   await handler(params, (event: SseEvent) => events.push(event));
 
-  // @ts-ignore
-  const { error, response } = buildJsonResponseFromEvents(events, req.body);
+    const { error, response } = buildJsonResponseFromEvents(events, req.body);
   if (error) return next(error);
 
   res.json(response);

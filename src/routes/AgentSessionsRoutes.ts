@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
@@ -26,17 +25,15 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const limit = Math.min(
-        // @ts-ignore - TODO: strict typing
-        Math.max(parseInt(req.query.limit, 10) || 50, 1),
+                Math.max(parseInt((req.query.limit as any), 10) || 50, 1),
         200,
       );
       const cursor = req.query.cursor || null;
       const agent = req.query.agent || null;
 
-      const filter: Record<string, unknown> = { project, username };
+      const filter: any = { project, username };
       // Match sessions belonging to this agent OR legacy sessions that
       // predate the agent field (backward compat for unique-project agents
       // like Lupos where all sessions belong to the same agent).
@@ -84,7 +81,7 @@ router.get(
       // ── Enrich session items from request logs (single aggregation) ──
       // Collects authoritative cost, unique models/providers, merged modalities,
       // and per-tool counts in one pipeline pass rather than separate queries.
-      const sessionIds = items.map((s: Record<string, unknown>) => s.id);
+      const sessionIds = items.map((s: any) => s.id);
 
       const enrichDocs =
         sessionIds.length > 0
@@ -128,28 +125,22 @@ router.get(
 
       // Build sessionId → enrichment map
       const enrichMap = new Map();
-      // @ts-ignore
-      for ( const document of enrichDocs) {
+            for ( const document of enrichDocs) {
         // Unique non-null models and providers
         const models = document.models.filter(Boolean);
         const providers = document.providers.filter(Boolean);
 
         // Merge modality keys from all requests into a single flags object
-        const mergedModalities = {};
-        // @ts-ignore
-        for ( const keySet of document.modalityKeys) {
-          // @ts-ignore
-          for ( const k of keySet) mergedModalities[k] = true;
+        const mergedModalities: any = {};
+                for ( const keySet of document.modalityKeys) {
+                    for ( const k of keySet) mergedModalities[k] = true;
         }
 
         // Count per-tool occurrences
-        const toolCounts = {};
-        // @ts-ignore
-        for ( const array of document.allToolApiNames) {
-          // @ts-ignore
-          for ( const name of array) {
-            // @ts-ignore
-            toolCounts[name] = (toolCounts[name] || 0) + 1;
+        const toolCounts: any = {};
+                for ( const array of document.allToolApiNames) {
+                    for ( const name of array) {
+                        toolCounts[name] = (toolCounts[name] || 0) + 1;
           }
         }
 
@@ -163,8 +154,7 @@ router.get(
       }
 
       // Merge enriched data into each session
-      // @ts-ignore
-      for ( const session of items) {
+            for ( const session of items) {
         const enrichment = enrichMap.get(session.id);
         if (!enrichment) continue;
 
@@ -200,9 +190,8 @@ router.get(
       }
 
       res.json({ items, nextCursor, hasMore });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error fetching agent sessions: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error fetching agent sessions: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -216,8 +205,7 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const session = await db
         .collection(COLLECTION)
         .findOne({ id: req.params.id, project, username });
@@ -240,8 +228,7 @@ router.get(
           });
         if (childIds.length === 0) break;
         const newIds = childIds.filter(Boolean);
-        // @ts-ignore
-        for ( const id of newIds) allSessionIds.add(id);
+                for ( const id of newIds) allSessionIds.add(id);
         frontier = newIds;
       }
 
@@ -271,7 +258,7 @@ router.get(
         .toArray();
 
       // ── Shared aggregation helper ───────────────────────────────
-      const aggregateRequests = (reqs: Record<string, unknown>) => {
+      const aggregateRequests = (reqs: any) => {
         if (reqs.length === 0) return null;
         const providers = new Set();
         const models = new Set();
@@ -282,14 +269,13 @@ router.get(
         let totalCacheReadInputTokens = 0;
         let totalCacheCreationInputTokens = 0;
         let totalReasoningOutputTokens = 0;
-        const mergedModalities = {};
-        const toolCounts = {};
+        const mergedModalities: any = {};
+        const toolCounts: any = {};
         // Collect per-request tok/s for generation-only average
-        const tpsValues: Record<string, unknown>[] = [];
-        const ttftValues: Record<string, unknown>[] = [];
+        const tpsValues: any[] = [];
+        const ttftValues: any[] = [];
 
-        // @ts-ignore
-        for ( const r of reqs) {
+                for ( const r of reqs) {
           totalCost += r.estimatedCost || 0;
           totalInputTokens += r.inputTokens || 0;
           totalOutputTokens += r.outputTokens || 0;
@@ -300,17 +286,13 @@ router.get(
           if (r.model) models.add(r.model);
           if (r.operation) operations.add(r.operation);
           if (r.modalities) {
-            // @ts-ignore
-            for ( const [k, v] of Object.entries(r.modalities)) {
-              // @ts-ignore
-              if (v) mergedModalities[k] = true;
+                        for ( const [k, v] of Object.entries(r.modalities)) {
+                            if (v) mergedModalities[k] = true;
             }
           }
           if (r.toolApiNames?.length > 0) {
-            // @ts-ignore
-            for ( const name of r.toolApiNames) {
-              // @ts-ignore
-              toolCounts[name] = (toolCounts[name] || 0) + 1;
+                        for ( const name of r.toolApiNames) {
+                            toolCounts[name] = (toolCounts[name] || 0) + 1;
             }
           }
           // Per-request generation metrics (null-safe)
@@ -322,16 +304,12 @@ router.get(
           }
         }
 
-        // @ts-ignore - TODO: strict typing
-        const earliest = reqs.reduce(
-          // @ts-ignore - TODO: strict typing
-          (min: Record<string, unknown>, r: Record<string, unknown>) => (!min || r.timestamp < min ? r.timestamp : min),
+                const earliest = (reqs as any).reduce(
+                    (min: any, r: any) => (!min || (r as any).timestamp < min ? r.timestamp : min),
           null,
         );
-        // @ts-ignore - TODO: strict typing
-        const latest = reqs.reduce(
-          // @ts-ignore - TODO: strict typing
-          (max: Record<string, unknown>, r: Record<string, unknown>) => (!max || r.timestamp > max ? r.timestamp : max),
+                const latest = (reqs as any).reduce(
+                    (max: any, r: any) => (!max || (r as any).timestamp > max ? r.timestamp : max),
           null,
         );
         const totalElapsedTime =
@@ -348,13 +326,11 @@ router.get(
         // time (only generation phases contribute measurements).
         const avgTokensPerSec =
           tpsValues.length > 0
-            // @ts-ignore - TODO: strict typing
-            ? tpsValues.reduce((a: Record<string, unknown>, b: Record<string, unknown>) => a + b, 0) / tpsValues.length
+                        ? tpsValues.reduce((a: any, b: any) => a + b, 0) / tpsValues.length
             : null;
         const avgTimeToGeneration =
           ttftValues.length > 0
-            // @ts-ignore - TODO: strict typing
-            ? ttftValues.reduce((a: Record<string, unknown>, b: Record<string, unknown>) => a + b, 0) /
+                        ? ttftValues.reduce((a: any, b: any) => a + b, 0) /
               ttftValues.length
             : null;
 
@@ -382,24 +358,21 @@ router.get(
 
       // ── Split requests into orchestrator vs worker buckets ────
       const orchestratorRequests = requests.filter(
-        (r: Record<string, unknown>) => r.agentSessionId === sessionId,
+        (r: any) => r.agentSessionId === sessionId,
       );
       const workerRequests = requests.filter(
-        (r: Record<string, unknown>) => r.agentSessionId !== sessionId,
+        (r: any) => r.agentSessionId !== sessionId,
       );
 
       let stats = null;
       if (requests.length > 0) {
         const allStats = aggregateRequests(requests);
-        // @ts-ignore
-        allStats.workerRequestCount = workerRequests.length;
+                allStats.workerRequestCount = workerRequests.length;
         // Guard against old sessions where per-iteration request logs under-report
         // cost due to the NaN cache token bug — prefer the higher of request-log
         // aggregate vs document-level message cost.
-        // @ts-ignore
-        allStats.totalCost = Math.max(
-          // @ts-ignore
-          allStats.totalCost,
+                allStats.totalCost = Math.max(
+                    allStats.totalCost,
           session.totalCost || 0,
         );
         stats = {
@@ -410,9 +383,8 @@ router.get(
       }
 
       res.json({ ...session, stats });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error fetching agent session: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error fetching agent session: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -426,8 +398,7 @@ router.patch(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const setFields = buildConversationPatchFields(req.body);
 
       const result = await db
@@ -446,9 +417,8 @@ router.patch(
         .findOne({ id: req.params.id, project, username });
 
       res.json(session);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error patching agent session: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error patching agent session: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -462,8 +432,7 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
       const result = await db
         .collection(COLLECTION)
         .deleteOne({ id: req.params.id, project, username });
@@ -473,9 +442,8 @@ router.delete(
       }
 
       res.json({ success: true, id: req.params.id });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Error deleting agent session: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Error deleting agent session: ${(error as Error).message}`);
       next(error);
     }
   }),

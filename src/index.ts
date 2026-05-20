@@ -19,8 +19,7 @@ import {
   MINIO_ACCESS_KEY,
   MINIO_SECRET_KEY,
   MINIO_BUCKET_NAME,
-  // @ts-ignore
-} from "../config.ts";
+  } from "../config.ts";
 import MongoWrapper from "./wrappers/MongoWrapper.ts";
 import MinioWrapper from "./wrappers/MinioWrapper.ts";
 import ChangeStreamService from "./services/ChangeStreamService.ts";
@@ -180,13 +179,11 @@ app.use(errorHandler);
 
 // WebSocket server
 const wss = new WebSocketServer({ server });
-// @ts-ignore - TODO: strict typing
-setupWebSocket(wss);
+setupWebSocket((wss as any));
 
 // Start
 (async () => {
-  // @ts-ignore - TODO: strict typing
-  await MongoWrapper.createClient(MONGO_DB_NAME, MONGO_URI);
+    await MongoWrapper.createClient(MONGO_DB_NAME, (MONGO_URI as any));
   await MemoryService.ensureIndexes();
 
   // ── Ensure collection indexes ──────────────────────────────────
@@ -266,9 +263,8 @@ setupWebSocket(wss);
       ]);
       logger.success("Database indexes ensured");
     }
-  } catch (error: unknown) {
-    // @ts-ignore - TODO: strict typing
-    logger.error(`Failed to ensure indexes: ${error.message}`);
+  } catch (error: any) {
+        logger.error(`Failed to ensure indexes: ${(error as Error).message}`);
   }
 
   // Clear any stale isGenerating flags left over from a previous crash/restart
@@ -293,9 +289,8 @@ setupWebSocket(wss);
         );
       }
     }
-  } catch (error: unknown) {
-    // @ts-ignore - TODO: strict typing
-    logger.error(`Failed to clear stale isGenerating flags: ${error.message}`);
+  } catch (error: any) {
+        logger.error(`Failed to clear stale isGenerating flags: ${(error as Error).message}`);
   }
 
   // ── One-time migration: conversations → agent_sessions ──────────
@@ -304,9 +299,8 @@ setupWebSocket(wss);
     const { default: AgentPersonaRegistry } =
       await import("./services/AgentPersonaRegistry.js");
     const agentProjects = AgentPersonaRegistry.list()
-      .map((p: Record<string, unknown>) => {
-        // @ts-ignore - TODO: strict typing
-        const persona = AgentPersonaRegistry.get(p.id);
+      .map((p: any) => {
+                const persona = AgentPersonaRegistry.get((p.id as any));
         return persona?.project;
       })
       .filter(Boolean);
@@ -319,7 +313,7 @@ setupWebSocket(wss);
         .toArray();
       if (agentConvs.length > 0) {
         // Strip _id to avoid duplicate key errors on insert
-        const docs = agentConvs.map(({ _id, ...rest }: Record<string, unknown>) => rest);
+        const docs = agentConvs.map(({ _id, ...rest }: any) => rest);
         await db
           .collection("agent_sessions")
           .insertMany(docs, { ordered: false })
@@ -332,9 +326,8 @@ setupWebSocket(wss);
         );
       }
     }
-  } catch (error: unknown) {
-    // @ts-ignore - TODO: strict typing
-    logger.error(`Agent session migration failed: ${error.message}`);
+  } catch (error: any) {
+        logger.error(`Agent session migration failed: ${(error as Error).message}`);
   }
 
   // Load custom agents from database into the persona registry
@@ -342,9 +335,8 @@ setupWebSocket(wss);
     const { default: AgentPersonaRegistryCustom } =
       await import("./services/AgentPersonaRegistry.js");
     await AgentPersonaRegistryCustom.loadCustomAgents();
-  } catch (error: unknown) {
-    // @ts-ignore - TODO: strict typing
-    logger.warn(`Custom agent loading failed: ${error.message}`);
+  } catch (error: any) {
+        logger.warn(`Custom agent loading failed: ${(error as Error).message}`);
   }
 
   // Initialize Change Streams (requires replica set — graceful fallback)
@@ -358,21 +350,17 @@ setupWebSocket(wss);
       await import("./services/AgentPersonaRegistry.js");
     const mcpDb = MongoWrapper.getDb(MONGO_DB_NAME);
     const codingProject =
-      // @ts-ignore - TODO: strict typing
-      AgentPersonaRegistryMCP.get("CODING")?.project || "coding";
+            AgentPersonaRegistryMCP.get(("CODING" as any))?.project || "coding";
     if (mcpDb) {
-      // @ts-ignore - TODO: strict typing
-      await MCPClientService.connectAllFromDB(mcpDb, codingProject, "admin");
+            await MCPClientService.connectAllFromDB((mcpDb as any), codingProject, "admin");
     }
-  } catch (error: unknown) {
-    // @ts-ignore - TODO: strict typing
-    logger.warn(`MCP auto-connect failed: ${error.message}`);
+  } catch (error: any) {
+        logger.warn(`MCP auto-connect failed: ${(error as Error).message}`);
   }
 
   // ── Scheduled Memory Consolidation ─────────────────
   // Runs every 24 hours, consolidates memories for all active projects and agents.
-  // @ts-ignore
-  const { hours } = await import("@rodrigo-barraza/utilities-library");
+    const { hours } = await import("@rodrigo-barraza/utilities-library");
   const CONSOLIDATION_INTERVAL_MS = hours(24);
   const consolidationInterval = setInterval(async () => {
     try {
@@ -385,16 +373,14 @@ setupWebSocket(wss);
       // Process projects sequentially — each consolidation loads the full
       // memory corpus with embeddings (~12KB/memory). Running them concurrently
       // compounds heap usage and can cause OOM on large collections.
-      // @ts-ignore
-      for ( const project of projects) {
+            for ( const project of projects) {
         // Find all distinct agents within this project
         const agents = await db
           .collection("memories")
           .distinct("agent", { project });
         if (!agents.length) continue;
 
-        // @ts-ignore
-        for ( const agent of agents) {
+                for ( const agent of agents) {
           const count = await db
             .collection("memories")
             .countDocuments({ project, agent });
@@ -410,18 +396,16 @@ setupWebSocket(wss);
               username: "system",
               trigger: "scheduled",
             });
-          } catch (error: unknown) {
+          } catch (error: any) {
             logger.error(
-              // @ts-ignore - TODO: strict typing
-              `[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${error.message}`,
+                            `[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${(error as Error).message}`,
             );
           }
         }
       }
-    } catch (error: unknown) {
+    } catch (error: any) {
       logger.error(
-        // @ts-ignore - TODO: strict typing
-        `[AutoDream] Scheduled consolidation sweep failed: ${error.message}`,
+                `[AutoDream] Scheduled consolidation sweep failed: ${(error as Error).message}`,
       );
     }
   }, CONSOLIDATION_INTERVAL_MS);
@@ -432,7 +416,7 @@ setupWebSocket(wss);
 
   // ── Background Housekeeping ────────────────────────────────
   // Boot-time run: clean up orphans from previous crashes
-  BackgroundHousekeepingService.run({ trigger: "boot" }).catch((error: Record<string, unknown>) =>
+  BackgroundHousekeepingService.run({ trigger: "boot" }).catch((error: any) =>
     logger.error(`[Housekeeping] Boot-time run failed: ${error.message}`),
   );
 
@@ -440,7 +424,7 @@ setupWebSocket(wss);
   const HOUSEKEEPING_INTERVAL_MS = hours(6);
   const housekeepingInterval = setInterval(() => {
     BackgroundHousekeepingService.run({ trigger: "scheduled" }).catch(
-      (error: Record<string, unknown>) =>
+      (error: any) =>
         logger.error(`[Housekeeping] Scheduled run failed: ${error.message}`),
     );
   }, HOUSEKEEPING_INTERVAL_MS);
@@ -481,21 +465,17 @@ setupWebSocket(wss);
       embedding: [6, 182, 212], // #06b6d4 — cyan
     };
     const coloredModalities = Object.values(TYPES)
-      // @ts-ignore - TODO: strict typing
-      .map((t: Record<string, unknown>) => {
-        // @ts-ignore
-        const [r, g, b] = MODALITY_COLORS[t] || [255, 255, 255];
+            .map((t: any) => {
+                const [r, g, b] = (MODALITY_COLORS as any)[(t as string)] || [255, 255, 255];
         return `\x1b[38;2;${r};${g};${b}m${t}\x1b[0m`;
       })
       .join(", ");
     logger.info("Available modalities:", coloredModalities);
-    // @ts-ignore - TODO: strict typing
-    ENDPOINTS.rest.forEach((ep: Record<string, unknown>) =>
-      logger.info(`  REST  →  http://localhost:${PORT}${ep}`),
+        ENDPOINTS.rest.forEach(((ep: any) =>
+              logger.info(`  REST  →  http://localhost:${PORT}${ep}`) as any as (value: string, index: number, array: string[]) => void),
     );
-    // @ts-ignore - TODO: strict typing
-    ENDPOINTS.websocket.forEach((ep: Record<string, unknown>) =>
-      logger.info(`  WS    →  ws://localhost:${PORT}${ep}`),
+        ENDPOINTS.websocket.forEach(((ep: any) =>
+              logger.info(`  WS    →  ws://localhost:${PORT}${ep}`) as any as (value: string, index: number, array: string[]) => void),
     );
   });
 })();

@@ -44,33 +44,24 @@ function estimateMessageTokens(message: string) {
   let tokens = 4; // Per-message overhead (role, formatting)
 
   // Text content
-  // @ts-ignore - TODO: strict typing
-  if (message.content) {
+    if ((message as any).content) {
     tokens += estimateTokens(
-      // @ts-ignore - TODO: strict typing
-      typeof message.content === "string"
-        // @ts-ignore - TODO: strict typing
-        ? message.content
-        // @ts-ignore - TODO: strict typing
-        : JSON.stringify(message.content),
+            typeof (message as any).content === "string"
+                ? (message as any).content
+                : JSON.stringify((message as any).content),
     );
   }
 
   // Thinking blocks
-  // @ts-ignore - TODO: strict typing
-  if (message.thinking) {
-    // @ts-ignore - TODO: strict typing
-    tokens += estimateTokens(message.thinking);
+    if ((message as any).thinking) {
+        tokens += estimateTokens((message as any).thinking);
   }
 
   // Tool calls (function name + args + results)
-  // @ts-ignore - TODO: strict typing
-  if (message.toolCalls && Array.isArray(message.toolCalls)) {
-    // @ts-ignore
-    for ( const tc of message.toolCalls) {
+    if ((message as any).toolCalls && Array.isArray((message as any).toolCalls)) {
+        for ( const tc of (message as any).toolCalls) {
       tokens += estimateTokens(tc.name || "");
-      // @ts-ignore - TODO: strict typing
-      tokens += estimateTokens(tc.args ? JSON.stringify(tc.args) : "");
+            tokens += estimateTokens((tc.args ? JSON.stringify(tc.args) : "" as any));
       if (tc.result) {
         tokens += estimateTokens(
           typeof tc.result === "string" ? tc.result : JSON.stringify(tc.result),
@@ -80,23 +71,17 @@ function estimateMessageTokens(message: string) {
   }
 
   // Tool response content (standalone tool messages)
-  // @ts-ignore - TODO: strict typing
-  if (message.role === "tool" && message.content) {
+    if ((message as any).role === "tool" && (message as any).content) {
     tokens += estimateTokens(
-      // @ts-ignore - TODO: strict typing
-      typeof message.content === "string"
-        // @ts-ignore - TODO: strict typing
-        ? message.content
-        // @ts-ignore - TODO: strict typing
-        : JSON.stringify(message.content),
+            typeof (message as any).content === "string"
+                ? (message as any).content
+                : JSON.stringify((message as any).content),
     );
   }
 
   // Images (rough: ~1000 tokens per image reference)
-  // @ts-ignore - TODO: strict typing
-  if (message.images && Array.isArray(message.images)) {
-    // @ts-ignore - TODO: strict typing
-    tokens += message.images.length * 1000;
+    if ((message as any).images && Array.isArray((message as any).images)) {
+        tokens += (message as any).images.length * 1000;
   }
 
   return tokens;
@@ -108,11 +93,9 @@ function estimateMessageTokens(message: string) {
 
 
  */
-function estimateTotalTokens(messages: Record<string, unknown>) {
-  // @ts-ignore - TODO: strict typing
-  return messages.reduce(
-    // @ts-ignore - TODO: strict typing
-    (sum: Record<string, unknown>, message: string) => sum + estimateMessageTokens(message),
+function estimateTotalTokens(messages: any) {
+    return (messages as any).reduce(
+        (sum: any, message: string) => sum + estimateMessageTokens(message),
     0,
   );
 }
@@ -135,39 +118,30 @@ function estimateTotalTokens(messages: Record<string, unknown>) {
  * @returns {Array} Messages with truncated tool results
  */
 function truncateToolResults(
-  messages: Record<string, unknown>,
-  // @ts-ignore - TODO: strict typing
-  protectedTurns: Record<string, unknown> = PROTECTED_RECENT_TURNS,
+  messages: any,
+    protectedTurns: any = PROTECTED_RECENT_TURNS,
 ) {
   // Find the protection boundary (same logic as compressOldAssistantMessages)
   let userTurnsSeen = 0;
   let protectionIndex = messages.length;
 
-  // @ts-ignore - TODO: strict typing
-  for (let i = messages.length - 1; i >= 0; i--) {
-    // @ts-ignore - TODO: strict typing
-    if (messages[i].role === "user") {
+    for (let i = (messages as any).length - 1; i >= 0; i--) {
+        if ((messages as any)[i].role === "user") {
       userTurnsSeen++;
-      // @ts-ignore - TODO: strict typing
-      if (userTurnsSeen >= protectedTurns) {
+            if (userTurnsSeen >= protectedTurns) {
         protectionIndex = i;
         break;
       }
     }
   }
 
-  // @ts-ignore - TODO: strict typing
-  return messages.map((message: string, i: Record<string, unknown>) => {
+    return (messages as any).map((message: string, i: any) => {
     // Never truncate tool results in recent (protected) messages
-    // @ts-ignore - TODO: strict typing
-    if (i >= protectionIndex) return message;
-    // @ts-ignore - TODO: strict typing
-    if (message.role !== "assistant" || !message.toolCalls?.length) return message;
+        if (i >= (protectionIndex as any)) return message;
+        if ((message as any).role !== "assistant" || !(message as any).toolCalls?.length) return message;
 
-    // @ts-ignore - TODO: strict typing
-    const truncated = { ...message };
-    // @ts-ignore - TODO: strict typing
-    truncated.toolCalls = message.toolCalls.map((tc: Record<string, unknown>) => {
+        const truncated = { ...message };
+        truncated.toolCalls = (message as any).toolCalls.map((tc: any) => {
       if (!tc.result) return tc;
 
       const resultStr =
@@ -194,53 +168,43 @@ function truncateToolResults(
 
  */
 function compressOldAssistantMessages(
-  messages: Record<string, unknown>,
-  // @ts-ignore - TODO: strict typing
-  protectedCount: Record<string, unknown> = PROTECTED_RECENT_TURNS,
+  messages: any,
+    protectedCount: any = PROTECTED_RECENT_TURNS,
 ) {
   // Count user turns from the end to determine protection boundary
   let userTurnsSeen = 0;
   let protectionIndex = messages.length;
 
-  // @ts-ignore - TODO: strict typing
-  for (let i = messages.length - 1; i >= 0; i--) {
-    // @ts-ignore - TODO: strict typing
-    if (messages[i].role === "user") {
+    for (let i = (messages as any).length - 1; i >= 0; i--) {
+        if ((messages as any)[i].role === "user") {
       userTurnsSeen++;
-      // @ts-ignore - TODO: strict typing
-      if (userTurnsSeen >= protectedCount) {
+            if (userTurnsSeen >= protectedCount) {
         protectionIndex = i;
         break;
       }
     }
   }
 
-  // @ts-ignore - TODO: strict typing
-  return messages.map((message: string, i: Record<string, unknown>) => {
+    return (messages as any).map((message: string, i: any) => {
     // Never compress system messages, user messages, or protected recent messages
-    // @ts-ignore - TODO: strict typing
-    if (message.role === "system" || message.role === "user" || i >= protectionIndex) {
+        if ((message as any).role === "system" || (message as any).role === "user" || i >= (protectionIndex as any)) {
       return message;
     }
 
     // Compress assistant messages
-    // @ts-ignore - TODO: strict typing
-    if (message.role === "assistant") {
-      // @ts-ignore - TODO: strict typing
-      const compressed = { ...message };
+        if ((message as any).role === "assistant") {
+            const compressed = { ...message };
 
       // Keep a short summary of what the assistant did
       const toolNames =
-        // @ts-ignore - TODO: strict typing
-        message.toolCalls?.map((tc: Record<string, unknown>) => tc.name).join(", ") || "";
-      // @ts-ignore - TODO: strict typing
-      const contentPreview = message.content?.slice(0, 200) || "";
+                (message as any).toolCalls?.map((tc: any) => tc.name).join(", ") || "";
+            const contentPreview = (message as any).content?.slice(0, 200) || "";
 
       compressed.content = `[Earlier response${toolNames ? ` — used: ${toolNames}` : ""}]${contentPreview ? `\n${contentPreview}...` : ""}`;
       compressed.thinking = undefined;
 
       if (compressed.toolCalls) {
-        compressed.toolCalls = compressed.toolCalls.map((tc: Record<string, unknown>) => ({
+        compressed.toolCalls = compressed.toolCalls.map((tc: any) => ({
           ...tc,
           result: tc.result
             ? "[result truncated for context budget]"
@@ -252,11 +216,9 @@ function compressOldAssistantMessages(
     }
 
     // Compress standalone tool messages
-    // @ts-ignore - TODO: strict typing
-    if (message.role === "tool") {
+        if ((message as any).role === "tool") {
       return {
-        // @ts-ignore - TODO: strict typing
-        ...message,
+                ...message,
         content: "[tool result truncated for context budget]",
       };
     }
@@ -273,43 +235,33 @@ function compressOldAssistantMessages(
 
 
  */
-function slidingWindowTruncation(messages: Record<string, unknown>, maxTokens: Record<string, unknown>) {
-  // @ts-ignore - TODO: strict typing
-  if (messages.length <= 3) return messages;
+function slidingWindowTruncation(messages: any, maxTokens: any) {
+    if ((messages as any).length <= 3) return messages;
 
   // Always keep: system message, first user message
-  const head: Record<string, unknown>[] = [];
+  const head: any[] = [];
   let headEnd = 0;
 
-  // @ts-ignore - TODO: strict typing
-  for (let i = 0; i < messages.length; i++) {
-    // @ts-ignore - TODO: strict typing
-    head.push(messages[i]);
+    for (let i = 0; i < (messages as any).length; i++) {
+        head.push((messages[i] as any));
     headEnd = i + 1;
-    // @ts-ignore - TODO: strict typing
-    if (messages[i].role === "user") break; // Stop after first user message
+        if ((messages as any)[i].role === "user") break; // Stop after first user message
   }
 
   // Build tail from the end until we approach budget
-  const tail: Record<string, unknown>[] = [];
+  const tail: any[] = [];
   let tailTokens = 0;
-  // @ts-ignore - TODO: strict typing
-  const headTokens = estimateTotalTokens(head);
-  // @ts-ignore - TODO: strict typing
-  const availableForTail = maxTokens - headTokens - 200; // 200 token buffer for marker
+    const headTokens = estimateTotalTokens((head as any));
+    const availableForTail = maxTokens - headTokens - 200; // 200 token buffer for marker
 
-  // @ts-ignore - TODO: strict typing
-  for (let i = messages.length - 1; i >= headEnd; i--) {
-    // @ts-ignore - TODO: strict typing
-    const msgTokens = estimateMessageTokens(messages[i]);
+    for (let i = (messages as any).length - 1; i >= headEnd; i--) {
+        const msgTokens = estimateMessageTokens((messages[i] as any));
     if (tailTokens + msgTokens > availableForTail) break;
-    // @ts-ignore - TODO: strict typing
-    tail.unshift(messages[i]);
+        tail.unshift((messages[i] as any));
     tailTokens += msgTokens;
   }
 
-  // @ts-ignore - TODO: strict typing
-  const droppedCount = messages.length - head.length - tail.length;
+    const droppedCount = (messages as any).length - head.length - tail.length;
 
   if (droppedCount > 0) {
     // Insert a context marker so the model knows history was dropped
@@ -337,24 +289,18 @@ export default class ContextWindowManager {
 
    * @returns {{ messages: Array, truncated: boolean, strategy: string|null, estimatedTokens: number }}
    */
-  static enforce(messages: Record<string, unknown>, options: Record<string, unknown> = {}) {
+  static enforce(messages: any, options: any = {}) {
     const {
-      // @ts-ignore
-      maxInputTokens = 128_000,
-      // @ts-ignore
-      maxOutputTokens = MIN_OUTPUT_RESERVE,
-      // @ts-ignore
-      toolCount = 0,
+            maxInputTokens = 128_000,
+            maxOutputTokens = MIN_OUTPUT_RESERVE,
+            toolCount = 0,
     } = options;
 
     // Calculate the effective token budget
-    // @ts-ignore - TODO: strict typing
-    const schemaOverhead = TOOL_SCHEMA_OVERHEAD_TOKENS + toolCount * 150;
-    // @ts-ignore - TODO: strict typing
-    const outputReserve = Math.max(maxOutputTokens, MIN_OUTPUT_RESERVE);
+        const schemaOverhead = TOOL_SCHEMA_OVERHEAD_TOKENS + (toolCount as any) * 150;
+        const outputReserve = Math.max((maxOutputTokens as any), MIN_OUTPUT_RESERVE);
     const budget = Math.floor(
-      // @ts-ignore - TODO: strict typing
-      (maxInputTokens - outputReserve - schemaOverhead) * TARGET_UTILIZATION,
+            ((maxInputTokens as any) - outputReserve - schemaOverhead) * TARGET_UTILIZATION,
     );
 
     if (budget <= 0) {
@@ -418,8 +364,7 @@ export default class ContextWindowManager {
     }
 
     // Strategy 3: Sliding window — drop middle turns
-    // @ts-ignore - TODO: strict typing
-    result = slidingWindowTruncation(result, budget);
+        result = slidingWindowTruncation(result, (budget as any));
     currentTokens = estimateTotalTokens(result);
 
     logger.info(
@@ -438,7 +383,7 @@ export default class ContextWindowManager {
 
 
    */
-  static estimateTokens(messages: Record<string, unknown>) {
+  static estimateTokens(messages: any) {
     return estimateTotalTokens(messages);
   }
 

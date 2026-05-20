@@ -39,7 +39,7 @@ export default {
   domain: "Reasoning",
   labels: ["coding"],
 
-  async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
+  async execute(args: any, context: any) {
     const { summary, keyFiles, openQuestions } = args;
     if (!summary || typeof summary !== "string") {
       return { error: "'summary' is required and must be a non-empty string" };
@@ -53,13 +53,11 @@ export default {
     };
 
     logger.info(
-      // @ts-ignore - TODO: strict typing
-      `[Brief] ${summary.length} chars, ${(keyFiles || []).length} files, ${(openQuestions || []).length} questions`,
+            `[Brief] ${summary.length} chars, ${((keyFiles || []) as any).length} files, ${((openQuestions || []) as any).length} questions`,
     );
 
     if (context._emit) {
-      // @ts-ignore - TODO: strict typing
-      context._emit({ type: "brief_update", brief });
+            context._emit({ type: "brief_update", brief });
     }
 
     return { acknowledged: true, brief };

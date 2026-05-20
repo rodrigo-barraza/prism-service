@@ -26,18 +26,15 @@ const GGUF_QUANT_SUFFIX_RE =
 
  * @returns {{ base: string, quant: string|null }}
  */
-export function parseModelQuant(modelKey: Record<string, unknown>) {
+export function parseModelQuant(modelKey: any) {
   // Handle @quant suffix (e.g. "qwen3-32b@q4_k_m")
-  // @ts-ignore - TODO: strict typing
-  if (modelKey.includes("@")) {
-    // @ts-ignore - TODO: strict typing
-    const [base, quant] = modelKey.split("@");
+    if ((modelKey as any).includes("@")) {
+        const [base, quant] = (modelKey as any).split("@");
     return { base, quant: quant.toUpperCase() };
   }
 
   // Handle GGUF path-style keys — strip .gguf, then match the quant suffix via regex
-  // @ts-ignore - TODO: strict typing
-  const stripped = modelKey.replace(/\.gguf$/i, "");
+    const stripped = (modelKey as any).replace(/\.gguf$/i, "");
   const match = stripped.match(GGUF_QUANT_SUFFIX_RE);
   if (match) {
     const quant = match[1].toUpperCase();
@@ -57,13 +54,12 @@ export function parseModelQuant(modelKey: Record<string, unknown>) {
  * @param {Array<{key?: string, id?: string, size_bytes?: number}>} availableModels - Models on the instance
  * @returns {string|null} The best available model key (by file size), or null
  */
-export function findBestQuantFallback(targetModel: Record<string, unknown>, availableModels: Record<string, unknown>) {
+export function findBestQuantFallback(targetModel: any, availableModels: any) {
   const { base: targetBase, quant: targetQuant } = parseModelQuant(targetModel);
 
   // Find all available models that share the same base name (any quant variant)
-  const candidates: Record<string, unknown>[] = [];
-  // @ts-ignore
-  for ( const m of availableModels) {
+  const candidates: any[] = [];
+    for ( const m of availableModels) {
     const mKey = m.key || m.id;
     const { base, quant } = parseModelQuant(mKey);
 
@@ -90,8 +86,7 @@ export function findBestQuantFallback(targetModel: Record<string, unknown>, avai
   if (candidates.length === 0) return null;
 
   // Sort by file size descending — largest file = highest quality quant
-  // @ts-ignore - TODO: strict typing
-  candidates.sort((a: Record<string, unknown>, b: Record<string, unknown>) => b.sizeBytes - a.sizeBytes);
+    candidates.sort((a: any, b: any) => (b as any).sizeBytes - (a as any).sizeBytes);
   return candidates[0].key;
 }
 
@@ -106,27 +101,23 @@ export function findBestQuantFallback(targetModel: Record<string, unknown>, avai
  * @param {Array<{id: string, concurrency: number}>} siblings - All instances of this provider type
  * @returns {Promise<{ usable: Array<{id: string, concurrency: number}>, modelOverrides: Map<string, string> }>}
  */
-export async function resolveModelForInstances(modelKey: Record<string, unknown>, siblings: Record<string, unknown>) {
+export async function resolveModelForInstances(modelKey: any, siblings: any) {
   /** @type {Map<string, string>} Per-instance model override (when quant fallback is used) */
   const modelOverrides = new Map();
 
   try {
     const checks = await Promise.allSettled(
-      // @ts-ignore - TODO: strict typing
-      siblings.map(async (inst: Record<string, unknown>) => {
-        // @ts-ignore - TODO: strict typing
-        const provider = getProvider(inst.id);
+            (siblings as any).map(async (inst: any) => {
+                const provider = getProvider((inst.id as any));
         if (!provider?.listModels) return { exact: false, fallback: null };
         const result = await Promise.race([
           provider.listModels(),
-          // @ts-ignore - TODO: strict typing
-          new Promise((_: Record<string, unknown>, rej: Record<string, unknown>) =>
-            // @ts-ignore - TODO: strict typing
-            setTimeout(() => rej(new Error("timeout")), 3000),
+                    new Promise(((_: any, rej: any) =>
+                                            setTimeout(() => rej(new Error("timeout")), 3000) as any as (resolve: (value: any) => void, reject: (reason?: any) => void) => void),
           ),
         ]);
         const models = result?.models || result?.data || [];
-        const modelKeys = models.map((m: Record<string, unknown>) => m.key || m.id);
+        const modelKeys = models.map((m: any) => m.key || m.id);
         const exactMatch = modelKeys.includes(modelKey);
         if (exactMatch) return { exact: true, fallback: null };
 
@@ -140,26 +131,21 @@ export async function resolveModelForInstances(modelKey: Record<string, unknown>
     );
 
     // Build usable instances list
-    const usable: Record<string, unknown>[] = [];
-    // @ts-ignore - TODO: strict typing
-    for (let i = 0; i < siblings.length; i++) {
+    const usable: any[] = [];
+        for (let i = 0; i < (siblings as any).length; i++) {
       if (checks[i].status !== "fulfilled") continue;
-      // @ts-ignore
-      const { exact, fallback } = checks[i].value;
+            const { exact, fallback } = checks[i].value;
 
       if (exact) {
-        // @ts-ignore - TODO: strict typing
-        usable.push(siblings[i]);
+                usable.push((siblings[i] as any));
       } else if (fallback) {
-        // @ts-ignore - TODO: strict typing
-        modelOverrides.set(siblings[i].id, fallback);
-        // @ts-ignore - TODO: strict typing
-        usable.push(siblings[i]);
+                modelOverrides.set((siblings as any)[i].id, fallback);
+                usable.push((siblings[i] as any));
       }
     }
 
     const summary = usable
-      .map((s: Record<string, unknown>) => {
+      .map((s: any) => {
         const override = modelOverrides.get(s.id);
         return override ? `${s.id}→"${override}"` : `${s.id} (exact)`;
       })
@@ -169,10 +155,9 @@ export async function resolveModelForInstances(modelKey: Record<string, unknown>
     );
 
     return { usable, modelOverrides };
-  } catch (error: unknown) {
+  } catch (error: any) {
     logger.warn(
-      // @ts-ignore - TODO: strict typing
-      `[ModelResolution] Model availability check failed: ${error.message}`,
+            `[ModelResolution] Model availability check failed: ${(error as Error).message}`,
     );
     return { usable: siblings, modelOverrides };
   }

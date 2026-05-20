@@ -86,16 +86,15 @@ export default {
   domain: "Agentic: Control Flow",
   labels: ["coding"],
 
-  async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
+  async execute(args: any, context: any) {
     const { question, choices, context: questionContext, questions } = args;
 
     // ── Normalize into questions array ─────────────────
-    let normalizedQuestions: Record<string, unknown>;
+    let normalizedQuestions: any;
     if (questions && Array.isArray(questions) && questions.length > 0) {
       // Multi-question mode — validate uniqueness
       const seen = new Set();
-      // @ts-ignore
-      for ( const q of questions) {
+            for ( const q of questions) {
         if (!q.question || typeof q.question !== "string") {
           return {
             error:
@@ -111,8 +110,7 @@ export default {
         // Validate option label uniqueness within each question
         if (q.options?.length > 0) {
           const labelsSeen = new Set();
-          // @ts-ignore
-          for ( const opt of q.options) {
+                    for ( const opt of q.options) {
             if (labelsSeen.has(opt.label)) {
               return {
                 error: `Duplicate option label "${opt.label}" in question "${q.question.slice(0, 40)}"`,
@@ -125,13 +123,10 @@ export default {
       if (questions.length > 4) {
         return { error: "Maximum 4 questions per call" };
       }
-      // @ts-ignore - TODO: strict typing
-      normalizedQuestions = questions.map((q: Record<string, unknown>) => ({
+            normalizedQuestions = questions.map((q: any) => ({
         question: q.question,
-        // @ts-ignore - TODO: strict typing
-        header: q.header?.slice(0, 16) || null,
-        // @ts-ignore - TODO: strict typing
-        options: (q.options || []).slice(0, 6).map((o: Record<string, unknown>) => ({
+                header: (q.header as any)?.slice(0, 16) || null,
+                options: ((q.options || []) as any).slice(0, 6).map((o: any) => ({
           label: o.label,
           preview: o.preview || null,
         })),
@@ -139,13 +134,11 @@ export default {
       }));
     } else if (question && typeof question === "string") {
       // Single question mode — backward-compatible
-      // @ts-ignore - TODO: strict typing
-      normalizedQuestions = [
+            normalizedQuestions = [
         {
           question,
           header: null,
-          // @ts-ignore - TODO: strict typing
-          options: (choices || []).map((c: Record<string, unknown>) => ({
+                    options: ((choices || []) as any).map((c: any) => ({
             label: c,
             preview: null,
           })),
@@ -166,57 +159,46 @@ export default {
       };
     }
 
-    // @ts-ignore - TODO: strict typing
-    const totalOptions = normalizedQuestions.reduce(
-      // @ts-ignore - TODO: strict typing
-      (sum: Record<string, unknown>, q: Record<string, unknown>) => sum + q.options.length,
+        const totalOptions = (normalizedQuestions as any).reduce(
+            (sum: any, q: any) => sum + (q as any).options.length,
       0,
     );
     logger.info(
       `[AskUserQuestion] ${normalizedQuestions.length} question(s), ` +
         `${totalOptions} total options — ` +
-        // @ts-ignore - TODO: strict typing
-        `"${normalizedQuestions[0].question.slice(0, 60)}${normalizedQuestions[0].question.length > 60 ? "..." : ""}"`,
+                `"${(normalizedQuestions as any)[0].question.slice(0, 60)}${(normalizedQuestions as any)[0].question.length > 60 ? "..." : ""}"`,
     );
 
     // Emit the SSE event with the full questions array
     if (context._emit) {
-      // @ts-ignore - TODO: strict typing
-      context._emit({
+            context._emit({
         type: "user_question",
         // Full multi-question payload
         questions: normalizedQuestions,
         // Backward-compat fields for simple consumers
-        // @ts-ignore - TODO: strict typing
-        question: normalizedQuestions[0].question,
-        // @ts-ignore - TODO: strict typing
-        choices: normalizedQuestions[0].options.map((o: Record<string, unknown>) => o.label),
+                question: (normalizedQuestions as any)[0].question,
+                choices: (normalizedQuestions as any)[0].options.map((o: any) => o.label),
         context: questionContext || null,
       });
     }
 
     const { default: AgenticLoopService } =
       await import("../AgenticLoopService.js");
-    // @ts-ignore - TODO: strict typing
-    const result = await new Promise((resolve: Record<string, unknown>) => {
+        const result = await new Promise((resolve: any) => {
       const timeoutId = setTimeout(
-        // @ts-ignore - TODO: strict typing
-        () => resolve({ answers: null, timedOut: true }),
+                () => resolve({ answers: null, timedOut: true }),
         300_000,
       );
-      // @ts-ignore - TODO: strict typing
-      AgenticLoopService._setPendingQuestion(sessionId, {
-        resolve: (value: Record<string, unknown>) => {
+            AgenticLoopService._setPendingQuestion((sessionId as any), {
+        resolve: (value: any) => {
           clearTimeout(timeoutId);
-          // @ts-ignore - TODO: strict typing
-          resolve(value);
+                    resolve(value);
         },
         questions: normalizedQuestions,
       });
     });
 
-    // @ts-ignore
-    if (result.timedOut) {
+        if ((result as any).timedOut) {
       logger.warn(`[AskUserQuestion] Timed out after 5 minutes`);
       return {
         answers: null,
@@ -225,25 +207,18 @@ export default {
       };
     }
 
-    // @ts-ignore
-    logger.info(
-      // @ts-ignore
-      `[AskUserQuestion] Answered: ${JSON.stringify(result.answers).slice(0, 200)}`,
+        logger.info(
+            `[AskUserQuestion] Answered: ${JSON.stringify((result as any).answers).slice(0, 200)}`,
     );
 
     // Return structured response
     return {
-      // @ts-ignore - TODO: strict typing
-      questions: normalizedQuestions.map((q: Record<string, unknown>) => q.question),
-      // @ts-ignore
-      answers: result.answers,
+            questions: (normalizedQuestions as any).map((q: any) => q.question),
+            answers: (result as any).answers,
       // Backward-compat for simple single-question consumers
-      // @ts-ignore
-      answer: Array.isArray(result.answers)
-        // @ts-ignore
-        ? result.answers[0]?.answer
-        // @ts-ignore
-        : result.answers,
+            answer: Array.isArray((result as any).answers)
+                ? (result as any).answers[0]?.answer
+                : (result as any).answers,
     };
   },
 };

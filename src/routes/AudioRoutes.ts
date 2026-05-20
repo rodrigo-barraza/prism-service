@@ -1,6 +1,4 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-// @ts-ignore
 import { formatCostTag, roundMs } from "@rodrigo-barraza/utilities-library";
 import express, { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
@@ -33,7 +31,7 @@ const router = express.Router();
  * @param {Function} emitJSON            Callback for JSON events: emitJSON({ type, ...data })
  * @returns {Promise<string>}            Content type of the audio
  */
-export async function handleVoice(params: Record<string, unknown>, emitBinary: Record<string, unknown>, emitJSON: Record<string, unknown>) {
+export async function handleVoice(params: any, emitBinary: any, emitJSON: any) {
   const requestId = crypto.randomUUID();
   const requestStart = performance.now();
   const {
@@ -47,8 +45,8 @@ export async function handleVoice(params: Record<string, unknown>, emitBinary: R
     conversationMeta: incomingConversationMeta,
     traceId: incomingTraceId,
     skipConversation,
-    project = "unknown",
-    username = "unknown",
+    project = "any",
+    username = "any",
     clientIp = null,
   } = params;
   // ── Auto-conversation: every AI request gets tracked ────────────
@@ -56,8 +54,7 @@ export async function handleVoice(params: Record<string, unknown>, emitBinary: R
   let conversationMeta = skipConversation ? null : incomingConversationMeta;
   if (!skipConversation && !conversationId) {
     conversationId = crypto.randomUUID();
-    // @ts-ignore - TODO: strict typing
-    const titleSnippet = (text || "").slice(0, 100).trim() || "TTS Request";
+        const titleSnippet = ((text || "") as any).slice(0, 100).trim() || "TTS Request";
     conversationMeta = conversationMeta || { title: titleSnippet };
   }
   // ── Trace: passthrough ────────────────────────────────────
@@ -65,8 +62,7 @@ export async function handleVoice(params: Record<string, unknown>, emitBinary: R
   const traceId = incomingTraceId || null;
   // Inject traceId into conversationMeta for storage
   if (traceId && conversationMeta) {
-    // @ts-ignore - TODO: strict typing
-    conversationMeta.traceId = traceId;
+        (conversationMeta as any).traceId = traceId;
   } else if (traceId) {
     conversationMeta = { traceId };
   }
@@ -81,30 +77,26 @@ export async function handleVoice(params: Record<string, unknown>, emitBinary: R
     if (!text) {
       throw new ProviderError("server", "Missing required field: text", 400);
     }
-    // @ts-ignore - TODO: strict typing
-    const provider = getProvider(providerName);
+        const provider = getProvider((providerName as any));
     if (!provider.generateSpeech) {
       throw new ProviderError(
-        // @ts-ignore - TODO: strict typing
-        providerName,
+                (providerName as any),
         `Provider "${providerName}" does not support text-to-speech`,
         400,
       );
     }
     // Mark conversation as generating (creates a stub doc via upsert)
     if (conversationId) {
-      ConversationService.setGenerating(
-        // @ts-ignore - TODO: strict typing
-        conversationId,
+      (ConversationService as any).setGenerating(
+                (conversationId as any),
         project,
         username,
         true,
-      ).catch((error: Record<string, unknown>) =>
+      ).catch((error: any) =>
         logger.error(`Failed to set isGenerating: ${error.message}`),
       );
     }
-    // @ts-ignore - TODO: strict typing
-    const options = { instructions, model, ...extraOptions };
+        const options = { instructions, model, ...extraOptions };
     const result = await provider.generateSpeech(text, voice, options);
     const totalSec = (performance.now() - requestStart) / 1000;
     const contentType = result.contentType || "audio/mpeg";
@@ -113,13 +105,10 @@ export async function handleVoice(params: Record<string, unknown>, emitBinary: R
     if (result.stream.pipe) {
       // Node.js readable stream
       if (audioChunks) {
-        // @ts-ignore
-        result.stream.on("data", (chunk: Record<string, unknown>) => audioChunks.push(chunk));
+                result.stream.on("data", (chunk: any) => audioChunks.push((chunk as any as never)));
       }
-      // @ts-ignore
-      for await ( const chunk of result.stream) {
-        // @ts-ignore - TODO: strict typing
-        emitBinary(chunk);
+            for await ( const chunk of result.stream) {
+                emitBinary(chunk);
       }
     } else {
       // Web ReadableStream (from fetch)
@@ -127,17 +116,14 @@ export async function handleVoice(params: Record<string, unknown>, emitBinary: R
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        // @ts-ignore
-        if (audioChunks) audioChunks.push(Buffer.from(value));
-        // @ts-ignore - TODO: strict typing
-        emitBinary(value);
+                if (audioChunks) audioChunks.push((Buffer.from as any as never)(value));
+                emitBinary(value);
       }
     }
     logger.request(
-      // @ts-ignore - TODO: strict typing
-      project,
-      username,
-      clientIp,
+            (project as any),
+      (username as any),
+      (clientIp as any),
       `[audio] ${providerName} model=${model || "default"} — ` +
         `total: ${totalSec.toFixed(2)}s`,
     );
@@ -152,31 +138,27 @@ export async function handleVoice(params: Record<string, unknown>, emitBinary: R
       conversationId: conversationId || null,
       traceId: traceId || null,
       success: true,
-      // @ts-ignore - TODO: strict typing
-      inputCharacters: text.length,
+            inputCharacters: (text as any).length,
       totalTime: roundMs(totalSec),
     });
-    // @ts-ignore - TODO: strict typing
-    emitJSON({ type: "done" });
+        emitJSON({ type: "done" });
     // Auto-append to conversation
     if (conversationId && audioChunks) {
       let audioRef = null;
       try {
         const audioBuffer = Buffer.concat(audioChunks);
         const dataUrl = `data:${contentType};base64,${audioBuffer.toString("base64")}`;
-        const { ref } = await FileService.uploadFile(
+        const { ref } = await (FileService as any).uploadFile(
           dataUrl,
           "generations",
-          // @ts-ignore - TODO: strict typing
-          project,
+                    (project as any | null | undefined),
           username,
         );
         audioRef = ref;
-      } catch (error: unknown) {
-        // @ts-ignore - TODO: strict typing
-        logger.error(`Failed to upload TTS audio: ${error.message}`);
+      } catch (error: any) {
+                logger.error(`Failed to upload TTS audio: ${(error as Error).message}`);
       }
-      const messagesToAppend: Record<string, unknown>[] = [];
+      const messagesToAppend: any[] = [];
       // Derive user message from text
       messagesToAppend.push({
         role: "user",
@@ -196,40 +178,37 @@ export async function handleVoice(params: Record<string, unknown>, emitBinary: R
       const meta = conversationMeta
         ? { ...conversationMeta, settings: { provider: providerName, model } }
         : undefined;
-      ConversationService.appendMessages(
-        // @ts-ignore - TODO: strict typing
-        conversationId,
+      (ConversationService as any).appendMessages(
+                (conversationId as any),
         project,
         username,
         messagesToAppend,
         meta,
       )
         .then(() =>
-          ConversationService.setGenerating(
-            // @ts-ignore - TODO: strict typing
-            conversationId,
+          (ConversationService as any).setGenerating(
+                        (conversationId as any),
             project,
             username,
             false,
           ),
         )
-        .catch((error: Record<string, unknown>) =>
+        .catch((error: any) =>
           logger.error(
             `Failed to append messages to conversation ${conversationId}: ${error.message}`,
           ),
         );
     }
     return contentType;
-  } catch (error: unknown) {
+  } catch (error: any) {
     // Clear isGenerating flag on error
     if (conversationId) {
-      ConversationService.setGenerating(
-        // @ts-ignore - TODO: strict typing
-        conversationId,
+      (ConversationService as any).setGenerating(
+                (conversationId as any),
         project,
         username,
         false,
-      ).catch((error: Record<string, unknown>) =>
+      ).catch((error: any) =>
         logger.error(`Failed to clear isGenerating on error: ${error.message}`),
       );
     }
@@ -244,12 +223,10 @@ export async function handleVoice(params: Record<string, unknown>, emitBinary: R
       model: model || null,
       traceId: traceId || null,
       success: false,
-      // @ts-ignore - TODO: strict typing
-      errorMessage: error.message,
+            errorMessage: (error as Error).message,
       totalTime: totalSec,
     });
-    // @ts-ignore - TODO: strict typing
-    emitJSON({ type: "error", message: error.message });
+        emitJSON({ type: "error", message: (error as Error).message });
     throw error;
   }
 }
@@ -269,8 +246,7 @@ router.post(
     try {
       // ── Data URL format: collect chunks → base64-encode → return JSON ──
       if (req.query.format === "dataUrl") {
-        // @ts-ignore
-        const audioChunks: Record<string, unknown>[] = [];
+                const audioChunks: any[] = [];
         const resultContentType = await handleVoice(
           {
             ...req.body,
@@ -278,15 +254,13 @@ router.post(
             username: req.username,
             clientIp: req.clientIp,
           },
-          // @ts-ignore - TODO: strict typing
-          (chunk: Record<string, unknown>) => audioChunks.push(Buffer.from(chunk)),
-          (_event: Record<string, unknown>) => {
+                    ((chunk: any) => audioChunks.push((Buffer.from as any)(chunk)) as any),
+          (_event: any) => {
             /* JSON events not needed for dataUrl format */
           },
         );
         const ct = resultContentType || "audio/mpeg";
-        // @ts-ignore
-        const audioDataUrl = `data:${ct};base64,${Buffer.concat(audioChunks).toString("base64")}`;
+                const audioDataUrl = `data:${ct};base64,${Buffer.concat((audioChunks as any as readonly Uint8Array<ArrayBufferLike>[])).toString("base64")}`;
         return res.json({ audioDataUrl, contentType: ct });
       }
       // ── Default: stream binary audio chunks ──
@@ -298,8 +272,7 @@ router.post(
           username: req.username,
           clientIp: req.clientIp,
         },
-        // @ts-ignore - TODO: strict typing
-        (chunk: Record<string, unknown>) => {
+                (chunk: any) => {
           // Set headers on first chunk
           if (!res.headersSent) {
             res.setHeader("Content-Type", contentType);
@@ -307,7 +280,7 @@ router.post(
           }
           res.write(chunk);
         },
-        (_event: Record<string, unknown>) => {
+        (_event: any) => {
           /* REST doesn't send JSON events to client */
         },
       );
@@ -315,7 +288,7 @@ router.post(
         contentType = resultContentType;
       }
       res.end();
-    } catch (error: unknown) {
+    } catch (error: any) {
       if (!res.headersSent) {
         next(error);
       }
@@ -378,13 +351,12 @@ router.post(
       // Mark conversation as generating (creates a stub doc via upsert)
       // so the frontend can fetch the conversation by ID immediately.
       if (conversationId) {
-        ConversationService.setGenerating(
+        (ConversationService as any).setGenerating(
           conversationId,
-          // @ts-ignore - TODO: strict typing
-          req.project,
+                    (req.project as any),
           req.username,
           true,
-        ).catch((error: Record<string, unknown>) =>
+        ).catch((error: any) =>
           logger.error(`Failed to set isGenerating: ${error.message}`),
         );
       }
@@ -397,22 +369,18 @@ router.post(
         );
       }
       // Parse audio — accept either data URL or raw base64
-      let audioBuffer: Record<string, unknown>;
+      let audioBuffer: any;
       let mimeType = "audio/mpeg";
       const dataUrlMatch = audio.match(/^data:([^;]+);base64,(.+)$/);
       if (dataUrlMatch) {
         mimeType = dataUrlMatch[1];
-        // @ts-ignore - TODO: strict typing
-        audioBuffer = Buffer.from(dataUrlMatch[2], "base64");
+                audioBuffer = Buffer.from(dataUrlMatch[2], "base64");
       } else {
-        // @ts-ignore - TODO: strict typing
-        audioBuffer = Buffer.from(audio, "base64");
+                audioBuffer = Buffer.from(audio, "base64");
       }
-      const options = {};
-      // @ts-ignore
-      if (language) options.language = language;
-      // @ts-ignore
-      if (transcriptionPrompt) options.prompt = transcriptionPrompt;
+      const options: any = {};
+            if (language) options.language = language;
+            if (transcriptionPrompt) options.prompt = transcriptionPrompt;
       const result = await provider.transcribeAudio(
         audioBuffer,
         mimeType,
@@ -423,19 +391,16 @@ router.post(
       // ── Cost estimation ─────────────────────────────────────────
       const modelDef = getModelByName(model);
       const pricing =
-        // @ts-ignore
-        modelDef?.pricing ||
-        // @ts-ignore
-        getPricing(TYPES.AUDIO, TYPES.TEXT)[model] ||
+                (modelDef as any)?.pricing ||
+                getPricing(TYPES.AUDIO, TYPES.TEXT)[model] ||
         null;
-      const estimatedCost = calculateAudioCost(result.usage, pricing);
+      const estimatedCost = calculateAudioCost(result.usage, (pricing as any));
       // ── Logging ────────────────────────────────────────────────
       const costStr = formatCostTag(estimatedCost);
       logger.request(
-        // @ts-ignore - TODO: strict typing
-        req.project,
-        req.username,
-        req.clientIp,
+                (req.project as any),
+        (req.username as any),
+        (req.clientIp as any),
         `[audio/transcribe] ${providerName} model=${model || "default"} — ` +
           `total: ${totalSec.toFixed(2)}s${costStr}`,
       );
@@ -460,16 +425,15 @@ router.post(
         // Upload audio to MinIO for storage
         let audioRef = audio;
         try {
-          const { ref } = await FileService.uploadFile(
+          const { ref } = await (FileService as any).uploadFile(
             audio,
             "uploads",
             req.project,
             req.username,
           );
           audioRef = ref;
-        } catch (error: unknown) {
-          // @ts-ignore - TODO: strict typing
-          logger.error(`Failed to upload STT audio: ${error.message}`);
+        } catch (error: any) {
+                    logger.error(`Failed to upload STT audio: ${(error as Error).message}`);
         }
         const messagesToAppend = [
           {
@@ -495,24 +459,22 @@ router.post(
               settings: { provider: providerName, model },
             }
           : undefined;
-        ConversationService.appendMessages(
+        (ConversationService as any).appendMessages(
           conversationId,
-          // @ts-ignore - TODO: strict typing
-          req.project,
+                    (req.project as any),
           req.username,
           messagesToAppend,
           meta,
         )
           .then(() =>
-            ConversationService.setGenerating(
+            (ConversationService as any).setGenerating(
               conversationId,
-              // @ts-ignore - TODO: strict typing
-              req.project,
+                            (req.project as any),
               req.username,
               false,
             ),
           )
-          .catch((error: Record<string, unknown>) =>
+          .catch((error: any) =>
             logger.error(
               `Failed to append messages to conversation ${conversationId}: ${error.message}`,
             ),
@@ -525,16 +487,15 @@ router.post(
         totalTime: roundMs(totalSec),
         ...(traceId && { traceId }),
       });
-    } catch (error: unknown) {
+    } catch (error: any) {
       // Clear isGenerating flag on error
       if (conversationId) {
-        ConversationService.setGenerating(
+        (ConversationService as any).setGenerating(
           conversationId,
-          // @ts-ignore - TODO: strict typing
-          req.project,
+                    (req.project as any),
           req.username,
           false,
-        ).catch((error: Record<string, unknown>) =>
+        ).catch((error: any) =>
           logger.error(
             `Failed to clear isGenerating on error: ${error.message}`,
           ),
@@ -552,8 +513,7 @@ router.post(
         conversationId,
         traceId: traceId || null,
         success: false,
-        // @ts-ignore - TODO: strict typing
-        errorMessage: error.message,
+                errorMessage: (error as Error).message,
         totalTime: totalSec,
       });
       next(error);

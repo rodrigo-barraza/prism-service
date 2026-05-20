@@ -1,4 +1,3 @@
-// @ts-ignore
 import { formatCostTag, roundMs } from "@rodrigo-barraza/utilities-library";
 import {
   calculateTextCost,
@@ -19,7 +18,7 @@ import logger from "../../../utils/logger.ts";
  * Resolve the MongoDB collection for conversation persistence.
  * Agent projects go to agent_sessions; everything else to conversations.
  */
-function getCollectionOpts(project: Record<string, unknown>) {
+function getCollectionOpts(project: any) {
   if (AgentPersonaRegistry.isAgentProject(project)) {
     return { collection: COLLECTIONS.AGENT_SESSIONS };
   }
@@ -40,7 +39,7 @@ function getCollectionOpts(project: Record<string, unknown>) {
  * Used by all harness implementations and the /chat streaming path.
  */
 export async function finalizeTextGeneration(
-  context: Record<string, unknown>,
+  context: any,
   {
     text,
     thinking,
@@ -59,9 +58,8 @@ export async function finalizeTextGeneration(
     contentSegments,
     textFragments,
     thinkingFragments,
-  }: Record<string, unknown>,
-  // @ts-ignore - TODO: strict typing
-  overrideMessagesToAppend: Record<string, unknown> = null,
+  }: any,
+    overrideMessagesToAppend: any = null,
 ) {
   const {
     providerName,
@@ -91,30 +89,24 @@ export async function finalizeTextGeneration(
   let estimatedCost = null;
   let tokensPerSec = null;
   if (usage) {
-    // @ts-ignore - TODO: strict typing
-    const imageCount = images.length;
-    if (imageCount > 0) {
+        const imageCount = (images as any).length;
+    if ((imageCount as any) > 0) {
       const imgPricing =
-        // @ts-ignore
-        getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel] || modelDef?.pricing;
+                getPricing(TYPES.TEXT, TYPES.IMAGE)[(resolvedModel as string)] || (modelDef as any)?.pricing;
       if (imgPricing?.imageOutputPerMillion) {
         // Derive image tokens dynamically from the API-reported total.
         // The API's outputTokens already includes both text and image tokens,
         // so we estimate text tokens from the generated text length (~4 chars/token)
         // and attribute the remainder to images. This adapts to any resolution
         // (512px≈747tok, 1024px≈1120tok, 2048px≈1680tok, 4096px≈2520tok).
-        // @ts-ignore - TODO: strict typing
-        const estimatedTextOutputTokens = Math.ceil((text?.length || 0) / 4);
+                const estimatedTextOutputTokens = Math.ceil(((text as any)?.length || 0) / 4);
         const imageTokens = Math.max(
           0,
-          // @ts-ignore - TODO: strict typing
-          usage.outputTokens - estimatedTextOutputTokens,
+                    (usage as any).outputTokens - estimatedTextOutputTokens,
         );
-        // @ts-ignore - TODO: strict typing
-        const textOutputTokens = Math.max(0, usage.outputTokens - imageTokens);
+                const textOutputTokens = Math.max(0, (usage as any).outputTokens - imageTokens);
         const inputCost =
-          // @ts-ignore - TODO: strict typing
-          (usage.inputTokens / 1_000_000) * (imgPricing.inputPerMillion || 0);
+                    ((usage as any).inputTokens / 1_000_000) * (imgPricing.inputPerMillion || 0);
         const textOutCost =
           (textOutputTokens / 1_000_000) * (imgPricing.outputPerMillion || 0);
         const imageOutCost =
@@ -123,68 +115,50 @@ export async function finalizeTextGeneration(
           (inputCost + textOutCost + imageOutCost).toFixed(8),
         );
       } else {
-        // @ts-ignore
-        const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
-        // @ts-ignore - TODO: strict typing
-        estimatedCost = calculateTextCost(usage, pricing);
+                const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[(resolvedModel as string)];
+                estimatedCost = calculateTextCost((usage as any), pricing);
       }
     } else {
-      // @ts-ignore
-      const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
-      // @ts-ignore - TODO: strict typing
-      estimatedCost = calculateTextCost(usage, pricing);
+            const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[(resolvedModel as string)];
+            estimatedCost = calculateTextCost((usage as any), pricing);
     }
-    // @ts-ignore - TODO: strict typing
-    tokensPerSec = calculateTokensPerSec(usage.outputTokens, generationSec, {
-      // @ts-ignore - TODO: strict typing
-      providerReported: usage.tokensPerSec,
+        tokensPerSec = calculateTokensPerSec((usage as any).outputTokens, generationSec, {
+            providerReported: (usage as any).tokensPerSec,
       fallbackSec: totalSec,
     });
   }
   // ── Console logging ───────────────────────────────────────────
-  // @ts-ignore - TODO: strict typing
-  const inputTokens = getTotalInputTokens(usage);
-  // @ts-ignore - TODO: strict typing
-  const outputTokens = usage?.outputTokens || 0;
+    const inputTokens = getTotalInputTokens((usage as any));
+    const outputTokens = (usage as any)?.outputTokens || 0;
   const tokensPerSecStr =
     tokensPerSec !== null ? tokensPerSec.toFixed(1) : "N/A";
   const cacheInfo =
-    // @ts-ignore - TODO: strict typing
-    usage?.cacheReadInputTokens || usage?.cacheCreationInputTokens
-      // @ts-ignore - TODO: strict typing
-      ? `, cache_read: ${usage.cacheReadInputTokens || 0}, cache_write: ${usage.cacheCreationInputTokens || 0}`
+        (usage as any)?.cacheReadInputTokens || (usage as any)?.cacheCreationInputTokens
+            ? `, cache_read: ${(usage as any).cacheReadInputTokens || 0}, cache_write: ${(usage as any).cacheCreationInputTokens || 0}`
       : "";
   logger.request(
-    // @ts-ignore - TODO: strict typing
-    project,
-    username,
-    clientIp,
+        (project as any),
+    (username as any),
+    (clientIp as any),
     `[chat] ${providerName} ${resolvedModel} — ` +
       `in: ${inputTokens} tokens, out: ${outputTokens} tokens${cacheInfo}, ` +
       `speed: ${tokensPerSecStr} tok/s, ` +
-      // @ts-ignore - TODO: strict typing
-      `ttg: ${timeToGenerationSec !== null ? timeToGenerationSec.toFixed(2) + "s" : "N/A"}, ` +
-      // @ts-ignore - TODO: strict typing
-      `generation: ${generationSec !== null ? generationSec.toFixed(2) + "s" : "N/A"}, ` +
-      // @ts-ignore - TODO: strict typing
-      `total: ${totalSec.toFixed(2)}s` +
+            `ttg: ${timeToGenerationSec !== null ? (timeToGenerationSec as any).toFixed(2) + "s" : "N/A"}, ` +
+            `generation: ${generationSec !== null ? (generationSec as any).toFixed(2) + "s" : "N/A"}, ` +
+            `total: ${(totalSec as any).toFixed(2)}s` +
       formatCostTag(estimatedCost),
   );
   // ── Build WAV from accumulated PCM audio chunks ───────────────
   let audioRef = null;
-  // @ts-ignore - TODO: strict typing
-  if (audioChunks.length > 0) {
+    if ((audioChunks as any).length > 0) {
     try {
-      // @ts-ignore - TODO: strict typing
-      const pcmBuffers = audioChunks.map((b64: Record<string, unknown>) =>
-        // @ts-ignore - TODO: strict typing
-        Buffer.from(b64, "base64"),
+            const pcmBuffers = (audioChunks as any).map((b64: any) =>
+                Buffer.from(b64, "base64"),
       );
       const pcmData = Buffer.concat(pcmBuffers);
       const numChannels = 1;
       const bitsPerSample = 16;
-      // @ts-ignore - TODO: strict typing
-      const byteRate = audioSampleRate * numChannels * (bitsPerSample / 8);
+            const byteRate = (audioSampleRate as any) * numChannels * (bitsPerSample / 8);
       const blockAlign = numChannels * (bitsPerSample / 8);
       const wavHeader = Buffer.alloc(44);
       wavHeader.write("RIFF", 0);
@@ -194,8 +168,7 @@ export async function finalizeTextGeneration(
       wavHeader.writeUInt32LE(16, 16);
       wavHeader.writeUInt16LE(1, 20);
       wavHeader.writeUInt16LE(numChannels, 22);
-      // @ts-ignore - TODO: strict typing
-      wavHeader.writeUInt32LE(audioSampleRate, 24);
+            wavHeader.writeUInt32LE((audioSampleRate as any), 24);
       wavHeader.writeUInt32LE(byteRate, 28);
       wavHeader.writeUInt16LE(blockAlign, 32);
       wavHeader.writeUInt16LE(bitsPerSample, 34);
@@ -203,18 +176,16 @@ export async function finalizeTextGeneration(
       wavHeader.writeUInt32LE(pcmData.length, 40);
       const wavBuffer = Buffer.concat([wavHeader, pcmData]);
       const dataUrl = `data:audio/wav;base64,${wavBuffer.toString("base64")}`;
-      const { ref } = await FileService.uploadFile(
+      const { ref } = await (FileService as any).uploadFile(
         dataUrl,
         "generations",
-        // @ts-ignore - TODO: strict typing
-        project,
+                (project as any | null | undefined),
         username,
       );
       audioRef = ref;
-    } catch (error: unknown) {
+    } catch (error: any) {
       logger.error(
-        // @ts-ignore - TODO: strict typing
-        `[chat] Failed to build/upload Live API audio WAV: ${error.message}`,
+                `[chat] Failed to build/upload Live API audio WAV: ${(error as Error).message}`,
       );
     }
   }
@@ -222,14 +193,11 @@ export async function finalizeTextGeneration(
   // Placed after audio build so audioRef is available for modality detection.
   // Agentic requests are logged granularly per-iteration by AgenticLoopService,
   // so we only log here for non-agentic paths (chat, live).
-  // @ts-ignore - TODO: strict typing
-  if (!options.agenticLoopEnabled) {
+    if (!(options as any).agenticLoopEnabled) {
     RequestLogger.logChatGeneration({
       requestId,
-      // @ts-ignore - TODO: strict typing
-      endpoint: modelDef?.liveAPI ? "/live" : "/chat",
-      // @ts-ignore - TODO: strict typing
-      operation: modelDef?.liveAPI ? "live" : "chat",
+            endpoint: (modelDef as any)?.liveAPI ? "/live" : "/chat",
+            operation: (modelDef as any)?.liveAPI ? "live" : "chat",
       project,
       username,
       clientIp,
@@ -260,10 +228,8 @@ export async function finalizeTextGeneration(
     });
   }
   // ── Emit done event ───────────────────────────────────────────
-  // @ts-ignore - TODO: strict typing
-  if (!signal?.aborted) {
-    // @ts-ignore - TODO: strict typing
-    emit({
+    if (!(signal as any)?.aborted) {
+        (emit as any)({
       type: "done",
       provider: providerName,
       model: resolvedModel,
@@ -272,24 +238,18 @@ export async function finalizeTextGeneration(
       tokensPerSec,
       ...(audioRef ? { audioRef } : {}),
       timeToGeneration:
-        // @ts-ignore - TODO: strict typing
-        timeToGenerationSec !== null ? roundMs(timeToGenerationSec) : null,
-      // @ts-ignore - TODO: strict typing
-      generationTime: generationSec !== null ? roundMs(generationSec) : null,
-      // @ts-ignore - TODO: strict typing
-      totalTime: roundMs(totalSec),
-      // @ts-ignore - TODO: strict typing
-      ...(traceId && { traceId }),
-      // @ts-ignore - TODO: strict typing
-      ...(conversationId && { conversationId }),
+                timeToGenerationSec !== null ? roundMs((timeToGenerationSec as any)) : null,
+            generationTime: generationSec !== null ? roundMs((generationSec as any)) : null,
+            totalTime: roundMs((totalSec as any)),
+            ...(traceId && { traceId }),
+            ...(conversationId && { conversationId }),
     });
   }
   // ── Conversation persistence ──────────────────────────────────
   if (conversationId) {
-    let messagesToAppend: Record<string, unknown>[] = [];
+    let messagesToAppend: any[] = [];
     if (overrideMessagesToAppend) {
-      // @ts-ignore - TODO: strict typing
-      messagesToAppend = [...overrideMessagesToAppend];
+            messagesToAppend = [...overrideMessagesToAppend];
       // When the agentic loop ran multiple iterations, intermediate assistant
       // messages already carry their own content + toolCalls. Attaching the
       // full-turn contentSegments/textFragments to the final message would
@@ -298,22 +258,16 @@ export async function finalizeTextGeneration(
       // Only include segments on single-iteration turns where the final
       // message is the sole assistant message — segments preserve the
       // thinking ↔ tools ↔ text interleaving for that case.
-      // @ts-ignore
-      const hasIntermediateToolMessages = overrideMessagesToAppend.some(
-        // @ts-ignore - TODO: strict typing
-        (m: Record<string, unknown>) => m.role === "assistant" && m.toolCalls?.length > 0,
+            const hasIntermediateToolMessages = (overrideMessagesToAppend as any).some(
+                (m: any) => m.role === "assistant" && (m.toolCalls as any)?.length > 0,
       );
       // Append the final LLM response block (contains telemetry and final text step)
-      // @ts-ignore
-      messagesToAppend.push({
+            messagesToAppend.push({
         role: "assistant",
         content: text,
-        // @ts-ignore - TODO: strict typing
-        ...(thinking && { thinking }),
-        // @ts-ignore - TODO: strict typing
-        ...(thinkingSignature && { thinkingSignature }),
-        // @ts-ignore - TODO: strict typing
-        ...(images.length > 0 && { images }),
+                ...(thinking && { thinking }),
+                ...(thinkingSignature && { thinkingSignature }),
+                ...((images as any).length > 0 && { images }),
         ...(audioRef && { audio: audioRef }),
         // Include toolCalls on the final message if no intermediate message
         // already persists them. The regular agentic loop embeds toolCalls in
@@ -321,14 +275,12 @@ export async function finalizeTextGeneration(
         // native MCP tool calls (e.g. LM Studio) bypass that path — without
         // this, tool calls vanish on page refresh.
         ...(!hasIntermediateToolMessages &&
-          // @ts-ignore - TODO: strict typing
-          toolCalls.length > 0 && { toolCalls }),
+                    (toolCalls as any).length > 0 && { toolCalls }),
         model: resolvedModel,
         provider: providerName,
         timestamp: new Date().toISOString(),
         usage: usage || null,
-        // @ts-ignore - TODO: strict typing
-        totalTime: roundMs(totalSec),
+                totalTime: roundMs((totalSec as any)),
         tokensPerSec,
         estimatedCost,
         // Display segment metadata — preserves interleaving order for Prism Client.
@@ -336,31 +288,21 @@ export async function finalizeTextGeneration(
         // otherwise intermediate messages already carry their own content and
         // the segments would cause duplicate rendering on page refresh.
         ...(!hasIntermediateToolMessages &&
-          // @ts-ignore - TODO: strict typing
-          contentSegments?.length > 0 && { contentSegments }),
+                    (contentSegments as any)?.length > 0 && { contentSegments }),
         ...(!hasIntermediateToolMessages &&
-          // @ts-ignore - TODO: strict typing
-          textFragments?.length > 0 && { textFragments }),
+                    (textFragments as any)?.length > 0 && { textFragments }),
         ...(!hasIntermediateToolMessages &&
-          // @ts-ignore - TODO: strict typing
-          thinkingFragments?.length > 0 && { thinkingFragments }),
+                    (thinkingFragments as any)?.length > 0 && { thinkingFragments }),
         // Generation settings — source of truth per request
         generationSettings: {
-          // @ts-ignore - TODO: strict typing
-          temperature: options.temperature,
-          // @ts-ignore - TODO: strict typing
-          maxTokens: options.maxTokens,
-          // @ts-ignore - TODO: strict typing
-          thinkingEnabled: options.thinkingEnabled || false,
-          // @ts-ignore - TODO: strict typing
-          ...(options.reasoningEffort && {
-            // @ts-ignore - TODO: strict typing
-            reasoningEffort: options.reasoningEffort,
+                    temperature: (options as any).temperature,
+                    maxTokens: (options as any).maxTokens,
+                    thinkingEnabled: (options as any).thinkingEnabled || false,
+                    ...((options as any).reasoningEffort && {
+                        reasoningEffort: (options as any).reasoningEffort,
           }),
-          // @ts-ignore - TODO: strict typing
-          ...(options.thinkingBudget && {
-            // @ts-ignore - TODO: strict typing
-            thinkingBudget: options.thinkingBudget,
+                    ...((options as any).thinkingBudget && {
+                        thinkingBudget: (options as any).thinkingBudget,
           }),
         },
       });
@@ -373,47 +315,34 @@ export async function finalizeTextGeneration(
         messagesToAppend.push({
           role: "user",
           ...userMessage,
-          // @ts-ignore - TODO: strict typing
-          timestamp: userMessage.timestamp || new Date().toISOString(),
+                    timestamp: (userMessage as any).timestamp || new Date().toISOString(),
         });
       }
       messagesToAppend.push({
         role: "assistant",
         content: text,
-        // @ts-ignore - TODO: strict typing
-        ...(thinking && { thinking }),
-        // @ts-ignore - TODO: strict typing
-        ...(thinkingSignature && { thinkingSignature }),
-        // @ts-ignore - TODO: strict typing
-        ...(images.length > 0 && { images }),
+                ...(thinking && { thinking }),
+                ...(thinkingSignature && { thinkingSignature }),
+                ...((images as any).length > 0 && { images }),
         ...(audioRef && { audio: audioRef }),
-        // @ts-ignore - TODO: strict typing
-        ...(toolCalls.length > 0 && { toolCalls }),
+                ...((toolCalls as any).length > 0 && { toolCalls }),
         model: resolvedModel,
         provider: providerName,
         timestamp: new Date().toISOString(),
         usage: usage || null,
-        // @ts-ignore - TODO: strict typing
-        totalTime: roundMs(totalSec),
+                totalTime: roundMs((totalSec as any)),
         tokensPerSec,
         estimatedCost,
         // Generation settings — source of truth per request
         generationSettings: {
-          // @ts-ignore - TODO: strict typing
-          temperature: options.temperature,
-          // @ts-ignore - TODO: strict typing
-          maxTokens: options.maxTokens,
-          // @ts-ignore - TODO: strict typing
-          thinkingEnabled: options.thinkingEnabled || false,
-          // @ts-ignore - TODO: strict typing
-          ...(options.reasoningEffort && {
-            // @ts-ignore - TODO: strict typing
-            reasoningEffort: options.reasoningEffort,
+                    temperature: (options as any).temperature,
+                    maxTokens: (options as any).maxTokens,
+                    thinkingEnabled: (options as any).thinkingEnabled || false,
+                    ...((options as any).reasoningEffort && {
+                        reasoningEffort: (options as any).reasoningEffort,
           }),
-          // @ts-ignore - TODO: strict typing
-          ...(options.thinkingBudget && {
-            // @ts-ignore - TODO: strict typing
-            thinkingBudget: options.thinkingBudget,
+                    ...((options as any).thinkingBudget && {
+                        thinkingBudget: (options as any).thinkingBudget,
           }),
         },
       });
@@ -427,26 +356,21 @@ export async function finalizeTextGeneration(
     // Merge parentAgentSessionId, workspaceRoot, and agent into meta for persistence
     let finalMeta = meta;
     if (parentAgentSessionId) {
-      // @ts-ignore - TODO: strict typing
-      finalMeta = { ...(finalMeta || {}), parentAgentSessionId };
+            finalMeta = { ...(finalMeta || {}), parentAgentSessionId };
     }
     if (workspaceRoot) {
-      // @ts-ignore - TODO: strict typing
-      finalMeta = { ...(finalMeta || {}), workspaceRoot };
+            finalMeta = { ...(finalMeta || {}), workspaceRoot };
     }
     if (agent) {
-      // @ts-ignore - TODO: strict typing
-      finalMeta = { ...(finalMeta || {}), agent };
+            finalMeta = { ...(finalMeta || {}), agent };
     }
     appendAndFinalize(
-      // @ts-ignore - TODO: strict typing
-      conversationId,
-      project,
-      username,
+            (conversationId as any),
+      (project as any),
+      (username as any),
       messagesToAppend,
       finalMeta,
-      // @ts-ignore - TODO: strict typing
-      getCollectionOpts(project),
+            getCollectionOpts((project as any)),
     );
   }
 }

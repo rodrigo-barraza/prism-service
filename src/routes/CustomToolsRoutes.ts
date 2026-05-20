@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import { ObjectId } from "mongodb";
@@ -19,8 +18,7 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
 
       const tools = await db
         .collection(COLLECTION)
@@ -28,9 +26,8 @@ router.get(
         .sort({ createdAt: -1 })
         .toArray();
 
-      // @ts-ignore - TODO: strict typing
-      res.json(tools.map((t: Record<string, unknown>) => ({ ...t, id: t._id.toString() })));
-    } catch (error: unknown) {
+            res.json(tools.map((t: any) => ({ ...t, id: (t as any)._id.toString() })));
+    } catch (error: any) {
       next(error);
     }
   }),
@@ -44,8 +41,7 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { project, username, db } = req;
+            const { project, username, db } = req;
 
       const document = {
         project,
@@ -67,7 +63,7 @@ router.post(
 
       logger.info(`Custom tool created: ${document.name} (${result.insertedId})`);
       res.status(201).json({ ...document, id: result.insertedId.toString() });
-    } catch (error: unknown) {
+    } catch (error: any) {
       next(error);
     }
   }),
@@ -81,8 +77,7 @@ router.put(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
       const updates = {
         ...(req.body.name !== undefined && { name: req.body.name }),
@@ -106,8 +101,7 @@ router.put(
       const result = await db
         .collection(COLLECTION)
         .findOneAndUpdate(
-          // @ts-ignore - TODO: strict typing
-          { _id: new ObjectId(req.params.id) },
+                    { _id: new ObjectId(req.params.id) },
           { $set: updates },
           { returnDocument: "after" },
         );
@@ -118,7 +112,7 @@ router.put(
 
       logger.info(`Custom tool updated: ${result.name} (${req.params.id})`);
       res.json({ ...result, id: result._id.toString() });
-    } catch (error: unknown) {
+    } catch (error: any) {
       next(error);
     }
   }),
@@ -132,13 +126,11 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
       const result = await db
         .collection(COLLECTION)
-        // @ts-ignore - TODO: strict typing
-        .findOneAndDelete({ _id: new ObjectId(req.params.id) });
+                .findOneAndDelete({ _id: new ObjectId(req.params.id) });
 
       if (!result) {
         return res.status(404).json({ error: "Tool not found" });
@@ -146,7 +138,7 @@ router.delete(
 
       logger.info(`Custom tool deleted: ${result.name} (${req.params.id})`);
       res.json({ success: true });
-    } catch (error: unknown) {
+    } catch (error: any) {
       next(error);
     }
   }),

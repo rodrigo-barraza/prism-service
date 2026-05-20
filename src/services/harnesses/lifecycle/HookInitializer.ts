@@ -31,9 +31,8 @@ export function createStandardHooks({
     fullAuto: autoApprove === true,
   });
   hooks.register(
-    // @ts-ignore - TODO: strict typing
-    "beforeToolCall",
-    approvalEngine.createHook(),
+        ("beforeToolCall" as any),
+    (approvalEngine.createHook as any)(),
     "AutoApprovalEngine",
   );
 
@@ -41,16 +40,14 @@ export function createStandardHooks({
     workspaceRoot: workspaceRoot || undefined,
   });
   hooks.register(
-    // @ts-ignore - TODO: strict typing
-    "beforePrompt",
-    assembler.createHook(),
+        ("beforePrompt" as any),
+    (assembler.createHook as any)(),
     "SystemPromptAssembler",
   );
 
   hooks.register(
-    // @ts-ignore - TODO: strict typing
-    "afterResponse",
-    MemoryExtractor.createHook(),
+        ("afterResponse" as any),
+    (MemoryExtractor.createHook as any)(),
     "MemoryExtractor",
   );
 

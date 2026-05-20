@@ -1,11 +1,9 @@
 // ─── Unified Gateway for Local Model Providers ──────────────
 
 import logger from "../utils/logger.ts";
-// @ts-ignore
 import {
   formatBytes,
   withTimeoutFallback,
-// @ts-ignore
 } from "@rodrigo-barraza/utilities-library";
 import { getProvider } from "../providers/index.ts";
 import {
@@ -18,10 +16,11 @@ import {
 } from "../providers/instance-registry.ts";
 import { TYPES } from "../config.ts";
 import { resolveArchParams, estimateMemory } from "../utils/gguf-arch.ts";
+import { InstanceEntry } from "../types/ProviderTypes.ts";
 
 interface ListModelsResponse {
-  models?: Record<string, unknown>[];
-  data?: Record<string, unknown>[];
+  models?: any[];
+  data?: any[];
 }
 
 // ─── PROVIDER TYPE CONSTANTS ────────────────────────────────
@@ -159,9 +158,8 @@ const AUDIO_PATTERNS = [
 ];
 
 /** Check if a lowercased model name matches any pattern in a list. */
-function matchesAny(nameLower: Record<string, unknown>, patterns: Record<string, unknown>) {
-  // @ts-ignore - TODO: strict typing
-  return patterns.some((p: Record<string, unknown>) => nameLower.includes(p));
+function matchesAny(nameLower: any, patterns: any) {
+    return (patterns as any).some((p: any) => (nameLower as any).includes(p));
 }
 
 /**
@@ -170,45 +168,34 @@ function matchesAny(nameLower: Record<string, unknown>, patterns: Record<string,
 
  * @returns {object} Detected capabilities
  */
-function detectCapabilities(modelKey: Record<string, unknown>, providerMeta: Record<string, unknown> = {}) {
-  // @ts-ignore - TODO: strict typing
-  const nameLower = (modelKey || "").toLowerCase();
+function detectCapabilities(modelKey: any, providerMeta: any = {}) {
+    const nameLower = (modelKey || "").toLowerCase();
 
   // Thinking / reasoning
-  // @ts-ignore
-  const hasReasoningCapability = !!providerMeta.capabilities?.reasoning;
+    const hasReasoningCapability = !!(providerMeta.capabilities as any)?.reasoning;
   const supportsThinking =
-    // @ts-ignore - TODO: strict typing
-    hasReasoningCapability || matchesAny(nameLower, THINKING_PATTERNS);
+        hasReasoningCapability || matchesAny(nameLower, (THINKING_PATTERNS as any));
 
   // Function calling / tool use
   const supportsFunctionCalling =
-    // @ts-ignore
-    !!providerMeta.capabilities?.trained_for_tool_use ||
-    // @ts-ignore - TODO: strict typing
-    matchesAny(nameLower, FC_PATTERNS);
+        !!(providerMeta.capabilities as any)?.trained_for_tool_use ||
+        matchesAny(nameLower, (FC_PATTERNS as any));
 
   // Vision (images)
   const supportsVision =
-    // @ts-ignore
-    !!providerMeta.capabilities?.vision ||
-    // @ts-ignore - TODO: strict typing
-    matchesAny(nameLower, VISION_PATTERNS);
+        !!(providerMeta.capabilities as any)?.vision ||
+        matchesAny(nameLower, (VISION_PATTERNS as any));
 
   // Video
-  // @ts-ignore - TODO: strict typing
-  const supportsVideo = matchesAny(nameLower, VIDEO_PATTERNS);
+    const supportsVideo = matchesAny(nameLower, (VIDEO_PATTERNS as any));
 
   // Audio
-  // @ts-ignore - TODO: strict typing
-  const supportsAudio = matchesAny(nameLower, AUDIO_PATTERNS);
+    const supportsAudio = matchesAny(nameLower, (AUDIO_PATTERNS as any));
 
   // Build tools list
-  const tools: Record<string, unknown>[] = [];
-  // @ts-ignore - TODO: strict typing
-  if (supportsThinking) tools.push("Thinking");
-  // @ts-ignore - TODO: strict typing
-  if (supportsFunctionCalling) tools.push("Tool Calling");
+  const tools: any[] = [];
+    if (supportsThinking) tools.push(("Thinking" as any));
+    if (supportsFunctionCalling) tools.push(("Tool Calling" as any));
 
   // Build input types
   const inputTypes = [TYPES.TEXT];
@@ -229,18 +216,14 @@ function detectCapabilities(modelKey: Record<string, unknown>, providerMeta: Rec
 }
 
 /** Format a total parameter count into a human-readable string. */
-function formatParams(totalParams: Record<string, unknown>) {
+function formatParams(totalParams: any) {
   if (!totalParams) return null;
-  // @ts-ignore - TODO: strict typing
-  if (totalParams >= 1_000_000_000) {
-    // @ts-ignore - TODO: strict typing
-    const billions = totalParams / 1_000_000_000;
+    if (totalParams >= 1_000_000_000) {
+        const billions = totalParams / 1_000_000_000;
     return billions % 1 === 0 ? `${billions}B` : `${billions.toFixed(1)}B`;
   }
-  // @ts-ignore - TODO: strict typing
-  if (totalParams >= 1_000_000) {
-    // @ts-ignore - TODO: strict typing
-    return `${(totalParams / 1_000_000).toFixed(0)}M`;
+    if (totalParams >= 1_000_000) {
+        return `${(totalParams / 1_000_000).toFixed(0)}M`;
   }
   return `${totalParams}`;
 }
@@ -268,8 +251,7 @@ function parseQuantFromName(name: string) {
     /[-_](INT4)\b/i,
     /[@](q\d+_k(?:_[sml])?)\b/i,
   ];
-  // @ts-ignore
-  for ( const pattern of quantPatterns) {
+    for ( const pattern of quantPatterns) {
     const match = name.match(pattern);
     if (match) return match[1].toUpperCase();
   }
@@ -292,7 +274,7 @@ const HF_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
  * Returns null on any failure (gated models, network errors, etc.).
  * Results are cached in-memory with a 30-minute TTL.
  */
-async function fetchHuggingFaceMetadata(modelId: Record<string, unknown>) {
+async function fetchHuggingFaceMetadata(modelId: any) {
   const cached = _hfCache.get(modelId);
   if (cached && Date.now() - cached.timestamp < HF_CACHE_TTL_MS) {
     return cached.data;
@@ -309,22 +291,14 @@ async function fetchHuggingFaceMetadata(modelId: Record<string, unknown>) {
     }
     const data = await response.json();
     const meta = {
-      // @ts-ignore
-      architectures: data.config?.architectures || [],
-      // @ts-ignore
-      modelType: data.config?.model_type || null,
-      // @ts-ignore
-      pipelineTag: data.pipeline_tag || null,
-      // @ts-ignore
-      tags: data.tags || [],
-      // @ts-ignore
-      author: data.author || null,
-      // @ts-ignore
-      totalParams: data.safetensors?.total || null,
-      // @ts-ignore
-      totalSize: data.usedStorage || null,
-      // @ts-ignore
-      paramsByDtype: data.safetensors?.parameters || null,
+            architectures: (data as any).config?.architectures || [],
+            modelType: (data as any).config?.model_type || null,
+            pipelineTag: (data as any).pipeline_tag || null,
+            tags: (data as any).tags || [],
+            author: (data as any).author || null,
+            totalParams: (data as any).safetensors?.total || null,
+            totalSize: (data as any).usedStorage || null,
+            paramsByDtype: (data as any).safetensors?.parameters || null,
     };
     _hfCache.set(modelId, { data: meta, timestamp: Date.now() });
     return meta;
@@ -338,9 +312,8 @@ async function fetchHuggingFaceMetadata(modelId: Record<string, unknown>) {
  * Enrich a model entry with HuggingFace metadata if the model ID
  * looks like a HF model path (has a slash: "org/model-name").
  */
-async function enrichWithHuggingFace(entry: Record<string, unknown>, modelKey: Record<string, unknown>) {
-  // @ts-ignore - TODO: strict typing
-  if (!modelKey.includes("/")) return entry;
+async function enrichWithHuggingFace(entry: any, modelKey: any) {
+    if (!(modelKey as any).includes("/")) return entry;
 
   const hf = await fetchHuggingFaceMetadata(modelKey).catch(() => null);
   if (!hf) return entry;
@@ -352,24 +325,18 @@ async function enrichWithHuggingFace(entry: Record<string, unknown>, modelKey: R
     hf.tags.includes("vision")
   ) {
     entry.vision = true;
-    // @ts-ignore - TODO: strict typing
-    if (!entry.inputTypes.includes(TYPES.IMAGE)) {
-      // @ts-ignore - TODO: strict typing
-      entry.inputTypes.push(TYPES.IMAGE);
+        if (!(entry as any).inputTypes.includes(TYPES.IMAGE)) {
+            (entry as any).inputTypes.push(TYPES.IMAGE);
     }
   }
   if (hf.pipelineTag === "video-text-to-text" || hf.tags.includes("video")) {
-    // @ts-ignore - TODO: strict typing
-    if (!entry.inputTypes.includes(TYPES.VIDEO)) {
-      // @ts-ignore - TODO: strict typing
-      entry.inputTypes.push(TYPES.VIDEO);
+        if (!(entry as any).inputTypes.includes(TYPES.VIDEO)) {
+            (entry as any).inputTypes.push(TYPES.VIDEO);
     }
   }
   if (hf.pipelineTag === "audio-text-to-text" || hf.tags.includes("audio")) {
-    // @ts-ignore - TODO: strict typing
-    if (!entry.inputTypes.includes(TYPES.AUDIO)) {
-      // @ts-ignore - TODO: strict typing
-      entry.inputTypes.push(TYPES.AUDIO);
+        if (!(entry as any).inputTypes.includes(TYPES.AUDIO)) {
+            (entry as any).inputTypes.push(TYPES.AUDIO);
     }
   }
 
@@ -391,16 +358,13 @@ async function enrichWithHuggingFace(entry: Record<string, unknown>, modelKey: R
  * LM Studio's /api/v1/models returns rich metadata including
  * type, capabilities, quantization, architecture, and load state.
  */
-function normalizeLmStudioModel(raw: Record<string, unknown>) {
+function normalizeLmStudioModel(raw: any) {
   const modelKey = raw.key;
-  // @ts-ignore - TODO: strict typing
-  const capabilities = detectCapabilities(modelKey, raw);
+    const capabilities = detectCapabilities((modelKey as any), raw);
 
   let label = raw.display_name || modelKey;
-  // @ts-ignore - TODO: strict typing
-  if (raw.quantization?.name) {
-    // @ts-ignore - TODO: strict typing
-    label += ` (${raw.quantization.name})`;
+    if ((raw.quantization as any)?.name) {
+        label += ` (${(raw.quantization as any).name})`;
   }
 
   const isEmbedding = raw.type === "embedding";
@@ -419,37 +383,24 @@ function normalizeLmStudioModel(raw: Record<string, unknown>) {
 
   // Capability flags (LLM only)
   if (!isEmbedding) {
-    // @ts-ignore
-    if (capabilities.tools.length > 0) entry.tools = capabilities.tools;
-    // @ts-ignore
-    if (capabilities.thinking) entry.thinking = true;
-    // @ts-ignore
-    if (capabilities.vision) entry.vision = true;
+        if (capabilities.tools.length > 0) (entry as any).tools = capabilities.tools;
+        if (capabilities.thinking) (entry as any).thinking = true;
+        if (capabilities.vision) (entry as any).vision = true;
   }
 
   // Metadata from LM Studio API
-  // @ts-ignore
-  if (raw.max_context_length) entry.contextLength = raw.max_context_length;
-  // @ts-ignore
-  if (raw.size_bytes) entry.size = formatBytes(raw.size_bytes);
-  // @ts-ignore
-  if (raw.params_string) entry.params = raw.params_string;
-  // @ts-ignore
-  if (raw.quantization?.name) entry.quantization = raw.quantization.name;
-  // @ts-ignore
-  if (raw.quantization?.bits_per_weight != null)
-    // @ts-ignore
-    entry.bitsPerWeight = raw.quantization.bits_per_weight;
-  // @ts-ignore
-  if (raw.architecture) entry.architecture = raw.architecture;
-  // @ts-ignore
-  if (raw.publisher) entry.publisher = raw.publisher;
-  // @ts-ignore
-  if (raw.loaded_instances?.length > 0) entry.loaded = true;
+    if (raw.max_context_length) (entry as any).contextLength = raw.max_context_length;
+    if (raw.size_bytes) (entry as any).size = formatBytes((raw.size_bytes as any));
+    if (raw.params_string) (entry as any).params = raw.params_string;
+    if ((raw.quantization as any)?.name) (entry as any).quantization = (raw as any).quantization.name;
+    if ((raw.quantization as any)?.bits_per_weight != null)
+        (entry as any).bitsPerWeight = (raw as any).quantization.bits_per_weight;
+    if (raw.architecture) (entry as any).architecture = raw.architecture;
+    if (raw.publisher) (entry as any).publisher = raw.publisher;
+    if ((raw.loaded_instances as any)?.length > 0) (entry as any).loaded = true;
 
   // Preserve raw for VRAM estimation
-  // @ts-ignore
-  entry._raw = raw;
+    (entry as any)._raw = raw;
 
   return entry;
 }
@@ -458,10 +409,9 @@ function normalizeLmStudioModel(raw: Record<string, unknown>) {
  * Normalize an Ollama model into a canonical model entry.
  * Ollama's /api/tags returns { name, model, size, details: { family, parameter_size, ... } }.
  */
-function normalizeOllamaModel(raw: Record<string, unknown>) {
+function normalizeOllamaModel(raw: any) {
   const name = raw.model || raw.name;
-  // @ts-ignore - TODO: strict typing
-  const capabilities = detectCapabilities(name);
+    const capabilities = detectCapabilities((name as any));
   const details = raw.details || {};
 
   const entry = {
@@ -476,16 +426,11 @@ function normalizeOllamaModel(raw: Record<string, unknown>) {
     pricing: { inputPerMillion: 0, outputPerMillion: 0 },
   };
 
-  // @ts-ignore
-  if (capabilities.tools.length > 0) entry.tools = capabilities.tools;
-  // @ts-ignore
-  if (capabilities.thinking) entry.thinking = true;
-  // @ts-ignore
-  if (details.parameter_size) entry.params = details.parameter_size;
-  // @ts-ignore
-  if (details.family) entry.architecture = details.family;
-  // @ts-ignore
-  if (raw.size) entry.size = formatBytes(raw.size);
+    if (capabilities.tools.length > 0) (entry as any).tools = capabilities.tools;
+    if (capabilities.thinking) (entry as any).thinking = true;
+    if ((details as any).parameter_size) (entry as any).params = (details as any).parameter_size;
+    if ((details as any).family) (entry as any).architecture = (details as any).family;
+    if (raw.size) (entry as any).size = formatBytes((raw.size as any));
 
   return entry;
 }
@@ -495,17 +440,13 @@ function normalizeOllamaModel(raw: Record<string, unknown>) {
  * Both use the OpenAI-compatible /v1/models which returns { id, object, owned_by }.
  * Enriches with name-parsed attributes; HF enrichment is done separately.
  */
-function normalizeOpenAICompatModel(raw: Record<string, unknown>) {
+function normalizeOpenAICompatModel(raw: any) {
   const modelKey = raw.key || raw.id;
-  // @ts-ignore - TODO: strict typing
-  const capabilities = detectCapabilities(modelKey);
+    const capabilities = detectCapabilities((modelKey as any));
 
-  // @ts-ignore - TODO: strict typing
-  const parsedParams = parseParamsFromName(modelKey);
-  // @ts-ignore - TODO: strict typing
-  const parsedQuant = parseQuantFromName(modelKey);
-  // @ts-ignore - TODO: strict typing
-  const parsedPublisher = parsePublisherFromName(modelKey);
+    const parsedParams = parseParamsFromName((modelKey as any));
+    const parsedQuant = parseQuantFromName((modelKey as any));
+    const parsedPublisher = parsePublisherFromName((modelKey as any));
 
   let label = raw.display_name || modelKey;
   if (parsedQuant) label += ` (${parsedQuant})`;
@@ -522,18 +463,12 @@ function normalizeOpenAICompatModel(raw: Record<string, unknown>) {
     pricing: { inputPerMillion: 0, outputPerMillion: 0 },
   };
 
-  // @ts-ignore
-  if (capabilities.tools.length > 0) entry.tools = capabilities.tools;
-  // @ts-ignore
-  if (capabilities.thinking) entry.thinking = true;
-  // @ts-ignore
-  if (capabilities.vision) entry.vision = true;
-  // @ts-ignore
-  if (parsedParams) entry.params = parsedParams;
-  // @ts-ignore
-  if (parsedQuant) entry.quantization = parsedQuant;
-  // @ts-ignore
-  if (parsedPublisher) entry.publisher = parsedPublisher;
+    if (capabilities.tools.length > 0) (entry as any).tools = capabilities.tools;
+    if (capabilities.thinking) (entry as any).thinking = true;
+    if (capabilities.vision) (entry as any).vision = true;
+    if (parsedParams) (entry as any).params = parsedParams;
+    if (parsedQuant) (entry as any).quantization = parsedQuant;
+    if (parsedPublisher) (entry as any).publisher = parsedPublisher;
 
   return entry;
 }
@@ -545,16 +480,13 @@ function normalizeOpenAICompatModel(raw: Record<string, unknown>) {
  * the server level regardless of name. Force "Tool Calling" onto all
  * vLLM models, then delegate the rest to the shared normalizer.
  */
-function normalizeVllmModel(raw: Record<string, unknown>) {
+function normalizeVllmModel(raw: any) {
   const entry = normalizeOpenAICompatModel(raw);
 
   // Ensure Tool Calling is always present for vLLM models
-  // @ts-ignore
-  if (!entry.tools) entry.tools = [];
-  // @ts-ignore
-  if (!entry.tools.includes("Tool Calling")) {
-    // @ts-ignore
-    entry.tools.push("Tool Calling");
+    if (!(entry as any).tools) (entry as any).tools = [];
+    if (!(entry as any).tools.includes("Tool Calling")) {
+        (entry as any).tools.push("Tool Calling");
   }
 
   return entry;
@@ -588,11 +520,9 @@ class LocalProviderGateway {
 
 
    */
-  isLocal(providerOrInstanceId: Record<string, unknown>) {
-    // @ts-ignore - TODO: strict typing
-    if (LOCAL_PROVIDER_TYPES.has(providerOrInstanceId)) return true;
-    // @ts-ignore - TODO: strict typing
-    return isInstance(providerOrInstanceId);
+  isLocal(providerOrInstanceId: any) {
+        if (LOCAL_PROVIDER_TYPES.has((providerOrInstanceId as any))) return true;
+        return isInstance((providerOrInstanceId as any));
   }
 
   /**
@@ -602,11 +532,10 @@ class LocalProviderGateway {
 
 
    */
-  isNativeMCP(providerOrInstanceId: Record<string, unknown>) {
+  isNativeMCP(providerOrInstanceId: any) {
     const type =
       this.getProviderType(providerOrInstanceId) || providerOrInstanceId;
-    // @ts-ignore - TODO: strict typing
-    return NATIVE_MCP_TYPES.has(type);
+        return NATIVE_MCP_TYPES.has((type as any));
   }
 
   /**
@@ -615,11 +544,10 @@ class LocalProviderGateway {
 
 
    */
-  defaultsThinkingEnabled(providerOrInstanceId: Record<string, unknown>) {
+  defaultsThinkingEnabled(providerOrInstanceId: any) {
     const type =
       this.getProviderType(providerOrInstanceId) || providerOrInstanceId;
-    // @ts-ignore - TODO: strict typing
-    return DEFAULT_THINKING_TYPES.has(type);
+        return DEFAULT_THINKING_TYPES.has((type as any));
   }
 
   /**
@@ -627,11 +555,10 @@ class LocalProviderGateway {
 
 
    */
-  supportsModelManagement(providerOrInstanceId: Record<string, unknown>) {
+  supportsModelManagement(providerOrInstanceId: any) {
     const type =
       this.getProviderType(providerOrInstanceId) || providerOrInstanceId;
-    // @ts-ignore - TODO: strict typing
-    return MODEL_MANAGEMENT_TYPES.has(type);
+        return MODEL_MANAGEMENT_TYPES.has((type as any));
   }
 
   /**
@@ -641,12 +568,10 @@ class LocalProviderGateway {
 
 
    */
-  getProviderType(providerOrInstanceId: Record<string, unknown>) {
-    // @ts-ignore - TODO: strict typing
-    if (LOCAL_PROVIDER_TYPES.has(providerOrInstanceId))
+  getProviderType(providerOrInstanceId: any) {
+        if (LOCAL_PROVIDER_TYPES.has((providerOrInstanceId as any)))
       return providerOrInstanceId;
-    // @ts-ignore - TODO: strict typing
-    return getInstanceType(providerOrInstanceId);
+        return getInstanceType((providerOrInstanceId as any));
   }
 
   // ── Instance Enumeration ────────────────────────────────────
@@ -656,15 +581,12 @@ class LocalProviderGateway {
    * @returns {Array<{ id: string, type: string, instanceNumber: number, concurrency: number }>}
    */
   getInstances() {
-    return listInstances().map(
-      // @ts-ignore - TODO: strict typing
-      ({ id, type, instanceNumber, concurrency }: Record<string, unknown>) => ({
-        id,
-        type,
-        instanceNumber,
-        concurrency,
-      }),
-    );
+    return listInstances().map((inst: InstanceEntry) => ({
+      id: inst.id,
+      type: inst.type,
+      instanceNumber: inst.instanceNumber,
+      concurrency: inst.concurrency,
+    }));
   }
 
   /**
@@ -672,9 +594,8 @@ class LocalProviderGateway {
 
 
    */
-  getInstancesByType(type: Record<string, unknown>) {
-    // @ts-ignore - TODO: strict typing
-    return getInstancesByType(type);
+  getInstancesByType(type: any) {
+        return getInstancesByType((type as any));
   }
 
   /**
@@ -691,17 +612,14 @@ class LocalProviderGateway {
    */
   getConcurrencyCapacity() {
     const instances = listInstances();
-    const byType = {};
-    const byInstance = {};
+    const byType: any = {};
+    const byInstance: any = {};
     let total = 0;
 
-    // @ts-ignore
-    for ( const inst of instances) {
+        for ( const inst of instances) {
       total += inst.concurrency;
-      // @ts-ignore
-      byType[inst.type] = (byType[inst.type] || 0) + inst.concurrency;
-      // @ts-ignore
-      byInstance[inst.id] = inst.concurrency;
+            byType[inst.type] = (byType[inst.type] || 0) + inst.concurrency;
+            byInstance[inst.id] = inst.concurrency;
     }
 
     return { total, byType, byInstance };
@@ -718,18 +636,16 @@ class LocalProviderGateway {
 
    * @returns {Promise<{ [instanceId: string]: object[] }>} Normalized models grouped by instance
    */
-  async discoverModels({ timeoutMs = 3000, enrich = true }: Record<string, unknown> = {}) {
+  async discoverModels({ timeoutMs = 3000, enrich = true }: any = {}) {
     const instances = listInstances();
-    const models = {};
+    const models: any = {};
 
     const results = await Promise.allSettled(
-      // @ts-ignore - TODO: strict typing
-      instances.map(async (inst: Record<string, unknown>) => {
+            instances.map(async (inst: any) => {
         const fetched = await this._fetchModelsForInstance(
           inst,
-          // @ts-ignore - TODO: strict typing
-          timeoutMs,
-          enrich,
+                    (timeoutMs as any),
+          (enrich as any),
         );
         return {
           id: inst.id,
@@ -740,8 +656,7 @@ class LocalProviderGateway {
       }),
     );
 
-    // @ts-ignore
-    for ( const result of results) {
+        for ( const result of results) {
       if (result.status === "fulfilled" && result.value.models.length > 0) {
         const {
           id,
@@ -750,13 +665,11 @@ class LocalProviderGateway {
           models: providerModels,
         } = result.value;
         // Tag each model with its instance metadata
-        // @ts-ignore
-        for ( const model of providerModels) {
+                for ( const model of providerModels) {
           model.instanceNumber = instanceNumber;
           model.providerType = type;
         }
-        // @ts-ignore
-        models[id] = providerModels;
+                models[(id as string)] = providerModels;
       }
     }
 
@@ -770,67 +683,57 @@ class LocalProviderGateway {
    * @returns {Promise<object[]>} Normalized model entries
    */
   async discoverModelsForInstance(
-    instanceId: Record<string, unknown>,
-    { timeoutMs = 3000, enrich = true }: Record<string, unknown> = {},
+    instanceId: any,
+    { timeoutMs = 3000, enrich = true }: any = {},
   ) {
-    // @ts-ignore - TODO: strict typing
-    const inst = getInstance(instanceId);
+        const inst = getInstance((instanceId as any));
     if (!inst) {
       logger.warn(`[LocalProviderGateway] Unknown instance: ${instanceId}`);
       return [];
     }
-    // @ts-ignore - TODO: strict typing
-    return this._fetchModelsForInstance(inst, timeoutMs, enrich);
+        return this._fetchModelsForInstance((inst as any), (timeoutMs as any), (enrich as any));
   }
 
   /**
    * Internal: Fetch, normalize, and optionally enrich models for an instance.
    * @private
    */
-  async _fetchModelsForInstance(inst: Record<string, unknown>, timeoutMs: Record<string, unknown>, enrich: Record<string, unknown>) {
+  async _fetchModelsForInstance(inst: any, timeoutMs: any, enrich: any) {
     try {
-      // @ts-ignore - TODO: strict typing
-      const provider = getProvider(inst.id);
+            const provider = getProvider((inst.id as any));
       if (!provider?.listModels) return [];
 
       const rawResult = (await withTimeoutFallback(
         provider.listModels(),
-        // @ts-ignore - TODO: strict typing
-        timeoutMs,
+                (timeoutMs as any),
         { models: [] },
       )) as ListModelsResponse | null | undefined;
 
       const rawModels = rawResult?.models || rawResult?.data || [];
       if (!Array.isArray(rawModels) || rawModels.length === 0) return [];
 
-      // @ts-ignore
-      const normalize = NORMALIZER_BY_TYPE[inst.type];
+            const normalize = (NORMALIZER_BY_TYPE as any)[((inst as string) as any).type];
       if (!normalize) return [];
 
       // Normalize all models
-      let normalized = rawModels.map((raw: Record<string, unknown>) => normalize(raw));
+      let normalized = rawModels.map((raw: any) => normalize(raw));
 
       // HuggingFace enrichment for vLLM/llama.cpp (their model IDs are HF-style)
-      // @ts-ignore - TODO: strict typing
-      if (enrich && HF_ENRICHED_TYPES.has(inst.type)) {
+            if (enrich && HF_ENRICHED_TYPES.has((inst.type as any))) {
         const enriched = await Promise.allSettled(
-          normalized.map((entry: Record<string, unknown>) =>
-            // @ts-ignore - TODO: strict typing
-            enrichWithHuggingFace(entry, entry.name),
+          normalized.map((entry: any) =>
+                        enrichWithHuggingFace(entry, (entry.name as any)),
           ),
         );
-        // @ts-ignore - TODO: strict typing
-        normalized = enriched.map((r: Record<string, unknown>, i: Record<string, unknown>) =>
-          // @ts-ignore - TODO: strict typing
+        normalized = enriched.map((r: any, i: number) =>
           r.status === "fulfilled" ? r.value : normalized[i],
         );
       }
 
       return normalized;
-    } catch (error: unknown) {
+    } catch (error: any) {
       logger.warn(
-        // @ts-ignore - TODO: strict typing
-        `[LocalProviderGateway] Failed to discover models for ${inst.id}: ${error.message}`,
+                `[LocalProviderGateway] Failed to discover models for ${inst.id}: ${(error as Error).message}`,
       );
       return [];
     }
@@ -845,14 +748,12 @@ class LocalProviderGateway {
 
    * @returns {Promise<Array<{ instanceId: string, model: object }>>}
    */
-  async searchModels(filter: Record<string, unknown> = {}) {
+  async searchModels(filter: any = {}) {
     const allModels = await this.discoverModels();
-    const results: Record<string, unknown>[] = [];
+    const results: any[] = [];
 
-    // @ts-ignore
-    for ( const [instanceId, models] of Object.entries(allModels)) {
-      // @ts-ignore
-      for ( const model of models) {
+        for ( const [instanceId, models] of Object.entries(allModels)) {
+            for ( const model of (models as any)) {
         if (!this._matchesFilter(model, filter)) continue;
         results.push({ instanceId, model });
       }
@@ -865,26 +766,20 @@ class LocalProviderGateway {
    * Check if a model entry matches the given filter criteria.
    * @private
    */
-  _matchesFilter(model: Record<string, unknown>, filter: Record<string, unknown>) {
+  _matchesFilter(model: any, filter: any) {
     if (filter.thinking && !model.thinking) return false;
-    // @ts-ignore - TODO: strict typing
-    if (filter.functionCalling && !model.tools?.includes("Tool Calling"))
+        if (filter.functionCalling && !(model.tools as any)?.includes("Tool Calling"))
       return false;
     if (filter.vision && !model.vision) return false;
-    // @ts-ignore - TODO: strict typing
-    if (filter.video && !model.inputTypes?.includes(TYPES.VIDEO)) return false;
-    // @ts-ignore - TODO: strict typing
-    if (filter.audio && !model.inputTypes?.includes(TYPES.AUDIO)) return false;
+        if (filter.video && !(model.inputTypes as any)?.includes(TYPES.VIDEO)) return false;
+        if (filter.audio && !(model.inputTypes as any)?.includes(TYPES.AUDIO)) return false;
     if (filter.modelType && model.modelType !== filter.modelType) return false;
     if (filter.loaded === true && !model.loaded) return false;
     if (filter.loaded === false && model.loaded) return false;
     if (filter.query) {
-      // @ts-ignore - TODO: strict typing
-      const searchQuery = filter.query.toLowerCase();
-      // @ts-ignore - TODO: strict typing
-      const nameMatch = model.name?.toLowerCase().includes(searchQuery);
-      // @ts-ignore - TODO: strict typing
-      const labelMatch = model.label?.toLowerCase().includes(searchQuery);
+            const searchQuery = (filter.query as any).toLowerCase();
+            const nameMatch = (model.name as any)?.toLowerCase().includes(searchQuery);
+            const labelMatch = (model.label as any)?.toLowerCase().includes(searchQuery);
       if (!nameMatch && !labelMatch) return false;
     }
     return true;
@@ -904,8 +799,8 @@ class LocalProviderGateway {
     let loadedModels = 0;
     let embeddingModels = 0;
     let conversationModels = 0;
-    const modelsByInstance = {};
-    const modelsByType = {};
+    const modelsByInstance: any = {};
+    const modelsByType: any = {};
     const capabilityDistribution = {
       thinking: 0,
       functionCalling: 0,
@@ -914,17 +809,13 @@ class LocalProviderGateway {
       audio: 0,
     };
 
-    // @ts-ignore
-    for ( const [instanceId, models] of Object.entries(allModels)) {
-      // @ts-ignore
-      modelsByInstance[instanceId] = models.length;
+        for ( const [instanceId, models] of Object.entries(allModels)) {
+            modelsByInstance[instanceId] = (models as any).length;
       const inst = getInstance(instanceId);
-      const type = inst?.type || "unknown";
-      // @ts-ignore
-      modelsByType[type] = (modelsByType[type] || 0) + models.length;
+      const type = inst?.type || "any";
+            modelsByType[type] = (modelsByType[type] || 0) + (models as any).length;
 
-      // @ts-ignore
-      for ( const model of models) {
+            for ( const model of (models as any)) {
         totalModels++;
         if (model.loaded) loadedModels++;
         if (model.modelType === "embed") embeddingModels++;
@@ -963,24 +854,21 @@ class LocalProviderGateway {
 
    * @returns {Promise<{ instanceId: string, type: string, provider: object } | null>}
    */
-  async resolveProvider(modelName: Record<string, unknown>, { timeoutMs = 3000 }: Record<string, unknown> = {}) {
+  async resolveProvider(modelName: any, { timeoutMs = 3000 }: any = {}) {
     const instances = listInstances();
 
     const checks = await Promise.allSettled(
-      // @ts-ignore - TODO: strict typing
-      instances.map(async (inst: Record<string, unknown>) => {
-        // @ts-ignore - TODO: strict typing
-        const provider = getProvider(inst.id);
+            instances.map(async (inst: any) => {
+                const provider = getProvider((inst.id as any));
         if (!provider?.listModels) return null;
 
         const result = (await withTimeoutFallback(
           provider.listModels(),
-          // @ts-ignore - TODO: strict typing
-          timeoutMs,
+                    (timeoutMs as any),
           { models: [] },
         )) as ListModelsResponse | null | undefined;
         const models = result?.models || result?.data || [];
-        const found = models.some((m: Record<string, unknown>) => {
+        const found = models.some((m: any) => {
           const key = m.key || m.id || m.model || m.name;
           return key === modelName;
         });
@@ -988,15 +876,13 @@ class LocalProviderGateway {
       }),
     );
 
-    // @ts-ignore
-    for ( const result of checks) {
+        for ( const result of checks) {
       if (result.status === "fulfilled" && result.value) {
         const inst = result.value;
         return {
           instanceId: inst.id,
           type: inst.type,
-          // @ts-ignore - TODO: strict typing
-          provider: getProvider(inst.id),
+                    provider: getProvider((inst.id as any)),
         };
       }
     }
@@ -1016,23 +902,19 @@ class LocalProviderGateway {
 
    * @returns {Promise<{ [instanceId: string]: { ok: boolean, status: string, type: string, models?: number } }>}
    */
-  // @ts-ignore - TODO: strict typing
-  async checkHealth(timeoutMs: Record<string, unknown> = 3000) {
+    async checkHealth(timeoutMs: any = 3000) {
     const instances = listInstances();
-    const health = {};
+    const health: any = {};
 
     const results = await Promise.allSettled(
-      // @ts-ignore - TODO: strict typing
-      instances.map(async (inst: Record<string, unknown>) => {
-        // @ts-ignore - TODO: strict typing
-        const provider = getProvider(inst.id);
+            instances.map(async (inst: any) => {
+                const provider = getProvider((inst.id as any));
 
         // Prefer native health check if available
         if (provider?.checkHealth) {
           const result = await withTimeoutFallback(
             provider.checkHealth(),
-            // @ts-ignore - TODO: strict typing
-            timeoutMs,
+                        (timeoutMs as any),
             { ok: false, status: "timeout" },
           );
           return {
@@ -1047,8 +929,7 @@ class LocalProviderGateway {
           try {
             const result = (await withTimeoutFallback(
               provider.listModels(),
-              // @ts-ignore - TODO: strict typing
-              timeoutMs,
+                            (timeoutMs as any),
               null,
             )) as ListModelsResponse | null | undefined;
             if (!result) {
@@ -1067,14 +948,13 @@ class LocalProviderGateway {
               status: "ok",
               models: models.length,
             };
-          } catch (error: unknown) {
+          } catch (error: any) {
             return {
               id: inst.id,
               type: inst.type,
               ok: false,
               status: "unreachable",
-              // @ts-ignore - TODO: strict typing
-              error: error.message,
+                            error: (error as Error).message,
             };
           }
         }
@@ -1083,12 +963,10 @@ class LocalProviderGateway {
       }),
     );
 
-    // @ts-ignore
-    for ( const result of results) {
+        for ( const result of results) {
       if (result.status === "fulfilled") {
         const { id, ...status } = result.value;
-        // @ts-ignore
-        health[id] = status;
+                health[(id as string)] = status;
       }
     }
 
@@ -1105,19 +983,17 @@ class LocalProviderGateway {
 
    * @returns {{ gpuGiB: number, totalGiB: number, cpuOffloaded: boolean, archParams: object, totalLayers: number } | null}
    */
-  estimateVRAM(modelData: Record<string, unknown>, options: Record<string, unknown> = {}) {
+  estimateVRAM(modelData: any, options: any = {}) {
     if (!modelData) return null;
 
     const sizeBytes = modelData.size_bytes || 0;
     if (!sizeBytes) return null;
 
-    // @ts-ignore - TODO: strict typing
-    const bpw = modelData.quantization?.bits_per_weight || 4;
+        const bpw = (modelData.quantization as any)?.bits_per_weight || 4;
     const archParams = resolveArchParams(
-      // @ts-ignore - TODO: strict typing
-      modelData.architecture,
-      modelData.params_string,
-      sizeBytes,
+            (modelData.architecture as any),
+      (modelData.params_string as any),
+      (sizeBytes as any),
       bpw,
     );
     const totalLayers = archParams.layers;
@@ -1125,20 +1001,13 @@ class LocalProviderGateway {
     const memory = estimateMemory({
       sizeBytes,
       archParams,
-      // @ts-ignore
-      gpuLayers: options.gpuLayers ?? totalLayers,
-      // @ts-ignore
-      contextLength: options.contextLength ?? 4096,
-      // @ts-ignore
-      offloadKvCache: options.offloadKvCache ?? true,
-      // @ts-ignore
-      flashAttention: options.flashAttention ?? true,
-      // @ts-ignore - TODO: strict typing
-      vision: modelData.capabilities?.vision || false,
-      // @ts-ignore
-      gpuTotalGiB: options.gpuTotalGiB,
-      // @ts-ignore
-      gpuBaselineGiB: options.gpuBaselineGiB || 0,
+            gpuLayers: options.gpuLayers ?? totalLayers,
+            contextLength: options.contextLength ?? 4096,
+            offloadKvCache: options.offloadKvCache ?? true,
+            flashAttention: options.flashAttention ?? true,
+            vision: (modelData.capabilities as any)?.vision || false,
+            gpuTotalGiB: options.gpuTotalGiB,
+            gpuBaselineGiB: options.gpuBaselineGiB || 0,
     });
 
     return {
@@ -1155,14 +1024,14 @@ class LocalProviderGateway {
 
 
    */
-  async estimateVRAMForModel(instanceId: Record<string, unknown>, modelKey: Record<string, unknown>, options: Record<string, unknown> = {}) {
+  async estimateVRAMForModel(instanceId: any, modelKey: any, options: any = {}) {
     const provider = getProvider(instanceId);
     if (!provider?.listModels) return null;
 
     const result = await provider.listModels();
     const allModels = result?.data || result?.models || [];
     const modelData = allModels.find(
-      (m: Record<string, unknown>) =>
+      (m: any) =>
         m.id === modelKey || m.path === modelKey || m.key === modelKey,
     );
 
@@ -1179,7 +1048,7 @@ class LocalProviderGateway {
 
 
    */
-  async loadModel(instanceId: Record<string, unknown>, modelKey: Record<string, unknown>, options: Record<string, unknown> = {}, signal: Record<string, unknown>) {
+  async loadModel(instanceId: any, modelKey: any, options: any = {}, signal: any) {
     const provider = getProvider(instanceId);
     if (!provider?.loadModel) {
       throw new Error(`Provider ${instanceId} does not support model loading`);
@@ -1196,11 +1065,11 @@ class LocalProviderGateway {
    * @returns {Promise<{ alreadyLoaded: boolean, contextLength: number|null }>}
    */
   async ensureModelLoaded(
-    instanceId: Record<string, unknown>,
-    modelKey: Record<string, unknown>,
-    options: Record<string, unknown> = {},
-    signal: Record<string, unknown>,
-    onStatus: Record<string, unknown>,
+    instanceId: any,
+    modelKey: any,
+    options: any = {},
+    signal: any,
+    onStatus: any,
   ) {
     const provider = getProvider(instanceId);
     if (!provider?.ensureModelLoaded) {
@@ -1217,7 +1086,7 @@ class LocalProviderGateway {
 
 
    */
-  async unloadModel(instanceId: Record<string, unknown>, modelInstanceId: Record<string, unknown>) {
+  async unloadModel(instanceId: any, modelInstanceId: any) {
     const provider = getProvider(instanceId);
     if (!provider?.unloadModel) {
       throw new Error(
@@ -1242,16 +1111,14 @@ class LocalProviderGateway {
 
    * @returns {object} The mutated options object (for chaining)
    */
-  applyLocalDefaults(providerName: Record<string, unknown>, options: Record<string, unknown>, clientParams: Record<string, unknown> = {}) {
+  applyLocalDefaults(providerName: any, options: any, clientParams: any = {}) {
     if (!this.isLocal(providerName)) return options;
 
     // Default thinkingEnabled=true for providers that emit <think> tags,
     // but only when the client didn't explicitly send a value.
-    // @ts-ignore
-    if (
+        if (
       this.defaultsThinkingEnabled(providerName) &&
-      // @ts-ignore
-      clientParams.thinkingEnabled === undefined
+            clientParams.thinkingEnabled === undefined
     ) {
       options.thinkingEnabled = true;
     }
@@ -1272,7 +1139,7 @@ class LocalProviderGateway {
 
    * @returns {Promise<{ text: string, thinking: string|null, usage: object }>}
    */
-  async generateText(messages: Record<string, unknown>, model: Record<string, unknown>, options: Record<string, unknown> = {}, instanceId: Record<string, unknown>) {
+  async generateText(messages: any, model: any, options: any = {}, instanceId: any) {
     const provider = await this._getProviderForModel(model, instanceId);
     return provider.generateText(messages, model, options);
   }
@@ -1285,10 +1152,10 @@ class LocalProviderGateway {
 
    */
   async *generateTextStream(
-    messages: Record<string, unknown>,
-    model: Record<string, unknown>,
-    options: Record<string, unknown> = {},
-    instanceId: Record<string, unknown>,
+    messages: any,
+    model: any,
+    options: any = {},
+    instanceId: any,
   ) {
     const provider = await this._getProviderForModel(model, instanceId);
     yield* provider.generateTextStream(messages, model, options);
@@ -1303,9 +1170,9 @@ class LocalProviderGateway {
    */
   async generateEmbedding(
     content: string,
-    model: Record<string, unknown>,
-    options: Record<string, unknown> = {},
-    instanceId: Record<string, unknown>,
+    model: any,
+    options: any = {},
+    instanceId: any,
   ) {
     const provider = await this._getProviderForModel(model, instanceId);
     if (!provider.generateEmbedding) {
@@ -1322,11 +1189,11 @@ class LocalProviderGateway {
    * @returns {Promise<{ text: string, usage: object }>}
    */
   async captionImage(
-    images: Record<string, unknown>,
-    prompt: Record<string, unknown>,
-    model: Record<string, unknown>,
-    systemPrompt: Record<string, unknown>,
-    instanceId: Record<string, unknown>,
+    images: any,
+    prompt: any,
+    model: any,
+    systemPrompt: any,
+    instanceId: any,
   ) {
     const provider = await this._getProviderForModel(model, instanceId);
     if (!provider.captionImage) {
@@ -1341,7 +1208,7 @@ class LocalProviderGateway {
    * Get the provider for a model, either by explicit instance or auto-routing.
    * @private
    */
-  async _getProviderForModel(model: Record<string, unknown>, instanceId: Record<string, unknown>) {
+  async _getProviderForModel(model: any, instanceId: any) {
     if (instanceId) {
       return getProvider(instanceId);
     }
@@ -1351,8 +1218,7 @@ class LocalProviderGateway {
       throw new Error(
         `No local provider found serving model "${model}". ` +
           `Available instances: ${listInstances()
-            // @ts-ignore - TODO: strict typing
-            .map((i: Record<string, unknown>) => i.id)
+            .map((i: InstanceEntry) => i.id)
             .join(", ")}`,
       );
     }

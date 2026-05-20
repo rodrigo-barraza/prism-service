@@ -18,7 +18,7 @@ export function markGenerating(
   opts: Record<string, unknown>,
 ) {
   if (!conversationId) return;
-  ConversationService.setGenerating(
+  (ConversationService as any).setGenerating(
     conversationId,
     project,
     username,
@@ -52,7 +52,7 @@ export function appendAndFinalize(
 ) {
   if (!conversationId) return;
 
-  ConversationService.appendMessages(
+  (ConversationService as any).appendMessages(
     conversationId,
     project,
     username,
@@ -61,12 +61,11 @@ export function appendAndFinalize(
     opts,
   )
     .then(() =>
-      ConversationService.setGenerating(
+      (ConversationService as any).setGenerating(
         conversationId,
         project,
         username,
-        // @ts-ignore - TODO: strict typing
-        false,
+                (false as any),
         opts,
       ),
     )
@@ -78,12 +77,11 @@ export function appendAndFinalize(
 
       // Always clear isGenerating even on failure — prevents sessions
       // from being permanently stuck as "generating" on the next page load.
-      ConversationService.setGenerating(
+      (ConversationService as any).setGenerating(
         conversationId,
         project,
         username,
-        // @ts-ignore - TODO: strict typing
-        false,
+                (false as any),
         opts,
       ).catch((clearErr: Record<string, unknown>) =>
         logger.error(

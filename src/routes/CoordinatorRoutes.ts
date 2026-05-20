@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response, NextFunction } from "express";
 import CoordinatorService from "../services/CoordinatorService.ts";
@@ -39,8 +38,7 @@ router.post(
       });
       res.json(plan);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[coordinator] PLAN ${error.message}`);
+            logger.error(`[coordinator] PLAN ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -74,8 +72,7 @@ router.post(
 
       res.json(result);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[coordinator] EXECUTE ${error.message}`);
+            logger.error(`[coordinator] EXECUTE ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -86,8 +83,7 @@ router.post(
  * Get the current status of a coordinator task.
  */
 router.get("/status/:taskId", (req: Request, res: Response) => {
-  // @ts-ignore - TODO: strict typing
-  const status = CoordinatorService.getStatus(req.params.taskId);
+    const status = CoordinatorService.getStatus((req.params.taskId as any));
   if (!status) {
     return res.status(404).json({ error: "Task not found" });
   }
@@ -110,15 +106,13 @@ router.post(
   "/approve-merge/:taskId",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const result = await CoordinatorService.approveMerge(req.params.taskId);
+            const result = await CoordinatorService.approveMerge((req.params.taskId as any));
       if (result.error) {
         return res.status(400).json(result);
       }
       res.json(result);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[coordinator] APPROVE-MERGE ${error.message}`);
+            logger.error(`[coordinator] APPROVE-MERGE ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -132,15 +126,13 @@ router.post(
   "/abort/:taskId",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const result = await CoordinatorService.abort(req.params.taskId);
+            const result = await CoordinatorService.abort((req.params.taskId as any));
       if (result.error) {
         return res.status(400).json(result);
       }
       res.json(result);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[coordinator] ABORT ${error.message}`);
+            logger.error(`[coordinator] ABORT ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -169,8 +161,7 @@ router.get(
       try {
         const { default: MongoWrapper } =
           await import("../wrappers/MongoWrapper.js");
-        // @ts-ignore
-        const { MONGO_DB_NAME } = await import("../../config.js");
+                const { MONGO_DB_NAME } = await import("../../config.js");
         const { COLLECTIONS } = await import("../constants.js");
         const col = MongoWrapper.getCollection(
           MONGO_DB_NAME,
@@ -185,8 +176,7 @@ router.get(
         }
       } catch (error: unknown) {
         logger.warn(
-          // @ts-ignore - TODO: strict typing
-          `[coordinator] Failed to load persisted workers: ${error.message}`,
+                    `[coordinator] Failed to load persisted workers: ${(error as Error).message}`,
         );
       }
     }
@@ -221,8 +211,7 @@ router.post(
  * Get the status of a specific chat-spawned worker.
  */
 router.get("/workers/:agentId", (req: Request, res: Response) => {
-  // @ts-ignore - TODO: strict typing
-  const status = CoordinatorService.getWorkerStatus(req.params.agentId);
+    const status = CoordinatorService.getWorkerStatus((req.params.agentId as any));
   if (!status) {
     return res.status(404).json({ error: "Worker not found" });
   }

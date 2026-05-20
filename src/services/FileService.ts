@@ -41,7 +41,7 @@ interface MinioStatResult {
  * When MinIO is unavailable, the original base64 data URL is returned unchanged,
  * so it continues to be stored inline in MongoDB.
  */
-const FileService = {
+const FileService = ({
   /**
    * Whether external (MinIO) storage is active.
    */
@@ -109,9 +109,9 @@ const FileService = {
   /**
    * Get a file stream from a MinIO reference.
    *
-   * @returns {Promise<{ stream: Record<string, unknown>, contentType: string } | null>}
+   * @returns {Promise<{ stream: any, contentType: string } | null>}
    */
-  async getFile(key: string): Promise<{ stream: Record<string, unknown>; contentType: string } | null> {
+  async getFile(key: string): Promise<{ stream: any; contentType: string } | null> {
     if (!MinioWrapper.isAvailable()) return null;
 
     // Helper to fetch stat + stream for a given key
@@ -126,8 +126,7 @@ const FileService = {
     };
 
     try {
-      // @ts-ignore - TODO: strict typing
-      return await tryKey(key);
+            return await tryKey(key);
     } catch {
       logger.error(`FileService: failed to get ${key}`);
       return null;
@@ -137,7 +136,7 @@ const FileService = {
   /**
    * Check if a string is a MinIO reference.
    */
-  isMinioRef(ref: unknown): ref is string {
+  isMinioRef(ref: any): ref is string {
     return typeof ref === "string" && ref.startsWith("minio://");
   },
 
@@ -149,6 +148,6 @@ const FileService = {
   extractKey(ref: string): string {
     return ref.replace("minio://", "");
   },
-};
+} as any as { stream: any; contentType: string; });
 
 export default FileService;

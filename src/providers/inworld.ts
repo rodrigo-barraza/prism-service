@@ -2,7 +2,6 @@ import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
 import { Readable } from "stream";
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
-// @ts-ignore
 import { INWORLD_BASIC } from "../../config.ts";
 import { DEFAULT_VOICES, getDefaultModels, TYPES } from "../config.ts";
 
@@ -20,9 +19,8 @@ function getApiKey() {
  * Each line is a JSON object with `result.audioContent` (base64) and
  * optionally `result.timestampInfo`.
  */
-async function* parseNdjsonStream(body: Record<string, unknown>) {
-  // @ts-ignore - TODO: strict typing
-  const reader = body.getReader();
+async function* parseNdjsonStream(body: any) {
+    const reader = (body as any).getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
@@ -35,17 +33,15 @@ async function* parseNdjsonStream(body: Record<string, unknown>) {
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
 
-      // @ts-ignore
-      for ( const line of lines) {
+            for ( const line of lines) {
         if (!line.trim()) continue;
         try {
           const chunk = JSON.parse(line);
           if (chunk.result) {
             yield chunk.result;
           }
-        } catch (error: unknown) {
-          // @ts-ignore - TODO: strict typing
-          logger.warn(`[Inworld] NDJSON parse error: ${error.message}`);
+        } catch (error: any) {
+                    logger.warn(`[Inworld] NDJSON parse error: ${(error as Error).message}`);
         }
       }
     }
@@ -54,7 +50,7 @@ async function* parseNdjsonStream(body: Record<string, unknown>) {
   }
 }
 
-const inworldProvider = {
+const inworldProvider = ({
   name: "inworld",
 
   /**
@@ -66,19 +62,16 @@ const inworldProvider = {
    * @returns {{ stream: Readable, contentType: string }}
    */
   async generateSpeech(
-    text: Record<string, unknown>,
-    // @ts-ignore - TODO: strict typing
-    voice: Record<string, unknown> = DEFAULT_VOICES.inworld,
+    text: any,
+        voice: any = DEFAULT_VOICES.inworld,
     options: ProviderOptions = {},
   ) {
-    // @ts-ignore - TODO: strict typing
-    logger.provider("Inworld", `generateSpeech voice=${voice}`);
+        (logger.provider as any)(("Inworld" as any), (`generateSpeech voice=${voice}` as any));
 
     try {
       const apiKey = getApiKey();
       const model =
-        // @ts-ignore
-        options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld;
+                options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld;
 
       const response = await fetch(INWORLD_TTS_URL, {
         method: "POST",
@@ -93,8 +86,7 @@ const inworldProvider = {
             audio_encoding: "MP3",
             sample_rate_hertz: 24000,
           },
-          // @ts-ignore
-          temperature: options.temperature ?? 1.1,
+                    temperature: options.temperature ?? 1.1,
           model_id: model,
         }),
       });
@@ -108,8 +100,7 @@ const inworldProvider = {
 
       // Collect base64 audio chunks from the NDJSON stream into a Node Readable
       async function* audioChunks() {
-        // @ts-ignore
-        for await ( const result of parseNdjsonStream(response.body)) {
+                for await ( const result of parseNdjsonStream((response.body as any))) {
           if (result.audioContent) {
             yield Buffer.from(result.audioContent, "base64");
           }
@@ -118,10 +109,9 @@ const inworldProvider = {
 
       const stream = Readable.from(audioChunks());
       return { stream, contentType: "audio/mpeg" };
-    } catch (error: unknown) {
+    } catch (error: any) {
       if (error instanceof ProviderError) throw error;
-      // @ts-ignore - TODO: strict typing
-      throw new ProviderError("inworld", error.message, 500, error);
+            throw new ProviderError("inworld", (error as Error).message, 500, error);
     }
   },
 
@@ -135,24 +125,20 @@ const inworldProvider = {
    * @yields {Buffer} PCM audio chunks.
    */
   async *generateSpeechStream(
-    textStream: Record<string, unknown>,
-    // @ts-ignore - TODO: strict typing
-    voice: Record<string, unknown> = DEFAULT_VOICES.inworld,
+    textStream: any,
+        voice: any = DEFAULT_VOICES.inworld,
     options: ProviderOptions = {},
   ) {
-    // @ts-ignore - TODO: strict typing
-    logger.provider("Inworld", `generateSpeechStream voice=${voice}`);
+        (logger.provider as any)(("Inworld" as any), (`generateSpeechStream voice=${voice}` as any));
 
     const apiKey = getApiKey();
     const model =
-      // @ts-ignore
-      options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld;
+            options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld;
 
     // Accumulate all text from the async iterator first, since
     // Inworld's API is request-level streaming (not input-level).
     let fullText = "";
-    // @ts-ignore
-    for await ( const chunk of textStream) {
+        for await ( const chunk of textStream) {
       fullText += chunk;
     }
 
@@ -176,8 +162,7 @@ const inworldProvider = {
             audio_encoding: "LINEAR16",
             sample_rate_hertz: 24000,
           },
-          // @ts-ignore
-          temperature: options.temperature ?? 1.1,
+                    temperature: options.temperature ?? 1.1,
           model_id: model,
           timestampType: "WORD",
         }),
@@ -191,22 +176,19 @@ const inworldProvider = {
         );
       }
 
-      // @ts-ignore
-      for await ( const result of parseNdjsonStream(response.body)) {
+            for await ( const result of parseNdjsonStream((response.body as any))) {
         if (result.audioContent) {
           yield Buffer.from(result.audioContent, "base64");
         }
       }
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      if (error.name === "AbortError") return;
+    } catch (error: any) {
+            if ((error as Error).name === "AbortError") return;
       if (error instanceof ProviderError) throw error;
-      // @ts-ignore - TODO: strict typing
-      throw new ProviderError("inworld", error.message, 500, error);
+            throw new ProviderError("inworld", (error as Error).message, 500, error);
     } finally {
       controller.abort();
     }
   },
-};
+} as any);
 
 export default inworldProvider;

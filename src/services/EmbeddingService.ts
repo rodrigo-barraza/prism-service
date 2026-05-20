@@ -1,4 +1,3 @@
-// @ts-ignore
 import { formatCostTag, roundMs } from "@rodrigo-barraza/utilities-library";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
@@ -29,20 +28,17 @@ const EmbeddingService = {
 
    * @returns {Promise<{ embedding: number[], dimensions: number, provider: string, model: string }>}
    */
-  async generate(content: string, options: Record<string, unknown> = {}) {
+  async generate(content: string, options: any = {}) {
     const requestId = crypto.randomUUID();
     const requestStart = performance.now();
     // Resolve defaults from settings when no explicit provider/model given
     const embedConfig = await getEmbeddingConfig();
-    // @ts-ignore
-    const providerName = options.provider || embedConfig.provider;
+        const providerName = options.provider || embedConfig.provider;
     const resolvedModel =
-      // @ts-ignore
-      options.model ||
-      // @ts-ignore
-      getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)?.[providerName] ||
+            options.model ||
+            getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)?.[providerName] ||
       embedConfig.model;
-    let result: Record<string, unknown>;
+    let result: any;
     let success = true;
     let errorMessage = null;
     try {
@@ -54,105 +50,80 @@ const EmbeddingService = {
           400,
         );
       }
-      const providerOptions = {};
-      // @ts-ignore
-      if (options.taskType) providerOptions.taskType = options.taskType;
-      // @ts-ignore
-      if (options.dimensions) providerOptions.dimensions = options.dimensions;
+      const providerOptions: any = {};
+            if (options.taskType) providerOptions.taskType = options.taskType;
+            if (options.dimensions) providerOptions.dimensions = options.dimensions;
       result = await provider.generateEmbedding(
         content,
         resolvedModel,
         providerOptions,
       );
-    } catch (error: unknown) {
+    } catch (error: any) {
       success = false;
-      // @ts-ignore - TODO: strict typing
-      errorMessage = error.message;
+            errorMessage = (error as Error).message;
       throw error;
     } finally {
       const totalSec = (performance.now() - requestStart) / 1000;
       // Cost estimation
-      // @ts-ignore
-      const pricing = getPricing(TYPES.TEXT, TYPES.EMBEDDING)[resolvedModel];
+            const pricing = getPricing(TYPES.TEXT, TYPES.EMBEDDING)[resolvedModel];
       const approxInputTokens =
-        // @ts-ignore - TODO: strict typing
-        typeof content === "string" ? estimateTokens(content) : 100;
+                typeof content === "string" ? estimateTokens((content as any)) : 100;
       let estimatedCost = null;
       if (pricing?.inputPerMillion) {
         estimatedCost =
           (approxInputTokens / 1_000_000) * pricing.inputPerMillion;
       }
-      // @ts-ignore
-      const source = options.source || "unknown";
+            const source = options.source || "any";
       // Determine input content type for payload logging
       const contentType =
         typeof content === "string"
           ? "text"
           : Array.isArray(content)
             ? "multimodal"
-            : "unknown";
+            : "any";
       const inputCharacters = typeof content === "string" ? content.length : 0;
       logger.request(
-        // @ts-ignore
-        options.project || null,
-        // @ts-ignore
-        options.username || "system",
-        // @ts-ignore
-        options.clientIp || null,
+                (options.project || null as any),
+                options.username || "system",
+                options.clientIp || null,
         `[embed] ${providerName} model=${resolvedModel} source=${source} — ` +
           (success
-            // @ts-ignore - TODO: strict typing
-            ? `dims: ${result?.dimensions}, total: ${totalSec.toFixed(2)}s`
+                        ? `dims: ${result?.dimensions}, total: ${totalSec.toFixed(2)}s`
             : `FAILED: ${errorMessage}`) +
           formatCostTag(estimatedCost),
       );
       RequestLogger.log({
         requestId,
-        // @ts-ignore
-        endpoint: options.endpoint || null,
+                endpoint: options.endpoint || null,
         operation: `embed:${source}`,
-        // @ts-ignore
-        project: options.project || null,
-        // @ts-ignore
-        username: options.username || "system",
-        // @ts-ignore
-        clientIp: options.clientIp || null,
-        // @ts-ignore
-        agent: options.agent || null,
+                project: options.project || null,
+                username: options.username || "system",
+                clientIp: options.clientIp || null,
+                agent: options.agent || null,
         provider: providerName,
         model: resolvedModel,
-        // @ts-ignore
-        traceId: options.traceId || null,
-        // @ts-ignore
-        agentSessionId: options.agentSessionId || null,
+                traceId: options.traceId || null,
+                agentSessionId: options.agentSessionId || null,
         success,
         errorMessage,
         estimatedCost,
         inputTokens: approxInputTokens,
         outputTokens: 0, // Embeddings produce vectors, not output tokens
-        // @ts-ignore - TODO: strict typing
-        tokensPerSec: calculateTokensPerSec(approxInputTokens, totalSec),
+                tokensPerSec: calculateTokensPerSec((approxInputTokens as any), (totalSec as any)),
         inputCharacters,
         totalTime: roundMs(totalSec),
         modalities: (() => {
           const mod = { embeddingOut: true };
           if (typeof content === "string") {
-            // @ts-ignore
-            mod.textIn = true;
+                        (mod as any).textIn = true;
           } else if (Array.isArray(content)) {
-            // @ts-ignore
-            for ( const part of content) {
-              // @ts-ignore
-              if (part.text) mod.textIn = true;
+                        for ( const part of content) {
+                            if (part.text) (mod as any).textIn = true;
               const mime = part.inlineData?.mimeType || "";
-              // @ts-ignore
-              if (mime.startsWith("image/")) mod.imageIn = true;
-              // @ts-ignore
-              else if (mime.startsWith("audio/")) mod.audioIn = true;
-              // @ts-ignore
-              else if (mime.startsWith("video/")) mod.videoIn = true;
-              // @ts-ignore
-              else if (mime === "application/pdf") mod.docIn = true;
+                            if (mime.startsWith("image/")) (mod as any).imageIn = true;
+                            else if (mime.startsWith("audio/")) (mod as any).audioIn = true;
+                            else if (mime.startsWith("video/")) (mod as any).videoIn = true;
+                            else if (mime === "application/pdf") (mod as any).docIn = true;
             }
           }
           return mod;
@@ -160,20 +131,16 @@ const EmbeddingService = {
         requestPayload: {
           source,
           contentType,
-          // @ts-ignore
-          ...(options.taskType ? { taskType: options.taskType } : {}),
-          // @ts-ignore
-          ...(options.dimensions ? { dimensions: options.dimensions } : {}),
+                    ...(options.taskType ? { taskType: options.taskType } : {}),
+                    ...(options.dimensions ? { dimensions: options.dimensions } : {}),
           ...(contentType === "text"
             ? { text: typeof content === "string" ? content : "" }
             : {}),
         },
         responsePayload: success
           ? {
-              // @ts-ignore - TODO: strict typing
-              dimensions: result?.dimensions || null,
-              // @ts-ignore - TODO: strict typing
-              embeddingPreview: result?.embedding?.slice(0, 5) || null,
+                            dimensions: result?.dimensions || null,
+                            embeddingPreview: (result?.embedding as any)?.slice(0, 5) || null,
             }
           : { error: errorMessage },
       });
@@ -192,9 +159,8 @@ const EmbeddingService = {
 
 
    */
-  async embed(text: Record<string, unknown>, options: Record<string, unknown> = {}) {
-    // @ts-ignore - TODO: strict typing
-    const result = await this.generate(text, options);
+  async embed(text: any, options: any = {}) {
+        const result = await this.generate((text as any), options);
     return result.embedding;
   },
 };

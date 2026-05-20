@@ -306,41 +306,35 @@ PERSONAS.set("CODING", {
 - After making changes, verify them by reading the modified section
 - Keep your explanations concise and technical`,
   interactionRules: "",
-  toolPolicy: (context: Record<string, unknown>) => {
-    // @ts-ignore - TODO: strict typing
-    const enabled = new Set(context.enabledTools || []);
-    const tips: Record<string, unknown>[] = [];
+  toolPolicy: (context: any) => {
+        const enabled = new Set(context.enabledTools || []);
+    const tips: any[] = [];
 
     // ── File editing tips ──
     if (enabled.has("multi_file_read")) {
       tips.push(
-        // @ts-ignore - TODO: strict typing
-        "- Use multi_file_read when you need to inspect several files at once",
+                ("- Use multi_file_read when you need to inspect several files at once" as any),
       );
     }
     if (enabled.has("project_summary")) {
       tips.push(
-        // @ts-ignore - TODO: strict typing
-        "- Use project_summary to understand unfamiliar codebases before diving in",
+                ("- Use project_summary to understand unfamiliar codebases before diving in" as any),
       );
     }
     if (enabled.has("git")) {
       tips.push(
-        // @ts-ignore - TODO: strict typing
-        "- Check git status before and after edits to track your changes",
+                ("- Check git status before and after edits to track your changes" as any),
       );
     }
     if (enabled.has("grep_search")) {
       tips.push(
-        // @ts-ignore - TODO: strict typing
-        '- When searching, use includes filters to narrow results (e.g. [".js", ".ts"])',
+                ('- When searching, use includes filters to narrow results (e.g. [".js", ".ts"])' as any),
       );
     }
 
-    const sections: Record<string, unknown>[] = [];
+    const sections: any[] = [];
     if (tips.length > 0) {
-      // @ts-ignore - TODO: strict typing
-      sections.push(`## Tool Tips\n${tips.join("\n")}`);
+            sections.push((`## Tool Tips\n${tips.join("\n")}` as any));
     }
 
     // ── Task management ──
@@ -349,8 +343,7 @@ PERSONAS.set("CODING", {
       enabled.has("task_list") ||
       enabled.has("task_update")
     ) {
-      // @ts-ignore - TODO: strict typing
-      sections.push(`## Task Management
+            sections.push((`## Task Management
 You have persistent task tools (task_create, task_list, task_update) that survive across conversations.
 Use them proactively:
 - At the START of a session, call task_list to check for in-progress or pending tasks from prior sessions
@@ -360,13 +353,12 @@ Use them proactively:
 - After completing a task, call task_list to find your next task
 - To delete a task that is no longer relevant or was created in error, set its status to "deleted" via task_update
 - Break large tasks into subtasks — use metadata to link related tasks
-- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`);
+- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking` as any));
     }
 
     // ── Proactive memory ──
     if (enabled.has("upsert_memory")) {
-      // @ts-ignore - TODO: strict typing
-      sections.push(`## Proactive Memory
+            sections.push((`## Proactive Memory
 You have a persistent memory tool (upsert_memory) that stores facts across sessions.
 Use it **proactively** — do NOT wait for the user to say "remember":
 - When the user states a preference: "I like X", "I hate Y", "I prefer Z", "I always do W"
@@ -374,7 +366,7 @@ Use it **proactively** — do NOT wait for the user to say "remember":
 - When the user corrects you: save the correction so you don't repeat the mistake
 - When you learn a project convention or workflow pattern worth preserving
 - **When in doubt, save it** — over-remembering is better than forgetting
-- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`);
+- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions` as any));
     }
 
     return sections.join("\n\n");
@@ -391,21 +383,17 @@ PERSONAS.set("LUPOS", {
   name: "Lupos",
   type: "conversational",
   project: "lupos",
-  identity: (context: Record<string, unknown>) => {
-    // @ts-ignore - TODO: strict typing
-    const aprilFools = context?.agentContext?.aprilFoolsMode === true;
-    // @ts-ignore - TODO: strict typing
-    const isClockCrew = context?.agentContext?.guildId === "249010731910037507";
+  identity: (context: any) => {
+        const aprilFools = (context?.agentContext as any)?.aprilFoolsMode === true;
+        const isClockCrew = (context?.agentContext as any)?.guildId === "249010731910037507";
 
-    let personality: Record<string, unknown>;
+    let personality: any;
     if (isClockCrew) {
-      // @ts-ignore - TODO: strict typing
-      personality = aprilFools
+            personality = aprilFools
         ? LUPOS_APRIL_FOOLS_CLOCK_CREW_CORE
         : LUPOS_CLOCK_CREW_CORE_PERSONALITY;
     } else {
-      // @ts-ignore - TODO: strict typing
-      personality = aprilFools
+            personality = aprilFools
         ? LUPOS_APRIL_FOOLS_CORE
         : LUPOS_CORE_PERSONALITY;
     }
@@ -570,7 +558,7 @@ PERSONAS.set("STICKERS", {
   name: "Clankerbox",
   type: "",
   project: "prism-chat",
-  identity: (_ctx: Record<string, unknown>) => {
+  identity: (_ctx: any) => {
     const sections = [
       STICKERS_CORE_PERSONALITY,
       STICKERS_PHYSICAL_DESCRIPTION,
@@ -677,7 +665,7 @@ PERSONAS.set("LIGHTS", {
   name: "Lights",
   type: "",
   project: "prism-chat",
-  identity: (_ctx: Record<string, unknown>) => {
+  identity: (_ctx: any) => {
     const sections = [
       LIGHTS_CORE_IDENTITY,
       LIGHTS_COLOR_REFERENCE,
@@ -778,31 +766,26 @@ PERSONAS.set("OOG", {
   },
   guidelines: "",
   interactionRules: "",
-  toolPolicy: (context: Record<string, unknown>) => {
-    // @ts-ignore - TODO: strict typing
-    const enabled = new Set(context.enabledTools || []);
-    const tips: Record<string, unknown>[] = [];
+  toolPolicy: (context: any) => {
+        const enabled = new Set(context.enabledTools || []);
+    const tips: any[] = [];
 
     if (enabled.has("str_replace_file") && enabled.has("write_file")) {
       tips.push(
-        // @ts-ignore - TODO: strict typing
-        "- oog prefer str_replace_file over write_file for edit. safer. preserve what not need change",
+                ("- oog prefer str_replace_file over write_file for edit. safer. preserve what not need change" as any),
       );
     }
     if (enabled.has("grep_search")) {
       tips.push(
-        // @ts-ignore - TODO: strict typing
-        "- oog use grep_search to find all repeat pattern before consolidate. no surprise",
+                ("- oog use grep_search to find all repeat pattern before consolidate. no surprise" as any),
       );
     }
     if (enabled.has("git")) {
-      // @ts-ignore - TODO: strict typing
-      tips.push("- oog check git status before and after. responsible caveman");
+            tips.push(("- oog check git status before and after. responsible caveman" as any));
     }
     if (enabled.has("project_summary")) {
       tips.push(
-        // @ts-ignore - TODO: strict typing
-        "- oog use project_summary to understand lay of land before swing club",
+                ("- oog use project_summary to understand lay of land before swing club" as any),
       );
     }
 
@@ -930,7 +913,7 @@ PERSONAS.set("DIGEST", {
   name: "Digest",
   type: "",
   project: "prism-chat",
-  identity: (_ctx: Record<string, unknown>) => {
+  identity: (_ctx: any) => {
     const sections = [
       DIGEST_CORE_PERSONALITY,
       DIGEST_CAPABILITIES,
@@ -1026,7 +1009,7 @@ PERSONAS.set("AGENT_CREATOR", {
   name: "Agent Creator",
   type: "",
   project: "prism-chat",
-  identity: (_ctx: Record<string, unknown>) => {
+  identity: (_ctx: any) => {
     const sections = [
       AGENT_CREATOR_CORE_IDENTITY,
       AGENT_CREATOR_CAPABILITIES,
@@ -1126,11 +1109,9 @@ PERSONAS.set("OMNI", {
 - After making changes, verify them by reading the modified section
 - Keep your explanations concise and technical`,
   interactionRules: "",
-  toolPolicy: (context: Record<string, unknown>) => {
-    // @ts-ignore - TODO: strict typing
-    const enabled = new Set(context.enabledTools || []);
-    // @ts-ignore - TODO: strict typing
-    const sections: Record<string, unknown>[] = [OMNI_TOOL_POLICY];
+  toolPolicy: (context: any) => {
+        const enabled = new Set(context.enabledTools || []);
+        const sections: any[] = ([OMNI_TOOL_POLICY] as any);
 
     // ── Task management ──
     if (
@@ -1138,8 +1119,7 @@ PERSONAS.set("OMNI", {
       enabled.has("task_list") ||
       enabled.has("task_update")
     ) {
-      // @ts-ignore - TODO: strict typing
-      sections.push(`## Task Management
+            sections.push((`## Task Management
 You have persistent task tools (task_create, task_list, task_update) that survive across conversations.
 Use them proactively:
 - At the START of a session, call task_list to check for in-progress or pending tasks from prior sessions
@@ -1149,13 +1129,12 @@ Use them proactively:
 - After completing a task, call task_list to find your next task
 - To delete a task that is no longer relevant or was created in error, set its status to "deleted" via task_update
 - Break large tasks into subtasks — use metadata to link related tasks
-- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`);
+- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking` as any));
     }
 
     // ── Proactive memory ──
     if (enabled.has("upsert_memory")) {
-      // @ts-ignore - TODO: strict typing
-      sections.push(`## Proactive Memory
+            sections.push((`## Proactive Memory
 You have a persistent memory tool (upsert_memory) that stores facts across sessions.
 Use it **proactively** — do NOT wait for the user to say "remember":
 - When the user states a preference: "I like X", "I hate Y", "I prefer Z", "I always do W"
@@ -1163,7 +1142,7 @@ Use it **proactively** — do NOT wait for the user to say "remember":
 - When the user corrects you: save the correction so you don't repeat the mistake
 - When you learn a project convention or workflow pattern worth preserving
 - **When in doubt, save it** — over-remembering is better than forgetting
-- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`);
+- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions` as any));
     }
 
     return sections.join("\n\n");
@@ -1213,7 +1192,7 @@ PERSONAS.set("MEEPO", {
   name: "Meepo",
   type: "conversational",
   project: "prism-chat",
-  identity: (_ctx: Record<string, unknown>) => {
+  identity: (_ctx: any) => {
     const sections = [
       MEEPO_CORE_PERSONALITY,
       MEEPO_RESPONSE_GUIDELINES,
@@ -1239,10 +1218,9 @@ const AgentPersonaRegistry = {
 
 
    */
-  get(agentId: Record<string, unknown>) {
+  get(agentId: any) {
     if (!agentId) return null;
-    // @ts-ignore - TODO: strict typing
-    const persona = PERSONAS.get(agentId.toUpperCase());
+        const persona = PERSONAS.get((agentId as any).toUpperCase());
     if (!persona) {
       logger.warn(`[AgentPersonaRegistry] Unknown agent: "${agentId}"`);
       return null;
@@ -1256,9 +1234,8 @@ const AgentPersonaRegistry = {
    */
   list() {
     return [...PERSONAS.values()]
-      // @ts-ignore - TODO: strict typing
-      .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (a.displayOrder ?? 100) - (b.displayOrder ?? 100))
-      .map((p: Record<string, unknown>) => ({
+            .sort((a: any, b: any) => (a.displayOrder ?? 100) - (b.displayOrder ?? 100))
+      .map((p: any) => ({
         id: p.id,
         name: p.name,
         type: p.type || "",
@@ -1271,9 +1248,8 @@ const AgentPersonaRegistry = {
 
 
    */
-  has(agentId: Record<string, unknown>) {
-    // @ts-ignore - TODO: strict typing
-    return PERSONAS.has((agentId || "").toUpperCase());
+  has(agentId: any) {
+        return PERSONAS.has((agentId || "").toUpperCase());
   },
 
   /**
@@ -1281,10 +1257,9 @@ const AgentPersonaRegistry = {
 
 
    */
-  isAgentProject(project: Record<string, unknown>) {
+  isAgentProject(project: any) {
     if (!project) return false;
-    // @ts-ignore
-    for ( const persona of PERSONAS.values()) {
+        for ( const persona of PERSONAS.values()) {
       if (persona.project === project) return true;
     }
     return false;
@@ -1297,7 +1272,7 @@ const AgentPersonaRegistry = {
    *
 
    */
-  registerCustom(document: Record<string, unknown>) {
+  registerCustom(document: any) {
     if (!document?.agentId) return;
 
     const persona = {
@@ -1330,10 +1305,9 @@ const AgentPersonaRegistry = {
    * Unregister a persona by agent ID (only custom agents should be removed).
 
    */
-  unregister(agentId: Record<string, unknown>) {
+  unregister(agentId: any) {
     if (!agentId) return;
-    // @ts-ignore - TODO: strict typing
-    const key = agentId.toUpperCase();
+        const key = (agentId as any).toUpperCase();
     const persona = PERSONAS.get(key);
     if (persona?.custom) {
       PERSONAS.delete(key);
@@ -1352,23 +1326,20 @@ const AgentPersonaRegistry = {
       const agents = await CustomAgentService.list();
 
       // Clear existing custom agents first
-      // @ts-ignore
-      for ( const [key, persona] of PERSONAS) {
+            for ( const [key, persona] of PERSONAS) {
         if (persona.custom) PERSONAS.delete(key);
       }
 
-      // @ts-ignore
-      for ( const document of agents) {
+            for ( const document of agents) {
         this.registerCustom(document);
       }
 
       logger.info(
         `[AgentPersonaRegistry] Loaded ${agents.length} custom agent(s) from database`,
       );
-    } catch (error: unknown) {
+    } catch (error: any) {
       logger.warn(
-        // @ts-ignore - TODO: strict typing
-        `[AgentPersonaRegistry] Failed to load custom agents: ${error.message}`,
+                `[AgentPersonaRegistry] Failed to load custom agents: ${(error as Error).message}`,
       );
     }
   },

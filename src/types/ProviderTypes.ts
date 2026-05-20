@@ -70,5 +70,5 @@ export interface ProviderOptions {
   instructions?: string;
   language?: string;
   prompt?: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }

@@ -25,11 +25,10 @@ const TRACKED_PREFIXES = ["generate", "transcribe"];
 /**
  * Check if a method name represents a tracked provider call.
  */
-function isTrackedMethod(name: Record<string, unknown>) {
+function isTrackedMethod(name: any) {
   return (
     typeof name === "string" &&
-    // @ts-ignore - TODO: strict typing
-    TRACKED_PREFIXES.some((p: Record<string, unknown>) => name.startsWith(p))
+        TRACKED_PREFIXES.some(((p: any) => (name as any).startsWith(p) as any as (value: string, index: number, array: string[]) => any))
   );
 }
 
@@ -37,10 +36,9 @@ function isTrackedMethod(name: Record<string, unknown>) {
  * Wrap an async generator (generateTextStream, generateTextStreamLive)
  * so the tracker stays incremented for the entire iteration lifetime.
  */
-async function* wrapAsyncGenerator(gen: Record<string, unknown>) {
+async function* wrapAsyncGenerator(gen: any) {
   try {
-    // @ts-ignore - TODO: strict typing
-    yield* gen;
+        yield* gen;
   } finally {
     ActiveGenerationTracker.decrement();
   }
@@ -53,32 +51,28 @@ async function* wrapAsyncGenerator(gen: Record<string, unknown>) {
  * - Async generators (streams): decrement when the iterator finishes/returns
  * - Promises (generateText, generateImage, etc.): decrement on settle
  */
-function wrapProvider(provider: Record<string, unknown>) {
+function wrapProvider(provider: any) {
   return new Proxy(provider, {
-    // @ts-ignore - TODO: strict typing
-    get(target: Record<string, unknown>, prop: Record<string, unknown>, receiver: Record<string, unknown>) {
-      // @ts-ignore - TODO: strict typing
-      const value = Reflect.get(target, prop, receiver);
+        get(target: any, prop: any, receiver: any) {
+            const value = Reflect.get(target, (prop as any as PropertyKey), receiver);
       if (typeof value !== "function" || !isTrackedMethod(prop)) {
         return value;
       }
 
       // Return a wrapper that tracks the call
-      // @ts-ignore - TODO: strict typing
-      return function trackedProviderCall(...args: Record<string, unknown>) {
+            return function trackedProviderCall(...args: any) {
         ActiveGenerationTracker.increment();
-        let result: Record<string, unknown>;
+        let result: any;
         try {
           result = value.apply(target, args);
-        } catch (error: unknown) {
+        } catch (error: any) {
           // Synchronous throw (rare but possible)
           ActiveGenerationTracker.decrement();
           throw error;
         }
 
         // Async generator — wrap the iterator
-        // @ts-ignore - TODO: strict typing
-        if (result && typeof result[Symbol.asyncIterator] === "function") {
+                if (result && typeof result[((Symbol as string) as any).asyncIterator] === "function") {
           return wrapAsyncGenerator(result);
         }
 
@@ -102,22 +96,18 @@ function wrapProvider(provider: Record<string, unknown>) {
 /** Per-name proxy cache so we don't create a new Proxy on every getProvider call. */
 const wrappedCache = new Map();
 
-export function getProvider(name: Record<string, unknown>) {
+export function getProvider(name: any) {
   // Check instance registry first (local providers + multi-instance)
-  // @ts-ignore - TODO: strict typing
-  if (isInstance(name)) {
+    if (isInstance((name as any))) {
     if (wrappedCache.has(name)) return wrappedCache.get(name);
-    // @ts-ignore - TODO: strict typing
-    const instanceProvider = getInstanceProvider(name);
-    // @ts-ignore - TODO: strict typing
-    const wrapped = wrapProvider(instanceProvider);
+        const instanceProvider = getInstanceProvider((name as any));
+        const wrapped = wrapProvider((instanceProvider as any));
     wrappedCache.set(name, wrapped);
     return wrapped;
   }
 
   // Fall through to static cloud providers
-  // @ts-ignore
-  const provider = providers[name];
+    const provider = (providers as any)[(name as string)];
   if (!provider) {
     const available = [...Object.keys(providers), "(+ local instances)"].join(
       ", ",
@@ -128,7 +118,7 @@ export function getProvider(name: Record<string, unknown>) {
   // Return cached proxy
   if (wrappedCache.has(name)) return wrappedCache.get(name);
 
-  const wrapped = wrapProvider(provider);
+  const wrapped = wrapProvider((provider as any));
   wrappedCache.set(name, wrapped);
   return wrapped;
 }

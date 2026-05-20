@@ -1,5 +1,4 @@
 import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
-// @ts-ignore
 import { sleep } from "@rodrigo-barraza/utilities-library";
 // ─────────────────────────────────────────────────────────────
 // LM Studio provider — Fully native /api/v1/chat
@@ -11,12 +10,10 @@ import { sleep } from "@rodrigo-barraza/utilities-library";
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 import { resolveArchParams } from "../utils/gguf-arch.ts";
-// @ts-ignore
 import {
   TOOLS_SERVICE_URL,
   LM_STUDIO_EVAL_BATCH_SIZE,
   LM_STUDIO_DEFAULT_MAX_CONTEXT,
-// @ts-ignore
 } from "../../config.ts";
 import { TYPES, getDefaultModels } from "../config.ts";
 import {} from "../utils/utilities.ts";
@@ -38,7 +35,7 @@ import { COORDINATOR_ONLY_TOOLS } from "../services/CoordinatorPrompt.ts";
 // message.start/delta/end, content.start/delta/end, chat.end.
 // This generator yields the same event types as parseSSEStream so both
 // paths integrate seamlessly with the rest of the pipeline.
-async function* parseNativeSSEStream(reader: Record<string, unknown>, options: ProviderOptions = {}) {
+async function* parseNativeSSEStream(reader: any, options: ProviderOptions = {}) {
   const decoder = new TextDecoder();
   let buffer = "";
   let usage = null;
@@ -46,20 +43,15 @@ async function* parseNativeSSEStream(reader: Record<string, unknown>, options: P
   let currentToolCall = null;
   try {
     while (true) {
-      // @ts-ignore
-      if (options.signal?.aborted) {
-        // @ts-ignore - TODO: strict typing
-        reader.cancel();
+            if (options.signal?.aborted) {
+                (reader as any).cancel();
         break;
       }
-      // @ts-ignore - TODO: strict typing
-      const { done, value } = await reader.read();
+            const { done, value } = await (reader as any).read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
-      // @ts-ignore
-      buffer = lines.pop();
-      // @ts-ignore
+      buffer = lines.pop() || "";
       for ( const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith(":")) continue;
@@ -140,18 +132,18 @@ async function* parseNativeSSEStream(reader: Record<string, unknown>, options: P
           // ── Tool call events (MCP) ──
           else if (type === "tool_call.start") {
             currentToolCall = {
-              tool: "unknown",
+              tool: "any",
               arguments: {},
             };
           } else if (type === "tool_call.name") {
             // Separate event with the tool name
             if (currentToolCall) {
-              currentToolCall.tool = json.tool_name || "unknown";
+              currentToolCall.tool = json.tool_name || "any";
             }
             yield {
               type: "toolCall",
               id: json.tool_call_id || null,
-              name: json.tool_name || "unknown",
+              name: json.tool_name || "any",
               args: {},
               status: "calling",
               native: true, // MCP-executed, skip agentic loop re-execution
@@ -168,7 +160,7 @@ async function* parseNativeSSEStream(reader: Record<string, unknown>, options: P
               currentToolCall.tool = json.tool;
             }
           } else if (type === "tool_call.success") {
-            const toolName = json.tool || currentToolCall?.tool || "unknown";
+            const toolName = json.tool || currentToolCall?.tool || "any";
             const args = json.arguments || currentToolCall?.arguments || {};
             yield {
               type: "toolCall",
@@ -184,7 +176,7 @@ async function* parseNativeSSEStream(reader: Record<string, unknown>, options: P
             yield {
               type: "toolCall",
               id: json.tool_call_id || null,
-              name: json.tool || currentToolCall?.tool || "unknown",
+              name: json.tool || currentToolCall?.tool || "any",
               args: currentToolCall?.arguments || {},
               result: { error: json.reason || "Tool call failed" },
               status: "error",
@@ -229,10 +221,9 @@ async function* parseNativeSSEStream(reader: Record<string, unknown>, options: P
     // reader released
   }
 }
-function safeParseJSON(str: Record<string, unknown>) {
+function safeParseJSON(str: any) {
   try {
-    // @ts-ignore - TODO: strict typing
-    return JSON.parse(str);
+        return JSON.parse((str as any));
   } catch {
     return str;
   }
@@ -257,18 +248,15 @@ function buildNativeInput(messages: ChatMessage[]) {
   let historyPrefix = "";
   if (historyMessages.length > 0) {
     const lines: string[] = [];
-    // @ts-ignore
-    for ( const message of historyMessages) {
+        for ( const message of historyMessages) {
       const role = message.role === "user" ? "User" : "Assistant";
       const text =
         typeof message.content === "string"
           ? message.content
           : Array.isArray(message.content)
             ? message.content
-                // @ts-ignore - TODO: strict typing
-                .filter((c: Record<string, unknown>) => c.type === "text")
-                // @ts-ignore - TODO: strict typing
-                .map((c: Record<string, unknown>) => c.text)
+                                .filter((c: any) => c.type === "text")
+                                .map((c: any) => c.text)
                 .join("\n")
             : "";
       if (text) lines.push(`[${role}]: ${text}`);
@@ -282,19 +270,16 @@ function buildNativeInput(messages: ChatMessage[]) {
   }
   // Check if the last user message has images (multi-part)
   if (Array.isArray(lastUser.content)) {
-    const parts: Record<string, unknown>[] = [];
+    const parts: any[] = [];
     // Prepend history as a text part if present
     let textContent = lastUser.content
-      // @ts-ignore - TODO: strict typing
-      .filter((c: Record<string, unknown>) => c.type === "text")
-      // @ts-ignore - TODO: strict typing
-      .map((c: Record<string, unknown>) => c.text)
+            .filter((c: any) => c.type === "text")
+            .map((c: any) => c.text)
       .join("\n");
     if (historyPrefix) textContent = historyPrefix + textContent;
     if (textContent) parts.push({ type: "text", content: textContent });
     // Add images
-    // @ts-ignore
-    for ( const c of lastUser.content) {
+        for ( const c of lastUser.content) {
       if (c.type === "image_url" && c.image_url?.url) {
         parts.push({ type: "image", data_url: c.image_url.url });
       }
@@ -325,22 +310,18 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
     name: instanceId,
     async generateText(
       messages: ChatMessage[],
-      // @ts-ignore
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["lm-studio"],
+            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["lm-studio"],
       options: ProviderOptions = {},
     ) {
       const baseUrl = getBaseUrl();
-      logger.provider(
-        // @ts-ignore - TODO: strict typing
-        "LM Studio",
-        `generateText model=${model} baseUrl=${baseUrl}`,
+      (logger.provider as any)(
+                ("LM Studio" as any),
+        (`generateText model=${model} baseUrl=${baseUrl}` as any),
       );
       try {
         // Expand video attachments to image frames (ffmpeg) before message prep
-        // @ts-ignore - TODO: strict typing
-        await expandVideoToFrames(messages);
-        // @ts-ignore - TODO: strict typing
-        const prepared = prepareOpenAICompatMessages(messages, {
+                await expandVideoToFrames((messages as any));
+                const prepared = prepareOpenAICompatMessages((messages as any), {
           mediaStrategy: MEDIA_STRATEGIES.IMAGES_ONLY,
         });
         const payload = {
@@ -348,73 +329,56 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           model,
           ...buildPayloadParams(options),
           // LM Studio extensions: top_k, min_p, repeat_penalty
-          // @ts-ignore
-          ...(options.topK > 0 && { top_k: options.topK }),
-          // @ts-ignore
+          ...(options.topK !== undefined && options.topK > 0 && { top_k: options.topK }),
           ...(options.minP !== undefined && { min_p: options.minP }),
-          // @ts-ignore
           ...(options.repeatPenalty !== undefined &&
-            // @ts-ignore
             options.repeatPenalty !== 1 && {
-              // @ts-ignore
               repeat_penalty: options.repeatPenalty,
             }),
           stream: false,
         };
         // Function calling tools
-        // @ts-ignore
-        const tools = convertToolsToOpenAI(options.tools);
-        // @ts-ignore
-        if (tools) payload.tools = tools;
+                const tools = convertToolsToOpenAI((options.tools as any));
+                if (tools) (payload as any).tools = tools;
         const response = await fetchOpenAICompat(
           `${baseUrl}/v1/chat/completions`,
           payload,
         );
         const data = await response.json();
         const { text, thinking, usage, toolCalls } =
-          // @ts-ignore - TODO: strict typing
-          processNonStreamingResponse(data);
+                    processNonStreamingResponse((data as any));
         const result = { text, thinking, usage };
-        // @ts-ignore
-        if (toolCalls) result.toolCalls = toolCalls;
+                if (toolCalls) (result as any).toolCalls = toolCalls;
         return result;
-      } catch (error: unknown) {
+      } catch (error: any) {
         if (error instanceof ProviderError) throw error;
-        // @ts-ignore - TODO: strict typing
-        throw new ProviderError("lm-studio", error.message, 500, error);
+                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
       }
     },
     // ── Streaming Text Generation (SSE) ──────────────────────
     async *generateTextStream(
       messages: ChatMessage[],
-      // @ts-ignore
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["lm-studio"],
+            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["lm-studio"],
       options: ProviderOptions = {},
     ) {
       const baseUrl = getBaseUrl();
-      logger.provider(
-        // @ts-ignore - TODO: strict typing
-        "LM Studio",
-        `generateTextStream model=${model} baseUrl=${baseUrl}`,
+      (logger.provider as any)(
+                ("LM Studio" as any),
+        (`generateTextStream model=${model} baseUrl=${baseUrl}` as any),
       );
       try {
         // Auto-load the model if not currently loaded (with streaming progress)
         try {
-          // @ts-ignore
-          if (options.signal?.aborted) return;
-          // @ts-ignore
-          const { models } = await this.listModels();
-          // @ts-ignore
-          if (options.signal?.aborted) return;
-          // @ts-ignore - TODO: strict typing
-          const modelEntry = (models || []).find((m: ChatMessage) => m.key === model);
+                    if (options.signal?.aborted) return;
+                    const { models } = await this.listModels();
+                    if (options.signal?.aborted) return;
+                    const modelEntry = (models || []).find((m: ChatMessage) => (m as any).key === model);
           const isLoaded = modelEntry?.loaded_instances?.length > 0;
           // Capture loaded context for tool cap calculation
           if (isLoaded) {
             const loadedCtx =
               modelEntry.loaded_instances[0]?.config?.context_length;
-            // @ts-ignore
-            if (loadedCtx) options._loadedContextLength = loadedCtx;
+                        if (loadedCtx) options._loadedContextLength = loadedCtx;
           }
           // If minContextLength is requested (e.g. agentic mode) and model is loaded
           // with insufficient context, force a reload with the required minimum.
@@ -422,53 +386,37 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           // would just load the same max again, creating an infinite unload/reload loop
           // (e.g. minContextLength=150k but model max is 32k → loads at 32k → 32k<150k → reload → 32k → …).
           const modelMaxCtx = modelEntry?.max_context_length || 0;
-          // @ts-ignore
-          const alreadyAtMax =
-            // @ts-ignore
-            modelMaxCtx > 0 && options._loadedContextLength >= modelMaxCtx;
+                    const alreadyAtMax =
+                        modelMaxCtx > 0 && (options as any)._loadedContextLength >= modelMaxCtx;
           const needsReload =
             isLoaded &&
-            // @ts-ignore
-            options.minContextLength &&
-            // @ts-ignore
-            options._loadedContextLength &&
-            // @ts-ignore
-            options._loadedContextLength < options.minContextLength &&
+                        options.minContextLength &&
+                        options._loadedContextLength &&
+                        options._loadedContextLength < options.minContextLength &&
             !alreadyAtMax;
-          // @ts-ignore
-          if (
+                    if (
             alreadyAtMax &&
-            // @ts-ignore
-            options.minContextLength &&
-            // @ts-ignore
-            options._loadedContextLength < options.minContextLength
+                        options.minContextLength &&
+                        (options as any)._loadedContextLength < options.minContextLength
           ) {
-            // @ts-ignore
-            logger.info(
-              // @ts-ignore
-              `[LM-Studio] Model ${model} already at max context (${options._loadedContextLength}/${modelMaxCtx}) — skipping reload (requested ${options.minContextLength})`,
+                        logger.info(
+                            `[LM-Studio] Model ${model} already at max context (${options._loadedContextLength}/${modelMaxCtx}) — skipping reload (requested ${options.minContextLength})`,
             );
           }
           if (needsReload) {
-            // @ts-ignore
-            const target = Math.min(
-              // @ts-ignore
-              options.minContextLength,
-              // @ts-ignore
-              modelEntry.max_context_length || options.minContextLength,
+                        const target = Math.min(
+                            (options.minContextLength as any),
+                            modelEntry.max_context_length || options.minContextLength,
             );
-            // @ts-ignore
-            logger.info(
-              // @ts-ignore
-              `[LM-Studio] Reloading ${model}: loaded ctx ${options._loadedContextLength} < required ${options.minContextLength}, target=${target}`,
+                        logger.info(
+                            `[LM-Studio] Reloading ${model}: loaded ctx ${options._loadedContextLength} < required ${options.minContextLength}, target=${target}`,
             );
             yield {
               type: "status",
               message: `Reloading model with ${(target / 1000).toFixed(0)}k context…`,
             };
             // Unload current instance
-            // @ts-ignore
-            for ( const inst of modelEntry.loaded_instances || []) {
+                        for ( const inst of modelEntry.loaded_instances || []) {
               await this.unloadModel(inst.id);
             }
             // Fall through to load below
@@ -499,19 +447,15 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
               } catch {
                 // If the original load failed, we'll re-detect below
               }
-              // @ts-ignore
-              if (options.signal?.aborted) return;
+                            if (options.signal?.aborted) return;
               // Model should now be loaded — capture its context length
               const refreshed = await this.listModels();
-              // @ts-ignore
-              const entry = (refreshed.models || []).find(
-                // @ts-ignore - TODO: strict typing
-                (m: ChatMessage) => m.key === model,
+                            const entry = ((refreshed as any).models || []).find(
+                                (m: ChatMessage) => (m as any).key === model,
               );
               if (entry?.loaded_instances?.length > 0) {
                 const context = entry.loaded_instances[0]?.config?.context_length;
-                // @ts-ignore
-                if (context) options._loadedContextLength = context;
+                                if (context) options._loadedContextLength = context;
                 logger.info(
                   `[LM-Studio:${instanceId}] Singleflight resolved — model "${model}" ready (ctx=${context})`,
                 );
@@ -532,26 +476,22 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
             if (!_loadInflight.has(model)) {
               // Check if the model was loaded by a previous singleflight or externally
               const recheck = await this.listModels()
-                // @ts-ignore - TODO: strict typing
-                .then(({ models: ms }: Record<string, unknown>) =>
-                  // @ts-ignore - TODO: strict typing
-                  (ms || []).find((m: ChatMessage) => m.key === model),
+                                .then((({ models: ms }: any) =>
+                                                                    ((ms || []) as any).find((m: ChatMessage) => (m as any).key === model) as any as (value: any) => any),
                 )
                 .catch(() => null);
-              const isNowLoaded = recheck?.loaded_instances?.length > 0;
+              const isNowLoaded = (recheck as any)?.loaded_instances?.length > 0;
               if (isNowLoaded && !needsReload) {
                 // Model is loaded — capture context and skip to inference
                 const context =
-                  recheck?.loaded_instances?.[0]?.config?.context_length;
-                // @ts-ignore
-                if (context) options._loadedContextLength = context;
+                  (recheck as any)?.loaded_instances?.[0]?.config?.context_length;
+                                if (context) options._loadedContextLength = context;
               } else if (!_loadInflight.has(model)) {
                 // ── SYNCHRONOUS registration — no awaits after this point ──
                 // Double-check: between our listModels() and here, another
                 // worker may have registered. Only register if still clear.
-                let resolveInflight: Record<string, unknown>, rejectInflight: Record<string, unknown>;
-                // @ts-ignore - TODO: strict typing
-                const inflightPromise = new Promise((res: Record<string, unknown>, rej: Record<string, unknown>) => {
+                let resolveInflight: any, rejectInflight: any;
+                                const inflightPromise = new Promise((res: any, rej: any) => {
                   resolveInflight = res;
                   rejectInflight = rej;
                 });
@@ -560,12 +500,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                 try {
                   // Unload any other loaded models first (single-model enforcement)
                   if (!needsReload) {
-                    // @ts-ignore
-                    for ( const m of models || []) {
-                      // @ts-ignore
-                      if (options.signal?.aborted) return;
-                      // @ts-ignore
-                      for ( const inst of m.loaded_instances || []) {
+                                        for ( const m of models || []) {
+                                            if (options.signal?.aborted) return;
+                                            for ( const inst of m.loaded_instances || []) {
                         yield {
                           type: "status",
                           message: "Unloading previous model…",
@@ -577,8 +514,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                       }
                     }
                   }
-                  // @ts-ignore
-                  if (options.signal?.aborted) return;
+                                    if (options.signal?.aborted) return;
                   logger.info(`Auto-loading model ${model} for streaming`);
                   yield {
                     type: "status",
@@ -590,54 +526,43 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                   const loadOpts = {
                     eval_batch_size: LM_STUDIO_EVAL_BATCH_SIZE,
                   };
-                  // @ts-ignore
-                  if (options.minContextLength) {
+                                    if (options.minContextLength) {
                     const maxCtx =
                       modelEntry?.max_context_length ||
                       LM_STUDIO_DEFAULT_MAX_CONTEXT;
-                    // @ts-ignore
-                    loadOpts.context_length = Math.min(
-                      // @ts-ignore
-                      options.minContextLength,
+                                        (loadOpts as any).context_length = Math.min(
+                                            (options.minContextLength as any),
                       maxCtx,
                     );
-                    // @ts-ignore
-                    logger.info(
-                      // @ts-ignore
-                      `[LM-Studio] Loading with context_length=${loadOpts.context_length} (min=${options.minContextLength}, max=${maxCtx})`,
+                                        logger.info(
+                                            `[LM-Studio] Loading with context_length=${(loadOpts as any).context_length} (min=${options.minContextLength}, max=${maxCtx})`,
                     );
                   }
                   // Start load (non-blocking) and poll for progress
                   let loadDone = false;
                   let loadError = null;
-                  // @ts-ignore
-                  const loadPromise = this.loadModel(
-                    // @ts-ignore - TODO: strict typing
-                    model,
+                                    const loadPromise = this.loadModel(
+                                        (model as any),
                     loadOpts,
-                    // @ts-ignore
-                    options.signal,
+                                        (options.signal as any),
                   )
                     .then(() => {
                       loadDone = true;
                     })
-                    .catch((error: unknown) => {
+                    .catch((error: any) => {
                       loadDone = true;
-                      // @ts-ignore - TODO: strict typing
-                      if (error.name !== "AbortError") loadError = error;
+                                            if ((error as any).name !== "AbortError") loadError = error;
                     });
                   const startTime = Date.now();
                   const EXPECTED_LOAD_MS = 15_000;
                   let lastPct = 0;
                   while (!loadDone) {
                     await sleep(500);
-                    // @ts-ignore
-                    if (options.signal?.aborted) {
+                                        if (options.signal?.aborted) {
                       logger.info(
                         `[LM-Studio] Aborted during model load for ${model}`,
                       );
-                      // @ts-ignore - TODO: strict typing
-                      this.unloadModelByKey(model).catch((e: Record<string, unknown>) =>
+                                            this.unloadModelByKey((model as any)).catch((e: any) =>
                         logger.warn(
                           `[LM-Studio] Failed to unload ${model} after abort: ${e.message}`,
                         ),
@@ -662,13 +587,11 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                     }
                   }
                   await loadPromise;
-                  // @ts-ignore
-                  if (options.signal?.aborted) {
+                                    if (options.signal?.aborted) {
                     logger.info(
                       `[LM-Studio] Model ${model} loaded but benchmark aborted — unloading`,
                     );
-                    // @ts-ignore - TODO: strict typing
-                    this.unloadModelByKey(model).catch((e: Record<string, unknown>) =>
+                                        this.unloadModelByKey((model as any)).catch((e: any) =>
                       logger.warn(
                         `[LM-Studio] Failed to unload ${model} after abort: ${e.message}`,
                       ),
@@ -676,8 +599,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                     return;
                   }
                   if (loadError) {
-                    // @ts-ignore - TODO: strict typing
-                    rejectInflight(loadError);
+                                        rejectInflight(loadError);
                     throw loadError;
                   }
                   yield {
@@ -688,20 +610,16 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                   // Re-fetch to get the loaded context length
                   try {
                     const refreshed = await this.listModels();
-                    // @ts-ignore
-                    const entry = (refreshed.models || []).find(
-                      // @ts-ignore - TODO: strict typing
-                      (m: ChatMessage) => m.key === model,
+                                        const entry = ((refreshed as any).models || []).find(
+                                            (m: ChatMessage) => (m as any).key === model,
                     );
                     const context =
                       entry?.loaded_instances?.[0]?.config?.context_length;
-                    // @ts-ignore
-                    if (context) options._loadedContextLength = context;
+                                        if (context) options._loadedContextLength = context;
                   } catch {
                     /* ignore */
                   }
-                  // @ts-ignore - TODO: strict typing
-                  resolveInflight();
+                                    resolveInflight();
                 } finally {
                   _loadInflight.delete(model);
                 }
@@ -722,56 +640,44 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                 } catch {
                   /* ignore */
                 }
-                // @ts-ignore
-                if (options.signal?.aborted) return;
+                                if (options.signal?.aborted) return;
                 const refreshed = await this.listModels().catch(() => ({
                   models: [],
                 }));
-                // @ts-ignore
-                const entry = (refreshed.models || []).find(
-                  // @ts-ignore - TODO: strict typing
-                  (m: ChatMessage) => m.key === model,
+                                const entry = ((refreshed as any).models || []).find(
+                                    (m: ChatMessage) => (m as any).key === model,
                 );
                 const context =
                   entry?.loaded_instances?.[0]?.config?.context_length;
-                // @ts-ignore
-                if (context) options._loadedContextLength = context;
+                                if (context) options._loadedContextLength = context;
               }
             }
           }
-        } catch (loadCheckErr: unknown) {
+        } catch (loadCheckErr: any) {
           // If model load explicitly failed, re-throw so the generator exits
           // cleanly. runSingleModel will catch it and record an error result,
           // allowing the benchmark to continue to the next model.
           if (
-            // @ts-ignore - TODO: strict typing
-            loadCheckErr?.cause?.type === "model_load_failed" ||
-            // @ts-ignore - TODO: strict typing
-            loadCheckErr.message?.includes("Failed to load") ||
-            // @ts-ignore - TODO: strict typing
-            loadCheckErr.message?.includes("API error")
+                        ((loadCheckErr as Error)?.cause as any)?.type === "model_load_failed" ||
+                        (loadCheckErr as Error).message?.includes("Failed to load") ||
+                        (loadCheckErr as Error).message?.includes("API error")
           ) {
             throw loadCheckErr;
           }
           logger.warn(
-            // @ts-ignore - TODO: strict typing
-            `Could not check/load model before streaming: ${loadCheckErr.message}`,
+                        `Could not check/load model before streaming: ${(loadCheckErr as Error).message}`,
           );
         }
-        // @ts-ignore
-        if (options.signal?.aborted) return;
+                if (options.signal?.aborted) return;
         // Expand video attachments to image frames (ffmpeg) before message prep.
         // This lets the model analyze video content as a sequence of frames,
         // which is the standard approach for Gemma 4 and other VLMs.
-        // @ts-ignore - TODO: strict typing
-        const hasVideo = messages.some((m: ChatMessage) => m.video?.length > 0);
+                const hasVideo = messages.some((m: ChatMessage) => (m as any).video?.length > 0);
         if (hasVideo) {
           yield { type: "status", message: "Extracting video frames…" };
-          // @ts-ignore - TODO: strict typing
-          await expandVideoToFrames(messages);
+                    await expandVideoToFrames((messages as any));
         }
-        // @ts-ignore - TODO: strict typing
-        const prepared = prepareOpenAICompatMessages(messages, {
+                const prepared = prepareOpenAICompatMessages((messages as any), {
           mediaStrategy: MEDIA_STRATEGIES.IMAGES_ONLY,
         });
         // ── Determine tool-calling strategy ──────────────────────
@@ -786,16 +692,12 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         // Coordinator tools (team_create, etc.) are Prism-local and
         // also require this path since they can't route via MCP.
         const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
-        // @ts-ignore
-        const hasCoordinatorTools = options.tools?.some((t: Record<string, unknown>) =>
-          // @ts-ignore - TODO: strict typing
-          coordinatorSet.has(t.name),
+                const hasCoordinatorTools = options.tools?.some((t: any) =>
+                    coordinatorSet.has((t.name as any)),
         );
-        // @ts-ignore
-        if (options.agent || hasCoordinatorTools) {
+                if (options.agent || hasCoordinatorTools) {
           // ── OpenAI-compat path (agentic + coordinator) ─────────
-          // @ts-ignore - TODO: strict typing
-          yield* this._streamOpenAICompat(prepared, model, options, baseUrl);
+                    yield* this._streamOpenAICompat(prepared, (model as any), options, baseUrl);
           return;
         }
         // ── Native /api/v1/chat path (MCP-based tools) ──────────
@@ -810,65 +712,46 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         // Extract system prompt from messages
         const systemMsg = prepared.find((m: ChatMessage) => m.role === "system");
         if (systemMsg?.content) {
-          // @ts-ignore
-          nativePayload.system_prompt = systemMsg.content;
+                    (nativePayload as any).system_prompt = systemMsg.content;
         }
         // Temperature & max tokens from options
         const params = buildPayloadParams(options);
-        // @ts-ignore
-        if (params.temperature != null)
-          // @ts-ignore
-          nativePayload.temperature = params.temperature;
-        // @ts-ignore
-        if (params.max_tokens > 0)
-          // @ts-ignore
-          nativePayload.max_output_tokens = params.max_tokens;
+                if (params.temperature != null)
+                    (nativePayload as any).temperature = params.temperature;
+                if ((params as any).max_tokens > 0)
+                    (nativePayload as any).max_output_tokens = params.max_tokens;
         // Extended sampling params for native API
-        // @ts-ignore
-        if (params.seed != null) nativePayload.seed = params.seed;
-        // @ts-ignore
-        if (options.topK > 0) nativePayload.top_k = options.topK;
-        // @ts-ignore
-        if (options.minP !== undefined) nativePayload.min_p = options.minP;
-        // @ts-ignore
+                if (params.seed != null) (nativePayload as any).seed = params.seed;
+        if (options.topK !== undefined && options.topK > 0) (nativePayload as any).top_k = options.topK;
+        if (options.minP !== undefined) (nativePayload as any).min_p = options.minP;
         if (options.repeatPenalty !== undefined && options.repeatPenalty !== 1)
-          // @ts-ignore
-          nativePayload.repeat_penalty = options.repeatPenalty;
+          (nativePayload as any).repeat_penalty = options.repeatPenalty;
         // Reasoning toggle — may be rejected by models that don't support it.
         // We'll try first, and retry without reasoning if it fails.
         let useReasoning = null;
-        // @ts-ignore
-        if (options.thinkingEnabled === false) {
+                if (options.thinkingEnabled === false) {
           useReasoning = "off";
-          // @ts-ignore
-        } else if (options.thinkingEnabled === true) {
+                  } else if (options.thinkingEnabled === true) {
           useReasoning = "on";
         }
         if (useReasoning) {
-          // @ts-ignore
-          nativePayload.reasoning = useReasoning;
+                    (nativePayload as any).reasoning = useReasoning;
         }
         // ── MCP integrations for function calling ──
         // When tools are requested, attach tools-api as an ephemeral MCP server.
         // LM Studio handles the agentic loop — calls tools, re-prompts, streams.
         // NOTE: Each MCP tool schema averages ~500 tokens. We cap the tool count
         // to prevent context overflow. The model's loaded context determines the cap.
-        // @ts-ignore
-        if (options.tools && options.tools.length > 0) {
-          // @ts-ignore
-          let toolNames = options.tools.map((t: Record<string, unknown>) => t.name);
+                if (options.tools && options.tools.length > 0) {
+                    let toolNames = options.tools.map((t: any) => t.name);
           // Cap tool count based on loaded model context
           // ~500 tokens/tool; reserve 50% of context for conversation
-          // @ts-ignore
-          const contextLength =
-            // @ts-ignore
-            options._loadedContextLength || options.contextLength || 8192;
-          // @ts-ignore - TODO: strict typing
-          const maxTools = Math.max(1, Math.floor((contextLength * 0.5) / 500));
+                    const contextLength =
+                        options._loadedContextLength || options.contextLength || 8192;
+                    const maxTools = Math.max(1, Math.floor((contextLength * 0.5) / 500));
           let skipMcp = false;
           // If context is too small for even 1 tool, skip MCP entirely
-          // @ts-ignore - TODO: strict typing
-          if (contextLength < 4096) {
+                    if (contextLength < 4096) {
             logger.warn(
               `[LM-Studio] Context (${contextLength}) too small for MCP tools. Minimum 4096 recommended. Skipping tools.`,
             );
@@ -879,21 +762,17 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
               `[LM-Studio] Tool count (${toolNames.length}) exceeds safe limit for ctx=${contextLength}. Capping at ${maxTools}.`,
             );
             toolNames = toolNames.slice(0, maxTools);
-            // @ts-ignore
-            yield {
+                        yield {
               type: "status",
-              // @ts-ignore
-              message: `Context limit (${contextLength}) — using ${maxTools} of ${options.tools.length} tools`,
+                            message: `Context limit (${contextLength}) — using ${maxTools} of ${options.tools.length} tools`,
             };
           }
           if (!skipMcp) {
-            // @ts-ignore
-            nativePayload.integrations = [
+                        (nativePayload as any).integrations = [
               {
                 type: "ephemeral_mcp",
                 server_label: "tools",
-                // @ts-ignore
-                server_url: `${MCP_SERVER_URL}/mcp/sse?project=${encodeURIComponent(options.project || "default")}&agent=${encodeURIComponent(options.agent || "CODING")}${options.username ? `&username=${encodeURIComponent(options.username)}` : ""}`,
+                                server_url: `${MCP_SERVER_URL}/mcp/sse?project=${encodeURIComponent((options.project || "default" as any | number | boolean))}&agent=${encodeURIComponent((options.agent || "CODING" as any | number | boolean))}${options.username ? `&username=${encodeURIComponent((options.username as any | number | boolean))}` : ""}`,
                 allowed_tools: toolNames,
               },
             ];
@@ -905,12 +784,11 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         // ── Send request (with reasoning fallback) ──
         // Some models (e.g. DeepSeek R1 Distill) don't expose reasoning config.
         // If the request fails with a reasoning-related error, retry without it.
-        const makeRequest = async (payload: Record<string, unknown>) => {
+        const makeRequest = async (payload: any) => {
           const payloadStr = JSON.stringify(payload, null, 2);
           const inputShape = Array.isArray(payload.input)
-            ? `array[${payload.input.length}]: ${payload.input.map((p: Record<string, unknown>) => p.type).join(", ")}`
-            // @ts-ignore - TODO: strict typing
-            : `string[${(payload.input || "").length}]`;
+            ? `array[${payload.input.length}]: ${payload.input.map((p: any) => p.type).join(", ")}`
+                        : `string[${((payload.input || "") as any).length}]`;
           logger.info(
             `[LM-Studio] Native API: reasoning=${payload.reasoning || "default"}, tools=${payload.integrations ? "mcp" : "none"}, input=${inputShape}, ${payloadStr.length} chars`,
           );
@@ -918,8 +796,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
-            // @ts-ignore
-            ...(options.signal && { signal: options.signal }),
+                        ...(options.signal && { signal: options.signal }),
           });
           return response;
         };
@@ -935,8 +812,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
             logger.warn(
               `[LM-Studio] Model ${model} does not support reasoning config, retrying without it`,
             );
-            // @ts-ignore
-            delete nativePayload.reasoning;
+                        delete (nativePayload as any).reasoning;
             nativeResponse = await makeRequest(nativePayload);
           } else {
             throw new Error(`API error: ${nativeResponse.status} ${errorText}`);
@@ -946,16 +822,13 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           const errorText = await nativeResponse.text();
           throw new Error(`API error: ${nativeResponse.status} ${errorText}`);
         }
-        // @ts-ignore
+        if (!nativeResponse.body) throw new Error("No response body");
         const nativeReader = nativeResponse.body.getReader();
-        // @ts-ignore
-        yield* parseNativeSSEStream(nativeReader, { signal: options.signal });
-      } catch (error: unknown) {
-        // @ts-ignore - TODO: strict typing
-        if (error.name === "AbortError") return; // Client disconnected
+        yield* parseNativeSSEStream((nativeReader as any), { signal: options.signal });
+      } catch (error: any) {
+                if ((error as Error).name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
-        // @ts-ignore - TODO: strict typing
-        throw new ProviderError("lm-studio", error.message, 500, error);
+                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
       }
     },
     /**
@@ -967,8 +840,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
      * @private
      */
     async *_streamOpenAICompat(
-      prepared: Record<string, unknown>,
-      model: Record<string, unknown>,
+      prepared: any,
+      model: any,
       options: ProviderOptions,
       baseUrl: string,
     ) {
@@ -976,8 +849,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         messages: prepared,
         model,
         ...buildPayloadParams(options),
-        // @ts-ignore - TODO: strict typing
-        ...(options.topK > 0 && { top_k: options.topK }),
+        ...(options.topK !== undefined && options.topK > 0 && { top_k: options.topK }),
         ...(options.minP !== undefined && { min_p: options.minP }),
         ...(options.repeatPenalty !== undefined &&
           options.repeatPenalty !== 1 && {
@@ -988,8 +860,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         stream_options: { include_usage: true },
       };
       // Convert tool schemas to OpenAI format
-      // @ts-ignore - TODO: strict typing
-      const tools = convertToolsToOpenAI(options.tools);
+            const tools = convertToolsToOpenAI((options.tools as any));
       if (tools) {
         // ── Cap tool count based on loaded model context ──────────
         // Each tool schema averages ~500 tokens. Reserve 50% of context
@@ -997,22 +868,18 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         // overflow the context and LM Studio returns empty responses.
         const contextLength =
           options._loadedContextLength || options.contextLength || 8192;
-        // @ts-ignore - TODO: strict typing
-        const maxTools = Math.max(1, Math.floor((contextLength * 0.5) / 500));
+                const maxTools = Math.max(1, Math.floor((contextLength * 0.5) / 500));
         if (tools.length > maxTools) {
           logger.warn(
             `[LM-Studio] OpenAI-compat: tool count (${tools.length}) exceeds safe limit for ctx=${contextLength}. Capping at ${maxTools}.`,
           );
-          // @ts-ignore
-          payload.tools = tools.slice(0, maxTools);
+                    (payload as any).tools = tools.slice(0, maxTools);
         } else {
-          // @ts-ignore
-          payload.tools = tools;
+                    (payload as any).tools = tools;
         }
       }
       logger.info(
-        // @ts-ignore
-        `[LM-Studio] OpenAI-compat streaming (agentic): model=${model}, tools=${payload.tools?.length || 0}/${options.tools?.length || 0}, ctx=${options._loadedContextLength || "unset"}`,
+                `[LM-Studio] OpenAI-compat streaming (agentic): model=${model}, tools=${(payload as any).tools?.length || 0}/${options.tools?.length || 0}, ctx=${options._loadedContextLength || "unset"}`,
       );
       yield { type: "status", message: "Starting…", phase: "starting" };
       const response = await fetch(`${baseUrl}/v1/chat/completions`, {
@@ -1035,11 +902,10 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         phase: "processing",
         progress: 0,
       };
-      // @ts-ignore
+      if (!response.body) throw new Error("No response body");
       const reader = response.body.getReader();
       let emittedPhaseTransition = false;
-      // @ts-ignore
-      for await ( const chunk of parseSSEStream(reader, {
+            for await ( const chunk of parseSSEStream((reader as any), {
         signal: options.signal,
         thinkingEnabled: options.thinkingEnabled,
       })) {
@@ -1069,46 +935,40 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
 
      * @returns {Promise<{ embedding: number[], dimensions: number }>}
      */
-    async generateEmbedding(content: Record<string, unknown>, model: Record<string, unknown>, options: ProviderOptions = {}) {
+    async generateEmbedding(content: any, model: any, options: ProviderOptions = {}) {
       const baseUrl = getBaseUrl();
-      logger.provider(
-        // @ts-ignore - TODO: strict typing
-        "LM Studio",
-        `generateEmbedding model=${model} baseUrl=${baseUrl}`,
+      (logger.provider as any)(
+                ("LM Studio" as any),
+        (`generateEmbedding model=${model} baseUrl=${baseUrl}` as any),
       );
       try {
         const payload = { model, input: content };
-        // @ts-ignore
-        if (options.dimensions) payload.dimensions = options.dimensions;
+                if (options.dimensions) (payload as any).dimensions = options.dimensions;
         const response = await fetchOpenAICompat(
           `${baseUrl}/v1/embeddings`,
           payload,
         );
         const data = await response.json();
-        // @ts-ignore
-        const embedding = data.data?.[0]?.embedding;
+                const embedding = (data as any).data?.[0]?.embedding;
         if (!embedding) {
           throw new Error("No embedding data in LM Studio response");
         }
         return { embedding, dimensions: embedding.length };
-      } catch (error: unknown) {
+      } catch (error: any) {
         if (error instanceof ProviderError) throw error;
-        // @ts-ignore - TODO: strict typing
-        throw new ProviderError("lm-studio", error.message, 500, error);
+                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
       }
     },
     async captionImage(
       images: string[],
       prompt: string = "Describe this image.",
-      // @ts-ignore
-      model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["lm-studio"],
+            model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["lm-studio"],
       systemPrompt?: string,
     ) {
       const baseUrl = getBaseUrl();
-      logger.provider(
-        // @ts-ignore - TODO: strict typing
-        "LM Studio",
-        `captionImage model=${model} baseUrl=${baseUrl}`,
+      (logger.provider as any)(
+                ("LM Studio" as any),
+        (`captionImage model=${model} baseUrl=${baseUrl}` as any),
       );
       try {
         const content = [
@@ -1134,19 +994,15 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           },
         );
         const data = await response.json();
-        // @ts-ignore
-        const text = data.choices?.[0]?.message?.content || "";
+                const text = (data as any).choices?.[0]?.message?.content || "";
         const usage = {
-          // @ts-ignore
-          inputTokens: data.usage?.prompt_tokens || 0,
-          // @ts-ignore
-          outputTokens: data.usage?.completion_tokens || 0,
+                    inputTokens: (data as any).usage?.prompt_tokens || 0,
+                    outputTokens: (data as any).usage?.completion_tokens || 0,
         };
         return { text, usage };
-      } catch (error: unknown) {
+      } catch (error: any) {
         if (error instanceof ProviderError) throw error;
-        // @ts-ignore - TODO: strict typing
-        throw new ProviderError("lm-studio", error.message, 500, error);
+                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
       }
     },
     // ── Model Management ─────────────────────────────────────
@@ -1161,18 +1017,16 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
      * @returns {{ alreadyLoaded: boolean, contextLength: number|null }} - Info about the loaded model.
      */
     async ensureModelLoaded(
-      modelKey: Record<string, unknown>,
-      loadOptions: Record<string, unknown> = {},
-      signal: Record<string, unknown>,
-      onStatus: Record<string, unknown>,
+      modelKey: any,
+      loadOptions: any = {},
+      signal: any,
+      onStatus: any,
     ) {
       if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
-      // @ts-ignore
-      const { models } = await this.listModels();
+            const { models } = await this.listModels();
       if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
       // Check if the requested model is already loaded
-      // @ts-ignore - TODO: strict typing
-      const modelEntry = (models || []).find((m: ChatMessage) => m.key === modelKey);
+            const modelEntry = (models || []).find((m: ChatMessage) => (m as any).key === modelKey);
       const isLoaded = modelEntry?.loaded_instances?.length > 0;
       if (isLoaded) {
         const loadedCtx =
@@ -1183,14 +1037,11 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         return { alreadyLoaded: true, contextLength: loadedCtx };
       }
       // Unload any other loaded models first (single-model enforcement)
-      // @ts-ignore
-      for ( const m of models || []) {
+            for ( const m of models || []) {
         if (signal?.aborted)
           return { alreadyLoaded: false, contextLength: null };
-        // @ts-ignore
-        for ( const inst of m.loaded_instances || []) {
-          // @ts-ignore - TODO: strict typing
-          onStatus?.("Unloading previous model…");
+                for ( const inst of m.loaded_instances || []) {
+                    onStatus?.("Unloading previous model…");
           logger.info(
             `[LM-Studio] Auto-unloading ${inst.id} before loading ${modelKey}`,
           );
@@ -1200,18 +1051,14 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
       if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
       // Load the requested model
       logger.info(`[LM-Studio] Loading model ${modelKey}`);
-      // @ts-ignore - TODO: strict typing
-      onStatus?.("Loading model… 0%");
+            onStatus?.("Loading model… 0%");
       await this.loadModel(modelKey, loadOptions, signal);
-      // @ts-ignore - TODO: strict typing
-      onStatus?.("Loading model… 100%");
+            onStatus?.("Loading model… 100%");
       // Re-fetch to get the loaded context length
       try {
         const refreshed = await this.listModels();
-        // @ts-ignore
-        const entry = (refreshed.models || []).find(
-          // @ts-ignore - TODO: strict typing
-          (m: ChatMessage) => m.key === modelKey,
+                const entry = ((refreshed as any).models || []).find(
+                    (m: ChatMessage) => (m as any).key === modelKey,
         );
         const context =
           entry?.loaded_instances?.[0]?.config?.context_length || null;
@@ -1224,10 +1071,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
      * List all models available in LM Studio.
      * Uses the proprietary GET /api/v1/models endpoint.
      */
-    async listModels() {
+    async listModels(): Promise<any> {
       const baseUrl = getBaseUrl();
-      // @ts-ignore - TODO: strict typing
-      logger.provider("LM Studio", "listModels");
+            (logger.provider as any)(("LM Studio" as any), ("listModels" as any));
       try {
         const response = await fetch(`${baseUrl}/api/v1/models`, {
           method: "GET",
@@ -1239,10 +1085,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         }
         const data = await response.json();
         // Enrich each model with resolved architecture params for VRAM estimation
-        // @ts-ignore
-        if (data?.data) {
-          // @ts-ignore
-          for ( const model of data.data) {
+                if ((data as any)?.data) {
+                    for ( const model of (data as any).data) {
             const arch = model.architecture;
             const params = model.params_string;
             const sizeBytes = model.size_bytes || 0;
@@ -1251,80 +1095,63 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           }
         }
         return data;
-      } catch (error: unknown) {
+      } catch (error: any) {
         if (error instanceof ProviderError) throw error;
-        // @ts-ignore - TODO: strict typing
-        throw new ProviderError("lm-studio", error.message, 500, error);
+                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
       }
     },
     /**
      * Load a model into LM Studio memory.
      */
-    async loadModel(model: Record<string, unknown>, options: ProviderOptions = {}, signal: Record<string, unknown>) {
+    async loadModel(model: any, options: ProviderOptions = {}, signal: any) {
       const baseUrl = getBaseUrl();
-      // @ts-ignore - TODO: strict typing
-      logger.provider("LM Studio", `loadModel model=${model}`);
+            (logger.provider as any)(("LM Studio" as any), (`loadModel model=${model}` as any));
       try {
         const payload = { model, echo_load_config: true };
-        // @ts-ignore
-        if (options.context_length != null)
-          // @ts-ignore
-          payload.context_length = options.context_length;
-        // @ts-ignore
-        if (options.flash_attention != null)
-          // @ts-ignore
-          payload.flash_attention = options.flash_attention;
-        // @ts-ignore
-        if (options.offload_kv_cache_to_gpu != null)
-          // @ts-ignore
-          payload.offload_kv_cache_to_gpu = options.offload_kv_cache_to_gpu;
-        // @ts-ignore
-        if (options.eval_batch_size != null)
-          // @ts-ignore
-          payload.eval_batch_size = options.eval_batch_size;
-        // @ts-ignore - TODO: strict typing
-        const response = await fetch(`${baseUrl}/api/v1/models/load`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          ...(signal && { signal }),
-        });
+                if (options.context_length != null)
+                    (payload as any).context_length = options.context_length;
+                if (options.flash_attention != null)
+                    (payload as any).flash_attention = options.flash_attention;
+                if (options.offload_kv_cache_to_gpu != null)
+                    (payload as any).offload_kv_cache_to_gpu = options.offload_kv_cache_to_gpu;
+                if (options.eval_batch_size != null)
+                    (payload as any).eval_batch_size = options.eval_batch_size;
+                const response = await fetch(`${baseUrl}/api/v1/models/load`, ({
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify(payload),
+                          ...(signal && { signal }),
+                        } as any as RequestInit));
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`API error: ${response.status} ${errorText}`);
         }
         return response.json();
-      } catch (error: unknown) {
-        // @ts-ignore - TODO: strict typing
-        if (error.name === "AbortError") throw error; // Let AbortError propagate
+      } catch (error: any) {
+                if ((error as Error).name === "AbortError") throw error; // Let AbortError propagate
         if (error instanceof ProviderError) throw error;
-        // @ts-ignore - TODO: strict typing
-        throw new ProviderError("lm-studio", error.message, 500, error);
+                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
       }
     },
     /**
      * Unload a model from LM Studio by its model key.
      * Looks up the loaded instance ID and unloads it.
      */
-    async unloadModelByKey(modelKey: Record<string, unknown>) {
+    async unloadModelByKey(modelKey: any) {
       try {
-        // @ts-ignore
-        const { models } = await this.listModels();
-        // @ts-ignore
-        for ( const m of models || []) {
+                const { models } = await this.listModels();
+                for ( const m of models || []) {
           if (m.key !== modelKey) continue;
-          // @ts-ignore
-          for ( const inst of m.loaded_instances || []) {
+                    for ( const inst of m.loaded_instances || []) {
             logger.info(
               `[LM-Studio] Unloading ${inst.id} (cleanup after abort)`,
             );
             await this.unloadModel(inst.id);
           }
         }
-      } catch (error: unknown) {
+      } catch (error: any) {
         logger.warn(
-          // @ts-ignore - TODO: strict typing
-          `[LM-Studio] unloadModelByKey(${modelKey}) failed: ${error.message}`,
+                    `[LM-Studio] unloadModelByKey(${modelKey}) failed: ${(error as Error).message}`,
         );
       }
     },
@@ -1333,8 +1160,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
      */
     async unloadModel(instanceId: string) {
       const baseUrl = getBaseUrl();
-      // @ts-ignore - TODO: strict typing
-      logger.provider("LM Studio", `unloadModel instanceId=${instanceId}`);
+            (logger.provider as any)(("LM Studio" as any), (`unloadModel instanceId=${instanceId}` as any));
       try {
         const response = await fetch(`${baseUrl}/api/v1/models/unload`, {
           method: "POST",
@@ -1346,10 +1172,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           throw new Error(`API error: ${response.status} ${errorText}`);
         }
         return response.json();
-      } catch (error: unknown) {
+      } catch (error: any) {
         if (error instanceof ProviderError) throw error;
-        // @ts-ignore - TODO: strict typing
-        throw new ProviderError("lm-studio", error.message, 500, error);
+                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
       }
     },
   };

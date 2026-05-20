@@ -31,16 +31,13 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
 
     async generateText(
       messages: ChatMessage[],
-      // @ts-ignore
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
+            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
       options: ProviderOptions = {},
     ) {
       const baseUrl = getBaseUrl();
-      // @ts-ignore - TODO: strict typing
-      logger.provider("vLLM", `generateText model=${model} baseUrl=${baseUrl}`);
+            (logger.provider as any)(("vLLM" as any), (`generateText model=${model} baseUrl=${baseUrl}` as any));
       try {
-        // @ts-ignore - TODO: strict typing
-        const prepared = prepareOpenAICompatMessages(messages, {
+                const prepared = prepareOpenAICompatMessages((messages as any), {
           mediaStrategy: MEDIA_STRATEGIES.FULL_MULTIMODAL,
         });
 
@@ -49,38 +46,27 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           model,
           ...buildPayloadParams(options),
           // vLLM extensions: top_k, min_p, repetition_penalty
-          // @ts-ignore
-          ...(options.topK > 0 && { top_k: options.topK }),
-          // @ts-ignore
-          ...(options.minP !== undefined && { min_p: options.minP }),
-          // @ts-ignore
-          ...(options.repeatPenalty !== undefined &&
-            // @ts-ignore
-            options.repeatPenalty !== 1 && {
-              // @ts-ignore
-              repetition_penalty: options.repeatPenalty,
+                    ...(options.topK > 0 && { top_k: options.topK }),
+                    ...(options.minP !== undefined && { min_p: options.minP }),
+                    ...(options.repeatPenalty !== undefined &&
+                        options.repeatPenalty !== 1 && {
+                            repetition_penalty: options.repeatPenalty,
             }),
           stream: false,
         };
 
         // Function calling tools
-        // @ts-ignore
-        const tools = convertToolsToOpenAI(options.tools);
+                const tools = convertToolsToOpenAI((options.tools as any));
         if (tools) {
-          // @ts-ignore
-          payload.tools = tools;
-          // @ts-ignore
-          payload.tool_choice = "auto";
+                    (payload as any).tools = tools;
+                    (payload as any).tool_choice = "auto";
         }
 
         // Thinking hard switch — vLLM extension for Qwen3/reasoning models
         // Uses chat_template_kwargs to control <think> token generation
-        // @ts-ignore
-        if (options.thinkingEnabled !== undefined) {
-          // @ts-ignore
-          payload.chat_template_kwargs = {
-            // @ts-ignore
-            enable_thinking: options.thinkingEnabled,
+                if (options.thinkingEnabled !== undefined) {
+                    (payload as any).chat_template_kwargs = {
+                        enable_thinking: options.thinkingEnabled,
           };
         }
 
@@ -90,20 +76,16 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         );
         const data = await response.json();
         const { text, thinking, usage, toolCalls } =
-          // @ts-ignore
-          processNonStreamingResponse(data, {
-            // @ts-ignore
-            thinkingEnabled: options.thinkingEnabled,
+                    processNonStreamingResponse((data as any), {
+                        thinkingEnabled: options.thinkingEnabled,
           });
 
         const result = { text, thinking, usage };
-        // @ts-ignore
-        if (toolCalls) result.toolCalls = toolCalls;
+                if (toolCalls) (result as any).toolCalls = toolCalls;
         return result;
-      } catch (error: unknown) {
+      } catch (error: any) {
         if (error instanceof ProviderError) throw error;
-        // @ts-ignore - TODO: strict typing
-        throw new ProviderError("vllm", error.message, 500, error);
+                throw new ProviderError("vllm", (error as Error).message, 500, error);
       }
     },
 
@@ -111,19 +93,16 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
 
     async *generateTextStream(
       messages: ChatMessage[],
-      // @ts-ignore
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
+            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
       options: ProviderOptions = {},
     ) {
       const baseUrl = getBaseUrl();
-      logger.provider(
-        // @ts-ignore - TODO: strict typing
-        "vLLM",
-        `generateTextStream model=${model} baseUrl=${baseUrl}`,
+      (logger.provider as any)(
+                ("vLLM" as any),
+        (`generateTextStream model=${model} baseUrl=${baseUrl}` as any),
       );
       try {
-        // @ts-ignore - TODO: strict typing
-        const prepared = prepareOpenAICompatMessages(messages, {
+                const prepared = prepareOpenAICompatMessages((messages as any), {
           mediaStrategy: MEDIA_STRATEGIES.FULL_MULTIMODAL,
         });
 
@@ -132,76 +111,56 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           model,
           ...buildPayloadParams(options),
           // vLLM extensions: top_k, min_p, repetition_penalty
-          // @ts-ignore
-          ...(options.topK > 0 && { top_k: options.topK }),
-          // @ts-ignore
-          ...(options.minP !== undefined && { min_p: options.minP }),
-          // @ts-ignore
-          ...(options.repeatPenalty !== undefined &&
-            // @ts-ignore
-            options.repeatPenalty !== 1 && {
-              // @ts-ignore
-              repetition_penalty: options.repeatPenalty,
+                    ...(options.topK > 0 && { top_k: options.topK }),
+                    ...(options.minP !== undefined && { min_p: options.minP }),
+                    ...(options.repeatPenalty !== undefined &&
+                        options.repeatPenalty !== 1 && {
+                            repetition_penalty: options.repeatPenalty,
             }),
           stream: true,
           stream_options: { include_usage: true },
         };
 
         // Function calling tools
-        // @ts-ignore
-        const tools = convertToolsToOpenAI(options.tools);
+                const tools = convertToolsToOpenAI((options.tools as any));
         if (tools) {
-          // @ts-ignore
-          payload.tools = tools;
-          // @ts-ignore
-          payload.tool_choice = "auto";
+                    (payload as any).tools = tools;
+                    (payload as any).tool_choice = "auto";
         }
 
         // Thinking hard switch — vLLM extension for Qwen3/reasoning models
-        // @ts-ignore
-        if (options.thinkingEnabled !== undefined) {
-          // @ts-ignore
-          payload.chat_template_kwargs = {
-            // @ts-ignore
-            enable_thinking: options.thinkingEnabled,
+                if (options.thinkingEnabled !== undefined) {
+                    (payload as any).chat_template_kwargs = {
+                        enable_thinking: options.thinkingEnabled,
           };
         }
 
         const response = await fetchOpenAICompat(
           `${baseUrl}/v1/chat/completions`,
           payload,
-          // @ts-ignore
-          { signal: options.signal },
+                    { signal: options.signal },
         );
 
-        // @ts-ignore
-        const reader = response.body.getReader();
-        // @ts-ignore - TODO: strict typing
-        yield* parseSSEStream(reader, {
-          // @ts-ignore
-          signal: options.signal,
-          // @ts-ignore
-          thinkingEnabled: options.thinkingEnabled,
+                const reader = response.body.getReader();
+                yield* parseSSEStream((reader as any), {
+                    signal: options.signal,
+                    thinkingEnabled: options.thinkingEnabled,
         });
-      } catch (error: unknown) {
-        // @ts-ignore - TODO: strict typing
-        if (error.name === "AbortError") return; // Client disconnected
+      } catch (error: any) {
+                if ((error as Error).name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
-        // @ts-ignore - TODO: strict typing
-        throw new ProviderError("vllm", error.message, 500, error);
+                throw new ProviderError("vllm", (error as Error).message, 500, error);
       }
     },
 
     async captionImage(
       images: string[],
       prompt: string = "Describe this image.",
-      // @ts-ignore
-      model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["vllm"],
+            model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["vllm"],
       systemPrompt?: string,
     ) {
       const baseUrl = getBaseUrl();
-      // @ts-ignore - TODO: strict typing
-      logger.provider("vLLM", `captionImage model=${model} baseUrl=${baseUrl}`);
+            (logger.provider as any)(("vLLM" as any), (`captionImage model=${model} baseUrl=${baseUrl}` as any));
       try {
         const content = [
           { type: "text", text: prompt },
@@ -228,19 +187,15 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         );
 
         const data = await response.json();
-        // @ts-ignore
-        const text = data.choices?.[0]?.message?.content || "";
+                const text = (data as any).choices?.[0]?.message?.content || "";
         const usage = {
-          // @ts-ignore
-          inputTokens: data.usage?.prompt_tokens || 0,
-          // @ts-ignore
-          outputTokens: data.usage?.completion_tokens || 0,
+                    inputTokens: (data as any).usage?.prompt_tokens || 0,
+                    outputTokens: (data as any).usage?.completion_tokens || 0,
         };
         return { text, usage };
-      } catch (error: unknown) {
+      } catch (error: any) {
         if (error instanceof ProviderError) throw error;
-        // @ts-ignore - TODO: strict typing
-        throw new ProviderError("vllm", error.message, 500, error);
+                throw new ProviderError("vllm", (error as Error).message, 500, error);
       }
     },
 
@@ -255,20 +210,18 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
 
      * @returns {Promise<{ embedding: number[], dimensions: number }>}
      */
-    async generateEmbedding(content: Record<string, unknown>, model: Record<string, unknown>, options: ProviderOptions = {}) {
+    async generateEmbedding(content: any, model: any, options: ProviderOptions = {}) {
       const baseUrl = getBaseUrl();
-      logger.provider(
-        // @ts-ignore - TODO: strict typing
-        "vLLM",
-        `generateEmbedding model=${model} baseUrl=${baseUrl}`,
+      (logger.provider as any)(
+                ("vLLM" as any),
+        (`generateEmbedding model=${model} baseUrl=${baseUrl}` as any),
       );
       try {
         const payload = {
           model,
           input: content,
         };
-        // @ts-ignore
-        if (options.dimensions) payload.dimensions = options.dimensions;
+                if (options.dimensions) (payload as any).dimensions = options.dimensions;
 
         const response = await fetchOpenAICompat(
           `${baseUrl}/v1/embeddings`,
@@ -276,8 +229,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         );
         const data = await response.json();
 
-        // @ts-ignore
-        const embedding = data.data?.[0]?.embedding;
+                const embedding = (data as any).data?.[0]?.embedding;
         if (!embedding) {
           throw new Error("No embedding data in vLLM response");
         }
@@ -286,10 +238,9 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           embedding,
           dimensions: embedding.length,
         };
-      } catch (error: unknown) {
+      } catch (error: any) {
         if (error instanceof ProviderError) throw error;
-        // @ts-ignore - TODO: strict typing
-        throw new ProviderError("vllm", error.message, 500, error);
+                throw new ProviderError("vllm", (error as Error).message, 500, error);
       }
     },
 
@@ -302,8 +253,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
      */
     async listModels() {
       const baseUrl = getBaseUrl();
-      // @ts-ignore - TODO: strict typing
-      logger.provider("vLLM", "listModels");
+            (logger.provider as any)(("vLLM" as any), ("listModels" as any));
       try {
         const response = await fetch(`${baseUrl}/v1/models`, {
           method: "GET",
@@ -314,21 +264,16 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           throw new Error(`API error: ${response.status} ${errorText}`);
         }
         const data = await response.json();
-        // @ts-ignore
-        const models = (data.data || []).map((m: ChatMessage) => ({
-          // @ts-ignore - TODO: strict typing
-          key: m.id,
-          // @ts-ignore - TODO: strict typing
-          display_name: m.id,
+                const models = ((data as any).data || []).map((m: ChatMessage) => ({
+                    key: (m as any).id,
+                    display_name: (m as any).id,
           type: "llm",
-          // @ts-ignore - TODO: strict typing
-          loaded_instances: [{ id: m.id }], // vLLM models are always loaded
+                    loaded_instances: [{ id: (m as any).id }], // vLLM models are always loaded
         }));
         return { models };
-      } catch (error: unknown) {
+      } catch (error: any) {
         if (error instanceof ProviderError) throw error;
-        // @ts-ignore - TODO: strict typing
-        throw new ProviderError("vllm", error.message, 500, error);
+                throw new ProviderError("vllm", (error as Error).message, 500, error);
       }
     },
   };

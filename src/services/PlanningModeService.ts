@@ -42,16 +42,14 @@ export default class PlanningModeService {
    *
 
    */
-  static injectPlanningInstruction(messages: Record<string, unknown>) {
-    // @ts-ignore - TODO: strict typing
-    const systemMsg = messages.find((m: Record<string, unknown>) => m.role === "system");
+  static injectPlanningInstruction(messages: any) {
+        const systemMsg = (messages as any).find((m: any) => m.role === "system");
     if (systemMsg) {
       // Idempotency: don't append twice
       if (systemMsg.content.includes("PLANNING MODE ACTIVE")) return;
       systemMsg.content = systemMsg.content + PLANNING_INSTRUCTION;
     } else {
-      // @ts-ignore - TODO: strict typing
-      messages.unshift({
+            (messages as any).unshift({
         role: "system",
         content: PLANNING_INSTRUCTION.trim(),
       });
@@ -68,9 +66,8 @@ export default class PlanningModeService {
    *
 
    */
-  static stripPlanningInstruction(messages: Record<string, unknown>) {
-    // @ts-ignore - TODO: strict typing
-    const systemMsg = messages.find((m: Record<string, unknown>) => m.role === "system");
+  static stripPlanningInstruction(messages: any) {
+        const systemMsg = (messages as any).find((m: any) => m.role === "system");
     if (systemMsg && systemMsg.content.includes("PLANNING MODE ACTIVE")) {
       systemMsg.content = systemMsg.content.replace(PLANNING_INSTRUCTION, "");
       logger.info(
@@ -85,14 +82,12 @@ export default class PlanningModeService {
 
    * @returns {Array<string>} Step descriptions
    */
-  static extractSteps(planText: Record<string, unknown>) {
+  static extractSteps(planText: any) {
     const stepRegex = /^\d+\.\s+(.+)$/gm;
-    const steps: Record<string, unknown>[] = [];
-    let match: Record<string, unknown>;
-    // @ts-ignore - TODO: strict typing
-    while ((match = stepRegex.exec(planText)) !== null) {
-      // @ts-ignore - TODO: strict typing
-      steps.push(match[1].trim());
+    const steps: any[] = [];
+    let match: any;
+        while ((match = stepRegex.exec((planText as any))) !== null) {
+            steps.push((match as any)[1].trim());
     }
     return steps;
   }

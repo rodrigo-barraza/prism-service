@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import CustomAgentService from "../services/CustomAgentService.ts";
@@ -18,8 +17,7 @@ router.get(
       const agents = await CustomAgentService.list();
       res.json(agents);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`GET /custom-agents error: ${error.message}`);
+            logger.error(`GET /custom-agents error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -45,13 +43,10 @@ router.post(
 
       res.status(201).json(created);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      if (error.message?.includes("already exists")) {
-        // @ts-ignore - TODO: strict typing
-        return res.status(409).json({ error: error.message });
+            if ((error as Error).message?.includes("already exists")) {
+                return res.status(409).json({ error: (error as Error).message });
       }
-      // @ts-ignore - TODO: strict typing
-      logger.error(`POST /custom-agents error: ${error.message}`);
+            logger.error(`POST /custom-agents error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -74,26 +69,22 @@ router.put(
       }
 
       // Get the old doc to unregister the old agentId if name changed
-      // @ts-ignore - TODO: strict typing
-      const oldDoc = await CustomAgentService.get(id);
+            const oldDoc = await CustomAgentService.get((id as any));
       if (!oldDoc) {
         return res.status(404).json({ error: "Agent not found" });
       }
 
-      // @ts-ignore - TODO: strict typing
-      const updated = await CustomAgentService.update(id, updates);
+            const updated = await CustomAgentService.update((id as any), updates);
 
       // Unregister old ID if it changed, then register new
       if (updated && oldDoc.agentId !== updated.agentId!) {
         AgentPersonaRegistry.unregister(oldDoc.agentId);
       }
-      // @ts-ignore - TODO: strict typing
-      AgentPersonaRegistry.registerCustom(updated);
+            AgentPersonaRegistry.registerCustom((updated as any));
 
       res.json(updated);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`PUT /custom-agents/:id error: ${error.message}`);
+            logger.error(`PUT /custom-agents/:id error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -110,20 +101,17 @@ router.delete(
       const { id } = req.params;
 
       // Get the doc first so we know the agentId to unregister
-      // @ts-ignore - TODO: strict typing
-      const document = await CustomAgentService.get(id);
+            const document = await CustomAgentService.get((id as any));
       if (!document) {
         return res.status(404).json({ error: "Agent not found" });
       }
 
-      // @ts-ignore - TODO: strict typing
-      await CustomAgentService.delete(id);
+            await CustomAgentService.delete((id as any));
       AgentPersonaRegistry.unregister(document.agentId);
 
       res.json({ success: true });
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`DELETE /custom-agents/:id error: ${error.message}`);
+            logger.error(`DELETE /custom-agents/:id error: ${(error as Error).message}`);
       next(error);
     }
   }),

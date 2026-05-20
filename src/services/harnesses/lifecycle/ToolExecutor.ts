@@ -38,32 +38,28 @@ export async function executeToolBatch(
   } = context;
 
   const results = await Promise.all(
-    toolCalls.map(async (toolCall) => {
-      // @ts-ignore - TODO: strict typing
-      await hooks.run("beforeToolCall", toolCall, context);
+    toolCalls.map(async (toolCall: any) => {
+            await hooks.run(("beforeToolCall" as any), (toolCall as any), context);
 
-      const customDefinition = tools.customToolMap.get(toolCall.name);
+      const customDefinition = tools.customToolMap.get((toolCall as any).name);
       if (customDefinition) {
         const result = await ToolOrchestratorService.executeCustomTool(
           customDefinition,
-          toolCall.args,
+          (toolCall as any).args,
         );
-        // @ts-ignore - TODO: strict typing
-        await hooks.run("afterToolCall", toolCall, result, context);
-        return { name: toolCall.name, id: toolCall.id, result };
+                await hooks.run(("afterToolCall" as any), (toolCall as any), result, context);
+        return { name: (toolCall as any).name, id: (toolCall as any).id, result };
       }
 
-      // @ts-ignore - TODO: strict typing
-      if (ToolOrchestratorService.isStreamable(toolCall.name)) {
+            if (ToolOrchestratorService.isStreamable((toolCall as any).name)) {
         const result = await ToolOrchestratorService.executeToolStreaming(
-          toolCall.name,
-          toolCall.args,
-          // @ts-ignore - TODO: strict typing
-          (event: string, data: unknown, meta: unknown) => {
+          (toolCall as any).name,
+          (toolCall as any).args,
+                    (event: string, data: any, meta: any) => {
             emit({
               type: "tool_output",
-              toolCallId: toolCall.id,
-              name: toolCall.name,
+              toolCallId: (toolCall as any).id,
+              name: (toolCall as any).name,
               event,
               data: data || undefined,
               meta: meta || undefined,
@@ -79,14 +75,13 @@ export async function executeToolBatch(
             workspaceRoot,
           },
         );
-        // @ts-ignore - TODO: strict typing
-        await hooks.run("afterToolCall", toolCall, result, context);
-        return { name: toolCall.name, id: toolCall.id, result };
+                await hooks.run(("afterToolCall" as any), (toolCall as any), result, context);
+        return { name: (toolCall as any).name, id: (toolCall as any).id, result };
       }
 
       const result = await ToolOrchestratorService.executeTool(
-        toolCall.name,
-        toolCall.args,
+        (toolCall as any).name,
+        (toolCall as any).args,
         {
           messages: context._currentMessages || context.messages,
           project,
@@ -106,9 +101,8 @@ export async function executeToolBatch(
           workspaceRoot,
         },
       );
-      // @ts-ignore - TODO: strict typing
-      await hooks.run("afterToolCall", toolCall, result, context);
-      return { name: toolCall.name, id: toolCall.id, result };
+            await hooks.run(("afterToolCall" as any), (toolCall as any), result, context);
+      return { name: (toolCall as any).name, id: (toolCall as any).id, result };
     }),
   );
 

@@ -1,6 +1,5 @@
 // ─── Boot Sequence ──────────────────────────────────────────
 
-// @ts-ignore
 import { bootstrapEnv } from "@rodrigo-barraza/utilities-library/vault";
 
 await bootstrapEnv();

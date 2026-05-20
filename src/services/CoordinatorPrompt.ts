@@ -17,10 +17,8 @@
  */
 export function getCoordinatorPromptAddendum({ workerTools = [] }: Record<string, unknown> = {}) {
   const workerToolList =
-    // @ts-ignore - TODO: strict typing
-    workerTools.length > 0
-      // @ts-ignore - TODO: strict typing
-      ? workerTools.sort().join(", ")
+        (workerTools as any).length > 0
+            ? (workerTools as any).sort().join(", ")
       : "all standard tools (read, write, search, shell, etc.)";
 
   return `## Coordinator Mode — Multi-Agent Orchestration

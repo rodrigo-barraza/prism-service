@@ -1,6 +1,5 @@
 import { ObjectId } from "mongodb";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
@@ -74,8 +73,7 @@ const CustomAgentService = {
     const col = getCollection();
     if (!col) throw new Error("Database not available");
 
-    // @ts-ignore - TODO: strict typing
-    const agentId = deriveAgentId(data.name);
+        const agentId = deriveAgentId((data.name as any));
 
     // Check for duplicate agentId
     const existing = await col.findOne({ agentId });
@@ -122,13 +120,11 @@ const CustomAgentService = {
     // If name changed, re-derive agentId
     const setFields = { ...updates, updatedAt: new Date().toISOString() };
     if (updates.name) {
-      // @ts-ignore - TODO: strict typing
-      setFields.agentId = deriveAgentId(updates.name);
+            (setFields as any).agentId = deriveAgentId((updates.name as any));
     }
 
     // Remove _id from $set if present
-    // @ts-ignore - TODO: strict typing
-    delete setFields._id;
+        delete (setFields as any)._id;
 
     await col.updateOne({ _id: new ObjectId(id) }, { $set: setFields });
 

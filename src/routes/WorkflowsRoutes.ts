@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response, NextFunction } from "express";
 import { ObjectId } from "mongodb";
@@ -22,28 +21,22 @@ const MEDIA_FIELDS = ["images", "audio", "video", "pdf"];
  * Non-data-URL strings (minio://, http://, etc.) pass through unchanged.
  */
 async function uploadIfDataUrl(
-  value: Record<string, unknown>,
-  // @ts-ignore - TODO: strict typing
-  category: Record<string, unknown> = "uploads",
-  // @ts-ignore - TODO: strict typing
-  project: Record<string, unknown> = null,
-  // @ts-ignore - TODO: strict typing
-  username: string = null,
+  value: any,
+    category: any = "uploads",
+    project: any = null,
+    username: string | null = null,
 ) {
-  // @ts-ignore - TODO: strict typing
-  if (typeof value === "string" && value.startsWith("data:")) {
+    if (typeof value === "string" && (value as any).startsWith("data:")) {
     try {
-      const { ref } = await FileService.uploadFile(
+      const { ref } = await (FileService as any).uploadFile(
         value,
-        // @ts-ignore - TODO: strict typing
-        category,
+                (category as any),
         project,
         username,
       );
       return ref;
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`Workflow file upload failed: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`Workflow file upload failed: ${(error as Error).message}`);
       return value;
     }
   }
@@ -56,17 +49,14 @@ async function uploadIfDataUrl(
  * used by ConversationService for chat messages.
  */
 async function extractWorkflowFiles(
-  nodes: Record<string, unknown>,
-  // @ts-ignore - TODO: strict typing
-  project: Record<string, unknown> = null,
-  // @ts-ignore - TODO: strict typing
-  username: string = null,
+  nodes: any,
+    project: any = null,
+    username: string | null = null,
 ) {
-  if (!Array.isArray(nodes) || !FileService.isExternalStorage()) return nodes;
+  if (!Array.isArray(nodes) || !(FileService as any).isExternalStorage()) return nodes;
 
-  const processed: Record<string, unknown>[] = [];
-  // @ts-ignore
-  for ( const node of nodes) {
+  const processed: any[] = [];
+    for ( const node of nodes) {
     const updated = { ...node };
 
     // 1. Node-level content (asset input nodes store content as a data URL)
@@ -76,8 +66,7 @@ async function extractWorkflowFiles(
     ) {
       updated.content = await uploadIfDataUrl(
         updated.content,
-        // @ts-ignore - TODO: strict typing
-        "uploads",
+                ("uploads" as any),
         project,
         username,
       );
@@ -85,26 +74,21 @@ async function extractWorkflowFiles(
 
     // 2. Messages array (conversation / model nodes)
     if (Array.isArray(updated.messages)) {
-      const newMessages: Record<string, unknown>[] = [];
-      // @ts-ignore
-      for ( const message of updated.messages) {
+      const newMessages: any[] = [];
+            for ( const message of updated.messages) {
         const m = { ...message };
-        // @ts-ignore
-        for ( const field of MEDIA_FIELDS) {
+                for ( const field of MEDIA_FIELDS) {
           const value = m[field];
           if (Array.isArray(value)) {
-            const array: Record<string, unknown>[] = [];
-            // @ts-ignore
-            for ( const item of value) {
+            const array: any[] = [];
+                        for ( const item of value) {
               array.push(
-                // @ts-ignore - TODO: strict typing
-                await uploadIfDataUrl(item, "uploads", project, username),
+                                (await uploadIfDataUrl(item, ("uploads" as any), project, username) as any),
               );
             }
             m[field] = array;
           } else if (typeof value === "string" && value.startsWith("data:")) {
-            // @ts-ignore - TODO: strict typing
-            m[field] = await uploadIfDataUrl(value, "uploads", project, username);
+                        m[field] = await uploadIfDataUrl((value as any), ("uploads" as any), project, username);
           }
         }
         newMessages.push(m);
@@ -117,14 +101,11 @@ async function extractWorkflowFiles(
       updated.receivedOutputs &&
       typeof updated.receivedOutputs === "object"
     ) {
-      const newReceived = {};
-      // @ts-ignore
-      for ( const [mod, data] of Object.entries(updated.receivedOutputs)) {
-        // @ts-ignore
-        newReceived[mod] = await uploadIfDataUrl(
-          // @ts-ignore - TODO: strict typing
-          data,
-          "uploads",
+      const newReceived: any = {};
+            for ( const [mod, data] of Object.entries(updated.receivedOutputs)) {
+                newReceived[mod] = await uploadIfDataUrl(
+                    (data as any),
+          ("uploads" as any),
           project,
           username,
         );
@@ -142,54 +123,44 @@ async function extractWorkflowFiles(
  * Shape: { [nodeId]: { [modality]: dataUrl | messagesArray } }
  */
 async function extractNodeResultFiles(
-  nodeResults: Record<string, unknown>,
-  // @ts-ignore - TODO: strict typing
-  project: Record<string, unknown> = null,
-  // @ts-ignore - TODO: strict typing
-  username: string = null,
+  nodeResults: any,
+    project: any = null,
+    username: string | null = null,
 ) {
   if (
     !nodeResults ||
     typeof nodeResults !== "object" ||
-    !FileService.isExternalStorage()
+    !(FileService as any).isExternalStorage()
   )
     return nodeResults;
 
-  const processed = {};
-  // @ts-ignore
-  for ( const [nodeId, outputs] of Object.entries(nodeResults)) {
+  const processed: any = {};
+    for ( const [nodeId, outputs] of Object.entries(nodeResults)) {
     if (!outputs || typeof outputs !== "object") {
-      // @ts-ignore
-      processed[nodeId] = outputs;
+            processed[nodeId] = outputs;
       continue;
     }
-    const newOutputs = {};
-    // @ts-ignore
-    for ( const [mod, data] of Object.entries(outputs)) {
+    const newOutputs: any = {};
+        for ( const [mod, data] of Object.entries(outputs)) {
       // conversation modality is an array of message objects with nested media
       if (mod === "conversation" && Array.isArray(data)) {
-        const msgs: Record<string, unknown>[] = [];
-        // @ts-ignore
-        for ( const message of data) {
+        const msgs: any[] = [];
+                for ( const message of data) {
           const m = { ...message };
-          // @ts-ignore
-          for ( const field of MEDIA_FIELDS) {
+                    for ( const field of MEDIA_FIELDS) {
             const value = m[field];
             if (Array.isArray(value)) {
-              const array: Record<string, unknown>[] = [];
-              // @ts-ignore
-              for ( const item of value) {
+              const array: any[] = [];
+                            for ( const item of value) {
                 array.push(
-                  // @ts-ignore - TODO: strict typing
-                  await uploadIfDataUrl(item, "uploads", project, username),
+                                    (await uploadIfDataUrl(item, ("uploads" as any), project, username) as any),
                 );
               }
               m[field] = array;
             } else if (typeof value === "string" && value.startsWith("data:")) {
               m[field] = await uploadIfDataUrl(
-                // @ts-ignore - TODO: strict typing
-                value,
-                "uploads",
+                                (value as any),
+                ("uploads" as any),
                 project,
                 username,
               );
@@ -197,21 +168,17 @@ async function extractNodeResultFiles(
           }
           msgs.push(m);
         }
-        // @ts-ignore
-        newOutputs[mod] = msgs;
+                newOutputs[mod] = msgs;
       } else {
-        // @ts-ignore
-        newOutputs[mod] = await uploadIfDataUrl(
+                newOutputs[mod] = await uploadIfDataUrl(
           data,
-          // @ts-ignore - TODO: strict typing
-          "uploads",
+                    ("uploads" as any),
           project,
           username,
         );
       }
     }
-    // @ts-ignore
-    processed[nodeId] = newOutputs;
+        processed[nodeId] = newOutputs;
   }
   return processed;
 }
@@ -220,11 +187,9 @@ async function extractNodeResultFiles(
  * Convert a minio:// ref to an HTTP /files/ URL.
  * Non-minio strings (data URLs, http URLs, etc.) pass through unchanged.
  */
-function resolveMinioRef(value: Record<string, unknown>, baseUrl: Record<string, unknown>) {
-  // @ts-ignore - TODO: strict typing
-  if (typeof value === "string" && value.startsWith("minio://")) {
-    // @ts-ignore - TODO: strict typing
-    const key = value.replace("minio://", "");
+function resolveMinioRef(value: any, baseUrl: any) {
+    if (typeof value === "string" && (value as any).startsWith("minio://")) {
+        const key = (value as any).replace("minio://", "");
     // Use direct MinIO URL when available, otherwise proxy through Prism
     const minioBase = MinioWrapper.getBucketUrl();
     if (minioBase) return `${minioBase}/${key}`;
@@ -237,11 +202,10 @@ function resolveMinioRef(value: Record<string, unknown>, baseUrl: Record<string,
  * Walk a workflow document and replace all minio:// refs with HTTP /files/ URLs
  * so the frontend receives browser-renderable URLs directly.
  */
-function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: Record<string, unknown>) {
+function resolveWorkflowFileRefs(workflow: any, baseUrl: any) {
   // Resolve nodes
   if (Array.isArray(workflow.nodes)) {
-    // @ts-ignore
-    for ( const node of workflow.nodes) {
+        for ( const node of workflow.nodes) {
       // Node-level content (asset input nodes)
       if (typeof node.content === "string") {
         node.content = resolveMinioRef(node.content, baseUrl);
@@ -249,18 +213,15 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: Rec
 
       // Messages array (conversation / model nodes)
       if (Array.isArray(node.messages)) {
-        // @ts-ignore
-        for ( const message of node.messages) {
-          // @ts-ignore
-          for ( const field of MEDIA_FIELDS) {
+                for ( const message of node.messages) {
+                    for ( const field of MEDIA_FIELDS) {
             const value = message[field];
             if (Array.isArray(value)) {
-              message[field] = value.map((item: Record<string, unknown>) =>
+              message[field] = value.map((item: any) =>
                 resolveMinioRef(item, baseUrl),
               );
             } else if (typeof value === "string") {
-              // @ts-ignore - TODO: strict typing
-              message[field] = resolveMinioRef(value, baseUrl);
+                            message[field] = resolveMinioRef((value as any), baseUrl);
             }
           }
         }
@@ -268,10 +229,8 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: Rec
 
       // Viewer receivedOutputs
       if (node.receivedOutputs && typeof node.receivedOutputs === "object") {
-        // @ts-ignore
-        for ( const [mod, data] of Object.entries(node.receivedOutputs)) {
-          // @ts-ignore - TODO: strict typing
-          node.receivedOutputs[mod] = resolveMinioRef(data, baseUrl);
+                for ( const [mod, data] of Object.entries(node.receivedOutputs)) {
+                    node.receivedOutputs[mod] = resolveMinioRef((data as any), baseUrl);
         }
       }
     }
@@ -279,31 +238,25 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: Rec
 
   // Resolve nodeResults: { [nodeId]: { [modality]: value | messagesArray } }
   if (workflow.nodeResults && typeof workflow.nodeResults === "object") {
-    // @ts-ignore
-    for ( const outputs of Object.values(workflow.nodeResults)) {
+        for ( const outputs of Object.values(workflow.nodeResults) as any[]) {
       if (!outputs || typeof outputs !== "object") continue;
-      // @ts-ignore
-      for ( const [mod, data] of Object.entries(outputs)) {
+            for ( const [mod, data] of Object.entries(outputs)) {
         // conversation modality is an array of message objects with nested media
         if (mod === "conversation" && Array.isArray(data)) {
-          // @ts-ignore
-          for ( const message of data) {
-            // @ts-ignore
-            for ( const field of MEDIA_FIELDS) {
+                    for ( const message of data) {
+                        for ( const field of MEDIA_FIELDS) {
               const value = message[field];
               if (Array.isArray(value)) {
-                message[field] = value.map((item: Record<string, unknown>) =>
+                message[field] = value.map((item: any) =>
                   resolveMinioRef(item, baseUrl),
                 );
               } else if (typeof value === "string") {
-                // @ts-ignore - TODO: strict typing
-                message[field] = resolveMinioRef(value, baseUrl);
+                                message[field] = resolveMinioRef((value as any), baseUrl);
               }
             }
           }
         } else {
-          // @ts-ignore
-          outputs[mod] = resolveMinioRef(data, baseUrl);
+                    outputs[mod] = resolveMinioRef((data as any), baseUrl);
         }
       }
     }
@@ -315,11 +268,9 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: Rec
 /**
  * Build the external base URL from the request (handles proxies, HTTPS, etc.).
  */
-function getBaseUrl(req: Record<string, unknown>) {
-  // @ts-ignore - TODO: strict typing
-  const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
-  // @ts-ignore - TODO: strict typing
-  const host = req.headers["x-forwarded-host"] || req.get("host");
+function getBaseUrl(req: any) {
+    const proto = (req as any).headers["x-forwarded-proto"] || req.protocol || "http";
+    const host = (req as any).headers["x-forwarded-host"] || (req as any).get("host");
   return `${proto}://${host}`;
 }
 
@@ -328,26 +279,22 @@ function getBaseUrl(req: Record<string, unknown>) {
  * Single source of truth for providers and modalities.
  * Cost is computed separately from linked conversations (PATCH endpoint).
  */
-function computeWorkflowMeta(nodes: Record<string, unknown>) {
+function computeWorkflowMeta(nodes: any) {
   const providers = [
     ...new Set(
-      // @ts-ignore - TODO: strict typing
-      (nodes || [])
-        .filter((n: Record<string, unknown>) => !n.nodeType && n.provider)
-        .map((n: Record<string, unknown>) => n.provider),
+            (nodes || [])
+        .filter((n: any) => !n.nodeType && n.provider)
+        .map((n: any) => n.provider),
     ),
   ];
-  const modalities = {};
-  // @ts-ignore
-  for ( const n of nodes || []) {
+  const modalities: any = {};
+    for ( const n of nodes || []) {
     // Only include boundary nodes: input assets define workflow inputs,
     // viewer nodes define workflow outputs
     if (n.nodeType === "input") {
-      // @ts-ignore
-      for ( const t of n.outputTypes || []) modalities[`${t}In`] = true;
+            for ( const t of n.outputTypes || []) modalities[`${t}In`] = true;
     } else if (n.nodeType === "viewer") {
-      // @ts-ignore
-      for ( const t of n.inputTypes || []) modalities[`${t}Out`] = true;
+            for ( const t of n.inputTypes || []) modalities[`${t}Out`] = true;
     }
   }
   return { providers, modalities };
@@ -359,10 +306,9 @@ function computeWorkflowMeta(nodes: Record<string, unknown>) {
  */
 router.get(
   "/",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncHandler(async (req: any, res: any, next: any) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
       const source = req.query.source || "prism-client";
       const query = source === "all" ? {} : { source };
@@ -375,9 +321,8 @@ router.get(
         .toArray();
 
       res.json(workflows);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`GET /workflows error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`GET /workflows error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -389,15 +334,13 @@ router.get(
  */
 router.get(
   "/:id",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncHandler(async (req: any, res: any, next: any) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
-      let filter: Record<string, unknown>;
+      let filter: any;
       try {
-        // @ts-ignore - TODO: strict typing
-        filter = { _id: new ObjectId(req.params.id) };
+                filter = { _id: new ObjectId(req.params.id) };
       } catch {
         filter = { workflowId: req.params.id };
       }
@@ -406,15 +349,12 @@ router.get(
       if (!workflow)
         return res.status(404).json({ error: "Workflow not found" });
 
-      // @ts-ignore - TODO: strict typing
-      const baseUrl = getBaseUrl(req);
-      // @ts-ignore - TODO: strict typing
-      resolveWorkflowFileRefs(workflow, baseUrl);
+            const baseUrl = getBaseUrl((req as any));
+            resolveWorkflowFileRefs(workflow, (baseUrl as any));
 
       res.json(workflow);
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`GET /workflows/:id error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`GET /workflows/:id error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -432,10 +372,9 @@ router.get(
  */
 router.post(
   "/",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncHandler(async (req: any, res: any, next: any) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
       const project = req.project;
       const username = req.username || null;
@@ -456,22 +395,19 @@ router.post(
 
       const processedNodes = await extractWorkflowFiles(
         nodes,
-        // @ts-ignore - TODO: strict typing
-        project,
-        username,
+                (project as any | undefined),
+        (username as any | undefined),
       );
       const processedResults = await extractNodeResultFiles(
         nodeResults,
-        // @ts-ignore - TODO: strict typing
-        project,
-        username,
+                (project as any | undefined),
+        (username as any | undefined),
       );
 
       const now = new Date().toISOString();
       const finalNodes = processedNodes || nodes;
 
-      // @ts-ignore - TODO: strict typing
-      const meta = computeWorkflowMeta(finalNodes);
+            const meta = computeWorkflowMeta((finalNodes as any));
 
       // Compute totalCost from linked conversations (source of truth for cost)
       let totalCost = 0;
@@ -483,8 +419,7 @@ router.post(
           .project({ totalCost: 1 })
           .toArray();
         totalCost = conversations.reduce(
-          // @ts-ignore - TODO: strict typing
-          (sum: Record<string, unknown>, c: Record<string, unknown>) => sum + (c.totalCost || 0),
+                    (sum: any, c: any) => sum + (c.totalCost || 0),
           0,
         );
       }
@@ -505,9 +440,8 @@ router.post(
 
       const result = await db.collection(WORKFLOWS_COL).insertOne(workflow);
       res.json({ success: true, id: result.insertedId.toString() });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`POST /workflows error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`POST /workflows error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -519,15 +453,13 @@ router.post(
  */
 router.put(
   "/:id",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncHandler(async (req: any, res: any, next: any) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
-      let filter: Record<string, unknown>;
+      let filter: any;
       try {
-        // @ts-ignore - TODO: strict typing
-        filter = { _id: new ObjectId(req.params.id) };
+                filter = { _id: new ObjectId(req.params.id) };
       } catch {
         filter = { workflowId: req.params.id };
       }
@@ -536,8 +468,7 @@ router.put(
       const username = req.username || null;
       const body = { ...req.body };
       if (Array.isArray(body.nodes)) {
-        // @ts-ignore - TODO: strict typing
-        body.nodes = await extractWorkflowFiles(body.nodes, project, username);
+                body.nodes = await extractWorkflowFiles(body.nodes, (project as any | undefined), (username as any | undefined));
         body.nodeCount = body.nodes.length;
 
         // Recompute metadata
@@ -546,9 +477,8 @@ router.put(
       if (body.nodeResults && typeof body.nodeResults === "object") {
         body.nodeResults = await extractNodeResultFiles(
           body.nodeResults,
-          // @ts-ignore - TODO: strict typing
-          project,
-          username,
+                    (project as any | undefined),
+          (username as any | undefined),
         );
       }
       if (Array.isArray(body.edges)) body.edgeCount = body.edges.length;
@@ -567,9 +497,8 @@ router.put(
         return res.status(404).json({ error: "Workflow not found" });
 
       res.json({ success: true });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`PUT /workflows/:id error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`PUT /workflows/:id error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -582,15 +511,13 @@ router.put(
  */
 router.patch(
   "/:id/conversations",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncHandler(async (req: any, res: any, next: any) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
-      let filter: Record<string, unknown>;
+      let filter: any;
       try {
-        // @ts-ignore - TODO: strict typing
-        filter = { _id: new ObjectId(req.params.id) };
+                filter = { _id: new ObjectId(req.params.id) };
       } catch {
         filter = { workflowId: req.params.id };
       }
@@ -621,8 +548,7 @@ router.patch(
           .project({ totalCost: 1 })
           .toArray();
         const totalCost = conversations.reduce(
-          // @ts-ignore - TODO: strict typing
-          (sum: Record<string, unknown>, c: Record<string, unknown>) => sum + (c.totalCost || 0),
+                    (sum: any, c: any) => sum + (c.totalCost || 0),
           0,
         );
         await db.collection(WORKFLOWS_COL).updateOne(filter, {
@@ -631,10 +557,9 @@ router.patch(
       }
 
       res.json({ success: true });
-    } catch (error: unknown) {
+    } catch (error: any) {
       logger.error(
-        // @ts-ignore - TODO: strict typing
-        `PATCH /workflows/:id/conversations error: ${error.message}`,
+                `PATCH /workflows/:id/conversations error: ${(error as Error).message}`,
       );
       next(error);
     }
@@ -647,24 +572,21 @@ router.patch(
  */
 router.delete(
   "/:id",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncHandler(async (req: any, res: any, next: any) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
-      let filter: Record<string, unknown>;
+      let filter: any;
       try {
-        // @ts-ignore - TODO: strict typing
-        filter = { _id: new ObjectId(req.params.id) };
+                filter = { _id: new ObjectId(req.params.id) };
       } catch {
         filter = { workflowId: req.params.id };
       }
 
       await db.collection(WORKFLOWS_COL).deleteOne(filter);
       res.json({ success: true });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`DELETE /workflows/:id error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`DELETE /workflows/:id error: ${(error as Error).message}`);
       next(error);
     }
   }),

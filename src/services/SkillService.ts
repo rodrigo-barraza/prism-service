@@ -1,5 +1,4 @@
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
@@ -107,20 +106,17 @@ const SkillService = {
 
 
    */
-  // @ts-ignore
-  async list({ project, limit = 50 }: Record<string, unknown> = {}) {
+    async list({ project, limit = 50 }: Record<string, unknown> = {}) {
     const col = getCollection();
     if (!col) return { skills: [], total: 0 };
 
-    const filter = {};
-    // @ts-ignore
-    if (project) filter.project = project;
+    const filter: Record<string, unknown> = {};
+        if (project) filter.project = project;
 
     const skills = await col
       .find(filter)
       .sort({ usageCount: -1, name: 1 })
-      // @ts-ignore - TODO: strict typing
-      .limit(Math.min(limit, 100))
+            .limit(Math.min((limit as any), 100))
       .toArray();
 
     return {
@@ -185,8 +181,7 @@ const SkillService = {
 
     // Interpolate variables into the prompt template
     let prompt = document.prompt;
-    // @ts-ignore
-    for ( const [key, value] of Object.entries(variables)) {
+        for ( const [key, value] of Object.entries(variables)) {
       prompt = prompt.replace(
         new RegExp(`\\{\\{${key}\\}\\}`, "g"),
         String(value),
@@ -196,8 +191,7 @@ const SkillService = {
     // Warn about unresolved variables
     const unresolvedMatch = prompt.match(/\{\{(\w+)\}\}/g);
     const unresolved = unresolvedMatch
-      // @ts-ignore - TODO: strict typing
-      ? [...new Set(unresolvedMatch.map((m: Record<string, unknown>) => m.slice(2, -2)))]
+            ? [...new Set(unresolvedMatch.map((m: Record<string, any>) => (m as any).slice(2, -2)))]
       : [];
 
     // Increment usage counter

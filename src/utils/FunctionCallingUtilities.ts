@@ -24,14 +24,12 @@ const TRUNCATABLE_ARRAY_KEYS = [
  * The full result is still stored in the DB and shown in the UI;
  * this only affects what gets re-sent to the model.
  */
-// @ts-ignore - TODO: strict typing
-export function truncateToolResult(result: Record<string, unknown>, maxChars: Record<string, unknown> = 8000) {
+export function truncateToolResult(result: any, maxChars: any = 8000) {
   if (!result || typeof result !== "object") return result;
 
   // If result has a known array wrapper, cap items at 10
   const trimmed = { ...result };
-  // @ts-ignore
-  for ( const key of TRUNCATABLE_ARRAY_KEYS) {
+    for ( const key of TRUNCATABLE_ARRAY_KEYS) {
     if (Array.isArray(trimmed[key]) && trimmed[key].length > 10) {
       const total = trimmed[key].length;
       trimmed[key] = trimmed[key].slice(0, 10);
@@ -44,15 +42,12 @@ export function truncateToolResult(result: Record<string, unknown>, maxChars: Re
     const sliced = result.slice(0, 10);
     sliced.push({ _truncated: `Showing 10 of ${result.length}` });
     const str = JSON.stringify(sliced);
-    // @ts-ignore - TODO: strict typing
-    return str.length > maxChars ? str.slice(0, maxChars) + "…}" : sliced;
+        return str.length > maxChars ? str.slice(0, (maxChars as any)) + "…}" : sliced;
   }
 
   const str = JSON.stringify(trimmed);
-  // @ts-ignore - TODO: strict typing
-  if (str.length <= maxChars) return trimmed;
-  // @ts-ignore - TODO: strict typing
-  return str.slice(0, maxChars) + "…}";
+    if (str.length <= maxChars) return trimmed;
+    return str.slice(0, (maxChars as any)) + "…}";
 }
 
 /**
@@ -66,35 +61,28 @@ export function truncateToolResult(result: Record<string, unknown>, maxChars: Re
  * @returns {Array} Provider-ready messages
  */
 export function expandMessagesForFC(
-  messages: Record<string, unknown>,
-  { filterDeleted = true }: Record<string, unknown> = {},
+  messages: any,
+  { filterDeleted = true }: any = {},
 ) {
   const filtered = filterDeleted
-    // @ts-ignore - TODO: strict typing
-    ? messages.filter(
-        (m: Record<string, unknown>) =>
+        ? (messages as any).filter(
+        (m: any) =>
           !m.deleted &&
-          // @ts-ignore - TODO: strict typing
-          (m.role !== "assistant" || m.content?.trim() || m.toolCalls?.length),
+                    (m.role !== "assistant" || (m.content as any)?.trim() || (m.toolCalls as any)?.length),
       )
     : messages;
 
-  return filtered.flatMap((m: Record<string, unknown>) => {
+  return filtered.flatMap((m: any) => {
     // Expand assistant messages with toolCalls into
     // [assistant(tool_calls), tool(result1), tool(result2), ...]
-    // @ts-ignore - TODO: strict typing
-    if (m.role === "assistant" && m.toolCalls?.length > 0) {
+        if (m.role === "assistant" && (m.toolCalls as any)?.length > 0) {
       const assistantMsg = {
         role: "assistant",
-        // @ts-ignore - TODO: strict typing
-        content: m.content?.trim() || null,
+                content: (m.content as any)?.trim() || null,
         // Preserve thinking + signature for Anthropic multi-turn round-trips
-        // @ts-ignore - TODO: strict typing
-        ...(m.thinking && { thinking: m.thinking }),
-        // @ts-ignore - TODO: strict typing
-        ...(m.thinkingSignature && { thinkingSignature: m.thinkingSignature }),
-        // @ts-ignore - TODO: strict typing
-        toolCalls: m.toolCalls.map((tc: Record<string, unknown>) => ({
+                ...(m.thinking && { thinking: m.thinking }),
+                ...(m.thinkingSignature && { thinkingSignature: m.thinkingSignature }),
+                toolCalls: (m as any).toolCalls.map((tc: any) => ({
           id: tc.id,
           name: tc.name,
           args: tc.args,
@@ -106,18 +94,16 @@ export function expandMessagesForFC(
             : {}),
         })),
       };
-      // @ts-ignore - TODO: strict typing
-      const toolMsgs = m.toolCalls
-        .filter((tc: Record<string, unknown>) => tc.result !== undefined)
-        .map((tc: Record<string, unknown>) => ({
+            const toolMsgs = (m as any).toolCalls
+        .filter((tc: any) => tc.result !== undefined)
+        .map((tc: any) => ({
           role: "tool",
           name: tc.name,
           tool_call_id: tc.id,
           content:
             typeof tc.result === "string"
               ? tc.result
-              // @ts-ignore - TODO: strict typing
-              : JSON.stringify(truncateToolResult(tc.result)),
+                            : JSON.stringify(truncateToolResult((tc.result as any))),
         }));
       return [assistantMsg, ...toolMsgs];
     }
@@ -140,16 +126,11 @@ export function expandMessagesForFC(
     return [
       {
         role: m.role,
-        // @ts-ignore - TODO: strict typing
-        ...(m.content?.trim() ? { content: m.content } : { content: " " }),
-        // @ts-ignore - TODO: strict typing
-        ...(m.images?.length > 0 ? { images: m.images } : {}),
-        // @ts-ignore - TODO: strict typing
-        ...(m.video?.length > 0 ? { video: m.video } : {}),
-        // @ts-ignore - TODO: strict typing
-        ...(m.audio?.length > 0 ? { audio: m.audio } : {}),
-        // @ts-ignore - TODO: strict typing
-        ...(m.pdf?.length > 0 ? { pdf: m.pdf } : {}),
+                ...((m.content as any)?.trim() ? { content: m.content } : { content: " " }),
+                ...((m.images as any)?.length > 0 ? { images: m.images } : {}),
+                ...((m.video as any)?.length > 0 ? { video: m.video } : {}),
+                ...((m.audio as any)?.length > 0 ? { audio: m.audio } : {}),
+                ...((m.pdf as any)?.length > 0 ? { pdf: m.pdf } : {}),
         ...(m.role === "assistant" && m.thinking
           ? { thinking: m.thinking }
           : {}),

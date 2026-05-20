@@ -6,8 +6,7 @@ import {
   PROVIDER_VLLM,
   PROVIDER_OLLAMA,
   PROVIDER_LLAMA_CPP,
-  // @ts-ignore
-} from "../../config.ts";
+  } from "../../config.ts";
 
 // Import factories
 import { createLmStudioProvider } from "./lm-studio.ts";
@@ -54,8 +53,7 @@ const registry = new Map<string, InstanceEntry>();
  * @param {Array<{url: string, concurrency?: number, nickname?: string}>} instances
  */
 function registerType(type: string, instances: ProviderInstanceConfig[]) {
-  // @ts-ignore
-  const factory = FACTORIES[type];
+    const factory = (FACTORIES as any)[type];
   if (!factory) return;
 
   for (let i = 0; i < instances.length; i++) {
@@ -75,8 +73,7 @@ function registerType(type: string, instances: ProviderInstanceConfig[]) {
       instanceNumber,
       provider,
     };
-    // @ts-ignore
-    if (nickname) entry.nickname = nickname;
+        if (nickname) (entry as any).nickname = nickname;
 
     registry.set(id, entry);
 
@@ -88,7 +85,6 @@ function registerType(type: string, instances: ProviderInstanceConfig[]) {
 }
 
 // ── Register all instances from secrets ─────────────────────
-// @ts-ignore
 for ( const [type, instances] of Object.entries(PROVIDER_ARRAYS)) {
   registerType(type, instances);
 }

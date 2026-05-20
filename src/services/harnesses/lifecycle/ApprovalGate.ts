@@ -25,8 +25,7 @@ export async function checkAndWaitForApproval(
 ): Promise<{ approved: boolean; approveAll: boolean }> {
   const { agentSessionId, emit, options } = context;
 
-  // @ts-ignore - TODO: strict typing
-  const { needsApproval } = approvalEngine.checkBatch(toolCalls);
+    const { needsApproval } = approvalEngine.checkBatch((toolCalls as any));
 
   if (needsApproval.length === 0 || options.autoApprove) {
     return { approved: true, approveAll: false };
@@ -41,10 +40,8 @@ export async function checkAndWaitForApproval(
         args: toolCallRequiringApproval.args,
         id: toolCallRequiringApproval.id,
       },
-      // @ts-ignore - TODO: strict typing
-      tier: toolCallRequiringApproval._approval?.tier,
-      // @ts-ignore - TODO: strict typing
-      tierLabel: toolCallRequiringApproval._approval?.tierLabel,
+            tier: (toolCallRequiringApproval._approval as any)?.tier,
+            tierLabel: (toolCallRequiringApproval._approval as any)?.tierLabel,
     });
   }
 
@@ -53,10 +50,10 @@ export async function checkAndWaitForApproval(
     approved: boolean;
     approveAll?: boolean;
     reason?: string;
-  }>((resolve) => {
+  }>((resolve: unknown) => {
     const timeoutId = setTimeout(() => {
       pendingApprovals.delete(agentSessionId);
-      resolve({ approved: false, reason: "timeout" });
+      (resolve as any)({ approved: false, reason: "timeout" });
     }, APPROVAL_TIMEOUT_MS);
 
     pendingApprovals.set(agentSessionId, {
@@ -67,17 +64,17 @@ export async function checkAndWaitForApproval(
       }) => {
         clearTimeout(timeoutId);
         pendingApprovals.delete(agentSessionId);
-        resolve(value);
+        (resolve as any)(value);
       },
       type: "tool",
-      tools: needsApproval.map((toolCall) => toolCall.name),
+      tools: needsApproval.map((toolCall: unknown) => (toolCall as any).name),
     });
   });
 
   if (!approvalResult?.approved) {
     emit({
       type: "status",
-      message: `Tool execution rejected: ${needsApproval.map((toolCall) => toolCall.name).join(", ")}`,
+      message: `Tool execution rejected: ${needsApproval.map((toolCall: unknown) => (toolCall as any).name).join(", ")}`,
     });
     return { approved: false, approveAll: false };
   }

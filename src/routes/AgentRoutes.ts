@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import AgenticLoopService from "../services/AgenticLoopService.ts";
@@ -71,12 +70,10 @@ router.post(
     }
 
     // Normalize: structured answers take priority, fall back to simple string
-    let normalizedAnswers: Record<string, unknown>;
+    let normalizedAnswers: { answer: string | string[]; annotations?: string }[];
     if (Array.isArray(answers) && answers.length > 0) {
-      // @ts-ignore - TODO: strict typing
-      normalizedAnswers = answers;
+      normalizedAnswers = answers as { answer: string | string[]; annotations?: string }[];
     } else if (answer !== undefined && answer !== null) {
-      // @ts-ignore - TODO: strict typing
       normalizedAnswers = [{ answer: String(answer) }];
     } else {
       return res.status(400).json({ error: "Missing answer or answers" });
@@ -84,7 +81,6 @@ router.post(
 
     const resolved = AgenticLoopService.resolveUserQuestion(
       agentSessionId,
-      // @ts-ignore - TODO: strict typing
       normalizedAnswers,
     );
 
@@ -126,24 +122,20 @@ router.post(
       ...req.body,
       functionCallingEnabled: true,
       agenticLoopEnabled: true,
-      project: req.project,
-      username: req.username,
-      clientIp: req.clientIp,
-      // @ts-ignore - TODO: strict typing
-      agent: req.body.agent || req.agent || null,
+      project: (req as any).project,
+      username: (req as any).username,
+      clientIp: (req as any).clientIp,
+      agent: req.body.agent || (req as any).agent || null,
       // Multi-workspace: override the default workspace root when the user has
       // selected a non-default workspace in the Prism Client sidebar. Sources:
       //   1. x-workspace-root header (set by Prism Client's serviceHeaders.js)
       //   2. body.workspaceRoot (for server-to-server / API callers)
-      // @ts-ignore - TODO: strict typing
-      workspaceRoot: req.workspaceRoot || req.body.workspaceRoot || null,
+      workspaceRoot: (req as any).workspaceRoot || req.body.workspaceRoot || null,
     };
 
     if (req.query.stream !== "false") {
-      // @ts-ignore - TODO: strict typing
       await handleSseRequest(req, res, params, handleAgent);
     } else {
-      // @ts-ignore - TODO: strict typing
       await handleJsonRequest(req, res, next, params, handleAgent);
     }
   }),

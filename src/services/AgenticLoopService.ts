@@ -55,15 +55,13 @@ export default class AgenticLoopService {
       try {
         const { default: SettingsService } =
           await import("./SettingsService.js");
-        // @ts-ignore - TODO: strict typing
-        const agentSettings = await SettingsService.getSection("agents");
+                const agentSettings = await SettingsService.getSection(("agents" as any));
         harnessId = agentSettings?.harness || "standard";
       } catch {
         harnessId = "standard";
       }
     }
-    // @ts-ignore - TODO: strict typing
-    const HarnessClass = HarnessRegistry.get(harnessId);
+        const HarnessClass = HarnessRegistry.get((harnessId as any));
     logger.info(
       `[AgenticLoop] Using harness: "${HarnessClass.id}" (${HarnessClass.label})`,
     );
@@ -78,13 +76,11 @@ export default class AgenticLoopService {
       pendingQuestions.delete(agentSessionId);
       if (!parentAgentSessionId) {
         const trackerSessionId = parentAgentSessionId || agentSessionId;
-        // @ts-ignore - TODO: strict typing
-        SessionGenerationTracker.cleanup(trackerSessionId);
+                (SessionGenerationTracker as any).cleanup((trackerSessionId as any));
         try {
           const { default: CoordinatorService } =
             await import("./CoordinatorService.js");
-          // @ts-ignore - TODO: strict typing
-          CoordinatorService.cleanupSession(agentSessionId);
+                    CoordinatorService.cleanupSession((agentSessionId as any));
         } catch {
           /* CoordinatorService may not be used */
         }
@@ -132,9 +128,9 @@ export default class AgenticLoopService {
   static _setPendingQuestion(
     agentSessionId: string,
     entry: {
-      resolve: (value: unknown) => void;
+      resolve: (value: any) => void;
       question?: string;
-      questions?: unknown[];
+      questions?: any[];
       choices?: string[];
     },
   ): void {
@@ -172,7 +168,6 @@ export default class AgenticLoopService {
     label: string;
     description: string;
   }> {
-    // @ts-ignore - TODO: strict typing
-    return HarnessRegistry.list();
+        return HarnessRegistry.list();
   }
 }

@@ -23,8 +23,7 @@ import logger from "../utils/logger.ts";
 export default class AgentHooks extends EventEmitter {
   constructor() {
     super();
-    // @ts-ignore
-    this._hooks = new Map();
+        (this as any)._hooks = new Map();
   }
 
   /**
@@ -34,14 +33,11 @@ export default class AgentHooks extends EventEmitter {
 
 
    */
-  register(event: Record<string, unknown>, handler: Record<string, unknown>, name: string) {
-    // @ts-ignore
-    if (!this._hooks.has(event)) {
-      // @ts-ignore
-      this._hooks.set(event, []);
+  register(event: any, handler: any, name: string) {
+        if (!(this as any)._hooks.has(event)) {
+            (this as any)._hooks.set(event, []);
     }
-    // @ts-ignore
-    this._hooks
+        (this as any)._hooks
       .get(event)
       .push({ handler, name: name || handler.name || "anonymous" });
   }
@@ -54,31 +50,24 @@ export default class AgentHooks extends EventEmitter {
 
    * @returns {Promise<object|undefined>} Merged results from handlers
    */
-  // @ts-ignore - TODO: strict typing
-  async run(event: Record<string, unknown>, ...args: Record<string, unknown>) {
-    // @ts-ignore
-    const hooks = this._hooks.get(event) || [];
-    let result: Record<string, unknown>;
+    async run(event: any, ...args: any) {
+        const hooks = (this as any)._hooks.get(event) || [];
+    let result: any;
 
-    // @ts-ignore
-    for ( const { handler, name } of hooks) {
+        for ( const { handler, name } of hooks) {
       try {
-        // @ts-ignore - TODO: strict typing
-        const hookResult = await handler(...args);
+                const hookResult = await handler(...args);
         if (hookResult && typeof hookResult === "object") {
-          // @ts-ignore - TODO: strict typing
-          result = { ...result, ...hookResult };
+                    result = { ...result, ...hookResult };
         }
-      } catch (error: unknown) {
+      } catch (error: any) {
         logger.error(
-          // @ts-ignore - TODO: strict typing
-          `[AgentHooks] Hook "${name}" on "${event}" failed: ${error.message}`,
+                    `[AgentHooks] Hook "${name}" on "${event}" failed: ${(error as Error).message}`,
         );
       }
     }
 
-    // @ts-ignore - TODO: strict typing
-    return result;
+        return result;
   }
 
   /**
@@ -86,8 +75,7 @@ export default class AgentHooks extends EventEmitter {
 
 
    */
-  hasHooks(event: Record<string, unknown>) {
-    // @ts-ignore
-    return (this._hooks.get(event) || []).length > 0;
+  hasHooks(event: any) {
+        return ((this as any)._hooks.get(event) || []).length > 0;
   }
 }

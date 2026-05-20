@@ -9,7 +9,6 @@
 // This adapter bridges the positional-args API to the config-object API.
 // ─────────────────────────────────────────────────────────────────────
 
-// @ts-ignore
 import { MinioManager } from "@rodrigo-barraza/service-library/minio";
 import logger from "../utils/logger.ts";
 

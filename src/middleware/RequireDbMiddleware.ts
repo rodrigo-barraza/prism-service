@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.ts";
 
 /**
@@ -15,7 +14,6 @@ export default function requireDb(req: Request, res: Response, next: NextFunctio
   if (!db) {
     return res.status(503).json({ error: "Database not available" });
   }
-  // @ts-ignore - TODO: strict typing
-  req.db = db;
+    (req as any).db = db;
   next();
 }

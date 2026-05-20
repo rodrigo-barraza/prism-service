@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
@@ -13,8 +12,7 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const { db } = req;
+            const { db } = req;
 
       const {
         page = 1,
@@ -26,23 +24,18 @@ router.get(
         from,
         to,
       } = req.query;
-      // @ts-ignore - TODO: strict typing
-      const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-      // @ts-ignore - TODO: strict typing
-      const lim = parseInt(limit, 10);
+            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
+            const lim = parseInt((limit as any), 10);
 
       // Always scope to the caller's project
-      const preMatch = { project: req.project };
+      const preMatch: any = { project: req.project };
       if (from || to) {
-        // @ts-ignore
-        preMatch.updatedAt = {};
-        // @ts-ignore
-        if (from) preMatch.updatedAt.$gte = from;
-        // @ts-ignore
-        if (to) preMatch.updatedAt.$lte = to;
+                preMatch.updatedAt = {};
+                if (from) preMatch.updatedAt.$gte = from;
+                if (to) preMatch.updatedAt.$lte = to;
       }
 
-      const pipeline = [
+      const pipeline: any[] = [
         { $match: preMatch },
         { $unwind: "$messages" },
         {
@@ -68,45 +61,39 @@ router.get(
       ];
 
       if (origin === "user") {
-        // @ts-ignore
-        pipeline.push({ $match: { role: "user" } });
+                pipeline.push({ $match: { role: "user" } });
       } else if (origin === "ai") {
-        // @ts-ignore
-        pipeline.push({ $match: { role: "assistant" } });
+                pipeline.push({ $match: { role: "assistant" } });
       }
       if (search) {
         pipeline.push({
-          // @ts-ignore
-          $match: { content: { $regex: search, $options: "i" } },
+                    $match: { content: { $regex: search, $options: "i" } },
         });
       }
       if (provider) {
         pipeline.push({
-          // @ts-ignore
-          $match: { model: { $regex: `^${provider}/`, $options: "i" } },
+                    $match: { model: { $regex: `^${provider}/`, $options: "i" } },
         });
       }
       if (model) {
-        // @ts-ignore
-        pipeline.push({ $match: { model } });
+                pipeline.push({ $match: { model } });
       }
 
-      const countPipeline = [...pipeline, { $count: "total" }];
+      const countPipeline: any[] = [...pipeline, { $count: "total" }];
       const [countResult] = await db
         .collection(COLLECTIONS.CONVERSATIONS)
         .aggregate(countPipeline)
         .toArray();
       const total = countResult?.total || 0;
 
-      // @ts-ignore
-      pipeline.push({ $skip: skip }, { $limit: lim });
+            pipeline.push({ $skip: skip }, { $limit: lim });
 
       const items = await db
         .collection(COLLECTIONS.CONVERSATIONS)
         .aggregate(pipeline)
         .toArray();
 
-      const data = items.map((item: Record<string, unknown>) => ({
+      const data = items.map((item: any) => ({
         content: item.content,
         origin: item.role === "assistant" ? "ai" : "user",
         role: item.role,
@@ -116,30 +103,26 @@ router.get(
         username: item.username,
         model: item.model,
         estimatedCost: item.estimatedCost,
-        // @ts-ignore - TODO: strict typing
-        hasImages: item.images > 0,
+                hasImages: (item as any).images > 0,
         timestamp: item.timestamp,
       }));
 
       res.json({
         data,
         total,
-        // @ts-ignore - TODO: strict typing
-        page: parseInt(page, 10),
+                page: parseInt((page as any), 10),
         limit: lim,
         providers: [
           ...new Set(
-            // @ts-ignore - TODO: strict typing
-            data.map((d: Record<string, unknown>) => d.model?.split("/")[0]).filter(Boolean),
+                        data.map((d: any) => (d.model as any)?.split("/")[0]).filter(Boolean),
           ),
         ].sort(),
         models: [
-          ...new Set(data.map((d: Record<string, unknown>) => d.model).filter(Boolean)),
+          ...new Set(data.map((d: any) => d.model).filter(Boolean)),
         ].sort(),
       });
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`GET /text error: ${error.message}`);
+    } catch (error: any) {
+            logger.error(`GET /text error: ${(error as Error).message}`);
       next(error);
     }
   }),

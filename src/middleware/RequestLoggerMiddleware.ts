@@ -27,8 +27,7 @@ export function requestLoggerMiddleware(req: Request, res: Response, next: NextF
   }
   const rawIp =
     req.clientIp ||
-    // @ts-ignore - TODO: strict typing
-    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+        (req.headers["x-forwarded-for"] as any)?.split(",")[0]?.trim() ||
     req.ip;
   // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1)
   const clientIp = rawIp?.replace(/^::ffff:/, "") || rawIp;
@@ -38,11 +37,9 @@ export function requestLoggerMiddleware(req: Request, res: Response, next: NextF
   res.on("finish", () => {
     // Skip SSE streaming requests — those are logged in detail by the route handlers
     const contentType = res.getHeader("content-type") || "";
-    // @ts-ignore - TODO: strict typing
-    if (contentType.includes("text/event-stream")) return;
+        if ((contentType as any).includes("text/event-stream")) return;
     // Skip binary audio streams — logged by route handler
-    // @ts-ignore - TODO: strict typing
-    if (contentType.includes("audio/")) return;
+        if ((contentType as any).includes("audio/")) return;
 
     const elapsed = performance.now() - start;
     // Re-read project/username in case authMiddleware set them after us
@@ -61,23 +58,20 @@ export function requestLoggerMiddleware(req: Request, res: Response, next: NextF
 
     // Request / response sizes (from headers — zero-cost)
     const inBytes = parseInt(req.headers["content-length"] || "0", 10);
-    // @ts-ignore - TODO: strict typing
-    const outBytes = parseInt(res.getHeader("content-length") || "0", 10);
+        const outBytes = parseInt((res.getHeader as any)("content-length") || "0", 10);
     const totalBytes = inBytes + outBytes;
     const sizeTag = `(in: ${formatBytes(inBytes)}, out: ${formatBytes(outBytes)}, total: ${formatBytes(totalBytes)})`;
 
-    logger.request(
-      // @ts-ignore - TODO: strict typing
-      finalProject,
-      finalUsername,
+    (logger.request as any)(
+            (finalProject as any),
+      (finalUsername as any),
       finalIp,
       `${method} ${path} ${status} — ${time} ${sizeTag}`,
     );
   });
 
   // Attach agent to req for downstream route handlers
-  // @ts-ignore - TODO: strict typing
-  if (agent) req.agent = agent;
+    if (agent) req.agent = agent;
 
   // Run the rest of the middleware chain inside AsyncLocalStorage context
   requestContext.run({ project, username, clientIp, agent }, () => {

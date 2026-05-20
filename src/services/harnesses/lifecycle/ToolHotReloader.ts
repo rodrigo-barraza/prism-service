@@ -1,5 +1,4 @@
 import MongoWrapper from "../../../wrappers/MongoWrapper.ts";
-// @ts-ignore — root-level config export
 import { MONGO_DB_NAME } from "../../../../config.ts";
 import logger from "../../../utils/logger.ts";
 
@@ -35,8 +34,8 @@ export async function reloadIfCustomToolsMutated(
   username: string,
   emit: EmitFn,
 ): Promise<boolean> {
-  const hasMutations = executedToolCalls.some((toolCall) =>
-    CUSTOM_TOOL_MUTATION_NAMES.has(toolCall.name),
+  const hasMutations = executedToolCalls.some((toolCall: unknown) =>
+    CUSTOM_TOOL_MUTATION_NAMES.has((toolCall as any).name),
   );
 
   if (!hasMutations) return false;
@@ -58,7 +57,7 @@ export async function reloadIfCustomToolsMutated(
 
     // Rebuild finalTools: remove old custom tools, add fresh ones
     const builtInTools = tools.finalTools.filter(
-      (tool) => !tool._isCustom,
+      (tool: unknown) => !(tool as any)._isCustom,
     );
     const freshSchemas = freshCustomTools.map((customTool: Record<string, any>) => ({
       name: customTool.name,
@@ -91,7 +90,7 @@ export async function reloadIfCustomToolsMutated(
     emit({ type: "status", message: "custom_tools_updated" });
     return true;
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
+    const msg = error instanceof Error ? (error as Error).message : String(error);
     logger.warn(`[ToolHotReloader] Failed to reload custom tools: ${msg}`);
     return false;
   }

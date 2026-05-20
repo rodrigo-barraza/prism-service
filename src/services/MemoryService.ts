@@ -1,9 +1,7 @@
-// @ts-ignore
 import { daysSinceIso } from "@rodrigo-barraza/utilities-library";
 import crypto from "crypto";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { getProvider } from "../providers/index.ts";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.ts";
 import EmbeddingService from "./EmbeddingService.ts";
 import RequestLogger from "./RequestLogger.ts";
@@ -42,21 +40,20 @@ export const CODING_MEMORY_TYPES = ["user", "feedback", "project", "reference"];
 
 
  */
-async function generateEmbedding(text: Record<string, unknown>, options: Record<string, unknown> = {}) {
+async function generateEmbedding(text: any, options: any = {}) {
   return EmbeddingService.embed(text, { source: "memory", ...options });
 }
 /**
  * Calculate days elapsed since a timestamp.
  */
-function memoryAgeDays(createdAt: Record<string, unknown>) {
-  // @ts-ignore - TODO: strict typing
-  return daysSinceIso(createdAt);
+function memoryAgeDays(createdAt: any) {
+    return daysSinceIso((createdAt as any));
 }
 /**
  * Human-readable age string. Models are poor at date arithmetic —
  * "47 days ago" triggers staleness reasoning better than a raw ISO timestamp.
  */
-function memoryAge(createdAt: Record<string, unknown>) {
+function memoryAge(createdAt: any) {
   const ageDays = memoryAgeDays(createdAt);
   if (ageDays === 0) return "today";
   if (ageDays === 1) return "yesterday";
@@ -66,7 +63,7 @@ function memoryAge(createdAt: Record<string, unknown>) {
  * Staleness caveat for memories >1 day old.
  * Returns empty string for fresh memories.
  */
-function freshnessCaveat(createdAt: Record<string, unknown>) {
+function freshnessCaveat(createdAt: any) {
   const ageDays = memoryAgeDays(createdAt);
   if (ageDays <= 1) return "";
   return ` ⚠️ ${ageDays} days old — verify against current code before acting on this.`;
@@ -87,29 +84,25 @@ interface ExtractedFact {
  * Returns an array of { fact, aboutUserId, aboutUsername, category, confidence }.
  */
 async function extractFactsFromConversation(
-  messages: Record<string, unknown>,
-  participants: Record<string, unknown>,
-  meta: Record<string, unknown> = {},
+  messages: any,
+  participants: any,
+  meta: any = {},
 ): Promise<ExtractedFact[]> {
-  // @ts-ignore
-  const endpoint = meta.endpoint || null;
-  // @ts-ignore
-  const agent = meta.agent || null;
+    const endpoint = meta.endpoint || null;
+    const agent = meta.agent || null;
   const { provider: extractionProvider, model: extractionModel } =
     await getExtractionConfig();
   const provider = getProvider(extractionProvider);
   const requestId = crypto.randomUUID();
   const requestStart = performance.now();
-  // @ts-ignore - TODO: strict typing
-  const participantList = participants
+    const participantList = (participants as any)
     .map(
-      (p: Record<string, unknown>) =>
+      (p: any) =>
         `- ID: ${p.id}, Username: ${p.username}, Display: ${p.displayName || p.username}`,
     )
     .join("\n");
-  // @ts-ignore - TODO: strict typing
-  const conversationText = messages
-    .map((m: Record<string, unknown>) => `${m.name || m.role}: ${m.content}`)
+    const conversationText = (messages as any)
+    .map((m: any) => `${m.name || m.role}: ${m.content}`)
     .join("\n");
   const systemPrompt = `You are a memory extraction system. Analyze the conversation and extract notable personal facts about the participants. Focus on:
 - Personal information (location, occupation, hobbies, pets, family)
@@ -142,7 +135,7 @@ ${participantList}`;
       content: `Extract personal facts from this conversation:\n\n${conversationText}`,
     },
   ];
-  let result: Record<string, unknown>;
+  let result: any;
   let success = true;
   let errorMessage = null;
   try {
@@ -150,32 +143,25 @@ ${participantList}`;
       maxTokens: 1000,
       temperature: 0.1,
     });
-  } catch (error: unknown) {
+  } catch (error: any) {
     success = false;
-    // @ts-ignore - TODO: strict typing
-    errorMessage = error.message;
+        errorMessage = (error as Error).message;
     throw error;
   } finally {
     RequestLogger.logBackgroundLlmCall({
       requestId,
       endpoint,
       operation: "memory:extract",
-      // @ts-ignore
-      project: meta.project || null,
-      // @ts-ignore
-      username: meta.username || "system",
+            project: meta.project || null,
+            username: meta.username || "system",
       agent,
       provider: extractionProvider,
       model: extractionModel,
-      // @ts-ignore
-      traceId: meta.traceId || null,
-      // @ts-ignore
-      agentSessionId: meta.agentSessionId || null,
+            traceId: meta.traceId || null,
+            agentSessionId: meta.agentSessionId || null,
       aiMessages,
-      // @ts-ignore - TODO: strict typing
-      resultText: result?.text || "",
-      // @ts-ignore - TODO: strict typing
-      usage: result?.usage || null,
+            resultText: result?.text || "",
+            usage: result?.usage || null,
       success,
       errorMessage,
       requestStartMs: requestStart,
@@ -185,13 +171,11 @@ ${participantList}`;
       },
     });
   }
-  // @ts-ignore - TODO: strict typing
-  const facts = parseJsonFromLlmResponse(result.text);
+    const facts = parseJsonFromLlmResponse((result.text as any | null | undefined));
   if (!Array.isArray(facts)) return [];
   // Validate each fact has the required fields
   return facts.filter(
-    // @ts-ignore - TODO: strict typing
-    (f: Record<string, unknown>) =>
+        (f: any) =>
       f.fact &&
       f.aboutUserId &&
       f.aboutUsername &&
@@ -237,54 +221,43 @@ const MemoryService = {
     traceId,
     agentSessionId,
     endpoint,
-  }: Record<string, unknown>) {
+  }: any) {
     if (!agent)
       throw new Error("MemoryService.store requires an agent identifier");
     if (!content) throw new Error("MemoryService.store requires content");
     // Validate type for CODING agent
     if (agent === "CODING") {
-      // @ts-ignore - TODO: strict typing
-      type = CODING_MEMORY_TYPES.includes(type) ? type : "project";
+            type = CODING_MEMORY_TYPES.includes((type as any)) ? type : "project";
     }
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     const embedText = title ? `${title}: ${content}` : content;
     // Generate embedding if not provided
     if (!embedding) {
       const embedOpts = { project };
-      // @ts-ignore
-      if (traceId) embedOpts.traceId = traceId;
-      // @ts-ignore
-      if (agentSessionId) embedOpts.agentSessionId = agentSessionId;
-      // @ts-ignore
-      if (endpoint) embedOpts.endpoint = endpoint;
-      // @ts-ignore
-      if (agent) embedOpts.agent = agent;
-      // @ts-ignore - TODO: strict typing
-      embedding = await generateEmbedding(embedText, embedOpts);
+            if (traceId) (embedOpts as any).traceId = traceId;
+            if (agentSessionId) (embedOpts as any).agentSessionId = agentSessionId;
+            if (endpoint) (embedOpts as any).endpoint = endpoint;
+            if (agent) (embedOpts as any).agent = agent;
+            embedding = await generateEmbedding((embedText as any), embedOpts);
     }
     // Duplicate detection — compare against existing memories for the same agent
     const dedupFilter = { agent };
-    // @ts-ignore
-    if (project) dedupFilter.project = project;
-    // @ts-ignore
-    if (metadata.guildId) dedupFilter.guildId = metadata.guildId;
-    // @ts-ignore
-    if (metadata.aboutUserId) dedupFilter.aboutUserId = metadata.aboutUserId;
+        if (project) (dedupFilter as any).project = project;
+        if ((metadata as any).guildId) (dedupFilter as any).guildId = (metadata as any).guildId;
+        if ((metadata as any).aboutUserId) (dedupFilter as any).aboutUserId = (metadata as any).aboutUserId;
     const existing = await collection
       .find(dedupFilter)
       .project({ embedding: 1 })
       .sort({ createdAt: -1 })
       .limit(200)
       .toArray();
-    const isDuplicate = existing.some((document: Record<string, unknown>) => {
+    const isDuplicate = existing.some((document: any) => {
       if (!document.embedding) return false;
-      // @ts-ignore - TODO: strict typing
-      return cosineSimilarity(embedding, document.embedding) > DUPLICATE_THRESHOLD;
+            return cosineSimilarity((embedding as any[] | null), (document.embedding as any[])) > DUPLICATE_THRESHOLD;
     });
     if (isDuplicate) {
       logger.info(
-        // @ts-ignore - TODO: strict typing
-        `[MemoryService] Skipping duplicate for ${agent}: "${(title || content).substring(0, 60)}"`,
+                `[MemoryService] Skipping duplicate for ${agent}: "${((title || content) as any).substring(0, 60)}"`,
       );
       return null;
     }
@@ -302,13 +275,11 @@ const MemoryService = {
       createdAt: now,
       updatedAt: now,
       // Spread agent-specific metadata at top level for efficient querying
-      // @ts-ignore - TODO: strict typing
-      ...metadata,
+            ...metadata,
     };
     await collection.insertOne(memory);
     logger.info(
-      // @ts-ignore - TODO: strict typing
-      `[MemoryService] Stored [${agent}/${memory.type}] "${(title || content).substring(0, 60)}"`,
+            `[MemoryService] Stored [${agent}/${memory.type}] "${((title || content) as any).substring(0, 60)}"`,
     );
     return memory;
   },
@@ -333,10 +304,9 @@ const MemoryService = {
     traceId,
     project,
     endpoint,
-  }: Record<string, unknown>) {
+  }: any) {
     // Extract facts from the conversation via AI
-    // @ts-ignore - TODO: strict typing
-    const facts = await extractFactsFromConversation(messages, participants, {
+        const facts = await extractFactsFromConversation((messages as any), (participants as any), {
       project,
       traceId,
       endpoint,
@@ -351,11 +321,10 @@ const MemoryService = {
     logger.info(
       `[MemoryService] Extracted ${facts.length} fact(s), generating embeddings...`,
     );
-    const storedMemories: Record<string, unknown>[] = [];
+    const storedMemories: any[] = [];
     for ( const fact of facts) {
       try {
-        // @ts-ignore - TODO: strict typing
-        const embedding = await generateEmbedding(fact.fact, {
+                const embedding = await generateEmbedding((fact.fact as any), {
           project,
           traceId,
           endpoint,
@@ -386,9 +355,8 @@ const MemoryService = {
             `[MemoryService] Stored: "${fact.fact.substring(0, 60)}..." (about: ${fact.aboutUsername})`,
           );
         }
-      } catch (error: unknown) {
-        // @ts-ignore - TODO: strict typing
-        logger.error(`[MemoryService] Failed to store fact: ${error.message}`);
+      } catch (error: any) {
+                logger.error(`[MemoryService] Failed to store fact: ${(error as Error).message}`);
       }
     }
     return storedMemories;
@@ -416,34 +384,24 @@ const MemoryService = {
     traceId,
     agentSessionId,
     endpoint,
-  }: Record<string, unknown>) {
+  }: any) {
     if (!agent)
       throw new Error("MemoryService.search requires an agent identifier");
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     // Generate embedding for the search query
-    const embeddingOpts = {};
-    // @ts-ignore
-    if (traceId) embeddingOpts.traceId = traceId;
-    // @ts-ignore
-    if (agentSessionId) embeddingOpts.agentSessionId = agentSessionId;
-    // @ts-ignore
-    if (project) embeddingOpts.project = project;
-    // @ts-ignore
-    if (endpoint) embeddingOpts.endpoint = endpoint;
-    // @ts-ignore
-    if (agent) embeddingOpts.agent = agent;
-    // @ts-ignore - TODO: strict typing
-    const queryEmbedding = await generateEmbedding(queryText, embeddingOpts);
+    const embeddingOpts: any = {};
+        if (traceId) embeddingOpts.traceId = traceId;
+        if (agentSessionId) embeddingOpts.agentSessionId = agentSessionId;
+        if (project) embeddingOpts.project = project;
+        if (endpoint) embeddingOpts.endpoint = endpoint;
+        if (agent) embeddingOpts.agent = agent;
+        const queryEmbedding = await generateEmbedding((queryText as any), embeddingOpts);
     // Build the filter — always scoped by agent
     const filter = { agent };
-    // @ts-ignore
-    if (project) filter.project = project;
-    // @ts-ignore
-    if (guildId) filter.guildId = guildId;
-    // @ts-ignore - TODO: strict typing
-    if (userIds && userIds.length > 0) {
-      // @ts-ignore
-      filter.aboutUserId = { $in: userIds };
+        if (project) (filter as any).project = project;
+        if (guildId) (filter as any).guildId = guildId;
+        if (userIds && (userIds as any).length > 0) {
+            (filter as any).aboutUserId = { $in: userIds };
     }
     // Fetch all memories matching the filter
     const memories = await collection
@@ -465,31 +423,23 @@ const MemoryService = {
     if (memories.length === 0) return [];
     // Compute cosine similarity and sort
     const scored = memories
-      // @ts-ignore - TODO: strict typing
-      .filter((m: Record<string, unknown>) => m.embedding && m.embedding.length > 0)
-      .map((m: Record<string, unknown>) => ({
+            .filter((m: any) => m.embedding && (m.embedding as any).length > 0)
+      .map((m: any) => ({
         id: m._id,
         type: m.type || "other",
-        // @ts-ignore - TODO: strict typing
-        title: m.title || (m.content ? m.content.substring(0, 60) : "untitled"),
+                title: m.title || (m.content ? (m.content as any).substring(0, 60) : "untitled"),
         content: m.content || "",
         aboutUserId: m.aboutUserId,
         aboutUsername: m.aboutUsername,
         confidence: m.confidence,
         createdAt: m.createdAt,
-        // @ts-ignore - TODO: strict typing
-        age: memoryAge(m.createdAt),
-        // @ts-ignore - TODO: strict typing
-        ageDays: memoryAgeDays(m.createdAt),
-        // @ts-ignore - TODO: strict typing
-        score: cosineSimilarity(queryEmbedding, m.embedding),
+                age: memoryAge((m.createdAt as any)),
+                ageDays: memoryAgeDays((m.createdAt as any)),
+                score: cosineSimilarity((queryEmbedding as any[] | null), (m.embedding as any[] | null)),
       }))
-      // @ts-ignore - TODO: strict typing
-      .filter((m: Record<string, unknown>) => m.score > RELEVANCE_THRESHOLD)
-      // @ts-ignore - TODO: strict typing
-      .sort((a: Record<string, unknown>, b: Record<string, unknown>) => b.score - a.score)
-      // @ts-ignore - TODO: strict typing
-      .slice(0, limit);
+            .filter((m: any) => (m as any).score > RELEVANCE_THRESHOLD)
+            .sort((a: any, b: any) => (b as any).score - (a as any).score)
+            .slice(0, (limit as any | undefined));
     logger.info(
       `[MemoryService] Search found ${scored.length} relevant memories for ${agent} (from ${memories.length} total)`,
     );
@@ -505,25 +455,19 @@ const MemoryService = {
 
    * @returns {Promise<{ memories: Array, total: number }>}
    */
-  async list({ agent, project, guildId, userId, limit = 50, skip = 0 }: Record<string, unknown>) {
+  async list({ agent, project, guildId, userId, limit = 50, skip = 0 }: any) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
-    const filter = {};
-    // @ts-ignore
-    if (agent) filter.agent = agent;
-    // @ts-ignore
-    if (project) filter.project = project;
-    // @ts-ignore
-    if (guildId) filter.guildId = guildId;
-    // @ts-ignore
-    if (userId) filter.aboutUserId = userId;
+    const filter: any = {};
+        if (agent) filter.agent = agent;
+        if (project) filter.project = project;
+        if (guildId) filter.guildId = guildId;
+        if (userId) filter.aboutUserId = userId;
     const [memories, total] = await Promise.all([
       collection
         .find(filter, { projection: { embedding: 0 } })
         .sort({ createdAt: -1 })
-        // @ts-ignore - TODO: strict typing
-        .skip(skip)
-        // @ts-ignore - TODO: strict typing
-        .limit(limit)
+                .skip((skip as any))
+                .limit((limit as any))
         .toArray(),
       collection.countDocuments(filter),
     ]);
@@ -565,7 +509,7 @@ const MemoryService = {
 
    * @returns {Promise<boolean>} Whether a document was deleted
    */
-  async delete(memoryId: Record<string, unknown>) {
+  async delete(memoryId: any) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     const result = await collection.deleteOne({ id: memoryId });
     return result.deletedCount > 0;
@@ -573,7 +517,7 @@ const MemoryService = {
   /**
    * Alias for delete — used by callers that preferred the AgentMemoryService naming.
    */
-  async remove(memoryId: Record<string, unknown>) {
+  async remove(memoryId: any) {
     return this.delete(memoryId);
   },
   // ── Update ─────────────────────────────────────────────────────────────────
@@ -583,15 +527,12 @@ const MemoryService = {
 
 
    */
-  async update(memoryId: Record<string, unknown>, { title, content, type }: Record<string, unknown>) {
+  async update(memoryId: any, { title, content, type }: any) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     const $set = { updatedAt: new Date().toISOString() };
-    // @ts-ignore
-    if (title !== undefined) $set.title = title;
-    // @ts-ignore
-    if (content !== undefined) $set.content = content;
-    // @ts-ignore
-    if (type !== undefined) $set.type = type;
+        if (title !== undefined) ($set as any).title = title;
+        if (content !== undefined) ($set as any).content = content;
+        if (type !== undefined) ($set as any).type = type;
     // Re-generate embedding if content changed
     if (content !== undefined) {
       const document = await collection.findOne(
@@ -600,8 +541,7 @@ const MemoryService = {
       );
       const embedText =
         title || document?.title ? `${title || document?.title}: ${content}` : content;
-      // @ts-ignore
-      $set.embedding = await generateEmbedding(embedText, {
+            ($set as any).embedding = await generateEmbedding((embedText as any), {
         project: document?.project,
       });
     }
@@ -616,15 +556,13 @@ const MemoryService = {
 
    * @returns {string} Formatted text block
    */
-  formatForPrompt(memories: Record<string, unknown>) {
+  formatForPrompt(memories: any) {
     if (!memories || memories.length === 0) return "";
-    // @ts-ignore - TODO: strict typing
-    return memories
-      .map((m: Record<string, unknown>) => {
+        return (memories as any)
+      .map((m: any) => {
         const badge = `[${m.type}]`;
         const age = m.age !== "today" ? ` (${m.age})` : "";
-        // @ts-ignore - TODO: strict typing
-        const caveat = freshnessCaveat(m.createdAt);
+                const caveat = freshnessCaveat((m.createdAt as any));
         return `- ${badge} **${m.title}**${age}: ${m.content}${caveat}`;
       })
       .join("\n");

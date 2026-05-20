@@ -54,12 +54,10 @@ class RateLimitStore {
      * Key: `${provider}::${model}` → { rateLimits, updatedAt }
      * @type {Map<string, { rateLimits: object, updatedAt: string }>}
      */
-    // @ts-ignore
-    this._models = new Map();
+        this._models = new Map();
 
     /** Static Google limits (separate shape — not per-response). */
-    // @ts-ignore
-    this._google = GOOGLE_STATIC_LIMITS;
+        this._google = GOOGLE_STATIC_LIMITS;
   }
 
   /**
@@ -69,12 +67,11 @@ class RateLimitStore {
 
 
    */
-  update(providerName: Record<string, unknown>, model: Record<string, unknown>, rateLimits: Record<string, unknown>) {
+  update(providerName: any, model: any, rateLimits: any) {
     if (!rateLimits || !providerName || !model) return;
 
     const key = `${providerName}::${model}`;
-    // @ts-ignore
-    this._models.set(key, {
+        (this as any)._models.set(key, {
       rateLimits,
       updatedAt: new Date().toISOString(),
     });
@@ -91,29 +88,22 @@ class RateLimitStore {
    * }
    */
   getAll() {
-    const result = {};
+    const result: any = {};
 
     // Group dynamic models by provider
-    // @ts-ignore
-    for ( const [key, value] of this._models) {
+        for ( const [key, value] of (this as any)._models) {
       const [provider, model] = key.split("::");
-      // @ts-ignore
-      if (!result[provider]) {
-        // @ts-ignore
-        result[provider] = { dynamic: true, models: {} };
+            if (!result[provider]) {
+                result[provider] = { dynamic: true, models: {} };
       }
-      // @ts-ignore
-      result[provider].models[model] = value;
+            (result as any)[provider].models[model] = value;
     }
 
     // Add Google static limits
-    // @ts-ignore
-    result.google = {
+        result.google = {
       dynamic: false,
-      // @ts-ignore
-      note: this._google.note,
-      // @ts-ignore
-      models: this._google.models,
+            note: (this as any)._google.note,
+            models: (this as any)._google.models,
     };
 
     return result;

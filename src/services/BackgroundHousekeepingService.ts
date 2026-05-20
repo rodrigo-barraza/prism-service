@@ -15,11 +15,9 @@
 
 import { readdir, stat, rm } from "node:fs/promises";
 import { resolve } from "node:path";
-// @ts-ignore
 import { MS_PER_DAY, hours } from "@rodrigo-barraza/utilities-library";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
-// @ts-ignore
 import { MONGO_DB_NAME } from "../../config.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
@@ -48,27 +46,21 @@ const STALE_SESSION_CUTOFF_MS = hours(2);
  * @returns {Promise<{ pruned: string[], errors: string[] }>}
  */
 async function pruneOrphanedWorktrees() {
-  // @ts-ignore
-  const pruned: Record<string, unknown>[] = [];
-  // @ts-ignore
-  const errors: Record<string, unknown>[] = [];
+    const pruned: any[] = [];
+    const errors: any[] = [];
 
-  let entries: Record<string, unknown>;
+  let entries: any;
   try {
-    // @ts-ignore - TODO: strict typing
-    entries = await readdir(WORKTREE_ROOT).catch(() => []);
+        entries = await readdir(WORKTREE_ROOT).catch(() => []);
   } catch {
-    // @ts-ignore
-    return { pruned, errors };
+        return { pruned, errors };
   }
 
-  // @ts-ignore
-  if (entries.length === 0) return { pruned, errors };
+    if (entries.length === 0) return { pruned, errors };
 
   const cutoff = Date.now() - WORKTREE_MAX_AGE_MS;
 
-  // @ts-ignore
-  for ( const entry of entries) {
+    for ( const entry of entries) {
     const entryPath = resolve(WORKTREE_ROOT, entry);
     try {
       const info = await stat(entryPath);
@@ -78,9 +70,8 @@ async function pruneOrphanedWorktrees() {
         await rm(entryPath, { recursive: true, force: true });
         pruned.push(entry);
       }
-    } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      errors.push(`${entry}: ${error.message}`);
+    } catch (error: any) {
+            errors.push((`${entry}: ${(error as Error).message}` as any));
     }
   }
 
@@ -180,10 +171,8 @@ async function pruneMinioOrphans() {
     const sessionCursor = db
       .collection(COLLECTIONS.AGENT_SESSIONS)
       .find({}, { projection: { id: 1, _id: 0 } });
-    // @ts-ignore
-    for await ( const document of convCursor) validIds.add(document.id);
-    // @ts-ignore
-    for await ( const document of sessionCursor) validIds.add(document.id);
+        for await ( const document of convCursor) validIds.add(document.id);
+        for await ( const document of sessionCursor) validIds.add(document.id);
 
     // List MinIO objects with the conversation-scoped prefix pattern
     // Convention: conversation objects are stored as {conversationId}/{filename}
@@ -204,8 +193,7 @@ async function pruneMinioOrphans() {
 
     // Remove orphaned prefixes
     for (const prefix of prefixes) {
-      // @ts-ignore - TODO: strict typing
-      const orphanedObjects = objects.filter((o: Record<string, unknown>) => {
+            const orphanedObjects = objects.filter((o: any) => {
         const name = typeof o === "string" ? o : (o as { name?: string })?.name;
         return name ? name.startsWith(`${prefix}/`) : false;
       });
@@ -221,9 +209,8 @@ async function pruneMinioOrphans() {
         }
       }
     }
-  } catch (error: unknown) {
-    // @ts-ignore - TODO: strict typing
-    logger.warn(`[Housekeeping] MinIO orphan scan failed: ${error.message}`);
+  } catch (error: any) {
+        logger.warn(`[Housekeeping] MinIO orphan scan failed: ${(error as Error).message}`);
   }
 
   return removed;
@@ -240,17 +227,16 @@ const BackgroundHousekeepingService = {
 
    * @returns {Promise<object>} Summary of actions taken
    */
-  async run({ trigger = "boot" }: Record<string, unknown> = {}) {
+  async run({ trigger = "boot" }: any = {}) {
     const startTime = performance.now();
     logger.info(`[Housekeeping] Starting (trigger: ${trigger})…`);
 
-    const results = {};
+    const results: any = {};
 
     // 1. Prune orphaned worktrees
     try {
       const worktrees = await pruneOrphanedWorktrees();
-      // @ts-ignore
-      results.worktrees = worktrees;
+            results.worktrees = worktrees;
       if (worktrees.pruned.length > 0) {
         logger.info(
           `[Housekeeping] Pruned ${worktrees.pruned.length} orphaned worktree(s): ${worktrees.pruned.join(", ")}`,
@@ -261,18 +247,15 @@ const BackgroundHousekeepingService = {
           `[Housekeeping] Worktree errors: ${worktrees.errors.join("; ")}`,
         );
       }
-    } catch (error: unknown) {
-      // @ts-ignore
-      results.worktrees = { error: error.message };
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[Housekeeping] Worktree pruning failed: ${error.message}`);
+    } catch (error: any) {
+            results.worktrees = { error: (error as Error).message };
+            logger.error(`[Housekeeping] Worktree pruning failed: ${(error as Error).message}`);
     }
 
     // 2. Clear stale sessions
     try {
       const sessions = await clearStaleSessions();
-      // @ts-ignore
-      results.staleSessions = sessions;
+            results.staleSessions = sessions;
       const total =
         sessions.conversationsCleared + sessions.agentSessionsCleared;
       if (total > 0) {
@@ -280,56 +263,46 @@ const BackgroundHousekeepingService = {
           `[Housekeeping] Cleared ${total} stale isGenerating flag(s)`,
         );
       }
-    } catch (error: unknown) {
-      // @ts-ignore
-      results.staleSessions = { error: error.message };
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[Housekeeping] Session cleanup failed: ${error.message}`);
+    } catch (error: any) {
+            results.staleSessions = { error: (error as Error).message };
+            logger.error(`[Housekeeping] Session cleanup failed: ${(error as Error).message}`);
     }
 
     // 3. Prune old request logs
     try {
       const deletedLogs = await pruneOldRequestLogs();
-      // @ts-ignore
-      results.requestLogs = { deleted: deletedLogs };
+            results.requestLogs = { deleted: deletedLogs };
       if (deletedLogs > 0) {
         logger.info(
           `[Housekeeping] Pruned ${deletedLogs} request log(s) older than ${REQUEST_LOG_MAX_AGE_DAYS} days`,
         );
       }
-    } catch (error: unknown) {
-      // @ts-ignore
-      results.requestLogs = { error: error.message };
+    } catch (error: any) {
+            results.requestLogs = { error: (error as Error).message };
       logger.error(
-        // @ts-ignore - TODO: strict typing
-        `[Housekeeping] Request log pruning failed: ${error.message}`,
+                `[Housekeeping] Request log pruning failed: ${(error as Error).message}`,
       );
     }
 
     // 4. MinIO orphan cleanup
     try {
       const minioOrphans = await pruneMinioOrphans();
-      // @ts-ignore
-      results.minioOrphans = { removed: minioOrphans };
+            results.minioOrphans = { removed: minioOrphans };
       if (minioOrphans > 0) {
         logger.info(
           `[Housekeeping] Removed ${minioOrphans} orphaned MinIO object(s)`,
         );
       }
-    } catch (error: unknown) {
-      // @ts-ignore
-      results.minioOrphans = { error: error.message };
+    } catch (error: any) {
+            results.minioOrphans = { error: (error as Error).message };
       logger.error(
-        // @ts-ignore - TODO: strict typing
-        `[Housekeeping] MinIO orphan cleanup failed: ${error.message}`,
+                `[Housekeeping] MinIO orphan cleanup failed: ${(error as Error).message}`,
       );
     }
 
     const durationMs = Math.round(performance.now() - startTime);
-    // @ts-ignore
-    results.durationMs = durationMs;
-    // @ts-ignore
-    results.trigger = trigger;
+        results.durationMs = durationMs;
+        results.trigger = trigger;
 
     logger.success(`[Housekeeping] Complete (${durationMs}ms)`);
     return results;

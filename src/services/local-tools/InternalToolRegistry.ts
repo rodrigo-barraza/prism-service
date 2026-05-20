@@ -18,7 +18,7 @@ const registry = new Map();
  * Register a tool with the internal registry.
 
  */
-function register(tool: Record<string, unknown>) {
+function register(tool: any) {
   if (!tool.name || !tool.execute) {
     logger.warn(
       `[InternalToolRegistry] Skipping invalid tool: missing name or execute`,
@@ -44,13 +44,11 @@ async function init() {
     import("./McpTools.js"),
   ]);
 
-  // @ts-ignore
-  for ( const mod of modules) {
+    for ( const mod of modules) {
     const tools = mod.default;
     // Modules can export a single tool or an array of tools
     if (Array.isArray(tools)) {
-      // @ts-ignore
-      for ( const tool of tools) register(tool);
+            for ( const tool of tools) register(tool);
     } else {
       register(tools);
     }
@@ -62,7 +60,7 @@ async function init() {
 }
 
 // Kick off registration at module load
-init().catch((error: Record<string, unknown>) =>
+init().catch((error: any) =>
   logger.error(`[InternalToolRegistry] Init failed: ${error.message}`),
 );
 
@@ -81,7 +79,7 @@ export default class InternalToolRegistry {
 
 
    */
-  static async execute(name: string, args: Record<string, unknown>, context: Record<string, unknown> = {}) {
+  static async execute(name: string, args: any, context: any = {}) {
     const tool = registry.get(name);
     if (!tool) {
       return { error: `Unknown internal tool: ${name}` };
@@ -94,7 +92,7 @@ export default class InternalToolRegistry {
 
    */
   static getSchemas() {
-    return [...registry.values()].map((t: Record<string, unknown>) => t.schema);
+    return [...registry.values()].map((t: any) => t.schema);
   }
 
   /**
@@ -102,9 +100,8 @@ export default class InternalToolRegistry {
 
    */
   static getClientSchemas() {
-    return [...registry.values()].map((t: Record<string, unknown>) => ({
-      // @ts-ignore - TODO: strict typing
-      ...t.schema,
+    return [...registry.values()].map((t: any) => ({
+            ...t.schema,
       domain: t.domain || "Reasoning",
       labels: t.labels || ["coding"],
     }));

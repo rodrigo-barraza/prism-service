@@ -18,19 +18,19 @@ export function emitPostExecutionStatus(
   toolCalls: ToolCall[],
   emit: EmitFn,
 ): void {
-  if (toolCalls.some((tc) => tc.name.startsWith("task_"))) {
+  if (toolCalls.some((tc: any) => (tc as any).name.startsWith("task_"))) {
     emit({ type: "status", message: "tasks_updated" });
   }
 
   if (
     toolCalls.some(
-      (tc) => tc.name === "team_create" || tc.name === "stop_agent",
+      (tc: unknown) => (tc as any).name === "team_create" || (tc as any).name === "stop_agent",
     )
   ) {
     emit({ type: "status", message: "workers_updated" });
   }
 
-  if (toolCalls.some((tc) => tc.name === "upsert_memory")) {
+  if (toolCalls.some((tc: unknown) => (tc as any).name === "upsert_memory")) {
     emit({ type: "status", message: "memories_updated" });
   }
 }
@@ -45,7 +45,7 @@ export function processToolResultMedia(
 ): void {
   for (const tc of toolCalls) {
     const res = results.find(
-      (r) => r.id === tc.id || (!r.id && r.name === tc.name),
+      (r: unknown) => (r as any).id === tc.id || (!(r as any).id && (r as any).name === tc.name),
     );
     const resultObj = res?.result as Record<string, any> | null;
     const hasError = !!resultObj?.error;
@@ -94,7 +94,7 @@ export function trackToolErrors(
 ): void {
   for (const tc of toolCalls) {
     const res = results.find(
-      (r) => r.id === tc.id || (!r.id && r.name === tc.name),
+      (r: unknown) => (r as any).id === tc.id || (!(r as any).id && (r as any).name === tc.name),
     );
     const hasError = !!(res?.result as Record<string, any>)?.error;
 

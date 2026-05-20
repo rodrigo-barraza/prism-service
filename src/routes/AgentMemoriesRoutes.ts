@@ -1,4 +1,3 @@
-// @ts-ignore
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import MemoryService from "../services/MemoryService.ts";
@@ -45,8 +44,7 @@ router.post(
       const { embedding: _emb, ...safe } = result;
       res.json(safe);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[agent-memories] POST ${error.message}`);
+            logger.error(`[agent-memories] POST ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -63,16 +61,13 @@ router.get(
     try {
       const project = req.project;
       const agent = req.query.agent || null;
-      // @ts-ignore - TODO: strict typing
-      const limit = parseInt(req.query.limit) || 100;
-      // @ts-ignore - TODO: strict typing
-      const skip = parseInt(req.query.skip) || 0;
+            const limit = parseInt((req.query.limit as any)) || 100;
+            const skip = parseInt((req.query.skip as any)) || 0;
 
       const result = await MemoryService.list({ agent, project, limit, skip });
       res.json(result);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[agent-memories] ${error.message}`);
+            logger.error(`[agent-memories] ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -86,15 +81,13 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // @ts-ignore - TODO: strict typing
-      const deleted = await MemoryService.remove(req.params.id);
+            const deleted = await MemoryService.remove((req.params.id as any));
       if (!deleted) {
         return res.status(404).json({ error: "Memory not found" });
       }
       res.json({ success: true });
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[agent-memories] DELETE ${error.message}`);
+            logger.error(`[agent-memories] DELETE ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -112,8 +105,7 @@ router.get(
       const combos = await MemoryService.discoverCombos();
       res.json({ combos });
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[agent-memories] DISCOVER ${error.message}`);
+            logger.error(`[agent-memories] DISCOVER ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -128,18 +120,15 @@ router.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const project = req.project;
-      // @ts-ignore - TODO: strict typing
-      const limit = parseInt(req.query.limit) || 10;
+            const limit = parseInt((req.query.limit as any)) || 10;
 
       const history = await MemoryConsolidationService.getHistory(
-        // @ts-ignore - TODO: strict typing
-        project,
-        limit,
+                (project as any),
+        (limit as any),
       );
       res.json({ history });
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[agent-memories] HISTORY ${error.message}`);
+            logger.error(`[agent-memories] HISTORY ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -166,8 +155,7 @@ router.post(
       });
       res.json(result);
     } catch (error: unknown) {
-      // @ts-ignore - TODO: strict typing
-      logger.error(`[agent-memories] CONSOLIDATE ${error.message}`);
+            logger.error(`[agent-memories] CONSOLIDATE ${(error as Error).message}`);
       next(error);
     }
   }),

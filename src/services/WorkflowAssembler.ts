@@ -15,32 +15,25 @@ const VIEWER_X_OFFSET = MODEL_X_OFFSET + 350;
  * These steps are shown in the graph but don't get viewers or chain edges,
  * keeping the graph clean and focused on meaningful output.
  */
-function isUtilityStep(step: Record<string, unknown>) {
+function isUtilityStep(step: any) {
   const label = step.label || "";
   // 🧠 prefix = internal decision steps (Emoji React, Image Detection, Fetch Count, etc.)
-  // @ts-ignore - TODO: strict typing
-  return label.startsWith("🧠");
+    return (label as any).startsWith("🧠");
 }
 
 /**
  * Build compound port IDs for a conversation input node.
  * Format: "{messageIndex}.{modality}" e.g. "0.text", "1.text", "1.image"
  */
-// @ts-ignore - TODO: strict typing
-function buildConversationPorts(messages: Record<string, unknown>, supportedModalities: Record<string, unknown> = ["text"]) {
-  const ports: Record<string, unknown>[] = [];
-  // @ts-ignore - TODO: strict typing
-  for (let i = 0; i < messages.length; i++) {
+function buildConversationPorts(messages: any, supportedModalities: any = ["text"]) {
+  const ports: any[] = [];
+    for (let i = 0; i < (messages as any).length; i++) {
     const message = messages[i];
-    // @ts-ignore - TODO: strict typing
-    ports.push(`${i}.text`);
-    // @ts-ignore - TODO: strict typing
-    if (message.role === "user" || message.role === "assistant") {
-      // @ts-ignore
-      for ( const mod of supportedModalities) {
+        ports.push((`${i}.text` as any));
+        if ((message as any).role === "user" || (message as any).role === "assistant") {
+            for ( const mod of supportedModalities) {
         if (mod !== "text") {
-          // @ts-ignore - TODO: strict typing
-          ports.push(`${i}.${mod}`);
+                    ports.push((`${i}.${mod}` as any));
         }
       }
     }
@@ -52,9 +45,8 @@ function buildConversationPorts(messages: Record<string, unknown>, supportedModa
  * Resolve a model's input/output types from the Prism config.
  * Falls back to step-derived values if the model isn't found in config.
  */
-function resolveModelModalities(step: Record<string, unknown>) {
-  // @ts-ignore - TODO: strict typing
-  const configModel = getModelByName(step.model);
+function resolveModelModalities(step: any) {
+    const configModel = getModelByName((step.model as any));
   const isImageGen = step.outputType === "image";
 
   if (configModel) {
@@ -66,10 +58,8 @@ function resolveModelModalities(step: Record<string, unknown>) {
       modelType:
         configModel.modelType || (isImageGen ? "image" : "conversation"),
       supportsSystemPrompt:
-        // @ts-ignore
-        configModel.supportsSystemPrompt !== undefined
-          ? // @ts-ignore
-            configModel.supportsSystemPrompt
+                (configModel as any).supportsSystemPrompt !== undefined
+          ?             (configModel as any).supportsSystemPrompt
           : (configModel.outputTypes?.includes("text") ?? true),
     };
   }
@@ -104,25 +94,20 @@ function resolveModelModalities(step: Record<string, unknown>) {
 
  * @returns {{ nodes, edges, nodeResults }}
  */
-function assembleGraph(steps: Record<string, unknown>) {
+function assembleGraph(steps: any) {
   if (!Array.isArray(steps) || steps.length === 0) {
     return { nodes: [], edges: [], nodeResults: {} };
   }
 
-  // @ts-ignore
-  const allNodes: Record<string, unknown>[] = [];
-  // @ts-ignore
-  const allEdges: Record<string, unknown>[] = [];
-  const nodeResults = {};
+    const allNodes: any[] = [];
+    const allEdges: any[] = [];
+  const nodeResults: any = {};
 
   // Track the last non-utility model ID for chain edges
-  // @ts-ignore
-  let prevOutputModelId = null;
+    let prevOutputModelId: any = null;
 
-  // @ts-ignore - TODO: strict typing
-  steps.forEach((step: Record<string, unknown>, i: Record<string, unknown>) => {
-    // @ts-ignore - TODO: strict typing
-    const baseX = 80 + i * STEP_WIDTH;
+    steps.forEach((step: any, i: any) => {
+        const baseX = 80 + i * STEP_WIDTH;
     const baseY = 80;
     const stepPrefix = `s${i}`;
     let inputY = baseY;
@@ -162,27 +147,24 @@ function assembleGraph(steps: Record<string, unknown>) {
 
     // ── 3. Conversation Node ──
     const convId = `${stepPrefix}_conv`;
-    const messages: Record<string, unknown>[] = [];
+    const messages: any[] = [];
     if (step.systemPrompt)
       messages.push({ role: "system", content: step.systemPrompt });
     const userMsg = { role: "user", content: step.input || "" };
     messages.push(userMsg);
     if (step.output) {
       const assistantMsg = { role: "assistant", content: step.output };
-      // @ts-ignore
-      if (step.outputImageRef) assistantMsg.images = [step.outputImageRef];
+            if (step.outputImageRef) (assistantMsg as any).images = [step.outputImageRef];
       messages.push(assistantMsg);
     }
 
     // Derive conversation supported modalities from the model's raw input types
     const supportedModalities = (modalities.rawInputTypes || ["text"]).filter(
-      // @ts-ignore - TODO: strict typing
-      (t: Record<string, unknown>) => t !== "conversation",
+            (t: any) => t !== "conversation",
     );
     const convInputTypes = buildConversationPorts(
-      // @ts-ignore - TODO: strict typing
-      messages,
-      supportedModalities,
+            (messages as any),
+      (supportedModalities as any),
     );
 
     allNodes.push({
@@ -224,9 +206,8 @@ function assembleGraph(steps: Record<string, unknown>) {
     const modelId = `${stepPrefix}_model`;
     allNodes.push({
       id: modelId,
-      modelName: step.model || "unknown",
-      // @ts-ignore - TODO: strict typing
-      provider: step.type?.toLowerCase() || "unknown",
+      modelName: step.model || "any",
+            provider: (step.type as any)?.toLowerCase() || "any",
       displayName: modalities.label || step.model || "Step",
       modelType: modalities.modelType,
       inputTypes: ["conversation"],
@@ -251,34 +232,26 @@ function assembleGraph(steps: Record<string, unknown>) {
     });
 
     // Store model results
-    const result = {};
-    // @ts-ignore
-    if (step.output) result.text = step.output;
-    // @ts-ignore
-    if (step.outputImageRef) result.image = step.outputImageRef;
-    // @ts-ignore
-    nodeResults[modelId] = result;
+    const result: any = {};
+        if (step.output) result.text = step.output;
+        if (step.outputImageRef) result.image = step.outputImageRef;
+        nodeResults[modelId] = result;
 
     // ── 5. Output Viewer ──
     {
       const viewerId = `${stepPrefix}_viewer`;
-      const viewerResult = {};
-      // @ts-ignore
-      if (step.output) viewerResult.text = step.output;
-      // @ts-ignore
-      if (step.outputImageRef) viewerResult.image = step.outputImageRef;
+      const viewerResult: any = {};
+            if (step.output) viewerResult.text = step.output;
+            if (step.outputImageRef) viewerResult.image = step.outputImageRef;
 
       allNodes.push({
         id: viewerId,
         nodeType: "viewer",
         modality: null,
-        // @ts-ignore
-        content: viewerResult.text || viewerResult.image || null,
-        // @ts-ignore
-        contentType: viewerResult.image
+                content: viewerResult.text || viewerResult.image || null,
+                contentType: viewerResult.image
           ? "image"
-          : // @ts-ignore
-            viewerResult.text
+          :             viewerResult.text
             ? "text"
             : null,
         receivedOutputs: viewerResult,
@@ -310,13 +283,11 @@ function assembleGraph(steps: Record<string, unknown>) {
         });
       }
 
-      // @ts-ignore
-      nodeResults[viewerId] = viewerResult;
+            nodeResults[viewerId] = viewerResult;
     }
 
     // ── 6. Chain edge from previous output model → this model (non-utility only) ──
-    // @ts-ignore
-    if (!utility && prevOutputModelId) {
+        if (!utility && prevOutputModelId) {
       allEdges.push({
         id: `chain_${prevOutputModelId}_to_${modelId}`,
         sourceNodeId: prevOutputModelId,
@@ -332,8 +303,7 @@ function assembleGraph(steps: Record<string, unknown>) {
     }
   });
 
-  // @ts-ignore
-  return { nodes: allNodes, edges: allEdges, nodeResults };
+    return { nodes: allNodes, edges: allEdges, nodeResults };
 }
 
 export { assembleGraph };

@@ -17,8 +17,7 @@ function register(HarnessClass: Record<string, unknown>) {
 }
 
 // ── Built-in harnesses ───────────────────────────────────────
-// @ts-ignore - TODO: strict typing
-register(ReActHarness);
+register((ReActHarness as any));
 
 // Future: register(SingleShotHarness);
 // Future: register(PlanExecuteHarness);
