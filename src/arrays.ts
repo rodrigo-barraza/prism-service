@@ -10,6 +10,7 @@ export const ARENA_SCORES = {
   // ── Text Arena ──────────────────────────────────────────────
   // Source: https://arena.ai/leaderboard/text
   text: {
+    "gemini-3.5-flash": 1515,
     "claude-opus-4-6": 1504,
     "claude-opus-4-6-thinking": 1502,
     "gemini-3.1-pro-preview": 1500,
@@ -341,6 +342,7 @@ export const ARENA_SCORES = {
     "claude-opus-4-6-thinking": 1556,
     "claude-opus-4-6": 1555,
     "claude-sonnet-4-6": 1523,
+    "gemini-3.5-flash": 1485,
     "claude-opus-4-5-20251101-thinking-32k": 1497,
     "claude-opus-4-5-20251101": 1475,
     "gpt-5.2-high": 1472,
@@ -399,6 +401,7 @@ export const ARENA_SCORES = {
   // Source: https://arena.ai/leaderboard/document
   document: {
     "claude-opus-4-6": 1525,
+    "gemini-3.5-flash": 1475,
     "claude-opus-4-5-20251101": 1474,
     "gemini-3.1-pro-preview": 1462,
     "claude-sonnet-4-5-20250929": 1450,
