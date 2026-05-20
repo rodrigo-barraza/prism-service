@@ -2,6 +2,7 @@ import OpenAI, { toFile } from "openai";
 import { ProviderError } from "../utils/errors.js";
 import logger from "../utils/logger.js";
 import { extractOpenAIRateLimits } from "../utils/rateLimits.js";
+// @ts-ignore
 import { OPENAI_API_KEY, OPENAI_TRANSCRIPTION_MODEL } from "../../config.js";
 import { TYPES, DEFAULT_VOICES, getDefaultModels, getModelByName, } from "../config.js";
 import { convertToolsToOpenAI } from "../utils/openai-compat.js";
@@ -889,7 +890,7 @@ const openaiProvider = {
                     imageBuffer = Buffer.from(lastImage.imageData, "base64");
                     mimeType = lastImage.mimeType || "image/png";
                 }
-                else {
+                else if (typeof lastImage === "string") {
                     // Data URL format: data:image/png;base64,...
                     const base64Match = lastImage.match(/^data:([^;]+);base64,(.+)$/);
                     if (!base64Match) {
@@ -897,6 +898,9 @@ const openaiProvider = {
                     }
                     imageBuffer = Buffer.from(base64Match[2], "base64");
                     mimeType = base64Match[1];
+                }
+                else {
+                    throw new Error("Invalid image data format");
                 }
                 const ext = mimeType.split("/")[1] || "png";
                 const imageFile = await toFile(imageBuffer, `input.${ext}`, {

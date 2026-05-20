@@ -1,6 +1,6 @@
 import type { ProviderOptions } from "../types/provider.ts";
 /** OpenAI conversation message (same shape as Google's ConversationMsg) */
-interface OpenAIMsg {
+export interface OpenAIMsg {
     role: string;
     content?: string;
     name?: string;

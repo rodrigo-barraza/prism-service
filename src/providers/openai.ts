@@ -2,6 +2,7 @@ import OpenAI, { toFile } from "openai";
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 import { extractOpenAIRateLimits } from "../utils/rateLimits.ts";
+// @ts-ignore
 import { OPENAI_API_KEY, OPENAI_TRANSCRIPTION_MODEL } from "../../config.ts";
 import {
   TYPES,
@@ -39,7 +40,7 @@ function getClient(): OpenAI {
 }
 
 /** OpenAI conversation message (same shape as Google's ConversationMsg) */
-interface OpenAIMsg {
+export interface OpenAIMsg {
   role: string;
   content?: string;
   name?: string;
