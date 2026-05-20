@@ -9,8 +9,8 @@ export default class ContextWindowManager {
   
      * @returns {{ messages: Array, truncated: boolean, strategy: string|null, estimatedTokens: number }}
      */
-    static enforce(messages: any, options?: any): {
-        messages: any;
+    static enforce(messages: Record<string, unknown>, options?: Record<string, unknown>): {
+        messages: Record<string, unknown>;
         truncated: boolean;
         strategy: null;
         estimatedTokens: any;
@@ -25,12 +25,12 @@ export default class ContextWindowManager {
   
   
      */
-    static estimateTokens(messages: any): any;
+    static estimateTokens(messages: Record<string, unknown>): any;
     /**
      * Estimate tokens for a single message (exposed for diagnostics).
   
   
      */
-    static estimateMessageTokens(message: any): number;
+    static estimateMessageTokens(message: string): number;
 }
 //# sourceMappingURL=ContextWindowManager.d.ts.map

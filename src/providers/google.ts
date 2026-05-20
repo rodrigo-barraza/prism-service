@@ -11,9 +11,6 @@ import {
   GOOGLE_EMBEDDING_MODEL,
 } from "../../config.ts";
 import { TYPES, MODELS, DEFAULT_VOICES, getDefaultModels } from "../config.ts";
-// @ts-ignore - TODO: strict typing
-import type { ProviderOptions } from "../types/provider.ts";
-
 // ── Google GenAI Content Types ──────────────────────────────
 
 interface GoogleToolDeclaration {

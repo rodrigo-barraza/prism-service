@@ -9,7 +9,7 @@ declare const SessionGenerationTracker: {
   
   
      */
-    register(agentSessionId: any, requestId: any, { provider, model, source, workerId }?: any): void;
+    register(agentSessionId: Record<string, unknown>, requestId: Record<string, unknown>, { provider, model, source, workerId }?: Record<string, unknown>): void;
     /**
      * Update a tracked request with new token data.
      * Called on each chunk/thinking event or on usage completion.
@@ -17,7 +17,7 @@ declare const SessionGenerationTracker: {
   
   
      */
-    update(requestId: any, { outputTokens, inputTokens, ttft }?: any): void;
+    update(requestId: Record<string, unknown>, { outputTokens, inputTokens, ttft }?: Record<string, unknown>): void;
     /**
      * Record chunk timing, increment the chunk counter, and accumulate
      * output characters for token estimation.
@@ -31,7 +31,7 @@ declare const SessionGenerationTracker: {
   
   
      */
-    recordChunkTiming(requestId: any, charCount?: any): void;
+    recordChunkTiming(requestId: Record<string, unknown>, charCount?: Record<string, unknown>): void;
     /**
      * Mark a request as complete and remove it from active tracking.
      * Rolls the request's final token counts and computed tok/s into
@@ -40,7 +40,7 @@ declare const SessionGenerationTracker: {
      *
   
      */
-    complete(requestId: any): void;
+    complete(requestId: Record<string, unknown>): void;
     /**
      * Compute aggregate stats for all active requests in a session.
      *
@@ -59,7 +59,7 @@ declare const SessionGenerationTracker: {
      *   avgTtft: number|null,
      * }}
      */
-    getSessionStats(agentSessionId: any): {
+    getSessionStats(agentSessionId: Record<string, unknown>): {
         tokPerSec: number | null;
         activeRequests: any;
         totalOutputTokens: any;
@@ -72,14 +72,14 @@ declare const SessionGenerationTracker: {
      *
   
      */
-    cleanup(agentSessionId: any): void;
+    cleanup(agentSessionId: Record<string, unknown>): void;
     /**
-     * Check if a session has any active requests.
+     * Check if a session has Record<string, unknown> active requests.
      *
   
   
      */
-    hasActiveRequests(agentSessionId: any): boolean;
+    hasActiveRequests(agentSessionId: Record<string, unknown>): boolean;
     /** Total active requests across all sessions (for diagnostics). */
     readonly totalActiveRequests: number;
 };

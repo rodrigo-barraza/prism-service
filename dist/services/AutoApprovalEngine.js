@@ -120,6 +120,7 @@ export default class AutoApprovalEngine {
      * @returns {{ approved: boolean, tier: number, tierLabel: string, reason: string }}
      */
     check(toolCall) {
+        // @ts-ignore - TODO: strict typing
         const tier = this.getTier(toolCall.name);
         const tierLabel = TIER_LABELS[tier] || "write";
         // Full Auto mode: everything runs

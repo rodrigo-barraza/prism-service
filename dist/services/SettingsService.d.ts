@@ -16,13 +16,13 @@ declare const SettingsService: {
   
   
      */
-    getSection(section: any): Promise<any>;
+    getSection(section: Record<string, unknown>): Promise<any>;
     /**
      * Update settings. Performs a deep merge with existing settings.
   
      * @returns {Promise<object>} The full settings after merge
      */
-    update(data: any): Promise<any>;
+    update(data: Record<string, unknown>): Promise<any>;
     /**
      * Resolve provider + model for a memory subsystem role.
      * Centralises the identical getXxxConfig() helpers in MemoryService,
@@ -31,7 +31,7 @@ declare const SettingsService: {
   
      * @returns {Promise<{ provider: string, model: string }>}
      */
-    getMemoryModelConfig(role: any): Promise<{
+    getMemoryModelConfig(role: string): Promise<{
         provider: any;
         model: any;
     }>;

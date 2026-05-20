@@ -11,7 +11,7 @@
  * of the default coding agent sections.
  */
 export default class SystemPromptAssembler {
-    constructor(options?: any);
+    constructor(options?: Record<string, unknown>);
     /**
      * Fetch project directory tree from tools-api.
      * Cached for 1 minute to avoid hammering the API.
@@ -24,7 +24,7 @@ export default class SystemPromptAssembler {
   
   
      */
-    _formatDirectoryTree(data: any): string;
+    _formatDirectoryTree(data: Record<string, unknown>): string;
     /**
      * Build domain-grouped tool descriptions from current schemas.
      *
@@ -35,7 +35,7 @@ export default class SystemPromptAssembler {
   
   
      */
-    buildToolDescriptions(enabledTools: any): string;
+    buildToolDescriptions(enabledTools: Record<string, unknown>): string;
     /**
      * Fetch relevant memories via embedding similarity search.
      * Queries the unified `memories` collection using cosine similarity,
@@ -45,7 +45,7 @@ export default class SystemPromptAssembler {
   
      * @returns {Promise<string>} Formatted memory sections for the system prompt
      */
-    fetchMemories(agent: any, project: any, queryText: any, { traceId, agentSessionId, endpoint, _username }?: any): Promise<any>;
+    fetchMemories(agent: Record<string, unknown>, project: Record<string, unknown>, queryText: Record<string, unknown>, { traceId, agentSessionId, endpoint, _username }?: Record<string, unknown>): Promise<any>;
     /**
      * Fetch enabled skills relevant to the user's query via embedding similarity.
      *
@@ -53,10 +53,10 @@ export default class SystemPromptAssembler {
   
      * @returns {Promise<Array<{ name: string, content: string, score: number }>>}
      */
-    fetchSkills(project: any, username: any, queryText: any, { traceId, agentSessionId, endpoint, agent }?: any): Promise<{
-        name: any;
-        content: any;
-        description: any;
+    fetchSkills(project: Record<string, unknown>, username: string, queryText: Record<string, unknown>, { traceId, agentSessionId, endpoint, agent }?: Record<string, unknown>): Promise<{
+        name: unknown;
+        content: unknown;
+        description: unknown;
         score: number;
     }[]>;
     /**
@@ -85,9 +85,9 @@ export default class SystemPromptAssembler {
   
      * @returns {Promise<{ prompt: string, skillNames: string[] }>} Complete system prompt + skill names for UI emission
      */
-    assemble(context: any): Promise<{
+    assemble(context: Record<string, unknown>): Promise<{
         prompt: string;
-        skillNames: any[];
+        skillNames: Record<string, unknown>[];
     }>;
     /**
      * Create a beforePrompt hook handler for AgentHooks.
@@ -98,6 +98,6 @@ export default class SystemPromptAssembler {
      *
   
      */
-    createHook(): (context: any) => Promise<void>;
+    createHook(): (context: Record<string, unknown>) => Promise<void>;
 }
 //# sourceMappingURL=SystemPromptAssembler.d.ts.map

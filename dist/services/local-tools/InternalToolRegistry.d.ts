@@ -4,18 +4,18 @@ export default class InternalToolRegistry {
   
   
      */
-    static has(name: any): boolean;
+    static has(name: string): boolean;
     /**
      * Execute an internal tool by name.
   
   
      */
-    static execute(name: any, args: any, context?: any): Promise<any>;
+    static execute(name: string, args: Record<string, unknown>, context?: Record<string, unknown>): Promise<any>;
     /**
      * Get all internal tool schemas (for LLM consumption — no endpoint metadata).
   
      */
-    static getSchemas(): any[];
+    static getSchemas(): unknown[];
     /**
      * Get all internal tool schemas with domain/labels (for client UI).
   

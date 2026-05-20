@@ -10,34 +10,34 @@ declare const CustomAgentService: {
   
   
      */
-    get(id: any): Promise<import("mongodb").WithId<import("bson").Document> | null>;
+    get(id: string): Promise<import("mongodb").WithId<import("bson").Document> | null>;
     /**
      * Get a custom agent by its derived agentId.
   
   
      */
-    getByAgentId(agentId: any): Promise<import("mongodb").WithId<import("bson").Document> | null>;
+    getByAgentId(agentId: Record<string, unknown>): Promise<import("mongodb").WithId<import("bson").Document> | null>;
     /**
      * Create a new custom agent.
   
      * @returns {Promise<object>} The created document
      */
-    create(data: any): Promise<{
+    create(data: Record<string, unknown>): Promise<{
         _id: ObjectId;
-        name: any;
+        name: unknown;
         agentId: string;
-        type: any;
-        description: any;
-        project: any;
-        icon: any;
-        color: any;
-        backgroundImage: any;
-        identity: any;
-        guidelines: any;
-        toolPolicy: any;
-        enabledTools: any;
-        usesDirectoryTree: any;
-        usesCodingGuidelines: any;
+        type: {};
+        description: {};
+        project: {};
+        icon: {};
+        color: {};
+        backgroundImage: {};
+        identity: {};
+        guidelines: {};
+        toolPolicy: {};
+        enabledTools: any[];
+        usesDirectoryTree: {};
+        usesCodingGuidelines: {};
         createdAt: string;
         updatedAt: string;
     }>;
@@ -47,13 +47,13 @@ declare const CustomAgentService: {
   
      * @returns {Promise<object>} The updated document
      */
-    update(id: any, updates: any): Promise<import("mongodb").WithId<import("bson").Document> | null>;
+    update(id: string, updates: Record<string, unknown>): Promise<import("mongodb").WithId<import("bson").Document> | null>;
     /**
      * Delete a custom agent.
   
   
      */
-    delete(id: any): Promise<boolean>;
+    delete(id: string): Promise<boolean>;
 };
 export default CustomAgentService;
 //# sourceMappingURL=CustomAgentService.d.ts.map

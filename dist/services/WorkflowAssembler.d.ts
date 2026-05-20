@@ -16,9 +16,9 @@
 
  * @returns {{ nodes, edges, nodeResults }}
  */
-declare function assembleGraph(steps: any): {
-    nodes: any[];
-    edges: any[];
+declare function assembleGraph(steps: Record<string, unknown>): {
+    nodes: Record<string, unknown>[];
+    edges: Record<string, unknown>[];
     nodeResults: {};
 };
 export { assembleGraph };

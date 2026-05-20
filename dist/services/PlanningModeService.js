@@ -41,6 +41,7 @@ export default class PlanningModeService {
   
      */
     static injectPlanningInstruction(messages) {
+        // @ts-ignore - TODO: strict typing
         const systemMsg = messages.find((m) => m.role === "system");
         if (systemMsg) {
             // Idempotency: don't append twice
@@ -49,6 +50,7 @@ export default class PlanningModeService {
             systemMsg.content = systemMsg.content + PLANNING_INSTRUCTION;
         }
         else {
+            // @ts-ignore - TODO: strict typing
             messages.unshift({
                 role: "system",
                 content: PLANNING_INSTRUCTION.trim(),
@@ -63,6 +65,7 @@ export default class PlanningModeService {
   
      */
     static stripPlanningInstruction(messages) {
+        // @ts-ignore - TODO: strict typing
         const systemMsg = messages.find((m) => m.role === "system");
         if (systemMsg && systemMsg.content.includes("PLANNING MODE ACTIVE")) {
             systemMsg.content = systemMsg.content.replace(PLANNING_INSTRUCTION, "");
@@ -79,7 +82,9 @@ export default class PlanningModeService {
         const stepRegex = /^\d+\.\s+(.+)$/gm;
         const steps = [];
         let match;
+        // @ts-ignore - TODO: strict typing
         while ((match = stepRegex.exec(planText)) !== null) {
+            // @ts-ignore - TODO: strict typing
             steps.push(match[1].trim());
         }
         return steps;

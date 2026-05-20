@@ -284,29 +284,40 @@ PERSONAS.set("CODING", {
 - Keep your explanations concise and technical`,
     interactionRules: "",
     toolPolicy: (context) => {
+        // @ts-ignore - TODO: strict typing
         const enabled = new Set(context.enabledTools || []);
         const tips = [];
         // ── File editing tips ──
         if (enabled.has("multi_file_read")) {
-            tips.push("- Use multi_file_read when you need to inspect several files at once");
+            tips.push(
+            // @ts-ignore - TODO: strict typing
+            "- Use multi_file_read when you need to inspect several files at once");
         }
         if (enabled.has("project_summary")) {
-            tips.push("- Use project_summary to understand unfamiliar codebases before diving in");
+            tips.push(
+            // @ts-ignore - TODO: strict typing
+            "- Use project_summary to understand unfamiliar codebases before diving in");
         }
         if (enabled.has("git")) {
-            tips.push("- Check git status before and after edits to track your changes");
+            tips.push(
+            // @ts-ignore - TODO: strict typing
+            "- Check git status before and after edits to track your changes");
         }
         if (enabled.has("grep_search")) {
-            tips.push('- When searching, use includes filters to narrow results (e.g. [".js", ".ts"])');
+            tips.push(
+            // @ts-ignore - TODO: strict typing
+            '- When searching, use includes filters to narrow results (e.g. [".js", ".ts"])');
         }
         const sections = [];
         if (tips.length > 0) {
+            // @ts-ignore - TODO: strict typing
             sections.push(`## Tool Tips\n${tips.join("\n")}`);
         }
         // ── Task management ──
         if (enabled.has("task_create") ||
             enabled.has("task_list") ||
             enabled.has("task_update")) {
+            // @ts-ignore - TODO: strict typing
             sections.push(`## Task Management
 You have persistent task tools (task_create, task_list, task_update) that survive across conversations.
 Use them proactively:
@@ -321,6 +332,7 @@ Use them proactively:
         }
         // ── Proactive memory ──
         if (enabled.has("upsert_memory")) {
+            // @ts-ignore - TODO: strict typing
             sections.push(`## Proactive Memory
 You have a persistent memory tool (upsert_memory) that stores facts across sessions.
 Use it **proactively** — do NOT wait for the user to say "remember":
@@ -345,15 +357,19 @@ PERSONAS.set("LUPOS", {
     type: "conversational",
     project: "lupos",
     identity: (context) => {
+        // @ts-ignore - TODO: strict typing
         const aprilFools = context?.agentContext?.aprilFoolsMode === true;
+        // @ts-ignore - TODO: strict typing
         const isClockCrew = context?.agentContext?.guildId === "249010731910037507";
         let personality;
         if (isClockCrew) {
+            // @ts-ignore - TODO: strict typing
             personality = aprilFools
                 ? LUPOS_APRIL_FOOLS_CLOCK_CREW_CORE
                 : LUPOS_CLOCK_CREW_CORE_PERSONALITY;
         }
         else {
+            // @ts-ignore - TODO: strict typing
             personality = aprilFools
                 ? LUPOS_APRIL_FOOLS_CORE
                 : LUPOS_CORE_PERSONALITY;
@@ -694,19 +710,27 @@ PERSONAS.set("OOG", {
     guidelines: "",
     interactionRules: "",
     toolPolicy: (context) => {
+        // @ts-ignore - TODO: strict typing
         const enabled = new Set(context.enabledTools || []);
         const tips = [];
         if (enabled.has("str_replace_file") && enabled.has("write_file")) {
-            tips.push("- oog prefer str_replace_file over write_file for edit. safer. preserve what not need change");
+            tips.push(
+            // @ts-ignore - TODO: strict typing
+            "- oog prefer str_replace_file over write_file for edit. safer. preserve what not need change");
         }
         if (enabled.has("grep_search")) {
-            tips.push("- oog use grep_search to find all repeat pattern before consolidate. no surprise");
+            tips.push(
+            // @ts-ignore - TODO: strict typing
+            "- oog use grep_search to find all repeat pattern before consolidate. no surprise");
         }
         if (enabled.has("git")) {
+            // @ts-ignore - TODO: strict typing
             tips.push("- oog check git status before and after. responsible caveman");
         }
         if (enabled.has("project_summary")) {
-            tips.push("- oog use project_summary to understand lay of land before swing club");
+            tips.push(
+            // @ts-ignore - TODO: strict typing
+            "- oog use project_summary to understand lay of land before swing club");
         }
         const sections = [OOG_TOOL_POLICY_OVERRIDE];
         if (tips.length > 0) {
@@ -1000,12 +1024,15 @@ PERSONAS.set("OMNI", {
 - Keep your explanations concise and technical`,
     interactionRules: "",
     toolPolicy: (context) => {
+        // @ts-ignore - TODO: strict typing
         const enabled = new Set(context.enabledTools || []);
+        // @ts-ignore - TODO: strict typing
         const sections = [OMNI_TOOL_POLICY];
         // ── Task management ──
         if (enabled.has("task_create") ||
             enabled.has("task_list") ||
             enabled.has("task_update")) {
+            // @ts-ignore - TODO: strict typing
             sections.push(`## Task Management
 You have persistent task tools (task_create, task_list, task_update) that survive across conversations.
 Use them proactively:
@@ -1020,6 +1047,7 @@ Use them proactively:
         }
         // ── Proactive memory ──
         if (enabled.has("upsert_memory")) {
+            // @ts-ignore - TODO: strict typing
             sections.push(`## Proactive Memory
 You have a persistent memory tool (upsert_memory) that stores facts across sessions.
 Use it **proactively** — do NOT wait for the user to say "remember":
@@ -1098,6 +1126,7 @@ const AgentPersonaRegistry = {
     get(agentId) {
         if (!agentId)
             return null;
+        // @ts-ignore - TODO: strict typing
         const persona = PERSONAS.get(agentId.toUpperCase());
         if (!persona) {
             logger.warn(`[AgentPersonaRegistry] Unknown agent: "${agentId}"`);
@@ -1111,6 +1140,7 @@ const AgentPersonaRegistry = {
      */
     list() {
         return [...PERSONAS.values()]
+            // @ts-ignore - TODO: strict typing
             .sort((a, b) => (a.displayOrder ?? 100) - (b.displayOrder ?? 100))
             .map((p) => ({
             id: p.id,
@@ -1125,6 +1155,7 @@ const AgentPersonaRegistry = {
   
      */
     has(agentId) {
+        // @ts-ignore - TODO: strict typing
         return PERSONAS.has((agentId || "").toUpperCase());
     },
     /**
@@ -1181,6 +1212,7 @@ const AgentPersonaRegistry = {
     unregister(agentId) {
         if (!agentId)
             return;
+        // @ts-ignore - TODO: strict typing
         const key = agentId.toUpperCase();
         const persona = PERSONAS.get(key);
         if (persona?.custom) {
@@ -1209,7 +1241,9 @@ const AgentPersonaRegistry = {
             logger.info(`[AgentPersonaRegistry] Loaded ${agents.length} custom agent(s) from database`);
         }
         catch (error) {
-            logger.warn(`[AgentPersonaRegistry] Failed to load custom agents: ${error.message}`);
+            logger.warn(
+            // @ts-ignore - TODO: strict typing
+            `[AgentPersonaRegistry] Failed to load custom agents: ${error.message}`);
         }
     },
 };

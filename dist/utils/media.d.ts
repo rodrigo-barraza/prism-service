@@ -9,9 +9,9 @@
 
  * @returns {Promise<{ data: string, mediaType: string }>} Compressed base64 + updated MIME
  */
-export declare function compressImageForSizeLimit(base64Data: any, mediaType: any, maxBytes?: any): Promise<{
-    data: any;
-    mediaType: any;
+export declare function compressImageForSizeLimit(base64Data: string, mediaType: string, maxBytes?: number): Promise<{
+    data: string;
+    mediaType: string;
 }>;
 /**
  * Constrain image pixel dimensions to MAX_IMAGE_DIMENSION.
@@ -24,28 +24,28 @@ export declare function compressImageForSizeLimit(base64Data: any, mediaType: an
 
  * @returns {Promise<{ data: string, mediaType: string }>} Possibly resized base64 + MIME
  */
-export declare function constrainImageDimensions(base64Data: any, mediaType: any, maxDim?: any): Promise<{
-    data: any;
-    mediaType: any;
+export declare function constrainImageDimensions(base64Data: string, mediaType: string, maxDim?: number): Promise<{
+    data: string;
+    mediaType: string;
 }>;
 /**
  * Detect MIME type from a base64 data URL.
 
  * @returns {string|null} The MIME type (e.g. "image/png") or null
  */
-export declare function getDataUrlMimeType(dataUrl: any): any;
+export declare function getDataUrlMimeType(dataUrl: string): string | null;
 /**
  * Check if a string is a valid data: URL, HTTP(S) URL, or other ref type.
 
 
  */
-export declare function getUrlType(url: any): "unknown" | "data" | "http";
+export declare function getUrlType(url: string): "unknown" | "data" | "http";
 /**
  * Infer MIME category from a URL's file extension.
 
 
  */
-export declare function inferMimeFromUrl(url: any): "unknown" | "text" | "image" | "pdf";
+export declare function inferMimeFromUrl(url: string): "unknown" | "text" | "image" | "pdf";
 /**
  * Extract frames from a video data URL using ffmpeg.
  * Returns an array of JPEG image data URLs (one per frame at 1fps).
@@ -58,5 +58,9 @@ export declare function inferMimeFromUrl(url: any): "unknown" | "text" | "image"
 
  * @returns {Promise<string[]>} Array of data:image/jpeg;base64,... URLs
  */
-export declare function extractVideoFrames(videoDataUrl: any, options?: any): Promise<any[]>;
+export declare function extractVideoFrames(videoDataUrl: string, options?: {
+    fps?: number;
+    maxFrames?: number;
+    quality?: number;
+}): Promise<string[]>;
 //# sourceMappingURL=media.d.ts.map

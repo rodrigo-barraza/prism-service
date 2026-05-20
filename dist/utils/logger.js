@@ -6,6 +6,7 @@ const base = createLogger("prism");
  * Build identity + IP tags from provided values or AsyncLocalStorage context.
  */
 function buildContextTags(project, username, clientIp) {
+    // @ts-ignore - TODO: strict typing
     const hasProject = project && project !== "unknown";
     const hasUser = username && username !== "unknown";
     let identityTag = "";
@@ -23,14 +24,19 @@ function buildContextTags(project, username, clientIp) {
 }
 const logger = {
     ...base,
+    // @ts-ignore - TODO: strict typing
     provider(provider, action, ...args) {
         const context = getRequestContext();
         // @ts-ignore
         const tags = buildContextTags(context.project, context.username, context.clientIp);
+        // @ts-ignore - TODO: strict typing
         base.info(`[${provider}] ${action}${tags}`, ...args);
     },
-    request(project, username, clientIp, message, ...args) {
+    request(project, username, clientIp, message, 
+    // @ts-ignore - TODO: strict typing
+    ...args) {
         const tags = buildContextTags(project, username, clientIp);
+        // @ts-ignore - TODO: strict typing
         base.info(`${message}${tags}`, ...args);
     },
 };

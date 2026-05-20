@@ -3,7 +3,7 @@
  * Returns { thinking, text } where thinking is the concatenated think content
  * and text is the remaining content with think tags removed.
  */
-export declare function extractThinkTags(raw: any): {
+export declare function extractThinkTags(raw: Record<string, unknown>): {
     thinking: string | null;
     text: any;
 };
@@ -17,11 +17,11 @@ export declare function extractThinkTags(raw: any): {
  */
 export declare class ThinkTagParser {
     constructor();
-    feed(chunk: any): any[];
+    feed(chunk: Record<string, unknown>): Record<string, unknown>[];
     /** Check if the end of str is a partial match for "<think>" */
-    _partialStartTag(str: any): number;
+    _partialStartTag(str: Record<string, unknown>): number;
     /** Check if the end of str is a partial match for "</think>" */
-    _partialEndTag(str: any): number;
+    _partialEndTag(str: Record<string, unknown>): number;
     /** Flush any remaining buffered content. */
     flush(): {
         type: string;

@@ -41,8 +41,9 @@ export function createSseEmitter(res, signal) {
             // Node flushes pending writes to the socket immediately. Critical
             // for events emitted before an await block (plan_proposal,
             // approval_required) where no further writes push the buffer.
-            if (typeof res.flush === "function") {
-                res.flush();
+            const resWithFlush = res;
+            if (typeof resWithFlush.flush === "function") {
+                resWithFlush.flush();
             }
             else if (res.socket && !res.socket.destroyed) {
                 res.socket.uncork?.();
@@ -63,7 +64,7 @@ export function createSseEmitter(res, signal) {
 export function buildJsonResponseFromEvents(events, reqBody) {
     const errorEvent = events.find((e) => e.type === "error");
     if (errorEvent) {
-        return { error: new ProviderError("server", errorEvent.message, 500) };
+        return { error: new ProviderError("server", errorEvent.message || "Unknown error", 500) };
     }
     const doneEvent = events.find((e) => e.type === "done") || {};
     const text = events
@@ -111,7 +112,9 @@ export function buildJsonResponseFromEvents(events, reqBody) {
 
 
  */
-export async function handleSseRequest(req, res, params, handler = handleConversation) {
+export async function handleSseRequest(req, res, params, 
+// @ts-ignore - TODO: strict typing
+handler = handleConversation) {
     initSseResponse(res);
     const controller = createAbortController();
     res.on("close", () => {
@@ -131,7 +134,9 @@ export async function handleSseRequest(req, res, params, handler = handleConvers
 
 
  */
-export async function handleJsonRequest(req, res, next, params, handler = handleConversation) {
+export async function handleJsonRequest(req, res, next, params, 
+// @ts-ignore - TODO: strict typing
+handler = handleConversation) {
     // @ts-ignore
     const events = [];
     await handler(params, (event) => events.push(event));

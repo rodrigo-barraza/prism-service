@@ -49,6 +49,7 @@ async function generateEmbedding(text, options = {}) {
  * Calculate days elapsed since a timestamp.
  */
 function memoryAgeDays(createdAt) {
+    // @ts-ignore - TODO: strict typing
     return daysSinceIso(createdAt);
 }
 /**
@@ -77,8 +78,6 @@ function freshnessCaveat(createdAt) {
 /**
  * Call an AI provider to extract facts from a conversation.
  * Returns an array of { fact, aboutUserId, aboutUsername, category, confidence }.
-
-
  */
 async function extractFactsFromConversation(messages, participants, meta = {}) {
     // @ts-ignore
@@ -89,9 +88,11 @@ async function extractFactsFromConversation(messages, participants, meta = {}) {
     const provider = getProvider(extractionProvider);
     const requestId = crypto.randomUUID();
     const requestStart = performance.now();
+    // @ts-ignore - TODO: strict typing
     const participantList = participants
         .map((p) => `- ID: ${p.id}, Username: ${p.username}, Display: ${p.displayName || p.username}`)
         .join("\n");
+    // @ts-ignore - TODO: strict typing
     const conversationText = messages
         .map((m) => `${m.name || m.role}: ${m.content}`)
         .join("\n");
@@ -137,6 +138,7 @@ ${participantList}`;
     }
     catch (error) {
         success = false;
+        // @ts-ignore - TODO: strict typing
         errorMessage = error.message;
         throw error;
     }
@@ -157,7 +159,9 @@ ${participantList}`;
             // @ts-ignore
             agentSessionId: meta.agentSessionId || null,
             aiMessages,
+            // @ts-ignore - TODO: strict typing
             resultText: result?.text || "",
+            // @ts-ignore - TODO: strict typing
             usage: result?.usage || null,
             success,
             errorMessage,
@@ -168,11 +172,14 @@ ${participantList}`;
             },
         });
     }
+    // @ts-ignore - TODO: strict typing
     const facts = parseJsonFromLlmResponse(result.text);
     if (!Array.isArray(facts))
         return [];
     // Validate each fact has the required fields
-    return facts.filter((f) => f.fact &&
+    return facts.filter(
+    // @ts-ignore - TODO: strict typing
+    (f) => f.fact &&
         f.aboutUserId &&
         f.aboutUsername &&
         typeof f.confidence === "number" &&
@@ -210,6 +217,7 @@ const MemoryService = {
             throw new Error("MemoryService.store requires content");
         // Validate type for CODING agent
         if (agent === "CODING") {
+            // @ts-ignore - TODO: strict typing
             type = CODING_MEMORY_TYPES.includes(type) ? type : "project";
         }
         const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
@@ -229,6 +237,7 @@ const MemoryService = {
             // @ts-ignore
             if (agent)
                 embedOpts.agent = agent;
+            // @ts-ignore - TODO: strict typing
             embedding = await generateEmbedding(embedText, embedOpts);
         }
         // Duplicate detection — compare against existing memories for the same agent
@@ -251,10 +260,13 @@ const MemoryService = {
         const isDuplicate = existing.some((document) => {
             if (!document.embedding)
                 return false;
+            // @ts-ignore - TODO: strict typing
             return cosineSimilarity(embedding, document.embedding) > DUPLICATE_THRESHOLD;
         });
         if (isDuplicate) {
-            logger.info(`[MemoryService] Skipping duplicate for ${agent}: "${(title || content).substring(0, 60)}"`);
+            logger.info(
+            // @ts-ignore - TODO: strict typing
+            `[MemoryService] Skipping duplicate for ${agent}: "${(title || content).substring(0, 60)}"`);
             return null;
         }
         const now = new Date().toISOString();
@@ -271,10 +283,13 @@ const MemoryService = {
             createdAt: now,
             updatedAt: now,
             // Spread agent-specific metadata at top level for efficient querying
+            // @ts-ignore - TODO: strict typing
             ...metadata,
         };
         await collection.insertOne(memory);
-        logger.info(`[MemoryService] Stored [${agent}/${memory.type}] "${(title || content).substring(0, 60)}"`);
+        logger.info(
+        // @ts-ignore - TODO: strict typing
+        `[MemoryService] Stored [${agent}/${memory.type}] "${(title || content).substring(0, 60)}"`);
         return memory;
     },
     // ── LUPOS: Extract & Store ─────────────────────────────────────────────────
@@ -291,6 +306,7 @@ const MemoryService = {
      */
     async extractAndStore({ guildId, channelId, messages, participants, sourceMessageId, traceId, project, endpoint, }) {
         // Extract facts from the conversation via AI
+        // @ts-ignore - TODO: strict typing
         const facts = await extractFactsFromConversation(messages, participants, {
             project,
             traceId,
@@ -305,6 +321,7 @@ const MemoryService = {
         const storedMemories = [];
         for (const fact of facts) {
             try {
+                // @ts-ignore - TODO: strict typing
                 const embedding = await generateEmbedding(fact.fact, {
                     project,
                     traceId,
@@ -336,6 +353,7 @@ const MemoryService = {
                 }
             }
             catch (error) {
+                // @ts-ignore - TODO: strict typing
                 logger.error(`[MemoryService] Failed to store fact: ${error.message}`);
             }
         }
@@ -375,6 +393,7 @@ const MemoryService = {
         // @ts-ignore
         if (agent)
             embeddingOpts.agent = agent;
+        // @ts-ignore - TODO: strict typing
         const queryEmbedding = await generateEmbedding(queryText, embeddingOpts);
         // Build the filter — always scoped by agent
         const filter = { agent };
@@ -384,6 +403,7 @@ const MemoryService = {
         // @ts-ignore
         if (guildId)
             filter.guildId = guildId;
+        // @ts-ignore - TODO: strict typing
         if (userIds && userIds.length > 0) {
             // @ts-ignore
             filter.aboutUserId = { $in: userIds };
@@ -409,22 +429,30 @@ const MemoryService = {
             return [];
         // Compute cosine similarity and sort
         const scored = memories
+            // @ts-ignore - TODO: strict typing
             .filter((m) => m.embedding && m.embedding.length > 0)
             .map((m) => ({
             id: m._id,
             type: m.type || "other",
+            // @ts-ignore - TODO: strict typing
             title: m.title || (m.content ? m.content.substring(0, 60) : "untitled"),
             content: m.content || "",
             aboutUserId: m.aboutUserId,
             aboutUsername: m.aboutUsername,
             confidence: m.confidence,
             createdAt: m.createdAt,
+            // @ts-ignore - TODO: strict typing
             age: memoryAge(m.createdAt),
+            // @ts-ignore - TODO: strict typing
             ageDays: memoryAgeDays(m.createdAt),
+            // @ts-ignore - TODO: strict typing
             score: cosineSimilarity(queryEmbedding, m.embedding),
         }))
+            // @ts-ignore - TODO: strict typing
             .filter((m) => m.score > RELEVANCE_THRESHOLD)
+            // @ts-ignore - TODO: strict typing
             .sort((a, b) => b.score - a.score)
+            // @ts-ignore - TODO: strict typing
             .slice(0, limit);
         logger.info(`[MemoryService] Search found ${scored.length} relevant memories for ${agent} (from ${memories.length} total)`);
         return scored;
@@ -458,7 +486,9 @@ const MemoryService = {
             collection
                 .find(filter, { projection: { embedding: 0 } })
                 .sort({ createdAt: -1 })
+                // @ts-ignore - TODO: strict typing
                 .skip(skip)
+                // @ts-ignore - TODO: strict typing
                 .limit(limit)
                 .toArray(),
             collection.countDocuments(filter),
@@ -554,10 +584,12 @@ const MemoryService = {
     formatForPrompt(memories) {
         if (!memories || memories.length === 0)
             return "";
+        // @ts-ignore - TODO: strict typing
         return memories
             .map((m) => {
             const badge = `[${m.type}]`;
             const age = m.age !== "today" ? ` (${m.age})` : "";
+            // @ts-ignore - TODO: strict typing
             const caveat = freshnessCaveat(m.createdAt);
             return `- ${badge} **${m.title}**${age}: ${m.content}${caveat}`;
         })

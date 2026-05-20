@@ -22,13 +22,13 @@ export default class MemoryExtractor {
   
      * @returns {Promise<Array>} Stored memory documents
      */
-    static extractAndStore({ project, username, messages, traceId, agentSessionId, conversationId, endpoint, agent, toolCalls, emit, }: any): Promise<any[]>;
+    static extractAndStore({ project, username, messages, traceId, agentSessionId, conversationId, endpoint, agent, toolCalls, emit, }: Record<string, unknown>): Promise<Record<string, unknown>[]>;
     /**
      * Create an afterResponse hook handler for AgentHooks.
      * Runs as fire-and-forget (non-blocking).
      *
   
      */
-    static createHook(): (context: any, { _text, messages, toolCalls }: any) => Promise<void>;
+    static createHook(): (context: Record<string, unknown>, { _text, messages, toolCalls }: Record<string, unknown>) => Promise<void>;
 }
 //# sourceMappingURL=MemoryExtractor.d.ts.map

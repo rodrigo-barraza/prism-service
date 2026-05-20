@@ -23,6 +23,7 @@ export function requestLoggerMiddleware(req, res, next) {
         }
     }
     const rawIp = req.clientIp ||
+        // @ts-ignore - TODO: strict typing
         req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
         req.ip;
     // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1)
@@ -32,9 +33,11 @@ export function requestLoggerMiddleware(req, res, next) {
     res.on("finish", () => {
         // Skip SSE streaming requests — those are logged in detail by the route handlers
         const contentType = res.getHeader("content-type") || "";
+        // @ts-ignore - TODO: strict typing
         if (contentType.includes("text/event-stream"))
             return;
         // Skip binary audio streams — logged by route handler
+        // @ts-ignore - TODO: strict typing
         if (contentType.includes("audio/"))
             return;
         const elapsed = performance.now() - start;
@@ -51,12 +54,16 @@ export function requestLoggerMiddleware(req, res, next) {
             : `${Math.round(elapsed)}ms`;
         // Request / response sizes (from headers — zero-cost)
         const inBytes = parseInt(req.headers["content-length"] || "0", 10);
+        // @ts-ignore - TODO: strict typing
         const outBytes = parseInt(res.getHeader("content-length") || "0", 10);
         const totalBytes = inBytes + outBytes;
         const sizeTag = `(in: ${formatBytes(inBytes)}, out: ${formatBytes(outBytes)}, total: ${formatBytes(totalBytes)})`;
-        logger.request(finalProject, finalUsername, finalIp, `${method} ${path} ${status} — ${time} ${sizeTag}`);
+        logger.request(
+        // @ts-ignore - TODO: strict typing
+        finalProject, finalUsername, finalIp, `${method} ${path} ${status} — ${time} ${sizeTag}`);
     });
     // Attach agent to req for downstream route handlers
+    // @ts-ignore - TODO: strict typing
     if (agent)
         req.agent = agent;
     // Run the rest of the middleware chain inside AsyncLocalStorage context

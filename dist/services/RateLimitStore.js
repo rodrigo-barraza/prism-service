@@ -13,6 +13,11 @@
 const GOOGLE_STATIC_LIMITS = {
     note: "Static tier-2 limits from Google AI Studio. Not dynamically updated.",
     models: {
+        "gemini-3.5-flash": {
+            rpm: 2000,
+            tpm: 4_000_000,
+            rpd: 100_000,
+        },
         "gemini-3-flash": {
             rpm: 2000,
             tpm: 3_000_000,

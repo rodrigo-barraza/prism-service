@@ -50,7 +50,7 @@ function registerType(type, instances) {
             continue;
         const instanceNumber = i + 1;
         const id = instanceNumber === 1 ? type : `${type}-${instanceNumber}`;
-        const maxConcurrency = Math.max(1, parseInt(concurrency, 10) || 1);
+        const maxConcurrency = Math.max(1, typeof concurrency === 'number' ? concurrency : parseInt(String(concurrency), 10) || 1);
         const provider = factory(url, id);
         const entry = {
             id,

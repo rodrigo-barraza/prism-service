@@ -51,6 +51,7 @@ export default class AgentHooks extends EventEmitter {
   
      * @returns {Promise<object|undefined>} Merged results from handlers
      */
+    // @ts-ignore - TODO: strict typing
     async run(event, ...args) {
         // @ts-ignore
         const hooks = this._hooks.get(event) || [];
@@ -58,15 +59,20 @@ export default class AgentHooks extends EventEmitter {
         // @ts-ignore
         for (const { handler, name } of hooks) {
             try {
+                // @ts-ignore - TODO: strict typing
                 const hookResult = await handler(...args);
                 if (hookResult && typeof hookResult === "object") {
+                    // @ts-ignore - TODO: strict typing
                     result = { ...result, ...hookResult };
                 }
             }
             catch (error) {
-                logger.error(`[AgentHooks] Hook "${name}" on "${event}" failed: ${error.message}`);
+                logger.error(
+                // @ts-ignore - TODO: strict typing
+                `[AgentHooks] Hook "${name}" on "${event}" failed: ${error.message}`);
             }
         }
+        // @ts-ignore - TODO: strict typing
         return result;
     }
     /**

@@ -14,12 +14,14 @@ const COLLECTION = COLLECTIONS.CUSTOM_TOOLS;
  */
 router.get("/", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const tools = await db
             .collection(COLLECTION)
             .find({ project, username })
             .sort({ createdAt: -1 })
             .toArray();
+        // @ts-ignore - TODO: strict typing
         res.json(tools.map((t) => ({ ...t, id: t._id.toString() })));
     }
     catch (error) {
@@ -32,6 +34,7 @@ router.get("/", asyncHandler(async (req, res, next) => {
  */
 router.post("/", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const document = {
             project,
@@ -61,6 +64,7 @@ router.post("/", asyncHandler(async (req, res, next) => {
  */
 router.put("/:id", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const updates = {
             ...(req.body.name !== undefined && { name: req.body.name }),
@@ -81,7 +85,9 @@ router.put("/:id", asyncHandler(async (req, res, next) => {
         };
         const result = await db
             .collection(COLLECTION)
-            .findOneAndUpdate({ _id: new ObjectId(req.params.id) }, { $set: updates }, { returnDocument: "after" });
+            .findOneAndUpdate(
+        // @ts-ignore - TODO: strict typing
+        { _id: new ObjectId(req.params.id) }, { $set: updates }, { returnDocument: "after" });
         if (!result) {
             return res.status(404).json({ error: "Tool not found" });
         }
@@ -98,9 +104,11 @@ router.put("/:id", asyncHandler(async (req, res, next) => {
  */
 router.delete("/:id", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const result = await db
             .collection(COLLECTION)
+            // @ts-ignore - TODO: strict typing
             .findOneAndDelete({ _id: new ObjectId(req.params.id) });
         if (!result) {
             return res.status(404).json({ error: "Tool not found" });

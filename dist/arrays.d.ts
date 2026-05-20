@@ -7,6 +7,7 @@
  */
 export declare const ARENA_SCORES: {
     text: {
+        "gemini-3.5-flash": number;
         "claude-opus-4-6": number;
         "claude-opus-4-6-thinking": number;
         "gemini-3.1-pro-preview": number;
@@ -335,6 +336,7 @@ export declare const ARENA_SCORES: {
         "claude-opus-4-6-thinking": number;
         "claude-opus-4-6": number;
         "claude-sonnet-4-6": number;
+        "gemini-3.5-flash": number;
         "claude-opus-4-5-20251101-thinking-32k": number;
         "claude-opus-4-5-20251101": number;
         "gpt-5.2-high": number;
@@ -387,6 +389,7 @@ export declare const ARENA_SCORES: {
     vision: {};
     document: {
         "claude-opus-4-6": number;
+        "gemini-3.5-flash": number;
         "claude-opus-4-5-20251101": number;
         "gemini-3.1-pro-preview": number;
         "claude-sonnet-4-5-20250929": number;

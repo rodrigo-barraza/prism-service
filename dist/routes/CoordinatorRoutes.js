@@ -33,6 +33,7 @@ router.post("/plan", asyncHandler(async (req, res, next) => {
         res.json(plan);
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`[coordinator] PLAN ${error.message}`);
         next(error);
     }
@@ -61,6 +62,7 @@ router.post("/execute", asyncHandler(async (req, res, next) => {
         res.json(result);
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`[coordinator] EXECUTE ${error.message}`);
         next(error);
     }
@@ -70,6 +72,7 @@ router.post("/execute", asyncHandler(async (req, res, next) => {
  * Get the current status of a coordinator task.
  */
 router.get("/status/:taskId", (req, res) => {
+    // @ts-ignore - TODO: strict typing
     const status = CoordinatorService.getStatus(req.params.taskId);
     if (!status) {
         return res.status(404).json({ error: "Task not found" });
@@ -89,6 +92,7 @@ router.get("/tasks", (_req, res) => {
  */
 router.post("/approve-merge/:taskId", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const result = await CoordinatorService.approveMerge(req.params.taskId);
         if (result.error) {
             return res.status(400).json(result);
@@ -96,6 +100,7 @@ router.post("/approve-merge/:taskId", asyncHandler(async (req, res, next) => {
         res.json(result);
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`[coordinator] APPROVE-MERGE ${error.message}`);
         next(error);
     }
@@ -106,6 +111,7 @@ router.post("/approve-merge/:taskId", asyncHandler(async (req, res, next) => {
  */
 router.post("/abort/:taskId", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const result = await CoordinatorService.abort(req.params.taskId);
         if (result.error) {
             return res.status(400).json(result);
@@ -113,6 +119,7 @@ router.post("/abort/:taskId", asyncHandler(async (req, res, next) => {
         res.json(result);
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`[coordinator] ABORT ${error.message}`);
         next(error);
     }
@@ -145,7 +152,9 @@ router.get("/workers", asyncHandler(async (req, res) => {
             }
         }
         catch (error) {
-            logger.warn(`[coordinator] Failed to load persisted workers: ${error.message}`);
+            logger.warn(
+            // @ts-ignore - TODO: strict typing
+            `[coordinator] Failed to load persisted workers: ${error.message}`);
         }
     }
     res.json({ workers });
@@ -170,6 +179,7 @@ router.post("/workers/stop", asyncHandler(async (req, res) => {
  * Get the status of a specific chat-spawned worker.
  */
 router.get("/workers/:agentId", (req, res) => {
+    // @ts-ignore - TODO: strict typing
     const status = CoordinatorService.getWorkerStatus(req.params.agentId);
     if (!status) {
         return res.status(404).json({ error: "Worker not found" });

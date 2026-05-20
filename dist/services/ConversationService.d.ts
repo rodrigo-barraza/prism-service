@@ -5,13 +5,13 @@
 
  * @returns {Promise<Array>} messages with refs replacing inline data
  */
-export declare function extractFiles(messages: any, project?: any, username?: any): Promise<any>;
+export declare function extractFiles(messages: Record<string, unknown>, project?: Record<string, unknown>, username?: string): Promise<Record<string, unknown> | Record<string, unknown>[]>;
 /**
  * Compute input/output modalities from messages for lightweight querying.
 
  * @returns {Object} modalities flags
  */
-export declare function computeModalities(messages: any): {
+export declare function computeModalities(messages: Record<string, unknown>): {
     textIn: boolean;
     textOut: boolean;
     imageIn: boolean;
@@ -29,13 +29,13 @@ export declare function computeModalities(messages: any): {
 
 
  */
-export declare function extractProviders(messages: any, settings: any): unknown[];
+export declare function extractProviders(messages: Record<string, unknown>, settings: Record<string, unknown>): unknown[];
 /**
  * Compute total estimated cost across all messages.
 
 
  */
-export declare function computeTotalCost(messages: any): number;
+export declare function computeTotalCost(messages: Record<string, unknown>): number;
 /**
  * Build the $set fields for a conversation/agent-session PATCH request.
  * Centralises the identical logic shared by conversations.js and agent-sessions.js.
@@ -43,7 +43,7 @@ export declare function computeTotalCost(messages: any): number;
 
  * @returns {object} $set fields ready for updateOne
  */
-export declare function buildConversationPatchFields({ title, messages, systemPrompt, settings, }: any): {
+export declare function buildConversationPatchFields({ title, messages, systemPrompt, settings, }: Record<string, unknown>): {
     updatedAt: string;
 };
 /**
@@ -60,7 +60,7 @@ declare const ConversationService: {
   
        * @returns {Promise<object>} The updated conversation document
        */
-    appendMessages(conversationId: any, project: any, username: any, newMessages: any, conversationMeta?: any, { collection }?: any): Promise<{
+    appendMessages(conversationId: Record<string, unknown>, project: Record<string, unknown>, username: string, newMessages: Record<string, unknown>, conversationMeta?: Record<string, unknown>, { collection }?: Record<string, unknown>): Promise<{
         modalities: {
             textIn: boolean;
             textOut: boolean;
@@ -85,7 +85,7 @@ declare const ConversationService: {
   
   
      */
-    setGenerating(conversationId: any, project: any, username: any, generating: any, { collection, agent }?: any): Promise<void>;
+    setGenerating(conversationId: Record<string, unknown>, project: Record<string, unknown>, username: string, generating: Record<string, unknown>, { collection, agent }?: Record<string, unknown>): Promise<void>;
 };
 export default ConversationService;
 //# sourceMappingURL=ConversationService.d.ts.map

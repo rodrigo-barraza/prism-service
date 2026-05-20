@@ -1,3 +1,4 @@
+import { ProviderOptions } from "../types/ProviderTypes.ts";
 import { Readable } from "stream";
 declare const inworldProvider: {
     name: string;
@@ -9,7 +10,7 @@ declare const inworldProvider: {
   
      * @returns {{ stream: Readable, contentType: string }}
      */
-    generateSpeech(text: any, voice?: any, options?: any): Promise<{
+    generateSpeech(text: Record<string, unknown>, voice?: Record<string, unknown>, options?: ProviderOptions): Promise<{
         stream: Readable;
         contentType: string;
     }>;
@@ -22,7 +23,7 @@ declare const inworldProvider: {
   
      * @yields {Buffer} PCM audio chunks.
      */
-    generateSpeechStream(textStream: any, voice?: any, options?: any): AsyncGenerator<Buffer<ArrayBuffer>, void, unknown>;
+    generateSpeechStream(textStream: Record<string, unknown>, voice?: Record<string, unknown>, options?: ProviderOptions): AsyncGenerator<Buffer<ArrayBuffer>, void, unknown>;
 };
 export default inworldProvider;
 //# sourceMappingURL=inworld.d.ts.map

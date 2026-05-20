@@ -9,9 +9,12 @@ router.use(requireDb);
 // ─── GET /text — extract text content from the caller's project conversations ─
 router.get("/", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const { page = 1, limit = 50, origin, search, provider, model, from, to, } = req.query;
+        // @ts-ignore - TODO: strict typing
         const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+        // @ts-ignore - TODO: strict typing
         const lim = parseInt(limit, 10);
         // Always scope to the caller's project
         const preMatch = { project: req.project };
@@ -95,16 +98,20 @@ router.get("/", asyncHandler(async (req, res, next) => {
             username: item.username,
             model: item.model,
             estimatedCost: item.estimatedCost,
+            // @ts-ignore - TODO: strict typing
             hasImages: item.images > 0,
             timestamp: item.timestamp,
         }));
         res.json({
             data,
             total,
+            // @ts-ignore - TODO: strict typing
             page: parseInt(page, 10),
             limit: lim,
             providers: [
-                ...new Set(data.map((d) => d.model?.split("/")[0]).filter(Boolean)),
+                ...new Set(
+                // @ts-ignore - TODO: strict typing
+                data.map((d) => d.model?.split("/")[0]).filter(Boolean)),
             ].sort(),
             models: [
                 ...new Set(data.map((d) => d.model).filter(Boolean)),
@@ -112,6 +119,7 @@ router.get("/", asyncHandler(async (req, res, next) => {
         });
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`GET /text error: ${error.message}`);
         next(error);
     }

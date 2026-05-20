@@ -30,7 +30,7 @@ declare const _default: {
     };
     domain: string;
     labels: string[];
-    execute(args: any, context: any): Promise<{
+    execute(args: Record<string, unknown>, context: Record<string, unknown>): Promise<{
         error: string;
         acknowledged?: undefined;
         brief?: undefined;
@@ -38,8 +38,8 @@ declare const _default: {
         acknowledged: boolean;
         brief: {
             summary: string;
-            keyFiles: any;
-            openQuestions: any;
+            keyFiles: {};
+            openQuestions: {};
             timestamp: string;
         };
         error?: undefined;

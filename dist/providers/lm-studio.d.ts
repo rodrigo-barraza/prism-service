@@ -1,20 +1,21 @@
+import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
 /**
  * Factory: create an LM Studio provider instance targeting a specific baseUrl.
 
 
  * @returns {object} Provider object with all LM Studio methods
  */
-export declare function createLmStudioProvider(baseUrl: any, instanceId?: any): {
-    name: any;
-    generateText(messages: any, model?: any, options?: any): Promise<{
+export declare function createLmStudioProvider(baseUrl: string, instanceId?: string): {
+    name: string;
+    generateText(messages: ChatMessage[], model?: string, options?: ProviderOptions): Promise<{
         text: any;
         thinking: any;
         usage: {
-            inputTokens: any;
-            outputTokens: any;
+            inputTokens: {};
+            outputTokens: {};
         };
     }>;
-    generateTextStream(messages: any, model?: any, options?: any): AsyncGenerator<any, void, unknown>;
+    generateTextStream(messages: ChatMessage[], model?: string, options?: ProviderOptions): AsyncGenerator<any, void, unknown>;
     /**
      * OpenAI-compat streaming path — used when coordinator tools are enabled.
      * Sends a standard /v1/chat/completions request with `tools` array.
@@ -23,7 +24,7 @@ export declare function createLmStudioProvider(baseUrl: any, instanceId?: any): 
      *
      * @private
      */
-    _streamOpenAICompat(prepared: any, model: any, options: any, baseUrl: any): AsyncGenerator<any, void, unknown>;
+    _streamOpenAICompat(prepared: Record<string, unknown>, model: Record<string, unknown>, options: ProviderOptions, baseUrl: string): AsyncGenerator<any, void, unknown>;
     /**
      * Generate an embedding via the OpenAI-compatible /v1/embeddings endpoint.
      * LM Studio exposes this for any loaded embedding model (e.g. Granite,
@@ -33,11 +34,11 @@ export declare function createLmStudioProvider(baseUrl: any, instanceId?: any): 
 
      * @returns {Promise<{ embedding: number[], dimensions: number }>}
      */
-    generateEmbedding(content: any, model: any, options?: any): Promise<{
+    generateEmbedding(content: Record<string, unknown>, model: Record<string, unknown>, options?: ProviderOptions): Promise<{
         embedding: any;
         dimensions: any;
     }>;
-    captionImage(images: any, prompt: any | undefined, model: any | undefined, systemPrompt: any): Promise<{
+    captionImage(images: string[], prompt?: string, model?: string, systemPrompt?: string): Promise<{
         text: any;
         usage: {
             inputTokens: any;
@@ -54,7 +55,7 @@ export declare function createLmStudioProvider(baseUrl: any, instanceId?: any): 
 
      * @returns {{ alreadyLoaded: boolean, contextLength: number|null }} - Info about the loaded model.
      */
-    ensureModelLoaded(modelKey: any, loadOptions: any | undefined, signal: any, onStatus: any): Promise<{
+    ensureModelLoaded(modelKey: Record<string, unknown>, loadOptions: Record<string, unknown> | undefined, signal: Record<string, unknown>, onStatus: Record<string, unknown>): Promise<{
         alreadyLoaded: boolean;
         contextLength: any;
     }>;
@@ -66,15 +67,15 @@ export declare function createLmStudioProvider(baseUrl: any, instanceId?: any): 
     /**
      * Load a model into LM Studio memory.
      */
-    loadModel(model: any, options: any | undefined, signal: any): Promise<unknown>;
+    loadModel(model: Record<string, unknown>, options: ProviderOptions | undefined, signal: Record<string, unknown>): Promise<unknown>;
     /**
      * Unload a model from LM Studio by its model key.
      * Looks up the loaded instance ID and unloads it.
      */
-    unloadModelByKey(modelKey: any): Promise<void>;
+    unloadModelByKey(modelKey: Record<string, unknown>): Promise<void>;
     /**
      * Unload a model from LM Studio memory.
      */
-    unloadModel(instanceId: any): Promise<unknown>;
+    unloadModel(instanceId: string): Promise<unknown>;
 };
 //# sourceMappingURL=lm-studio.d.ts.map

@@ -776,6 +776,55 @@ declare const MODELS: {
         webSearch: string;
         tools: string[];
     };
+    GEMINI_35_FLASH: {
+        name: string;
+        label: string;
+        provider: string;
+        modelType: string;
+        default: boolean;
+        year: number;
+        defaultTemperature: number;
+        arena: {
+            text: number;
+            code: number;
+            vision: number;
+            document: number;
+        };
+        pricing: {
+            inputPerMillion: number;
+            audioInputPerMillion: number;
+            outputPerMillion: number;
+        };
+        maxInputTokens: number;
+        maxOutputTokens: number;
+        inputTypes: string[];
+        outputTypes: string[];
+        mediaLimits: {
+            image: {
+                maxCount: number;
+                maxSizeMB: number;
+            };
+            audio: {
+                maxCount: number;
+                maxSizeMB: number;
+            };
+            video: {
+                maxCount: number;
+                maxSizeMB: number;
+            };
+            pdf: {
+                maxCount: number;
+                maxSizeMB: number;
+            };
+        };
+        streaming: boolean;
+        thinking: boolean;
+        thinkingLevels: string[];
+        webSearch: string;
+        codeExecution: boolean;
+        urlContext: boolean;
+        tools: string[];
+    };
     GPT_4O_MINI_TTS: {
         name: string;
         label: string;
@@ -1119,6 +1168,20 @@ declare const MODELS: {
         provider: string;
         year: number;
         modelType: string;
+        pricing: {
+            audioInputPerMillion: number;
+            outputPerMillion: number;
+        };
+        inputTypes: string[];
+        outputTypes: string[];
+    };
+    GEMINI_35_FLASH_STT: {
+        name: string;
+        label: string;
+        provider: string;
+        modelType: string;
+        year: number;
+        default: boolean;
         pricing: {
             audioInputPerMillion: number;
             outputPerMillion: number;

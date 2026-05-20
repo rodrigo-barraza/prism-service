@@ -1,5 +1,5 @@
+import { ProviderOptions } from "../types/ProviderTypes.ts";
 import { Readable } from "stream";
-import type { ProviderOptions } from "../types/provider.ts";
 interface GoogleToolDeclaration {
     functionDeclarations: Array<{
         name: string;

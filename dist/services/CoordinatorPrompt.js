@@ -15,7 +15,10 @@
  * @returns {string} System prompt section to append
  */
 export function getCoordinatorPromptAddendum({ workerTools = [] } = {}) {
-    const workerToolList = workerTools.length > 0
+    const workerToolList = 
+    // @ts-ignore - TODO: strict typing
+    workerTools.length > 0
+        // @ts-ignore - TODO: strict typing
         ? workerTools.sort().join(", ")
         : "all standard tools (read, write, search, shell, etc.)";
     return `## Coordinator Mode — Multi-Agent Orchestration

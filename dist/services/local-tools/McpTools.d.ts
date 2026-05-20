@@ -16,7 +16,7 @@ declare const _default: ({
     };
     domain: string;
     labels: string[];
-    execute(args: any): Promise<{
+    execute(args: Record<string, unknown>): Promise<{
         error: string;
         resources?: undefined;
         serverName?: undefined;
@@ -24,13 +24,13 @@ declare const _default: ({
         note?: undefined;
     } | {
         resources: any;
-        serverName: any;
+        serverName: Record<string, unknown>;
         count: any;
         error?: undefined;
         note?: undefined;
     } | {
         resources: never[];
-        serverName: any;
+        serverName: Record<string, unknown>;
         count: number;
         note: string;
         error?: undefined;
@@ -40,9 +40,9 @@ declare const _default: ({
         message: string;
         servers?: undefined;
     } | {
-        resources: any[];
+        resources: Record<string, unknown>[];
         count: number;
-        servers: any[];
+        servers: unknown[];
         message?: undefined;
     }>;
 } | {
@@ -67,7 +67,7 @@ declare const _default: ({
     };
     domain: string;
     labels: string[];
-    execute(args: any): Promise<{
+    execute(args: Record<string, unknown>): Promise<{
         error: string;
         uri?: undefined;
         mimeType?: undefined;
@@ -78,12 +78,12 @@ declare const _default: ({
         uri: any;
         mimeType: any;
         content: any;
-        serverName: any;
+        serverName: Record<string, unknown>;
         error?: undefined;
         contents?: undefined;
     } | {
         contents: any;
-        serverName: any;
+        serverName: Record<string, unknown>;
         error?: undefined;
         uri?: undefined;
         mimeType?: undefined;
@@ -123,7 +123,7 @@ declare const _default: ({
     };
     domain: string;
     labels: string[];
-    execute(args: any): Promise<{
+    execute(args: Record<string, unknown>): Promise<{
         error: string;
         acknowledged?: undefined;
         serverName?: undefined;
@@ -131,7 +131,7 @@ declare const _default: ({
         message?: undefined;
     } | {
         acknowledged: boolean;
-        serverName: any;
+        serverName: Record<string, unknown>;
         toolCount: number;
         message: string;
         error?: undefined;

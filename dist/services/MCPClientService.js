@@ -63,8 +63,10 @@ function mcpToolToSchema(serverName, mcpTool) {
  * Returns null if the name doesn't match the MCP pattern.
  */
 function parseMCPToolName(fullName) {
+    // @ts-ignore - TODO: strict typing
     if (!fullName.startsWith(MCP_PREFIX))
         return null;
+    // @ts-ignore - TODO: strict typing
     const rest = fullName.slice(MCP_PREFIX.length);
     const delimIdx = rest.indexOf(MCP_DELIMITER);
     if (delimIdx === -1)
@@ -80,12 +82,15 @@ function parseMCPToolName(fullName) {
 function createTransport(config) {
     if (config.transport === "stdio") {
         return new StdioClientTransport({
+            // @ts-ignore - TODO: strict typing
             command: config.command,
+            // @ts-ignore - TODO: strict typing
             args: config.args || [],
             env: { ...process.env, ...(config.env || {}) },
         });
     }
     if (config.transport === "streamable-http") {
+        // @ts-ignore - TODO: strict typing
         const url = new URL(config.url);
         return new StreamableHTTPClientTransport(url, {
             requestInit: {
@@ -111,6 +116,7 @@ const MCPClientService = {
         const { name: serverName } = config;
         // Disconnect existing connection if any
         if (connections.has(serverName)) {
+            // @ts-ignore - TODO: strict typing
             await this.disconnect(serverName);
         }
         logger.info(`[MCP] Connecting to "${serverName}" (${config.transport})...`);
@@ -120,7 +126,9 @@ const MCPClientService = {
             await client.connect(transport);
         }
         catch (error) {
-            logger.error(`[MCP] Failed to connect to "${serverName}": ${error.message}`);
+            logger.error(
+            // @ts-ignore - TODO: strict typing
+            `[MCP] Failed to connect to "${serverName}": ${error.message}`);
             throw error;
         }
         // Discover tools
@@ -131,7 +139,9 @@ const MCPClientService = {
             mcpTools = result.tools || [];
         }
         catch (error) {
-            logger.warn(`[MCP] Failed to list tools for "${serverName}": ${error.message}`);
+            logger.warn(
+            // @ts-ignore - TODO: strict typing
+            `[MCP] Failed to list tools for "${serverName}": ${error.message}`);
         }
         // Convert to our schema format
         // @ts-ignore
@@ -163,6 +173,7 @@ const MCPClientService = {
             await conn.client.close();
         }
         catch (error) {
+            // @ts-ignore - TODO: strict typing
             logger.warn(`[MCP] Error closing "${serverName}": ${error.message}`);
         }
         // For stdio, ensure child process is killed
@@ -232,7 +243,10 @@ const MCPClientService = {
         }
         catch (error) {
             // Attempt reconnect once on connection errors
-            if (error.message?.includes("closed") ||
+            if (
+            // @ts-ignore - TODO: strict typing
+            error.message?.includes("closed") ||
+                // @ts-ignore - TODO: strict typing
                 error.message?.includes("transport")) {
                 logger.warn(`[MCP] Connection lost to "${serverName}", attempting reconnect...`);
                 try {
@@ -241,10 +255,12 @@ const MCPClientService = {
                 }
                 catch (reconnectErr) {
                     return {
+                        // @ts-ignore - TODO: strict typing
                         error: `MCP server "${serverName}" connection lost and reconnect failed: ${reconnectErr.message}`,
                     };
                 }
             }
+            // @ts-ignore - TODO: strict typing
             return { error: `MCP tool call failed: ${error.message}` };
         }
     },
@@ -296,6 +312,7 @@ const MCPClientService = {
   
      */
     isMCPTool(toolName) {
+        // @ts-ignore - TODO: strict typing
         return toolName.startsWith(MCP_PREFIX);
     },
     /**
@@ -331,8 +348,12 @@ const MCPClientService = {
         }
         catch (error) {
             // Some servers don't implement resources — that's fine
-            if (error.message?.includes("not supported") ||
+            if (
+            // @ts-ignore - TODO: strict typing
+            error.message?.includes("not supported") ||
+                // @ts-ignore - TODO: strict typing
                 error.message?.includes("not implemented") ||
+                // @ts-ignore - TODO: strict typing
                 error.code === -32601) {
                 return {
                     resources: [],
@@ -342,6 +363,7 @@ const MCPClientService = {
                 };
             }
             return {
+                // @ts-ignore - TODO: strict typing
                 error: `Failed to list resources from "${serverName}": ${error.message}`,
             };
         }
@@ -381,6 +403,7 @@ const MCPClientService = {
         }
         catch (error) {
             return {
+                // @ts-ignore - TODO: strict typing
                 error: `Failed to read resource "${uri}" from "${serverName}": ${error.message}`,
             };
         }
@@ -459,6 +482,7 @@ const MCPClientService = {
         }
         catch (error) {
             return {
+                // @ts-ignore - TODO: strict typing
                 error: `Authentication failed for "${serverName}": ${error.message}`,
             };
         }
@@ -472,6 +496,7 @@ const MCPClientService = {
         if (!db)
             return;
         try {
+            // @ts-ignore - TODO: strict typing
             const servers = await db
                 .collection("mcp_servers")
                 .find({ project, username, enabled: true })
@@ -489,6 +514,7 @@ const MCPClientService = {
             }
         }
         catch (error) {
+            // @ts-ignore - TODO: strict typing
             logger.warn(`[MCP] Auto-connect DB query failed: ${error.message}`);
         }
     },

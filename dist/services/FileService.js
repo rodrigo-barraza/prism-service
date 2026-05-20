@@ -41,8 +41,7 @@ const FileService = {
     },
     /**
      * Upload a file from a base64 data URL.
-  
-  
+     *
      * @returns {Promise<{ ref: string, size: number, contentType: string }>}
      *   ref is either `minio://...` or the original dataUrl.
      */
@@ -61,7 +60,6 @@ const FileService = {
         const contentType = match[1];
         const base64Data = match[2];
         const buffer = Buffer.from(base64Data, "base64");
-        // @ts-ignore
         const ext = MIME_TO_EXT[contentType] || "bin";
         // Build path: projects/{project}/{username}/{category}/{uuid}.{ext}
         // Falls back to flat {category}/{uuid}.{ext} when project/username not provided
@@ -69,10 +67,7 @@ const FileService = {
         if (project && username) {
             // Sanitize: never use raw IP addresses as path segments — they cause
             // duplicate directories when the same user is later identified by name.
-            // @ts-ignore
-            const safeUsername = 
-            // @ts-ignore
-            /^\d{1,3}(\.\d{1,3}){3}$/.test(username) || username.includes(":")
+            const safeUsername = /^\d{1,3}(\.\d{1,3}){3}$/.test(username) || username.includes(":")
                 ? "anonymous"
                 : username;
             key = `projects/${project}/${safeUsername}/${category}/${crypto.randomUUID()}.${ext}`;
@@ -90,22 +85,23 @@ const FileService = {
     },
     /**
      * Get a file stream from a MinIO reference.
-  
-     * @returns {Promise<{ stream: import('stream').Readable, contentType: string } | null>}
+     *
+     * @returns {Promise<{ stream: Record<string, unknown>, contentType: string } | null>}
      */
     async getFile(key) {
         if (!MinioWrapper.isAvailable())
             return null;
         // Helper to fetch stat + stream for a given key
         const tryKey = async (k) => {
-            const stat = await MinioWrapper.stat(k);
+            const stat = (await MinioWrapper.stat(k));
             const stream = await MinioWrapper.get(k);
             return {
                 stream,
-                contentType: stat.metaData?.["content-type"] || "application/octet-stream",
+                contentType: stat?.metaData?.["content-type"] || "application/octet-stream",
             };
         };
         try {
+            // @ts-ignore - TODO: strict typing
             return await tryKey(key);
         }
         catch {
@@ -115,15 +111,13 @@ const FileService = {
     },
     /**
      * Check if a string is a MinIO reference.
-  
-  
      */
     isMinioRef(ref) {
         return typeof ref === "string" && ref.startsWith("minio://");
     },
     /**
      * Extract the object key from a MinIO reference.
-  
+     *
      * @returns {string} - e.g. "files/abc-123.png"
      */
     extractKey(ref) {

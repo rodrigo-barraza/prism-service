@@ -46,7 +46,7 @@ export default class BaseAgenticHarness {
      * Consume an LLM stream, routing each chunk through `processStreamChunk`.
      * Handles abort signals and stream teardown.
      */
-    protected consumeStream(stream: AsyncIterable<unknown>, pass: PassState, allowedToolNames: Set<string>): Promise<void>;
+    consumeStream(stream: AsyncIterable<unknown>, pass: PassState, allowedToolNames: Set<string>): Promise<void>;
     /** Register a request with SessionGenerationTracker. */
     registerTrackerRequest(passRequestId: string): void;
     /**

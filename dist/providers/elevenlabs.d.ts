@@ -1,6 +1,7 @@
+import { ProviderOptions } from "../types/ProviderTypes.ts";
 declare const elevenlabsProvider: {
     name: string;
-    generateSpeech(text: any, voiceId?: any, options?: any): Promise<{
+    generateSpeech(text: Record<string, unknown>, voiceId?: Record<string, unknown>, options?: ProviderOptions): Promise<{
         stream: import("node:stream/web").ReadableStream<any> | null;
         contentType: string;
     }>;
@@ -10,7 +11,7 @@ declare const elevenlabsProvider: {
   
      * @returns {AsyncGenerator<Buffer>} Audio chunks.
      */
-    generateSpeechStream(textStream: any, voiceId?: any, options?: any): AsyncGenerator<Buffer<ArrayBuffer>, void, unknown>;
+    generateSpeechStream(textStream: Record<string, unknown>, voiceId?: Record<string, unknown>, options?: ProviderOptions): AsyncGenerator<Buffer<ArrayBufferLike>, void, unknown>;
 };
 export default elevenlabsProvider;
 //# sourceMappingURL=elevenlabs.d.ts.map

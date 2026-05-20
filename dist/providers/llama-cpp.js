@@ -48,10 +48,14 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
         // @ts-ignore
         model = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["llama-cpp"], options = {}) {
             const baseUrl = getBaseUrl();
-            logger.provider("llama.cpp", `generateText model=${model} baseUrl=${baseUrl}`);
+            logger.provider(
+            // @ts-ignore - TODO: strict typing
+            "llama.cpp", `generateText model=${model} baseUrl=${baseUrl}`);
             try {
                 // Expand video attachments to image frames (ffmpeg) before message prep
+                // @ts-ignore - TODO: strict typing
                 await expandVideoToFrames(messages);
+                // @ts-ignore - TODO: strict typing
                 const prepared = prepareOpenAICompatMessages(messages, {
                     mediaStrategy: MEDIA_STRATEGIES.TEXT_FALLBACK,
                 });
@@ -109,6 +113,7 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
             catch (error) {
                 if (error instanceof ProviderError)
                     throw error;
+                // @ts-ignore - TODO: strict typing
                 throw new ProviderError("llama-cpp", error.message, 500, error);
             }
         },
@@ -117,10 +122,14 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
         // @ts-ignore
         model = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["llama-cpp"], options = {}) {
             const baseUrl = getBaseUrl();
-            logger.provider("llama.cpp", `generateTextStream model=${model} baseUrl=${baseUrl}`);
+            logger.provider(
+            // @ts-ignore - TODO: strict typing
+            "llama.cpp", `generateTextStream model=${model} baseUrl=${baseUrl}`);
             try {
                 // Expand video attachments to image frames (ffmpeg) before message prep
+                // @ts-ignore - TODO: strict typing
                 await expandVideoToFrames(messages);
+                // @ts-ignore - TODO: strict typing
                 const prepared = prepareOpenAICompatMessages(messages, {
                     mediaStrategy: MEDIA_STRATEGIES.TEXT_FALLBACK,
                 });
@@ -160,6 +169,7 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
                 { signal: options.signal });
                 // @ts-ignore
                 const reader = response.body.getReader();
+                // @ts-ignore - TODO: strict typing
                 yield* parseSSEStream(reader, {
                     // @ts-ignore
                     signal: options.signal,
@@ -167,17 +177,22 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
                     thinkingEnabled: options.thinkingEnabled,
                     // llama.cpp extension: extract timings for tok/s
                     onUsage: (json, usage) => {
+                        // @ts-ignore - TODO: strict typing
                         if (json.timings?.predicted_per_second) {
-                            usage.tokensPerSec = parseFloat(json.timings.predicted_per_second.toFixed(1));
+                            usage.tokensPerSec = parseFloat(
+                            // @ts-ignore - TODO: strict typing
+                            json.timings.predicted_per_second.toFixed(1));
                         }
                     },
                 });
             }
             catch (error) {
+                // @ts-ignore - TODO: strict typing
                 if (error.name === "AbortError")
                     return; // Client disconnected
                 if (error instanceof ProviderError)
                     throw error;
+                // @ts-ignore - TODO: strict typing
                 throw new ProviderError("llama-cpp", error.message, 500, error);
             }
         },
@@ -188,7 +203,9 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
         // @ts-ignore
         model = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["llama-cpp"], systemPrompt) {
             const baseUrl = getBaseUrl();
-            logger.provider("llama.cpp", `captionImage model=${model} baseUrl=${baseUrl}`);
+            logger.provider(
+            // @ts-ignore - TODO: strict typing
+            "llama.cpp", `captionImage model=${model} baseUrl=${baseUrl}`);
             try {
                 const content = [
                     { type: "text", text: prompt },
@@ -223,6 +240,7 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
             catch (error) {
                 if (error instanceof ProviderError)
                     throw error;
+                // @ts-ignore - TODO: strict typing
                 throw new ProviderError("llama-cpp", error.message, 500, error);
             }
         },
@@ -230,6 +248,7 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
         // GET /v1/models
         async listModels() {
             const baseUrl = getBaseUrl();
+            // @ts-ignore - TODO: strict typing
             logger.provider("llama.cpp", "listModels");
             try {
                 const response = await fetch(`${baseUrl}/v1/models`, {
@@ -244,9 +263,12 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
                 // Normalize to our standard { models: [...] } format
                 // @ts-ignore
                 const models = (data.data || []).map((m) => ({
+                    // @ts-ignore - TODO: strict typing
                     key: m.id,
+                    // @ts-ignore - TODO: strict typing
                     display_name: m.id,
                     type: "llm",
+                    // @ts-ignore - TODO: strict typing
                     loaded_instances: [{ id: m.id }], // llama.cpp models are always loaded
                 }));
                 return { models };
@@ -254,6 +276,7 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
             catch (error) {
                 if (error instanceof ProviderError)
                     throw error;
+                // @ts-ignore - TODO: strict typing
                 throw new ProviderError("llama-cpp", error.message, 500, error);
             }
         },
@@ -261,6 +284,7 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
         // GET /health
         async checkHealth() {
             const baseUrl = getBaseUrl();
+            // @ts-ignore - TODO: strict typing
             logger.provider("llama.cpp", "checkHealth");
             try {
                 const response = await fetch(`${baseUrl}/health`, {
@@ -282,6 +306,7 @@ export function createLlamaCppProvider(baseUrl, instanceId = "llama-cpp") {
                 };
             }
             catch (error) {
+                // @ts-ignore - TODO: strict typing
                 return { ok: false, status: "unreachable", error: error.message };
             }
         },

@@ -1,21 +1,22 @@
+import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
 /**
  * Factory: create a vLLM provider instance targeting a specific baseUrl.
 
 
  * @returns {object} Provider object with all vLLM methods
  */
-export declare function createVllmProvider(baseUrl: any, instanceId?: any): {
-    name: any;
-    generateText(messages: any, model?: any, options?: any): Promise<{
+export declare function createVllmProvider(baseUrl: string, instanceId?: string): {
+    name: string;
+    generateText(messages: ChatMessage[], model?: string, options?: ProviderOptions): Promise<{
         text: any;
         thinking: any;
         usage: {
-            inputTokens: any;
-            outputTokens: any;
+            inputTokens: {};
+            outputTokens: {};
         };
     }>;
-    generateTextStream(messages: any, model?: any, options?: any): AsyncGenerator<any, void, unknown>;
-    captionImage(images: any, prompt: any | undefined, model: any | undefined, systemPrompt: any): Promise<{
+    generateTextStream(messages: ChatMessage[], model?: string, options?: ProviderOptions): AsyncGenerator<any, void, unknown>;
+    captionImage(images: string[], prompt?: string, model?: string, systemPrompt?: string): Promise<{
         text: any;
         usage: {
             inputTokens: any;
@@ -31,7 +32,7 @@ export declare function createVllmProvider(baseUrl: any, instanceId?: any): {
 
      * @returns {Promise<{ embedding: number[], dimensions: number }>}
      */
-    generateEmbedding(content: any, model: any, options?: any): Promise<{
+    generateEmbedding(content: Record<string, unknown>, model: Record<string, unknown>, options?: ProviderOptions): Promise<{
         embedding: any;
         dimensions: any;
     }>;

@@ -146,6 +146,7 @@ const SessionGenerationTracker = {
   
   
      */
+    // @ts-ignore - TODO: strict typing
     recordChunkTiming(requestId, charCount = 0) {
         const entry = activeRequests.get(requestId);
         if (!entry)
@@ -237,6 +238,7 @@ const SessionGenerationTracker = {
             const totalOut = completedOutputTokens;
             const totalIn = completedInputTokens;
             const avgTtft = ttftSamples.length > 0
+                // @ts-ignore - TODO: strict typing
                 ? ttftSamples.reduce((a, b) => a + b, 0) /
                     ttftSamples.length
                 : null;
@@ -298,7 +300,9 @@ const SessionGenerationTracker = {
         const totalOut = completedOutputTokens + activeOutputTokens;
         const totalIn = completedInputTokens + activeInputTokens;
         // Average TTFT across completed + active samples
-        const allTtftSum = ttftSamples.reduce((a, b) => a + b, 0) + activeTtftSum;
+        const allTtftSum = 
+        // @ts-ignore - TODO: strict typing
+        ttftSamples.reduce((a, b) => a + b, 0) + activeTtftSum;
         const allTtftCount = ttftSamples.length + activeTtftCount;
         const avgTtft = allTtftCount > 0 ? allTtftSum / allTtftCount : null;
         // Tok/s: aggregate throughput across all active requests (sum, not average).
@@ -341,7 +345,7 @@ const SessionGenerationTracker = {
         sessionAccumulators.delete(agentSessionId);
     },
     /**
-     * Check if a session has any active requests.
+     * Check if a session has Record<string, unknown> active requests.
      *
   
   

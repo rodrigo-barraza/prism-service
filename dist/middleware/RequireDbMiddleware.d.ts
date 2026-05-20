@@ -1,3 +1,4 @@
+import { Request, Response, NextFunction } from "express";
 /**
  * Express middleware that attaches the MongoDB database instance to `req.db`.
  * Returns 503 if the database is not available, eliminating the need for
@@ -5,5 +6,5 @@
  *
  * Usage: `router.use(requireDb)` or per-route `router.get("/", requireDb, handler)`
  */
-export default function requireDb(req: any, res: any, next: any): any;
+export default function requireDb(req: Request, res: Response, next: NextFunction): Response<any, Record<string, any>> | undefined;
 //# sourceMappingURL=RequireDbMiddleware.d.ts.map

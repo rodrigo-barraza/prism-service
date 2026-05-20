@@ -4,15 +4,15 @@ declare const MinioWrapper: {
   
   
      */
-    init(endpoint: any, accessKey: any, secretKey: any, bucket: any): Promise<void>;
+    init(endpoint: string, accessKey: string, secretKey: string, bucket: string): Promise<void>;
     isAvailable: () => boolean;
     getBucketUrl: () => string | null;
-    getPublicUrl: (key: any) => string | null;
-    upload: (key: any, buffer: any, contentType: any) => Promise<void>;
-    get: (key: any) => Promise<import("node:stream").Readable>;
-    remove: (key: any) => Promise<void>;
-    stat: (key: any) => Promise<Record<string, unknown>>;
-    listObjects: (prefix: any) => Promise<import("@rodrigo-barraza/service-library/minio").MinioObjectInfo[]>;
+    getPublicUrl: (key: string) => string | null;
+    upload: (key: string, buffer: Buffer, contentType: string) => Promise<void>;
+    get: (key: string) => Promise<import("node:stream").Readable>;
+    remove: (key: string) => Promise<void>;
+    stat: (key: string) => Promise<Record<string, unknown>>;
+    listObjects: (prefix: string) => Promise<import("@rodrigo-barraza/service-library/minio").MinioObjectInfo[]>;
 };
 export default MinioWrapper;
 //# sourceMappingURL=MinioWrapper.d.ts.map

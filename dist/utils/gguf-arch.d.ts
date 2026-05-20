@@ -7,7 +7,7 @@
  * @param {number} [bitsPerWeight=4] — quantization bits per weight
  * @returns {{ layers: number, kvHeads: number, headDim: number, attnRatio: number, isKnown: boolean }}
  */
-export declare function resolveArchParams(architecture: any, paramsString: any, sizeBytes: any, bitsPerWeight?: any): {
+export declare function resolveArchParams(architecture: Record<string, unknown>, paramsString: Record<string, unknown>, sizeBytes: Record<string, unknown>, bitsPerWeight?: Record<string, unknown>): {
     layers: any;
     kvHeads: any;
     headDim: any;
@@ -39,7 +39,7 @@ export declare function resolveArchParams(architecture: any, paramsString: any, 
  * @param {number} [opts.gpuBaselineGiB=0] — VRAM already used (displays, desktop, etc.)
  * @returns {{ gpuGiB: number, totalGiB: number, cpuOffloaded: boolean }}
  */
-export declare function estimateMemory({ sizeBytes, archParams, gpuLayers, contextLength, offloadKvCache, flashAttention, vision, gpuTotalGiB, gpuBaselineGiB, }: any): {
+export declare function estimateMemory({ sizeBytes, archParams, gpuLayers, contextLength, offloadKvCache, flashAttention, vision, gpuTotalGiB, gpuBaselineGiB, }: Record<string, unknown>): {
     gpuGiB: number;
     totalGiB: number;
     cpuOffloaded: boolean;

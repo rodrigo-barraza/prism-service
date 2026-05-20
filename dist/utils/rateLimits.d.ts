@@ -21,7 +21,7 @@
 
  * @returns {object|null} Parsed rate-limit data, or null if unavailable
  */
-export declare function extractOpenAIRateLimits(response: any, model: any): {
+export declare function extractOpenAIRateLimits(response: Record<string, unknown>, model: Record<string, unknown>): {
     provider: string;
     requests: {
         limit: number | null;
@@ -52,7 +52,7 @@ export declare function extractOpenAIRateLimits(response: any, model: any): {
 
  * @returns {object|null} Parsed rate-limit data, or null if unavailable
  */
-export declare function extractAnthropicRateLimits(response: any, model: any): {
+export declare function extractAnthropicRateLimits(response: Record<string, unknown>, model: Record<string, unknown>): {
     provider: string;
     requests: {
         limit: number | null;

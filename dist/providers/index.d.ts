@@ -1,13 +1,218 @@
 declare const providers: {
     openai: {
         name: string;
-        generateText(messages: import("./openai.ts").OpenAIMsg[], model?: string, options?: import("../types/provider.ts").ProviderOptions): Promise<Record<string, unknown>>;
-        _generateTextResponses(messages: import("./openai.ts").OpenAIMsg[], model: string, options: import("../types/provider.ts").ProviderOptions): Promise<Record<string, unknown>>;
-        _generateTextChatCompletions(messages: import("./openai.ts").OpenAIMsg[], model: string, options: import("../types/provider.ts").ProviderOptions): Promise<Record<string, unknown>>;
-        generateTextStream(messages: import("./openai.ts").OpenAIMsg[], model?: string, options?: import("../types/provider.ts").ProviderOptions): AsyncGenerator<any, void, unknown>;
-        _streamResponses(messages: import("./openai.ts").OpenAIMsg[], model: string, options: import("../types/provider.ts").ProviderOptions): AsyncGenerator<any, void, unknown>;
-        _streamChatCompletions(messages: import("./openai.ts").OpenAIMsg[], model: string, options: import("../types/provider.ts").ProviderOptions): AsyncGenerator<any, void, unknown>;
-        generateSpeech(text: string, voice?: string, options?: import("../types/provider.ts").ProviderOptions): Promise<{
+        generateText(messages: import("./openai.ts").OpenAIMsg[], model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<Record<string, unknown>>;
+        _generateTextResponses(messages: import("./openai.ts").OpenAIMsg[], model: string, options: import("../types/ProviderTypes.ts").ProviderOptions): Promise<Record<string, unknown>>;
+        _generateTextChatCompletions(messages: import("./openai.ts").OpenAIMsg[], model: string, options: import("../types/ProviderTypes.ts").ProviderOptions): Promise<Record<string, unknown>>;
+        generateTextStream(messages: import("./openai.ts").OpenAIMsg[], model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): AsyncGenerator<string | {
+            type: string;
+            content: string;
+            data?: undefined;
+            mimeType?: undefined;
+            characters?: undefined;
+            id?: undefined;
+            responsesItemId?: undefined;
+            name?: undefined;
+            args?: undefined;
+            usage?: undefined;
+            rateLimits?: undefined;
+        } | {
+            type: string;
+            data: string;
+            mimeType: string;
+            content?: undefined;
+            characters?: undefined;
+            id?: undefined;
+            responsesItemId?: undefined;
+            name?: undefined;
+            args?: undefined;
+            usage?: undefined;
+            rateLimits?: undefined;
+        } | {
+            type: string;
+            characters: number;
+            id?: undefined;
+            name?: undefined;
+            args?: undefined;
+            usage?: undefined;
+            rateLimits?: undefined;
+        } | {
+            type: string;
+            id: string;
+            name: string;
+            args: {};
+            characters?: undefined;
+            usage?: undefined;
+            rateLimits?: undefined;
+        } | {
+            type: string;
+            usage: {
+                inputTokens: number;
+                outputTokens: number;
+            };
+            characters?: undefined;
+            id?: undefined;
+            name?: undefined;
+            args?: undefined;
+            rateLimits?: undefined;
+        } | {
+            type: string;
+            rateLimits: {
+                provider: string;
+                requests: {
+                    limit: number | null;
+                    remaining: number | null;
+                    reset: any;
+                };
+                tokens: {
+                    limit: number | null;
+                    remaining: number | null;
+                    reset: any;
+                };
+            };
+            characters?: undefined;
+            id?: undefined;
+            name?: undefined;
+            args?: undefined;
+            usage?: undefined;
+        }, void, unknown>;
+        _streamResponses(messages: import("./openai.ts").OpenAIMsg[], model: string, options: import("../types/ProviderTypes.ts").ProviderOptions): AsyncGenerator<string | {
+            type: string;
+            content: string;
+            data?: undefined;
+            mimeType?: undefined;
+            characters?: undefined;
+            id?: undefined;
+            responsesItemId?: undefined;
+            name?: undefined;
+            args?: undefined;
+            usage?: undefined;
+            rateLimits?: undefined;
+        } | {
+            type: string;
+            data: string;
+            mimeType: string;
+            content?: undefined;
+            characters?: undefined;
+            id?: undefined;
+            responsesItemId?: undefined;
+            name?: undefined;
+            args?: undefined;
+            usage?: undefined;
+            rateLimits?: undefined;
+        } | {
+            type: string;
+            characters: number;
+            content?: undefined;
+            data?: undefined;
+            mimeType?: undefined;
+            id?: undefined;
+            responsesItemId?: undefined;
+            name?: undefined;
+            args?: undefined;
+            usage?: undefined;
+            rateLimits?: undefined;
+        } | {
+            type: string;
+            id: string;
+            responsesItemId: string;
+            name: string;
+            args: {};
+            content?: undefined;
+            data?: undefined;
+            mimeType?: undefined;
+            characters?: undefined;
+            usage?: undefined;
+            rateLimits?: undefined;
+        } | {
+            type: string;
+            usage: {
+                inputTokens: number;
+                outputTokens: number;
+            };
+            content?: undefined;
+            data?: undefined;
+            mimeType?: undefined;
+            characters?: undefined;
+            id?: undefined;
+            responsesItemId?: undefined;
+            name?: undefined;
+            args?: undefined;
+            rateLimits?: undefined;
+        } | {
+            type: string;
+            rateLimits: {
+                provider: string;
+                requests: {
+                    limit: number | null;
+                    remaining: number | null;
+                    reset: any;
+                };
+                tokens: {
+                    limit: number | null;
+                    remaining: number | null;
+                    reset: any;
+                };
+            };
+            content?: undefined;
+            data?: undefined;
+            mimeType?: undefined;
+            characters?: undefined;
+            id?: undefined;
+            responsesItemId?: undefined;
+            name?: undefined;
+            args?: undefined;
+            usage?: undefined;
+        }, void, unknown>;
+        _streamChatCompletions(messages: import("./openai.ts").OpenAIMsg[], model: string, options: import("../types/ProviderTypes.ts").ProviderOptions): AsyncGenerator<string | {
+            type: string;
+            characters: number;
+            id?: undefined;
+            name?: undefined;
+            args?: undefined;
+            usage?: undefined;
+            rateLimits?: undefined;
+        } | {
+            type: string;
+            id: string;
+            name: string;
+            args: {};
+            characters?: undefined;
+            usage?: undefined;
+            rateLimits?: undefined;
+        } | {
+            type: string;
+            usage: {
+                inputTokens: number;
+                outputTokens: number;
+            };
+            characters?: undefined;
+            id?: undefined;
+            name?: undefined;
+            args?: undefined;
+            rateLimits?: undefined;
+        } | {
+            type: string;
+            rateLimits: {
+                provider: string;
+                requests: {
+                    limit: number | null;
+                    remaining: number | null;
+                    reset: any;
+                };
+                tokens: {
+                    limit: number | null;
+                    remaining: number | null;
+                    reset: any;
+                };
+            };
+            characters?: undefined;
+            id?: undefined;
+            name?: undefined;
+            args?: undefined;
+            usage?: undefined;
+        }, void, unknown>;
+        generateSpeech(text: string, voice?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<{
             stream: import("node:stream/web").ReadableStream<any> | null;
             contentType: string;
         }>;
@@ -29,37 +234,37 @@ declare const providers: {
         generateEmbedding(text: string, model?: string): Promise<{
             embedding: number[];
         }>;
-        transcribeAudio(audioBuffer: Buffer, mimeType: string, model?: string, options?: import("../types/provider.ts").ProviderOptions): Promise<{
+        transcribeAudio(audioBuffer: Buffer, mimeType: string, model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<{
             text: string;
             usage: Record<string, number>;
         }>;
     };
     anthropic: {
         name: string;
-        generateText(messages: any, model?: any, options?: any): Promise<{
+        generateText(messages: import("../types/ProviderTypes.ts").ChatMessage[], model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<{
             text: string;
             usage: {
-                inputTokens: any;
-                outputTokens: any;
-                cacheReadInputTokens: any;
-                cacheCreationInputTokens: any;
+                inputTokens: number;
+                outputTokens: number;
+                cacheReadInputTokens: number;
+                cacheCreationInputTokens: number;
             };
         }>;
-        captionImage(images: any, prompt: any | undefined, model: any | undefined, systemPrompt: any): Promise<{
+        captionImage(images: string[], prompt?: string, model?: string, systemPrompt?: string): Promise<{
             text: string;
             usage: {
-                inputTokens: any;
-                outputTokens: any;
-                cacheReadInputTokens: any;
-                cacheCreationInputTokens: any;
+                inputTokens: number;
+                outputTokens: number;
+                cacheReadInputTokens: number;
+                cacheCreationInputTokens: number;
             };
         }>;
-        generateTextStream(messages: any, model?: any, options?: any): any;
+        generateTextStream(messages: import("../types/ProviderTypes.ts").ChatMessage[], model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): any;
     };
     google: {
         name: string;
-        generateText(messages: import("./google.ts").ConversationMsg[], model?: string, options?: import("../types/provider.ts").ProviderOptions): Promise<Record<string, unknown>>;
-        generateTextStream(messages: import("./google.ts").ConversationMsg[], model?: string, options?: import("../types/provider.ts").ProviderOptions): AsyncGenerator<string | {
+        generateText(messages: import("./google.ts").ConversationMsg[], model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<Record<string, unknown>>;
+        generateTextStream(messages: import("./google.ts").ConversationMsg[], model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): AsyncGenerator<string | {
             type: string;
             id: string;
             name: string;
@@ -171,7 +376,7 @@ declare const providers: {
             output?: undefined;
             outcome?: undefined;
         }, void, unknown>;
-        generateTextStreamLive(messages: import("./google.ts").ConversationMsg[], model: string, options?: import("../types/provider.ts").ProviderOptions): AsyncGenerator<string | {
+        generateTextStreamLive(messages: import("./google.ts").ConversationMsg[], model: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): AsyncGenerator<string | {
             type: string;
             content: string | undefined;
             id?: undefined;
@@ -230,40 +435,40 @@ declare const providers: {
             mimeType: string;
             text: string;
         }>;
-        generateSpeech(text: string, voice?: string, options?: import("../types/provider.ts").ProviderOptions): Promise<{
+        generateSpeech(text: string, voice?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<{
             stream: import("node:stream").Readable;
             contentType: string;
         }>;
-        transcribeAudio(audioBuffer: Buffer, mimeType: string, model?: string, options?: import("../types/provider.ts").ProviderOptions): Promise<{
+        transcribeAudio(audioBuffer: Buffer, mimeType: string, model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<{
             text: string;
             usage: {
                 inputTokens: number;
                 outputTokens: number;
             };
         }>;
-        generateEmbedding(content: unknown, model?: string, options?: import("../types/provider.ts").ProviderOptions): Promise<{
+        generateEmbedding(content: unknown, model?: string, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<{
             embedding: number[];
             dimensions: number;
         }>;
     };
     elevenlabs: {
         name: string;
-        generateSpeech(text: any, voiceId?: any, options?: any): Promise<{
+        generateSpeech(text: Record<string, unknown>, voiceId?: Record<string, unknown>, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<{
             stream: import("node:stream/web").ReadableStream<any> | null;
             contentType: string;
         }>;
-        generateSpeechStream(textStream: any, voiceId?: any, options?: any): AsyncGenerator<Buffer<ArrayBuffer>, void, unknown>;
+        generateSpeechStream(textStream: Record<string, unknown>, voiceId?: Record<string, unknown>, options?: import("../types/ProviderTypes.ts").ProviderOptions): AsyncGenerator<Buffer<ArrayBufferLike>, void, unknown>;
     };
     inworld: {
         name: string;
-        generateSpeech(text: any, voice?: any, options?: any): Promise<{
+        generateSpeech(text: Record<string, unknown>, voice?: Record<string, unknown>, options?: import("../types/ProviderTypes.ts").ProviderOptions): Promise<{
             stream: import("node:stream").Readable;
             contentType: string;
         }>;
-        generateSpeechStream(textStream: any, voice?: any, options?: any): AsyncGenerator<Buffer<ArrayBuffer>, void, unknown>;
+        generateSpeechStream(textStream: Record<string, unknown>, voice?: Record<string, unknown>, options?: import("../types/ProviderTypes.ts").ProviderOptions): AsyncGenerator<Buffer<ArrayBuffer>, void, unknown>;
     };
 };
-export declare function getProvider(name: any): any;
+export declare function getProvider(name: Record<string, unknown>): any;
 export declare function listProviders(): string[];
 export { providers };
 //# sourceMappingURL=index.d.ts.map

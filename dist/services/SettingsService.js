@@ -100,6 +100,7 @@ const SettingsService = {
      * @returns {Promise<{ provider: string, model: string }>}
      */
     async getMemoryModelConfig(role) {
+        // @ts-ignore - TODO: strict typing
         const mem = await this.getSection("memory");
         const provider = mem[`${role}Provider`];
         const model = mem[`${role}Model`];

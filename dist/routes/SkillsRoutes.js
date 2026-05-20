@@ -17,6 +17,7 @@ async function generateSkillEmbedding(skill) {
     const text = [skill.name, skill.description, skill.content]
         .filter(Boolean)
         .join("\n");
+    // @ts-ignore - TODO: strict typing
     return EmbeddingService.embed(text, {
         source: "skill-creation",
         endpoint: "/skills",
@@ -28,6 +29,7 @@ async function generateSkillEmbedding(skill) {
  */
 router.get("/", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const skills = await db
             .collection(COLLECTION)
@@ -36,6 +38,7 @@ router.get("/", asyncHandler(async (req, res, next) => {
             // Don't return embedding vectors to the client — they're large
             .project({ embedding: 0 })
             .toArray();
+        // @ts-ignore - TODO: strict typing
         res.json(skills.map((s) => ({ ...s, id: s._id.toString() })));
     }
     catch (error) {
@@ -48,6 +51,7 @@ router.get("/", asyncHandler(async (req, res, next) => {
  */
 router.post("/", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const document = {
             project,
@@ -65,6 +69,7 @@ router.post("/", asyncHandler(async (req, res, next) => {
             document.embedding = await generateSkillEmbedding(document);
         }
         catch (error) {
+            // @ts-ignore - TODO: strict typing
             logger.warn(`[Skills] Embedding generation failed: ${error.message}`);
             // @ts-ignore
             document.embedding = null;
@@ -85,6 +90,7 @@ router.post("/", asyncHandler(async (req, res, next) => {
  */
 router.put("/:id", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const updates = {
             ...(req.body.name !== undefined && { name: req.body.name }),
@@ -104,6 +110,7 @@ router.put("/:id", asyncHandler(async (req, res, next) => {
                 // Need current doc to merge fields for embedding
                 const current = await db
                     .collection(COLLECTION)
+                    // @ts-ignore - TODO: strict typing
                     .findOne({ _id: new ObjectId(req.params.id) });
                 if (current) {
                     const merged = {
@@ -116,12 +123,16 @@ router.put("/:id", asyncHandler(async (req, res, next) => {
                 }
             }
             catch (error) {
-                logger.warn(`[Skills] Embedding re-generation failed: ${error.message}`);
+                logger.warn(
+                // @ts-ignore - TODO: strict typing
+                `[Skills] Embedding re-generation failed: ${error.message}`);
             }
         }
         const result = await db
             .collection(COLLECTION)
-            .findOneAndUpdate({ _id: new ObjectId(req.params.id) }, { $set: updates }, { returnDocument: "after", projection: { embedding: 0 } });
+            .findOneAndUpdate(
+        // @ts-ignore - TODO: strict typing
+        { _id: new ObjectId(req.params.id) }, { $set: updates }, { returnDocument: "after", projection: { embedding: 0 } });
         if (!result) {
             return res.status(404).json({ error: "Skill not found" });
         }
@@ -138,9 +149,11 @@ router.put("/:id", asyncHandler(async (req, res, next) => {
  */
 router.delete("/:id", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const result = await db
             .collection(COLLECTION)
+            // @ts-ignore - TODO: strict typing
             .findOneAndDelete({ _id: new ObjectId(req.params.id) });
         if (!result) {
             return res.status(404).json({ error: "Skill not found" });

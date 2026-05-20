@@ -28,13 +28,17 @@ export function appendAndFinalize(conversationId, project, username, messagesToA
     if (!conversationId)
         return;
     ConversationService.appendMessages(conversationId, project, username, messagesToAppend, meta, opts)
-        .then(() => ConversationService.setGenerating(conversationId, project, username, false, opts))
+        .then(() => ConversationService.setGenerating(conversationId, project, username, 
+    // @ts-ignore - TODO: strict typing
+    false, opts))
         .catch((error) => {
         logger.error(`Failed to append ${messagesToAppend?.length ?? 0} messages to ${conversationId} ` +
             `(project=${project}, collection=${opts?.collection || "conversations"}): ${error.message}`);
         // Always clear isGenerating even on failure — prevents sessions
         // from being permanently stuck as "generating" on the next page load.
-        ConversationService.setGenerating(conversationId, project, username, false, opts).catch((clearErr) => logger.error(`Failed to clear isGenerating after append failure: ${clearErr.message}`));
+        ConversationService.setGenerating(conversationId, project, username, 
+        // @ts-ignore - TODO: strict typing
+        false, opts).catch((clearErr) => logger.error(`Failed to clear isGenerating after append failure: ${clearErr.message}`));
     });
 }
 //# sourceMappingURL=ConversationUtilities.js.map

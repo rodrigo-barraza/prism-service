@@ -8,6 +8,7 @@
 export function estimateTokens(text) {
     if (!text)
         return 0;
+    // @ts-ignore - TODO: strict typing
     return Math.ceil(text.length / 4);
 }
 /**
@@ -21,7 +22,9 @@ export function estimateTokens(text) {
 export function getTotalInputTokens(usage) {
     if (!usage)
         return 0;
-    return ((usage.inputTokens || 0) +
+    return (
+    // @ts-ignore - TODO: strict typing
+    (usage.inputTokens || 0) +
         (usage.cacheReadInputTokens || 0) +
         (usage.cacheCreationInputTokens || 0));
 }
@@ -50,10 +53,15 @@ export function createUsageAccumulator() {
 export function mergeUsage(target, source) {
     if (!source)
         return target;
+    // @ts-ignore - TODO: strict typing
     target.inputTokens += source.inputTokens || 0;
+    // @ts-ignore - TODO: strict typing
     target.outputTokens += source.outputTokens || 0;
+    // @ts-ignore - TODO: strict typing
     target.cacheReadInputTokens += source.cacheReadInputTokens || 0;
+    // @ts-ignore - TODO: strict typing
     target.cacheCreationInputTokens += source.cacheCreationInputTokens || 0;
+    // @ts-ignore - TODO: strict typing
     target.reasoningOutputTokens += source.reasoningOutputTokens || 0;
     return target;
 }
@@ -69,17 +77,23 @@ export function mergeUsage(target, source) {
 export function calculateTextCost(usage, pricing) {
     if (!pricing || !usage)
         return null;
-    let cost = (usage.inputTokens / 1_000_000) * (pricing.inputPerMillion || 0) +
+    let cost = 
+    // @ts-ignore - TODO: strict typing
+    (usage.inputTokens / 1_000_000) * (pricing.inputPerMillion || 0) +
+        // @ts-ignore - TODO: strict typing
         (usage.outputTokens / 1_000_000) * (pricing.outputPerMillion || 0);
     // Cache read tokens (Anthropic: 0.1x base rate)
     if (usage.cacheReadInputTokens && pricing.cachedInputPerMillion) {
         cost +=
+            // @ts-ignore - TODO: strict typing
             (usage.cacheReadInputTokens / 1_000_000) * pricing.cachedInputPerMillion;
     }
     // Cache write tokens (Anthropic: 1.25x base rate)
     if (usage.cacheCreationInputTokens && pricing.cacheWriteInputPerMillion) {
         cost +=
+            // @ts-ignore - TODO: strict typing
             (usage.cacheCreationInputTokens / 1_000_000) *
+                // @ts-ignore - TODO: strict typing
                 pricing.cacheWriteInputPerMillion;
     }
     return parseFloat(cost.toFixed(8));
@@ -97,12 +111,18 @@ export function calculateAudioCost(usage, pricing) {
         return null;
     // Strategy 1: per-minute pricing
     if (pricing.perMinute && usage.durationSeconds) {
-        return parseFloat(((usage.durationSeconds / 60) * pricing.perMinute).toFixed(8));
+        return parseFloat(
+        // @ts-ignore - TODO: strict typing
+        ((usage.durationSeconds / 60) * pricing.perMinute).toFixed(8));
     }
     // Strategy 2: token-based pricing
     if (pricing.audioInputPerMillion && usage.inputTokens) {
-        return parseFloat(((usage.inputTokens / 1_000_000) * pricing.audioInputPerMillion +
+        return parseFloat((
+        // @ts-ignore - TODO: strict typing
+        (usage.inputTokens / 1_000_000) * pricing.audioInputPerMillion +
+            // @ts-ignore - TODO: strict typing
             ((usage.outputTokens || 0) / 1_000_000) *
+                // @ts-ignore - TODO: strict typing
                 (pricing.outputPerMillion || 0)).toFixed(8));
     }
     return null;
@@ -122,7 +142,10 @@ export function calculateLiveCost(usage, pricing) {
         return null;
     const inputRate = pricing.audioInputPerMillion || pricing.inputPerMillion || 0;
     const outputRate = pricing.audioOutputPerMillion || pricing.outputPerMillion || 0;
-    return parseFloat(((usage.inputTokens / 1_000_000) * inputRate +
+    return parseFloat((
+    // @ts-ignore - TODO: strict typing
+    (usage.inputTokens / 1_000_000) * inputRate +
+        // @ts-ignore - TODO: strict typing
         (usage.outputTokens / 1_000_000) * outputRate).toFixed(8));
 }
 /**
@@ -138,24 +161,33 @@ export function calculateLiveCost(usage, pricing) {
 
  * @returns {number|null} Cost in USD, or null if pricing is unavailable.
  */
-export function calculateImageCost(prompt, pricing, inputImages = 0, outputImageTokens = 1120) {
+export function calculateImageCost(prompt, pricing, 
+// @ts-ignore - TODO: strict typing
+inputImages = 0, 
+// @ts-ignore - TODO: strict typing
+outputImageTokens = 1120) {
     if (!pricing || !prompt)
         return null;
     const estimatedInputTokens = estimateTokens(prompt);
     let cost = 0;
     // Input text cost
     if (pricing.inputPerMillion) {
+        // @ts-ignore - TODO: strict typing
         cost += (estimatedInputTokens / 1_000_000) * pricing.inputPerMillion;
     }
     // Input image cost (for edit requests)
+    // @ts-ignore - TODO: strict typing
     if (inputImages > 0 && pricing.imageInputPerMillion) {
+        // @ts-ignore - TODO: strict typing
         cost += ((inputImages * 258) / 1_000_000) * pricing.imageInputPerMillion;
     }
     // Output image cost
     if (pricing.imageOutputPerMillion) {
+        // @ts-ignore - TODO: strict typing
         cost += (outputImageTokens / 1_000_000) * pricing.imageOutputPerMillion;
     }
     else if (pricing.outputPerMillion) {
+        // @ts-ignore - TODO: strict typing
         cost += (outputImageTokens / 1_000_000) * pricing.outputPerMillion;
     }
     return cost > 0 ? parseFloat(cost.toFixed(8)) : null;

@@ -7,7 +7,7 @@ declare const BackgroundHousekeepingService: {
   
      * @returns {Promise<object>} Summary of actions taken
      */
-    run({ trigger }?: any): Promise<{}>;
+    run({ trigger }?: Record<string, unknown>): Promise<{}>;
 };
 export default BackgroundHousekeepingService;
 //# sourceMappingURL=BackgroundHousekeepingService.d.ts.map

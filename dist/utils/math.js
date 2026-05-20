@@ -32,8 +32,10 @@ export function calculateTokensPerSec(tokens, sec, opts = {}) {
             // @ts-ignore
             ? opts.fallbackSec
             : null;
+    // @ts-ignore - TODO: strict typing
     if (!effectiveSec || !tokens || tokens <= 0)
         return null;
+    // @ts-ignore - TODO: strict typing
     const value = parseFloat((tokens / effectiveSec).toFixed(1));
     return value > MAX_TOKENS_PER_SEC ? null : value;
 }

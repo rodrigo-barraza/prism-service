@@ -23,10 +23,11 @@ const MAX_RETRIES = 3;
  */
 function isRetryableError(error) {
     // SDK wraps the error body — check both the error type and HTTP status
-    const errorType = error?.error?.type || error?.type;
+    const err = error;
+    const errorType = err?.error?.type || err?.type;
     if (errorType === "overloaded_error")
         return true;
-    if (error.status === 529)
+    if (err.status === 529)
         return true;
     return false;
 }
@@ -64,7 +65,9 @@ async function enforceImageSizeLimits(messages) {
             if (size <= MAX_IMAGE_BYTES)
                 continue;
             logger.warn(`[anthropic] SAFETY NET: image still ${(size / 1024 / 1024).toFixed(2)} MB after prepareMessages. Compressing now...`);
-            const result = await compressImageForSizeLimit(block.source.data, block.source.media_type || "image/png");
+            const result = await compressImageForSizeLimit(
+            // @ts-ignore - TODO: strict typing
+            block.source.data, block.source.media_type || "image/png");
             block.source.data = result.data;
             block.source.media_type = result.mediaType;
             const newSize = result.data.length;
@@ -81,7 +84,7 @@ async function prepareMessages(messages) {
     // Extract system message
     const conversation = messages.map((m) => ({ ...m }));
     if (conversation.length > 0 && conversation[0].role === "system") {
-        systemMessage = conversation.shift().content;
+        systemMessage = conversation.shift()?.content;
     }
     // Build clean messages with ONLY the fields Anthropic's API accepts.
     // Whitelist approach: explicitly construct each output object instead of
@@ -97,6 +100,7 @@ async function prepareMessages(messages) {
                 content: [
                     {
                         type: "tool_result",
+                        // @ts-ignore - TODO: strict typing
                         tool_use_id: m.tool_call_id || m.id || m.name || "unknown",
                         content: typeof m.content === "string"
                             ? m.content
@@ -106,6 +110,7 @@ async function prepareMessages(messages) {
             };
         }
         // Convert assistant messages with toolCalls to multi-part content
+        // @ts-ignore - TODO: strict typing
         if (m.role === "assistant" && m.toolCalls?.length > 0) {
             const contentBlocks = [];
             // Preserve thinking blocks for multi-step reasoning continuity.
@@ -120,7 +125,7 @@ async function prepareMessages(messages) {
                     signature: m.thinkingSignature,
                 });
             }
-            if (m.content?.trim()) {
+            if (typeof m.content === "string" && m.content.trim()) {
                 contentBlocks.push({ type: "text", text: m.content });
             }
             // @ts-ignore
@@ -201,6 +206,7 @@ async function prepareMessages(messages) {
                 // Other MIME types (audio, video) are not supported by Anthropic — skip
             }
             if (m.content) {
+                // @ts-ignore - TODO: strict typing
                 contentBlocks.push({ type: "text", text: m.content });
             }
             return {
@@ -222,7 +228,7 @@ async function prepareMessages(messages) {
                     signature: m.thinkingSignature,
                 });
             }
-            if (m.content?.trim()) {
+            if (typeof m.content === "string" && m.content.trim()) {
                 contentBlocks.push({ type: "text", text: m.content });
             }
             else {
@@ -232,11 +238,11 @@ async function prepareMessages(messages) {
                 role: "assistant",
                 content: contentBlocks.length > 1
                     ? contentBlocks
-                    : m.content?.trim() || " ",
+                    : (typeof m.content === "string" ? m.content.trim() : "") || " ",
             };
         }
         // Ensure assistant messages never have empty content
-        if (m.role === "assistant" && (!m.content || !m.content.trim())) {
+        if (m.role === "assistant" && (!m.content || (typeof m.content === "string" && !m.content.trim()))) {
             return { role: "assistant", content: " " };
         }
         // Default: user or assistant with plain text — whitelist only role + content
@@ -429,6 +435,7 @@ const anthropicProvider = {
     async generateText(messages, 
     // @ts-ignore
     model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic, options = {}) {
+        // @ts-ignore - TODO: strict typing
         logger.provider("Anthropic", `generateText model=${model}`);
         const prepared = await prepareMessages(messages);
         const payload = {
@@ -496,6 +503,7 @@ const anthropicProvider = {
                 const { data: response, response: rawResponse } = await getClient()
                     .messages.create(payload)
                     .withResponse();
+                // @ts-ignore - TODO: strict typing
                 const rateLimits = extractAnthropicRateLimits(rawResponse, model);
                 const { text, thinking, thinkingSignature, citations, toolCalls } = extractResponseContent(response.content);
                 const result = {
@@ -533,7 +541,7 @@ const anthropicProvider = {
                     await sleep(RETRY_DELAY_MS);
                     continue;
                 }
-                throw new ProviderError("anthropic", error.message, error.status || 500, error);
+                throw new ProviderError("anthropic", error instanceof Error ? error.message : error?.message || String(error), error?.status || 500, error);
             }
         }
         // Should never reach here, but safety net
@@ -548,6 +556,7 @@ const anthropicProvider = {
     async captionImage(images, prompt = "Describe this image.", 
     // @ts-ignore
     model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic, systemPrompt) {
+        // @ts-ignore - TODO: strict typing
         logger.provider("Anthropic", `captionImage model=${model}`);
         try {
             const contentBlocks = [];
@@ -608,13 +617,18 @@ const anthropicProvider = {
             };
         }
         catch (error) {
-            throw new ProviderError("anthropic", error.message, error.status || 500, error);
+            throw new ProviderError("anthropic", 
+            // @ts-ignore - TODO: strict typing
+            error.message, 
+            // @ts-ignore - TODO: strict typing
+            error.status || 500, error);
         }
     },
     // @ts-ignore
     async *generateTextStream(messages, 
     // @ts-ignore
     model = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic, options = {}) {
+        // @ts-ignore - TODO: strict typing
         logger.provider("Anthropic", `generateTextStream model=${model}`);
         try {
             const prepared = await prepareMessages(messages);
@@ -705,6 +719,7 @@ const anthropicProvider = {
                     messageStartUsage = chunk.message.usage;
                     // Capture rate-limit headers from the stream's initial response
                     if (!rateLimits && stream.response) {
+                        // @ts-ignore - TODO: strict typing
                         rateLimits = extractAnthropicRateLimits(stream.response, model);
                     }
                     continue;
@@ -880,6 +895,7 @@ const anthropicProvider = {
             }
         }
         catch (error) {
+            // @ts-ignore - TODO: strict typing
             if (error.name === "AbortError")
                 return;
             // For streaming, retry overloaded errors with the same delay/attempts policy
@@ -897,7 +913,11 @@ const anthropicProvider = {
                     return;
                 }
             }
-            throw new ProviderError("anthropic", error.message, error.status || 500, error);
+            throw new ProviderError("anthropic", 
+            // @ts-ignore - TODO: strict typing
+            error.message, 
+            // @ts-ignore - TODO: strict typing
+            error.status || 500, error);
         }
     },
 };

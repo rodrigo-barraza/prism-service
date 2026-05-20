@@ -1,6 +1,6 @@
 declare const logger: {
-    provider(provider: any, action: any, ...args: any): void;
-    request(project: any, username: any, clientIp: any, message: any, ...args: any): void;
+    provider(provider: Record<string, unknown>, action: Record<string, unknown>, ...args: Record<string, unknown>): void;
+    request(project: Record<string, unknown>, username: string, clientIp: Record<string, unknown>, message: string, ...args: Record<string, unknown>): void;
     info(message: string, ...args: unknown[]): void;
     success(message: string, ...args: unknown[]): void;
     warn(message: string, ...args: unknown[]): void;

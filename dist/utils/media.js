@@ -122,7 +122,7 @@ export async function constrainImageDimensions(base64Data, mediaType, maxDim = M
         return { data: resizedB64, mediaType: outputMime };
     }
     catch (error) {
-        logger.warn(`[media] Dimension check failed (${error.message}), passing through`);
+        logger.warn(`[media] Dimension check failed (${error instanceof Error ? error.message : String(error)}), passing through`);
         return { data: base64Data, mediaType };
     }
 }

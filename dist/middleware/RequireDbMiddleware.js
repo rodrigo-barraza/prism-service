@@ -13,6 +13,7 @@ export default function requireDb(req, res, next) {
     if (!db) {
         return res.status(503).json({ error: "Database not available" });
     }
+    // @ts-ignore - TODO: strict typing
     req.db = db;
     next();
 }

@@ -27,7 +27,7 @@ export default class AgentHooks extends EventEmitter {
   
   
      */
-    register(event: any, handler: any, name: any): void;
+    register(event: Record<string, unknown>, handler: Record<string, unknown>, name: string): void;
     /**
      * Run all registered hooks for an event sequentially.
      * Each hook can mutate ctx or return a control object.
@@ -36,12 +36,12 @@ export default class AgentHooks extends EventEmitter {
   
      * @returns {Promise<object|undefined>} Merged results from handlers
      */
-    run(event: any, ...args: any): Promise<any>;
+    run(event: Record<string, unknown>, ...args: Record<string, unknown>): Promise<Record<string, unknown>>;
     /**
      * Check if any hooks are registered for an event.
   
   
      */
-    hasHooks(event: any): boolean;
+    hasHooks(event: Record<string, unknown>): boolean;
 }
 //# sourceMappingURL=AgentHooks.d.ts.map

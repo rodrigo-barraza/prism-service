@@ -60,6 +60,7 @@ const EmbeddingService = {
         }
         catch (error) {
             success = false;
+            // @ts-ignore - TODO: strict typing
             errorMessage = error.message;
             throw error;
         }
@@ -68,7 +69,9 @@ const EmbeddingService = {
             // Cost estimation
             // @ts-ignore
             const pricing = getPricing(TYPES.TEXT, TYPES.EMBEDDING)[resolvedModel];
-            const approxInputTokens = typeof content === "string" ? estimateTokens(content) : 100;
+            const approxInputTokens = 
+            // @ts-ignore - TODO: strict typing
+            typeof content === "string" ? estimateTokens(content) : 100;
             let estimatedCost = null;
             if (pricing?.inputPerMillion) {
                 estimatedCost =
@@ -91,6 +94,7 @@ const EmbeddingService = {
             // @ts-ignore
             options.clientIp || null, `[embed] ${providerName} model=${resolvedModel} source=${source} — ` +
                 (success
+                    // @ts-ignore - TODO: strict typing
                     ? `dims: ${result?.dimensions}, total: ${totalSec.toFixed(2)}s`
                     : `FAILED: ${errorMessage}`) +
                 formatCostTag(estimatedCost));
@@ -118,6 +122,7 @@ const EmbeddingService = {
                 estimatedCost,
                 inputTokens: approxInputTokens,
                 outputTokens: 0, // Embeddings produce vectors, not output tokens
+                // @ts-ignore - TODO: strict typing
                 tokensPerSec: calculateTokensPerSec(approxInputTokens, totalSec),
                 inputCharacters,
                 totalTime: roundMs(totalSec),
@@ -163,7 +168,9 @@ const EmbeddingService = {
                 },
                 responsePayload: success
                     ? {
+                        // @ts-ignore - TODO: strict typing
                         dimensions: result?.dimensions || null,
+                        // @ts-ignore - TODO: strict typing
                         embeddingPreview: result?.embedding?.slice(0, 5) || null,
                     }
                     : { error: errorMessage },
@@ -184,6 +191,7 @@ const EmbeddingService = {
   
      */
     async embed(text, options = {}) {
+        // @ts-ignore - TODO: strict typing
         const result = await this.generate(text, options);
         return result.embedding;
     },

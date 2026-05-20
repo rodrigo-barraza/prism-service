@@ -29,7 +29,7 @@ declare const MemoryService: {
   
      * @returns {Promise<object|null>} Stored memory document, or null if duplicate
      */
-    store({ agent, project, username, type, title, content, embedding, metadata, conversationId, traceId, agentSessionId, endpoint, }: any): Promise<any>;
+    store({ agent, project, username, type, title, content, embedding, metadata, conversationId, traceId, agentSessionId, endpoint, }: Record<string, unknown>): Promise<any>;
     /**
      * Extract and store LUPOS memories from a Discord conversation chunk.
      *
@@ -41,7 +41,7 @@ declare const MemoryService: {
   
      * @returns {Promise<Array>} The stored memory documents
      */
-    extractAndStore({ guildId, channelId, messages, participants, sourceMessageId, traceId, project, endpoint, }: any): Promise<any[]>;
+    extractAndStore({ guildId, channelId, messages, participants, sourceMessageId, traceId, project, endpoint, }: Record<string, unknown>): Promise<Record<string, unknown>[]>;
     /**
      * Search for relevant memories using cosine similarity.
      * Always scoped by `agent`.
@@ -54,15 +54,15 @@ declare const MemoryService: {
   
      * @returns {Promise<Array>} Relevant memories sorted by relevance
      */
-    search({ agent, project, guildId, userIds, queryText, limit, traceId, agentSessionId, endpoint, }: any): Promise<{
-        id: any;
-        type: any;
+    search({ agent, project, guildId, userIds, queryText, limit, traceId, agentSessionId, endpoint, }: Record<string, unknown>): Promise<{
+        id: unknown;
+        type: {};
         title: any;
-        content: any;
-        aboutUserId: any;
-        aboutUsername: any;
-        confidence: any;
-        createdAt: any;
+        content: {};
+        aboutUserId: unknown;
+        aboutUsername: unknown;
+        confidence: unknown;
+        createdAt: unknown;
         age: string;
         ageDays: number;
         score: number;
@@ -76,7 +76,7 @@ declare const MemoryService: {
   
      * @returns {Promise<{ memories: Array, total: number }>}
      */
-    list({ agent, project, guildId, userId, limit, skip }: any): Promise<{
+    list({ agent, project, guildId, userId, limit, skip }: Record<string, unknown>): Promise<{
         memories: import("mongodb").WithId<import("bson").Document>[];
         total: number;
     }>;
@@ -93,18 +93,18 @@ declare const MemoryService: {
   
      * @returns {Promise<boolean>} Whether a document was deleted
      */
-    delete(memoryId: any): Promise<boolean>;
+    delete(memoryId: Record<string, unknown>): Promise<boolean>;
     /**
      * Alias for delete — used by callers that preferred the AgentMemoryService naming.
      */
-    remove(memoryId: any): Promise<boolean>;
+    remove(memoryId: Record<string, unknown>): Promise<boolean>;
     /**
      * Update an existing memory.
      *
   
   
      */
-    update(memoryId: any, { title, content, type }: any): Promise<boolean>;
+    update(memoryId: Record<string, unknown>, { title, content, type }: Record<string, unknown>): Promise<boolean>;
     /**
      * Format memories for injection into the system prompt.
      * Adds type badges and staleness caveats.
@@ -112,7 +112,7 @@ declare const MemoryService: {
   
      * @returns {string} Formatted text block
      */
-    formatForPrompt(memories: any): any;
+    formatForPrompt(memories: Record<string, unknown>): any;
     /**
      * Ensure indexes exist on the unified memories collection.
      */

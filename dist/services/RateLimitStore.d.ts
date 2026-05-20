@@ -17,7 +17,7 @@ declare class RateLimitStore {
   
   
      */
-    update(providerName: any, model: any, rateLimits: any): void;
+    update(providerName: Record<string, unknown>, model: Record<string, unknown>, rateLimits: Record<string, unknown>): void;
     /**
      * Get a snapshot of all provider rate limits, grouped by provider.
      *

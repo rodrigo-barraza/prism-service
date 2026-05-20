@@ -17,6 +17,6 @@ declare const router: import("express-serve-static-core").Router;
  * @param {Function} emitJSON            Callback for JSON events: emitJSON({ type, ...data })
  * @returns {Promise<string>}            Content type of the audio
  */
-export declare function handleVoice(params: any, emitBinary: any, emitJSON: any): Promise<any>;
+export declare function handleVoice(params: Record<string, unknown>, emitBinary: Record<string, unknown>, emitJSON: Record<string, unknown>): Promise<any>;
 export default router;
 //# sourceMappingURL=AudioRoutes.d.ts.map

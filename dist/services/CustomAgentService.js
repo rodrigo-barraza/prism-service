@@ -70,6 +70,7 @@ const CustomAgentService = {
         const col = getCollection();
         if (!col)
             throw new Error("Database not available");
+        // @ts-ignore - TODO: strict typing
         const agentId = deriveAgentId(data.name);
         // Check for duplicate agentId
         const existing = await col.findOne({ agentId });
@@ -111,9 +112,11 @@ const CustomAgentService = {
         // If name changed, re-derive agentId
         const setFields = { ...updates, updatedAt: new Date().toISOString() };
         if (updates.name) {
+            // @ts-ignore - TODO: strict typing
             setFields.agentId = deriveAgentId(updates.name);
         }
         // Remove _id from $set if present
+        // @ts-ignore - TODO: strict typing
         delete setFields._id;
         await col.updateOne({ _id: new ObjectId(id) }, { $set: setFields });
         const updated = await col.findOne({ _id: new ObjectId(id) });

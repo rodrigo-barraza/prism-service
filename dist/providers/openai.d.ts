@@ -1,4 +1,4 @@
-import type { ProviderOptions } from "../types/provider.ts";
+import { ProviderOptions } from "../types/ProviderTypes.ts";
 /** OpenAI conversation message (same shape as Google's ConversationMsg) */
 export interface OpenAIMsg {
     role: string;
@@ -26,15 +26,220 @@ declare const openaiProvider: {
      * Chat Completions fallback for older models.
      */
     _generateTextChatCompletions(messages: OpenAIMsg[], model: string, options: ProviderOptions): Promise<Record<string, unknown>>;
-    generateTextStream(messages: OpenAIMsg[], model?: string, options?: ProviderOptions): AsyncGenerator<any, void, unknown>;
+    generateTextStream(messages: OpenAIMsg[], model?: string, options?: ProviderOptions): AsyncGenerator<string | {
+        type: string;
+        content: string;
+        data?: undefined;
+        mimeType?: undefined;
+        characters?: undefined;
+        id?: undefined;
+        responsesItemId?: undefined;
+        name?: undefined;
+        args?: undefined;
+        usage?: undefined;
+        rateLimits?: undefined;
+    } | {
+        type: string;
+        data: string;
+        mimeType: string;
+        content?: undefined;
+        characters?: undefined;
+        id?: undefined;
+        responsesItemId?: undefined;
+        name?: undefined;
+        args?: undefined;
+        usage?: undefined;
+        rateLimits?: undefined;
+    } | {
+        type: string;
+        characters: number;
+        id?: undefined;
+        name?: undefined;
+        args?: undefined;
+        usage?: undefined;
+        rateLimits?: undefined;
+    } | {
+        type: string;
+        id: string;
+        name: string;
+        args: {};
+        characters?: undefined;
+        usage?: undefined;
+        rateLimits?: undefined;
+    } | {
+        type: string;
+        usage: {
+            inputTokens: number;
+            outputTokens: number;
+        };
+        characters?: undefined;
+        id?: undefined;
+        name?: undefined;
+        args?: undefined;
+        rateLimits?: undefined;
+    } | {
+        type: string;
+        rateLimits: {
+            provider: string;
+            requests: {
+                limit: number | null;
+                remaining: number | null;
+                reset: any;
+            };
+            tokens: {
+                limit: number | null;
+                remaining: number | null;
+                reset: any;
+            };
+        };
+        characters?: undefined;
+        id?: undefined;
+        name?: undefined;
+        args?: undefined;
+        usage?: undefined;
+    }, void, unknown>;
     /**
      * Streaming via the Responses API.
      */
-    _streamResponses(messages: OpenAIMsg[], model: string, options: ProviderOptions): AsyncGenerator<any, void, unknown>;
+    _streamResponses(messages: OpenAIMsg[], model: string, options: ProviderOptions): AsyncGenerator<string | {
+        type: string;
+        content: string;
+        data?: undefined;
+        mimeType?: undefined;
+        characters?: undefined;
+        id?: undefined;
+        responsesItemId?: undefined;
+        name?: undefined;
+        args?: undefined;
+        usage?: undefined;
+        rateLimits?: undefined;
+    } | {
+        type: string;
+        data: string;
+        mimeType: string;
+        content?: undefined;
+        characters?: undefined;
+        id?: undefined;
+        responsesItemId?: undefined;
+        name?: undefined;
+        args?: undefined;
+        usage?: undefined;
+        rateLimits?: undefined;
+    } | {
+        type: string;
+        characters: number;
+        content?: undefined;
+        data?: undefined;
+        mimeType?: undefined;
+        id?: undefined;
+        responsesItemId?: undefined;
+        name?: undefined;
+        args?: undefined;
+        usage?: undefined;
+        rateLimits?: undefined;
+    } | {
+        type: string;
+        id: string;
+        responsesItemId: string;
+        name: string;
+        args: {};
+        content?: undefined;
+        data?: undefined;
+        mimeType?: undefined;
+        characters?: undefined;
+        usage?: undefined;
+        rateLimits?: undefined;
+    } | {
+        type: string;
+        usage: {
+            inputTokens: number;
+            outputTokens: number;
+        };
+        content?: undefined;
+        data?: undefined;
+        mimeType?: undefined;
+        characters?: undefined;
+        id?: undefined;
+        responsesItemId?: undefined;
+        name?: undefined;
+        args?: undefined;
+        rateLimits?: undefined;
+    } | {
+        type: string;
+        rateLimits: {
+            provider: string;
+            requests: {
+                limit: number | null;
+                remaining: number | null;
+                reset: any;
+            };
+            tokens: {
+                limit: number | null;
+                remaining: number | null;
+                reset: any;
+            };
+        };
+        content?: undefined;
+        data?: undefined;
+        mimeType?: undefined;
+        characters?: undefined;
+        id?: undefined;
+        responsesItemId?: undefined;
+        name?: undefined;
+        args?: undefined;
+        usage?: undefined;
+    }, void, unknown>;
     /**
      * Streaming via Chat Completions (fallback for older models).
      */
-    _streamChatCompletions(messages: OpenAIMsg[], model: string, options: ProviderOptions): AsyncGenerator<any, void, unknown>;
+    _streamChatCompletions(messages: OpenAIMsg[], model: string, options: ProviderOptions): AsyncGenerator<string | {
+        type: string;
+        characters: number;
+        id?: undefined;
+        name?: undefined;
+        args?: undefined;
+        usage?: undefined;
+        rateLimits?: undefined;
+    } | {
+        type: string;
+        id: string;
+        name: string;
+        args: {};
+        characters?: undefined;
+        usage?: undefined;
+        rateLimits?: undefined;
+    } | {
+        type: string;
+        usage: {
+            inputTokens: number;
+            outputTokens: number;
+        };
+        characters?: undefined;
+        id?: undefined;
+        name?: undefined;
+        args?: undefined;
+        rateLimits?: undefined;
+    } | {
+        type: string;
+        rateLimits: {
+            provider: string;
+            requests: {
+                limit: number | null;
+                remaining: number | null;
+                reset: any;
+            };
+            tokens: {
+                limit: number | null;
+                remaining: number | null;
+                reset: any;
+            };
+        };
+        characters?: undefined;
+        id?: undefined;
+        name?: undefined;
+        args?: undefined;
+        usage?: undefined;
+    }, void, unknown>;
     generateSpeech(text: string, voice?: string, options?: ProviderOptions): Promise<{
         stream: import("node:stream/web").ReadableStream<any> | null;
         contentType: string;

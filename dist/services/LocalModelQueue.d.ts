@@ -6,13 +6,13 @@ declare class LocalModelQueue {
   
   
      */
-    isLocal(provider: any): boolean;
+    isLocal(provider: Record<string, unknown>): boolean;
     /**
      * Get or create the semaphore queue for an instance.
   
   
      */
-    _getQueue(instanceId: any): any;
+    _getQueue(instanceId: Record<string, unknown>): any;
     /**
      * Acquire a semaphore slot for an instance. Resolves immediately if a
      * slot is available, otherwise enqueues and waits (FIFO order).
@@ -22,15 +22,15 @@ declare class LocalModelQueue {
      * @returns {Promise<() => void>} A release function — MUST be called
      *   when inference is complete (use try/finally).
      */
-    acquire(instanceId?: any): any;
+    acquire(instanceId?: Record<string, unknown>): any;
     /** Number of requests waiting for a specific instance. */
-    pending(instanceId?: any): any;
+    pending(instanceId?: Record<string, unknown>): any;
     /** Whether all slots are in use for a specific instance. */
-    busy(instanceId?: any): any;
+    busy(instanceId?: Record<string, unknown>): any;
     /** Number of active slots for a specific instance. */
     get activeCount(): number;
     /** Max concurrency for a specific instance (or default). */
-    maxConcurrency(instanceId?: any): any;
+    maxConcurrency(instanceId?: Record<string, unknown>): any;
     /** Total requests processed across all instances. */
     get totalProcessed(): number;
 }

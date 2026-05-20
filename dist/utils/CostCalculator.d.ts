@@ -5,7 +5,7 @@
 
 
  */
-export declare function estimateTokens(text: any): number;
+export declare function estimateTokens(text: Record<string, unknown>): number;
 /**
  * Get the total input token count from a usage object.
  * Providers like Anthropic and Google split prompt tokens into
@@ -14,7 +14,7 @@ export declare function estimateTokens(text: any): number;
  * @param {{ inputTokens?: number, cacheReadInputTokens?: number, cacheCreationInputTokens?: number }} usage
 
  */
-export declare function getTotalInputTokens(usage: any): any;
+export declare function getTotalInputTokens(usage: Record<string, unknown>): any;
 /**
  * Create a fresh usage accumulator object with all token fields zeroed.
  * @returns {{ inputTokens: number, outputTokens: number, cacheReadInputTokens: number, cacheCreationInputTokens: number, reasoningOutputTokens: number }}
@@ -35,7 +35,7 @@ export declare function createUsageAccumulator(): {
 
  * @returns {object} The target accumulator (for chaining)
  */
-export declare function mergeUsage(target: any, source: any): any;
+export declare function mergeUsage(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown>;
 /**
  * Calculate the estimated cost for a text-to-text request.
  * Supports Anthropic prompt caching: cache reads at reduced rate,
@@ -45,7 +45,7 @@ export declare function mergeUsage(target: any, source: any): any;
  * @param {{ inputPerMillion: number, outputPerMillion: number, cachedInputPerMillion?: number, cacheWriteInputPerMillion?: number }} pricing
  * @returns {number|null} Cost in USD, or null if pricing is unavailable.
  */
-export declare function calculateTextCost(usage: any, pricing: any): number | null;
+export declare function calculateTextCost(usage: Record<string, unknown>, pricing: Record<string, unknown>): number | null;
 /**
  * Calculate the estimated cost for an audio-to-text request.
  * Supports two strategies — per-minute pricing takes priority.
@@ -54,7 +54,7 @@ export declare function calculateTextCost(usage: any, pricing: any): number | nu
  * @param {{ perMinute?: number, audioInputPerMillion?: number, outputPerMillion?: number }} pricing
  * @returns {number|null} Cost in USD, or null if pricing is unavailable.
  */
-export declare function calculateAudioCost(usage: any, pricing: any): number | null;
+export declare function calculateAudioCost(usage: Record<string, unknown>, pricing: Record<string, unknown>): number | null;
 /**
  * Calculate the estimated cost for a Live API session turn.
  * The Live API streams audio in and out, so input tokens should
@@ -65,7 +65,7 @@ export declare function calculateAudioCost(usage: any, pricing: any): number | n
  * @param {{ inputPerMillion?: number, audioInputPerMillion?: number, outputPerMillion?: number, audioOutputPerMillion?: number }} pricing
  * @returns {number|null} Cost in USD, or null if pricing is unavailable.
  */
-export declare function calculateLiveCost(usage: any, pricing: any): number | null;
+export declare function calculateLiveCost(usage: Record<string, unknown>, pricing: Record<string, unknown>): number | null;
 /**
  * Calculate the estimated cost for a text-to-image request.
  * Estimates input tokens from prompt length (~4 chars per token).
@@ -79,5 +79,5 @@ export declare function calculateLiveCost(usage: any, pricing: any): number | nu
 
  * @returns {number|null} Cost in USD, or null if pricing is unavailable.
  */
-export declare function calculateImageCost(prompt: any, pricing: any, inputImages?: any, outputImageTokens?: any): number | null;
+export declare function calculateImageCost(prompt: Record<string, unknown>, pricing: Record<string, unknown>, inputImages?: Record<string, unknown>, outputImageTokens?: Record<string, unknown>): number | null;
 //# sourceMappingURL=CostCalculator.d.ts.map

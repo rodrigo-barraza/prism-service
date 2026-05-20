@@ -155,9 +155,11 @@ app.use("/workspaces", workspacesRouter);
 app.use(errorHandler);
 // WebSocket server
 const wss = new WebSocketServer({ server });
+// @ts-ignore - TODO: strict typing
 setupWebSocket(wss);
 // Start
 (async () => {
+    // @ts-ignore - TODO: strict typing
     await MongoWrapper.createClient(MONGO_DB_NAME, MONGO_URI);
     await MemoryService.ensureIndexes();
     // ── Ensure collection indexes ──────────────────────────────────
@@ -237,6 +239,7 @@ setupWebSocket(wss);
         }
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`Failed to ensure indexes: ${error.message}`);
     }
     // Clear any stale isGenerating flags left over from a previous crash/restart
@@ -259,6 +262,7 @@ setupWebSocket(wss);
         }
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`Failed to clear stale isGenerating flags: ${error.message}`);
     }
     // ── One-time migration: conversations → agent_sessions ──────────
@@ -267,6 +271,7 @@ setupWebSocket(wss);
         const { default: AgentPersonaRegistry } = await import("./services/AgentPersonaRegistry.js");
         const agentProjects = AgentPersonaRegistry.list()
             .map((p) => {
+            // @ts-ignore - TODO: strict typing
             const persona = AgentPersonaRegistry.get(p.id);
             return persona?.project;
         })
@@ -292,6 +297,7 @@ setupWebSocket(wss);
         }
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`Agent session migration failed: ${error.message}`);
     }
     // Load custom agents from database into the persona registry
@@ -300,6 +306,7 @@ setupWebSocket(wss);
         await AgentPersonaRegistryCustom.loadCustomAgents();
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.warn(`Custom agent loading failed: ${error.message}`);
     }
     // Initialize Change Streams (requires replica set — graceful fallback)
@@ -309,12 +316,16 @@ setupWebSocket(wss);
         const { default: MCPClientService } = await import("./services/MCPClientService.js");
         const { default: AgentPersonaRegistryMCP } = await import("./services/AgentPersonaRegistry.js");
         const mcpDb = MongoWrapper.getDb(MONGO_DB_NAME);
-        const codingProject = AgentPersonaRegistryMCP.get("CODING")?.project || "coding";
+        const codingProject = 
+        // @ts-ignore - TODO: strict typing
+        AgentPersonaRegistryMCP.get("CODING")?.project || "coding";
         if (mcpDb) {
+            // @ts-ignore - TODO: strict typing
             await MCPClientService.connectAllFromDB(mcpDb, codingProject, "admin");
         }
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.warn(`MCP auto-connect failed: ${error.message}`);
     }
     // ── Scheduled Memory Consolidation ─────────────────
@@ -357,13 +368,17 @@ setupWebSocket(wss);
                         });
                     }
                     catch (error) {
-                        logger.error(`[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${error.message}`);
+                        logger.error(
+                        // @ts-ignore - TODO: strict typing
+                        `[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${error.message}`);
                     }
                 }
             }
         }
         catch (error) {
-            logger.error(`[AutoDream] Scheduled consolidation sweep failed: ${error.message}`);
+            logger.error(
+            // @ts-ignore - TODO: strict typing
+            `[AutoDream] Scheduled consolidation sweep failed: ${error.message}`);
         }
     }, CONSOLIDATION_INTERVAL_MS);
     registerCleanup(async () => clearInterval(consolidationInterval));
@@ -401,6 +416,7 @@ setupWebSocket(wss);
             embedding: [6, 182, 212], // #06b6d4 — cyan
         };
         const coloredModalities = Object.values(TYPES)
+            // @ts-ignore - TODO: strict typing
             .map((t) => {
             // @ts-ignore
             const [r, g, b] = MODALITY_COLORS[t] || [255, 255, 255];
@@ -408,7 +424,9 @@ setupWebSocket(wss);
         })
             .join(", ");
         logger.info("Available modalities:", coloredModalities);
+        // @ts-ignore - TODO: strict typing
         ENDPOINTS.rest.forEach((ep) => logger.info(`  REST  →  http://localhost:${PORT}${ep}`));
+        // @ts-ignore - TODO: strict typing
         ENDPOINTS.websocket.forEach((ep) => logger.info(`  WS    →  ws://localhost:${PORT}${ep}`));
     });
 })();

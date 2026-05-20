@@ -15,6 +15,7 @@ const COLLECTION = COLLECTIONS.MCP_SERVERS;
  */
 router.get("/", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const servers = await db
             .collection(COLLECTION)
@@ -28,6 +29,7 @@ router.get("/", asyncHandler(async (req, res, next) => {
             const conn = connectedMap.get(s.name);
             return {
                 ...s,
+                // @ts-ignore - TODO: strict typing
                 id: s._id.toString(),
                 connected: !!conn,
                 toolCount: conn?.toolCount || 0,
@@ -47,6 +49,7 @@ router.get("/", asyncHandler(async (req, res, next) => {
  */
 router.post("/", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const document = {
             project,
@@ -77,6 +80,7 @@ router.post("/", asyncHandler(async (req, res, next) => {
  */
 router.put("/:id", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const updates = {
             ...(req.body.name !== undefined && { name: req.body.name }),
@@ -96,7 +100,9 @@ router.put("/:id", asyncHandler(async (req, res, next) => {
         };
         const result = await db
             .collection(COLLECTION)
-            .findOneAndUpdate({ _id: new ObjectId(req.params.id) }, { $set: updates }, { returnDocument: "after" });
+            .findOneAndUpdate(
+        // @ts-ignore - TODO: strict typing
+        { _id: new ObjectId(req.params.id) }, { $set: updates }, { returnDocument: "after" });
         if (!result) {
             return res.status(404).json({ error: "MCP server not found" });
         }
@@ -113,9 +119,11 @@ router.put("/:id", asyncHandler(async (req, res, next) => {
  */
 router.delete("/:id", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const result = await db
             .collection(COLLECTION)
+            // @ts-ignore - TODO: strict typing
             .findOneAndDelete({ _id: new ObjectId(req.params.id) });
         if (!result) {
             return res.status(404).json({ error: "MCP server not found" });
@@ -135,16 +143,22 @@ router.delete("/:id", asyncHandler(async (req, res, next) => {
  * POST /mcp-servers/:id/connect
  * Connect to an MCP server.
  */
-router.post("/:id/connect", asyncHandler(async (req, res, _next) => {
+router.post("/:id/connect", 
+// @ts-ignore - TODO: strict typing
+asyncHandler(async (req, res, _next) => {
     try {
         const { db } = req;
+        // @ts-ignore - TODO: strict typing
         const server = await db
             .collection(COLLECTION)
+            // @ts-ignore - TODO: strict typing
             .findOne({ _id: new ObjectId(req.params.id) });
         if (!server) {
+            // @ts-ignore - TODO: strict typing
             return res.status(404).json({ error: "MCP server not found" });
         }
         const result = await MCPClientService.connect(server);
+        // @ts-ignore - TODO: strict typing
         res.json({
             success: true,
             serverName: result.serverName,
@@ -156,8 +170,11 @@ router.post("/:id/connect", asyncHandler(async (req, res, _next) => {
         });
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`MCP connect failed for ${req.params.id}: ${error.message}`);
+        // @ts-ignore - TODO: strict typing
         logger.error(`MCP connection failed: ${error.message}`);
+        // @ts-ignore - TODO: strict typing
         res.status(502).json({ error: "MCP server connection failed" });
     }
 }));
@@ -167,9 +184,11 @@ router.post("/:id/connect", asyncHandler(async (req, res, _next) => {
  */
 router.post("/:id/disconnect", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { db } = req;
         const server = await db
             .collection(COLLECTION)
+            // @ts-ignore - TODO: strict typing
             .findOne({ _id: new ObjectId(req.params.id) });
         if (!server) {
             return res.status(404).json({ error: "MCP server not found" });

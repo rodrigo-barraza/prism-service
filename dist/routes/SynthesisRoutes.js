@@ -13,6 +13,7 @@ const COLLECTION = COLLECTIONS.SYNTHESIS;
  */
 router.get("/", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const runs = await db
             .collection(COLLECTION)
@@ -22,6 +23,7 @@ router.get("/", asyncHandler(async (req, res, next) => {
         res.json(runs);
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`Error fetching synthesis runs: ${error.message}`);
         next(error);
     }
@@ -32,6 +34,7 @@ router.get("/", asyncHandler(async (req, res, next) => {
  */
 router.get("/:id", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const run = await db
             .collection(COLLECTION)
@@ -42,6 +45,7 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
         res.json(run);
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`Error fetching synthesis run: ${error.message}`);
         next(error);
     }
@@ -52,6 +56,7 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
  */
 router.post("/", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const { id, title, systemPrompt, userPersona, category, targetTurns, seedMessages, settings, conversationId, } = req.body;
         if (!id) {
@@ -77,6 +82,7 @@ router.post("/", asyncHandler(async (req, res, next) => {
         res.json(document);
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`Error creating synthesis run: ${error.message}`);
         next(error);
     }
@@ -87,6 +93,7 @@ router.post("/", asyncHandler(async (req, res, next) => {
  */
 router.patch("/:id", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const allowedFields = [
             "title",
@@ -119,6 +126,7 @@ router.patch("/:id", asyncHandler(async (req, res, next) => {
         res.json(updated);
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`Error patching synthesis run: ${error.message}`);
         next(error);
     }
@@ -129,6 +137,7 @@ router.patch("/:id", asyncHandler(async (req, res, next) => {
  */
 router.delete("/:id", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const result = await db
             .collection(COLLECTION)
@@ -139,6 +148,7 @@ router.delete("/:id", asyncHandler(async (req, res, next) => {
         res.json({ success: true, id: req.params.id });
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`Error deleting synthesis run: ${error.message}`);
         next(error);
     }

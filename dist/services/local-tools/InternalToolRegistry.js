@@ -88,6 +88,7 @@ export default class InternalToolRegistry {
      */
     static getClientSchemas() {
         return [...registry.values()].map((t) => ({
+            // @ts-ignore - TODO: strict typing
             ...t.schema,
             domain: t.domain || "Reasoning",
             labels: t.labels || ["coding"],

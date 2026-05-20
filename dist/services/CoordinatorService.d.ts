@@ -14,16 +14,16 @@ export default class CoordinatorService {
      * @param {object} params.coordinatorCtx - Coordinator's loop context
      * @returns {Promise<object>} Spawn result with agentId
      */
-    static spawnFromTool({ description, prompt, files, model, assignedProvider, assignedModel, coordinatorCtx, }: any): Promise<{
-        agent_id: any;
-        description: any;
-        status: any;
+    static spawnFromTool({ description, prompt, files, model, assignedProvider, assignedModel, coordinatorCtx, }: Record<string, unknown>): Promise<{
+        agent_id: unknown;
+        description: unknown;
+        status: unknown;
         summary: string;
         result: any;
         toolUses: any;
         toolNames: {} | undefined;
-        iterations: any;
-        durationMs: any;
+        iterations: {};
+        durationMs: {};
         messages: any;
     } | {
         error: string;
@@ -33,13 +33,13 @@ export default class CoordinatorService {
   
   
      */
-    static sendMessage(agentId: any, message: any, coordinatorCtx: any): Promise<{
+    static sendMessage(agentId: Record<string, unknown>, message: string, coordinatorCtx: Record<string, unknown>): Promise<{
         error: string;
         agent_id?: undefined;
         status?: undefined;
         message?: undefined;
     } | {
-        agent_id: any;
+        agent_id: Record<string, unknown>;
         status: string;
         message: string;
         error?: undefined;
@@ -49,12 +49,12 @@ export default class CoordinatorService {
   
   
      */
-    static stopAgent(agentId: any): Promise<{
+    static stopAgent(agentId: Record<string, unknown>): Promise<{
         error: string;
         agent_id?: undefined;
         status?: undefined;
     } | {
-        agent_id: any;
+        agent_id: Record<string, unknown>;
         status: string;
         error?: undefined;
     }>;
@@ -64,16 +64,16 @@ export default class CoordinatorService {
   
   
      */
-    static getTaskOutput(agentId: any): {
-        agent_id: any;
-        description: any;
-        status: any;
+    static getTaskOutput(agentId: Record<string, unknown>): {
+        agent_id: unknown;
+        description: unknown;
+        status: unknown;
         summary: string;
         result: any;
         toolUses: any;
         toolNames: {} | undefined;
-        iterations: any;
-        durationMs: any;
+        iterations: {};
+        durationMs: {};
         messages: any;
     } | {
         error: string;
@@ -86,7 +86,7 @@ export default class CoordinatorService {
         durationMs?: undefined;
         message?: undefined;
     } | {
-        agent_id: any;
+        agent_id: Record<string, unknown>;
         description: any;
         status: string;
         partialOutput: any;
@@ -104,16 +104,16 @@ export default class CoordinatorService {
   
      * @returns {{ stopped: string[], alreadyStopped: string[] }}
      */
-    static abortWorkersBySession(parentAgentSessionId: any): Promise<{
-        stopped: any[];
-        alreadyStopped: any[];
+    static abortWorkersBySession(parentAgentSessionId: Record<string, unknown>): Promise<{
+        stopped: Record<string, unknown>[];
+        alreadyStopped: Record<string, unknown>[];
     }>;
     /**
      * Get the status of a specific worker.
   
   
      */
-    static getWorkerStatus(agentId: any): {
+    static getWorkerStatus(agentId: Record<string, unknown>): {
         agentId: any;
         description: any;
         status: any;
@@ -127,22 +127,22 @@ export default class CoordinatorService {
   
   
      */
-    static listWorkers({ parentAgentSessionId }?: any): {
-        agentId: any;
-        workerAgentSessionId: any;
-        parentAgentSessionId: any;
-        description: any;
-        status: any;
-        branchName: any;
+    static listWorkers({ parentAgentSessionId }?: Record<string, unknown>): {
+        agentId: unknown;
+        workerAgentSessionId: unknown;
+        parentAgentSessionId: unknown;
+        description: unknown;
+        status: unknown;
+        branchName: unknown;
         toolCallCount: any;
-        durationMs: any;
-        totalCost: any;
-        usage: any;
-        traceId: any;
-        providerName: any;
-        resolvedModel: any;
-        files: any;
-        startedAt: any;
+        durationMs: unknown;
+        totalCost: {} | null;
+        usage: {} | null;
+        traceId: unknown;
+        providerName: unknown;
+        resolvedModel: unknown;
+        files: unknown;
+        startedAt: unknown;
     }[];
     /** Active teams — keyed by team name, value is { agentIds: string[] } */
     static _activeTeams: Map<any, any>;
@@ -153,7 +153,7 @@ export default class CoordinatorService {
      *
   
      */
-    static cleanupSession(parentAgentSessionId: any): void;
+    static cleanupSession(parentAgentSessionId: Record<string, unknown>): void;
     /**
      * Create a named team of parallel worker agents.
      * Each member is spawned via spawnFromTool and runs concurrently.
@@ -165,7 +165,7 @@ export default class CoordinatorService {
   
   
      */
-    static createTeam(args: any, coordinatorCtx: any): Promise<{
+    static createTeam(args: Record<string, unknown>, coordinatorCtx: Record<string, unknown>): Promise<{
         error: string;
         team?: undefined;
         totalMembers?: undefined;
@@ -185,14 +185,14 @@ export default class CoordinatorService {
   
   
      */
-    static deleteTeam(teamName: any): Promise<{
+    static deleteTeam(teamName: Record<string, unknown>): Promise<{
         error: string;
         team?: undefined;
         deleted?: undefined;
         stopped?: undefined;
         total?: undefined;
     } | {
-        team: string;
+        team: never;
         deleted: boolean;
         stopped: number;
         total: any;
@@ -202,7 +202,7 @@ export default class CoordinatorService {
      * Run the worker's agentic loop in its isolated worktree.
      * @private
      */
-    static _runWorkerLoop(worker: any, prompt: any, coordinatorCtx: any): Promise<void>;
+    static _runWorkerLoop(worker: Record<string, unknown>, prompt: Record<string, unknown>, coordinatorCtx: Record<string, unknown>): Promise<void>;
     /**
      * Decompose a task into parallel sub-tasks using LLM.
      *
@@ -212,7 +212,7 @@ export default class CoordinatorService {
   
      * @returns {Promise<object>} Decomposed plan with sub-tasks
      */
-    static decompose({ task, files, repoPath, endpoint, agentSessionId, }: any): Promise<{
+    static decompose({ task, files, repoPath, endpoint, agentSessionId, }: Record<string, unknown>): Promise<{
         error: string;
         raw: any;
         taskId?: undefined;
@@ -223,10 +223,10 @@ export default class CoordinatorService {
         status?: undefined;
     } | {
         taskId: `${string}-${string}-${string}-${string}-${string}`;
-        task: any;
-        repoPath: any;
-        subTasks: any;
-        summary: any;
+        task: unknown;
+        repoPath: {};
+        subTasks: Record<string, unknown>[];
+        summary: string;
         status: string;
         error?: undefined;
         raw?: undefined;
@@ -238,7 +238,7 @@ export default class CoordinatorService {
   
      * @returns {Promise<object>} Execution results with diffs
      */
-    static execute(plan: any, options?: any): Promise<{
+    static execute(plan: Record<string, unknown>, options?: Record<string, unknown>): Promise<{
         error: string;
         taskId?: undefined;
         status?: undefined;
@@ -246,7 +246,7 @@ export default class CoordinatorService {
         completedCount?: undefined;
         totalCount?: undefined;
     } | {
-        taskId: any;
+        taskId: unknown;
         status: string;
         workers: any;
         completedCount: any;
@@ -254,7 +254,7 @@ export default class CoordinatorService {
         error?: undefined;
     } | {
         error: any;
-        taskId: any;
+        taskId: unknown;
         status?: undefined;
         workers?: undefined;
         completedCount?: undefined;
@@ -264,20 +264,20 @@ export default class CoordinatorService {
      * Run a single worker agent in a worktree (manual panel flow).
      * @private
      */
-    static _runPanelWorker(worker: any, { repoPath: _repoPath, provider: providerName, model, project, username, onProgress, }: any): Promise<void>;
+    static _runPanelWorker(worker: Record<string, unknown>, { repoPath: _repoPath, provider: providerName, model, project, username, onProgress, }: Record<string, unknown>): Promise<void>;
     /**
      * Approve and merge all completed worker branches.
      *
   
   
      */
-    static approveMerge(taskId: any): Promise<{
+    static approveMerge(taskId: Record<string, unknown>): Promise<{
         error: string;
         taskId?: undefined;
         merged?: undefined;
     } | {
-        taskId: any;
-        merged: any[];
+        taskId: Record<string, unknown>;
+        merged: Record<string, unknown>[];
         error?: undefined;
     }>;
     /**
@@ -286,12 +286,12 @@ export default class CoordinatorService {
   
   
      */
-    static abort(taskId: any): Promise<{
+    static abort(taskId: Record<string, unknown>): Promise<{
         error: string;
         taskId?: undefined;
         status?: undefined;
     } | {
-        taskId: any;
+        taskId: Record<string, unknown>;
         status: string;
         error?: undefined;
     }>;
@@ -299,23 +299,23 @@ export default class CoordinatorService {
      * Clean up worktrees for a task.
      * @private
      */
-    static cleanup(taskId: any): Promise<void>;
+    static cleanup(taskId: Record<string, unknown>): Promise<void>;
     /**
      * Get the current status of a coordinator task.
      *
   
   
      */
-    static getStatus(taskId: any): any;
+    static getStatus(taskId: Record<string, unknown>): any;
     /**
      * List all active coordinator tasks.
   
      */
     static listTasks(): {
-        taskId: any;
-        status: any;
+        taskId: unknown;
+        status: unknown;
         workerCount: any;
-        startedAt: any;
+        startedAt: unknown;
     }[];
 }
 //# sourceMappingURL=CoordinatorService.d.ts.map

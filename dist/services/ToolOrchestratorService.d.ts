@@ -6,15 +6,15 @@ export default class ToolOrchestratorService {
      */
     static ensureSchemas(): Promise<void>;
     /** AI-clean schemas (no endpoint/domain/dataSource/labels) — for LLM tool arrays */
-    static getToolSchemas(): any[];
+    static getToolSchemas(): unknown[];
     /** Client-facing schemas (with domain/dataSource/labels, no endpoint) — for Prism Client UI */
     static getClientToolSchemas(): any[];
     /** Workspace root paths from tools-api (single source of truth) */
-    static getWorkspaceRoots(): any[];
+    static getWorkspaceRoots(): Record<string, unknown>[];
     /** Primary workspace root (first entry) */
-    static getWorkspaceRoot(): any;
+    static getWorkspaceRoot(): Record<string, unknown>;
     /** Static roots from config.js (immutable, for "pinned" UI distinction) */
-    static getStaticRoots(): any[];
+    static getStaticRoots(): Record<string, unknown>[];
     /** Re-fetch workspace roots from tools-api config */
     static refreshWorkspaceRoots(): Promise<void>;
     /**
@@ -22,13 +22,13 @@ export default class ToolOrchestratorService {
   
   
      */
-    static updateWorkspaceRoots(roots: any): Promise<unknown>;
+    static updateWorkspaceRoots(roots: Record<string, unknown>): Promise<unknown>;
     /**
      * Validate a single workspace path via tools-api.
   
   
      */
-    static validateWorkspacePath(path: any): Promise<unknown>;
+    static validateWorkspacePath(path: string): Promise<unknown>;
     /**
      * Get the effective workspace root for a session.
      * Returns the worktree path if the session is in an isolated worktree,
@@ -36,14 +36,14 @@ export default class ToolOrchestratorService {
   
   
      */
-    static getEffectiveWorkspaceRoot(agentSessionId: any): any;
+    static getEffectiveWorkspaceRoot(agentSessionId: Record<string, unknown>): any;
     /**
      * Get the active worktree state for a session, if any.
   
      * @returns {{ worktreePath: string, branchName: string, originalRoot: string }|null}
      */
-    static getWorktreeState(agentSessionId: any): any;
-    static getToolFields(toolName: any): any;
+    static getWorktreeState(agentSessionId: Record<string, unknown>): any;
+    static getToolFields(toolName: Record<string, unknown>): any;
     static checkApiHealth(): Promise<{
         offline: Set<unknown>;
         apiStatus: {
@@ -52,7 +52,7 @@ export default class ToolOrchestratorService {
     }>;
     static refreshSchemas(): Promise<number>;
     static isInitialized(): boolean;
-    static executeTool(name: any, args?: any, context?: any): Promise<any>;
+    static executeTool(name: string, args?: Record<string, unknown>, context?: Record<string, unknown>): Promise<any>;
     /**
      * Execute a coordinator tool (team_create, send_message, stop_agent).
      * These are Prism-local — they dispatch to CoordinatorService in-process.
@@ -60,16 +60,16 @@ export default class ToolOrchestratorService {
   
   
      */
-    static executeCoordinatorTool(name: any, args?: any, context?: any): Promise<{
-        agent_id: any;
-        description: any;
-        status: any;
+    static executeCoordinatorTool(name: string, args?: Record<string, unknown>, context?: Record<string, unknown>): Promise<{
+        agent_id: unknown;
+        description: unknown;
+        status: unknown;
         summary: string;
         result: any;
         toolUses: any;
         toolNames: {} | undefined;
-        iterations: any;
-        durationMs: any;
+        iterations: {};
+        durationMs: {};
         messages: any;
     } | {
         error: string;
@@ -90,7 +90,7 @@ export default class ToolOrchestratorService {
         agent_id?: undefined;
         status?: undefined;
     } | {
-        agent_id: any;
+        agent_id: Record<string, unknown>;
         status: string;
         error?: undefined;
     } | {
@@ -100,7 +100,7 @@ export default class ToolOrchestratorService {
         stopped?: undefined;
         total?: undefined;
     } | {
-        team: string;
+        team: never;
         deleted: boolean;
         stopped: number;
         total: any;
@@ -113,12 +113,12 @@ export default class ToolOrchestratorService {
   
   
      */
-    static executeMCPTool(fullName: any, args?: any): Promise<any>;
+    static executeMCPTool(fullName: Record<string, unknown>, args?: Record<string, unknown>): Promise<any>;
     /**
      * Get all tool schemas from connected MCP servers.
   
      */
-    static getMCPToolSchemas(): any[];
+    static getMCPToolSchemas(): Record<string, unknown>[];
     /**
      * Map of tool names to their streaming SSE endpoint paths.
      * Only process-based tools that spawn subprocesses benefit from streaming.
@@ -129,7 +129,7 @@ export default class ToolOrchestratorService {
         execute_javascript: string;
         run_command: string;
     };
-    static isStreamable(toolName: any): boolean;
+    static isStreamable(toolName: Record<string, unknown>): boolean;
     /**
      * Execute a tool using the streaming SSE endpoint.
      * Calls `onChunk(event, data)` for each stdout/stderr chunk.
@@ -139,11 +139,11 @@ export default class ToolOrchestratorService {
   
      * @returns {Promise<object>} final result
      */
-    static executeToolStreaming(name: any, args: any | undefined, onChunk: any, context?: any): Promise<any>;
-    static executeToolCalls(toolCalls: any): Promise<any[]>;
-    static executeCustomTool(toolDef: any, args?: any): Promise<unknown>;
-    /** @internal */ static _setWorktree(sessionId: any, state: any): void;
-    /** @internal */ static _clearWorktree(sessionId: any): void;
-    /** @internal */ static _proxyPost(path: any, body: any, context: any): Promise<unknown>;
+    static executeToolStreaming(name: string, args: Record<string, unknown> | undefined, onChunk: Record<string, unknown>, context?: Record<string, unknown>): Promise<any>;
+    static executeToolCalls(toolCalls: Record<string, unknown>): Promise<any>;
+    static executeCustomTool(toolDef: Record<string, unknown>, args?: Record<string, unknown>): Promise<unknown>;
+    /** @internal */ static _setWorktree(sessionId: Record<string, unknown>, state: Record<string, unknown>): void;
+    /** @internal */ static _clearWorktree(sessionId: Record<string, unknown>): void;
+    /** @internal */ static _proxyPost(path: string, body: Record<string, unknown>, context: Record<string, unknown>): Promise<unknown>;
 }
 //# sourceMappingURL=ToolOrchestratorService.d.ts.map

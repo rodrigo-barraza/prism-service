@@ -5,7 +5,7 @@
 
 
  */
-export declare function markGenerating(conversationId: any, project: any, username: any, generating: any, opts: any): void;
+export declare function markGenerating(conversationId: Record<string, unknown>, project: Record<string, unknown>, username: string, generating: Record<string, unknown>, opts: Record<string, unknown>): void;
 /**
  * Append messages to a conversation and clear the isGenerating flag.
  * Fire-and-forget with error logging.
@@ -17,5 +17,5 @@ export declare function markGenerating(conversationId: any, project: any, userna
 
 
  */
-export declare function appendAndFinalize(conversationId: any, project: any, username: any, messagesToAppend: any, meta: any, opts: any): void;
+export declare function appendAndFinalize(conversationId: Record<string, unknown>, project: Record<string, unknown>, username: string, messagesToAppend: Record<string, unknown>, meta: Record<string, unknown>, opts: Record<string, unknown>): void;
 //# sourceMappingURL=ConversationUtilities.d.ts.map

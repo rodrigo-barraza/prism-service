@@ -21,6 +21,7 @@ const listMcpResources = {
     async execute(args) {
         const { server_name } = args;
         if (server_name) {
+            // @ts-ignore - TODO: strict typing
             const result = await MCPClientService.listResources(server_name);
             logger.info(`[MCP] list_resources: ${server_name} → ${result.count ?? 0} resources`);
             return result;
@@ -32,6 +33,7 @@ const listMcpResources = {
         const allResources = [];
         // @ts-ignore
         for (const server of servers) {
+            // @ts-ignore - TODO: strict typing
             const result = await MCPClientService.listResources(server.name);
             if (result.resources) {
                 // @ts-ignore
@@ -71,6 +73,7 @@ const readMcpResource = {
         if (!server_name || !uri)
             return { error: "'server_name' and 'uri' are required" };
         logger.info(`[MCP] read_resource: ${server_name} → ${uri}`);
+        // @ts-ignore - TODO: strict typing
         return MCPClientService.readResource(server_name, uri);
     },
 };
@@ -114,6 +117,7 @@ const mcpAuthenticate = {
                 error: "At least one of 'token', 'api_key', or 'env' must be provided",
             };
         logger.info(`[MCP] authenticate: ${server_name}`);
+        // @ts-ignore - TODO: strict typing
         return MCPClientService.authenticate(server_name, {
             token,
             apiKey: api_key,

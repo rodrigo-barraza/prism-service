@@ -16,10 +16,10 @@ declare const _default: {
     };
     domain: string;
     labels: string[];
-    execute(args: any): Promise<{
+    execute(args: Record<string, unknown>): Promise<{
         acknowledged: boolean;
         mode: string;
-        reason: any;
+        reason: {} | null;
         message: string;
     }>;
 };

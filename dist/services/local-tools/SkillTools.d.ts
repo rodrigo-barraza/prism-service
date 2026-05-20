@@ -46,12 +46,14 @@ declare const _default: ({
     };
     domain: string;
     labels: string[];
-    execute(args: any): Promise<{
+    execute(args: Record<string, unknown>): Promise<{
         error: string;
         skill?: undefined;
         message?: undefined;
     } | {
-        skill: any;
+        skill: {
+            [x: string]: unknown;
+        } | null;
         message: string;
         error?: undefined;
     }>;
@@ -77,7 +79,7 @@ declare const _default: ({
     };
     domain: string;
     labels: string[];
-    execute(args: any, context: any): Promise<{
+    execute(args: Record<string, unknown>, context: Record<string, unknown>): Promise<{
         error: string;
         skillId?: undefined;
         name?: undefined;
@@ -86,15 +88,15 @@ declare const _default: ({
         unresolved?: undefined;
         steps?: undefined;
     } | {
-        agent_id: any;
-        description: any;
-        status: any;
+        agent_id: unknown;
+        description: unknown;
+        status: unknown;
         summary: string;
         result: any;
         toolUses: any;
         toolNames: {} | undefined;
-        iterations: any;
-        durationMs: any;
+        iterations: {};
+        durationMs: {};
         messages: any;
     } | {
         error: string;
@@ -115,7 +117,7 @@ declare const _default: ({
         agent_id?: undefined;
         status?: undefined;
     } | {
-        agent_id: any;
+        agent_id: Record<string, unknown>;
         status: string;
         error?: undefined;
     } | {
@@ -125,7 +127,7 @@ declare const _default: ({
         stopped?: undefined;
         total?: undefined;
     } | {
-        team: string;
+        team: never;
         deleted: boolean;
         stopped: number;
         total: any;
@@ -149,8 +151,10 @@ declare const _default: ({
     };
     domain: string;
     labels: string[];
-    execute(args: any, context: any): Promise<{
-        skills: any[];
+    execute(args: Record<string, unknown>, context: Record<string, unknown>): Promise<{
+        skills: ({
+            [x: string]: unknown;
+        } | null)[];
         total: number;
     }>;
 } | {
@@ -171,14 +175,14 @@ declare const _default: ({
     };
     domain: string;
     labels: string[];
-    execute(args: any): Promise<{
+    execute(args: Record<string, unknown>): Promise<{
         error: string;
         deleted?: undefined;
         skillId?: undefined;
         name?: undefined;
     } | {
         deleted: boolean;
-        skillId: any;
+        skillId: Record<string, unknown>;
         name: any;
         error?: undefined;
     }>;

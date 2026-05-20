@@ -36,7 +36,7 @@ declare const _default: {
     };
     domain: string;
     labels: string[];
-    execute(args: any, context: any): Promise<{
+    execute(args: Record<string, unknown>, context: Record<string, unknown>): Promise<{
         error: string;
         acknowledged?: undefined;
         items?: undefined;
@@ -45,9 +45,9 @@ declare const _default: {
         acknowledged: boolean;
         items: {
             id: any;
-            content: any;
-            status: any;
-            priority: any;
+            content: {};
+            status: {};
+            priority: {};
         }[];
         stats: {
             total: number;

@@ -4,22 +4,22 @@ declare const HarnessRegistry: {
   
   
      */
-    get(id: any): any;
+    get(id: string): any;
     /**
      * List all registered harnesses for the settings UI.
      * @returns {Array<{ id: string, label: string, description: string }>}
      */
     list(): {
-        id: any;
-        label: any;
-        description: any;
+        id: unknown;
+        label: unknown;
+        description: unknown;
     }[];
     /**
      * Check if a harness ID exists.
   
   
      */
-    has(id: any): boolean;
+    has(id: string): boolean;
 };
 export default HarnessRegistry;
 //# sourceMappingURL=HarnessRegistry.d.ts.map

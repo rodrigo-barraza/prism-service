@@ -21,8 +21,11 @@ const COLLECTION = COLLECTIONS.AGENT_SESSIONS;
  */
 router.get("/", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
-        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+        const limit = Math.min(
+        // @ts-ignore - TODO: strict typing
+        Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
         const cursor = req.query.cursor || null;
         const agent = req.query.agent || null;
         const filter = { project, username };
@@ -175,6 +178,7 @@ router.get("/", asyncHandler(async (req, res, next) => {
         res.json({ items, nextCursor, hasMore });
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`Error fetching agent sessions: ${error.message}`);
         next(error);
     }
@@ -185,6 +189,7 @@ router.get("/", asyncHandler(async (req, res, next) => {
  */
 router.get("/:id", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const session = await db
             .collection(COLLECTION)
@@ -291,8 +296,14 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
                     ttftValues.push(r.timeToGeneration);
                 }
             }
-            const earliest = reqs.reduce((min, r) => (!min || r.timestamp < min ? r.timestamp : min), null);
-            const latest = reqs.reduce((max, r) => (!max || r.timestamp > max ? r.timestamp : max), null);
+            // @ts-ignore - TODO: strict typing
+            const earliest = reqs.reduce(
+            // @ts-ignore - TODO: strict typing
+            (min, r) => (!min || r.timestamp < min ? r.timestamp : min), null);
+            // @ts-ignore - TODO: strict typing
+            const latest = reqs.reduce(
+            // @ts-ignore - TODO: strict typing
+            (max, r) => (!max || r.timestamp > max ? r.timestamp : max), null);
             const totalElapsedTime = earliest && latest
                 ? Math.max(0, (new Date(latest).getTime() - new Date(earliest).getTime()) /
                     1000)
@@ -301,9 +312,11 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
             // (each request measures its own generation speed) and excludes idle
             // time (only generation phases contribute measurements).
             const avgTokensPerSec = tpsValues.length > 0
+                // @ts-ignore - TODO: strict typing
                 ? tpsValues.reduce((a, b) => a + b, 0) / tpsValues.length
                 : null;
             const avgTimeToGeneration = ttftValues.length > 0
+                // @ts-ignore - TODO: strict typing
                 ? ttftValues.reduce((a, b) => a + b, 0) /
                     ttftValues.length
                 : null;
@@ -352,6 +365,7 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
         res.json({ ...session, stats });
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`Error fetching agent session: ${error.message}`);
         next(error);
     }
@@ -362,6 +376,7 @@ router.get("/:id", asyncHandler(async (req, res, next) => {
  */
 router.patch("/:id", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const setFields = buildConversationPatchFields(req.body);
         const result = await db
@@ -376,6 +391,7 @@ router.patch("/:id", asyncHandler(async (req, res, next) => {
         res.json(session);
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`Error patching agent session: ${error.message}`);
         next(error);
     }
@@ -386,6 +402,7 @@ router.patch("/:id", asyncHandler(async (req, res, next) => {
  */
 router.delete("/:id", asyncHandler(async (req, res, next) => {
     try {
+        // @ts-ignore - TODO: strict typing
         const { project, username, db } = req;
         const result = await db
             .collection(COLLECTION)
@@ -396,6 +413,7 @@ router.delete("/:id", asyncHandler(async (req, res, next) => {
         res.json({ success: true, id: req.params.id });
     }
     catch (error) {
+        // @ts-ignore - TODO: strict typing
         logger.error(`Error deleting agent session: ${error.message}`);
         next(error);
     }

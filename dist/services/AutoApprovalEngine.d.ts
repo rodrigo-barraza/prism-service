@@ -17,26 +17,26 @@ export declare const APPROVAL_TIERS: {
  * Registered as a `beforeToolCall` hook in AgentHooks.
  */
 export default class AutoApprovalEngine {
-    constructor(options?: any);
+    constructor(options?: Record<string, unknown>);
     /**
      * Get the approval tier for a tool.
   
      * @returns {number} Tier constant (1, 2, or 3)
      */
-    getTier(toolName: any): any;
+    getTier(toolName: Record<string, unknown>): any;
     /**
      * Get the tier label for a tool.
   
   
      */
-    getTierLabel(toolName: any): string;
+    getTierLabel(toolName: Record<string, unknown>): string;
     /**
      * Check whether a tool call should auto-execute.
      *
   
      * @returns {{ approved: boolean, tier: number, tierLabel: string, reason: string }}
      */
-    check(toolCall: any): {
+    check(toolCall: Record<string, unknown>): {
         approved: boolean;
         tier: any;
         tierLabel: string;
@@ -48,15 +48,15 @@ export default class AutoApprovalEngine {
   
      * @returns {{ autoApproved: Array, needsApproval: Array }}
      */
-    checkBatch(toolCalls: any): {
-        autoApproved: any[];
-        needsApproval: any[];
+    checkBatch(toolCalls: Record<string, unknown>): {
+        autoApproved: Record<string, unknown>[];
+        needsApproval: Record<string, unknown>[];
     };
     /**
      * Create a beforeToolCall hook handler for AgentHooks.
   
      */
-    createHook(): (toolCall: any, _ctx: any) => Promise<{
+    createHook(): (toolCall: Record<string, unknown>, _ctx: Record<string, unknown>) => Promise<{
         approved: boolean;
         tier: any;
         tierLabel: string;

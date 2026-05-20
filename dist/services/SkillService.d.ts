@@ -9,12 +9,14 @@ declare const SkillService: {
   
   
      */
-    create(data: any): Promise<{
+    create(data: Record<string, unknown>): Promise<{
         error: string;
         skill?: undefined;
         message?: undefined;
     } | {
-        skill: any;
+        skill: {
+            [x: string]: unknown;
+        } | null;
         message: string;
         error?: undefined;
     }>;
@@ -23,8 +25,10 @@ declare const SkillService: {
   
   
      */
-    list({ project, limit }?: any): Promise<{
-        skills: any[];
+    list({ project, limit }?: Record<string, unknown>): Promise<{
+        skills: ({
+            [x: string]: unknown;
+        } | null)[];
         total: number;
     }>;
     /**
@@ -32,20 +36,22 @@ declare const SkillService: {
   
   
      */
-    get(skillId: any): Promise<any>;
+    get(skillId: Record<string, unknown>): Promise<{
+        [x: string]: unknown;
+    } | null>;
     /**
      * Delete a skill by skillId.
   
   
      */
-    delete(skillId: any): Promise<{
+    delete(skillId: Record<string, unknown>): Promise<{
         error: string;
         deleted?: undefined;
         skillId?: undefined;
         name?: undefined;
     } | {
         deleted: boolean;
-        skillId: any;
+        skillId: Record<string, unknown>;
         name: any;
         error?: undefined;
     }>;
@@ -60,7 +66,7 @@ declare const SkillService: {
   
      * @returns {Promise<object>} { prompt, config } or { error }
      */
-    prepare(skillId: any, variables?: any): Promise<{
+    prepare(skillId: Record<string, unknown>, variables?: Record<string, unknown>): Promise<{
         error: string;
         skillId?: undefined;
         name?: undefined;
@@ -69,7 +75,7 @@ declare const SkillService: {
         unresolved?: undefined;
         steps?: undefined;
     } | {
-        skillId: any;
+        skillId: Record<string, unknown>;
         name: any;
         prompt: any;
         config: {

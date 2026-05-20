@@ -9,35 +9,35 @@ declare const MCPClientService: {
   
      * @returns {Promise<{ tools: Array, serverName: string }>}
      */
-    connect(config: any): Promise<{
+    connect(config: Record<string, unknown>): Promise<{
         tools: {
             name: string;
-            description: any;
-            parameters: any;
-            _mcpServer: any;
-            _mcpOriginalName: any;
+            description: {};
+            parameters: {};
+            _mcpServer: Record<string, unknown>;
+            _mcpOriginalName: unknown;
         }[];
-        serverName: any;
+        serverName: unknown;
     }>;
     /**
      * Disconnect from an MCP server.
   
      */
-    disconnect(serverName: any): Promise<void>;
+    disconnect(serverName: Record<string, unknown>): Promise<void>;
     /**
      * Reconnect to an MCP server (disconnect then connect).
   
      * @returns {Promise<{ tools: Array, serverName: string }>}
      */
-    reconnect(serverName: any): Promise<{
+    reconnect(serverName: Record<string, unknown>): Promise<{
         tools: {
             name: string;
-            description: any;
-            parameters: any;
-            _mcpServer: any;
-            _mcpOriginalName: any;
+            description: {};
+            parameters: {};
+            _mcpServer: Record<string, unknown>;
+            _mcpOriginalName: unknown;
         }[];
-        serverName: any;
+        serverName: unknown;
     }>;
     /**
      * Call a tool on a connected MCP server.
@@ -46,35 +46,35 @@ declare const MCPClientService: {
   
      * @returns {Promise<object>} Tool result
      */
-    callTool(serverName: any, toolName: any, args?: any): any;
+    callTool(serverName: Record<string, unknown>, toolName: Record<string, unknown>, args?: Record<string, unknown>): any;
     /**
      * Get all tool schemas from all connected MCP servers.
      * @returns {Array} Namespaced tool schemas
      */
-    getToolSchemas(): any[];
+    getToolSchemas(): Record<string, unknown>[];
     /**
      * Get connection info for all servers.
      * @returns {Array<{ name, status, toolCount, transport, connectedAt }>}
      */
-    getConnectedServers(): any[];
+    getConnectedServers(): Record<string, unknown>[];
     /**
      * Check if a specific server is connected.
   
   
      */
-    isConnected(serverName: any): boolean;
+    isConnected(serverName: Record<string, unknown>): boolean;
     /**
      * Check if a tool name is an MCP tool.
   
   
      */
-    isMCPTool(toolName: any): any;
+    isMCPTool(toolName: Record<string, unknown>): any;
     /**
      * Parse an MCP-namespaced tool name.
   
      * @returns {{ serverName: string, toolName: string } | null}
      */
-    parseMCPToolName(fullName: any): {
+    parseMCPToolName(fullName: Record<string, unknown>): {
         serverName: any;
         toolName: any;
     } | null;
@@ -86,7 +86,7 @@ declare const MCPClientService: {
   
      * @returns {Promise<{ resources: Array<{ uri: string, name: string, description?: string, mimeType?: string }> }>}
      */
-    listResources(serverName: any): Promise<{
+    listResources(serverName: Record<string, unknown>): Promise<{
         error: string;
         resources?: undefined;
         serverName?: undefined;
@@ -94,13 +94,13 @@ declare const MCPClientService: {
         note?: undefined;
     } | {
         resources: any;
-        serverName: any;
+        serverName: Record<string, unknown>;
         count: any;
         error?: undefined;
         note?: undefined;
     } | {
         resources: never[];
-        serverName: any;
+        serverName: Record<string, unknown>;
         count: number;
         note: string;
         error?: undefined;
@@ -112,7 +112,7 @@ declare const MCPClientService: {
   
      * @returns {Promise<object>} Resource content
      */
-    readResource(serverName: any, uri: any): Promise<{
+    readResource(serverName: Record<string, unknown>, uri: string): Promise<{
         error: string;
         uri?: undefined;
         mimeType?: undefined;
@@ -123,12 +123,12 @@ declare const MCPClientService: {
         uri: any;
         mimeType: any;
         content: any;
-        serverName: any;
+        serverName: Record<string, unknown>;
         error?: undefined;
         contents?: undefined;
     } | {
         contents: any;
-        serverName: any;
+        serverName: Record<string, unknown>;
         error?: undefined;
         uri?: undefined;
         mimeType?: undefined;
@@ -147,7 +147,7 @@ declare const MCPClientService: {
   
      * @returns {Promise<object>} Reconnection result
      */
-    authenticate(serverName: any, auth?: any): Promise<{
+    authenticate(serverName: Record<string, unknown>, auth?: Record<string, unknown>): Promise<{
         error: string;
         acknowledged?: undefined;
         serverName?: undefined;
@@ -155,7 +155,7 @@ declare const MCPClientService: {
         message?: undefined;
     } | {
         acknowledged: boolean;
-        serverName: any;
+        serverName: Record<string, unknown>;
         toolCount: number;
         message: string;
         error?: undefined;
@@ -165,7 +165,7 @@ declare const MCPClientService: {
   
   
      */
-    connectAllFromDB(db: any, project: any, username: any): Promise<void>;
+    connectAllFromDB(db: Record<string, unknown>, project: Record<string, unknown>, username: string): Promise<void>;
     /**
      * Disconnect all connected servers. Called on shutdown.
      */

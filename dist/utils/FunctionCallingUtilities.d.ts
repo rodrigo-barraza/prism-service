@@ -12,7 +12,9 @@
  * The full result is still stored in the DB and shown in the UI;
  * this only affects what gets re-sent to the model.
  */
-export declare function truncateToolResult(result: any, maxChars?: any): any;
+export declare function truncateToolResult(result: Record<string, unknown>, maxChars?: Record<string, unknown>): string | any[] | {
+    [x: string]: unknown;
+};
 /**
  * Expand a messages array into the format expected by LLM providers for
  * function calling. Assistant messages with toolCalls are expanded into
@@ -23,5 +25,5 @@ export declare function truncateToolResult(result: any, maxChars?: any): any;
 
  * @returns {Array} Provider-ready messages
  */
-export declare function expandMessagesForFC(messages: any, { filterDeleted }?: any): any;
+export declare function expandMessagesForFC(messages: Record<string, unknown>, { filterDeleted }?: Record<string, unknown>): any;
 //# sourceMappingURL=FunctionCallingUtilities.d.ts.map
