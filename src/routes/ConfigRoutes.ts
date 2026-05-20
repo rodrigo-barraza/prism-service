@@ -1,5 +1,5 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import express, { Request, Response, NextFunction } from "express";
+import express, { Request, Response } from "express";
 import {
   PROVIDERS,
   PROVIDER_LIST,

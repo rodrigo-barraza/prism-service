@@ -51,12 +51,12 @@ export default {
       return { error: "'items' must be an array of todo objects" };
     }
 
-        const normalized = items.map(((item: any, i: any) => ({
-                    id: i + 1,
-              content: item.content || "",
-              status: item.status || "pending",
-              priority: item.priority || "medium",
-            }) as any as (value: any, index: number, array: any[]) => { id: any; content: {}; status: {}; priority: {}; }));
+    const normalized = items.map((item: any, i: number) => ({
+      id: i + 1,
+      content: item.content || "",
+      status: item.status || "pending",
+      priority: item.priority || "medium",
+    }));
 
     const stats = {
       total: normalized.length,

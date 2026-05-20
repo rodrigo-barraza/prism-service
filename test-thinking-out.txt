@@ -1,20 +1,58 @@
-Starting stream with model: gemini-3.5-flash...
-(node:393426) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
-(Use `node --trace-warnings ...` to show where the warning was created)
-CHUNK PARTS: [
-  {
-    "text": "**Defining the Scope**\n\nI've scoped the request and identified its core elements: a single-sentence, concise explanation of why the sky appears blue. Now I need to select the crucial scientific details.\n\n\n",
-    "thought": true
-  }
-]
-CHUNK PARTS: [
-  {
-    "text": "The sky is blue because Earth's atmosphere scatters blue light from the sun more than other colors."
-  }
-]
-CHUNK PARTS: [
-  {
-    "text": "",
-    "thoughtSignature": "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"
-  }
-]
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.5 [39m[90m/home/rodrigo/development/prism-service[39m
+
+[90mstdout[2m | tests/thinkingMode.test.ts
+[22m[39m[01:02:15] INFO  [prism] [InternalToolRegistry] Registered 14 internal tools: [enter_plan_mode, exit_plan_mode, skill_create, skill_execute, skill_list, skill_delete, enter_worktree, exit_worktree, todo_write, brief, ask_user_question, list_mcp_resources, read_mcp_resource, mcp_authenticate]
+
+[90mstdout[2m | tests/thinkingMode.test.ts
+[22m[39m[01:02:15] INFO  [prism] [LocalProviderGateway] Initialized
+
+[90mstdout[2m | tests/thinkingMode.test.ts
+[22m[39m[01:02:15] INFO  [prism] [LocalModelQueue] Initialized (default concurrency: 1)
+
+[90mstdout[2m | tests/thinkingMode.test.ts[2m > [22m[2mGemini 3.5 Flash / Agentic Thinking Mode[2m > [22m[2mGoogle Provider Config Builder[2m > [22m[2mconfigures thinkingConfig when model supports thinking and thinkingEnabled is true
+[22m[39m[01:02:15] INFO  [prism] [Google] generateText model=gemini-3.5-flash
+
+[90mstdout[2m | tests/thinkingMode.test.ts[2m > [22m[2mGemini 3.5 Flash / Agentic Thinking Mode[2m > [22m[2mGoogle Provider Config Builder[2m > [22m[2mparses thinkingBudget as integer even if passed as a string
+[22m[39m[01:02:15] INFO  [prism] [Google] generateText model=gemini-3.5-flash
+
+[90mstdout[2m | tests/thinkingMode.test.ts[2m > [22m[2mGemini 3.5 Flash / Agentic Thinking Mode[2m > [22m[2mGoogle Provider Config Builder[2m > [22m[2mdoes not configure thinkingConfig if thinkingEnabled is explicitly false
+[22m[39m[01:02:15] INFO  [prism] [Google] generateText model=gemini-3.5-flash
+
+[90mstdout[2m | tests/thinkingMode.test.ts[2m > [22m[2mGemini 3.5 Flash / Agentic Thinking Mode[2m > [22m[2mGoogle Provider Config Builder[2m > [22m[2mdoes not configure thinkingConfig if model does not support thinking
+[22m[39m[01:02:15] INFO  [prism] [Google] generateText model=espeak-ng
+
+[90mstdout[2m | tests/thinkingMode.test.ts[2m > [22m[2mGemini 3.5 Flash / Agentic Thinking Mode[2m > [22m[2mGoogle Provider Stream Thinking Chunk Parsing[2m > [22m[2myields thinking type chunks when parts contain thought and text
+[22m[39m[01:02:15] INFO  [prism] [Google] generateTextStream model=gemini-3.5-flash
+
+[90mstdout[2m | tests/thinkingMode.test.ts[2m > [22m[2mGemini 3.5 Flash / Agentic Thinking Mode[2m > [22m[2mGoogle Provider Live API Thinking Parsing[2m > [22m[2mhandles setup complete, yields thinking, yields text and yields usage
+[22m[39m[01:02:15] INFO  [prism] [Google] generateTextStreamLive (Live API) model=gemini-3.1-flash-live-preview
+
+[90mstdout[2m | tests/thinkingMode.test.ts[2m > [22m[2mGemini 3.5 Flash / Agentic Thinking Mode[2m > [22m[2mGoogle Provider Live API Thinking Parsing[2m > [22m[2mhandles setup complete, yields thinking, yields text and yields usage
+[22m[39m[01:02:15] INFO  [prism] [Google] Live API session opened for gemini-3.1-flash-live-preview
+
+[90mstdout[2m | tests/thinkingMode.test.ts[2m > [22m[2mAnthropic Claude / Agentic Thinking Mode[2m > [22m[2mAnthropic Provider Config Builder[2m > [22m[2mconfigures thinking and adjusts max_tokens/temperature when thinking is enabled
+[22m[39m[01:02:15] INFO  [prism] [Anthropic] generateText model=claude-sonnet-4-6
+
+[90mstdout[2m | tests/thinkingMode.test.ts[2m > [22m[2mAnthropic Claude / Agentic Thinking Mode[2m > [22m[2mAnthropic Provider Config Builder[2m > [22m[2mparses thinkingBudget as integer and maps effort levels correctly
+[22m[39m[01:02:15] INFO  [prism] [Anthropic] generateText model=claude-sonnet-4-6
+
+[90mstdout[2m | tests/thinkingMode.test.ts[2m > [22m[2mAnthropic Claude / Agentic Thinking Mode[2m > [22m[2mAnthropic Provider Config Builder[2m > [22m[2mparses thinkingBudget as integer and maps effort levels correctly
+[22m[39m[01:02:15] INFO  [prism] [Anthropic] generateText model=claude-sonnet-4-6
+
+[90mstdout[2m | tests/thinkingMode.test.ts[2m > [22m[2mAnthropic Claude / Agentic Thinking Mode[2m > [22m[2mAnthropic Provider Config Builder[2m > [22m[2mdoes not configure thinking if thinkingEnabled is false
+[22m[39m[01:02:15] INFO  [prism] [Anthropic] generateText model=claude-sonnet-4-6
+
+[90mstdout[2m | tests/thinkingMode.test.ts[2m > [22m[2mAnthropic Claude / Agentic Thinking Mode[2m > [22m[2mAnthropic Provider Config Builder[2m > [22m[2mdoes not configure thinking if thinkingEnabled is false
+[22m[39m[01:02:15] INFO  [prism] [Anthropic] generateText model=claude-sonnet-4-6
+
+[90mstdout[2m | tests/thinkingMode.test.ts[2m > [22m[2mAnthropic Claude / Agentic Thinking Mode[2m > [22m[2mAnthropic Provider Stream Thinking Chunk Parsing[2m > [22m[2myields thinking, signature, text, and usage chunks
+[22m[39m[01:02:15] INFO  [prism] [Anthropic] generateTextStream model=claude-sonnet-4-6
+
+ [32m✓[39m tests/thinkingMode.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m12 passed[39m[22m[90m (12)[39m
+[2m   Start at [22m 01:02:15
+[2m   Duration [22m 658ms[2m (transform 444ms, setup 0ms, import 554ms, tests 31ms, environment 0ms)[22m
+

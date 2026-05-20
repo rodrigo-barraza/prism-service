@@ -2422,7 +2422,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(`\nFatal: ${error.message}`);
-  console.error(error.stack);
+  console.error(`\nFatal: ${err.message}`);
+  console.error(err.stack);
   process.exit(1);
 });

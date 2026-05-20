@@ -34,7 +34,7 @@ const MAX_SIZE_GB = 16;
 // ── Helpers ─────────────────────────────────────────────────
 
 // Known param counts for models whose IDs don't contain a parseable size
-const KNOWN_PARAM_COUNTS = {
+const KNOWN_PARAM_COUNTS: Record<string, number> = {
   "mistralai/devstral-small-2507": 24,
   "mistralai/devstral-small-2-2512": 24,
   "nvidia/nemotron-3-nano": 8,
@@ -48,7 +48,7 @@ const KNOWN_PARAM_COUNTS = {
  * Parses patterns like "8b", "32b", "1.7b", "4b", "0.6b", etc.
  * Falls back to known param counts, returns null if unknown.
  */
-function extractParamCount(modelId) {
+function extractParamCount(modelId: string) {
   const lower = modelId.toLowerCase();
   // Match patterns like -8b, _8b, /8b, -1.7b, -0.6b
   const match = lower.match(/[-_/](\d+(?:\.\d+)?)\s*b(?:[-_@\s]|$)/);
@@ -66,7 +66,7 @@ function extractParamCount(modelId) {
  * Estimate GGUF file size in GB from param count + quantization.
  * Rough formula: params * bytes_per_param / 1e9
  */
-function estimateSizeGB(modelId, paramBillions) {
+function estimateSizeGB(modelId: string, paramBillions: number | null) {
   if (!paramBillions) return null;
   const lower = modelId.toLowerCase();
 
@@ -90,7 +90,7 @@ function estimateSizeGB(modelId, paramBillions) {
 /**
  * Determine if a model should be tested.
  */
-function shouldTestModel(modelId) {
+function shouldTestModel(modelId: string) {
   // Skip non-chat models
   if (SKIP_PATTERNS.some((p) => p.test(modelId))) return false;
 
@@ -108,7 +108,7 @@ function shouldTestModel(modelId) {
 /**
  * Detect model capabilities from its ID.
  */
-function detectCapabilities(modelId) {
+function detectCapabilities(modelId: string) {
   const lower = modelId.toLowerCase();
   return {
     isVision:
@@ -124,7 +124,7 @@ function detectCapabilities(modelId) {
   };
 }
 
-async function chat(payload) {
+async function chat(payload: any) {
   const res = await fetch(`${PRISM_SERVICE_URL}/chat?stream=false`, {
     method: "POST",
     headers: {
@@ -141,7 +141,7 @@ async function chat(payload) {
   return body;
 }
 
-async function _loadModel(modelId) {
+async function _loadModel(modelId: string) {
   const res = await fetch(`${LM_STUDIO_URL}/api/v1/models/load`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -177,8 +177,8 @@ async function _unloadAllModels() {
 async function getAvailableModels() {
   const res = await fetch(`${LM_STUDIO_URL}/v1/models`);
   if (!res.ok) throw new Error("LM Studio not responding");
-  const data = await res.json();
-  return (data.data || []).map((m) => m.id);
+  const data = await res.json() as any;
+  return (data.data || []).map((m: any) => m.id);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -213,7 +213,7 @@ const SAMPLE_TOOLS = [
   },
 ];
 
-let modelsToTest = [];
+let modelsToTest: string[] = [];
 
 beforeAll(async () => {
   // Check both services are running
@@ -227,11 +227,11 @@ beforeAll(async () => {
   modelsToTest = allModels.filter(shouldTestModel);
 
   const skipped = allModels.filter((m) => !shouldTestModel(m));
-  const params = (id) => {
+  const params = (id: string) => {
     const p = extractParamCount(id);
     return p ? `${p}B` : "?B";
   };
-  const size = (id) => {
+  const size = (id: string) => {
     const p = extractParamCount(id);
     const s = estimateSizeGB(id, p);
     return s ? `~${s.toFixed(1)}GB` : "?GB";
@@ -313,7 +313,7 @@ describe("LM Studio — Model Compatibility", () => {
         expect(
           res.estimatedCost === null || res.estimatedCost === 0,
         ).toBe(true);
-      } catch (error) {
+      } catch (e: any) {
         status = "✗";
         error = e.message;
       }
@@ -380,7 +380,7 @@ describe("LM Studio — Model Compatibility", () => {
 
         // Should also produce final text answer
         expect(res.text || res.thinking).toBeTruthy();
-      } catch (error) {
+      } catch (e: any) {
         status = "✗";
         error = e.message;
       }
@@ -448,7 +448,7 @@ describe("LM Studio — Model Compatibility", () => {
         // The streaming path may have already executed them
         const hasOutput = res.text || res.thinking;
         expect(hasOutput || res.usage.outputTokens > 0).toBeTruthy();
-      } catch (error) {
+      } catch (e: any) {
         // Some models may error on FC — that's a valid test result
         status = "⚠";
         error = e.message;
@@ -516,7 +516,7 @@ describe("LM Studio — Model Compatibility", () => {
         const _hasName = output.includes("testbot") || output.includes("test");
         // Not all models will get this right, but we at least got a response
         expect(res.text || res.thinking).toBeTruthy();
-      } catch (error) {
+      } catch (e: any) {
         status = "✗";
         error = e.message;
       }
@@ -571,7 +571,7 @@ describe("LM Studio — Model Compatibility", () => {
 
         expect(res.usage).toBeDefined();
         expect(res.text || res.thinking).toBeTruthy();
-      } catch (error) {
+      } catch (e: any) {
         status = "✗";
         error = e.message;
       }

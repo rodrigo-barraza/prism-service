@@ -1,4 +1,4 @@
-import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
+import { ProviderOptions } from "../types/ProviderTypes.ts";
 import { GoogleGenAI, Modality, type Content, type Part, type GenerateContentConfig, type ThinkingLevel, type LiveServerMessage } from "@google/genai";
 import crypto from "crypto";
 import { Readable } from "stream";

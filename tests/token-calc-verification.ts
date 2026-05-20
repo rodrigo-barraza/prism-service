@@ -18,7 +18,7 @@ const MODEL = "qwen3.6-35b-a3b";
 // ── Import the functions we're testing ────────────────────────
 // Mirror of prism-client/src/utils/utilities.js logic
 
-function getTotalInputTokens(usage) {
+function getTotalInputTokens(usage: any) {
   if (!usage) return 0;
   return (
     (usage.inputTokens || 0) +
@@ -27,7 +27,7 @@ function getTotalInputTokens(usage) {
   );
 }
 
-function getSessionTokenStats(messages) {
+function getSessionTokenStats(messages: any[]) {
   let input = 0;
   let output = 0;
   let requests = 0;
@@ -55,7 +55,7 @@ function getSessionTokenStats(messages) {
     }
     // Worker generation progress
     if (m._workerGenerationProgress) {
-      for (const wp of Object.values(m._workerGenerationProgress)) {
+      for (const wp of Object.values(m._workerGenerationProgress) as any[]) {
         if (wp.outputTokens > 0) output += wp.outputTokens;
       }
     }
@@ -80,9 +80,9 @@ const THIN = "─".repeat(70);
 let totalPassed = 0;
 let totalFailed = 0;
 
-function log(icon, msg) { console.log(`  ${icon}  ${msg}`); }
-function logSection(title) { console.log(`\n${THIN}\n  ${title}\n${THIN}`); }
-function passFail(label, actual, expected) {
+function log(icon: string, msg: string) { console.log(`  ${icon}  ${msg}`); }
+function logSection(title: string) { console.log(`\n${THIN}\n  ${title}\n${THIN}`); }
+function passFail(label: string, actual: any, expected: any) {
   const ok = actual === expected;
   console.log(`  ${ok ? "✅" : "❌"}  ${label}: ${actual} ${ok ? "==" : "!="} ${expected}${ok ? "" : " ← MISMATCH"}`);
   if (ok) totalPassed++; else totalFailed++;
@@ -91,7 +91,7 @@ function passFail(label, actual, expected) {
 
 // ── SSE Stream Consumer ─────────────────────────────────────
 
-async function streamAgentRequest(prompt, options = {}) {
+async function streamAgentRequest(prompt: string, options: any = {}) {
   const sessionId = options.sessionId || `token-test-${Date.now()}`;
   const payload = {
     provider: PROVIDER,
@@ -139,7 +139,7 @@ async function streamAgentRequest(prompt, options = {}) {
   let lastThinkingOutputTokens = 0;
   let maxOutputTokensFromChunks = 0;
 
-  const reader = res.body.getReader();
+  const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
@@ -148,7 +148,7 @@ async function streamAgentRequest(prompt, options = {}) {
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split("\n");
-    buffer = lines.pop();
+    buffer = lines.pop() || "";
 
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue;
@@ -490,7 +490,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("\n❌ Test failed:", error.message);
-  console.error(error.stack);
+  console.error("\n❌ Test failed:", err.message);
+  console.error(err.stack);
   process.exit(1);
 });

@@ -9,6 +9,7 @@ import type { Request, Response, NextFunction, ErrorRequestHandler } from "expre
 
 export type { Request, Response, NextFunction, ErrorRequestHandler };
 
+/* eslint-disable @typescript-eslint/no-namespace */
 declare global {
   namespace Express {
     interface Request {

@@ -1,5 +1,5 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import express, { Request, Response, NextFunction } from "express";
+import express, { Request, Response } from "express";
 import { basename } from "node:path";
 import { TOOLS_SERVICE_URL } from "../../config.ts";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";

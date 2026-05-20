@@ -1,4 +1,4 @@
-import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
+import { ProviderOptions } from "../types/ProviderTypes.ts";
 import OpenAI, { toFile } from "openai";
 import type { Stream } from "openai/streaming";
 import type { Reasoning, ReasoningEffort } from "openai/resources/shared";

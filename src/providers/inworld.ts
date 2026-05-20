@@ -1,4 +1,4 @@
-import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
+import { ProviderOptions } from "../types/ProviderTypes.ts";
 import { Readable } from "stream";
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
