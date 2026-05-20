@@ -57,8 +57,8 @@ export async function extractFiles(
               username,
             );
             newImages.push(ref);
-          } catch (error: any) {
-            logger.error(`Failed to upload file: ${error.message}`);
+          } catch (error: unknown) {
+            logger.error(`Failed to upload file: ${(error as Error).message}`);
             newImages.push(image);
           }
         } else {
@@ -83,8 +83,8 @@ export async function extractFiles(
           username,
         );
         updated.audio = ref;
-      } catch (error: any) {
-        logger.error(`Failed to upload audio: ${error.message}`);
+      } catch (error: unknown) {
+        logger.error(`Failed to upload audio: ${(error as Error).message}`);
       }
     }
 

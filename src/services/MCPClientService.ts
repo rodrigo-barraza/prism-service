@@ -126,7 +126,7 @@ const MCPClientService = {
 
     try {
       await client.connect(transport);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(
                 `[MCP] Failed to connect to "${serverName}": ${(error as Error).message}`,
       );
@@ -138,7 +138,7 @@ const MCPClientService = {
     try {
       const result = await client.listTools();
       mcpTools = result.tools || [];
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn(
                 `[MCP] Failed to list tools for "${serverName}": ${(error as Error).message}`,
       );
@@ -174,7 +174,7 @@ const MCPClientService = {
 
     try {
       await conn.client.close();
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.warn(`[MCP] Error closing "${serverName}": ${(error as Error).message}`);
     }
 
@@ -244,7 +244,7 @@ const MCPClientService = {
       }
 
       return { result: textParts.join("\n") };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Attempt reconnect once on connection errors
       if (
                 (error as Error).message?.includes("closed") ||
@@ -256,7 +256,7 @@ const MCPClientService = {
         try {
           await this.reconnect(serverName);
           return this.callTool(serverName, toolName, args);
-        } catch (reconnectErr: any) {
+        } catch (reconnectErr: unknown) {
           return {
                         error: `MCP server "${serverName}" connection lost and reconnect failed: ${(reconnectErr as Error).message}`,
           };
@@ -344,7 +344,7 @@ const MCPClientService = {
         mimeType: r.mimeType || null,
       }));
       return { resources, serverName, count: resources.length };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Some servers don't implement resources — that's fine
       if (
                 (error as Error).message?.includes("not supported") ||
@@ -395,7 +395,7 @@ const MCPClientService = {
       }
 
       return { contents, serverName };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
                 error: `Failed to read resource "${uri}" from "${serverName}": ${(error as Error).message}`,
       };
@@ -464,7 +464,7 @@ const MCPClientService = {
         toolCount: result.tools.length,
         message: `Successfully authenticated with "${serverName}". ${result.tools.length} tools available.`,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
                 error: `Authentication failed for "${serverName}": ${(error as Error).message}`,
       };
@@ -503,7 +503,7 @@ const MCPClientService = {
           );
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
             logger.warn(`[MCP] Auto-connect DB query failed: ${(error as Error).message}`);
     }
   },
