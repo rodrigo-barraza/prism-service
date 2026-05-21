@@ -88,7 +88,7 @@ export const ChatRequestSchema = z
     disabledBuiltIns: z.array(z.string()).nullable().optional(),
     minContextLength: z.number().nullable().optional(),
     forceImageGeneration: z.boolean().nullable().optional(),
-    responseFormat: z.any().nullable().optional(),
+    responseFormat: z.unknown().nullable().optional(),
     serviceTier: z.string().nullable().optional(),
     textOnly: z.boolean().nullable().optional(),
     skipConversation: z.boolean().nullable().optional(),
@@ -96,7 +96,7 @@ export const ChatRequestSchema = z
     planFirst: z.boolean().nullable().optional(),
     maxIterations: z.number().nullable().optional(),
     maxWorkerIterations: z.number().nullable().optional(),
-    agentContext: z.any().nullable().optional(),
+    agentContext: z.unknown().nullable().optional(),
     workspaceRoot: z.string().nullable().optional(),
   })
   .passthrough(); // Support extra provider/custom parameters dynamically
@@ -117,7 +117,12 @@ export const PostCustomToolSchema = z.object({
   code: z.string().optional().default(""),
   endpoint: z.string().optional().default(""),
   method: z.string().optional().default("GET"),
-  parameters: z.array(z.any()).optional().default([]),
+  parameters: z.array(z.object({
+    name: z.string(),
+    type: z.string().optional(),
+    description: z.string().optional(),
+    required: z.boolean().optional(),
+  })).optional().default([]),
   execution: z.enum(["sandboxed", "privileged"]).optional().default("sandboxed"),
   enabled: z.boolean().optional().default(true),
 });
@@ -128,7 +133,12 @@ export const PutCustomToolSchema = z.object({
   code: z.string().optional(),
   endpoint: z.string().optional(),
   method: z.string().optional(),
-  parameters: z.array(z.any()).optional(),
+  parameters: z.array(z.object({
+    name: z.string(),
+    type: z.string().optional(),
+    description: z.string().optional(),
+    required: z.boolean().optional(),
+  })).optional(),
   execution: z.enum(["sandboxed", "privileged"]).optional(),
   enabled: z.boolean().optional(),
 });
@@ -219,7 +229,7 @@ export const PostSynthesisBodySchema = z.object({
   userPersona: z.string().optional().default(""),
   category: z.string().optional().default("Chat"),
   targetTurns: z.number().int().optional().default(4),
-  seedMessages: z.array(z.any()).optional().default([]),
+  seedMessages: z.array(ChatMessageSchema).optional().default([]),
   settings: z.record(z.string(), z.unknown()).optional().default({}),
   conversationId: z.string().nullable().optional().default(null),
 });
@@ -231,7 +241,7 @@ export const PatchSynthesisBodySchema = z.object({
   userPersona: z.string().optional(),
   category: z.string().optional(),
   targetTurns: z.number().int().optional(),
-  seedMessages: z.array(z.any()).optional(),
+  seedMessages: z.array(ChatMessageSchema).optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
   conversationId: z.string().nullable().optional(),
 });export const PostSkillSchema = z.object({

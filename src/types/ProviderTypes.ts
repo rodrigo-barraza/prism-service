@@ -50,25 +50,52 @@ export interface ProviderOptions {
   stopSequences?: string[];
   serviceTier?: string;
   thinkingEnabled?: boolean;
+  thinkingLevel?: string;
   thinkingBudget?: number | string;
   reasoningEffort?: 'low' | 'medium' | 'high';
   signal?: AbortSignal;
-  webSearch?: boolean;
+  webSearch?: boolean | string;
   webFetch?: boolean;
   codeExecution?: boolean;
+  urlContext?: boolean;
   tools?: Array<{ name: string; description?: string; parameters?: Record<string, unknown> }>;
   _retryAttempt?: number;
-  reasoningSummary?: boolean;
-  verbosity?: "low" | "medium" | "high";
-  seed?: number;
+  reasoningSummary?: boolean | string;
+  verbosity?: string;
+  seed?: number | string;
   responseFormat?: string | { type: string };
   responseSchema?: Record<string, unknown>;
   frequencyPenalty?: number;
   presencePenalty?: number;
+  repeatPenalty?: number;
   model?: string;
   format?: string;
   instructions?: string;
   language?: string;
-  prompt?: string;
-  [key: string]: any;
+  prompt?: string | number;
+  // Context length
+  minContextLength?: number;
+  contextLength?: number;
+  _loadedContextLength?: number;
+  // Embedding
+  dimensions?: number;
+  // Extended sampling
+  minP?: number;
+  // LM Studio load config
+  context_length?: number;
+  flash_attention?: boolean;
+  offload_kv_cache_to_gpu?: boolean;
+  eval_batch_size?: number;
+  // Image generation
+  forceImageGeneration?: boolean;
+  imageCount?: number;
+  // System prompt
+  systemPrompt?: string;
+  // OpenAI Responses API
+  responsesAPI?: boolean;
+  // Provider routing
+  agent?: string;
+  username?: string;
+  project?: string;
+  [key: string]: unknown;
 }

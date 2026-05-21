@@ -56,6 +56,7 @@ export interface ProviderOptions {
   // ── Context Length ───────────────────────────────────────
   minContextLength?: number;
   contextLength?: number;
+  _loadedContextLength?: number;
 
   // ── OpenAI Responses API ─────────────────────────────────
   responsesAPI?: boolean;
@@ -71,8 +72,26 @@ export interface ProviderOptions {
   instructions?: string;
   language?: string;
 
+  // ── Embedding ────────────────────────────────────────────
+  dimensions?: number;
+
+  // ── Extended Sampling ────────────────────────────────────
+  minP?: number;
+
+  // ── LM Studio Load Config ───────────────────────────────
+  context_length?: number;
+  flash_attention?: boolean;
+  offload_kv_cache_to_gpu?: boolean;
+  eval_batch_size?: number;
+
+  // ── Provider Routing / Metadata ─────────────────────────
+  agent?: string;
+  username?: string;
+  project?: string;
+  _retryAttempt?: number;
+
   // ── Extensible ───────────────────────────────────────────
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // ── Google GenAI Config ─────────────────────────────────────
@@ -95,7 +114,7 @@ export interface GoogleGenerateConfig {
   tools?: Record<string, unknown>[];
   responseModalities?: string[];
   systemInstruction?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // ── LM Studio Config ────────────────────────────────────────
@@ -107,7 +126,7 @@ export interface LmStudioLoadConfig {
   flash_attention?: boolean;
   offload_kv_cache_to_gpu?: boolean;
   eval_batch_size?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface LmStudioModelMeta {
@@ -119,7 +138,7 @@ export interface LmStudioModelMeta {
   signal?: AbortSignal;
   thinkingEnabled?: boolean;
   tools?: ToolSchema[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface LmStudioResponsesBody {
@@ -131,7 +150,7 @@ export interface LmStudioResponsesBody {
   max_output_tokens?: number;
   repeat_penalty?: number;
   tools?: ToolSchema[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // ── Streaming Chunk Types ───────────────────────────────────

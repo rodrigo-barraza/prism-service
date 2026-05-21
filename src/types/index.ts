@@ -54,4 +54,90 @@ export {
 
 export type { ChatRequest } from "./schemas.ts";
 
+export type {
+  MemoryDocument,
+  MemorySearchResult,
+  MemoryStoreParams,
+  MemorySearchParams,
+  MemoryListParams,
+  ConsolidationAction,
+  ConsolidationResult,
+  ConsolidationParams,
+  ConsolidationBatch,
+  PartitionMeta,
+  ConsolidationRunResult,
+  ExtractedFact,
+  ExtractionMeta,
+  ExtractionParticipant,
+} from "./memory.ts";
 
+export type {
+  WorkerState,
+  WorktreeDiff,
+  WorkerResult,
+  InstanceInfo,
+  InstanceAssignment,
+  CoordinatorSpawnParams,
+  CoordinatorContext,
+  ToolsApiResponse,
+  WorktreeCreateResponse,
+  SubTask,
+  DecompositionResult,
+} from "./coordinator.ts";
+
+export type {
+  DateRangeFilter,
+  AdminQueryParams,
+  RequestLogEntry,
+  ModalityFlags,
+  StatsOverview,
+  ProjectStats,
+  ModelStats,
+  MongoTimestampFilter,
+  LogChatGenerationParams,
+  LogBackgroundLlmCallParams,
+  TokenUsage,
+  GenerationOptions,
+  ToolEntry,
+  ToolCallEntry,
+  ChatMessage,
+} from "./admin.ts";
+
+export {
+  MATCH_MODES,
+  COMPARATORS,
+} from "./benchmark.ts";
+
+export type {
+  MatchMode,
+  TextAssertion,
+  ComparisonOperator,
+  AgentAssertion,
+  BenchmarkDefinition,
+  BenchmarkModelTarget,
+  ResolvedBenchmarkModel,
+  BenchmarkModelResult,
+  BenchmarkToolCall,
+  BenchmarkRun,
+  BenchmarkRunSummary,
+  BenchmarkExecutionData,
+  BenchmarkRunCallbacks,
+  BenchmarkStreamEvent,
+  ComparatorFn,
+} from "./benchmark.ts";
+
+export type {
+  GraphNodeBase,
+  InputNode,
+  ModelNode,
+  ViewerNode,
+  GraphNode,
+  GraphEdge,
+  NodeResult,
+  NodeResultMap,
+  AssembledGraph,
+  WorkflowStep,
+  WorkflowMessage,
+  WorkflowDefinition,
+  ResolvedModalities,
+} from "./workflow.ts";

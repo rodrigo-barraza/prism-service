@@ -28,9 +28,9 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
       options: ProviderOptions = {},
     ) {
       const baseUrl = getBaseUrl();
-            (logger.provider as any)(("vLLM" as any), (`generateText model=${model} baseUrl=${baseUrl}` as any));
+            logger.provider("vLLM", `generateText model=${model} baseUrl=${baseUrl}`);
       try {
-                const prepared = prepareOpenAICompatMessages((messages as any), {
+        const prepared = prepareOpenAICompatMessages(messages, {
           mediaStrategy: MEDIA_STRATEGIES.FULL_MULTIMODAL,
         });
 
@@ -39,8 +39,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           model,
           ...buildPayloadParams(options),
           // vLLM extensions: top_k, min_p, repetition_penalty
-                    // @ts-ignore - TODO: strict typing
-                    ...(options.topK > 0 && { top_k: options.topK }),
+          ...(options.topK !== undefined && options.topK > 0 && { top_k: options.topK }),
                     ...(options.minP !== undefined && { min_p: options.minP }),
                     ...(options.repeatPenalty !== undefined &&
                         options.repeatPenalty !== 1 && {
@@ -70,12 +69,12 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         );
         const data = await response.json();
         const { text, thinking, usage, toolCalls } =
-                    processNonStreamingResponse((data as any), {
-                        thinkingEnabled: options.thinkingEnabled,
+          processNonStreamingResponse(data, {
+            thinkingEnabled: options.thinkingEnabled,
           });
 
-        const result = { text, thinking, usage };
-                if (toolCalls) (result as any).toolCalls = toolCalls;
+        const result: Record<string, unknown> = { text, thinking, usage };
+        if (toolCalls) result.toolCalls = toolCalls;
         return result;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
@@ -91,12 +90,12 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
       options: ProviderOptions = {},
     ) {
       const baseUrl = getBaseUrl();
-      (logger.provider as any)(
-                ("vLLM" as any),
-        (`generateTextStream model=${model} baseUrl=${baseUrl}` as any),
+      logger.provider(
+        "vLLM",
+        `generateTextStream model=${model} baseUrl=${baseUrl}`,
       );
       try {
-                const prepared = prepareOpenAICompatMessages((messages as any), {
+        const prepared = prepareOpenAICompatMessages(messages, {
           mediaStrategy: MEDIA_STRATEGIES.FULL_MULTIMODAL,
         });
 
@@ -105,8 +104,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           model,
           ...buildPayloadParams(options),
           // vLLM extensions: top_k, min_p, repetition_penalty
-                    // @ts-ignore - TODO: strict typing
-                    ...(options.topK > 0 && { top_k: options.topK }),
+          ...(options.topK !== undefined && options.topK > 0 && { top_k: options.topK }),
                     ...(options.minP !== undefined && { min_p: options.minP }),
                     ...(options.repeatPenalty !== undefined &&
                         options.repeatPenalty !== 1 && {
@@ -136,9 +134,8 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
                     { signal: options.signal },
         );
 
-                // @ts-ignore - TODO: strict typing
-                const reader = response.body.getReader();
-                yield* parseSSEStream((reader as any), {
+        const reader = response.body!.getReader();
+        yield* parseSSEStream(reader, {
                     signal: options.signal,
                     thinkingEnabled: options.thinkingEnabled,
         });
@@ -156,7 +153,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
       systemPrompt?: string,
     ) {
       const baseUrl = getBaseUrl();
-            (logger.provider as any)(("vLLM" as any), (`captionImage model=${model} baseUrl=${baseUrl}` as any));
+      logger.provider("vLLM", `captionImage model=${model} baseUrl=${baseUrl}`);
       try {
         const content = [
           { type: "text", text: prompt },
@@ -183,10 +180,13 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         );
 
         const data = await response.json();
-                const text = (data as any).choices?.[0]?.message?.content || "";
+        const responseData = data as Record<string, unknown>;
+        const choices = responseData.choices as Array<Record<string, unknown>> | undefined;
+        const text = (choices?.[0]?.message as Record<string, unknown>)?.content as string || "";
+        const rawUsage = responseData.usage as Record<string, number> | undefined;
         const usage = {
-                    inputTokens: (data as any).usage?.prompt_tokens || 0,
-                    outputTokens: (data as any).usage?.completion_tokens || 0,
+          inputTokens: rawUsage?.prompt_tokens || 0,
+          outputTokens: rawUsage?.completion_tokens || 0,
         };
         return { text, usage };
       } catch (error: unknown) {
@@ -202,18 +202,18 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
      * vLLM also exposes /v2/embed, but /v1/embeddings keeps the response
      * contract identical to the OpenAI provider.
      */
-    async generateEmbedding(content: any, model: any, options: ProviderOptions = {}) {
+    async generateEmbedding(content: unknown, model: string, options: ProviderOptions = {}) {
       const baseUrl = getBaseUrl();
-      (logger.provider as any)(
-                ("vLLM" as any),
-        (`generateEmbedding model=${model} baseUrl=${baseUrl}` as any),
+      logger.provider(
+        "vLLM",
+        `generateEmbedding model=${model} baseUrl=${baseUrl}`,
       );
       try {
         const payload = {
           model,
           input: content,
         };
-                if (options.dimensions) (payload as any).dimensions = options.dimensions;
+        if (options.dimensions) (payload as Record<string, unknown>).dimensions = options.dimensions;
 
         const response = await fetchOpenAICompat(
           `${baseUrl}/v1/embeddings`,
@@ -221,7 +221,9 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         );
         const data = await response.json();
 
-                const embedding = (data as any).data?.[0]?.embedding;
+        const responseData = data as Record<string, unknown>;
+        const embeddingArr = responseData.data as Array<Record<string, unknown>> | undefined;
+        const embedding = embeddingArr?.[0]?.embedding as number[] | undefined;
         if (!embedding) {
           throw new Error("No embedding data in vLLM response");
         }
@@ -245,7 +247,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
      */
     async listModels() {
       const baseUrl = getBaseUrl();
-            (logger.provider as any)(("vLLM" as any), ("listModels" as any));
+      logger.provider("vLLM", "listModels");
       try {
         const response = await fetch(`${baseUrl}/v1/models`, {
           method: "GET",
@@ -256,11 +258,12 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           throw new Error(`API error: ${response.status} ${errorText}`);
         }
         const data = await response.json();
-                const models = ((data as any).data || []).map((m: ChatMessage) => ({
-                    key: (m as any).id,
-                    display_name: (m as any).id,
+        const responseData = data as Record<string, unknown>;
+        const models = ((responseData.data || []) as Array<Record<string, unknown>>).map((m: Record<string, unknown>) => ({
+          key: m.id as string,
+          display_name: m.id as string,
           type: "llm",
-                    loaded_instances: [{ id: (m as any).id }], // vLLM models are always loaded
+          loaded_instances: [{ id: m.id }],
         }));
         return { models };
       } catch (error: unknown) {

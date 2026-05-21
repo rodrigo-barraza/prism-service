@@ -1,4 +1,5 @@
 import { ProviderOptions } from "../types/ProviderTypes.ts";
+import type { GenerateTextResult } from "../types/provider.ts";
 import { GoogleGenAI, Modality, type Content, type Part, type GenerateContentConfig, type ThinkingLevel, type LiveServerMessage } from "@google/genai";
 import crypto from "crypto";
 import { Readable } from "stream";
@@ -10,15 +11,24 @@ import {
   GOOGLE_EMBEDDING_MODEL,
 } from "../../config.ts";
 import { TYPES, MODELS, DEFAULT_VOICES, getDefaultModels } from "../config.ts";
+
+/** Shape of a model definition from the MODELS catalog. */
+interface ModelDef {
+  name: string;
+  thinking?: boolean;
+  thinkingLevels?: string[];
+  outputTypes?: string[];
+  [key: string]: unknown;
+}
 // ── Google GenAI Content Types ──────────────────────────────
 
 interface GoogleToolDeclaration {
   functionDeclarations: Array<{
     name: string;
     description: string;
-    parameters: any;
+    parameters: Record<string, unknown>;
   }>;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface ConversationMsg {
@@ -27,14 +37,14 @@ export interface ConversationMsg {
   name?: string;
   toolCalls?: Array<{
     name: string;
-    args: any;
+    args: Record<string, unknown>;
     thoughtSignature?: string;
   }>;
   images?: string[];
   audio?: string[];
   video?: string[];
   pdf?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 let client: GoogleGenAI | null = null;
@@ -55,7 +65,7 @@ function getClient(): GoogleGenAI {
  * Returns true for errors that should be handled gracefully (empty result)
  * rather than propagated as 500 server errors.
  */
-function isSafetyBlockError(error: any): boolean {
+function isSafetyBlockError(error: unknown): boolean {
   const message = ((error as Error)?.message || "").toLowerCase();
   return (
     message.includes("prohibited_content") ||
@@ -118,15 +128,15 @@ const GOOGLE_UNSUPPORTED_KEYS = new Set([
 ]);
 
 function sanitizeSchemaForGoogle(
-  schema: any,
+  schema: unknown,
   isPropertyMap: boolean = false,
-): any {
+): unknown {
   if (!schema || typeof schema !== "object") return schema;
   if (Array.isArray(schema))
-    return schema.map((item: any) => sanitizeSchemaForGoogle(item, false));
+    return schema.map((item: unknown) => sanitizeSchemaForGoogle(item, false));
 
-  const source = schema as any;
-  const cleaned: any = {};
+  const source = schema as Record<string, unknown>;
+  const cleaned: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(source)) {
     // Convert `const` → single-value `enum`
     if (key === "const" && !isPropertyMap) {
@@ -149,15 +159,15 @@ function sanitizeSchemaForGoogle(
  * Output: [{ functionDeclarations: [...] }]
  */
 export function convertToolsToGoogle(
-  tools: Array<{ name: string; description?: string; parameters?: any }> | null | undefined,
+  tools: Array<{ name: string; description?: string; parameters?: Record<string, unknown> }> | null | undefined,
 ): GoogleToolDeclaration[] | null {
   if (!tools || !Array.isArray(tools) || tools.length === 0) return null;
   return [
     {
-      functionDeclarations: tools.map((t: any) => ({
-        name: (t as any).name,
-        description: (t as any).description || "",
-        parameters: sanitizeSchemaForGoogle((t as any).parameters || {}) as any,
+      functionDeclarations: tools.map((t) => ({
+        name: t.name,
+        description: t.description || "",
+        parameters: sanitizeSchemaForGoogle(t.parameters || {}) as Record<string, unknown>,
       })),
     },
   ];
@@ -168,7 +178,7 @@ export function convertToolsToGoogle(
  * Centralizes the repeated config-building pattern across generateText,
  * generateTextStream, and generateTextStreamLive.
  */
-function buildGenerateConfig(options: ProviderOptions, modelDef: any | null | undefined): GenerateContentConfig {
+function buildGenerateConfig(options: ProviderOptions, modelDef: ModelDef | null | undefined): GenerateContentConfig {
   const config: GenerateContentConfig = {};
 
   if (options.temperature !== undefined) config.temperature = options.temperature;
@@ -312,10 +322,10 @@ const googleProvider = {
     model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).google,
     options: ProviderOptions = {},
   ) {
-        (logger.provider as any)(("Google" as any), (`generateText model=${model}` as any));
+    logger.provider("Google", `generateText model=${model}`);
     try {
       const contents = await convertMessages(messages);
-      const modelDef = Object.values(MODELS).find((m: any) => (m as any).name === model) as any | undefined;
+      const modelDef = Object.values(MODELS).find((m) => m.name === model) as ModelDef | undefined;
       const config = buildGenerateConfig(options, modelDef);
 
       // Web search
@@ -344,7 +354,7 @@ const googleProvider = {
       });
 
       // Check for function calls, images, and text in the response
-      interface ToolCallResult { id: string; name: string; args: any; thoughtSignature?: string }
+      interface ToolCallResult { id: string; name: string; args: Record<string, unknown>; thoughtSignature?: string }
       interface ImageResult { data: string; mimeType: string }
       const toolCalls: ToolCallResult[] = [];
       const textParts: string[] = [];
@@ -355,8 +365,8 @@ const googleProvider = {
           toolCalls.push({
             id: `google-tc-${crypto.randomUUID()}`,
             name: part.functionCall.name || "any",
-            args: (part.functionCall.args || {}) as any,
-            thoughtSignature: (part as any).thoughtSignature as string | undefined,
+            args: (part.functionCall.args || {}) as Record<string, unknown>,
+            thoughtSignature: (part as Record<string, unknown>).thoughtSignature as string | undefined,
           });
         } else if (part.text) {
           textParts.push(part.text);
@@ -368,7 +378,7 @@ const googleProvider = {
         }
       }
 
-      const result: any = {
+      const result: GenerateTextResult = {
         text: textParts.join("") || response.text || "",
         usage: {
           inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
@@ -399,14 +409,14 @@ const googleProvider = {
     model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).google,
     options: ProviderOptions = {},
   ) {
-        (logger.provider as any)(("Google" as any), (`generateTextStream model=${model}` as any));
+    logger.provider("Google", `generateTextStream model=${model}`);
     try {
       const contents = await convertMessages(messages);
-      const modelDef = Object.values(MODELS).find((m: any) => (m as any).name === model) as any | undefined;
+      const modelDef = Object.values(MODELS).find((m) => m.name === model) as ModelDef | undefined;
       const config = buildGenerateConfig(options, modelDef);
 
       // Build tools array based on enabled options
-      const tools: any[] = [];
+      const tools: Record<string, unknown>[] = [];
       if (options.webSearch) tools.push({ googleSearch: {} });
       if (options.codeExecution) tools.push({ codeExecution: {} });
       if (options.urlContext) tools.push({ urlContext: {} });
@@ -446,8 +456,8 @@ const googleProvider = {
                 type: "toolCall",
                 id: `google-tc-${crypto.randomUUID()}`,
                 name: part.functionCall.name || "any",
-                args: (part.functionCall.args || {}) as any,
-                thoughtSignature: (part as any).thoughtSignature as string | undefined,
+                args: (part.functionCall.args || {}) as Record<string, unknown>,
+                thoughtSignature: (part as Record<string, unknown>).thoughtSignature as string | undefined,
               };
             } else if (part.thought && part.text) {
               yield { type: "thinking", content: part.text };
@@ -514,17 +524,14 @@ const googleProvider = {
    * the same interface as generateTextStream().
    */
   async *generateTextStreamLive(messages: ConversationMsg[], model: string, options: ProviderOptions = {}) {
-    (logger.provider as any)(
-            ("Google" as any),
-      (`generateTextStreamLive (Live API) model=${model}` as any),
-    );
-    const modelDef = Object.values(MODELS).find((m: any) => (m as any).name === model) as any | undefined;
+    logger.provider("Google", `generateTextStreamLive (Live API) model=${model}`);
+    const modelDef = Object.values(MODELS).find((m) => m.name === model) as ModelDef | undefined;
     let session: Awaited<ReturnType<GoogleGenAI["live"]["connect"]>> | null = null;
     try {
       // ── Build Live API config ────────────────────────────────────
       // This model ONLY supports AUDIO output modality.
       // Text responses come via outputTranscription, not responseModalities.
-      const liveConfig: any = {
+      const liveConfig: Record<string, unknown> = {
         responseModalities: [Modality.AUDIO],
         outputAudioTranscription: {},
       };
@@ -539,7 +546,7 @@ const googleProvider = {
         supportsThinking &&
         options.thinkingEnabled !== false
       ) {
-        const thinkCfg: any = { includeThoughts: true };
+        const thinkCfg: Record<string, unknown> = { includeThoughts: true };
         if (options.thinkingLevel && modelDef?.thinkingLevels) {
           thinkCfg.thinkingLevel = options.thinkingLevel;
         }
@@ -550,14 +557,14 @@ const googleProvider = {
       }
 
       // Tools
-      const tools: any[] = [];
+      const tools: Record<string, unknown>[] = [];
       if (options.webSearch) tools.push({ googleSearch: {} });
       const customTools = convertToolsToGoogle(options.tools);
       if (customTools) tools.push(...customTools);
       if (tools.length > 0) liveConfig.tools = tools;
 
       // System instruction from messages[0] if role === "system"
-      const systemMsg = messages.find((m: any) => (m as any).role === "system");
+      const systemMsg = messages.find((m) => m.role === "system");
       if (systemMsg?.content) {
         liveConfig.systemInstruction = systemMsg.content;
       }
@@ -570,7 +577,7 @@ const googleProvider = {
         mimeType?: string;
         id?: string;
         name?: string;
-        args?: any;
+        args?: Record<string, unknown>;
         thoughtSignature?: string;
         usage?: { inputTokens: number; outputTokens: number };
         message?: string;
@@ -594,8 +601,8 @@ const googleProvider = {
         if (queue.length > 0) {
           return Promise.resolve(queue.shift());
         }
-        return new Promise((resolve: any) => {
-          resolver = resolve;
+        return new Promise<LiveQueueItem | undefined>((resolve) => {
+          resolver = resolve as (item: LiveQueueItem) => void;
         });
       }
 
@@ -605,7 +612,7 @@ const googleProvider = {
         config: liveConfig,
         callbacks: {
           onopen: () => {
-                        (logger.provider as any)(("Google" as any), (`Live API session opened for ${model}` as any));
+            logger.provider("Google", `Live API session opened for ${model}`);
           },
           onmessage: (message: LiveServerMessage) => {
             // Setup complete — signal we can send messages
@@ -657,7 +664,7 @@ const googleProvider = {
                   type: "toolCall",
                   id: `google-tc-${crypto.randomUUID()}`,
                   name: fc.name || "any",
-                  args: (fc.args || {}) as any,
+                  args: (fc.args || {}) as Record<string, unknown>,
                 });
               }
             }
@@ -682,10 +689,10 @@ const googleProvider = {
               enqueue({ type: "done" });
             }
           },
-          onerror: (e: any) => {
-            const errObj = e as any;
-            const innerErr = errObj?.error as any | undefined;
-            const errMsg = (innerErr?.message as string) || (errObj?.message as string) || "any";
+          onerror: (e: unknown) => {
+            const errObj = e as Record<string, unknown> | null;
+            const innerErr = (errObj?.error ?? null) as Record<string, unknown> | null;
+            const errMsg = (innerErr?.message as string) || (errObj?.message as string) || "unknown error";
             logger.error(
               `[Google Live API] Error: ${errMsg}`,
             );
@@ -696,7 +703,7 @@ const googleProvider = {
             });
           },
           onclose: () => {
-                        (logger.provider as any)(("Google" as any), ("Live API session closed" as any));
+            logger.provider("Google", "Live API session closed");
             done = true;
             enqueue({ type: "done" });
           },
@@ -718,7 +725,7 @@ const googleProvider = {
       // So we seed history with sendClientContent, then send the last
       // user message via sendRealtimeInput.
       const nonSystemMessages = messages.filter(
-        (m: any) => (m as any).role !== "system",
+        (m) => m.role !== "system",
       );
       const lastUserMsg = nonSystemMessages[nonSystemMessages.length - 1];
       const priorMessages = nonSystemMessages.slice(0, -1);
@@ -804,7 +811,7 @@ const googleProvider = {
     model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT).google,
     systemPrompt?: string,
   ) {
-        (logger.provider as any)(("Google" as any), (`captionImage model=${model}` as any));
+    logger.provider("Google", `captionImage model=${model}`);
     try {
       // Process each image into inline data parts
       const imageParts: Part[] = [];
@@ -864,7 +871,7 @@ const googleProvider = {
     model: string = MODELS.GEMINI_3_PRO_IMAGE.name,
     systemPrompt?: string,
   ) {
-        (logger.provider as any)(("Google" as any), (`generateImage model=${model}` as any));
+    logger.provider("Google", `generateImage model=${model}`);
     try {
       const config: GenerateContentConfig = {
         responseModalities: ["IMAGE"],
@@ -929,7 +936,7 @@ const googleProvider = {
   },
 
   async generateSpeech(text: string, voice: string = DEFAULT_VOICES.google, options: ProviderOptions = {}) {
-        (logger.provider as any)(("Google" as any), (`generateSpeech voice=${voice}` as any));
+    logger.provider("Google", `generateSpeech voice=${voice}`);
     try {
       const config: GenerateContentConfig = {
         temperature: 1,
@@ -990,7 +997,7 @@ const googleProvider = {
     model: string = GOOGLE_TTS_MODEL || "gemini-2.0-flash",
     options: ProviderOptions = {},
   ) {
-        (logger.provider as any)(("Google" as any), (`transcribeAudio model=${model}` as any));
+    logger.provider("Google", `transcribeAudio model=${model}`);
     try {
       const audioBase64 = audioBuffer.toString("base64");
       const prompt =
@@ -1030,13 +1037,13 @@ const googleProvider = {
     }
   },
 
-  async generateEmbedding(content: any, model?: string, options: ProviderOptions = {}) {
+  async generateEmbedding(content: unknown, model?: string, options: ProviderOptions = {}) {
     const resolvedModel =
       model ||
       getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)?.google ||
       GOOGLE_EMBEDDING_MODEL ||
       "gemini-embedding-2-preview";
-        (logger.provider as any)(("Google" as any), (`generateEmbedding model=${resolvedModel}` as any));
+    logger.provider("Google", `generateEmbedding model=${resolvedModel}`);
     try {
       type EmbedParams = Parameters<GoogleGenAI["models"]["embedContent"]>[0];
       const config: NonNullable<EmbedParams["config"]> = {};
@@ -1049,7 +1056,7 @@ const googleProvider = {
         contents = content;
       } else if (Array.isArray(content)) {
         // Multimodal: wrap all parts in a single Content object.
-        contents = { role: "user", parts: content as any[] };
+        contents = { role: "user", parts: content as Part[] };
       } else {
         contents = content as EmbedParams["contents"];
       }
@@ -1089,7 +1096,7 @@ const googleProvider = {
       throw new ProviderError(
         "google",
         (error as Error).message,
-        (error as any).status as number || 500,
+        ((error as Record<string, unknown>).status as number) || 500,
         error,
       );
     }
