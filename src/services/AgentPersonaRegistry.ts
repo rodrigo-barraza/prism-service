@@ -1,6 +1,35 @@
 import logger from "../utils/logger.ts";
 import { L } from "./ToolTaxonomyConstants.ts";
 
+// ── Types ────────────────────────────────────────────────────
+
+interface PersonaContext {
+  enabledTools?: string[];
+  agentContext?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface Persona {
+  id: string;
+  name: string;
+  type: string;
+  project: string;
+  displayOrder?: number;
+  custom?: boolean;
+  description?: string;
+  icon?: string;
+  color?: string;
+  backgroundImage?: string;
+  identity: (context: PersonaContext) => string;
+  guidelines: string;
+  interactionRules: string;
+  toolPolicy: string | ((context: PersonaContext) => string);
+  enabledTools: string[];
+  capabilities: string;
+  usesDirectoryTree: boolean;
+  usesCodingGuidelines: boolean;
+}
+
 // ════════════════════════════════════════════════════════════════
 // Agent Persona Registry
 //
@@ -276,7 +305,7 @@ const LUPOS_ENABLED_TOOLS = [
  * @property {boolean} usesCodingGuidelines - Whether to inject coding guidelines
  */
 
-const PERSONAS = new Map();
+const PERSONAS = new Map<string, Persona>();
 
 // ── CODING Agent enabled tools ───────────────────────────────────
 // Uses label-based references for broad coverage. The "coding" label
@@ -305,35 +334,35 @@ PERSONAS.set("CODING", {
 - After making changes, verify them by reading the modified section
 - Keep your explanations concise and technical`,
   interactionRules: "",
-  toolPolicy: (context: any) => {
-        const enabled = new Set(context.enabledTools || []);
-    const tips: any[] = [];
+  toolPolicy: (context: PersonaContext) => {
+    const enabled = new Set(context.enabledTools || []);
+    const tips: string[] = [];
 
     // ── File editing tips ──
     if (enabled.has("multi_file_read")) {
       tips.push(
-                ("- Use multi_file_read when you need to inspect several files at once" as any),
+        "- Use multi_file_read when you need to inspect several files at once",
       );
     }
     if (enabled.has("project_summary")) {
       tips.push(
-                ("- Use project_summary to understand unfamiliar codebases before diving in" as any),
+        "- Use project_summary to understand unfamiliar codebases before diving in",
       );
     }
     if (enabled.has("git")) {
       tips.push(
-                ("- Check git status before and after edits to track your changes" as any),
+        "- Check git status before and after edits to track your changes",
       );
     }
     if (enabled.has("grep_search")) {
       tips.push(
-                ('- When searching, use includes filters to narrow results (e.g. [".js", ".ts"])' as any),
+        '- When searching, use includes filters to narrow results (e.g. [".js", ".ts"])',
       );
     }
 
-    const sections: any[] = [];
+    const sections: string[] = [];
     if (tips.length > 0) {
-            sections.push((`## Tool Tips\n${tips.join("\n")}` as any));
+      sections.push(`## Tool Tips\n${tips.join("\n")}`);
     }
 
     // ── Task management ──
@@ -342,7 +371,7 @@ PERSONAS.set("CODING", {
       enabled.has("task_list") ||
       enabled.has("task_update")
     ) {
-            sections.push((`## Task Management
+      sections.push(`## Task Management
 You have persistent task tools (task_create, task_list, task_update) that survive across conversations.
 Use them proactively:
 - At the START of a session, call task_list to check for in-progress or pending tasks from prior sessions
@@ -352,12 +381,12 @@ Use them proactively:
 - After completing a task, call task_list to find your next task
 - To delete a task that is no longer relevant or was created in error, set its status to "deleted" via task_update
 - Break large tasks into subtasks — use metadata to link related tasks
-- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking` as any));
+- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`);
     }
 
     // ── Proactive memory ──
     if (enabled.has("upsert_memory")) {
-            sections.push((`## Proactive Memory
+      sections.push(`## Proactive Memory
 You have a persistent memory tool (upsert_memory) that stores facts across sessions.
 Use it **proactively** — do NOT wait for the user to say "remember":
 - When the user states a preference: "I like X", "I hate Y", "I prefer Z", "I always do W"
@@ -365,7 +394,7 @@ Use it **proactively** — do NOT wait for the user to say "remember":
 - When the user corrects you: save the correction so you don't repeat the mistake
 - When you learn a project convention or workflow pattern worth preserving
 - **When in doubt, save it** — over-remembering is better than forgetting
-- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions` as any));
+- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`);
     }
 
     return sections.join("\n\n");
@@ -382,11 +411,11 @@ PERSONAS.set("LUPOS", {
   name: "Lupos",
   type: "conversational",
   project: "lupos",
-  identity: (context: any) => {
-        const aprilFools = (context?.agentContext as any)?.aprilFoolsMode === true;
-        const isClockCrew = (context?.agentContext as any)?.guildId === "249010731910037507";
+  identity: (context: PersonaContext) => {
+    const aprilFools = context?.agentContext?.aprilFoolsMode === true;
+    const isClockCrew = context?.agentContext?.guildId === "249010731910037507";
 
-    let personality: any;
+    let personality: string;
     if (isClockCrew) {
             personality = aprilFools
         ? LUPOS_APRIL_FOOLS_CLOCK_CREW_CORE
@@ -557,7 +586,7 @@ PERSONAS.set("STICKERS", {
   name: "Clankerbox",
   type: "",
   project: "prism-chat",
-  identity: (_ctx: any) => {
+  identity: (_ctx: PersonaContext) => {
     const sections = [
       STICKERS_CORE_PERSONALITY,
       STICKERS_PHYSICAL_DESCRIPTION,
@@ -664,7 +693,7 @@ PERSONAS.set("LIGHTS", {
   name: "Lights",
   type: "",
   project: "prism-chat",
-  identity: (_ctx: any) => {
+  identity: (_ctx: PersonaContext) => {
     const sections = [
       LIGHTS_CORE_IDENTITY,
       LIGHTS_COLOR_REFERENCE,
@@ -776,15 +805,15 @@ PERSONAS.set("OOG", {
     }
     if (enabled.has("grep_search")) {
       tips.push(
-                ("- oog use grep_search to find all repeat pattern before consolidate. no surprise" as any),
+        "- oog use grep_search to find all repeat pattern before consolidate. no surprise",
       );
     }
     if (enabled.has("git")) {
-            tips.push(("- oog check git status before and after. responsible caveman" as any));
+      tips.push("- oog check git status before and after. responsible caveman");
     }
     if (enabled.has("project_summary")) {
       tips.push(
-                ("- oog use project_summary to understand lay of land before swing club" as any),
+        "- oog use project_summary to understand lay of land before swing club",
       );
     }
 
@@ -912,7 +941,7 @@ PERSONAS.set("DIGEST", {
   name: "Digest",
   type: "",
   project: "prism-chat",
-  identity: (_ctx: any) => {
+  identity: (_ctx: PersonaContext) => {
     const sections = [
       DIGEST_CORE_PERSONALITY,
       DIGEST_CAPABILITIES,
@@ -1008,7 +1037,7 @@ PERSONAS.set("AGENT_CREATOR", {
   name: "Agent Creator",
   type: "",
   project: "prism-chat",
-  identity: (_ctx: any) => {
+  identity: (_ctx: PersonaContext) => {
     const sections = [
       AGENT_CREATOR_CORE_IDENTITY,
       AGENT_CREATOR_CAPABILITIES,
@@ -1108,9 +1137,9 @@ PERSONAS.set("OMNI", {
 - After making changes, verify them by reading the modified section
 - Keep your explanations concise and technical`,
   interactionRules: "",
-  toolPolicy: (context: any) => {
-        const enabled = new Set(context.enabledTools || []);
-        const sections: any[] = ([OMNI_TOOL_POLICY] as any);
+  toolPolicy: (context: PersonaContext) => {
+    const enabled = new Set(context.enabledTools || []);
+    const sections: string[] = [OMNI_TOOL_POLICY];
 
     // ── Task management ──
     if (
@@ -1118,7 +1147,7 @@ PERSONAS.set("OMNI", {
       enabled.has("task_list") ||
       enabled.has("task_update")
     ) {
-            sections.push((`## Task Management
+      sections.push(`## Task Management
 You have persistent task tools (task_create, task_list, task_update) that survive across conversations.
 Use them proactively:
 - At the START of a session, call task_list to check for in-progress or pending tasks from prior sessions
@@ -1128,12 +1157,12 @@ Use them proactively:
 - After completing a task, call task_list to find your next task
 - To delete a task that is no longer relevant or was created in error, set its status to "deleted" via task_update
 - Break large tasks into subtasks — use metadata to link related tasks
-- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking` as any));
+- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`);
     }
 
     // ── Proactive memory ──
     if (enabled.has("upsert_memory")) {
-            sections.push((`## Proactive Memory
+      sections.push(`## Proactive Memory
 You have a persistent memory tool (upsert_memory) that stores facts across sessions.
 Use it **proactively** — do NOT wait for the user to say "remember":
 - When the user states a preference: "I like X", "I hate Y", "I prefer Z", "I always do W"
@@ -1141,7 +1170,7 @@ Use it **proactively** — do NOT wait for the user to say "remember":
 - When the user corrects you: save the correction so you don't repeat the mistake
 - When you learn a project convention or workflow pattern worth preserving
 - **When in doubt, save it** — over-remembering is better than forgetting
-- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions` as any));
+- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`);
     }
 
     return sections.join("\n\n");
@@ -1191,7 +1220,7 @@ PERSONAS.set("MEEPO", {
   name: "Meepo",
   type: "conversational",
   project: "prism-chat",
-  identity: (_ctx: any) => {
+  identity: (_ctx: PersonaContext) => {
     const sections = [
       MEEPO_CORE_PERSONALITY,
       MEEPO_RESPONSE_GUIDELINES,
@@ -1212,9 +1241,9 @@ PERSONAS.set("MEEPO", {
 // ── Registry API ─────────────────────────────────────────────────
 
 const AgentPersonaRegistry = {
-  get(agentId: any) {
+  get(agentId: string): Persona | null {
     if (!agentId) return null;
-        const persona = PERSONAS.get((agentId as any).toUpperCase());
+    const persona = PERSONAS.get(agentId.toUpperCase());
     if (!persona) {
       logger.warn(`[AgentPersonaRegistry] Unknown agent: "${agentId}"`);
       return null;
@@ -1223,18 +1252,18 @@ const AgentPersonaRegistry = {
   },
   list() {
     return [...PERSONAS.values()]
-            .sort((a: any, b: any) => (a.displayOrder ?? 100) - (b.displayOrder ?? 100))
-      .map((p: any) => ({
+      .sort((a, b) => (a.displayOrder ?? 100) - (b.displayOrder ?? 100))
+      .map((p) => ({
         id: p.id,
         name: p.name,
         type: p.type || "",
         ...(p.custom ? { custom: true } : {}),
       }));
   },
-  has(agentId: any) {
-        return PERSONAS.has((agentId || "").toUpperCase());
+  has(agentId: string): boolean {
+    return PERSONAS.has((agentId || "").toUpperCase());
   },
-  isAgentProject(project: any) {
+  isAgentProject(project: string): boolean {
     if (!project) return false;
         for ( const persona of PERSONAS.values()) {
       if (persona.project === project) return true;
@@ -1247,37 +1276,37 @@ const AgentPersonaRegistry = {
    * Converts a MongoDB document into a persona object compatible
    * with the built-in format, then inserts into the PERSONAS map.
    */
-  registerCustom(document: any) {
-    if (!document?.agentId) return;
+  registerCustom(doc: Record<string, unknown>) {
+    if (!doc?.agentId || typeof doc.agentId !== 'string') return;
 
-    const persona = {
-      id: document.agentId,
-      name: document.name,
-      type: document.type || "",
-      description: document.description || "",
-      project: document.project || "prism-chat",
+    const persona: Persona = {
+      id: doc.agentId as string,
+      name: (doc.name as string) || doc.agentId as string,
+      type: (doc.type as string) || "",
+      description: (doc.description as string) || "",
+      project: (doc.project as string) || "prism-chat",
       custom: true,
-      icon: document.icon || "",
-      color: document.color || "",
-      backgroundImage: document.backgroundImage || "",
-      identity: () => document.identity || "",
-      guidelines: document.guidelines || "",
+      icon: (doc.icon as string) || "",
+      color: (doc.color as string) || "",
+      backgroundImage: (doc.backgroundImage as string) || "",
+      identity: () => (doc.identity as string) || "",
+      guidelines: (doc.guidelines as string) || "",
       interactionRules: "",
-      toolPolicy: document.toolPolicy || "",
-      enabledTools: Array.isArray(document.enabledTools) ? document.enabledTools : [],
+      toolPolicy: (doc.toolPolicy as string) || "",
+      enabledTools: Array.isArray(doc.enabledTools) ? doc.enabledTools as string[] : [],
       capabilities: "",
-      usesDirectoryTree: document.usesDirectoryTree || false,
-      usesCodingGuidelines: document.usesCodingGuidelines || false,
+      usesDirectoryTree: (doc.usesDirectoryTree as boolean) || false,
+      usesCodingGuidelines: (doc.usesCodingGuidelines as boolean) || false,
     };
 
-    PERSONAS.set(document.agentId, persona);
+    PERSONAS.set(doc.agentId as string, persona);
     logger.info(
-      `[AgentPersonaRegistry] Registered custom agent: "${document.name}" (${document.agentId}) with ${persona.enabledTools.length} tools`,
+      `[AgentPersonaRegistry] Registered custom agent: "${doc.name}" (${doc.agentId}) with ${persona.enabledTools.length} tools`,
     );
   },
-  unregister(agentId: any) {
+  unregister(agentId: string) {
     if (!agentId) return;
-        const key = (agentId as any).toUpperCase();
+    const key = agentId.toUpperCase();
     const persona = PERSONAS.get(key);
     if (persona?.custom) {
       PERSONAS.delete(key);

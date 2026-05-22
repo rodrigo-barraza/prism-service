@@ -23,56 +23,57 @@ import { calculateTokensPerSec } from "../utils/math.ts";
  *   /ws/live   — Persistent Live API session (audio/text bidirectional)
  */
 export function setupWebSocket(wss: any) {
-    (wss as any).on("connection", (ws: any, req: any) => {
-        const url = new URL((req.url as any | URL), `http://${(req as any).headers.host}`);
+    (wss as any).on("connection", (ws: import("ws").WebSocket, req: any) => {
+        const url = new URL((req.url as any | URL), `http://${(req as import("http").IncomingMessage).headers.host}`);
     const pathname = url.pathname;
 
     const project =
-            (req as any).headers["x-project"] || url.searchParams.get("project") || "any";
+            (req as import("http").IncomingMessage).headers["x-project"] || url.searchParams.get("project") || "any";
+    const xfwd = (req as import("http").IncomingMessage).headers["x-forwarded-for"];
     const rawIp =
-            (req as any).headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-            (req as any).socket.remoteAddress;
+            (Array.isArray(xfwd) ? xfwd[0] : xfwd)?.split(",")[0]?.trim() ||
+            (req as import("http").IncomingMessage).socket.remoteAddress;
     // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1)
     const clientIp = rawIp?.replace(/^::ffff:/, "") || rawIp;
     const username =
-            (req as any).headers["x-username"] ||
+            ((req as import("http").IncomingMessage).headers["x-username"] as string) ||
       url.searchParams.get("username") ||
       "anonymous";
-        const agent = (req as any).headers["x-agent"] || null;
+        const agent = ((req as import("http").IncomingMessage).headers["x-agent"] as string) || null;
     logger.info(
       `WebSocket connection on ${pathname} (project: ${project}, user: ${username})`,
     );
 
     if (pathname === "/ws/chat") {
-      handleWsChat(ws, project, username, clientIp, agent);
+      handleWsChat(ws, project, username, clientIp || "unknown", agent);
     } else if (pathname === "/ws/text-to-audio") {
-      handleWsVoice(ws, project, username, clientIp, agent);
+      handleWsVoice(ws, project, username, clientIp || "unknown", agent);
     } else if (pathname === "/ws/live") {
-      handleWsLive(ws, project, username, clientIp, agent);
+      handleWsLive(ws, project, username, clientIp || "unknown", agent);
     } else {
-            (ws as any).send(
+            (ws as import("ws").WebSocket).send(
         JSON.stringify({
           type: "error",
           message: `Unknown WebSocket path: ${pathname}`,
         }),
       );
-            (ws as any).close();
+            (ws as import("ws").WebSocket).close();
     }
   });
 }
 function handleWsChat(
-  ws: any,
+  ws: import("ws").WebSocket,
   project: any,
   username: string,
-  clientIp: any,
-  agent: any,
+  clientIp: string,
+  agent: string | null,
 ) {
-    (ws as any).on("message", async (rawData: any) => {
+    (ws as import("ws").WebSocket).on("message", async (rawData: any) => {
     let data: any;
     try {
       data = JSON.parse(rawData.toString());
     } catch {
-            (ws as any).send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
+            (ws as import("ws").WebSocket).send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
       return;
     }
 
@@ -80,7 +81,7 @@ function handleWsChat(
       { ...data, project, username, clientIp, agent },
             (event: any) => {
         if (ws.readyState === ws.OPEN) {
-                    (ws as any).send(JSON.stringify(event));
+                    (ws as import("ws").WebSocket).send(JSON.stringify(event));
         }
       },
     );
@@ -92,18 +93,18 @@ function handleWsChat(
  * Sends binary audio frames for audio data, JSON for control events.
  */
 function handleWsVoice(
-  ws: any,
+  ws: import("ws").WebSocket,
   project: any,
   username: string,
-  clientIp: any,
-  agent: any,
+  clientIp: string,
+  agent: string | null,
 ) {
-    (ws as any).on("message", async (rawData: any) => {
+    (ws as import("ws").WebSocket).on("message", async (rawData: any) => {
     let data: any;
     try {
       data = JSON.parse(rawData.toString());
     } catch {
-            (ws as any).send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
+            (ws as import("ws").WebSocket).send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
       return;
     }
 
@@ -112,12 +113,12 @@ function handleWsVoice(
         { ...data, project, username, clientIp, agent },
                 (chunk: any) => {
           if (ws.readyState === ws.OPEN) {
-                        (ws as any).send(chunk); // Binary audio frame
+                        (ws as import("ws").WebSocket).send(chunk); // Binary audio frame
           }
         },
         (event: any) => {
           if (ws.readyState === ws.OPEN) {
-                        (ws as any).send(JSON.stringify(event));
+                        (ws as import("ws").WebSocket).send(JSON.stringify(event));
           }
         },
       );
@@ -152,11 +153,11 @@ function handleWsVoice(
  *   { type: "error", message }             — Error
  */
 function handleWsLive(
-  ws: any,
+  ws: import("ws").WebSocket,
   project: any,
   username: string,
-  _clientIp: any,
-  agent: any,
+  _clientIp: string,
+  agent: string | null,
 ) {
     let liveSession: any = null;
   /** @type {string[]} Accumulated base64 PCM audio chunks for current turn (model output, 24kHz) */
@@ -185,7 +186,7 @@ function handleWsLive(
 
   function emit(event: any) {
     if (ws.readyState === ws.OPEN) {
-            (ws as any).send(JSON.stringify(event));
+            (ws as import("ws").WebSocket).send(JSON.stringify(event));
     }
   }
     async function buildAndUploadAudio(
@@ -233,7 +234,7 @@ function handleWsLive(
     }
   }
 
-    (ws as any).on("message", async (rawData: any) => {
+    (ws as import("ws").WebSocket).on("message", async (rawData: any) => {
     let data: any;
     try {
       data = JSON.parse(rawData.toString());
@@ -843,7 +844,7 @@ function handleWsLive(
   });
 
   // Clean up on client disconnect
-    (ws as any).on("close", () => {
+    (ws as import("ws").WebSocket).on("close", () => {
         if (liveSession) {
       try {
         (liveSession as any).close();

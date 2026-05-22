@@ -11,28 +11,89 @@ import {
   TOOL_API_HEALTH_TIMEOUT_MS
 } from "../constants.ts";
 import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
+import type { CoordinatorContext, TeamMember } from "../types/coordinator.ts";
+
+// ────────────────────────────────────────────────────────────
+// Types
+// ────────────────────────────────────────────────────────────
+
+/** Endpoint metadata attached to full tool schemas from tools-api */
+interface ToolEndpoint {
+  path: string;
+  method?: string;
+  pathParams?: string[];
+  queryParams?: string[];
+  conditionalPath?: { param: string; template: string };
+}
+
+/** Full tool schema as returned by tools-api /admin/tool-schemas */
+interface ToolSchemaFull {
+  name: string;
+  description?: string;
+  parameters?: Record<string, unknown>;
+  endpoint?: ToolEndpoint;
+  domain?: string;
+  dataSource?: string;
+  labels?: string[];
+  [key: string]: unknown;
+}
+
+/** tools-api /admin/config response */
+interface ToolsApiConfig {
+  workspaceRoots?: string[];
+  staticRoots?: string[];
+  [key: string]: unknown;
+}
+
+/** Context passed through from the agentic loop to tool execution */
+interface ToolExecutionContext {
+  project?: string | null;
+  username?: string | null;
+  agent?: string | null;
+  requestId?: string;
+  traceId?: string | null;
+  agentSessionId?: string | null;
+  iteration?: number;
+  workspaceRoot?: string | null;
+  signal?: AbortSignal;
+  messages?: Array<{ role: string; images?: string[]; [key: string]: unknown }>;
+  _providerName?: string;
+  _resolvedModel?: string;
+  _emit?: ((event: { type: string; [key: string]: unknown }) => void) | null;
+  _maxWorkerIterations?: number;
+  _minContextLength?: number;
+  [key: string]: unknown;
+}
+
+/** Worktree session state */
+interface WorktreeState {
+  originalRoot: string;
+  worktreePath: string;
+  branch?: string;
+  [key: string]: unknown;
+}
 
 // ────────────────────────────────────────────────────────────
 // Schema Cache — fetched from tools-api at startup
 // ────────────────────────────────────────────────────────────
 
 /** @type {Array} Full tool schemas (with endpoint metadata) */
-let cachedSchemas: any[] = [];
+let cachedSchemas: ToolSchemaFull[] = [];
 
 /** @type {Array} Clean schemas for LLM (without endpoint metadata) */
-let cachedAISchemas: any[] = [];
+let cachedAISchemas: Record<string, unknown>[] = [];
 
 /** @type {Array} Client-facing schemas (with domain/dataSource/labels, without endpoint) */
-let cachedClientSchemas: any[] = [];
+let cachedClientSchemas: Record<string, unknown>[] = [];
 
-/** @type {Map<string, object>} Tool name → full schema (for routing) */
-const toolMap = new Map();
+/** @type {Map<string, ToolSchemaFull>} Tool name → full schema (for routing) */
+const toolMap = new Map<string, ToolSchemaFull>();
 
 /** @type {string[]} Allowed workspace root paths (fetched from tools-api) */
-let cachedWorkspaceRoots: any[] = [];
+let cachedWorkspaceRoots: string[] = [];
 
 /** @type {string[]} Static roots from config.js (immutable, for "pinned" UI) */
-let cachedStaticRoots: any[] = [];
+let cachedStaticRoots: string[] = [];
 
 /** @type {boolean} Whether initial fetch has completed */
 let initialized = false;
@@ -43,7 +104,7 @@ let initialized = false;
  * is redirected to the worktree path. All file/git/shell tool calls
  * then operate in the worktree until exit_worktree is called.
  */
-const activeWorktrees = new Map();
+const activeWorktrees = new Map<string, WorktreeState>();
 
 /**
  * Fetch tool schemas from tools-api and populate caches.
@@ -66,7 +127,7 @@ async function fetchSchemas() {
       return;
     }
 
-    const schemas = await response.json();
+    const schemas = await response.json() as ToolSchemaFull[];
 
     if (!Array.isArray(schemas) || schemas.length === 0) {
       logger.warn(
@@ -78,7 +139,7 @@ async function fetchSchemas() {
     cachedSchemas = schemas;
 
     // Client-facing schemas: keep domain/dataSource/labels for UI grouping, strip only endpoint
-    cachedClientSchemas = schemas.map(({ endpoint: _e, ...rest }: any) => rest);
+    cachedClientSchemas = schemas.map(({ endpoint: _e, ...rest }) => rest);
 
     // Strip endpoint, dataSource, domain, and labels metadata for LLM consumption
     cachedAISchemas = schemas.map(
@@ -88,7 +149,7 @@ async function fetchSchemas() {
         domain: _d,
         labels: _l,
         ...rest
-      }: any) => rest,
+      }) => rest,
     );
 
     // Build lookup map for executor
@@ -109,15 +170,15 @@ async function fetchSchemas() {
         signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MS),
       });
       if (configRes.ok) {
-        const config = await configRes.json();
-                if (Array.isArray((config as any).workspaceRoots)) {
-                    cachedWorkspaceRoots = (config as any).workspaceRoots;
+        const config = await configRes.json() as ToolsApiConfig;
+        if (Array.isArray(config.workspaceRoots)) {
+          cachedWorkspaceRoots = config.workspaceRoots;
           logger.info(
             `[ToolOrchestrator] Workspace roots: ${cachedWorkspaceRoots.join(", ")}`,
           );
         }
-                if (Array.isArray((config as any).staticRoots)) {
-                    cachedStaticRoots = (config as any).staticRoots;
+        if (Array.isArray(config.staticRoots)) {
+          cachedStaticRoots = config.staticRoots;
         }
       }
     } catch (cfgErr: unknown) {
@@ -141,39 +202,38 @@ fetchSchemas();
 // Generic URL Builder — uses endpoint metadata
 // ────────────────────────────────────────────────────────────
 
-function buildUrlFromEndpoint(endpoint: any, args: any = {}) {
+function buildUrlFromEndpoint(endpoint: ToolEndpoint, args: Record<string, unknown> = {}) {
   let path = endpoint.path;
   if (endpoint.conditionalPath) {
-        const { param, template } = endpoint.conditionalPath;
-        if (args[param]) {
+    const { param, template } = endpoint.conditionalPath;
+    if (args[param]) {
       path = template;
     }
   }
 
-    const pathParams = new Set(endpoint.pathParams || []);
-    for (const param of pathParams) {
-      const pKey = param as string;
-      const pVal = args[pKey];
-      if (pVal !== undefined && pVal !== null) {
-        path = (path as string).replace(`:${pKey}`, encodeURIComponent(String(pVal)));
-      }
+  const pathParams = new Set(endpoint.pathParams || []);
+  for (const param of pathParams) {
+    const pVal = args[param];
+    if (pVal !== undefined && pVal !== null) {
+      path = path.replace(`:${param}`, encodeURIComponent(String(pVal)));
     }
+  }
 
   const params = new URLSearchParams();
 
   const queryParams = endpoint.queryParams || [];
-    for ( const key of queryParams) {
-        const value = args[key];
+  for (const key of queryParams) {
+    const value = args[key];
     if (value !== undefined && value !== null && value !== "") {
-            params.set(key, (value as any));
+      params.set(key, String(value));
     }
   }
 
-    if (args.fields) {
-        const fieldsStr = Array.isArray(args.fields)
-      ?         args.fields.join(",")
-      :         args.fields;
-        params.set("fields", (fieldsStr as any));
+  if (args.fields) {
+    const fieldsStr = Array.isArray(args.fields)
+      ? args.fields.join(",")
+      : String(args.fields);
+    params.set("fields", fieldsStr);
   }
 
   const qs = params.toString();
@@ -185,20 +245,20 @@ const ARG_REMAPS = {
   search_products: { query: "q" },
 };
 
-async function executeToolGeneric(name: string, args: any = {}, context: any = {}) {
+async function executeToolGeneric(name: string, args: Record<string, unknown> = {}, context: ToolExecutionContext = {}) {
   const schema = toolMap.get(name);
   if (!schema || !schema.endpoint) {
     return { error: `Unknown tool: ${name}` };
   }
 
-    const remaps = (ARG_REMAPS as any)[name];
-  let resolvedArgs = args;
+  const remaps = ARG_REMAPS[name as keyof typeof ARG_REMAPS];
+  let resolvedArgs: Record<string, unknown> = args;
   if (remaps) {
     resolvedArgs = { ...args };
-        for ( const [from, to] of Object.entries(remaps)) {
-            if (resolvedArgs[from] !== undefined) {
-                resolvedArgs[(to as string)] = resolvedArgs[from];
-                delete resolvedArgs[from];
+    for (const [from, to] of Object.entries(remaps)) {
+      if (resolvedArgs[from] !== undefined) {
+        resolvedArgs[to] = resolvedArgs[from];
+        delete resolvedArgs[from];
       }
     }
   }
@@ -212,40 +272,40 @@ async function executeToolGeneric(name: string, args: any = {}, context: any = {
     // Inject trusted session context into body — the model's args never
     // include these fields (they're stripped from schemas), so they can
     // only come from the orchestrator's session context.
-    const body = { ...resolvedArgs };
-        if (context.project) body.project = context.project;
-        if (context.agent) body.agent = context.agent;
-        if (context.username) body.username = context.username;
+    const body: Record<string, unknown> = { ...resolvedArgs };
+    if (context.project) body.project = context.project;
+    if (context.agent) body.agent = context.agent;
+    if (context.username) body.username = context.username;
 
     // Worktree path rewriting — redirect file paths to the worktree directory
     // when the session has an active worktree.
-        if (context.agentSessionId && activeWorktrees.has(context.agentSessionId)) {
-            const wt = activeWorktrees.get(context.agentSessionId);
-      const rewritePath = (p: any) => {
+    if (context.agentSessionId && activeWorktrees.has(context.agentSessionId)) {
+      const wt = activeWorktrees.get(context.agentSessionId)!;
+      const rewritePath = (p: unknown): unknown => {
         if (typeof p !== "string") return p;
-                if ((p as any).startsWith(wt.originalRoot)) {
-                    return wt.worktreePath + (p as any).slice(wt.originalRoot.length);
+        if (p.startsWith(wt.originalRoot)) {
+          return wt.worktreePath + p.slice(wt.originalRoot.length);
         }
         return p;
       };
 
       // Rewrite common path fields used by file/git/shell tools
-            if (body.path) body.path = rewritePath((body.path as any));
-            if (body.filePath) body.filePath = rewritePath((body.filePath as any));
-            if (body.oldPath) body.oldPath = rewritePath((body.oldPath as any));
-            if (body.newPath) body.newPath = rewritePath((body.newPath as any));
-            if (body.cwd) body.cwd = rewritePath((body.cwd as any));
-            if (body.directory) body.directory = rewritePath((body.directory as any));
+      if (body.path) body.path = rewritePath(body.path);
+      if (body.filePath) body.filePath = rewritePath(body.filePath);
+      if (body.oldPath) body.oldPath = rewritePath(body.oldPath);
+      if (body.newPath) body.newPath = rewritePath(body.newPath);
+      if (body.cwd) body.cwd = rewritePath(body.cwd);
+      if (body.directory) body.directory = rewritePath(body.directory);
 
       // Inject workspace override header so tools-api sandbox validation passes
-            contextHeaders["X-Workspace-Override"] = wt.worktreePath;
+      contextHeaders["X-Workspace-Override"] = wt.worktreePath;
     }
 
-        return fetchJsonPost(url, body, contextHeaders, (context.signal as any));
+    return fetchJsonPost(url, body, contextHeaders, context.signal);
   }
 
   const url = buildUrlFromEndpoint(schema.endpoint, resolvedArgs);
-    return fetchJson(url, contextHeaders, (context.signal as any));
+  return fetchJson(url, contextHeaders, context.signal);
 }
 
 /**
@@ -253,34 +313,33 @@ async function executeToolGeneric(name: string, args: any = {}, context: any = {
  * These are consumed by tools-api's ToolCallLoggerMiddleware.
 
  */
-function buildContextHeaders(context: any = {}) {
-  const headers: any = {};
-    if (context.project) headers["X-Project"] = context.project;
-    if (context.username) headers["X-Username"] = context.username;
-    if (context.agent) headers["X-Agent"] = context.agent;
-    if (context.requestId) headers["X-Request-Id"] = context.requestId;
-    if (context.traceId) headers["X-Trace-Id"] = context.traceId;
-    if (context.agentSessionId) headers["X-Agent-Session-Id"] = context.agentSessionId;
-    if (context.iteration !== undefined && context.iteration !== null)
-        headers["X-Iteration"] = String(context.iteration);
+function buildContextHeaders(context: ToolExecutionContext = {}): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (context.project) headers["X-Project"] = context.project;
+  if (context.username) headers["X-Username"] = context.username;
+  if (context.agent) headers["X-Agent"] = context.agent;
+  if (context.requestId) headers["X-Request-Id"] = context.requestId;
+  if (context.traceId) headers["X-Trace-Id"] = context.traceId;
+  if (context.agentSessionId) headers["X-Agent-Session-Id"] = context.agentSessionId;
+  if (context.iteration !== undefined && context.iteration !== null)
+    headers["X-Iteration"] = String(context.iteration);
   // Multi-workspace: when the user has selected a non-default workspace root,
   // send it to tools-api so file/git/shell tools resolve within it.
-    if (context.workspaceRoot) headers["X-Workspace-Root"] = context.workspaceRoot;
+  if (context.workspaceRoot) headers["X-Workspace-Root"] = context.workspaceRoot;
   return headers;
 }
 
-async function fetchJson(url: string, extraHeaders: any = {}, signal: any) {
+async function fetchJson(url: string, extraHeaders: Record<string, string> = {}, signal?: AbortSignal) {
   try {
     const response = await fetch(url, {
-            headers: { ...extraHeaders },
+      headers: { ...extraHeaders },
       ...(signal && { signal }),
     });
     if (!response.ok) {
       try {
-        const errBody = await response.json();
-                return {
-          error:
-                        (errBody as any).error || `API returned ${response.status}: ${response.statusText}`,
+        const errBody = await response.json() as Record<string, unknown>;
+        return {
+          error: errBody.error || `API returned ${response.status}: ${response.statusText}`,
         };
       } catch {
         return { error: `API returned ${response.status}: ${response.statusText}` };
@@ -288,33 +347,32 @@ async function fetchJson(url: string, extraHeaders: any = {}, signal: any) {
     }
     return await response.json();
   } catch (error: unknown) {
-        if ((error as Error).name === "AbortError") {
+    if ((error as Error).name === "AbortError") {
       return { error: "Tool execution aborted" };
     }
-        return { error: `Failed to reach API: ${(error as Error).message}` };
+    return { error: `Failed to reach API: ${(error as Error).message}` };
   }
 }
 
 async function fetchJsonPost(
   url: string,
-  body: any,
-  extraHeaders: any = {},
-  signal: any,
+  body: Record<string, unknown>,
+  extraHeaders: Record<string, string> = {},
+  signal?: AbortSignal,
 ) {
   try {
-        const response = await fetch(url, ({
-              method: "POST",
-              headers: { "Content-Type": "application/json", ...extraHeaders },
-              body: JSON.stringify(body),
-              ...(signal && { signal }),
-            } as any as RequestInit));
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...extraHeaders },
+      body: JSON.stringify(body),
+      ...(signal && { signal }),
+    });
     if (!response.ok) {
       // Forward the actual error body from tools-api for debugging
       try {
-        const errBody = await response.json();
-                return {
-          error:
-                        (errBody as any).error || `API returned ${response.status}: ${response.statusText}`,
+        const errBody = await response.json() as Record<string, unknown>;
+        return {
+          error: errBody.error || `API returned ${response.status}: ${response.statusText}`,
         };
       } catch {
         return { error: `API returned ${response.status}: ${response.statusText}` };
@@ -322,10 +380,10 @@ async function fetchJsonPost(
     }
     return await response.json();
   } catch (error: unknown) {
-        if ((error as Error).name === "AbortError") {
+    if ((error as Error).name === "AbortError") {
       return { error: "Tool execution aborted" };
     }
-        return { error: `Failed to reach API: ${(error as Error).message}` };
+    return { error: `Failed to reach API: ${(error as Error).message}` };
   }
 }
 
@@ -477,7 +535,7 @@ export default class ToolOrchestratorService {
   /** Client-facing schemas (with domain/dataSource/labels, no endpoint) — for Prism Client UI */
   static getClientToolSchemas() {
     // Coordinator tools are Prism-local — add domain metadata for UI grouping
-    const coordinatorClient = COORDINATOR_TOOL_SCHEMAS.map((t: any) => ({
+    const coordinatorClient = COORDINATOR_TOOL_SCHEMAS.map((t) => ({
       ...t,
       domain: "Coordinator",
       labels: ["coding", "orchestration"],
@@ -511,12 +569,12 @@ export default class ToolOrchestratorService {
         signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MS),
       });
       if (configRes.ok) {
-        const config = await configRes.json();
-                if (Array.isArray((config as any).workspaceRoots)) {
-                    cachedWorkspaceRoots = (config as any).workspaceRoots;
+        const config = await configRes.json() as ToolsApiConfig;
+        if (Array.isArray(config.workspaceRoots)) {
+          cachedWorkspaceRoots = config.workspaceRoots;
         }
-                if (Array.isArray((config as any).staticRoots)) {
-                    cachedStaticRoots = (config as any).staticRoots;
+        if (Array.isArray(config.staticRoots)) {
+          cachedStaticRoots = config.staticRoots;
         }
       }
     } catch (error: unknown) {
@@ -525,23 +583,23 @@ export default class ToolOrchestratorService {
       );
     }
   }
-  static async updateWorkspaceRoots(roots: any) {
+  static async updateWorkspaceRoots(roots: string[]) {
     const response = await fetch(`${TOOLS_SERVICE_URL}/admin/config/workspaces`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ roots }),
       signal: AbortSignal.timeout(TOOL_WORKSPACE_UPDATE_TIMEOUT_MS),
     });
-    const result = await response.json();
-        if (!response.ok)
-            throw new Error((result as any).error || "Failed to update workspace roots");
+    const result = await response.json() as ToolsApiConfig & { error?: string };
+    if (!response.ok)
+      throw new Error(result.error || "Failed to update workspace roots");
 
     // Refresh local cache
-        if (Array.isArray((result as any).workspaceRoots)) {
-            cachedWorkspaceRoots = (result as any).workspaceRoots;
+    if (Array.isArray(result.workspaceRoots)) {
+      cachedWorkspaceRoots = result.workspaceRoots;
     }
-        if (Array.isArray((result as any).staticRoots)) {
-            cachedStaticRoots = (result as any).staticRoots;
+    if (Array.isArray(result.staticRoots)) {
+      cachedStaticRoots = result.staticRoots;
     }
     return result;
   }
@@ -565,24 +623,27 @@ export default class ToolOrchestratorService {
 
 
    */
-  static getEffectiveWorkspaceRoot(agentSessionId: any) {
+  static getEffectiveWorkspaceRoot(agentSessionId: string | null | undefined) {
     if (agentSessionId && activeWorktrees.has(agentSessionId)) {
-      return activeWorktrees.get(agentSessionId).worktreePath;
+      return activeWorktrees.get(agentSessionId)!.worktreePath;
     }
-        return cachedWorkspaceRoots[0] || null;
+    return cachedWorkspaceRoots[0] || null;
   }
-  static getWorktreeState(agentSessionId: any) {
+  static getWorktreeState(agentSessionId: string | null | undefined) {
+    if (!agentSessionId) return null;
     return activeWorktrees.get(agentSessionId) || null;
   }
 
-  static getToolFields(toolName: any) {
-        const tool = cachedAISchemas.find((t: any) => t.name === toolName);
+  static getToolFields(toolName: string) {
+    const tool = cachedAISchemas.find((t) => t.name === toolName);
     if (!tool) return null;
-        return (tool.parameters as any)?.properties?.fields?.items?.enum || null;
+    const params = tool.parameters as Record<string, unknown> | undefined;
+    const props = params?.properties as Record<string, Record<string, unknown>> | undefined;
+    return (props?.fields?.items as Record<string, unknown>)?.enum || null;
   }
 
   static async checkApiHealth() {
-        const toolNames = cachedSchemas.map((t: any) => t.name);
+    const toolNames = cachedSchemas.map((t) => t.name);
 
     let online = false;
     try {
@@ -618,7 +679,7 @@ export default class ToolOrchestratorService {
     return initialized;
   }
 
-  static async executeTool(name: string, args: any = {}, context: any = {}) {
+  static async executeTool(name: string, args: Record<string, unknown> = {}, context: ToolExecutionContext = {}) {
     // ── Internal tools — delegated to InternalToolRegistry ──────
     if (InternalToolRegistry.has(name)) {
       return InternalToolRegistry.execute(name, args, context);
@@ -630,8 +691,8 @@ export default class ToolOrchestratorService {
     }
 
     // Route MCP tools to MCPClientService
-        if (MCPClientService.isMCPTool((name as any))) {
-            return ToolOrchestratorService.executeMCPTool((name as any), args);
+    if (MCPClientService.isMCPTool(name)) {
+      return ToolOrchestratorService.executeMCPTool(name, args);
     }
 
     // Inject reference images from conversation context into generate_image args.
@@ -639,11 +700,11 @@ export default class ToolOrchestratorService {
     // access to Prism's conversation messages.
     // IMPORTANT: Only extract from the LAST user message to avoid collecting
     // stale images from conversation history.
-        if (name === "generate_image" && context.messages) {
-      const referenceImages: any[] = [];
+    if (name === "generate_image" && context.messages) {
+      const referenceImages: string[] = [];
       // Find the last user message with images
-            for (let i = (context.messages as any).length - 1; i >= 0; i--) {
-                const message = context.messages[i];
+      for (let i = context.messages.length - 1; i >= 0; i--) {
+        const message = context.messages[i];
         if (
           message.role === "user" &&
           message.images &&
@@ -658,14 +719,14 @@ export default class ToolOrchestratorService {
               typeof image === "string" &&
               (image.startsWith("http://") || image.startsWith("https://"))
             ) {
-                            referenceImages.push((image as any));
+              referenceImages.push(image);
               logger.info(
                 `[ToolOrchestrator] generate_image: accepted HTTP image ref (${image.substring(0, 80)}...)`,
               );
             } else if (typeof image === "string" && image.startsWith("data:")) {
               // Accept base64 data URLs — the /creative route supports up to 50MB bodies.
               // Discord avatars and user-attached images are typically well under 5MB.
-                            referenceImages.push((image as any));
+              referenceImages.push(image);
               logger.info(
                 `[ToolOrchestrator] generate_image: accepted base64 data URL (${(image.length / 1024).toFixed(0)} KB)`,
               );
@@ -693,17 +754,18 @@ export default class ToolOrchestratorService {
     const result = await executeToolGeneric(name, args, context);
 
     // Post-process: upload generated images to MinIO
-        if (name === "generate_image" && (result as any).image?.data && !(result as any).error) {
+    if (name === "generate_image" && (result as Record<string, unknown>).image && !(result as Record<string, unknown>).error) {
       try {
         const FileService = (await import("./FileService.js")).default;
-                const dataUrl = `data:${(result as any).image.mimeType || "image/png"};base64,${(result as any).image.data}`;
-                const { ref } = await (FileService as any).uploadFile(
+        const image = (result as Record<string, unknown>).image as Record<string, unknown>;
+        const dataUrl = `data:${image.mimeType || "image/png"};base64,${image.data}`;
+        const { ref } = await FileService.uploadFile(
           dataUrl,
           "generations",
-                    (context.project as any | null | undefined),
-                    context.username,
+          context.project || null,
+          context.username || null,
         );
-                (result as any).image.minioRef = ref;
+        image.minioRef = ref;
       } catch (error: unknown) {
         logger.warn(
                     `[ToolOrchestrator] Image MinIO upload failed: ${(error as Error).message}`,
@@ -712,18 +774,19 @@ export default class ToolOrchestratorService {
     }
 
     // Post-process: upload browser screenshots to MinIO
-        if (name === "browser_action" && (result as any).screenshot && !(result as any).error) {
+    if (name === "browser_action" && (result as Record<string, unknown>).screenshot && !(result as Record<string, unknown>).error) {
       try {
         const FileService = (await import("./FileService.js")).default;
-                const dataUrl = `data:${(result as any).mimeType || "image/png"};base64,${(result as any).screenshot}`;
-                const { ref } = await (FileService as any).uploadFile(
+        const resultObj = result as Record<string, unknown>;
+        const dataUrl = `data:${resultObj.mimeType || "image/png"};base64,${resultObj.screenshot}`;
+        const { ref } = await FileService.uploadFile(
           dataUrl,
           "screenshots",
-                    (context.project as any | null | undefined),
-                    context.username,
+          context.project || null,
+          context.username || null,
         );
-                (result as any).screenshotRef = ref;
-                delete (result as any).screenshot; // Don't send base64 downstream
+        resultObj.screenshotRef = ref;
+        delete resultObj.screenshot; // Don't send base64 downstream
       } catch (error: unknown) {
         logger.warn(
                     `[ToolOrchestrator] Screenshot MinIO upload failed: ${(error as Error).message}`,
@@ -739,7 +802,7 @@ export default class ToolOrchestratorService {
    * Execute a coordinator tool (team_create, send_message, stop_agent).
    * These are Prism-local — they dispatch to CoordinatorService in-process.
    */
-  static async executeCoordinatorTool(name: string, args: any = {}, context: any = {}) {
+  static async executeCoordinatorTool(name: string, args: Record<string, unknown> = {}, context: ToolExecutionContext = {}) {
     const { default: CoordinatorService } =
       await import("./CoordinatorService.js");
 
@@ -765,23 +828,23 @@ export default class ToolOrchestratorService {
 
     switch (name) {
       case "team_create":
-        return CoordinatorService.createTeam(args, coordinatorCtx);
+        return CoordinatorService.createTeam(args as { name: string; members: TeamMember[] }, coordinatorCtx as CoordinatorContext);
 
       case "send_message":
-                return CoordinatorService.sendMessage(
-                    (args.to as any),
-                    (args.message as any),
-          coordinatorCtx,
+        return CoordinatorService.sendMessage(
+          args.to as string,
+          args.message as string,
+          coordinatorCtx as CoordinatorContext,
         );
 
       case "stop_agent":
-                return CoordinatorService.stopAgent((args.agent_id as any));
+        return CoordinatorService.stopAgent(args.agent_id as string);
 
       case "task_output":
-                return CoordinatorService.getTaskOutput((args.agent_id as any));
+        return CoordinatorService.getTaskOutput(args.agent_id as string);
 
       case "team_delete":
-                return CoordinatorService.deleteTeam((args.teamName as any));
+        return CoordinatorService.deleteTeam(args.teamName as string);
 
       default:
         return { error: `Unknown coordinator tool: ${name}` };
@@ -792,7 +855,7 @@ export default class ToolOrchestratorService {
    * Execute a tool on an MCP server.
    * Parses the namespaced tool name and delegates to MCPClientService.
    */
-  static async executeMCPTool(fullName: any, args: any = {}) {
+  static async executeMCPTool(fullName: string, args: Record<string, unknown> = {}) {
     const parsed = MCPClientService.parseMCPToolName(fullName);
     if (!parsed) {
       return { error: `Invalid MCP tool name: ${fullName}` };
@@ -814,8 +877,8 @@ export default class ToolOrchestratorService {
     run_command: "/agentic/command/stream",
   };
 
-  static isStreamable(toolName: any) {
-        return toolName in ToolOrchestratorService.STREAMABLE_TOOLS;
+  static isStreamable(toolName: string) {
+    return toolName in ToolOrchestratorService.STREAMABLE_TOOLS;
   }
 
   /**
@@ -825,23 +888,23 @@ export default class ToolOrchestratorService {
    */
   static async executeToolStreaming(
     name: string,
-    args: any = {},
-    onChunk: any,
-    context: any = {},
+    args: Record<string, unknown> = {},
+    onChunk: ((event: string, data: string | null, meta?: Record<string, unknown>) => void) | null,
+    context: ToolExecutionContext = {},
   ) {
-        const streamPath = ToolOrchestratorService.STREAMABLE_TOOLS[name];
+    const streamPath = ToolOrchestratorService.STREAMABLE_TOOLS[name];
     if (!streamPath) {
       return ToolOrchestratorService.executeTool(name, args, context);
     }
 
-        const remaps = (ARG_REMAPS as any)[name];
-    let resolvedArgs = args;
+    const remaps = ARG_REMAPS[name as keyof typeof ARG_REMAPS];
+    let resolvedArgs: Record<string, unknown> = args;
     if (remaps) {
       resolvedArgs = { ...args };
-            for ( const [from, to] of Object.entries(remaps)) {
-                if (resolvedArgs[from] !== undefined) {
-                    resolvedArgs[(to as string)] = resolvedArgs[from];
-                    delete resolvedArgs[from];
+      for (const [from, to] of Object.entries(remaps)) {
+        if (resolvedArgs[from] !== undefined) {
+          resolvedArgs[to] = resolvedArgs[from];
+          delete resolvedArgs[from];
         }
       }
     }
@@ -857,18 +920,18 @@ export default class ToolOrchestratorService {
       const timeout = setTimeout(() => controller.abort(), 65_000); // generous timeout
 
       // If session signal exists, abort the local controller when session aborts
-            if (context.signal && !(context.signal as any).aborted) {
+      if (context.signal && !context.signal.aborted) {
         const onSessionAbort = () => controller.abort();
-                (context.signal as any).addEventListener("abort", onSessionAbort, { once: true });
+        context.signal.addEventListener("abort", onSessionAbort, { once: true });
         // Clean up listener when controller aborts from timeout (not session)
         controller.signal.addEventListener(
           "abort",
           () => {
-                        (context as any).signal.removeEventListener("abort", onSessionAbort);
+            context.signal!.removeEventListener("abort", onSessionAbort);
           },
           { once: true },
         );
-              } else if ((context.signal as any)?.aborted) {
+      } else if (context.signal?.aborted) {
         controller.abort();
       }
 
@@ -894,8 +957,8 @@ export default class ToolOrchestratorService {
       const decoder = new TextDecoder();
       let buffer = "";
       let finalResult = null;
-      const stdoutChunks: any[] = [];
-      const stderrChunks: any[] = [];
+      const stdoutChunks: string[] = [];
+      const stderrChunks: string[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -955,17 +1018,17 @@ export default class ToolOrchestratorService {
     }
   }
 
-  static async executeToolCalls(toolCalls: any) {
+  static async executeToolCalls(toolCalls: Array<{ name: string; id: string; args?: Record<string, unknown> }>) {
     return Promise.all(
-            (toolCalls as any).map(async (tc: any) => ({
+      toolCalls.map(async (tc) => ({
         name: tc.name,
         id: tc.id,
-                result: await ToolOrchestratorService.executeTool((tc.name as any), (tc.args as any | undefined)),
+        result: await ToolOrchestratorService.executeTool(tc.name, tc.args || {}),
       })),
     );
   }
 
-  static async executeCustomTool(toolDef: any, args: any = {}) {
+  static async executeCustomTool(toolDef: Record<string, unknown>, args: Record<string, unknown> = {}) {
     // ── Code-based tools — execute JS via tools-service ────────
     // The execution tier (sandboxed/privileged) is stored on the tool
     // document and controls which vm globals are injected.
@@ -985,8 +1048,8 @@ export default class ToolOrchestratorService {
         if (!response.ok) {
           try {
             const errBody = await response.json();
-                        return {
-                            error: (errBody as any).error || `Execution failed: ${response.status}`,
+            return {
+              error: (errBody as Record<string, unknown>).error || `Execution failed: ${response.status}`,
             };
           } catch {
             return {
@@ -1010,11 +1073,11 @@ export default class ToolOrchestratorService {
     try {
       const headers = { "Content-Type": "application/json" };
       if (toolDef.bearerToken) {
-                (headers as any)["Authorization"] = `Bearer ${toolDef.bearerToken}`;
+        (headers as Record<string, string>)["Authorization"] = `Bearer ${toolDef.bearerToken}`;
       }
 
       if (toolDef.method === "POST") {
-                const response = await fetch((toolDef.endpoint as any | URL | Request), {
+        const response = await fetch(toolDef.endpoint as string, {
           method: "POST",
           headers,
           body: JSON.stringify(args),
@@ -1026,9 +1089,9 @@ export default class ToolOrchestratorService {
       }
 
       const params = new URLSearchParams();
-            for ( const [key, value] of Object.entries(args)) {
+      for (const [key, value] of Object.entries(args)) {
         if (value !== undefined && value !== null && value !== "") {
-                    params.set(key, (value as any));
+          params.set(key, String(value));
         }
       }
       const qs = params.toString();
@@ -1044,18 +1107,18 @@ export default class ToolOrchestratorService {
   }
 
   // ── Worktree State Helpers — used by WorktreeTools.js ──────
-  /** @internal */ static _setWorktree(sessionId: any, state: any) {
+  /** @internal */ static _setWorktree(sessionId: string, state: WorktreeState) {
     activeWorktrees.set(sessionId, state);
   }
-  /** @internal */ static _clearWorktree(sessionId: any) {
+  /** @internal */ static _clearWorktree(sessionId: string) {
     activeWorktrees.delete(sessionId);
   }
-  /** @internal */ static async _proxyPost(path: string, body: any, context: any) {
+  /** @internal */ static async _proxyPost(path: string, body: Record<string, unknown>, context: ToolExecutionContext) {
     return fetchJsonPost(
       `${TOOLS_SERVICE_URL}${path}`,
       body,
       buildContextHeaders(context),
-            (context.signal as any),
+      context.signal,
     );
   }
 }

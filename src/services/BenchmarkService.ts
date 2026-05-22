@@ -10,110 +10,242 @@ import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import {} from "../utils/utilities.ts";
 import { COLLECTIONS } from "../constants.ts";
+import type { SseEvent } from "../types/SseTypes.ts";
+
 const BENCHMARKS_COL = COLLECTIONS.BENCHMARKS;
 const RUNS_COL = COLLECTIONS.BENCHMARK_RUNS;
+
 // In-memory counter: how many benchmark model calls are actively generating
 let activeGenerationCount = 0;
+
+// ── Types ────────────────────────────────────────────────────
+
+interface Assertion {
+  expectedValue: string;
+  matchMode?: string;
+}
+
+interface AgentAssertion {
+  type: string;
+  operator?: string;
+  operand?: string;
+}
+
+interface BenchmarkDoc {
+  id: string;
+  name: string;
+  prompt: string;
+  systemPrompt?: string | null;
+  expectedValue?: string;
+  matchMode?: string;
+  benchmarkMode?: "model" | "agent" | "combined";
+  assertions?: Assertion[];
+  assertionOperator?: "AND" | "OR";
+  agentAssertions?: AgentAssertion[];
+  agentAssertionOperator?: "AND" | "OR";
+  temperature?: number;
+  maxTokens?: number;
+  tags?: string[];
+  [key: string]: unknown;
+}
+
+interface ModelTarget {
+  provider: string;
+  model: string;
+  label?: string;
+  display_name?: string;
+  thinkingEnabled?: boolean;
+  toolsEnabled?: boolean;
+  agent?: string;
+}
+
+interface ModelEntry {
+  provider: string;
+  model: string;
+  label: string;
+  thinkingEnabled: boolean;
+  toolsEnabled: boolean;
+  agent?: string;
+}
+
+interface BenchmarkEvent {
+  type: string;
+  content?: string;
+  message?: string;
+  status?: string;
+  usage?: Record<string, number>;
+  estimatedCost?: number | null;
+  id?: string;
+  name?: string;
+  args?: Record<string, unknown>;
+  result?: unknown;
+  tool?: { id?: string; name?: string; args?: Record<string, unknown>; result?: unknown };
+  [key: string]: unknown;
+}
+
+interface ModelResult {
+  provider: string;
+  model: string;
+  label: string;
+  thinkingEnabled: boolean;
+  toolsEnabled: boolean;
+  agent?: string;
+  response: string | null;
+  thinking: string | null;
+  toolCalls?: ToolCallResult[] | null;
+  passed: boolean;
+  matchMode: string;
+  turnCount?: number;
+  latency: number;
+  usage: Record<string, number> | null;
+  estimatedCost: number | null;
+  error: string | null;
+  completedAt: string;
+}
+
+interface ToolCallResult {
+  id?: string;
+  name?: string;
+  args?: Record<string, unknown>;
+  result?: unknown;
+  status: string;
+}
+
+interface RunBenchmarkCallbacks {
+  onRunStart?: (info: { totalModels: number }) => void;
+  onModelStart?: (model: ModelEntry & { isLocal: boolean }) => void;
+  onModelComplete?: (result: ModelResult) => void;
+  onEvent?: (event: BenchmarkEvent) => void;
+  signal?: AbortSignal;
+}
+
+interface BenchmarkCreateData {
+  name: string;
+  prompt: string;
+  systemPrompt?: string | null;
+  expectedValue?: string;
+  matchMode?: string;
+  benchmarkMode?: string;
+  assertions?: Assertion[];
+  assertionOperator?: string;
+  agentAssertions?: AgentAssertion[];
+  agentAssertionOperator?: string;
+  temperature?: number;
+  maxTokens?: number;
+  tags?: string[];
+}
+
 // ─── evaluate model response against expected value ─────────
-const MATCH_MODES: any = {
+const MATCH_MODES = {
   CONTAINS: "contains",
   EXACT: "exact",
   STARTS_WITH: "startsWith",
   REGEX: "regex",
-};
+} as const;
+
+type MatchMode = (typeof MATCH_MODES)[keyof typeof MATCH_MODES];
+
 function evaluate(
-  response: any,
-  expected: any,
-    matchMode: any = MATCH_MODES.CONTAINS,
-) {
+  response: string,
+  expected: string,
+  matchMode: MatchMode | string = MATCH_MODES.CONTAINS,
+): boolean {
   if (!response || !expected) return false;
-    const norm = (s: any) => (s as any).trim().toLowerCase();
+  const norm = (s: string) => s.trim().toLowerCase();
   switch (matchMode) {
-        case MATCH_MODES.EXACT:
+    case MATCH_MODES.EXACT:
       return norm(response) === norm(expected);
-        case MATCH_MODES.STARTS_WITH:
+    case MATCH_MODES.STARTS_WITH:
       return norm(response).startsWith(norm(expected));
-        case MATCH_MODES.REGEX: {
+    case MATCH_MODES.REGEX: {
       try {
-                const re = new RegExp(expected, "i");
-                return re.test((response as any));
+        const re = new RegExp(expected, "i");
+        return re.test(response);
       } catch {
         logger.warn(`[benchmark] Invalid regex: ${expected}`);
         return false;
       }
     }
-        case MATCH_MODES.CONTAINS:
+    case MATCH_MODES.CONTAINS:
     default:
       return norm(response).includes(norm(expected));
   }
 }
-function evaluateAssertions(response: any, benchmark: any) {
+function evaluateAssertions(response: string, benchmark: BenchmarkDoc): boolean {
   const assertions = benchmark.assertions;
-    if (!assertions || (assertions as any).length === 0) {
+  if (!assertions || assertions.length === 0) {
     return false;
   }
   const operator = benchmark.assertionOperator || "AND";
   if (operator === "OR") {
     // Disjunction: ANY assertion must pass
-        return (assertions as any).some((a: any) =>
-            evaluate(response, (a.expectedValue as any), a.matchMode || MATCH_MODES.CONTAINS),
+    return assertions.some((a) =>
+      evaluate(response, a.expectedValue, a.matchMode || MATCH_MODES.CONTAINS),
     );
   }
   // Conjunction (AND): ALL assertions must pass
-    return (assertions as any).every((a: any) =>
-        evaluate(response, (a.expectedValue as any), a.matchMode || MATCH_MODES.CONTAINS),
+  return assertions.every((a) =>
+    evaluate(response, a.expectedValue, a.matchMode || MATCH_MODES.CONTAINS),
   );
 }
 // ─── behavioral assertions ──────────────────────────────────
-const COMPARATORS = {
-  gte: (a: any, b: any) => a >= b,
-  lte: (a: any, b: any) => a <= b,
-  gt: (a: any, b: any) => a > b,
-  lt: (a: any, b: any) => a < b,
-  eq: (a: any, b: any) => a === b,
+const COMPARATORS: Record<string, (a: number, b: number) => boolean> = {
+  gte: (a, b) => a >= b,
+  lte: (a, b) => a <= b,
+  gt: (a, b) => a > b,
+  lt: (a, b) => a < b,
+  eq: (a, b) => a === b,
 };
-function evaluateSingleAgentAssertion(assertion: any, executionData: any) {
+
+interface ExecutionData {
+  response: string | null;
+  thinking: string | null;
+  toolCalls: ToolCallResult[];
+  turnCount: number;
+}
+
+function evaluateSingleAgentAssertion(assertion: AgentAssertion, executionData: ExecutionData): boolean {
   const { type, operator, operand } = assertion;
   switch (type) {
     case "replied":
       return (
-                !!executionData.response && (executionData.response as any).trim().length > 0
+        !!executionData.response && executionData.response.trim().length > 0
       );
     case "used_tool_calls": {
-            const count = (executionData.toolCalls as any)?.length || 0;
-            const target = parseInt((operand as any), 10);
+      const count = executionData.toolCalls?.length || 0;
+      const target = parseInt(operand || "", 10);
       if (isNaN(target)) return count > 0; // Fallback: any tool calls
-            const compareFn = (COMPARATORS as any)[(operator as string) || "gte"];
+      const compareFn = COMPARATORS[operator || "gte"];
       return compareFn ? compareFn(count, target) : count >= target;
     }
     case "thought":
       return (
-                !!executionData.thinking && (executionData.thinking as any).trim().length > 0
+        !!executionData.thinking && executionData.thinking.trim().length > 0
       );
     case "max_turns": {
       const turns = executionData.turnCount || 1;
-            const limit = parseInt((operand as any), 10);
+      const limit = parseInt(operand || "", 10);
       if (isNaN(limit)) return true; // No limit specified
-            const compareFn = (COMPARATORS as any)[(operator as string) || "lte"];
-            return compareFn ? compareFn(turns, limit) : turns <= limit;
+      const compareFn = COMPARATORS[operator || "lte"];
+      return compareFn ? compareFn(turns, limit) : turns <= limit;
     }
     default:
       logger.warn(`[benchmark] Unknown agent assertion type: ${type}`);
       return false;
   }
 }
-function evaluateAgentAssertions(benchmark: any, executionData: any) {
+function evaluateAgentAssertions(benchmark: BenchmarkDoc, executionData: ExecutionData): boolean {
   const assertions = benchmark.agentAssertions;
-    if (!assertions || (assertions as any).length === 0) {
+  if (!assertions || assertions.length === 0) {
     return true; // No agent assertions = pass by default
   }
   const operator = benchmark.agentAssertionOperator || "AND";
   if (operator === "OR") {
-        return (assertions as any).some((a: any) =>
+    return assertions.some((a) =>
       evaluateSingleAgentAssertion(a, executionData),
     );
   }
-    return (assertions as any).every((a: any) =>
+  return assertions.every((a) =>
     evaluateSingleAgentAssertion(a, executionData),
   );
 }
@@ -122,19 +254,21 @@ function evaluateAgentAssertions(benchmark: any, executionData: any) {
  * Get all listed conversation-type models grouped by provider.
  * Returns flat array of { provider, model, label }.
  */
-function getConversationModels() {
-  const results: any[] = [];
-    for ( const m of Object.values(MODELS)) {
+function getConversationModels(): ModelEntry[] {
+  const results: ModelEntry[] = [];
+  for (const m of Object.values(MODELS)) {
     if (m.modelType !== MODEL_TYPES.CONVERSATION) continue;
-        if ((m as any).listed === false) continue;
+    if ((m as Record<string, unknown>).listed === false) continue;
     // Skip image-only output models (no text output)
     if (!m.outputTypes?.includes("text")) continue;
     // Skip image API models (generate images, not text completions)
-        if ((m as any).imageAPI) continue;
+    if ((m as Record<string, unknown>).imageAPI) continue;
     results.push({
       provider: m.provider,
       model: m.name,
       label: m.label,
+      thinkingEnabled: false,
+      toolsEnabled: false,
     });
   }
   return results;
@@ -145,12 +279,12 @@ function getConversationModels() {
  * For cloud providers we check if getProvider() doesn't throw.
  * For local providers we also do a quick health check.
  */
-function filterAvailableModels(models: any) {
-  const checked = new Map();
-    return (models as any).filter((m: any) => {
+function filterAvailableModels(models: ModelEntry[]): ModelEntry[] {
+  const checked = new Map<string, boolean>();
+  return models.filter((m) => {
     if (checked.has(m.provider)) return checked.get(m.provider);
     try {
-            getProvider((m.provider as any));
+      getProvider(m.provider);
       checked.set(m.provider, true);
       return true;
     } catch {
@@ -161,20 +295,20 @@ function filterAvailableModels(models: any) {
 }
 // ─── Run a single model against a benchmark prompt ──────────
 async function runSingleModel(
-  benchmark: any,
-  model: any,
-  project: any,
+  benchmark: BenchmarkDoc,
+  model: ModelEntry,
+  project: string | null,
   username: string,
-    { signal, onEvent }: any = {},
-) {
+  { signal, onEvent }: { signal?: AbortSignal; onEvent?: (event: BenchmarkEvent) => void } = {},
+): Promise<ModelResult> {
   // Config flags carried on every result for stats differentiation
   const configFlags = {
     thinkingEnabled: model.thinkingEnabled || false,
     toolsEnabled: model.toolsEnabled || false,
-        ...(model.agent && { agent: model.agent }),
+    ...(model.agent && { agent: model.agent }),
   };
   // Bail immediately if already aborted
-    if ((signal as any)?.aborted) {
+  if (signal?.aborted) {
     logger.info(
       `[benchmark] ⏭ Skipping ${model.provider}/${model.model} — already aborted`,
     );
@@ -195,7 +329,7 @@ async function runSingleModel(
     };
   }
   const start = performance.now();
-  const messages: any[] = [];
+  const messages: Array<{ role: string; content: string }> = [];
   // Optional system prompt
   if (benchmark.systemPrompt) {
     messages.push({ role: "system", content: benchmark.systemPrompt });
@@ -203,7 +337,7 @@ async function runSingleModel(
   messages.push({ role: "user", content: benchmark.prompt });
   logger.info(`[benchmark] ▶ Running ${model.provider}/${model.model}`);
   try {
-        const events: any[] = [];
+    const events: BenchmarkEvent[] = [];
     const handler = model.agent ? handleAgent : handleConversation;
     await handler(
       {
@@ -211,67 +345,68 @@ async function runSingleModel(
         model: model.model,
         messages,
         temperature: benchmark.temperature ?? 0,
-                maxTokens: Math.max((benchmark.maxTokens ?? 2048 as any), 2048),
+        maxTokens: Math.max(benchmark.maxTokens ?? 2048, 2048),
         project,
         username,
         skipConversation: true,
         thinkingEnabled: model.thinkingEnabled || false,
-                ...(model.agent && {
+        ...(model.agent && {
           agent: model.agent,
           agenticLoopEnabled: true,
           autoApprove: true,
           maxIterations: 10,
         }),
-                ...(model.toolsEnabled && {
+        ...(model.toolsEnabled && {
           functionCallingEnabled: true,
           enabledTools: ["precise_calculator"],
         }),
       },
-            (event: any) => {
-        events.push(event);
+      (event: SseEvent) => {
+        const e = event as SseEvent & BenchmarkEvent;
+        events.push(e);
         // Forward chunk/thinking/tool events in real-time for live preview
         if (
-          event.type === "chunk" ||
-          event.type === "thinking" ||
-          event.type === "toolCall" ||
-          event.type === "tool_execution" ||
-          event.type === "tool_output"
+          e.type === "chunk" ||
+          e.type === "thinking" ||
+          e.type === "toolCall" ||
+          e.type === "tool_execution" ||
+          e.type === "tool_output"
         ) {
           if (onEvent) {
             try {
-                            onEvent(event);
+              onEvent(e);
             } catch {
               /* noop */
             }
           }
         }
         // Log every event for debugging
-        if (event.type === "chunk") {
+        if (e.type === "chunk") {
           logger.info(
-                        `[benchmark]   📦 ${model.model} chunk (${(event.content as any)?.length || 0} chars)`,
+            `[benchmark]   📦 ${model.model} chunk (${e.content?.length || 0} chars)`,
           );
-        } else if (event.type === "error") {
+        } else if (e.type === "error") {
           logger.error(
-            `[benchmark]   ❌ ${model.model} error: ${event.message}`,
+            `[benchmark]   ❌ ${model.model} error: ${e.message}`,
           );
-        } else if (event.type === "done") {
+        } else if (e.type === "done") {
           logger.info(
-            `[benchmark]   ✅ ${model.model} done — usage: ${JSON.stringify(event.usage || null)}, cost: ${event.estimatedCost ?? "N/A"}`,
+            `[benchmark]   ✅ ${model.model} done — usage: ${JSON.stringify(e.usage || null)}, cost: ${e.estimatedCost ?? "N/A"}`,
           );
         } else {
-          logger.info(`[benchmark]   📨 ${model.model} event: ${event.type}`);
+          logger.info(`[benchmark]   📨 ${model.model} event: ${e.type}`);
         }
       },
       { signal },
     );
     const latency = (performance.now() - start) / 1000;
     // Log all event types received
-        const eventTypes = events.map((e: any) => e.type);
+    const eventTypes = events.map((e) => e.type);
     logger.info(
       `[benchmark] ◀ ${model.model} finished in ${latency.toFixed(2)}s — events: [${eventTypes.join(", ")}]`,
     );
     // Check for errors
-        const errorEvent = events.find((e: any) => e.type === "error");
+    const errorEvent = events.find((e) => e.type === "error");
     if (errorEvent) {
       logger.warn(
         `[benchmark]   ⚠ ${model.model} returned error event: ${errorEvent.message}`,
@@ -288,60 +423,60 @@ async function runSingleModel(
         latency: roundMs(latency),
         usage: null,
         estimatedCost: null,
-        error: errorEvent.message,
+        error: errorEvent.message || "Unknown error",
         completedAt: new Date().toISOString(),
       };
     }
     // Extract text response
-        const text = events
-      .filter((e: any) => e.type === "chunk")
-      .map((e: any) => e.content)
+    const text = events
+      .filter((e) => e.type === "chunk")
+      .map((e) => e.content)
       .join("");
     if (!text) {
       logger.warn(
-                `[benchmark]   ⚠ ${model.model} produced NO text — chunk count: ${events.filter((e: any) => e.type === "chunk").length}, all events: ${JSON.stringify(eventTypes)}`,
+        `[benchmark]   ⚠ ${model.model} produced NO text — chunk count: ${events.filter((e) => e.type === "chunk").length}, all events: ${JSON.stringify(eventTypes)}`,
       );
     }
-        const doneEvent = events.find((e: any) => e.type === "done") || {};
+    const doneEvent = events.find((e) => e.type === "done") || {} as BenchmarkEvent;
     const matchMode = benchmark.matchMode || MATCH_MODES.CONTAINS;
     // Extract thinking content (emitted as type: "thinking")
-        const thinkingText = events
-      .filter((e: any) => e.type === "thinking")
-      .map((e: any) => e.content)
+    const thinkingText = events
+      .filter((e) => e.type === "thinking")
+      .map((e) => e.content)
       .join("");
     // Extract tool calls from both event paths:
     // - "toolCall" with status "done" — native MCP path (e.g. LM Studio)
     // - "tool_execution" with status "done" — standard agentic path (cloud providers)
-        const nativeToolCalls = events
-      .filter((e: any) => e.type === "toolCall" && e.status === "done")
-      .map((tc: any) => ({
+    const nativeToolCalls: ToolCallResult[] = events
+      .filter((e) => e.type === "toolCall" && e.status === "done")
+      .map((tc) => ({
         id: tc.id,
         name: tc.name,
         args: tc.args,
         result: tc.result,
         status: "done",
       }));
-        const agenticToolCalls = events
+    const agenticToolCalls: ToolCallResult[] = events
       .filter(
-        (e: any) =>
+        (e) =>
           e.type === "tool_execution" &&
           (e.status === "done" || e.status === "error"),
       )
-      .map((e: any) => ({
-                id: (e.tool as any)?.id,
-                name: (e.tool as any)?.name,
-                args: (e.tool as any)?.args,
-                result: (e.tool as any)?.result,
-        status: e.status,
+      .map((e) => ({
+        id: e.tool?.id,
+        name: e.tool?.name,
+        args: e.tool?.args,
+        result: e.tool?.result,
+        status: e.status || "done",
       }));
     const toolCalls = [...nativeToolCalls, ...agenticToolCalls];
     const toolCallsResult = toolCalls.length > 0 ? toolCalls : null;
     // Count agentic loop turns (each chunk of tool calls + response = 1 turn)
     // A turn is roughly: user→model→(tools)→model. Count "done" events as turn markers.
-        const turnCount = events.filter((e: any) => e.type === "done").length || 1;
+    const turnCount = events.filter((e) => e.type === "done").length || 1;
     // ── Mode-aware pass/fail evaluation ──────────────────────
     const mode = benchmark.benchmarkMode || "model";
-    let passed: any;
+    let passed: boolean;
     if (mode === "agent") {
       // Agent mode: only behavioral assertions
       passed = evaluateAgentAssertions(benchmark, {
@@ -352,7 +487,7 @@ async function runSingleModel(
       });
     } else if (mode === "combined") {
       // Combined mode: both text + behavioral assertions must pass
-            const textPassed = evaluateAssertions((text as any), benchmark);
+      const textPassed = evaluateAssertions(text, benchmark);
       const agentPassed = evaluateAgentAssertions(benchmark, {
         response: text,
         thinking: thinkingText,
@@ -362,7 +497,7 @@ async function runSingleModel(
       passed = textPassed && agentPassed;
     } else {
       // Model mode (default): text assertions only
-            passed = evaluateAssertions((text as any), benchmark);
+      passed = evaluateAssertions(text, benchmark);
     }
     return {
       provider: model.provider,
@@ -376,14 +511,14 @@ async function runSingleModel(
       matchMode,
       turnCount,
       latency: roundMs(latency),
-      usage: doneEvent.usage || null,
-      estimatedCost: doneEvent.estimatedCost ?? null,
+      usage: (doneEvent.usage as Record<string, number>) || null,
+      estimatedCost: (doneEvent.estimatedCost as number) ?? null,
       error: null,
       completedAt: new Date().toISOString(),
     };
   } catch (error: unknown) {
     const latency = (performance.now() - start) / 1000;
-        logger.error(`[benchmark]   💥 ${model.model} threw: ${(error as Error).message}`);
+    logger.error(`[benchmark]   💥 ${model.model} threw: ${(error as Error).message}`);
     return {
       provider: model.provider,
       model: model.model,
@@ -396,7 +531,7 @@ async function runSingleModel(
       latency: roundMs(latency),
       usage: null,
       estimatedCost: null,
-            error: (error as Error).message,
+      error: (error as Error).message,
       completedAt: new Date().toISOString(),
     };
   }
@@ -411,29 +546,29 @@ const BenchmarkService = {
     return activeGenerationCount;
   },
   async runBenchmark(
-    benchmark: any,
-    modelTargets: any,
-    project: any,
+    benchmark: BenchmarkDoc,
+    modelTargets: ModelTarget[] | null,
+    project: string | null,
     username: string,
-        { onRunStart, onModelStart, onModelComplete, onEvent, signal }: any = {},
+    { onRunStart, onModelStart, onModelComplete, onEvent, signal }: RunBenchmarkCallbacks = {},
   ) {
     // Resolve target models
-    let models: any;
-        if (modelTargets && (modelTargets as any).length > 0) {
+    let models: ModelEntry[];
+    if (modelTargets && modelTargets.length > 0) {
       // Validate and enrich with labels
-            models = (modelTargets as any).map((t: any) => {
-                const modelDefinition = getModelByName((t.model as any));
+      models = modelTargets.map((t) => {
+        const modelDefinition = getModelByName(t.model);
         return {
           provider: t.provider,
           model: t.model,
           label: modelDefinition?.label || t.display_name || t.model,
           thinkingEnabled: t.thinkingEnabled || false,
           toolsEnabled: t.toolsEnabled || false,
-                    ...(t.agent && { agent: t.agent }),
+          ...(t.agent && { agent: t.agent }),
         };
       });
     } else {
-            models = filterAvailableModels((getConversationModels as any)());
+      models = filterAvailableModels(getConversationModels());
     }
     if (models.length === 0) {
       throw new Error("No models available for benchmarking");
@@ -441,7 +576,7 @@ const BenchmarkService = {
     // Notify caller of total model count (used for live reconnection state)
     if (onRunStart) {
       try {
-                onRunStart({ totalModels: models.length });
+        onRunStart({ totalModels: models.length });
       } catch {
         /* noop */
       }
@@ -459,11 +594,11 @@ const BenchmarkService = {
     // Two instances means two concurrent local inference streams.
     const INTRA_PROVIDER_DELAY_MS = 100;
     // Group models by provider; local providers use their instance ID as key
-    const buckets = new Map();
-        for ( const m of models) {
+    const buckets = new Map<string, ModelEntry[]>();
+    for (const m of models) {
       const key = m.provider; // Instance IDs are already unique (lm-studio, lm-studio-2, etc.)
       if (!buckets.has(key)) buckets.set(key, []);
-      buckets.get(key).push(m);
+      buckets.get(key)!.push(m);
     }
     logger.info(
       `[benchmark] Executing across ${buckets.size} provider bucket(s): ${[...buckets.keys()].join(", ")}`,
@@ -473,11 +608,11 @@ const BenchmarkService = {
     // instance level, so concurrent benchmark runs and chat requests are safe.
     let aborted = false;
     const bucketPromises = [...buckets.entries()].map(
-            async ([_key, bucketModels]: any) => {
-        const bucketResults: any[] = [];
+      async ([_key, bucketModels]) => {
+        const bucketResults: ModelResult[] = [];
         for (let i = 0; i < bucketModels.length; i++) {
           // Check abort signal before each model
-                    if ((signal as any)?.aborted || aborted) {
+          if (signal?.aborted || aborted) {
             logger.info(`[benchmark] Aborting bucket — signal received`);
             break;
           }
@@ -485,7 +620,7 @@ const BenchmarkService = {
           const model = bucketModels[i];
           if (onModelStart) {
             try {
-                            onModelStart({ ...model, isLocal: isInstance(model.provider) });
+              onModelStart({ ...model, isLocal: isInstance(model.provider) });
             } catch {
               /* noop */
             }
@@ -494,8 +629,8 @@ const BenchmarkService = {
           // Wrap onEvent to tag each event with the source model (enables
           // correct attribution when multiple provider buckets stream concurrently).
           const modelOnEvent = onEvent
-            ? (event: any) =>
-                                onEvent({
+            ? (event: BenchmarkEvent) =>
+                onEvent({
                   ...event,
                   _sourceModel: {
                     provider: model.provider,
@@ -503,7 +638,7 @@ const BenchmarkService = {
                   },
                 })
             : undefined;
-          let result: any;
+          let result: ModelResult;
           try {
             result = await runSingleModel(benchmark, model, project, username, {
               signal,
@@ -512,14 +647,14 @@ const BenchmarkService = {
           } finally {
             activeGenerationCount = Math.max(0, activeGenerationCount - 1);
           }
-                    if ((signal as any)?.aborted || aborted) {
+          if (signal?.aborted || aborted) {
             logger.info(
               `[benchmark] Aborting after model ${model.model} completed`,
             );
             // Still record this model's result even though we're stopping
             if (onModelComplete) {
               try {
-                                onModelComplete(result);
+                onModelComplete(result);
               } catch {
                 /* noop */
               }
@@ -529,7 +664,7 @@ const BenchmarkService = {
           }
           if (onModelComplete) {
             try {
-                            onModelComplete(result);
+              onModelComplete(result);
             } catch {
               /* noop */
             }
@@ -541,7 +676,7 @@ const BenchmarkService = {
     );
     // Listen for abort signal to propagate to all buckets
     if (signal) {
-            (signal as any).addEventListener(
+      signal.addEventListener(
         "abort",
         () => {
           aborted = true;
@@ -552,13 +687,13 @@ const BenchmarkService = {
     const bucketOutputs = await Promise.all(bucketPromises);
     const results = bucketOutputs.flat();
     const completedAt = new Date().toISOString();
-        const wasAborted = (signal as any)?.aborted || aborted;
-    const passed = results.filter((r: any) => r.passed).length;
-    const failed = results.filter((r: any) => !r.passed && !r.error).length;
-    const errored = results.filter((r: any) => r.error).length;
+    const wasAborted = signal?.aborted || aborted;
+    const passed = results.filter((r) => r.passed).length;
+    const failed = results.filter((r) => !r.passed && !r.error).length;
+    const errored = results.filter((r) => r.error).length;
     const totalCost = results.reduce(
-            (sum: any, r: any) => sum + (r.estimatedCost || 0),
-            0,
+      (sum, r) => sum + (r.estimatedCost || 0),
+      0,
     );
     const run = {
       id: runId,
@@ -590,7 +725,7 @@ const BenchmarkService = {
     return run;
   },
   // ── CRUD Helpers ────────────────────────────────────────────
-  async create(data: any, project: any, username: string) {
+  async create(data: BenchmarkCreateData, project: string | null, username: string) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
     const now = new Date().toISOString();
@@ -617,7 +752,7 @@ const BenchmarkService = {
     await db.collection(BENCHMARKS_COL).insertOne(document);
     return document;
   },
-  async list(project: any) {
+  async list(project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
     return db
@@ -626,18 +761,18 @@ const BenchmarkService = {
       .sort({ updatedAt: -1 })
       .toArray();
   },
-  async getById(id: string, project: any) {
+  async getById(id: string, project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
     return db.collection(BENCHMARKS_COL).findOne({ id, project });
   },
-  async remove(id: string, project: any) {
+  async remove(id: string, project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
     await db.collection(BENCHMARKS_COL).deleteOne({ id, project });
     await db.collection(RUNS_COL).deleteMany({ benchmarkId: id, project });
   },
-  async getRuns(benchmarkId: any, project: any) {
+  async getRuns(benchmarkId: string, project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
     return db
@@ -646,12 +781,12 @@ const BenchmarkService = {
       .sort({ startedAt: -1 })
       .toArray();
   },
-  async getRunById(runId: any, project: any) {
+  async getRunById(runId: string, project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
     return db.collection(RUNS_COL).findOne({ id: runId, project });
   },
-  async getLatestRun(benchmarkId: any, project: any) {
+  async getLatestRun(benchmarkId: string, project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
     return db

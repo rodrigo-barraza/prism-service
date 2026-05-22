@@ -15,6 +15,57 @@ import { DIRECTORY_CACHE_TTL_MS, DIRECTORY_FETCH_TIMEOUT_MS } from "../constants
 
 const SKILL_RELEVANCE_THRESHOLD = 0.3;
 
+// ── Types ───────────────────────────────────────────────────
+
+interface DirectoryEntry {
+  name?: string;
+  path?: string;
+  type: string;
+  children?: DirectoryEntry[];
+}
+
+interface DirectoryData {
+  entries: DirectoryEntry[];
+}
+
+interface ScoredSkill {
+  name: string;
+  content: string;
+  description: string;
+  score: number;
+}
+
+interface AssemblerContext {
+  agent?: string | null;
+  project?: string | null;
+  username?: string;
+  messages?: Array<{ role: string; content?: string; [key: string]: unknown }>;
+  enabledTools?: string[];
+  agentContext?: Record<string, unknown>;
+  traceId?: string | null;
+  agentSessionId?: string | null;
+  clientIp?: string | null;
+  requestId?: string;
+  options?: Record<string, unknown>;
+  _injectedSkills?: string[];
+  _currentMessages?: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+}
+
+interface MemoryFetchOptions {
+  traceId?: string | null;
+  agentSessionId?: string | null;
+  endpoint?: string;
+  _username?: string;
+}
+
+interface SkillFetchOptions {
+  traceId?: string | null;
+  agentSessionId?: string | null;
+  endpoint?: string;
+  agent?: string | null;
+}
+
 /**
  * SystemPromptAssembler — sole owner of the agent's system prompt.
  *
@@ -28,35 +79,38 @@ const SKILL_RELEVANCE_THRESHOLD = 0.3;
  * of the default coding agent sections.
  */
 export default class SystemPromptAssembler {
-  constructor(options: any = {}) {
-        (this as any).workspaceRoot =
-            options.workspaceRoot ||
+  workspaceRoot: string;
+  private _directoryCache: string | null = null;
+  private _directoryCacheTime = 0;
+  private _directoryCacheTTL: number;
+
+  constructor(options: { workspaceRoot?: string } = {}) {
+    this.workspaceRoot =
+      options.workspaceRoot ||
       ToolOrchestratorService.getWorkspaceRoot() ||
       process.env.HOME ||
       "/home";
-        (this as any)._directoryCache = null;
-        (this as any)._directoryCacheTime = 0;
-        (this as any)._directoryCacheTTL = DIRECTORY_CACHE_TTL_MS;
+    this._directoryCacheTTL = DIRECTORY_CACHE_TTL_MS;
   }
 
   /**
    * Fetch project directory tree from tools-api.
    * Cached for 1 minute to avoid hammering the API.
    */
-  async fetchDirectoryTree() {
+  async fetchDirectoryTree(): Promise<string> {
     const now = Date.now();
-        if (
-            (this as any)._directoryCache &&
-            now - (this as any)._directoryCacheTime < (this as any)._directoryCacheTTL
+    if (
+      this._directoryCache &&
+      now - this._directoryCacheTime < this._directoryCacheTTL
     ) {
-            return (this as any)._directoryCache;
+      return this._directoryCache;
     }
 
     try {
       const controller = createAbortController();
       const timeout = setTimeout(() => controller.abort(), DIRECTORY_FETCH_TIMEOUT_MS);
 
-            const url = `${TOOLS_SERVICE_URL}/filesystem/list?path=${encodeURIComponent((this as any).workspaceRoot)}&depth=2`;
+      const url = `${TOOLS_SERVICE_URL}/filesystem/list?path=${encodeURIComponent(this.workspaceRoot)}&depth=2`;
       const response = await fetch(url, { signal: controller.signal });
       clearTimeout(timeout);
 
@@ -67,35 +121,35 @@ export default class SystemPromptAssembler {
         return "";
       }
 
-      const data = await response.json();
-            const tree = this._formatDirectoryTree((data as any));
-            (this as any)._directoryCache = tree;
-            (this as any)._directoryCacheTime = now;
+      const data = await response.json() as DirectoryData;
+      const tree = this._formatDirectoryTree(data);
+      this._directoryCache = tree;
+      this._directoryCacheTime = now;
       return tree;
     } catch (error: unknown) {
       logger.warn(
-                `[SystemPromptAssembler] Directory fetch error: ${(error as Error).message}`,
+        `[SystemPromptAssembler] Directory fetch error: ${(error as Error).message}`,
       );
-            return (this as any)._directoryCache || "";
+      return this._directoryCache || "";
     }
   }
-  _formatDirectoryTree(data: any) {
+  _formatDirectoryTree(data: DirectoryData): string {
     if (!data || !data.entries) return "";
 
-    const lines: any[] = [];
-        for ( const entry of data.entries) {
+    const lines: string[] = [];
+    for (const entry of data.entries) {
       const prefix = entry.type === "directory" ? "📁" : "📄";
       const name = entry.name || entry.path;
-            lines.push((`${prefix} ${name}` as any));
+      lines.push(`${prefix} ${name}`);
 
       // Include first-level children for directories
       if (entry.children && Array.isArray(entry.children)) {
-                for ( const child of entry.children.slice(0, 20)) {
+        for (const child of entry.children.slice(0, 20)) {
           const childPrefix = child.type === "directory" ? "📁" : "📄";
-                    lines.push((`  ${childPrefix} ${child.name || child.path}` as any));
+          lines.push(`  ${childPrefix} ${child.name || child.path}`);
         }
         if (entry.children.length > 20) {
-                    lines.push((`  ... and ${entry.children.length - 20} more` as any));
+          lines.push(`  ... and ${entry.children.length - 20} more`);
         }
       }
     }
@@ -110,37 +164,37 @@ export default class SystemPromptAssembler {
    *   - Name + first sentence of description (capability summary)
    *   - Full parameter listing with required markers
    */
-  buildToolDescriptions(enabledTools: any) {
+  buildToolDescriptions(enabledTools?: string[]): string {
     const schemas = ToolOrchestratorService.getToolSchemas();
-        const enabledSet = enabledTools ? new Set(enabledTools) : null;
+    const enabledSet = enabledTools ? new Set(enabledTools) : null;
 
     const filtered = enabledSet
-            ? schemas.filter((t: any) => enabledSet.has(t.name))
+      ? schemas.filter((t) => enabledSet.has(t.name as string))
       : schemas;
 
     if (filtered.length === 0) return "";
 
     // Group by domain
-    const groups = new Map();
-        for ( const tool of filtered) {
-            const domain = ((tool as any).domain || "Other").replace(/^Agentic:\s*/i, "");
+    const groups = new Map<string, Record<string, unknown>[]>();
+    for (const tool of filtered) {
+      const domain = ((tool.domain as string) || "Other").replace(/^Agentic:\s*/i, "");
       if (!groups.has(domain)) groups.set(domain, []);
-      groups.get(domain).push(tool);
+      groups.get(domain)!.push(tool);
     }
 
     // Build categorised sections with parameter details
-    const sections: any[] = [];
-        for ( const [domain, domainTools] of groups) {
-      const entries = domainTools.map((tool: any) => {
-        const desc = tool.description || "";
+    const sections: string[] = [];
+    for (const [domain, domainTools] of groups) {
+      const entries = domainTools.map((tool) => {
+        const desc = (tool.description as string) || "";
 
-                const params = (tool.parameters as any)?.properties || {};
+        const params = (tool.parameters as Record<string, unknown>)?.properties as Record<string, Record<string, unknown>> || {};
         const paramNames = Object.keys(params);
-                const required = (tool.parameters as any)?.required || [];
+        const required = ((tool.parameters as Record<string, unknown>)?.required || []) as string[];
         const paramStr = paramNames
-                    .map((p: any) => {
-            const isReq = (required as any).includes(p);
-            const paramDesc = (params as any)[(p as string)].description || "";
+          .map((p) => {
+            const isReq = required.includes(p);
+            const paramDesc = (params[p].description as string) || "";
             return `  - ${p}${isReq ? " (required)" : ""}: ${paramDesc}`;
           })
           .join("\n");
@@ -148,7 +202,7 @@ export default class SystemPromptAssembler {
         return `### ${tool.name}\n${desc}\n${paramStr}`;
       });
 
-            sections.push((`**${domain}**\n${entries.join("\n\n")}` as any));
+      sections.push(`**${domain}**\n${entries.join("\n\n")}`);
     }
 
     return sections.join("\n\n");
@@ -159,20 +213,20 @@ export default class SystemPromptAssembler {
    * Queries the unified `memories` collection using cosine similarity,
    * scoped by agent and project.
    */
-    async fetchMemories(
-    agent: any,
-    project: any,
-    queryText: any,
-        { traceId, agentSessionId, endpoint, _username }: any = {},
-  ) {
+  async fetchMemories(
+    agent: string,
+    project: string | null,
+    queryText: string,
+    { traceId, agentSessionId, endpoint, _username }: MemoryFetchOptions = {},
+  ): Promise<string> {
     try {
       const memories = await MemoryService.search({
         agent,
         project,
         queryText,
         limit: 10,
-        traceId: traceId || null,
-        agentSessionId: agentSessionId || null,
+        traceId: traceId || undefined,
+        agentSessionId: agentSessionId || undefined,
         endpoint: endpoint || "/agent",
       });
 
@@ -181,20 +235,20 @@ export default class SystemPromptAssembler {
       logger.info(
         `[SystemPromptAssembler] Memory search returned ${memories.length} results for ${agent}`,
       );
-            return MemoryService.formatForPrompt((memories as any));
+      return MemoryService.formatForPrompt(memories);
     } catch (error: unknown) {
       logger.warn(
-                `[SystemPromptAssembler] Memory fetch error: ${(error as Error).message}`,
+        `[SystemPromptAssembler] Memory fetch error: ${(error as Error).message}`,
       );
       return "";
     }
   }
-    async fetchSkills(
-    project: any,
+  async fetchSkills(
+    project: string | null,
     username: string,
-    queryText: any,
-        { traceId, agentSessionId, endpoint, agent }: any = {},
-  ) {
+    queryText: string,
+    { traceId, agentSessionId, endpoint, agent }: SkillFetchOptions = {},
+  ): Promise<ScoredSkill[]> {
     try {
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
       if (!db) return [];
@@ -208,23 +262,23 @@ export default class SystemPromptAssembler {
       if (skills.length === 0) return [];
 
       // If no query or no skills have embeddings, return all (graceful fallback)
-            const hasEmbeddings = skills.some((s: any) => (s.embedding as any)?.length > 0);
+      const hasEmbeddings = skills.some((s) => Array.isArray(s.embedding) && s.embedding.length > 0);
       if (!queryText || !hasEmbeddings) {
         logger.info(
           `[SystemPromptAssembler] Returning all ${skills.length} skills (no query or no embeddings)`,
         );
-        return skills.map((s: any) => ({
-          name: s.name,
-          content: s.content,
-          description: s.description,
+        return skills.map((s) => ({
+          name: s.name as string,
+          content: s.content as string,
+          description: s.description as string,
           score: 1,
         }));
       }
 
       // Generate query embedding
-      let queryEmbedding: any;
+      let queryEmbedding: number[];
       try {
-                queryEmbedding = await EmbeddingService.embed(queryText, {
+        queryEmbedding = await EmbeddingService.embed(queryText, {
           source: "skill-relevance",
           project,
           endpoint: endpoint || "/agent",
@@ -234,37 +288,37 @@ export default class SystemPromptAssembler {
         });
       } catch (error: unknown) {
         logger.warn(
-                    `[SystemPromptAssembler] Query embedding failed: ${(error as Error).message} — returning all skills`,
+          `[SystemPromptAssembler] Query embedding failed: ${(error as Error).message} — returning all skills`,
         );
-        return skills.map((s: any) => ({
-          name: s.name,
-          content: s.content,
-          description: s.description,
+        return skills.map((s) => ({
+          name: s.name as string,
+          content: s.content as string,
+          description: s.description as string,
           score: 1,
         }));
       }
 
       // Score and filter by relevance threshold
-      const scored = skills
-        .map((s: any) => ({
-          name: s.name,
-          content: s.content,
-          description: s.description,
+      const scored: ScoredSkill[] = skills
+        .map((s) => ({
+          name: s.name as string,
+          content: s.content as string,
+          description: s.description as string,
           score: s.embedding
-                        ? cosineSimilarity((queryEmbedding as any[]), (s.embedding as any[]))
+            ? cosineSimilarity(queryEmbedding, s.embedding as number[])
             : 0,
         }))
-                .filter((s: any) => (s as any).score >= SKILL_RELEVANCE_THRESHOLD)
-                .sort((a: any, b: any) => (b as any).score - (a as any).score);
+        .filter((s) => s.score >= SKILL_RELEVANCE_THRESHOLD)
+        .sort((a, b) => b.score - a.score);
 
       logger.info(
-                `[SystemPromptAssembler] Skills: ${scored.length}/${skills.length} above threshold (${scored.map((s: any) => `${s.name}:${(s as any).score.toFixed(2)}`).join(", ")})`,
+        `[SystemPromptAssembler] Skills: ${scored.length}/${skills.length} above threshold (${scored.map((s) => `${s.name}:${s.score.toFixed(2)}`).join(", ")})`,
       );
 
       return scored;
     } catch (error: unknown) {
       logger.warn(
-                `[SystemPromptAssembler] Skills fetch error: ${(error as Error).message}`,
+        `[SystemPromptAssembler] Skills fetch error: ${(error as Error).message}`,
       );
       return [];
     }
@@ -287,12 +341,12 @@ export default class SystemPromptAssembler {
    *   8. Project skills (relevance-filtered)
    *   9. Session memory from past conversations
    */
-  async assemble(context: any) {
-    const sections: any[] = [];
+  async assemble(context: AssemblerContext) {
+    const sections: string[] = [];
     // null/undefined agent = direct chat mode (no persona)
     const isDirectMode = !context.agent;
     const agentId = context.agent || "CODING";
-        const persona = isDirectMode ? null : AgentPersonaRegistry.get((agentId as any));
+    const persona = isDirectMode ? null : AgentPersonaRegistry.get(agentId);
 
     // If no persona found, fall back to CODING defaults (unless direct mode)
     const codingFallback =
@@ -301,7 +355,7 @@ export default class SystemPromptAssembler {
     // ── 1. Agent Identity ────────────────────────────────────────
     if (isDirectMode) {
       sections.push(
-                (`You are a helpful AI assistant with access to a comprehensive suite of real-time data and utility tools. Present data clearly with relevant formatting. For questions that don't require API data, respond naturally without tool calls.` as any),
+        `You are a helpful AI assistant with access to a comprehensive suite of real-time data and utility tools. Present data clearly with relevant formatting. For questions that don't require API data, respond naturally without tool calls.`,
       );
     } else if (persona) {
       const identityText =
@@ -311,7 +365,7 @@ export default class SystemPromptAssembler {
       sections.push(identityText);
     } else {
       sections.push(
-                (`You are a highly capable coding agent with access to file system, git, command execution, and web tools.` as any),
+        `You are a highly capable coding agent with access to file system, git, command execution, and web tools.`,
       );
     }
 
@@ -323,41 +377,41 @@ export default class SystemPromptAssembler {
 
       // Structured context blocks — each is a pre-formatted text block
       // assembled by the caller (Lupos/Prism Client/etc.)
-            if ((ac as any).discordContext) {
-                sections.push((ac as any).discordContext);
+      if (ac.discordContext) {
+        sections.push(ac.discordContext as string);
       }
-            if ((ac as any).serverContext) {
-                sections.push((ac as any).serverContext);
+      if (ac.serverContext) {
+        sections.push(ac.serverContext as string);
       }
-            if ((ac as any).imageContext) {
-                sections.push((ac as any).imageContext);
+      if (ac.imageContext) {
+        sections.push(ac.imageContext as string);
       }
-            if ((ac as any).clockCrewContext) {
-                sections.push((ac as any).clockCrewContext);
+      if (ac.clockCrewContext) {
+        sections.push(ac.clockCrewContext as string);
       }
 
       // Stickers kiosk context — stage flow, emotion state, visual context
-            if ((ac as any).stickersContext) {
-                sections.push((ac as any).stickersContext);
+      if (ac.stickersContext) {
+        sections.push(ac.stickersContext as string);
       }
-            if ((ac as any).emotionContext) {
-                sections.push((ac as any).emotionContext);
+      if (ac.emotionContext) {
+        sections.push(ac.emotionContext as string);
       }
-            if ((ac as any).visualContext) {
-                sections.push((ac as any).visualContext);
+      if (ac.visualContext) {
+        sections.push(ac.visualContext as string);
       }
 
       // Discord IDs — explicitly inject so discord tools get the correct IDs
       // (the LLM cannot infer these from guild/channel names alone)
-            if ((ac as any).guildId) {
-                let idsBlock = `# Discord IDs\n- Guild ID: ${(ac as any).guildId}`;
-                if ((ac as any).channelId) idsBlock += `\n- Channel ID: ${(ac as any).channelId}`;
-                sections.push((idsBlock as any));
+      if (ac.guildId) {
+        let idsBlock = `# Discord IDs\n- Guild ID: ${ac.guildId}`;
+        if (ac.channelId) idsBlock += `\n- Channel ID: ${ac.channelId}`;
+        sections.push(idsBlock);
       }
 
       // Lights context — current light states, night lock, automation mode
-            if ((ac as any).lightsContext) {
-                sections.push((ac as any).lightsContext);
+      if (ac.lightsContext) {
+        sections.push(ac.lightsContext as string);
       }
     }
 
@@ -375,14 +429,14 @@ export default class SystemPromptAssembler {
     // This ensures every persona (CODING, LUPOS, future agents) gets the
     // same domain-grouped tool documentation in its system prompt.
     {
-            const toolDescs = this.buildToolDescriptions((context.enabledTools as any));
+      const toolDescs = this.buildToolDescriptions(context.enabledTools);
       if (toolDescs) {
         const schemas = ToolOrchestratorService.getToolSchemas();
         const count = context.enabledTools
-                    ? schemas.filter((t: any) => new Set(context.enabledTools).has(t.name))
+          ? schemas.filter((t) => new Set(context.enabledTools).has(t.name as string))
               .length
           : schemas.length;
-                sections.push((`## Available Tools (${count})\n` + toolDescs as any));
+        sections.push(`## Available Tools (${count})\n` + toolDescs);
       }
     }
 
@@ -396,21 +450,21 @@ export default class SystemPromptAssembler {
         sections.push(persona.guidelines);
       } else if (codingFallback || persona?.usesCodingGuidelines) {
         sections.push(
-                    (`## Coding Guidelines\n` +
-                        `- Always read relevant files before making edits to understand context\n` +
-                        `- After making changes, verify them by reading the modified section\n` +
-                        `- Keep your explanations concise and technical\n` +
-                        `\n## Command Execution\n` +
-                        `- For dev servers and long-running processes (npm run dev, next dev, vite, nodemon, etc.), ALWAYS set run_in_background: true. These commands never terminate on their own.\n` +
-                        `- You will receive the first ~2.5 seconds of output to confirm the server started correctly.\n` +
-                        `- Do NOT use run_in_background for one-shot commands (npm install, npm test, git status, eslint, prettier, tsc, etc.) — let them complete normally.` as any),
+          `## Coding Guidelines\n` +
+            `- Always read relevant files before making edits to understand context\n` +
+            `- After making changes, verify them by reading the modified section\n` +
+            `- Keep your explanations concise and technical\n` +
+            `\n## Command Execution\n` +
+            `- For dev servers and long-running processes (npm run dev, next dev, vite, nodemon, etc.), ALWAYS set run_in_background: true. These commands never terminate on their own.\n` +
+            `- You will receive the first ~2.5 seconds of output to confirm the server started correctly.\n` +
+            `- Do NOT use run_in_background for one-shot commands (npm install, npm test, git status, eslint, prettier, tsc, etc.) — let them complete normally.`,
         );
       }
     }
 
     // ── 5b. Coordinator Mode Addendum (when coordinator tools available) ──
     if (!isDirectMode && (codingFallback || persona?.usesCodingGuidelines)) {
-            const enabledSet = context.enabledTools ? new Set(context.enabledTools) : null;
+      const enabledSet = context.enabledTools ? new Set(context.enabledTools) : null;
       const coordinatorAvailable = enabledSet
         ? COORDINATOR_ONLY_TOOLS.some((t: string) => enabledSet.has(t))
         : true; // No filter = all tools available including coordinator
@@ -419,37 +473,37 @@ export default class SystemPromptAssembler {
         const allSchemas = ToolOrchestratorService.getToolSchemas();
         const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
         const workerTools = allSchemas
-          .map((t: any) => t.name as string)
+          .map((t) => t.name as string)
           .filter((name: string) => !coordinatorSet.has(name));
-                sections.push((getCoordinatorPromptAddendum as any)({ workerTools }));
+        sections.push(getCoordinatorPromptAddendum({ workerTools }));
       }
     }
 
     // ── 6. Environment ───────────────────────────────────────────
     sections.push(
-            (`## Environment\n` +
-                `- Date/Time: ${new Date().toLocaleString("en-US", { dateStyle: "full", timeStyle: "long" })}\n` +
-                `- OS: Linux (WSL2)\n` +
-                        `- Workspace: ${(this as any).workspaceRoot}` as any),
+      `## Environment\n` +
+        `- Date/Time: ${new Date().toLocaleString("en-US", { dateStyle: "full", timeStyle: "long" })}\n` +
+        `- OS: Linux (WSL2)\n` +
+                `- Workspace: ${this.workspaceRoot}`,
     );
 
     // ── 7. Project Structure (cached) ────────────────────────────
     if (codingFallback || persona?.usesDirectoryTree) {
       const dirTree = await this.fetchDirectoryTree();
       if (dirTree) {
-                sections.push((`## Project Structure\n` + dirTree as any));
+        sections.push(`## Project Structure\n` + dirTree);
       }
     }
 
     // ── 8. Project Skills (relevance-filtered) ────────────────────
-        const lastUserMsg = [...(context.messages || [])]
+    const lastUserMsg = [...(context.messages || [])]
       .reverse()
-      .find((m: any) => m.role === "user");
-    const queryText = lastUserMsg?.content || "";
+      .find((m) => m.role === "user");
+    const queryText = (lastUserMsg?.content as string) || "";
 
     const skills = await this.fetchSkills(
-            (context.project as any),
-      (context.username as any),
+      context.project || null,
+      context.username || "",
       queryText,
       {
         traceId: context.traceId,
@@ -458,14 +512,14 @@ export default class SystemPromptAssembler {
         agent: agentId,
       },
     );
-        const skillNames: any[] = [];
+    const skillNames: string[] = [];
     if (skills.length > 0) {
-      const skillBlocks = skills.map((s: any) => {
-                skillNames.push((s.name as any));
+      const skillBlocks = skills.map((s) => {
+        skillNames.push(s.name);
         return `### ${s.name}\n${s.content}`;
       });
       sections.push(
-                (`## Project Skills (${skills.length})\n` + skillBlocks.join("\n\n") as any),
+        `## Project Skills (${skills.length})\n` + skillBlocks.join("\n\n"),
       );
     }
 
@@ -474,22 +528,22 @@ export default class SystemPromptAssembler {
 
     if (memoryQuery) {
       const memories = await this.fetchMemories(
-                (agentId as any),
-        (context.project as any),
+        agentId,
+        context.project || null,
         memoryQuery,
         {
           traceId: context.traceId,
           agentSessionId: context.agentSessionId,
           endpoint: "/agent",
-          username: context.username,
+          _username: context.username,
         },
       );
       if (memories) {
-                sections.push((`## Agent Memory\n` + memories as any));
+        sections.push(`## Agent Memory\n` + memories);
       }
     }
 
-        return { prompt: sections.join("\n\n"), skillNames };
+    return { prompt: sections.join("\n\n"), skillNames };
   }
 
   /**
@@ -500,7 +554,7 @@ export default class SystemPromptAssembler {
    * backend is the single source of truth for the agent system prompt.
    */
   createHook() {
-    return async (context: any) => {
+    return async (context: AssemblerContext) => {
       try {
         const { prompt: systemPrompt, skillNames } = await this.assemble(context);
         if (!systemPrompt) return;
@@ -509,13 +563,13 @@ export default class SystemPromptAssembler {
         context._injectedSkills = skillNames;
 
         // Replace existing system message or prepend a new one
-                const systemIdx = (context.messages as any)?.findIndex(
-          (m: any) => m.role === "system",
+        const systemIdx = context.messages?.findIndex(
+          (m) => m.role === "system",
         );
         if (systemIdx !== undefined && systemIdx >= 0) {
-                    (context as any).messages[systemIdx].content = systemPrompt;
+          context.messages![systemIdx].content = systemPrompt;
         } else {
-                    (context.messages as any)?.unshift({ role: "system", content: systemPrompt });
+          context.messages?.unshift({ role: "system", content: systemPrompt });
         }
 
         logger.info(
@@ -523,7 +577,7 @@ export default class SystemPromptAssembler {
         );
       } catch (error: unknown) {
         logger.error(
-                    `[SystemPromptAssembler] Assembly failed: ${(error as Error).message}`,
+          `[SystemPromptAssembler] Assembly failed: ${(error as Error).message}`,
         );
       }
     };

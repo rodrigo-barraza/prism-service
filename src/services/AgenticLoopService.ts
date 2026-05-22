@@ -37,10 +37,10 @@ export default class AgenticLoopService {
     // 1. Resolve tools
     const resolvedTools = await AgenticToolResolver.resolve({
       options,
-      agent,
+      agent: agent || undefined,
       project,
       username,
-      modelDef,
+      modelDef: modelDef || undefined,
     });
 
     // 2. Initialize shared state

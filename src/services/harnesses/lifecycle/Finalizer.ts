@@ -62,7 +62,7 @@ export interface FinalizerPayload {
  * Agent projects go to agent_sessions; everything else to conversations.
  */
 function getCollectionOpts(project: string | null | undefined) {
-  if (AgentPersonaRegistry.isAgentProject(project)) {
+  if (AgentPersonaRegistry.isAgentProject(project || "")) {
     return { collection: COLLECTIONS.AGENT_SESSIONS };
   }
   return undefined;

@@ -498,7 +498,7 @@ router.post(
       const { models: modelTargets } = req.body || {};
 
       const run = await BenchmarkService.runBenchmark(
-        benchmark,
+        benchmark as unknown as Parameters<typeof BenchmarkService.runBenchmark>[0],
         modelTargets,
                 (req.project as any),
         (req.username as any),
@@ -744,7 +744,7 @@ router.post(
       }));
 
       const run = await BenchmarkService.runBenchmark(
-        benchmark,
+        benchmark as unknown as Parameters<typeof BenchmarkService.runBenchmark>[0],
         modelTargets,
                 (req.project as any),
         (req.username as any),

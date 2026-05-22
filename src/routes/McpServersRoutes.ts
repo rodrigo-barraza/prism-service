@@ -3,6 +3,7 @@ import express, { Request, Response, NextFunction } from "express";
 import { ObjectId } from "mongodb";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import MCPClientService from "../services/MCPClientService.ts";
+import type { MCPServerConfig } from "../services/MCPClientService.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
 import { PostMcpServerSchema, PutMcpServerSchema } from "../types/index.ts";
@@ -235,12 +236,12 @@ router.post(
         return res.status(404).json({ error: "MCP server not found" });
       }
 
-      const result = await MCPClientService.connect(server);
+      const result = await MCPClientService.connect(server as unknown as MCPServerConfig);
       res.json({
         success: true,
         serverName: result.serverName,
         toolCount: result.tools.length,
-        tools: result.tools.map((t: any) => ({
+        tools: result.tools.map((t) => ({
           name: t.name,
           description: t.description,
         })),

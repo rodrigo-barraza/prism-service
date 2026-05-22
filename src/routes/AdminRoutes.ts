@@ -56,22 +56,22 @@ router.get(
         order = "desc",
       } = req.query;
 
-      const filter: any = {};
-            if (project) filter.project = project;
-            if (username) filter.username = username;
-            if (provider) filter.provider = provider;
-            if (model) filter.model = model;
-            if (endpoint) filter.endpoint = endpoint;
-            if (operation) filter.operation = operation;
-            if (success !== undefined) filter.success = success === "true";
+      const filter: Record<string, unknown> = {};
+      if (project) filter.project = project;
+      if (username) filter.username = username;
+      if (provider) filter.provider = provider;
+      if (model) filter.model = model;
+      if (endpoint) filter.endpoint = endpoint;
+      if (operation) filter.operation = operation;
+      if (success !== undefined) filter.success = success === "true";
       if (from || to) {
-                filter.timestamp = {};
-                if (from) (filter as any).timestamp.$gte = from;
-                if (to) (filter as any).timestamp.$lte = to;
+        filter.timestamp = {};
+        if (from) (filter.timestamp as Record<string, unknown>).$gte = from;
+        if (to) (filter.timestamp as Record<string, unknown>).$lte = to;
       }
 
-            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
-            const lim = parseInt((limit as any), 10);
+      const skip = (parseInt((page as string), 10) - 1) * parseInt((limit as string), 10);
+      const lim = parseInt((limit as string), 10);
       const sortDir = order === "asc" ? 1 : -1;
 
       const [docs, total] = await Promise.all([
@@ -87,7 +87,7 @@ router.get(
         db.collection(REQUESTS_COL).countDocuments(filter),
       ]);
 
-            res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
+      res.json({ data: docs, total, page: parseInt((page as string), 10), limit: lim });
     } catch (error: unknown) {
             logger.error(`Admin /requests error: ${(error as Error).message}`);
       next(error);
@@ -129,9 +129,9 @@ router.get(
         .findOne({ requestId: req.params.id });
       if (!request) return res.status(404).json({ error: "Request not found" });
 
-      let conversations: any[] = [];
-      let workflows: any[] = [];
-      let traces: any[] = [];
+      let conversations: Record<string, unknown>[] = [];
+      let workflows: Record<string, unknown>[] = [];
+      let traces: Record<string, unknown>[] = [];
 
       if (request.conversationId) {
         // Find conversations matching this conversationId
@@ -161,8 +161,8 @@ router.get(
           .toArray();
 
         // Normalize _id to string id
-        workflows = workflows.map((w: any) => ({
-                    id: (w as any)._id.toString(),
+        workflows = workflows.map((w: Record<string, unknown>) => ({
+          id: (w._id as { toString: () => string }).toString(),
           name: w.name || "Untitled Workflow",
           nodeCount: w.nodeCount || 0,
           edgeCount: w.edgeCount || 0,
@@ -192,7 +192,7 @@ router.get(
               },
             ])
             .toArray();
-          traces = traceAgg.map((s: any) => ({
+          traces = traceAgg.map((s: Record<string, unknown>) => ({
             id: s._id,
             project: s.project,
             username: s.username,
@@ -220,15 +220,15 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { from, to, project } = req.query;
-      const match: any = {};
-            if (project) match.project = project;
+      const match: Record<string, unknown> = {};
+      if (project) match.project = project;
       if (from || to) {
-                match.timestamp = {};
-                if (from) match.timestamp.$gte = from;
-                if (to) match.timestamp.$lte = to;
+        match.timestamp = {};
+        if (from) (match.timestamp as Record<string, unknown>).$gte = from;
+        if (to) (match.timestamp as Record<string, unknown>).$lte = to;
       }
 
-      const pipeline: any[] = [
+      const pipeline: Record<string, unknown>[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
         {
           $group: {
@@ -251,7 +251,7 @@ router.get(
       ];
 
       // Tool call count: sum the lengths of toolApiNames arrays across all matching requests
-      const toolCallPipeline: any[] = [
+      const toolCallPipeline: Record<string, unknown>[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
         { $match: { toolApiNames: { $exists: true, $ne: [] } } },
         { $unwind: "$toolApiNames" },
@@ -259,23 +259,22 @@ router.get(
       ];
 
       // Count total traces and conversations (respecting date + project filters)
-      const convMatch: any = {};
-            if (project) convMatch.project = project;
+      const convMatch: Record<string, unknown> = {};
+      if (project) convMatch.project = project;
       if (from || to) {
-                convMatch.createdAt = {};
-                if (from) convMatch.createdAt.$gte = from;
-                if (to) convMatch.createdAt.$lte = to;
+        convMatch.createdAt = {};
+        if (from) (convMatch.createdAt as Record<string, unknown>).$gte = from;
+        if (to) (convMatch.createdAt as Record<string, unknown>).$lte = to;
       }
 
       // Traces: count distinct traceIds from requests that match filters
-      const traceMatch: any = { traceId: { $ne: null } };
+      const traceMatch: Record<string, unknown> = { traceId: { $ne: null } };
             if (project) traceMatch.project = project;
       if (from || to) {
-                traceMatch.timestamp = {};
-                if (from) traceMatch.timestamp.$gte = from;
-                if (to) traceMatch.timestamp.$lte = to;
+        if (from) (traceMatch.timestamp as Record<string, unknown>).$gte = from;
+        if (to) (traceMatch.timestamp as Record<string, unknown>).$lte = to;
       }
-      const traceCountPipeline: any[] = [
+      const traceCountPipeline: Record<string, unknown>[] = [
         { $match: traceMatch },
         { $group: { _id: "$traceId" } },
         { $count: "total" },
@@ -332,15 +331,15 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { from, to, project } = req.query;
-      const match: any = {};
-            if (project) match.project = project;
+      const match: Record<string, unknown> = {};
+      if (project) match.project = project;
       if (from || to) {
-                match.timestamp = {};
-                if (from) match.timestamp.$gte = from;
-                if (to) match.timestamp.$lte = to;
+        match.timestamp = {};
+        if (from) (match.timestamp as Record<string, unknown>).$gte = from;
+        if (to) (match.timestamp as Record<string, unknown>).$lte = to;
       }
 
-      const pipeline: any[] = [
+      const pipeline: Record<string, unknown>[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
         {
           $group: {
@@ -367,7 +366,7 @@ router.get(
       ];
 
       // Count workflows per project via conversationIds → conversations.project
-      const workflowPipeline: any[] = [
+      const workflowPipeline: Record<string, unknown>[] = [
         { $match: { conversationIds: { $exists: true, $ne: [] } } },
         {
           $lookup: {
@@ -389,12 +388,12 @@ router.get(
       ];
 
       // Count conversations per project
-      const convPipeline: any[] = [
+      const convPipeline: Record<string, unknown>[] = [
         { $group: { _id: "$project", conversationCount: { $sum: 1 } } },
       ];
 
       // Count traces per project — derived from requests
-      const tracePipeline: any[] = [
+      const tracePipeline: Record<string, unknown>[] = [
         { $match: { traceId: { $ne: null } } },
         { $group: { _id: { project: "$project", traceId: "$traceId" } } },
         { $group: { _id: "$_id.project", traceCount: { $sum: 1 } } },
@@ -409,25 +408,25 @@ router.get(
         ]);
 
       // Build a project → workflowCount map
-      const wfMap: any = {};
-            for ( const wc of workflowCounts) {
-                wfMap[wc._id || "any"] = wc.workflowCount;
+      const wfMap: Record<string, number> = {};
+      for (const wc of workflowCounts) {
+        wfMap[wc._id || "any"] = wc.workflowCount;
       }
 
       // Build a project → conversationCount map
-      const convMap: any = {};
-            for ( const cc of convCounts) {
-                convMap[cc._id || "any"] = cc.conversationCount;
+      const convMap: Record<string, number> = {};
+      for (const cc of convCounts) {
+        convMap[cc._id || "any"] = cc.conversationCount;
       }
 
       // Build a project → traceCount map
-      const traceMap: any = {};
-            for ( const tc of traceCounts) {
-                traceMap[tc._id || "any"] = tc.traceCount;
+      const traceMap: Record<string, number> = {};
+      for (const tc of traceCounts) {
+        traceMap[tc._id || "any"] = tc.traceCount;
       }
 
       res.json(
-        results.map((r: any) => ({
+        results.map((r: Record<string, unknown>) => ({
           project: r._id || "any",
           totalRequests: r.totalRequests,
           totalInputTokens: r.totalInputTokens,
@@ -439,11 +438,11 @@ router.get(
           lastRequest: r.lastRequest,
           modelCount: r.modelCount,
           providerCount: r.providerCount,
-                    models: ((r._models || []) as any).filter(Boolean),
-                    providers: ((r._providers || []) as any).filter(Boolean),
-                    workflowCount: wfMap[((r as string) as any)._id || "any"] || 0,
-                    conversationCount: convMap[((r as string) as any)._id || "any"] || 0,
-                    traceCount: traceMap[((r as string) as any)._id || "any"] || 0,
+          models: ((r._models || []) as string[]).filter(Boolean),
+          providers: ((r._providers || []) as string[]).filter(Boolean),
+          workflowCount: wfMap[(r._id as string) || "any"] || 0,
+          conversationCount: convMap[(r._id as string) || "any"] || 0,
+          traceCount: traceMap[(r._id as string) || "any"] || 0,
         })),
       );
     } catch (error: unknown) {
@@ -461,7 +460,7 @@ router.get(
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
       if (!db) return res.status(503).json({ error: "Database not available" });
 
-      const pipeline: any[] = [
+      const pipeline: Record<string, unknown>[] = [
         {
           $group: {
             _id: "$username",
@@ -481,7 +480,7 @@ router.get(
         .toArray();
 
       res.json(
-        results.map((r: any) => ({
+        results.map((r: Record<string, unknown>) => ({
           username: r._id || "any",
           totalRequests: r.totalRequests,
           totalTokens: r.totalTokens,
@@ -506,15 +505,15 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { from, to, project } = req.query;
-      const match: any = {};
-            if (project) match.project = project;
+      const match: Record<string, unknown> = {};
+      if (project) match.project = project;
       if (from || to) {
-                match.timestamp = {};
-                if (from) match.timestamp.$gte = from;
-                if (to) match.timestamp.$lte = to;
+        match.timestamp = {};
+        if (from) (match.timestamp as Record<string, unknown>).$gte = from;
+        if (to) (match.timestamp as Record<string, unknown>).$lte = to;
       }
 
-      const pipeline: any[] = [
+      const pipeline: Record<string, unknown>[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
         {
           $group: {
@@ -549,7 +548,7 @@ router.get(
       }
 
       // Count workflows per conversationId
-      const wfByConv: any = {};
+      const wfByConv: Record<string, number> = {};
       if (allConvIds.size > 0) {
         const wfResults = await db
           .collection(WORKFLOWS_COL)
@@ -573,7 +572,7 @@ router.get(
       }
 
       // Map conversationId → traceId for trace counting
-      const traceByConv: any = {};
+      const traceByConv: Record<string, string> = {};
       if (allConvIds.size > 0) {
         const convDocs = await db
           .collection(CONVERSATIONS_COL)
@@ -589,18 +588,18 @@ router.get(
       }
 
       res.json(
-        results.map((r: any) => {
-                    const convIds = ((r._convIds || []) as any).filter(Boolean);
+        results.map((r: Record<string, unknown>) => {
+          const convIds = ((r._convIds || []) as string[]).filter(Boolean);
           const conversationCount = convIds.length;
           let workflowCount = 0;
           const traceSet = new Set();
-                    for ( const cid of convIds) {
-                        workflowCount += wfByConv[cid] || 0;
-                        if (traceByConv[cid]) traceSet.add(traceByConv[cid]);
+          for (const cid of convIds) {
+            workflowCount += wfByConv[cid] || 0;
+            if (traceByConv[cid]) traceSet.add(traceByConv[cid]);
           }
           return {
-                        model: (r as any)._id.model,
-                        provider: (r as any)._id.provider,
+            model: (r._id as { model: string }).model,
+            provider: (r._id as { provider: string }).provider,
             totalRequests: r.totalRequests,
             totalInputTokens: r.totalInputTokens,
             totalOutputTokens: r.totalOutputTokens,
@@ -631,15 +630,15 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { from, to, project, tool } = req.query;
-      const match: any = { toolApiNames: { $exists: true, $ne: [] } };
-            if (project) match.project = project;
+      const match: Record<string, unknown> = { toolApiNames: { $exists: true, $ne: [] } };
+      if (project) match.project = project;
       if (from || to) {
-                match.timestamp = {};
-                if (from) match.timestamp.$gte = from;
-                if (to) match.timestamp.$lte = to;
+        match.timestamp = {};
+        if (from) (match.timestamp as Record<string, unknown>).$gte = from;
+        if (to) (match.timestamp as Record<string, unknown>).$lte = to;
       }
 
-      const pipeline: any[] = [
+      const pipeline: Record<string, unknown>[] = [
         { $match: match },
         { $unwind: "$toolApiNames" },
         // Optional: filter to a single tool
@@ -680,10 +679,10 @@ router.get(
         .toArray();
 
       res.json(
-        results.map((r: any) => {
+        results.map((r: Record<string, unknown>) => {
           // Count top models
           const modelCounts: Record<string, number> = {};
-          for ( const m of r._models || []) {
+          for (const m of (r._models as string[]) || []) {
             if (m) modelCounts[m] = (modelCounts[m] || 0) + 1;
           }
           const topModels = Object.entries(modelCounts)
@@ -693,7 +692,7 @@ router.get(
 
           // Count top agents
           const agentCounts: Record<string, number> = {};
-          for ( const a of r._agents || []) {
+          for (const a of (r._agents as string[]) || []) {
             if (a) agentCounts[a] = (agentCounts[a] || 0) + 1;
           }
           const topAgents = Object.entries(agentCounts)
@@ -711,7 +710,7 @@ router.get(
             avgLatency: r.avgLatency,
             firstUsed: r.firstUsed,
             lastUsed: r.lastUsed,
-                        providers: (r._providers as any)?.filter(Boolean) || [],
+            providers: (r._providers as string[])?.filter(Boolean) || [],
             topModels,
             topAgents,
             successCount: r.successCount,
@@ -735,14 +734,14 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { from, to } = req.query;
-      const match: any = {};
+      const match: Record<string, unknown> = {};
       if (from || to) {
-                match.timestamp = {};
-                if (from) match.timestamp.$gte = from;
-                if (to) match.timestamp.$lte = to;
+        match.timestamp = {};
+        if (from) (match.timestamp as Record<string, unknown>).$gte = from;
+        if (to) (match.timestamp as Record<string, unknown>).$lte = to;
       }
 
-      const pipeline: any[] = [
+      const pipeline: Record<string, unknown>[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
         {
           $group: {
@@ -765,7 +764,7 @@ router.get(
         .toArray();
 
       res.json(
-        results.map((r: any) => ({
+        results.map((r: Record<string, unknown>) => ({
           endpoint: r._id || "any",
           totalRequests: r.totalRequests,
           totalTokens: r.totalTokens,
@@ -790,11 +789,11 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { from, to } = req.query;
-      const match: any = {};
+      const match: Record<string, unknown> = {};
       if (from || to) {
-                match.timestamp = {};
-                if (from) match.timestamp.$gte = from;
-                if (to) match.timestamp.$lte = to;
+        match.timestamp = {};
+        if (from) (match.timestamp as Record<string, unknown>).$gte = from;
+        if (to) (match.timestamp as Record<string, unknown>).$lte = to;
       }
       const matchStage = Object.keys(match).length ? [{ $match: match }] : [];
 
