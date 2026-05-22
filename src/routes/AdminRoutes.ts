@@ -294,7 +294,7 @@ router.get(
           db.collection(REQUESTS_COL).aggregate(traceCountPipeline).toArray(),
           db.collection(CONVERSATIONS_COL).countDocuments(convMatch),
         ]);
-      const result = (resultDocs[0] || {}) as Record<string, any>;
+      const result = (resultDocs[0] || {}) as Record<string, unknown>;
       const traceCount = traceResult[0]?.total || 0;
       const totalToolCalls = toolCallResult[0]?.total || 0;
 
@@ -883,11 +883,11 @@ router.get(
       } = result;
 
       // Nest provider breakdown under each project
-      const providersByProject: any = {};
+      const providersByProject: Record<string, Record<string, unknown>[]> = {};
             for ( const row of byProjectProvider) {
         const proj = row._id.project || "any";
                 if (!providersByProject[proj]) providersByProject[proj] = [];
-                (providersByProject as any)[proj].push({
+                (providersByProject)[proj].push({
           provider: row._id.provider || "any",
           totalCost: row.totalCost,
           totalInputTokens: row.totalInputTokens,
@@ -898,11 +898,11 @@ router.get(
       }
 
       // Nest endpoint breakdown under each project
-      const endpointsByProject: any = {};
+      const endpointsByProject: Record<string, Record<string, unknown>[]> = {};
             for ( const row of byProjectEndpoint) {
         const proj = row._id.project || "any";
                 if (!endpointsByProject[proj]) endpointsByProject[proj] = [];
-                (endpointsByProject as any)[proj].push({
+                (endpointsByProject)[proj].push({
           endpoint: row._id.endpoint || "any",
           totalCost: row.totalCost,
           totalInputTokens: row.totalInputTokens,
@@ -913,11 +913,11 @@ router.get(
       }
 
       // Nest model breakdown under each project
-      const modelsByProject: any = {};
+      const modelsByProject: Record<string, Record<string, unknown>[]> = {};
             for ( const row of byProjectModel) {
         const proj = row._id.project || "any";
                 if (!modelsByProject[proj]) modelsByProject[proj] = [];
-                (modelsByProject as any)[proj].push({
+                (modelsByProject)[proj].push({
           model: row._id.model || "any",
           provider: row._id.provider || "any",
           totalCost: row.totalCost,
@@ -943,34 +943,34 @@ router.get(
           totalRequests: t.totalRequests,
           avgTokensPerSec: t.avgTokensPerSec,
         },
-        byProject: byProject.map((r: any) => ({
+        byProject: byProject.map((r: Record<string, unknown>) => ({
           project: r._id || "any",
           totalCost: r.totalCost,
           totalInputTokens: r.totalInputTokens,
           totalOutputTokens: r.totalOutputTokens,
           totalRequests: r.totalRequests,
           avgTokensPerSec: r.avgTokensPerSec,
-                    byProvider: providersByProject[((r as string) as any)._id || "any"] || [],
-                    byEndpoint: endpointsByProject[((r as string) as any)._id || "any"] || [],
-                    byModel: modelsByProject[((r as string) as any)._id || "any"] || [],
+          byProvider: providersByProject[(r._id as string) || "any"] || [],
+          byEndpoint: endpointsByProject[(r._id as string) || "any"] || [],
+          byModel: modelsByProject[(r._id as string) || "any"] || [],
         })),
-        byProvider: byProvider.map((r: any) => ({
+        byProvider: byProvider.map((r: Record<string, unknown>) => ({
           provider: r._id || "any",
           totalCost: r.totalCost,
           totalInputTokens: r.totalInputTokens,
           totalOutputTokens: r.totalOutputTokens,
           totalRequests: r.totalRequests,
         })),
-        byModel: byModel.map((r: any) => ({
-                    model: (r as any)._id.model || "any",
-                    provider: (r as any)._id.provider || "any",
+        byModel: byModel.map((r: Record<string, unknown>) => ({
+          model: (r._id as Record<string, string>)?.model || "any",
+          provider: (r._id as Record<string, string>)?.provider || "any",
           totalCost: r.totalCost,
           totalInputTokens: r.totalInputTokens,
           totalOutputTokens: r.totalOutputTokens,
           totalRequests: r.totalRequests,
           avgTokensPerSec: r.avgTokensPerSec,
         })),
-        byEndpoint: byEndpoint.map((r: any) => ({
+        byEndpoint: byEndpoint.map((r: Record<string, unknown>) => ({
           endpoint: r._id || "any",
           totalCost: r.totalCost,
           totalInputTokens: r.totalInputTokens,
@@ -1001,7 +1001,7 @@ router.get(
       if (typeof from === "string") {
         sinceDate = new Date(from);
       } else {
-        sinceDate = new Date(Date.now() - hoursToMs(parseInt((hours as any), 10)));
+        sinceDate = new Date(Date.now() - hoursToMs(parseInt(hours as string, 10)));
       }
       if (typeof to === "string") {
         untilDate = new Date(to);
@@ -1014,7 +1014,7 @@ router.get(
 
       // Eight-tier granularity — targets ~200 data points for every time range.
       // Each tier boundary is chosen so the maximum bin count stays in the 120–288 range.
-      let granularity: any, groupId: any;
+      let granularity: string, groupId: Record<string, unknown>;
       if (spanMinutes <= 2) {
         // ≤ 2 minutes → 1-second bins  (max 120 pts)  "2026-04-02T22:05:31"
                 granularity = "1s";
@@ -1269,13 +1269,13 @@ router.get(
         groupId = { $substr: ["$timestamp", 0, 10] }; // "2026-03-21"
       }
 
-            const timeMatch: any = { $gte: (sinceDate as any).toISOString() };
-            if (untilDate) timeMatch.$lte = (untilDate as any).toISOString();
+            const timeMatch: Record<string, string> = { $gte: sinceDate.toISOString() };
+            if (untilDate) timeMatch.$lte = untilDate!.toISOString();
 
-      const matchFilter: any = { timestamp: timeMatch };
+      const matchFilter: Record<string, unknown> = { timestamp: timeMatch };
             if (project) matchFilter.project = project;
 
-      const pipeline: any[] = [
+      const pipeline: Record<string, unknown>[] = [
         { $match: matchFilter },
         {
           $group: {
@@ -1306,14 +1306,14 @@ router.get(
 
       res.json({
         granularity,
-        data: results.map((r: any) => ({
+        data: results.map((r: Record<string, unknown>) => ({
           hour: r._id,
           requests: r.requests,
           tokens: r.tokens,
           cost: r.cost,
-                    avgLatency: r.avgLatency ? Math.round((r.avgLatency as any)) : 0,
+                    avgLatency: r.avgLatency ? Math.round(r.avgLatency as number) : 0,
           successRate:
-                        (r as any).requests > 0 ? Math.round(((r as any).successes / (r as any).requests) * 100) : 100,
+            (r.requests as number) > 0 ? Math.round(((r.successes as number) / (r.requests as number)) * 100) : 100,
         })),
       });
     } catch (error: unknown) {
@@ -1346,13 +1346,13 @@ router.get(
         order = "desc",
       } = req.query;
 
-       const filter: any = {};
+       const filter: Record<string, unknown> = {};
             if (trace) filter.traceId = trace;
             if (project) filter.project = project;
             if (username) filter.username = username;
        if (search) {
         const regex = { $regex: search, $options: "i" };
-        const orClauses: Record<string, any>[] = [
+        const orClauses: Record<string, unknown>[] = [
           { title: regex },
           { project: regex },
           { username: regex },
@@ -1360,7 +1360,7 @@ router.get(
 
         // IP lives on requests, not conversations — resolve matching
         // conversationIds first, then fold them into the $or filter.
-                if (/^[\d.:a-f]+$/i.test((search as any).trim())) {
+                if (/^[\d.:a-f]+$/i.test((search as string).trim())) {
           const matchingConvIds = await db
             .collection(REQUESTS_COL)
             .distinct("conversationId", { clientIp: regex });
@@ -1375,15 +1375,15 @@ router.get(
             if (model) filter["messages.model"] = model;
       if (from || to) {
                 filter.updatedAt = {};
-                if (from) (filter as any).updatedAt.$gte = from;
-                if (to) (filter as any).updatedAt.$lte = to;
+                if (from) (filter as Record<string, Record<string, unknown>>).updatedAt.$gte = from;
+                if (to) (filter as Record<string, Record<string, unknown>>).updatedAt.$lte = to;
       }
 
-            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
-            const lim = parseInt((limit as any), 10);
+            const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
+            const lim = parseInt(limit as string, 10);
       const sortDir = order === "asc" ? 1 : -1;
 
-      const pipeline: any[] = [
+      const pipeline: Record<string, unknown>[] = [
         ...(Object.keys(filter).length ? [{ $match: filter }] : []),
                 { $sort: { [sort as string]: sortDir as 1 | -1 } },
         {
@@ -1534,7 +1534,7 @@ router.get(
         db.collection(CONVERSATIONS_COL).countDocuments(filter),
       ]);
 
-            res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
+            res.json({ data: docs, total, page: parseInt(page as string, 10), limit: lim });
     } catch (error: unknown) {
             logger.error(`Admin /conversations error: ${(error as Error).message}`);
       next(error);
@@ -1650,8 +1650,8 @@ router.get(
             { isGenerating: true, updatedAt: { $lt: fiveMinAgo } },
             { $set: { isGenerating: false } },
           )
-                    .then(({ modifiedCount }: any) => {
-                        if ((modifiedCount as any) > 0)
+                    .then(({ modifiedCount }: { modifiedCount: number }) => {
+                        if (modifiedCount > 0)
               logger.info(
                 `Auto-cleared ${modifiedCount} stale isGenerating flag(s)`,
               );
@@ -1680,12 +1680,12 @@ router.get(
 
     if (ChangeStreamService.available) {
       // Change Stream-driven: re-query stats only when conversations change
-      const onEvent = (event: any) => {
+      const onEvent = (event: Record<string, unknown>) => {
         if (event.collection === "conversations") {
           sendStats();
         }
       };
-            ChangeStreamService.subscribe((onEvent as any));
+            ChangeStreamService.subscribe(onEvent);
 
       // Secondary poll: catch generation activity not tracked via Change
       // Streams (benchmarks skip conversation persistence, and provider
@@ -1709,7 +1709,7 @@ router.get(
       }, SSE_KEEPALIVE_INTERVAL_MS);
 
       req.on("close", () => {
-                ChangeStreamService.unsubscribe((onEvent as any));
+                ChangeStreamService.unsubscribe(onEvent);
         clearInterval(generationPoll);
         clearInterval(keepAlive);
       });
@@ -1746,7 +1746,7 @@ router.get(
 
     if (ChangeStreamService.available) {
       // Push change events as they arrive from MongoDB
-      const onEvent = (event: any) => {
+      const onEvent = (event: Record<string, unknown>) => {
         try {
           res.write(
             `data: ${JSON.stringify({ type: "change", ...event })}\n\n`,
@@ -1756,7 +1756,7 @@ router.get(
         }
       };
 
-            ChangeStreamService.subscribe((onEvent as any));
+            ChangeStreamService.subscribe(onEvent);
 
       // Keep-alive ping every 30s
       const keepAlive = setInterval(() => {
@@ -1768,7 +1768,7 @@ router.get(
       }, SSE_KEEPALIVE_INTERVAL_MS);
 
       req.on("close", () => {
-                ChangeStreamService.unsubscribe((onEvent as any));
+                ChangeStreamService.unsubscribe(onEvent);
         clearInterval(keepAlive);
       });
     } else {
@@ -1822,7 +1822,7 @@ router.get(
 
       const { minutes: minParam = 5 } = req.query;
       const since = new Date(
-                Date.now() - parseInt((minParam as any), 10) * MS_PER_MINUTE,
+                Date.now() - parseInt(minParam as string, 10) * MS_PER_MINUTE,
       ).toISOString();
 
       const [rawConversations, recentRequests] = await Promise.all([
@@ -1851,32 +1851,32 @@ router.get(
       ]);
 
       // Enrich conversations with lastMessage info and remap fields
-      const conversations = rawConversations.map((c: any) => {
-        const msgs = c.messages || [];
-                const lastMsg = (msgs as any).length > 0 ? (msgs as any)[(msgs as any).length - 1] : null;
+      const conversations = rawConversations.map((c: Record<string, unknown>) => {
+        const msgs = (c.messages || []) as Record<string, unknown>[];
+        const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
         let lastMessageText = null;
         if (lastMsg) {
-          const content = (lastMsg as any).content;
+          const content = lastMsg.content;
           if (typeof content === "string") {
             lastMessageText = content;
           } else if (Array.isArray(content)) {
-            const textPart = content.find((p: any) => p.type === "text");
+            const textPart = content.find((p: Record<string, unknown>) => p.type === "text");
             lastMessageText = textPart?.text || null;
           }
         }
         // Compute totalCost from messages (covers docs saved before totalCost field existed)
         const totalCost =
           c.totalCost ||
-                    (msgs as any).reduce((sum: any, m: any) => sum + (m.estimatedCost || 0), 0);
+          msgs.reduce((sum: number, m: Record<string, unknown>) => sum + ((m.estimatedCost as number) || 0), 0);
         return {
           id: c.id,
           project: c.project,
           username: c.username,
           title: c.title,
           lastActivity: c.updatedAt,
-                    messageCount: (msgs as any).length,
+          messageCount: msgs.length,
           lastMessage: lastMessageText,
-          lastMessageRole: (lastMsg as any)?.role || null,
+          lastMessageRole: lastMsg?.role || null,
           isGenerating: c.isGenerating || false,
           modalities: c.modalities || null,
           providers: c.providers || [],
@@ -1888,7 +1888,7 @@ router.get(
       const totalRecent = await db
         .collection(REQUESTS_COL)
         .countDocuments({ timestamp: { $gte: since } });
-            const requestsPerMinute = totalRecent / parseInt((minParam as any), 10);
+            const requestsPerMinute = totalRecent / parseInt(minParam as string, 10);
 
       res.json({
         conversations,
@@ -1950,7 +1950,7 @@ router.get(
   "/lm-studio/models",
   asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
     try {
-            const provider = getProvider(("lm-studio" as any));
+            const provider = getProvider("lm-studio");
       const data = await provider.listModels();
       res.json(data);
     } catch (error: unknown) {
@@ -1982,10 +1982,10 @@ router.post(
           .json({ error: "Missing 'model' in request body" });
       }
 
-            const provider = getProvider(("lm-studio" as any));
+            const provider = getProvider("lm-studio");
 
       // Build load options from request body
-      const loadOptions: any = {};
+      const loadOptions: Record<string, unknown> = {};
             if (context_length != null) loadOptions.context_length = context_length;
             if (flash_attention != null)
                 loadOptions.flash_attention = flash_attention;
@@ -2027,7 +2027,7 @@ router.post(
         });
       }
 
-            const provider = getProvider(("lm-studio" as any));
+            const provider = getProvider("lm-studio");
       const data = await provider.unloadModel(instance_id);
       res.json(data);
     } catch (error: unknown) {
@@ -2059,11 +2059,11 @@ router.post(
           .json({ error: "Missing 'model' in request body" });
       }
 
-            const provider = getProvider(("lm-studio" as any));
+            const provider = getProvider("lm-studio");
       const result = await provider.listModels();
       const allModels = result?.data || result?.models || [];
       const modelData = allModels.find(
-        (m: any) => m.id === model || m.path === model || m.key === model,
+        (m: Record<string, unknown>) => m.id === model || m.path === model || m.key === model,
       );
 
       if (!modelData) {
@@ -2125,20 +2125,20 @@ router.get(
         order = "desc",
       } = req.query;
 
-      const filter: any = {};
+      const filter: Record<string, unknown> = {};
             if (guildId) filter.guildId = guildId;
             if (userId) filter.userId = userId;
             if (userName) filter.userName = { $regex: userName, $options: "i" };
       if (from || to) {
                 filter.createdAt = {};
-                if (from) (filter as any).createdAt.$gte = from;
-                if (to) (filter as any).createdAt.$lte = to;
+                if (from) (filter as Record<string, Record<string, unknown>>).createdAt.$gte = from;
+                if (to) (filter as Record<string, Record<string, unknown>>).createdAt.$lte = to;
       }
 
       // If project, provider, or model is specified, find matching conversation IDs
       // and filter workflows that reference those conversations
       if (project || provider || model) {
-        const convFilter: any = {};
+        const convFilter: Record<string, unknown> = {};
                 if (project) convFilter.project = project;
                 if (provider) convFilter.providers = provider;
                 if (model) convFilter["messages.model"] = model;
@@ -2148,8 +2148,8 @@ router.get(
                 filter.conversationIds = { $elemMatch: { $in: convIds } };
       }
 
-            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
-            const lim = parseInt((limit as any), 10);
+            const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
+            const lim = parseInt(limit as string, 10);
       const sortDir = order === "asc" ? 1 : -1;
 
       const [docs, total] = await Promise.all([
@@ -2183,7 +2183,7 @@ router.get(
         db.collection(WORKFLOWS_COL).countDocuments(filter),
       ]);
 
-            res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
+            res.json({ data: docs, total, page: parseInt(page as string, 10), limit: lim });
     } catch (error: unknown) {
             logger.error(`Admin GET /workflows error: ${(error as Error).message}`);
       next(error);
@@ -2198,9 +2198,9 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const { ObjectId } = await import("mongodb");
-      let objectId: any;
+      let objectId: InstanceType<typeof ObjectId>;
       try {
-                objectId = new (ObjectId as any)(req.params.id);
+        objectId = new ObjectId(req.params.id as string);
       } catch {
         return res.status(400).json({ error: "Invalid workflow ID" });
       }
@@ -2235,8 +2235,8 @@ router.get(
         from,
         to,
       } = req.query;
-            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
-            const lim = parseInt((limit as any), 10);
+            const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
+            const lim = parseInt(limit as string, 10);
 
       // Get distinct projects and usernames for filter dropdowns
       const [convProjects, convUsernames, reqProjects, reqUsernames] =
@@ -2262,16 +2262,16 @@ router.get(
         .sort();
 
       // Use aggregation to unwind messages and extract media in one query
-      const preMatch: any = {};
+      const preMatch: Record<string, unknown> = {};
             if (project) preMatch.project = project;
             if (username) preMatch.username = username;
       if (from || to) {
-                preMatch.updatedAt = {};
-                if (from) preMatch.updatedAt.$gte = from;
-                if (to) preMatch.updatedAt.$lte = to;
+        preMatch.updatedAt = {} as Record<string, unknown>;
+        if (from) (preMatch.updatedAt as Record<string, unknown>).$gte = from;
+        if (to) (preMatch.updatedAt as Record<string, unknown>).$lte = to;
       }
 
-      const pipeline: any[] = [
+      const pipeline: Record<string, unknown>[] = [
         ...(Object.keys(preMatch).length ? [{ $match: preMatch }] : []),
         { $unwind: "$messages" },
         {
@@ -2394,10 +2394,10 @@ router.get(
         .toArray();
 
       // ── Agent-generated images from requests (captures skipConversation callers) ──
-      let requestGenItems: any[] = [];
+      let requestGenItems: Record<string, unknown>[] = [];
       if (!type || type === "image") {
         if (origin !== "user") {
-          const reqMatch: any = {
+          const reqMatch: Record<string, unknown> = {
             operation: { $in: ["agent:image", "agent:iteration"] },
             success: true,
             "responsePayload.images": { $exists: true, $ne: [] },
@@ -2405,9 +2405,9 @@ router.get(
                     if (project) reqMatch.project = project;
                     if (username) reqMatch.username = username;
           if (from || to) {
-                        reqMatch.timestamp = {};
-                        if (from) reqMatch.timestamp.$gte = from;
-                        if (to) reqMatch.timestamp.$lte = to;
+            reqMatch.timestamp = {} as Record<string, unknown>;
+            if (from) (reqMatch.timestamp as Record<string, unknown>).$gte = from;
+            if (to) (reqMatch.timestamp as Record<string, unknown>).$lte = to;
           }
           if (search) {
                         reqMatch["requestPayload.messages.content"] = {
@@ -2416,7 +2416,7 @@ router.get(
             };
           }
 
-          const reqPipeline: any[] = [
+          const reqPipeline: Record<string, unknown>[] = [
             { $match: reqMatch },
             { $unwind: "$responsePayload.images" },
             {
@@ -2451,7 +2451,7 @@ router.get(
       }
 
       // ── Merge and deduplicate ──────────────────────────────────
-      const seenUrls = new Set(convItems.map((i: any) => i.url));
+      const seenUrls = new Set(convItems.map((i: Record<string, unknown>) => i.url));
       const mergedItems = [...convItems];
             for ( const item of requestGenItems) {
         if (!seenUrls.has(item.url)) {
@@ -2460,7 +2460,7 @@ router.get(
         }
       }
 
-      mergedItems.sort((a: any, b: any) => {
+      mergedItems.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
         const ta = a.timestamp || "";
         const tb = b.timestamp || "";
         return ta < tb ? 1 : ta > tb ? -1 : 0;
@@ -2469,7 +2469,7 @@ router.get(
       const total = mergedItems.length;
       const paginatedItems = mergedItems.slice(skip, skip + lim);
 
-      const data = paginatedItems.map((item: any) => ({
+      const data = paginatedItems.map((item: Record<string, unknown>) => ({
         url: item.url,
         mediaType: item.mediaType,
         origin: item.role === "assistant" ? "ai" : "user",
@@ -2479,13 +2479,13 @@ router.get(
         username: item.username,
         model: item.model,
         timestamp: item.timestamp,
-                ...(item.agent && { agent: item.agent }),
+        ...(item.agent ? { agent: item.agent } : {}),
       }));
 
       res.json({
         data,
         total,
-                page: parseInt((page as any), 10),
+                page: parseInt(page as string, 10),
         limit: lim,
         projects: allProjects,
         usernames: allUsernames,
@@ -2514,18 +2514,18 @@ router.get(
         from,
         to,
       } = req.query;
-            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
-            const lim = parseInt((limit as any), 10);
+            const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
+            const lim = parseInt(limit as string, 10);
 
-      const preMatch: any = {};
+      const preMatch: Record<string, unknown> = {};
             if (project) preMatch.project = project;
       if (from || to) {
-                preMatch.updatedAt = {};
-                if (from) preMatch.updatedAt.$gte = from;
-                if (to) preMatch.updatedAt.$lte = to;
+        preMatch.updatedAt = {} as Record<string, unknown>;
+        if (from) (preMatch.updatedAt as Record<string, unknown>).$gte = from;
+        if (to) (preMatch.updatedAt as Record<string, unknown>).$lte = to;
       }
 
-      const pipeline: any[] = [
+      const pipeline: Record<string, unknown>[] = [
         ...(Object.keys(preMatch).length ? [{ $match: preMatch }] : []),
         { $unwind: "$messages" },
         {
@@ -2562,7 +2562,7 @@ router.get(
         });
       }
 
-      const countPipeline: any[] = [...pipeline, { $count: "total" }];
+      const countPipeline: Record<string, unknown>[] = [...pipeline, { $count: "total" }];
       const [countResult] = await db
         .collection(CONVERSATIONS_COL)
         .aggregate(countPipeline)
@@ -2576,7 +2576,7 @@ router.get(
         .aggregate(pipeline)
         .toArray();
 
-      const data = items.map((item: any) => ({
+      const data = items.map((item: Record<string, unknown>) => ({
         content: item.content,
         origin: item.role === "assistant" ? "ai" : "user",
         role: item.role,
@@ -2586,11 +2586,11 @@ router.get(
         username: item.username,
         model: item.model,
         estimatedCost: item.estimatedCost,
-                hasImages: (item as any).images > 0,
+        hasImages: (item.images as number) > 0,
         timestamp: item.timestamp,
       }));
 
-            res.json({ data, total, page: parseInt((page as any), 10), limit: lim });
+            res.json({ data, total, page: parseInt(page as string, 10), limit: lim });
     } catch (error: unknown) {
             logger.error(`Admin /text error: ${(error as Error).message}`);
       next(error);
@@ -2617,20 +2617,20 @@ router.get(
       } = req.query;
 
       // Base filter: only requests with a traceId
-      const match: any = { traceId: { $ne: null } };
+      const match: Record<string, unknown> = { traceId: { $ne: null } };
             if (project) match.project = project;
             if (username) match.username = username;
       if (from || to) {
-                match.timestamp = {};
-                if (from) match.timestamp.$gte = from;
-                if (to) match.timestamp.$lte = to;
+                match.timestamp = {} as Record<string, unknown>;
+          if (from) (match.timestamp as Record<string, unknown>).$gte = from;
+          if (to) (match.timestamp as Record<string, unknown>).$lte = to;
       }
 
-            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
-            const lim = parseInt((limit as any), 10);
+            const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
+            const lim = parseInt(limit as string, 10);
       const sortDir = order === "asc" ? 1 : -1;
 
-      const pipeline: any[] = [
+      const pipeline: Record<string, unknown>[] = [
         { $match: match },
         // Group all requests by traceId
         {
@@ -2766,7 +2766,7 @@ router.get(
       ];
 
       // Count total matching traces
-      const countPipeline: any[] = [...pipeline, { $count: "total" }];
+      const countPipeline: Record<string, unknown>[] = [...pipeline, { $count: "total" }];
 
       // Add pagination to the data pipeline
             pipeline.push({ $skip: skip }, { $limit: lim });
@@ -2777,7 +2777,7 @@ router.get(
       ]);
       const total = countResult[0]?.total || 0;
 
-            res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
+            res.json({ data: docs, total, page: parseInt(page as string, 10), limit: lim });
     } catch (error: unknown) {
             logger.error(`Admin /traces error: ${(error as Error).message}`);
       next(error);
@@ -2809,24 +2809,24 @@ router.get(
         username: requests[0].username,
         requestCount: requests.length,
         totalCost: requests.reduce(
-                    (sum: any, r: any) => sum + (r.estimatedCost || 0),
+                    (sum: number, r: Record<string, unknown>) => sum + ((r.estimatedCost as number) || 0),
                     0,
         ),
         totalInputTokens: requests.reduce(
-                    (sum: any, r: any) => sum + (r.inputTokens || 0),
+                    (sum: number, r: Record<string, unknown>) => sum + ((r.inputTokens as number) || 0),
                     0,
         ),
         totalOutputTokens: requests.reduce(
-                    (sum: any, r: any) => sum + (r.outputTokens || 0),
+                    (sum: number, r: Record<string, unknown>) => sum + ((r.outputTokens as number) || 0),
                     0,
         ),
-        createdAt: requests.reduce(
-                    (min: any, r: any) => (!min || (r as any).timestamp < min ? r.timestamp : min),
-          null,
+        createdAt: (requests as Record<string, unknown>[]).reduce(
+          (min: string | null, r) => (!min || (r.timestamp as string) < min ? (r.timestamp as string) : min),
+          null as string | null,
         ),
-        updatedAt: requests.reduce(
-                    (max: any, r: any) => (!max || (r as any).timestamp > max ? r.timestamp : max),
-          null,
+        updatedAt: (requests as Record<string, unknown>[]).reduce(
+          (max: string | null, r) => (!max || (r.timestamp as string) > max ? (r.timestamp as string) : max),
+          null as string | null,
         ),
         requests,
       };
@@ -2902,8 +2902,8 @@ router.get(
       let totalCacheReadInputTokens = 0;
       let totalCacheCreationInputTokens = 0;
       let totalReasoningOutputTokens = 0;
-      const mergedModalities: any = {};
-      const toolCounts: any = {};
+      const mergedModalities: Record<string, boolean> = {};
+      const toolCounts: Record<string, number> = {};
 
             for ( const r of requests) {
         totalCost += r.estimatedCost || 0;
@@ -2930,16 +2930,16 @@ router.get(
       }
 
       const workerRequestCount = requests.filter(
-        (r: any) => r.agentSessionId !== sessionId,
+        (r) => r.agentSessionId !== sessionId,
       ).length;
 
-      const createdAt = requests.reduce(
-                (min: any, r: any) => (!min || (r as any).timestamp < min ? r.timestamp : min),
-        null,
+      const createdAt = (requests as Record<string, unknown>[]).reduce(
+        (min: string | null, r) => (!min || (r.timestamp as string) < min ? (r.timestamp as string) : min),
+        null as string | null,
       );
-      const updatedAt = requests.reduce(
-                (max: any, r: any) => (!max || (r as any).timestamp > max ? r.timestamp : max),
-        null,
+      const updatedAt = (requests as Record<string, unknown>[]).reduce(
+        (max: string | null, r) => (!max || (r.timestamp as string) > max ? (r.timestamp as string) : max),
+        null as string | null,
       );
 
       // Wall-clock elapsed time: from first request to last request (includes workers)
@@ -2947,7 +2947,7 @@ router.get(
         createdAt && updatedAt
           ? Math.max(
               0,
-                            (new Date(updatedAt).getTime() - new Date(createdAt).getTime()) /
+              (new Date(updatedAt as string).getTime() - new Date(createdAt as string).getTime()) /
                 1000,
             )
           : 0;
@@ -3076,16 +3076,16 @@ router.get(
         order = "desc",
       } = req.query;
 
-      const filter: any = {};
+      const filter: Record<string, unknown> = {};
             if (project) filter.project = project;
       if (from || to) {
                 filter.updatedAt = {};
-                if (from) (filter as any).updatedAt.$gte = from;
-                if (to) (filter as any).updatedAt.$lte = to;
+                if (from) (filter as Record<string, Record<string, unknown>>).updatedAt.$gte = from;
+                if (to) (filter as Record<string, Record<string, unknown>>).updatedAt.$lte = to;
       }
 
-            const skip = (parseInt((page as any), 10) - 1) * parseInt((limit as any), 10);
-            const lim = parseInt((limit as any), 10);
+            const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
+            const lim = parseInt(limit as string, 10);
       const sortDir = order === "asc" ? 1 : -1;
 
       const [docs, total] = await Promise.all([
@@ -3102,7 +3102,7 @@ router.get(
         db.collection(COLLECTIONS.AGENT_SESSIONS).countDocuments(filter),
       ]);
 
-            res.json({ data: docs, total, page: parseInt((page as any), 10), limit: lim });
+            res.json({ data: docs, total, page: parseInt(page as string, 10), limit: lim });
     } catch (error: unknown) {
             logger.error(`Admin /agent-sessions error: ${(error as Error).message}`);
       next(error);
