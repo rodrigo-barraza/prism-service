@@ -893,7 +893,7 @@ const anthropicProvider = {
           if (chunk.delta?.stop_reason) {
             yield { type: "stopReason", stopReason: chunk.delta.stop_reason };
           }
-          if ("stop_details" in chunk.delta) {
+          if (chunk.delta && "stop_details" in chunk.delta) {
             yield {
               type: "stopDetails",
               stopDetails: chunk.delta.stop_details,
