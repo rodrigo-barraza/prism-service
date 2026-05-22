@@ -19,6 +19,7 @@ import {
   calculateImageCost,
   mergeUsage,
 } from "../utils/CostCalculator.ts";
+import type { TokenUsage } from "../types/admin.ts";
 import logger from "../utils/logger.ts";
 import RequestLogger from "../services/RequestLogger.ts";
 import FileService from "../services/FileService.ts";
@@ -987,7 +988,7 @@ async function handleStreamingText(context: GenerationContext) {
           signal,
         });
   const ss = createStreamState();
-  (ss as Record<string, unknown>).requestStart = requestStart;
+  ss.requestStart = requestStart;
   for await (const chunk of stream) {
     // Client disconnected — abort the upstream provider stream
     if (signal?.aborted) {
@@ -1014,14 +1015,14 @@ async function handleStreamingText(context: GenerationContext) {
   while (
     options.functionCallingEnabled &&
     ss.toolCalls.length > 0 &&
-    (ss.toolCalls as Record<string, unknown>[]).some(
+    ss.toolCalls.some(
       (tc) => !tc.result && tc.status !== "done" && tc.status !== "error",
     ) &&
     fcIteration < MAX_FC_ITERATIONS &&
     !signal?.aborted
   ) {
     fcIteration++;
-    const pendingCalls = (ss.toolCalls as Record<string, unknown>[]).filter(
+    const pendingCalls = ss.toolCalls.filter(
       (tc) => !tc.result && tc.status !== "done" && tc.status !== "error",
     );
     if (pendingCalls.length === 0) break;
@@ -1070,7 +1071,7 @@ async function handleStreamingText(context: GenerationContext) {
     const assistantToolMsg = {
       role: "assistant",
       content: ss.text || "",
-      toolCalls: (ss.toolCalls as Record<string, unknown>[]).map((tc) => ({
+      toolCalls: ss.toolCalls.map((tc) => ({
         id: tc.id,
         name: tc.name,
         args: tc.args,
@@ -1080,7 +1081,7 @@ async function handleStreamingText(context: GenerationContext) {
         ? { thinkingSignature: ss.thinkingSignature }
         : {}),
     };
-    const toolResultMsgs = (ss.toolCalls as Record<string, unknown>[])
+    const toolResultMsgs = ss.toolCalls
       .filter((tc) => tc.result)
       .map((tc) => ({
         role: "tool",
@@ -1105,11 +1106,11 @@ async function handleStreamingText(context: GenerationContext) {
       },
     );
     // Use dispatchChunk with a custom usage merger for follow-up iteration
-    const usageMerger = (followUpUsage: Record<string, number>) => {
+    const usageMerger = (followUpUsage: TokenUsage) => {
       if (ss.usage) {
         mergeUsage(ss.usage, followUpUsage);
       } else {
-        (ss as Record<string, unknown>).usage = followUpUsage;
+        ss.usage = followUpUsage;
       }
     };
     for await (const chunk of followUpStream) {
@@ -1141,12 +1142,11 @@ async function handleStreamingText(context: GenerationContext) {
   await finalizeTextGeneration(context, {
     text: ss.text,
     thinking: ss.thinking,
-    thinkingSignature: ss.thinkingSignature,
     images: ss.images,
-    toolCalls: ss.toolCalls,
+    toolCalls: ss.toolCalls as any,
     audioChunks: ss.audioChunks,
     audioSampleRate: ss.audioSampleRate,
-    usage: ss.usage,
+    usage: ss.usage as any,
     outputCharacters: ss.outputCharacters,
     timeToGenerationSec: ss.firstTokenTime
       ? (ss.firstTokenTime - requestStart) / 1000
@@ -1156,7 +1156,7 @@ async function handleStreamingText(context: GenerationContext) {
         ? (ss.generationEnd - ss.firstTokenTime) / 1000
         : null,
     totalSec: (now - requestStart) / 1000,
-    rateLimits: ss.rateLimits,
+    rateLimits: ss.rateLimits as Record<string, unknown> | null,
   });
 }
 // ─── Dispatch: Non-streaming text generation (fallback) ─────

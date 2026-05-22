@@ -132,9 +132,8 @@ export default class AgenticToolResolver {
         );
       } else {
         resolvedEnabledTools = dynamicTools
-                    .map(((t: any) => t.name as any as (value: any, index: number, array: any[]) => any))
-                    // @ts-ignore - TODO: strict typing
-                    .filter((name: string) => !disabledSet.has(name));
+          .map((t: any) => t.name as string)
+          .filter((name: string) => !disabledSet.has(name));
         logger.info(
           `[AgenticLoop] disabledBuiltIns mode (no persona): ${disabledSet.size} disabled → ${(resolvedEnabledTools as any).length} enabled tools`,
         );
@@ -192,8 +191,8 @@ export default class AgenticToolResolver {
       }
 
       const preFilterCustom = finalTools
-                .filter((t: any) => t._isCustom)
-                .map(((t: any) => t.name as any as (value: any, index: number, array: any[]) => any));
+        .filter((t: any) => t._isCustom)
+        .map((t: any) => t.name as string);
       finalTools = finalTools.filter(
                 (t: any) =>
                     (enabledSet as any).has(t.name) ||
@@ -203,8 +202,8 @@ export default class AgenticToolResolver {
                     (PRISM_LOCAL_TOOL_NAMES as any).has((t.name as any)),
       );
       const postFilterCustom = finalTools
-                .filter((t: any) => t._isCustom)
-                .map(((t: any) => t.name as any as (value: any, index: number, array: any[]) => any));
+        .filter((t: any) => t._isCustom)
+        .map((t: any) => t.name as string);
       if (preFilterCustom.length > 0) {
         logger.info(
           `[AgenticToolResolver] Custom tools: pre-filter=[${preFilterCustom.join(", ")}] post-filter=[${postFilterCustom.join(", ")}] (enabledSet has ${enabledSet.size} entries)`,

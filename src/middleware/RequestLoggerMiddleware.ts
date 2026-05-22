@@ -15,31 +15,30 @@ export function requestLoggerMiddleware(req: Request, res: Response, next: NextF
 
   // Resolve identity + IP early (before authMiddleware for admin/files routes)
   // Fall back to headers, then to path-based extraction for /files/projects/{project}/{username}/
-  let project = req.project || req.headers["x-project"] || null;
-  let username = req.username || req.headers["x-username"] || null;
-  if (!project && req.originalUrl.startsWith("/files/projects/")) {
+  let project = req.project || (req.headers["x-project"] as string) || "any";
+  let username = req.username || (req.headers["x-username"] as string) || "any";
+  if (project === "any" && req.originalUrl.startsWith("/files/projects/")) {
     const segments = req.originalUrl.split("/");
     // /files/projects/{project}/{username}/...
     if (segments.length >= 5) {
-      project = segments[3] || null;
-      username = segments[4]?.split("?")[0] || null;
+      project = segments[3] || "any";
+      username = segments[4]?.split("?")[0] || "any";
     }
   }
-  const rawIp =
-    req.clientIp ||
-        (req.headers["x-forwarded-for"] as any)?.split(",")[0]?.trim() ||
-    req.ip;
+  const forwardedFor = req.headers["x-forwarded-for"];
+  const forwardedIp = typeof forwardedFor === "string" ? forwardedFor.split(",")[0]?.trim() : null;
+  const rawIp = req.clientIp || forwardedIp || req.ip || null;
   // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1)
   const clientIp = rawIp?.replace(/^::ffff:/, "") || rawIp;
-  const agent = req.headers["x-agent"] || null;
+  const agent = (req.headers["x-agent"] as string) || null;
 
   // Log on response finish
   res.on("finish", () => {
     // Skip SSE streaming requests — those are logged in detail by the route handlers
     const contentType = res.getHeader("content-type") || "";
-        if ((contentType as string).includes("text/event-stream")) return;
+    if (typeof contentType === "string" && contentType.includes("text/event-stream")) return;
     // Skip binary audio streams — logged by route handler
-        if ((contentType as string).includes("audio/")) return;
+    if (typeof contentType === "string" && contentType.includes("audio/")) return;
 
     const elapsed = performance.now() - start;
     // Re-read project/username in case authMiddleware set them after us
@@ -58,21 +57,21 @@ export function requestLoggerMiddleware(req: Request, res: Response, next: NextF
 
     // Request / response sizes (from headers — zero-cost)
     const inBytes = parseInt(req.headers["content-length"] || "0", 10);
-        const outBytes = parseInt((res.getHeader as any)("content-length") || "0", 10);
+    const outHeader = res.getHeader("content-length");
+    const outBytes = parseInt(typeof outHeader === "string" ? outHeader : "0", 10);
     const totalBytes = inBytes + outBytes;
     const sizeTag = `(in: ${formatBytes(inBytes)}, out: ${formatBytes(outBytes)}, total: ${formatBytes(totalBytes)})`;
 
-    (logger.request as any)(
-            (finalProject as any),
-      (finalUsername as any),
+    logger.request(
+      finalProject,
+      finalUsername,
       finalIp,
       `${method} ${path} ${status} — ${time} ${sizeTag}`,
     );
   });
 
   // Attach agent to req for downstream route handlers
-    // @ts-ignore - TODO: strict typing
-    if (agent) req.agent = agent;
+  if (agent) req.agent = agent;
 
   // Run the rest of the middleware chain inside AsyncLocalStorage context
   requestContext.run({ project, username, clientIp, agent }, () => {

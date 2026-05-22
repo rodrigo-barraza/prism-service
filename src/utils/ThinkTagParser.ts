@@ -4,19 +4,29 @@
 // Used by local model providers (lm-studio, vllm, llama-cpp) to
 // parse <think>…</think> reasoning blocks from model responses.
 
+export interface ThinkTagResult {
+  thinking: string | null;
+  text: string;
+}
+
+export interface ThinkTagChunk {
+  type: "thinking" | "text";
+  content: string;
+}
+
 /**
  * Extract <think>…</think> blocks from a complete response string.
  * Returns { thinking, text } where thinking is the concatenated think content
  * and text is the remaining content with think tags removed.
  */
-export function extractThinkTags(raw: any) {
+export function extractThinkTags(raw: string): ThinkTagResult {
   const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
-  const thinkParts: any[] = [];
-  let match: any;
-    while ((match = thinkRegex.exec((raw as any))) !== null) {
-        thinkParts.push((match as any)[1].trim());
+  const thinkParts: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = thinkRegex.exec(raw)) !== null) {
+    thinkParts.push(match[1].trim());
   }
-    const text = (raw as any).replace(thinkRegex, "").trim();
+  const text = raw.replace(thinkRegex, "").trim();
   return {
     thinking: thinkParts.length > 0 ? thinkParts.join("\n\n") : null,
     text,
@@ -32,71 +42,63 @@ export function extractThinkTags(raw: any) {
  *   - { type: "text", content: string }
  */
 export class ThinkTagParser {
-  constructor() {
-        (this as any).insideThink = false;
-        (this as any).buffer = "";
-  }
+  private insideThink = false;
+  private buffer = "";
 
-  feed(chunk: any) {
-        (this as any).buffer += chunk;
-    const results: any[] = [];
+  feed(chunk: string): ThinkTagChunk[] {
+    this.buffer += chunk;
+    const results: ThinkTagChunk[] = [];
 
-        while ((this as any).buffer.length > 0) {
-            if ((this as any).insideThink) {
-                const closeIdx = (this as any).buffer.indexOf("</think>");
+    while (this.buffer.length > 0) {
+      if (this.insideThink) {
+        const closeIdx = this.buffer.indexOf("</think>");
         if (closeIdx !== -1) {
           // Found closing tag — emit thinking content up to it
-                    const thinkContent = (this as any).buffer.slice(0, closeIdx);
+          const thinkContent = this.buffer.slice(0, closeIdx);
           if (thinkContent) {
             results.push({ type: "thinking", content: thinkContent });
           }
-                    (this as any).buffer = (this as any).buffer.slice(closeIdx + "</think>".length);
-                    (this as any).insideThink = false;
+          this.buffer = this.buffer.slice(closeIdx + "</think>".length);
+          this.insideThink = false;
         } else {
           // No closing tag yet — check if buffer might end with a partial </think>
-                    const partialMatch = this._partialEndTag((this as any).buffer);
+          const partialMatch = this._partialEndTag(this.buffer);
           if (partialMatch > 0) {
             // Emit everything except the potential partial tag
-                        const safe = (this as any).buffer.slice(
-              0,
-                            (this as any).buffer.length - partialMatch,
-            );
+            const safe = this.buffer.slice(0, this.buffer.length - partialMatch);
             if (safe) {
               results.push({ type: "thinking", content: safe });
             }
-                        (this as any).buffer = (this as any).buffer.slice((this as any).buffer.length - partialMatch);
+            this.buffer = this.buffer.slice(this.buffer.length - partialMatch);
           } else {
             // Emit all as thinking
-                        results.push({ type: "thinking", content: (this as any).buffer });
-                        (this as any).buffer = "";
+            results.push({ type: "thinking", content: this.buffer });
+            this.buffer = "";
           }
           break;
         }
       } else {
-                const openIdx = (this as any).buffer.indexOf("<think>");
+        const openIdx = this.buffer.indexOf("<think>");
         if (openIdx !== -1) {
           // Found opening tag — emit text before it
-                    const textBefore = (this as any).buffer.slice(0, openIdx);
+          const textBefore = this.buffer.slice(0, openIdx);
           if (textBefore) {
             results.push({ type: "text", content: textBefore });
           }
-                    (this as any).buffer = (this as any).buffer.slice(openIdx + "<think>".length);
-                    (this as any).insideThink = true;
+          this.buffer = this.buffer.slice(openIdx + "<think>".length);
+          this.insideThink = true;
         } else {
           // No opening tag — check for partial <think> at end
-                    const partialMatch = this._partialStartTag((this as any).buffer);
+          const partialMatch = this._partialStartTag(this.buffer);
           if (partialMatch > 0) {
-                        const safe = (this as any).buffer.slice(
-              0,
-                            (this as any).buffer.length - partialMatch,
-            );
+            const safe = this.buffer.slice(0, this.buffer.length - partialMatch);
             if (safe) {
               results.push({ type: "text", content: safe });
             }
-                        (this as any).buffer = (this as any).buffer.slice((this as any).buffer.length - partialMatch);
+            this.buffer = this.buffer.slice(this.buffer.length - partialMatch);
           } else {
-                        results.push({ type: "text", content: (this as any).buffer });
-                        (this as any).buffer = "";
+            results.push({ type: "text", content: this.buffer });
+            this.buffer = "";
           }
           break;
         }
@@ -106,10 +108,10 @@ export class ThinkTagParser {
   }
 
   /** Check if the end of str is a partial match for "<think>" */
-  _partialStartTag(str: any) {
+  private _partialStartTag(str: string): number {
     const tag = "<think>";
-        for (let len = Math.min(tag.length - 1, (str.length as any)); len >= 1; len--) {
-            if ((str as any).endsWith(tag.slice(0, len))) {
+    for (let len = Math.min(tag.length - 1, str.length); len >= 1; len--) {
+      if (str.endsWith(tag.slice(0, len))) {
         return len;
       }
     }
@@ -117,10 +119,10 @@ export class ThinkTagParser {
   }
 
   /** Check if the end of str is a partial match for "</think>" */
-  _partialEndTag(str: any) {
+  private _partialEndTag(str: string): number {
     const tag = "</think>";
-        for (let len = Math.min(tag.length - 1, (str.length as any)); len >= 1; len--) {
-            if ((str as any).endsWith(tag.slice(0, len))) {
+    for (let len = Math.min(tag.length - 1, str.length); len >= 1; len--) {
+      if (str.endsWith(tag.slice(0, len))) {
         return len;
       }
     }
@@ -128,11 +130,11 @@ export class ThinkTagParser {
   }
 
   /** Flush any remaining buffered content. */
-  flush() {
-        if (!(this as any).buffer) return [];
-        const type = (this as any).insideThink ? "thinking" : "text";
-        const result = [{ type, content: (this as any).buffer }];
-        (this as any).buffer = "";
+  flush(): ThinkTagChunk[] {
+    if (!this.buffer) return [];
+    const type = this.insideThink ? "thinking" : "text";
+    const result: ThinkTagChunk[] = [{ type, content: this.buffer }];
+    this.buffer = "";
     return result;
   }
 }

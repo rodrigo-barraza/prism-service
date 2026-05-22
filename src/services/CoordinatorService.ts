@@ -1576,7 +1576,7 @@ export default class CoordinatorService {
       worker.repoPath,
       worker.branchName!,
     );
-    worker.diff = diffResult.error ? null : (diffResult as unknown as WorktreeDiff);
+    worker.diff = diffResult.error ? null : (diffResult as WorktreeDiff);
     worker.status = "complete";
 
     // ── Release heavy data from completed workers ──────────────
@@ -1844,7 +1844,7 @@ export default class CoordinatorService {
           worker.diff = null;
           worker.error = `Diff retrieval failed: ${diffResult.error}`;
         } else {
-          worker.diff = diffResult as unknown as WorktreeDiff;
+          worker.diff = diffResult as WorktreeDiff;
         }
       }
 

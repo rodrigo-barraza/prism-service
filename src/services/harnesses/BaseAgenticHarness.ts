@@ -9,12 +9,12 @@ import { getPricing, TYPES } from "../../config.ts";
 import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.ts";
 import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
-import RequestLogger from "../RequestLogger.ts";
+import RequestLogger, { type LogChatGenerationParams, TokenUsage, MessagePayload, ToolCallPayload } from "../RequestLogger.ts";
 import FileService from "../FileService.ts";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
 import { COLLECTIONS } from "../../constants.ts";
-import { finalizeTextGeneration } from "./lifecycle/Finalizer.ts";
+import { finalizeTextGeneration, type FinalizerContext } from "./lifecycle/Finalizer.ts";
 import logger from "../../utils/logger.ts";
 
 import type AgenticLoopState from "../AgenticLoopState.ts";
@@ -149,7 +149,7 @@ export default class BaseAgenticHarness {
         strategy: contextResult.strategy,
         estimatedTokens: contextResult.estimatedTokens,
       });
-      return contextResult.messages;
+      return contextResult.messages as ConversationMessage[];
     }
     return messages;
   }
@@ -499,7 +499,7 @@ export default class BaseAgenticHarness {
       parentAgentSessionId: parentAgentSessionId || null,
       traceId: traceId || null,
       success: true,
-      usage: pass.usage,
+      usage: pass.usage as unknown as TokenUsage,
       estimatedCost: passEstimatedCost,
       tokensPerSec: passTokensPerSec,
       timeToGenerationSec: pass.firstTokenTime
@@ -508,11 +508,11 @@ export default class BaseAgenticHarness {
       generationSec: passGenerationSec,
       totalSec: passTotalSec,
       options: pass.options,
-      messages: currentMessages,
+      messages: currentMessages as unknown as MessagePayload[],
       text: pass.streamedText,
       thinking: pass.streamedThinking,
       images: pass.streamedImages,
-      toolCalls: pass.pendingToolCalls,
+      toolCalls: pass.pendingToolCalls as unknown as ToolCallPayload[],
       outputCharacters: pass.outputCharacters,
       agenticIteration: state.iterations,
     }).catch((error: Error) =>
@@ -580,7 +580,7 @@ export default class BaseAgenticHarness {
     );
 
     await finalizeTextGeneration(
-      context,
+      context as FinalizerContext,
       {
         text: state.finalStreamedText.trim(),
         thinking: state.streamedThinking.trim() || "",
@@ -588,7 +588,7 @@ export default class BaseAgenticHarness {
         toolCalls: state.streamedToolCalls,
         audioChunks: state.streamedAudioChunks,
         audioSampleRate: state.audioSampleRate,
-        usage: state.overallUsage,
+        usage: state.overallUsage as any,
         outputCharacters: state.overallOutputCharacters,
         timeToGenerationSec: state.overallFirstTokenTime
           ? (state.overallFirstTokenTime - requestStart) / 1000

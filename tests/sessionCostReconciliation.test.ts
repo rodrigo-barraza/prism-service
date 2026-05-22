@@ -95,7 +95,7 @@ describe("Session Cost Reconciliation", () => {
      * Uses Math.max to guard against old sessions where request logs
      * under-report due to the NaN cache token bug.
      */
-    function applyRequestLogCostOverlay(sessions, costDocs) {
+    function applyRequestLogCostOverlay(sessions: any[], costDocs: any[]) {
       const costMap = new Map();
       for (const doc of costDocs) {
         costMap.set(doc._id, doc.totalCost);
@@ -143,7 +143,7 @@ describe("Session Cost Reconciliation", () => {
       const sessions = [
         { id: "session-empty", totalCost: 0 },
       ];
-      const costDocs = []; // no request logs
+      const costDocs: any[] = []; // no request logs
 
       const result = applyRequestLogCostOverlay(sessions, costDocs);
       expect(result[0].totalCost).toBe(0);
@@ -282,13 +282,10 @@ describe("Session Cost Reconciliation", () => {
       expect(target.cacheReadInputTokens).toBe(0);
     });
 
-    it("mergeUsage into bare object WITHOUT cache fields should produce NaN (regression guard)", () => {
-      // This is the bug that existed before the fix: pass.usage was initialized
-      // as { inputTokens: 0, outputTokens: 0, totalTokens: 0 } — missing
-      // cacheReadInputTokens and cacheCreationInputTokens. mergeUsage does
-      // `target.cacheCreationInputTokens += source.cacheCreationInputTokens`
-      // which is `undefined += 34751` → NaN.
-      const broken = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    it("mergeUsage into bare object WITHOUT cache fields should safely merge without producing NaN", () => {
+      // With our robust mergeUsage implementation, passing a bare object without
+      // cache fields is safely supported. `undefined ?? 0` prevents NaN results.
+      const broken: any = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
       const source = {
         inputTokens: 3,
         outputTokens: 75,
@@ -297,8 +294,8 @@ describe("Session Cost Reconciliation", () => {
 
       mergeUsage(broken, source);
 
-      // Confirm the NaN behavior that caused the bug
-      expect(Number.isNaN(broken.cacheCreationInputTokens)).toBe(true);
+      // Verify that it merged safely instead of producing NaN
+      expect(broken.cacheCreationInputTokens).toBe(34751);
     });
 
     it("calculateTextCost should include cache write cost when tokens are present", () => {
@@ -322,16 +319,15 @@ describe("Session Cost Reconciliation", () => {
       // output:     75 / 1M * 4.00 = 0.0003
       // cache_write: 34751 / 1M * 1.00 = 0.034751
       // total ≈ 0.0350534
-      expect(cost).toBeGreaterThan(0.034);
-      expect(cost).toBeLessThan(0.036);
+      expect(cost!).toBeGreaterThan(0.034);
+      expect(cost!).toBeLessThan(0.036);
 
-      // The broken path (without cache init) would only calculate:
-      // input + output = 0.0000024 + 0.0003 = ~0.00030
+      // Even starting with an incomplete target object:
       const brokenUsage = { inputTokens: 3, outputTokens: 75, totalTokens: 78 };
       mergeUsage(brokenUsage, { cacheCreationInputTokens: 34751 });
       const brokenCost = calculateTextCost(brokenUsage, pricing);
-      // NaN cache tokens get skipped → cost is ~100x lower
-      expect(brokenCost).toBeLessThan(cost * 0.02);
+      // Now it merges safely and computes the exact correct cost instead of being NaN/lower
+      expect(brokenCost!).toBeCloseTo(cost!, 6);
     });
   });
 });

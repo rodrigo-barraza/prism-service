@@ -20,7 +20,11 @@ import rateLimitStore from "../services/RateLimitStore.ts";
  *   x-ratelimit-reset-requests      → RPM reset time
  *   x-ratelimit-reset-tokens        → TPM reset time
  */
-export function extractOpenAIRateLimits(response: any, model: string) {
+interface HttpResponseWithHeaders {
+  headers?: { get(name: string): string | null };
+}
+
+export function extractOpenAIRateLimits(response: HttpResponseWithHeaders | null | undefined, model: string) {
   if (!response?.headers) return null;
   const headers = response.headers;
 
@@ -64,7 +68,7 @@ export function extractOpenAIRateLimits(response: any, model: string) {
  *   anthropic-ratelimit-tokens-reset        → TPM reset time
  *   retry-after                             → seconds to wait if 429
  */
-export function extractAnthropicRateLimits(response: any, model: string) {
+export function extractAnthropicRateLimits(response: HttpResponseWithHeaders | null | undefined, model: string) {
   if (!response?.headers) return null;
   const headers = response.headers;
 
@@ -103,7 +107,7 @@ export function extractAnthropicRateLimits(response: any, model: string) {
 
   return result;
 }
-function safeInt(value: any) {
+function safeInt(value: string | null | undefined): number | null {
   if (value == null) return null;
   const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;

@@ -9,6 +9,7 @@ import { TYPES, getDefaultModels } from "../config.ts";
 import { sleep } from "@rodrigo-barraza/utilities-library";
 
 import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
+import type { TokenUsage } from "../types/admin.ts";
 
 export interface AnthropicBlock {
   type: string;
@@ -18,7 +19,7 @@ export interface AnthropicBlock {
   source?: { type: string; media_type?: string; data?: string; url?: string };
   id?: string;
   name?: string;
-  input?: any;
+  input?: Record<string, unknown>;
   tool_use_id?: string;
   content?: string | AnthropicBlock[];
   citations?: Array<{ type: string; url?: string; title?: string; cited_text?: string }>;
@@ -27,8 +28,28 @@ export interface AnthropicBlock {
   page_age?: string;
 }
 
+/** Typed shape for errors thrown by the Anthropic SDK. */
+interface AnthropicSdkError extends Error {
+  status?: number;
+  type?: string;
+  error?: { type?: string };
+}
+
+/** Result shape returned by generateText/captionImage. */
+export interface AnthropicGenerateResult {
+  text: string;
+  usage: TokenUsage;
+  thinking?: string | null;
+  thinkingSignature?: string | null;
+  citations?: Array<{ url?: string; title?: string; citedText?: string }>;
+  toolCalls?: Array<{ id?: string; name?: string; args: Record<string, unknown> }>;
+  rateLimits?: ReturnType<typeof extractAnthropicRateLimits>;
+  stopReason?: string;
+  stopDetails?: Record<string, unknown>;
+}
+
 // Default budget tokens mapped from effort level (for non-adaptive models)
-const EFFORT_BUDGET_MAP = {
+const EFFORT_BUDGET_MAP: Record<string, number> = {
   low: 1024,
   medium: 4096,
   high: 50000,
@@ -37,19 +58,18 @@ const EFFORT_BUDGET_MAP = {
 // Retry config for transient Anthropic errors (overloaded, rate limit)
 const RETRY_DELAY_MS = 10_000;
 const MAX_RETRIES = 3;
-function isRetryableError(error: any) {
-  // SDK wraps the error body — check both the error type and HTTP status
-  const err = error as any;
-  const errorType = (err?.error as any)?.type || err?.type;
+function isRetryableError(error: unknown): boolean {
+  const err = error as AnthropicSdkError;
+  const errorType = err?.error?.type || err?.type;
   if (errorType === "overloaded_error") return true;
   if (err.status === 529) return true;
   return false;
 }
 
-let client: any = null;
+let client: Anthropic | null = null;
 
-function getClient() {
-    if (!client) {
+function getClient(): Anthropic {
+  if (!client) {
     if (!ANTHROPIC_API_KEY) {
       throw new ProviderError("anthropic", "ANTHROPIC_API_KEY is not set", 401);
     }
@@ -80,7 +100,7 @@ async function enforceImageSizeLimits(messages: ChatMessage[]) {
         `[anthropic] SAFETY NET: image still ${(size / 1024 / 1024).toFixed(2)} MB after prepareMessages. Compressing now...`,
       );
       const result = await compressImageForSizeLimit(
-                (block.source.data as any),
+        data,
         block.source.media_type || "image/png",
       );
       block.source.data = result.data;
@@ -125,7 +145,7 @@ async function prepareMessages(messages: ChatMessage[]) {
             content: [
               {
                 type: "tool_result",
-                                tool_use_id: (m as any).tool_call_id || (m as any).id || m.name || "any",
+                tool_use_id: m.tool_call_id || m.id || m.name || "unknown",
                 content:
                   typeof m.content === "string"
                     ? m.content
@@ -136,8 +156,7 @@ async function prepareMessages(messages: ChatMessage[]) {
         }
 
         // Convert assistant messages with toolCalls to multi-part content
-                // @ts-ignore - TODO: strict typing
-                if (m.role === "assistant" && m.toolCalls?.length > 0) {
+        if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
           const contentBlocks: AnthropicBlock[] = [];
           // Preserve thinking blocks for multi-step reasoning continuity.
           // The signature field is REQUIRED by Anthropic's API for multi-turn
@@ -154,8 +173,7 @@ async function prepareMessages(messages: ChatMessage[]) {
           if (typeof m.content === "string" && m.content.trim()) {
             contentBlocks.push({ type: "text", text: m.content });
           }
-                    // @ts-ignore - TODO: strict typing
-                    for ( const tc of m.toolCalls) {
+          for (const tc of m.toolCalls) {
             contentBlocks.push({
               type: "tool_use",
               id: tc.id || tc.name || `tc-${Date.now()}`,
@@ -233,9 +251,9 @@ async function prepareMessages(messages: ChatMessage[]) {
             }
             // Other MIME types (audio, video) are not supported by Anthropic — skip
           }
-          if (m.content) {
-                        // @ts-ignore - TODO: strict typing
-                        contentBlocks.push({ type: "text", text: m.content });
+          const textContent = typeof m.content === "string" ? m.content : "";
+          if (textContent) {
+            contentBlocks.push({ type: "text", text: textContent });
           }
           return {
             role: m.role,
@@ -371,7 +389,7 @@ async function prepareMessages(messages: ChatMessage[]) {
   return { systemMessage, messages: merged };
 }
 function buildTools(options: ProviderOptions) {
-  const tools: any[] = [];
+  const tools: Array<Record<string, unknown>> = [];
   if (options.webSearch) {
     tools.push({
       type: "web_search_20260209",
@@ -408,8 +426,8 @@ function extractResponseContent(contentBlocks: AnthropicBlock[]) {
   let text = "";
   let thinking = null;
   let thinkingSignature = null;
-  const citations: any[] = [];
-  const toolCalls: any[] = [];
+  const citations: Array<{ url?: string; title?: string; citedText?: string }> = [];
+  const toolCalls: Array<{ id?: string; name?: string; args: Record<string, unknown> }> = [];
 
     for ( const block of contentBlocks || []) {
     if (block.type === "text") {
@@ -441,7 +459,7 @@ function extractResponseContent(contentBlocks: AnthropicBlock[]) {
 
   return { text, thinking, thinkingSignature, citations, toolCalls };
 }
-function buildUsage(responseUsage: Record<string, number> | null | undefined) {
+function buildUsage(responseUsage: { input_tokens?: number | null; output_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null } | null | undefined): TokenUsage {
   return {
     inputTokens: responseUsage?.input_tokens ?? 0,
     outputTokens: responseUsage?.output_tokens ?? 0,
@@ -455,48 +473,47 @@ const anthropicProvider = {
 
   async generateText(
     messages: ChatMessage[],
-        model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
+    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
     options: ProviderOptions = {},
   ) {
-        (logger.provider as any)(("Anthropic" as any), (`generateText model=${model}` as any));
+    logger.provider("Anthropic", `generateText model=${model}`);
 
     const prepared = await prepareMessages(messages);
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       cache_control: { type: "ephemeral" },
       system: prepared.systemMessage,
       model,
       messages: prepared.messages,
-            max_tokens: options.maxTokens || 1000,
+      max_tokens: options.maxTokens || 1000,
       temperature:
-                options.temperature !== undefined
-                    ? Math.min(options.temperature, 1)
+        options.temperature !== undefined
+          ? Math.min(options.temperature, 1)
           : undefined,
       top_p:
-                options.temperature === undefined && options.topP !== undefined
-          ?             options.topP
+        options.temperature === undefined && options.topP !== undefined
+          ? options.topP
           : undefined,
-            top_k: options.topK !== undefined ? options.topK : undefined,
+      top_k: options.topK !== undefined ? options.topK : undefined,
       stop_sequences:
-                options.stopSequences !== undefined
-          ?             options.stopSequences
+        options.stopSequences !== undefined
+          ? options.stopSequences
           : undefined,
-            ...(options.serviceTier && { service_tier: options.serviceTier }),
+      ...(options.serviceTier && { service_tier: options.serviceTier }),
     };
 
     // Server tools
     const tools = buildTools(options);
     if (tools) payload.tools = tools;
 
-        if (
-            options.thinkingEnabled !== false &&
-            (options.thinkingEnabled === true ||
-                options.thinkingBudget ||
-                options.reasoningEffort)
+    if (
+      options.thinkingEnabled !== false &&
+      (options.thinkingEnabled === true ||
+        options.thinkingBudget ||
+        options.reasoningEffort)
     ) {
-            const budget = options.thinkingBudget
-        ?           parseInt((options.thinkingBudget as any))
-        // @ts-ignore - TODO: strict typing
-        :           (EFFORT_BUDGET_MAP as any)[((options as string) as any).reasoningEffort] || EFFORT_BUDGET_MAP.high;
+      const budget = options.thinkingBudget
+        ? parseInt(String(options.thinkingBudget))
+        : (options.reasoningEffort ? EFFORT_BUDGET_MAP[options.reasoningEffort] : undefined) || EFFORT_BUDGET_MAP.high;
       payload.thinking = { type: "enabled", budget_tokens: budget };
       if ((payload.max_tokens as number) <= budget) {
         payload.max_tokens = budget + 1024;
@@ -507,28 +524,29 @@ const anthropicProvider = {
       delete payload.top_k;
     }
 
-    let lastError: any;
+    let lastError: unknown;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const { data: response, response: rawResponse } = await (getClient as any)()
-          .messages.create(payload)
+        const { data: response, response: rawResponse } = await getClient()
+          .messages.create(payload as unknown as Anthropic.MessageCreateParamsNonStreaming)
           .withResponse();
-                const rateLimits = extractAnthropicRateLimits(rawResponse, (model as any));
+        const rateLimits = extractAnthropicRateLimits(rawResponse, model);
+        const msg = response as Anthropic.Messages.Message;
 
         const { text, thinking, thinkingSignature, citations, toolCalls } =
-          extractResponseContent(response.content);
-        const result = {
+          extractResponseContent(msg.content as AnthropicBlock[]);
+        const result: AnthropicGenerateResult = {
           text,
-          usage: buildUsage(response.usage),
+          usage: buildUsage(msg.usage),
         };
-                if (thinking) (result as any).thinking = thinking;
-                if (thinkingSignature) (result as any).thinkingSignature = thinkingSignature;
-                if (citations.length > 0) (result as any).citations = citations;
-                if (toolCalls.length > 0) (result as any).toolCalls = toolCalls;
-                if (rateLimits) (result as any).rateLimits = rateLimits;
+        if (thinking) result.thinking = thinking;
+        if (thinkingSignature) result.thinkingSignature = thinkingSignature;
+        if (citations.length > 0) result.citations = citations;
+        if (toolCalls.length > 0) result.toolCalls = toolCalls;
+        if (rateLimits) result.rateLimits = rateLimits;
         // Forward structured stop details for observability (SDK 0.82+)
-                if (response.stop_reason) (result as any).stopReason = response.stop_reason;
-                if (response.stop_details) (result as any).stopDetails = response.stop_details;
+        if (msg.stop_reason) result.stopReason = msg.stop_reason;
+        if ("stop_details" in msg && msg.stop_details) result.stopDetails = { ...msg.stop_details };
         return result;
       } catch (error: unknown) {
         lastError = error;
@@ -541,8 +559,8 @@ const anthropicProvider = {
         }
         throw new ProviderError(
           "anthropic",
-          error instanceof Error ? (error as Error).message : (error as any)?.message as string || String(error),
-          ((error as any)?.status as number) || 500,
+          error instanceof Error ? error.message : String(error),
+          (error as AnthropicSdkError)?.status || 500,
           error,
         );
       }
@@ -550,22 +568,22 @@ const anthropicProvider = {
     // Should never reach here, but safety net
     throw new ProviderError(
       "anthropic",
-      (lastError as any)?.message as string || "Max retries exceeded",
-      ((lastError as any)?.status as number) || 500,
+      lastError instanceof Error ? lastError.message : "Max retries exceeded",
+      (lastError as AnthropicSdkError)?.status || 500,
       lastError,
     );
   },
   async captionImage(
     images: string[],
     prompt: string = "Describe this image.",
-        model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
+    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
     systemPrompt?: string,
   ) {
-        (logger.provider as any)(("Anthropic" as any), (`captionImage model=${model}` as any));
+    logger.provider("Anthropic", `captionImage model=${model}`);
     try {
       const contentBlocks: AnthropicBlock[] = [];
 
-            for ( const imageUrlOrBase64 of images) {
+      for (const imageUrlOrBase64 of images) {
         const match = imageUrlOrBase64.match(/^data:([^;]+);base64,(.+)$/);
         if (match) {
           let mediaType = match[1];
@@ -603,18 +621,20 @@ const anthropicProvider = {
 
       contentBlocks.push({ type: "text", text: prompt });
 
-      const payload = {
+      const payload: Record<string, unknown> = {
         model,
         messages: [{ role: "user", content: contentBlocks }],
         max_tokens: 1000,
       };
       if (systemPrompt) {
-                (payload as any).system = systemPrompt;
+        payload.system = systemPrompt;
       }
 
-      const response = await (getClient as any)().messages.create(payload);
+      const response = await getClient().messages.create(
+        payload as unknown as Anthropic.MessageCreateParamsNonStreaming,
+      ) as Anthropic.Messages.Message;
 
-      const { text } = extractResponseContent(response.content);
+      const { text } = extractResponseContent(response.content as AnthropicBlock[]);
       return {
         text,
         usage: buildUsage(response.usage),
@@ -622,59 +642,57 @@ const anthropicProvider = {
     } catch (error: unknown) {
       throw new ProviderError(
         "anthropic",
-                (error as Error).message,
-                ((error as Error) as any).status || 500,
+        (error as Error).message,
+        (error as AnthropicSdkError)?.status || 500,
         error,
       );
     }
   },
 
-    // @ts-ignore - TODO: strict typing
-    async *generateTextStream(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async *generateTextStream(
     messages: ChatMessage[],
-        model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
+    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
     options: ProviderOptions = {},
-  ) {
-        (logger.provider as any)(("Anthropic" as any), (`generateTextStream model=${model}` as any));
+  ): AsyncGenerator<Record<string, unknown> | string> {
+    logger.provider("Anthropic", `generateTextStream model=${model}`);
     try {
       const prepared = await prepareMessages(messages);
-      const streamPayload: any = {
+      const streamPayload: Record<string, unknown> = {
         cache_control: { type: "ephemeral" },
         system: prepared.systemMessage,
         model,
         messages: prepared.messages,
-                max_tokens: options.maxTokens || 1000,
+        max_tokens: options.maxTokens || 1000,
         temperature:
-                    options.temperature !== undefined
-                        ? Math.min(options.temperature, 1)
+          options.temperature !== undefined
+            ? Math.min(options.temperature, 1)
             : undefined,
         top_p:
-                    options.temperature === undefined && options.topP !== undefined
-            ?               options.topP
+          options.temperature === undefined && options.topP !== undefined
+            ? options.topP
             : undefined,
-                top_k: options.topK !== undefined ? options.topK : undefined,
+        top_k: options.topK !== undefined ? options.topK : undefined,
         stop_sequences:
-                    options.stopSequences !== undefined
-            ?               options.stopSequences
+          options.stopSequences !== undefined
+            ? options.stopSequences
             : undefined,
-                ...(options.serviceTier && { service_tier: options.serviceTier }),
+        ...(options.serviceTier && { service_tier: options.serviceTier }),
       };
 
       // Server tools
       const tools = buildTools(options);
       if (tools) streamPayload.tools = tools;
 
-            if (
-                options.thinkingEnabled !== false &&
-                (options.thinkingEnabled === true ||
-                    options.thinkingBudget ||
-                    options.reasoningEffort)
+      if (
+        options.thinkingEnabled !== false &&
+        (options.thinkingEnabled === true ||
+          options.thinkingBudget ||
+          options.reasoningEffort)
       ) {
-                const budget = options.thinkingBudget
-          ?             parseInt((options.thinkingBudget as any))
-          // @ts-ignore - TODO: strict typing
-          :             (EFFORT_BUDGET_MAP as any)[((options as string) as any).reasoningEffort] ||
-            EFFORT_BUDGET_MAP.high;
+        const budget = options.thinkingBudget
+          ? parseInt(String(options.thinkingBudget))
+          : (options.reasoningEffort ? EFFORT_BUDGET_MAP[options.reasoningEffort] : undefined) || EFFORT_BUDGET_MAP.high;
         streamPayload.thinking = { type: "enabled", budget_tokens: budget };
         if ((streamPayload.max_tokens as number) <= budget) {
           streamPayload.max_tokens = budget + 1024;
@@ -687,21 +705,24 @@ const anthropicProvider = {
 
       await enforceImageSizeLimits(streamPayload.messages as ChatMessage[]);
 
-      const stream = (getClient as any)().messages.stream(streamPayload, {
-                ...(options.signal && { signal: options.signal }),
-      });
+      const stream = getClient().messages.stream(
+        streamPayload as unknown as Anthropic.MessageCreateParamsNonStreaming,
+        {
+          ...(options.signal && { signal: options.signal }),
+        },
+      );
 
       // Track current content block type for server tool response processing
-      let currentBlockType = null;
-      let currentBlockName = null;
-      let currentToolUseId = null;
+      let currentBlockType: string | null = null;
+      let currentBlockName: string | null = null;
+      let currentToolUseId: string | null = null;
       let codeInput = "";
-      let usage = null;
-      let messageStartUsage = null;
-      let rateLimits = null;
+      let usage: TokenUsage | null = null;
+      let messageStartUsage: { input_tokens?: number | null; output_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null } | null = null;
+      let rateLimits: ReturnType<typeof extractAnthropicRateLimits> | null = null;
 
-            for await ( const chunk of stream) {
-                if (options.signal?.aborted) {
+      for await (const chunk of stream) {
+        if (options.signal?.aborted) {
           stream.abort();
           break;
         }
@@ -712,7 +733,7 @@ const anthropicProvider = {
           messageStartUsage = chunk.message.usage;
           // Capture rate-limit headers from the stream's initial response
           if (!rateLimits && stream.response) {
-                        rateLimits = extractAnthropicRateLimits(stream.response, (model as any));
+            rateLimits = extractAnthropicRateLimits(stream.response, model);
           }
           continue;
         }
@@ -720,17 +741,54 @@ const anthropicProvider = {
         if (chunk.type === "content_block_start") {
           const block = chunk.content_block;
           currentBlockType = block?.type || null;
-          currentBlockName = block?.name || null;
-          currentToolUseId = block?.id || null;
+          currentBlockName = ("name" in block ? block.name : null) as string | null;
+          currentToolUseId = ("id" in block ? block.id : null) as string | null;
           codeInput = "";
 
           // Server tool use start — yield the tool name being invoked
           if (
             block?.type === "server_tool_use" &&
-            block?.name === "code_execution"
+            "name" in block && block.name === "code_execution"
           ) {
             // Code execution starting — we'll accumulate the input
           }
+
+          // Code execution tool result
+          if (block?.type === "code_execution_tool_result") {
+            const result = (block as { content?: { stdout?: string; stderr?: string; return_code?: number } }).content;
+            if (result) {
+              yield {
+                type: "codeExecutionResult",
+                output: result.stdout || result.stderr || "",
+                outcome: result.return_code === 0 ? "OK" : "ERROR",
+              };
+            }
+          }
+
+          // Web search / web fetch tool result — extract citations
+          if (
+            block?.type === "web_search_tool_result" ||
+            block?.type === "web_fetch_tool_result"
+          ) {
+            const content = (block as { content?: AnthropicBlock[] }).content;
+            if (Array.isArray(content)) {
+              const results = content
+                .filter(
+                  (r: AnthropicBlock) =>
+                    r.type === "web_search_result" ||
+                    r.type === "web_fetch_result",
+                )
+                .map((r: AnthropicBlock) => ({
+                  url: r.url,
+                  title: r.title,
+                  pageAge: r.page_age,
+                }));
+              if (results.length > 0) {
+                yield { type: "webSearchResult", results };
+              }
+            }
+          }
+
           continue;
         }
 
@@ -757,7 +815,7 @@ const anthropicProvider = {
           }
           // Custom tool_use block ended — emit toolCall
           if (currentBlockType === "tool_use") {
-            let args = {};
+            let args: Record<string, unknown> = {};
             if (codeInput) {
               try {
                 args = JSON.parse(codeInput);
@@ -819,48 +877,6 @@ const anthropicProvider = {
           }
         }
 
-        // Code execution tool result
-        if (
-          chunk.type === "content_block_start" &&
-          chunk.content_block?.type === "code_execution_tool_result"
-        ) {
-          const result = chunk.content_block.content;
-          if (result) {
-            yield {
-              type: "codeExecutionResult",
-              output: result.stdout || result.stderr || "",
-              outcome: result.return_code === 0 ? "OK" : "ERROR",
-            };
-          }
-          continue;
-        }
-
-        // Web search / web fetch tool result — extract citations
-        if (
-          chunk.type === "content_block_start" &&
-          (chunk.content_block?.type === "web_search_tool_result" ||
-            chunk.content_block?.type === "web_fetch_tool_result")
-        ) {
-          const content = chunk.content_block.content;
-          if (Array.isArray(content)) {
-            const results = content
-              .filter(
-                (r: AnthropicBlock) =>
-                  r.type === "web_search_result" ||
-                  r.type === "web_fetch_result",
-              )
-              .map((r: AnthropicBlock) => ({
-                url: r.url,
-                title: r.title,
-                pageAge: r.page_age,
-              }));
-            if (results.length > 0) {
-              yield { type: "webSearchResult", results };
-            }
-          }
-          continue;
-        }
-
         // Message delta (final usage + stop details) — carries output_tokens only
         if (chunk.type === "message_delta") {
           if (chunk.usage) {
@@ -877,7 +893,7 @@ const anthropicProvider = {
           if (chunk.delta?.stop_reason) {
             yield { type: "stopReason", stopReason: chunk.delta.stop_reason };
           }
-          if (chunk.delta?.stop_details) {
+          if ("stop_details" in chunk.delta) {
             yield {
               type: "stopDetails",
               stopDetails: chunk.delta.stop_details,
@@ -904,11 +920,11 @@ const anthropicProvider = {
         yield { type: "rateLimits", rateLimits };
       }
     } catch (error: unknown) {
-            if ((error as Error).name === "AbortError") return;
+      if ((error as Error).name === "AbortError") return;
       // For streaming, retry overloaded errors with the same delay/attempts policy
       if (isRetryableError(error)) {
         // Recursive retry with attempt tracking via options._retryAttempt
-                const attempt = options._retryAttempt || 1;
+        const attempt = options._retryAttempt ?? 1;
         if (attempt < MAX_RETRIES) {
           logger.warn(
             `[anthropic] Overloaded on attempt ${attempt}/${MAX_RETRIES} for generateTextStream model=${model}. Retrying in ${RETRY_DELAY_MS / 1000}s...`,
@@ -923,8 +939,8 @@ const anthropicProvider = {
       }
       throw new ProviderError(
         "anthropic",
-                (error as Error).message,
-                ((error as Error) as any).status || 500,
+        (error as Error).message,
+        (error as AnthropicSdkError)?.status || 500,
         error,
       );
     }

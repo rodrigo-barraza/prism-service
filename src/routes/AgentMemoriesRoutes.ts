@@ -28,7 +28,7 @@ router.post(
         content,
         type: type || "project",
         title: title || null,
-        sessionId: agentSessionId || null,
+        agentSessionId: agentSessionId || null,
         endpoint: "/agent-memories",
       });
 
@@ -64,7 +64,7 @@ router.get(
             const limit = parseInt((req.query.limit as any)) || 100;
             const skip = parseInt((req.query.skip as any)) || 0;
 
-      const result = await MemoryService.list({ agent, project, limit, skip });
+      const result = await MemoryService.list({ agent: agent as string, project: project as string, limit: Number(limit), skip: Number(skip) });
       res.json(result);
     } catch (error: unknown) {
             logger.error(`[agent-memories] ${(error as Error).message}`);

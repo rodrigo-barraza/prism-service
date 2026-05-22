@@ -1090,7 +1090,7 @@ class LocalProviderGateway {
       contextLength: options.contextLength ?? 4096,
       offloadKvCache: options.offloadKvCache ?? true,
       flashAttention: options.flashAttention ?? true,
-      vision: modelData.capabilities?.vision || false,
+      vision: !!modelData.capabilities?.vision,
       gpuTotalGiB: options.gpuTotalGiB,
       gpuBaselineGiB: options.gpuBaselineGiB || 0,
     });

@@ -7,6 +7,75 @@
 
 import FileService from "../services/FileService.ts";
 import logger from "./logger.ts";
+import type { TokenUsage, ToolCallEntry } from "../types/admin.ts";
+
+// ── Types ────────────────────────────────────────────────────
+
+export interface StreamState {
+  usage: TokenUsage | null;
+  firstTokenTime: number | null;
+  generationEnd: number | null;
+  requestStart: number | null;
+  outputCharacters: number;
+  text: string;
+  thinking: string;
+  thinkingSignature: string;
+  images: string[];
+  toolCalls: ToolCallEntry[];
+  audioChunks: string[];
+  audioSampleRate: number;
+  rateLimits: unknown;
+}
+
+export interface StreamContext {
+  emit: (event: StreamEvent) => void;
+  project: string;
+  username: string;
+}
+
+interface DispatchOptions {
+  logPrefix?: string;
+  onUsage?: (usage: TokenUsage) => void;
+}
+
+/** Represents any typed chunk arriving from a provider stream. */
+interface StreamChunk {
+  type?: string;
+  content?: string;
+  data?: string;
+  mimeType?: string;
+  usage?: TokenUsage;
+  rateLimits?: unknown;
+  signature?: string;
+  code?: string;
+  language?: string;
+  output?: string;
+  outcome?: string;
+  results?: unknown;
+  id?: string | null;
+  name?: string;
+  args?: Record<string, unknown>;
+  result?: unknown;
+  status?: string;
+  thoughtSignature?: string;
+  message?: string;
+  phase?: string;
+  progress?: number;
+  characters?: number;
+}
+
+/** Union of all SSE event shapes emitted to the client. */
+interface StreamEvent {
+  type: string;
+  [key: string]: unknown;
+}
+
+interface ImageChunkInput {
+  data?: string;
+  mimeType?: string;
+}
+
+// ── Helpers ──────────────────────────────────────────────────
 
 /**
  * Strip XML tool call markup that some local models (e.g. Gemma 4) leak into
@@ -15,48 +84,64 @@ import logger from "./logger.ts";
  * Handles both completed tags (matched pairs) and incomplete tags at the
  * end of a streaming buffer (closing tag hasn't arrived yet).
  */
-export function stripToolCallMarkup(text: any) {
-  return (
-        (text as any)
-      // Completed tag pairs
-      .replace(/<\|?tool_call\|?>[\s\S]*?<\/?\|?tool_call\|?>/gi, "")
-      .replace(/<\|?tool_response\|?>[\s\S]*?<\/?\|?tool_response\|?>/gi, "")
-      .replace(/<\|?result\|?>[\s\S]*?<\/?\|?result\|?>/gi, "")
-      .replace(/\[END_TOOL_REQUEST\]/gi, "")
-      // Incomplete tags at end of stream (closing tag hasn't arrived yet)
-      .replace(/<\|?tool_call\|?>[\s\S]*$/gi, "")
-      .replace(/<\|?tool_response\|?>[\s\S]*$/gi, "")
-      .replace(/<\|?result\|?>[\s\S]*$/gi, "")
-  );
+export function stripToolCallMarkup(text: string): string {
+  return text
+    // Completed tag pairs
+    .replace(/<\|?tool_call\|?>[\s\S]*?<\/?\|?tool_call\|?>/gi, "")
+    .replace(/<\|?tool_response\|?>[\s\S]*?<\/?\|?tool_response\|?>/gi, "")
+    .replace(/<\|?result\|?>[\s\S]*?<\/?\|?result\|?>/gi, "")
+    .replace(/\[END_TOOL_REQUEST\]/gi, "")
+    // Incomplete tags at end of stream (closing tag hasn't arrived yet)
+    .replace(/<\|?tool_call\|?>[\s\S]*$/gi, "")
+    .replace(/<\|?tool_response\|?>[\s\S]*$/gi, "")
+    .replace(/<\|?result\|?>[\s\S]*$/gi, "");
 }
+
 export async function uploadImageChunk(
-  chunk: any,
-  project: any,
+  chunk: ImageChunkInput,
+  project: string,
   username: string,
-    logPrefix: any = "stream",
-) {
+  logPrefix = "stream",
+): Promise<string | null> {
   if (!chunk.data) return null;
   try {
     const mimeType = chunk.mimeType || "image/png";
     const dataUrl = `data:${mimeType};base64,${chunk.data}`;
-    const { ref } = await (FileService as any).uploadFile(
+    const { ref } = await FileService.uploadFile(
       dataUrl,
       "generations",
-            (project as any),
+      project,
       username,
     );
     return ref;
   } catch (error: unknown) {
-        logger.error(`[${logPrefix}] MinIO upload failed: ${(error as Error).message}`);
+    logger.error(`[${logPrefix}] MinIO upload failed: ${(error as Error).message}`);
     return null;
   }
 }
+
 export function imageRefOrInline(
-  minioRef: any,
-  data: any,
-    mimeType: any = "image/png",
-) {
+  minioRef: string | null,
+  data: string,
+  mimeType = "image/png",
+): string {
   return minioRef || `data:${mimeType};base64,${data}`;
+}
+
+// ── Emit TTFT helper (DRY) ──────────────────────────────────
+
+function emitFirstToken(state: StreamState, emit: StreamContext["emit"]): void {
+  if (!state.firstTokenTime) {
+    state.firstTokenTime = performance.now();
+    if (state.requestStart) {
+      emit({
+        type: "status",
+        message: "generation_started",
+        timeToFirstToken: (state.firstTokenTime - state.requestStart) / 1000,
+      });
+    }
+  }
+  state.generationEnd = performance.now();
 }
 
 /**
@@ -66,35 +151,25 @@ export function imageRefOrInline(
  * previously duplicated across chat.js (handleStreamingText) and AgenticLoopService.
  */
 export async function dispatchChunk(
-  chunk: any,
-  state: any,
-  context: any,
-  options: any = {},
-) {
+  chunk: StreamChunk | string | null | undefined,
+  state: StreamState,
+  context: StreamContext,
+  options: DispatchOptions = {},
+): Promise<boolean> {
   const { emit, project, username } = context;
-    const logPrefix = options.logPrefix || "stream";
+  const logPrefix = options.logPrefix || "stream";
 
   // Non-object chunks are treated as text (raw string from provider)
   if (!chunk || typeof chunk !== "object") {
-    if (!state.firstTokenTime) {
-      state.firstTokenTime = performance.now();
-      if (state.requestStart) {
-                (emit as any)({
-          type: "status",
-          message: "generation_started",
-                    timeToFirstToken: ((state as any).firstTokenTime - state.requestStart) / 1000,
-        });
-      }
-    }
-    state.generationEnd = performance.now();
+    emitFirstToken(state, emit);
     const rawStr = typeof chunk === "string" ? chunk : "";
     state.text += rawStr;
     // Strip tool call XML markup leaked by some local models (Gemma 4)
-        const cleanText = stripToolCallMarkup((state.text as any));
+    const cleanText = stripToolCallMarkup(state.text);
     const chunkStr = cleanText.slice(state.outputCharacters);
     state.outputCharacters = cleanText.length;
     if (chunkStr)
-            (emit as any)({
+      emit({
         type: "chunk",
         content: chunkStr,
         outputCharacters: state.outputCharacters,
@@ -104,10 +179,10 @@ export async function dispatchChunk(
 
   switch (chunk.type) {
     case "usage":
-            if (options.onUsage) {
-                options.onUsage(chunk.usage);
+      if (options.onUsage && chunk.usage) {
+        options.onUsage(chunk.usage);
       } else {
-        state.usage = chunk.usage;
+        state.usage = chunk.usage || null;
       }
       return true;
 
@@ -116,21 +191,10 @@ export async function dispatchChunk(
       return true;
 
     case "thinking":
-      if (!state.firstTokenTime) {
-        state.firstTokenTime = performance.now();
-        if (state.requestStart) {
-                    (emit as any)({
-            type: "status",
-            message: "generation_started",
-            timeToFirstToken:
-                            ((state as any).firstTokenTime - state.requestStart) / 1000,
-          });
-        }
-      }
-      state.generationEnd = performance.now();
-            (state as any).thinking += (chunk as any).content;
-            (state as any).outputCharacters += ((chunk.content || "") as any).length;
-            (emit as any)({
+      emitFirstToken(state, emit);
+      state.thinking += chunk.content || "";
+      state.outputCharacters += (chunk.content || "").length;
+      emit({
         type: "thinking",
         content: chunk.content,
         outputCharacters: state.outputCharacters,
@@ -138,22 +202,22 @@ export async function dispatchChunk(
       return true;
 
     case "thinking_signature":
-      state.thinkingSignature = chunk.signature;
+      state.thinkingSignature = chunk.signature || "";
       return true;
 
     case "image": {
       const minioRef = await uploadImageChunk(
         chunk,
-                (project as any),
-        (username as any),
-        (logPrefix as any),
+        project,
+        username,
+        logPrefix,
       );
       if (chunk.data) {
-                (state as any).images.push(
-                    imageRefOrInline((minioRef as any), (chunk.data as any), (chunk.mimeType as any | undefined)),
+        state.images.push(
+          imageRefOrInline(minioRef, chunk.data, chunk.mimeType),
         );
       }
-            (emit as any)({
+      emit({
         type: "image",
         data: chunk.data,
         mimeType: chunk.mimeType,
@@ -163,7 +227,7 @@ export async function dispatchChunk(
     }
 
     case "executableCode":
-            (emit as any)({
+      emit({
         type: "executableCode",
         code: chunk.code,
         language: chunk.language,
@@ -171,7 +235,7 @@ export async function dispatchChunk(
       return true;
 
     case "codeExecutionResult":
-            (emit as any)({
+      emit({
         type: "codeExecutionResult",
         output: chunk.output,
         outcome: chunk.outcome,
@@ -179,36 +243,25 @@ export async function dispatchChunk(
       return true;
 
     case "webSearchResult":
-            (emit as any)({ type: "webSearchResult", results: chunk.results });
+      emit({ type: "webSearchResult", results: chunk.results });
       return true;
 
     case "audio":
-            (emit as any)({ type: "audio", data: chunk.data, mimeType: chunk.mimeType });
-            if (chunk.data) (state as any).audioChunks.push(chunk.data);
+      emit({ type: "audio", data: chunk.data, mimeType: chunk.mimeType });
+      if (chunk.data) state.audioChunks.push(chunk.data);
       if (chunk.mimeType) {
-                const rateMatch = (chunk.mimeType as any).match(/rate=(\d+)/);
+        const rateMatch = chunk.mimeType.match(/rate=(\d+)/);
         if (rateMatch) state.audioSampleRate = parseInt(rateMatch[1], 10);
       }
       return true;
 
     case "toolCall":
       // Tool call chunks indicate model output — track generation timing
-      if (!state.firstTokenTime) {
-        state.firstTokenTime = performance.now();
-        if (state.requestStart) {
-                    (emit as any)({
-            type: "status",
-            message: "generation_started",
-            timeToFirstToken:
-                            ((state as any).firstTokenTime - state.requestStart) / 1000,
-          });
-        }
-      }
-      state.generationEnd = performance.now();
+      emitFirstToken(state, emit);
 
       if (chunk.status === "done" || chunk.status === "error") {
-                const existing = (state as any).toolCalls.find(
-          (tc: any) =>
+        const existing = state.toolCalls.find(
+          (tc) =>
             (chunk.id && tc.id === chunk.id) ||
             (!chunk.id && tc.name === chunk.name && !tc.result),
         );
@@ -220,16 +273,16 @@ export async function dispatchChunk(
           }
         }
       } else {
-                (state as any).toolCalls.push({
+        state.toolCalls.push({
           id: chunk.id || null,
-          name: chunk.name,
+          name: chunk.name || "",
           args: chunk.args || {},
           result: chunk.result || undefined,
           status: chunk.status || undefined,
           thoughtSignature: chunk.thoughtSignature || undefined,
         });
       }
-            (emit as any)({
+      emit({
         type: "toolCall",
         id: chunk.id || null,
         name: chunk.name,
@@ -243,23 +296,12 @@ export async function dispatchChunk(
     case "toolCallDelta":
       // Incremental tool call argument streaming — track generation timing
       // so the throughput badge stays alive, but don't emit to the client.
-      if (!state.firstTokenTime) {
-        state.firstTokenTime = performance.now();
-        if (state.requestStart) {
-                    (emit as any)({
-            type: "status",
-            message: "generation_started",
-            timeToFirstToken:
-                            ((state as any).firstTokenTime - state.requestStart) / 1000,
-          });
-        }
-      }
-      state.generationEnd = performance.now();
-            (state as any).outputCharacters += Math.ceil((chunk.characters || 0) / 4);
+      emitFirstToken(state, emit);
+      state.outputCharacters += Math.ceil((chunk.characters || 0) / 4);
       return true;
 
     case "status":
-            (emit as any)({
+      emit({
         type: "status",
         message: chunk.message,
         phase: chunk.phase,
@@ -269,26 +311,15 @@ export async function dispatchChunk(
 
     default: {
       // Unknown typed chunk — treat as text
-      if (!state.firstTokenTime) {
-        state.firstTokenTime = performance.now();
-        if (state.requestStart) {
-                    (emit as any)({
-            type: "status",
-            message: "generation_started",
-            timeToFirstToken:
-                            ((state as any).firstTokenTime - state.requestStart) / 1000,
-          });
-        }
-      }
-      state.generationEnd = performance.now();
+      emitFirstToken(state, emit);
       const rawStr = typeof chunk === "string" ? chunk : "";
       state.text += rawStr;
       // Strip tool call XML markup leaked by some local models (Gemma 4)
-            const cleanText = stripToolCallMarkup((state.text as any));
+      const cleanText = stripToolCallMarkup(state.text);
       const chunkStr = cleanText.slice(state.outputCharacters);
       state.outputCharacters = cleanText.length;
       if (chunkStr)
-                (emit as any)({
+        emit({
           type: "chunk",
           content: chunkStr,
           outputCharacters: state.outputCharacters,
@@ -297,7 +328,8 @@ export async function dispatchChunk(
     }
   }
 }
-export function createStreamState() {
+
+export function createStreamState(): StreamState {
   return {
     usage: null,
     firstTokenTime: null,

@@ -7,6 +7,8 @@
  * logic to avoid duplication.
  */
 
+import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
+
 // ── Array keys whose entries get capped during truncation ─────
 const TRUNCATABLE_ARRAY_KEYS = [
   "events",
@@ -24,30 +26,57 @@ const TRUNCATABLE_ARRAY_KEYS = [
  * The full result is still stored in the DB and shown in the UI;
  * this only affects what gets re-sent to the model.
  */
-export function truncateToolResult(result: any, maxChars: any = 8000) {
+export function truncateToolResult(result: unknown, maxChars = 8000): unknown {
   if (!result || typeof result !== "object") return result;
-
-  // If result has a known array wrapper, cap items at 10
-  const trimmed = { ...result };
-    for ( const key of TRUNCATABLE_ARRAY_KEYS) {
-    if (Array.isArray(trimmed[key]) && trimmed[key].length > 10) {
-      const total = trimmed[key].length;
-      trimmed[key] = trimmed[key].slice(0, 10);
-      trimmed[`_${key}Truncated`] = `Showing 10 of ${total}`;
-    }
-  }
 
   // Also handle top-level arrays (e.g. tides, earthquakes)
   if (Array.isArray(result) && result.length > 10) {
     const sliced = result.slice(0, 10);
     sliced.push({ _truncated: `Showing 10 of ${result.length}` });
     const str = JSON.stringify(sliced);
-        return str.length > maxChars ? str.slice(0, (maxChars as any)) + "…}" : sliced;
+    return str.length > maxChars ? str.slice(0, maxChars) + "…}" : sliced;
+  }
+
+  // If result has a known array wrapper, cap items at 10
+  const trimmed = { ...(result as Record<string, unknown>) };
+  for (const key of TRUNCATABLE_ARRAY_KEYS) {
+    const arr = trimmed[key];
+    if (Array.isArray(arr) && arr.length > 10) {
+      const total = arr.length;
+      trimmed[key] = arr.slice(0, 10);
+      trimmed[`_${key}Truncated`] = `Showing 10 of ${total}`;
+    }
   }
 
   const str = JSON.stringify(trimmed);
-    if (str.length <= maxChars) return trimmed;
-    return str.slice(0, (maxChars as any)) + "…}";
+  if (str.length <= maxChars) return trimmed;
+  return str.slice(0, maxChars) + "…}";
+}
+
+interface ExpandOptions {
+  filterDeleted?: boolean;
+}
+
+interface ExpandedToolCall {
+  id?: string | null;
+  name: string;
+  args?: unknown;
+  responsesItemId?: string;
+  thoughtSignature?: string;
+}
+
+interface ExpandedMessage {
+  role: string;
+  content?: string | unknown | null;
+  name?: string;
+  tool_call_id?: string | null;
+  thinking?: string;
+  thinkingSignature?: string;
+  toolCalls?: ExpandedToolCall[];
+  images?: string[];
+  video?: string[];
+  audio?: string | string[];
+  pdf?: string[];
 }
 
 /**
@@ -57,28 +86,30 @@ export function truncateToolResult(result: any, maxChars: any = 8000) {
  * OpenAI Chat Completions spec.
  */
 export function expandMessagesForFC(
-  messages: any,
-  { filterDeleted = true }: any = {},
-) {
+  messages: ChatMessage[],
+  { filterDeleted = true }: ExpandOptions = {},
+): ExpandedMessage[] {
   const filtered = filterDeleted
-        ? (messages as any).filter(
-        (m: any) =>
-          !m.deleted &&
-                    (m.role !== "assistant" || (m.content as any)?.trim() || (m.toolCalls as any)?.length),
+    ? messages.filter(
+        (m) =>
+          !(m as ChatMessage & { deleted?: boolean }).deleted &&
+          (m.role !== "assistant" || m.content?.toString().trim() || m.toolCalls?.length),
       )
     : messages;
 
-  return filtered.flatMap((m: any) => {
+  return filtered.flatMap((m) => {
     // Expand assistant messages with toolCalls into
     // [assistant(tool_calls), tool(result1), tool(result2), ...]
-        if (m.role === "assistant" && (m.toolCalls as any)?.length > 0) {
-      const assistantMsg = {
+    if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+      const assistantMsg: ExpandedMessage = {
         role: "assistant",
-                content: (m.content as any)?.trim() || null,
+        content: m.content?.toString().trim() || null,
         // Preserve thinking + signature for Anthropic multi-turn round-trips
-                ...(m.thinking && { thinking: m.thinking }),
-                ...(m.thinkingSignature && { thinkingSignature: m.thinkingSignature }),
-                toolCalls: (m as any).toolCalls.map((tc: any) => ({
+        ...(m.thinking && { thinking: m.thinking }),
+        ...((m as ChatMessage & { thinkingSignature?: string }).thinkingSignature && {
+          thinkingSignature: (m as ChatMessage & { thinkingSignature?: string }).thinkingSignature,
+        }),
+        toolCalls: m.toolCalls.map((tc: ToolCallEntry) => ({
           id: tc.id,
           name: tc.name,
           args: tc.args,
@@ -90,16 +121,16 @@ export function expandMessagesForFC(
             : {}),
         })),
       };
-            const toolMsgs = (m as any).toolCalls
-        .filter((tc: any) => tc.result !== undefined)
-        .map((tc: any) => ({
+      const toolMsgs: ExpandedMessage[] = m.toolCalls
+        .filter((tc: ToolCallEntry) => tc.result !== undefined)
+        .map((tc: ToolCallEntry) => ({
           role: "tool",
           name: tc.name,
           tool_call_id: tc.id,
           content:
             typeof tc.result === "string"
               ? tc.result
-                            : JSON.stringify(truncateToolResult((tc.result as any))),
+              : JSON.stringify(truncateToolResult(tc.result)),
         }));
       return [assistantMsg, ...toolMsgs];
     }
@@ -109,7 +140,7 @@ export function expandMessagesForFC(
       return [
         {
           role: "tool",
-          tool_call_id: m.tool_call_id,
+          tool_call_id: (m as ChatMessage & { tool_call_id?: string }).tool_call_id,
           name: m.name,
           content: m.content,
         },
@@ -122,16 +153,16 @@ export function expandMessagesForFC(
     return [
       {
         role: m.role,
-                ...((m.content as any)?.trim() ? { content: m.content } : { content: " " }),
-                ...((m.images as any)?.length > 0 ? { images: m.images } : {}),
-                ...((m.video as any)?.length > 0 ? { video: m.video } : {}),
-                ...((m.audio as any)?.length > 0 ? { audio: m.audio } : {}),
-                ...((m.pdf as any)?.length > 0 ? { pdf: m.pdf } : {}),
+        ...(m.content?.toString().trim() ? { content: m.content } : { content: " " }),
+        ...(m.images && m.images.length > 0 ? { images: m.images } : {}),
+        ...(m.video && m.video.length > 0 ? { video: m.video } : {}),
+        ...(m.audio && (Array.isArray(m.audio) ? m.audio.length > 0 : m.audio) ? { audio: m.audio } : {}),
+        ...(m.pdf && m.pdf.length > 0 ? { pdf: m.pdf } : {}),
         ...(m.role === "assistant" && m.thinking
           ? { thinking: m.thinking }
           : {}),
-        ...(m.role === "assistant" && m.thinkingSignature
-          ? { thinkingSignature: m.thinkingSignature }
+        ...(m.role === "assistant" && (m as ChatMessage & { thinkingSignature?: string }).thinkingSignature
+          ? { thinkingSignature: (m as ChatMessage & { thinkingSignature?: string }).thinkingSignature }
           : {}),
       },
     ];

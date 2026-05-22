@@ -216,6 +216,8 @@ export interface TokenUsage {
   cacheCreationInputTokens?: number;
   reasoningOutputTokens?: number;
   totalTokens?: number;
+  /** Provider-reported tokens/sec (llama.cpp, lm-studio). */
+  tokensPerSec?: number;
 }
 
 export interface GenerationOptions {
@@ -237,16 +239,18 @@ export interface ToolEntry {
 }
 
 export interface ToolCallEntry {
-  id?: string;
+  id?: string | null;
   name: string;
   args?: unknown;
   result?: unknown;
   status?: string;
+  responsesItemId?: string;
+  thoughtSignature?: string;
 }
 
 export interface ChatMessage {
   role: string;
-  content: string | unknown;
+  content?: string;
   name?: string;
   images?: string[];
   audio?: string | string[];
@@ -254,4 +258,7 @@ export interface ChatMessage {
   pdf?: string[];
   toolCalls?: ToolCallEntry[];
   thinking?: string;
+  thinkingSignature?: string;
+  deleted?: boolean;
+  tool_call_id?: string;
 }

@@ -22,7 +22,7 @@ import {
 import type { ToolSchema } from "../services/harnesses/types.ts";
 function useResponsesAPI(model: string): boolean {
   const modelDef = getModelByName(model);
-  return modelDef !== null && "responsesAPI" in modelDef && (modelDef as any).responsesAPI === true;
+  return modelDef !== null && "responsesAPI" in modelDef && (modelDef as { responsesAPI?: boolean }).responsesAPI === true;
 }
 
 let client: OpenAI | null = null;
@@ -46,12 +46,12 @@ export interface OpenAIMsg {
   toolCalls?: Array<{
     id?: string;
     name: string;
-    args: any;
+    args: Record<string, unknown>;
     responsesItemId?: string;
   }>;
   tool_call_id?: string;
   id?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -61,25 +61,25 @@ export interface OpenAIMsg {
  */
 function convertToolsToResponsesAPI(tools?: ToolSchema[] | null): OpenAI.Responses.Tool[] | null {
   if (!tools || !Array.isArray(tools) || tools.length === 0) return null;
-  return tools.map((t: any): OpenAI.Responses.Tool => ({
+  return tools.map((t: ToolSchema): OpenAI.Responses.Tool => ({
     type: "function" as const,
-    name: (t as any).name,
-    description: (t as any).description || "",
-    parameters: ((t as any).parameters as any) || {},
+    name: t.name,
+    description: t.description || "",
+    parameters: (t.parameters || {}) as Record<string, unknown>,
     strict: true,
   }));
 }
 
 /** Narrow any errors into ProviderError for all catch blocks. */
-function toProviderError(error: any): never {
+function toProviderError(error: unknown): never {
   let message = String(error);
   let status = 500;
   if (error && typeof error === "object") {
-    if ("message" in error && typeof error.message === "string") {
-      message = error.message;
+    if ("message" in error && typeof (error as { message: unknown }).message === "string") {
+      message = (error as { message: string }).message;
     }
-    if ("status" in error && typeof error.status === "number") {
-      status = error.status;
+    if ("status" in error && typeof (error as { status: unknown }).status === "number") {
+      status = (error as { status: number }).status;
     }
   }
   throw new ProviderError("openai", message, status, error);
@@ -88,74 +88,74 @@ function toProviderError(error: any): never {
 interface ErrorRecord {
   message?: string;
   status?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /** Narrow any catch to a typed error record for retry logic. */
-function asErrorRecord(error: any): ErrorRecord {
+function asErrorRecord(error: unknown): ErrorRecord {
   return error as ErrorRecord;
 }
 function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletionMessageParam[] {
-  return messages.map((m: any): OpenAI.Chat.ChatCompletionMessageParam => {
+  return messages.map((m: OpenAIMsg): OpenAI.Chat.ChatCompletionMessageParam => {
     // Tool result messages — include tool_call_id for correlation
-    if ((m as any).role === "tool") {
+    if (m.role === "tool") {
       return {
         role: "tool",
-        tool_call_id: (m as any).tool_call_id || (m as any).id || "",
+        tool_call_id: m.tool_call_id || m.id || "",
         content:
-          typeof (m as any).content === "string"
-            ? (m as any).content
-            : JSON.stringify((m as any).content ?? ""),
+          typeof m.content === "string"
+            ? m.content
+            : JSON.stringify(m.content ?? ""),
       };
     }
 
     // Assistant messages with tool calls — include tool_calls in OpenAI format
-    if ((m as any).role === "assistant") {
-      if ((m as any).toolCalls && (m as any).toolCalls.length > 0) {
+    if (m.role === "assistant") {
+      if (m.toolCalls && m.toolCalls.length > 0) {
         return {
           role: "assistant",
-          ...((m as any).name ? { name: (m as any).name } : {}),
-          content: (m as any).content?.trim() || null,
-          tool_calls: (m as any).toolCalls.map((tc: any, i: any) => ({
-            id: (tc as any).id || `call_${i}`,
+          ...(m.name ? { name: m.name } : {}),
+          content: m.content?.trim() || null,
+          tool_calls: m.toolCalls.map((tc, i) => ({
+            id: tc.id || `call_${i}`,
             type: "function" as const,
             function: {
-              name: (tc as any).name,
+              name: tc.name,
               arguments:
-                typeof (tc as any).args === "string"
-                  ? (tc as any).args
-                  : JSON.stringify((tc as any).args || {}),
+                typeof tc.args === "string"
+                  ? tc.args
+                  : JSON.stringify(tc.args || {}),
             },
           })),
         };
       }
       return {
         role: "assistant",
-        ...((m as any).name ? { name: (m as any).name } : {}),
-        content: (m as any).content ?? "",
+        ...(m.name ? { name: m.name } : {}),
+        content: m.content ?? "",
       };
     }
 
-    if ((m as any).role === "system") {
+    if (m.role === "system") {
       return {
         role: "system",
-        ...((m as any).name ? { name: (m as any).name } : {}),
-        content: (m as any).content ?? "",
+        ...(m.name ? { name: m.name } : {}),
+        content: m.content ?? "",
       };
     }
 
-    if ((m as any).role === "developer") {
+    if (m.role === "developer") {
       return {
         role: "developer",
-        ...((m as any).name ? { name: (m as any).name } : {}),
-        content: (m as any).content ?? "",
+        ...(m.name ? { name: m.name } : {}),
+        content: m.content ?? "",
       };
     }
 
     // User messages (can be multimodal)
-    if ((m as any).images && (m as any).images.length > 0) {
+    if (m.images && m.images.length > 0) {
       const content: OpenAI.Chat.ChatCompletionContentPart[] = [];
-      for (const mediaRef of (m as any).images) {
+      for (const mediaRef of m.images) {
         const urlType = getUrlType(mediaRef);
 
         if (urlType === "data") {
@@ -167,7 +167,7 @@ function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletio
             content.push({
               type: "file",
               file: { file_data: mediaRef, filename: "document.pdf" },
-            } as any as OpenAI.Chat.ChatCompletionContentPart);
+            } as OpenAI.Chat.ChatCompletionContentPart);
           } else if (
             mime &&
             (mime.startsWith("text/") || mime === "application/json")
@@ -191,7 +191,7 @@ function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletio
             content.push({
               type: "file",
               file: { file_data: mediaRef, filename: "attachment" },
-            } as any as OpenAI.Chat.ChatCompletionContentPart);
+            } as OpenAI.Chat.ChatCompletionContentPart);
           }
         } else if (urlType === "http") {
           // HTTP(S) URL — the Chat Completions API accepts URLs in image_url
@@ -203,7 +203,7 @@ function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletio
             content.push({
               type: "file",
               file: { file_data: mediaRef, filename: "attachment" },
-            } as any as OpenAI.Chat.ChatCompletionContentPart);
+            } as OpenAI.Chat.ChatCompletionContentPart);
           }
         } else {
           // Unknown ref type (e.g. minio://) — skip with warning
@@ -212,20 +212,20 @@ function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletio
           );
         }
       }
-      if ((m as any).content) {
-        content.push({ type: "text", text: (m as any).content });
+      if (m.content) {
+        content.push({ type: "text", text: m.content });
       }
       return {
         role: "user",
-        ...((m as any).name ? { name: (m as any).name } : {}),
+        ...(m.name ? { name: m.name } : {}),
         content,
       };
     }
 
     return {
       role: "user",
-      ...((m as any).name ? { name: (m as any).name } : {}),
-      content: (m as any).content ?? "",
+      ...(m.name ? { name: m.name } : {}),
+      content: m.content ?? "",
     };
   });
 }
@@ -260,7 +260,7 @@ function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.Response
             typeof tc.args === "string"
               ? tc.args
               : JSON.stringify(tc.args || {}),
-        } as OpenAI.Responses.ResponseFunctionToolCall as any as OpenAI.Responses.ResponseInputItem);
+        } as OpenAI.Responses.ResponseFunctionToolCall as unknown as OpenAI.Responses.ResponseInputItem);
       }
       continue;
     }
@@ -274,7 +274,7 @@ function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.Response
           typeof m.content === "string"
             ? m.content
             : JSON.stringify(m.content || ""),
-      } as any as OpenAI.Responses.ResponseInputItem);
+      } as unknown as OpenAI.Responses.ResponseInputItem);
       continue;
     }
 
@@ -371,7 +371,7 @@ const openaiProvider = {
     model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai,
     options: ProviderOptions = {},
   ) {
-        (logger.provider as any)(("OpenAI" as any), (`generateText model=${model}` as any));
+    logger.provider("OpenAI", `generateText model=${model}`);
     try {
       if (useResponsesAPI(model)) {
         return await this._generateTextResponses(messages, model, options);
@@ -387,7 +387,7 @@ const openaiProvider = {
       seed?: number;
       frequency_penalty?: number;
       presence_penalty?: number;
-      stop?: any;
+      stop?: string[];
     } = { model, input };
 
     // Reasoning
@@ -432,7 +432,7 @@ const openaiProvider = {
       text.format = {
         type: "json_schema",
         json_schema: options.responseSchema,
-      } as any as OpenAI.Responses.ResponseFormatTextJSONSchemaConfig;
+      } as unknown as OpenAI.Responses.ResponseFormatTextJSONSchemaConfig;
     }
     if (Object.keys(text).length > 0) {
       payload.text = text;
@@ -458,7 +458,7 @@ const openaiProvider = {
     }
 
     // Custom function calling tools
-        const customTools = convertToolsToResponsesAPI((options.tools as any as ToolSchema[] | null | undefined));
+    const customTools = convertToolsToResponsesAPI(options.tools as ToolSchema[] | null | undefined);
     if (customTools) {
       payload.tools = [...((payload.tools as OpenAI.Responses.Tool[]) || []), ...customTools];
     }
@@ -468,11 +468,11 @@ const openaiProvider = {
       .withResponse();
 
     // Extract rate-limit headers
-        const rateLimits = extractOpenAIRateLimits((rawResponse as any), (model as any));
+    const rateLimits = extractOpenAIRateLimits(rawResponse, model);
 
     // Collect tool calls and images from output items
     const images: Array<{ type: string; data: string; mimeType: string }> = [];
-    const toolCalls: Array<{ id: string; name: string; args: any }> = [];
+    const toolCalls: Array<{ id: string; name: string; args: Record<string, unknown> }> = [];
     if (response.output) {
       for (const item of response.output) {
         if (item.type === "image_generation_call" && item.result) {
@@ -482,7 +482,7 @@ const openaiProvider = {
             mimeType: "image/png",
           });
         } else if (item.type === "function_call") {
-          let args = {};
+          let args: Record<string, unknown> = {};
           try {
             args = JSON.parse(item.arguments || "{}");
           } catch {
@@ -497,7 +497,7 @@ const openaiProvider = {
       }
     }
 
-    const result: any = {
+    const result: Record<string, unknown> = {
       text: response.output_text || "",
       images,
       usage: {
@@ -552,11 +552,11 @@ const openaiProvider = {
     }
 
     if (options.webSearch) {
-      payload.tools = [{ type: "web_search" } as any as OpenAI.Chat.ChatCompletionTool];
+      payload.tools = [{ type: "web_search" } as unknown as OpenAI.Chat.ChatCompletionTool];
     }
 
     // Custom function calling tools
-        const customTools = convertToolsToOpenAI((options.tools as any)) as OpenAI.Chat.ChatCompletionTool[] | null;
+    const customTools = convertToolsToOpenAI(options.tools as ToolSchema[] | null | undefined) as OpenAI.Chat.ChatCompletionTool[] | null;
     if (customTools) {
       payload.tools = [...((payload.tools as OpenAI.Chat.ChatCompletionTool[]) || []), ...customTools];
     }
@@ -565,9 +565,9 @@ const openaiProvider = {
       const { data: response, response: rawResponse } = await getClient()
         .chat.completions.create(payload)
         .withResponse();
-            const rateLimits = extractOpenAIRateLimits((rawResponse as any), (model as any));
+      const rateLimits = extractOpenAIRateLimits(rawResponse, model);
       const message = response.choices[0].message;
-      const result: any = {
+      const result: Record<string, unknown> = {
         text: message.content || "",
         usage: {
           inputTokens: response.usage?.prompt_tokens ?? 0,
@@ -575,23 +575,23 @@ const openaiProvider = {
         },
       };
       if (message.tool_calls && message.tool_calls.length > 0) {
-        result.toolCalls = message.tool_calls.map((tc: any) => {
-          if ((tc as any).type === "function") {
-            const fn = (tc as any).function;
-            let args = {};
+        result.toolCalls = message.tool_calls.map((tc) => {
+          if (tc.type === "function") {
+            const fn = tc.function;
+            let args: Record<string, unknown> = {};
             try {
-              args = JSON.parse((fn as any).arguments || "{}");
+              args = JSON.parse(fn.arguments || "{}");
             } catch {
               /* ignore */
             }
             return {
-              id: (tc as any).id,
-              name: (fn as any).name || "",
+              id: tc.id,
+              name: fn.name || "",
               args,
             };
           }
           return {
-            id: (tc as any).id,
+            id: tc.id,
             name: "",
             args: {},
           };
@@ -611,15 +611,15 @@ const openaiProvider = {
           "max_completion_tokens",
         ];
         let stripped = false;
-        const payloadRecord = payload as any;
+        const payloadRecord = payload as unknown as Record<string, unknown>;
         for (const param of unsupportedParams) {
           if (
             err.message?.includes(`'${param}'`) &&
             payloadRecord[param] !== undefined
           ) {
-            (logger.provider as any)(
-                            ("OpenAI" as any),
-              (`Stripping unsupported param '${param}' for ${model} and retrying` as any),
+            logger.provider(
+              "OpenAI",
+              `Stripping unsupported param '${param}' for ${model} and retrying`,
             );
             delete payloadRecord[param];
             stripped = true;
@@ -645,7 +645,7 @@ const openaiProvider = {
     model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai,
     options: ProviderOptions = {},
   ) {
-        (logger.provider as any)(("OpenAI" as any), (`generateTextStream model=${model}` as any));
+    logger.provider("OpenAI", `generateTextStream model=${model}`);
     try {
       if (useResponsesAPI(model)) {
         yield* this._streamResponses(messages, model, options);
@@ -663,7 +663,7 @@ const openaiProvider = {
       seed?: number;
       frequency_penalty?: number;
       presence_penalty?: number;
-      stop?: any;
+      stop?: string[];
     } = { model, input, stream: true };
 
     // Reasoning
@@ -708,7 +708,7 @@ const openaiProvider = {
       text.format = {
         type: "json_schema",
         json_schema: options.responseSchema,
-      } as any as OpenAI.Responses.ResponseFormatTextJSONSchemaConfig;
+      } as unknown as OpenAI.Responses.ResponseFormatTextJSONSchemaConfig;
     }
     if (Object.keys(text).length > 0) {
       payload.text = text;
@@ -734,7 +734,7 @@ const openaiProvider = {
     }
 
     // Custom function calling tools
-        const customTools = convertToolsToResponsesAPI((options.tools as any as ToolSchema[] | null | undefined));
+    const customTools = convertToolsToResponsesAPI(options.tools as ToolSchema[] | null | undefined);
     if (customTools) {
       payload.tools = [...((payload.tools as OpenAI.Responses.Tool[]) || []), ...customTools];
     }
@@ -744,7 +744,7 @@ const openaiProvider = {
         ...(options.signal && { signal: options.signal }),
       })
       .withResponse();
-        const rateLimits = extractOpenAIRateLimits((rawStreamResponse as any), (model as any));
+    const rateLimits = extractOpenAIRateLimits(rawStreamResponse, model);
     let usage = null;
     // Track function names from output_item.added events; the arguments.done
     // event may not include the name property (known OpenAI SDK issue).
@@ -804,9 +804,9 @@ const openaiProvider = {
       if (event.type === "response.function_call_arguments.done") {
         const ev = event as OpenAI.Responses.ResponseFunctionCallArgumentsDoneEvent & { call_id?: string };
         const tracked = pendingFunctions[ev.item_id];
-        const name = tracked?.name || ev.name || "any";
+        const name = tracked?.name || ev.name || "unknown";
         const callId = tracked?.callId || ev.call_id || ev.item_id;
-        let args = {};
+        let args: Record<string, unknown> = {};
         try {
           args = JSON.parse(ev.arguments || tracked?.args || "{}");
         } catch {
@@ -888,11 +888,11 @@ const openaiProvider = {
     }
 
     if (options.webSearch) {
-      payload.tools = [{ type: "web_search" } as any as OpenAI.Chat.ChatCompletionTool];
+      payload.tools = [{ type: "web_search" } as unknown as OpenAI.Chat.ChatCompletionTool];
     }
 
     // Custom function calling tools
-        const customTools = convertToolsToOpenAI((options.tools as any)) as OpenAI.Chat.ChatCompletionTool[] | null;
+    const customTools = convertToolsToOpenAI(options.tools as ToolSchema[] | null | undefined) as OpenAI.Chat.ChatCompletionTool[] | null;
     if (customTools) {
       payload.tools = [...((payload.tools as OpenAI.Chat.ChatCompletionTool[]) || []), ...customTools];
     }
@@ -907,7 +907,7 @@ const openaiProvider = {
           })
           .withResponse();
       stream = streamData;
-            rateLimits = extractOpenAIRateLimits((rawStreamResponse as any), (model as any));
+      rateLimits = extractOpenAIRateLimits(rawStreamResponse, model);
     } catch (error: unknown) {
       const err = asErrorRecord(error);
       // Retry once after stripping unsupported parameters (e.g. gpt-5-nano rejects temperature)
@@ -920,15 +920,15 @@ const openaiProvider = {
           "max_completion_tokens",
         ];
         let stripped = false;
-        const payloadRecord = payload as any;
+        const payloadRecord = payload as unknown as Record<string, unknown>;
         for (const param of unsupportedParams) {
           if (
             err.message?.includes(`'${param}'`) &&
             payloadRecord[param] !== undefined
           ) {
-            (logger.provider as any)(
-                            ("OpenAI" as any),
-              (`Stripping unsupported param '${param}' for ${model} and retrying (stream)` as any),
+            logger.provider(
+              "OpenAI",
+              `Stripping unsupported param '${param}' for ${model} and retrying (stream)`,
             );
             delete payloadRecord[param];
             stripped = true;
@@ -941,7 +941,7 @@ const openaiProvider = {
             })
             .withResponse();
           stream = retryResult.data;
-                    rateLimits = extractOpenAIRateLimits((retryResult.response as any), (model as any));
+          rateLimits = extractOpenAIRateLimits(retryResult.response, model);
         } else {
           throw error;
         }
@@ -997,7 +997,7 @@ const openaiProvider = {
       // If finish_reason is "tool_calls", yield accumulated tool calls
       if (chunk.choices[0]?.finish_reason === "tool_calls") {
         for (const tc of Object.values(pendingToolCalls)) {
-          let args = {};
+          let args: Record<string, unknown> = {};
           try {
             args = JSON.parse(tc.args || "{}");
           } catch {
@@ -1023,7 +1023,7 @@ const openaiProvider = {
   },
 
   async generateSpeech(text: string, voice: string = DEFAULT_VOICES.openai, options: ProviderOptions = {}) {
-        (logger.provider as any)(("OpenAI" as any), (`generateSpeech voice=${voice}` as any));
+    logger.provider("OpenAI", `generateSpeech voice=${voice}`);
     try {
       const payload: OpenAI.Audio.SpeechCreateParams & { instructions?: string } = {
         model:
@@ -1043,9 +1043,9 @@ const openaiProvider = {
   },
 
   async generateImage(prompt: string, images: Array<string | { imageData: string; mimeType?: string }> = [], model: string = "gpt-image-1.5") {
-    (logger.provider as any)(
-            ("OpenAI" as any),
-      (`generateImage model=${model} images=${images.length}` as any),
+    logger.provider(
+      "OpenAI",
+      `generateImage model=${model} images=${images.length}`,
     );
     try {
       let response: OpenAI.Images.ImagesResponse;
@@ -1095,7 +1095,7 @@ const openaiProvider = {
       }
 
       const firstImage = response.data?.[0];
-      const imageData = firstImage?.b64_json || (firstImage as any)?.b64 || (response as any)?.b64;
+      const imageData = firstImage?.b64_json || (firstImage as unknown as Record<string, unknown>)?.b64 || (response as unknown as Record<string, unknown>)?.b64;
       if (!imageData) {
         throw new Error("No image data received from OpenAI");
       }
@@ -1115,7 +1115,7 @@ const openaiProvider = {
     model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai,
     systemPrompt?: string,
   ) {
-        (logger.provider as any)(("OpenAI" as any), (`captionImage model=${model}` as any));
+    logger.provider("OpenAI", `captionImage model=${model}`);
     try {
       const content: OpenAI.Chat.ChatCompletionContentPart[] = [
         { type: "text" as const, text: prompt },
@@ -1148,7 +1148,7 @@ const openaiProvider = {
     text: string,
     model: string = getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING).openai,
   ) {
-        (logger.provider as any)(("OpenAI" as any), (`generateEmbedding model=${model}` as any));
+    logger.provider("OpenAI", `generateEmbedding model=${model}`);
     try {
       const response = await getClient().embeddings.create({
         model,
@@ -1166,7 +1166,7 @@ const openaiProvider = {
     model: string = (OPENAI_TRANSCRIPTION_MODEL as string) || "whisper-1",
     options: ProviderOptions = {},
   ) {
-        (logger.provider as any)(("OpenAI" as any), (`transcribeAudio model=${model}` as any));
+    logger.provider("OpenAI", `transcribeAudio model=${model}`);
     try {
       const subType = mimeType.split("/")[1] || "wav";
       const ext = ["wav", "mp3", "opus", "aac", "flac", "pcm"].includes(subType)

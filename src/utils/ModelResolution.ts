@@ -6,6 +6,34 @@
 
 import logger from "./logger.ts";
 import { getProvider } from "../providers/index.ts";
+import type { InstanceEntry } from "../types/ProviderTypes.ts";
+
+// ── Types ────────────────────────────────────────────────────
+
+interface ParsedQuant {
+  base: string;
+  quant: string | null;
+}
+
+interface AvailableModel {
+  key?: string;
+  id?: string;
+  size_bytes?: number;
+}
+
+interface QuantCandidate {
+  key: string;
+  quant: string | null;
+  sizeBytes: number;
+}
+
+
+interface ModelResolutionResult {
+  usable: InstanceEntry[];
+  modelOverrides: Map<string, string>;
+}
+
+// ── Implementation ───────────────────────────────────────────
 
 /**
  * Regex to match GGUF quantization suffixes.
@@ -23,15 +51,15 @@ const GGUF_QUANT_SUFFIX_RE =
  *   "lmstudio-community/qwen3-32b-GGUF/qwen3-32b-Q8_0.gguf"
  *     → { base: "lmstudio-community/qwen3-32b-GGUF/qwen3-32b", quant: "Q8_0" }
  */
-export function parseModelQuant(modelKey: any) {
+export function parseModelQuant(modelKey: string): ParsedQuant {
   // Handle @quant suffix (e.g. "qwen3-32b@q4_k_m")
-    if ((modelKey as any).includes("@")) {
-        const [base, quant] = (modelKey as any).split("@");
+  if (modelKey.includes("@")) {
+    const [base, quant] = modelKey.split("@");
     return { base, quant: quant.toUpperCase() };
   }
 
   // Handle GGUF path-style keys — strip .gguf, then match the quant suffix via regex
-    const stripped = (modelKey as any).replace(/\.gguf$/i, "");
+  const stripped = modelKey.replace(/\.gguf$/i, "");
   const match = stripped.match(GGUF_QUANT_SUFFIX_RE);
   if (match) {
     const quant = match[1].toUpperCase();
@@ -47,13 +75,13 @@ export function parseModelQuant(modelKey: any) {
  * on a specific instance. Ranks by `size_bytes` (file size on disk) —
  * the largest file is the highest-quality quantization.
  */
-export function findBestQuantFallback(targetModel: any, availableModels: any) {
+export function findBestQuantFallback(targetModel: string, availableModels: AvailableModel[]): string | null {
   const { base: targetBase, quant: targetQuant } = parseModelQuant(targetModel);
 
   // Find all available models that share the same base name (any quant variant)
-  const candidates: any[] = [];
-    for ( const m of availableModels) {
-    const mKey = m.key || m.id;
+  const candidates: QuantCandidate[] = [];
+  for (const m of availableModels) {
+    const mKey = m.key || m.id || "";
     const { base, quant } = parseModelQuant(mKey);
 
     // Compare bases case-insensitively.
@@ -79,7 +107,7 @@ export function findBestQuantFallback(targetModel: any, availableModels: any) {
   if (candidates.length === 0) return null;
 
   // Sort by file size descending — largest file = highest quality quant
-    candidates.sort((a: any, b: any) => (b as any).sizeBytes - (a as any).sizeBytes);
+  candidates.sort((a, b) => b.sizeBytes - a.sizeBytes);
   return candidates[0].key;
 }
 
@@ -90,23 +118,27 @@ export function findBestQuantFallback(targetModel: any, availableModels: any) {
  *
  * This is the same logic the CoordinatorService uses for worker agents.
  */
-export async function resolveModelForInstances(modelKey: any, siblings: any) {
-  /** @type {Map<string, string>} Per-instance model override (when quant fallback is used) */
-  const modelOverrides = new Map();
+export async function resolveModelForInstances(
+  modelKey: string,
+  siblings: InstanceEntry[],
+): Promise<ModelResolutionResult> {
+  const modelOverrides = new Map<string, string>();
 
   try {
     const checks = await Promise.allSettled(
-            (siblings as any).map(async (inst: any) => {
-                const provider = getProvider((inst.id as any));
+      siblings.map(async (inst) => {
+        const provider = getProvider(inst.id);
         if (!provider?.listModels) return { exact: false, fallback: null };
+
         const result = await Promise.race([
           provider.listModels(),
-                    new Promise(((_: any, rej: any) =>
-                                            setTimeout(() => rej(new Error("timeout")), 3000) as any as (resolve: (value: any) => void, reject: (reason?: any) => void) => void),
+          new Promise<never>((_, rej) =>
+            setTimeout(() => rej(new Error("timeout")), 3000),
           ),
         ]);
-        const models = result?.models || result?.data || [];
-        const modelKeys = models.map((m: any) => m.key || m.id);
+
+        const models: AvailableModel[] = result?.models || result?.data || [];
+        const modelKeys = models.map((m) => m.key || m.id || "");
         const exactMatch = modelKeys.includes(modelKey);
         if (exactMatch) return { exact: true, fallback: null };
 
@@ -120,22 +152,22 @@ export async function resolveModelForInstances(modelKey: any, siblings: any) {
     );
 
     // Build usable instances list
-    const usable: any[] = [];
-        for (let i = 0; i < (siblings as any).length; i++) {
-      if (checks[i].status !== "fulfilled") continue;
-            // @ts-ignore - TODO: strict typing
-            const { exact, fallback } = checks[i].value;
+    const usable: InstanceEntry[] = [];
+    for (let i = 0; i < siblings.length; i++) {
+      const check = checks[i];
+      if (check.status !== "fulfilled") continue;
+      const { exact, fallback } = check.value;
 
       if (exact) {
-                usable.push((siblings[i] as any));
+        usable.push(siblings[i]);
       } else if (fallback) {
-                modelOverrides.set((siblings as any)[i].id, fallback);
-                usable.push((siblings[i] as any));
+        modelOverrides.set(siblings[i].id, fallback);
+        usable.push(siblings[i]);
       }
     }
 
     const summary = usable
-      .map((s: any) => {
+      .map((s) => {
         const override = modelOverrides.get(s.id);
         return override ? `${s.id}→"${override}"` : `${s.id} (exact)`;
       })
@@ -147,7 +179,7 @@ export async function resolveModelForInstances(modelKey: any, siblings: any) {
     return { usable, modelOverrides };
   } catch (error: unknown) {
     logger.warn(
-            `[ModelResolution] Model availability check failed: ${(error as Error).message}`,
+      `[ModelResolution] Model availability check failed: ${(error as Error).message}`,
     );
     return { usable: siblings, modelOverrides };
   }

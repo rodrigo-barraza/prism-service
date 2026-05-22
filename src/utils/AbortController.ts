@@ -20,8 +20,8 @@ const DEFAULT_MAX_LISTENERS = 50;
  * Prevents MaxListenersExceededWarning when multiple consumers
  * (tool calls, stream readers, etc.) listen on the same signal.
  */
-export function createAbortController(maxListeners: any = DEFAULT_MAX_LISTENERS) {
+export function createAbortController(maxListeners: number = DEFAULT_MAX_LISTENERS): AbortController {
   const controller = new AbortController();
-    setMaxListeners((maxListeners as any), controller.signal);
+  setMaxListeners(maxListeners, controller.signal);
   return controller;
 }

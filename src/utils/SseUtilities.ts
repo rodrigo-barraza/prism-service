@@ -3,6 +3,7 @@ import { ProviderError } from "./errors.ts";
 import { createAbortController } from "./AbortController.ts";
 import { Request, Response, NextFunction } from "express";
 import { SseEvent } from "../types/SseTypes.ts";
+import type { ChatRequest } from "../types/schemas.ts";
 
 // ─── shared by /chat and /agent routes ──────────────────────
 
@@ -56,7 +57,7 @@ export function createSseEmitter(res: Response, signal: AbortSignal) {
  * Build a flat JSON response from collected SSE events.
  * Used by non-streaming callers (?stream=false).
  */
-export function buildJsonResponseFromEvents(events: SseEvent[], reqBody: any) {
+export function buildJsonResponseFromEvents(events: SseEvent[], reqBody: ChatRequest) {
   const errorEvent = events.find((e: SseEvent) => e.type === "error");
   if (errorEvent) {
     return { error: new ProviderError("server", errorEvent.message || "Unknown error", 500) };
@@ -111,8 +112,8 @@ export function buildJsonResponseFromEvents(events: SseEvent[], reqBody: any) {
 export async function handleSseRequest(
   req: Request,
   res: Response,
-  params: any,
-    handler: (params: any, onEvent: (event: SseEvent) => void, context: { signal: AbortSignal }) => Promise<void> = handleConversation,
+  params: ChatRequest,
+  handler: (params: ChatRequest, onEvent: (event: SseEvent) => void, context: { signal: AbortSignal }) => Promise<void> = handleConversation,
 ) {
   initSseResponse(res);
 
@@ -136,8 +137,8 @@ export async function handleJsonRequest(
   req: Request,
   res: Response,
   next: NextFunction,
-  params: any,
-    handler: (params: any, onEvent: (event: SseEvent) => void) => Promise<void> = handleConversation,
+  params: ChatRequest,
+  handler: (params: ChatRequest, onEvent: (event: SseEvent) => void) => Promise<void> = handleConversation,
 ) {
     const events: SseEvent[] = [];
   await handler(params, (event: SseEvent) => events.push(event));

@@ -31,21 +31,130 @@ const API_TO_CANONICAL = {
   imageGeneration: "Image Generation",
   image_generation: "Image Generation",
 };
-function sanitizeMsg(m: any) {
-  const sanitizeStr = (s: any) =>
-        typeof s === "string" && (s as any).startsWith("data:") ? `[base64 data]` : s;
-  const sanitizeMedia = (value: any) => {
+export interface LogParams {
+  requestId?: string;
+  endpoint?: string | null;
+  operation?: string | null;
+  project?: string | null;
+  username?: string | null;
+  clientIp?: string | null;
+  agent?: string | null;
+  provider?: string | null;
+  model?: string | null;
+  conversationId?: string | null;
+  traceId?: string | null;
+  agentSessionId?: string | null;
+  parentAgentSessionId?: string | null;
+  toolsUsed?: boolean;
+  toolDisplayNames?: string[];
+  toolApiNames?: string[];
+  success?: boolean;
+  errorMessage?: string | null;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+  reasoningOutputTokens?: number;
+  estimatedCost?: number | null;
+  tokensPerSec?: number | null;
+  temperature?: number | null;
+  maxTokens?: number | null;
+  topP?: number | null;
+  topK?: number | null;
+  frequencyPenalty?: number | null;
+  presencePenalty?: number | null;
+  stopSequences?: string[] | null;
+  messageCount?: number;
+  inputCharacters?: number;
+  outputCharacters?: number;
+  timeToGeneration?: number | null;
+  generationTime?: number | null;
+  totalTime?: number | null;
+  requestPayload?: Record<string, unknown> | null;
+  responsePayload?: Record<string, unknown> | null;
+  modalities?: Record<string, unknown> | null;
+  rateLimits?: Record<string, unknown> | null;
+}
+
+export interface TokenUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+  reasoningOutputTokens?: number;
+  [key: string]: number | undefined;
+}
+
+export interface LlmOptions {
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  topK?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  stopSequences?: string[];
+  tools?: { name?: string; function?: { name: string } }[];
+  [key: string]: unknown;
+}
+
+export interface ToolCallPayload {
+  name: string;
+  id?: string | null;
+  args?: Record<string, unknown> | string;
+}
+
+export interface MessagePayload {
+  role: string;
+  content?: string | unknown[] | null;
+  images?: string[] | unknown[];
+  audio?: string | unknown[];
+  video?: string | unknown[];
+  pdf?: string | unknown[];
+  toolCalls?: ToolCallPayload[];
+  thinking?: string;
+  [key: string]: unknown;
+}
+
+export interface LogChatGenerationParams extends LogParams {
+  usage?: TokenUsage;
+  timeToGenerationSec?: number | null;
+  generationSec?: number | null;
+  totalSec?: number | null;
+  options?: LlmOptions;
+  messages?: MessagePayload[];
+  text?: string | null;
+  thinking?: string | null;
+  images?: string[];
+  toolCalls?: ToolCallPayload[];
+  audioRef?: string | null;
+  agenticIteration?: number | null;
+}
+
+export interface LogBackgroundLlmCallParams extends LogParams {
+  provider: string;
+  aiMessages: MessagePayload[];
+  resultText: string | null;
+  usage?: TokenUsage | Record<string, unknown> | null;
+  requestStartMs: number;
+  extraRequestPayload?: Record<string, unknown>;
+  extraResponsePayload?: Record<string, unknown>;
+}
+
+function sanitizeMsg(m: MessagePayload) {
+  const sanitizeStr = (s: unknown) =>
+        typeof s === "string" && s.startsWith("data:") ? `[base64 data]` : s;
+  const sanitizeMedia = (value: unknown) => {
     if (Array.isArray(value)) return value.map(sanitizeStr);
     if (typeof value === "string") return sanitizeStr(value);
     return value;
   };
   return {
     role: m.role,
-    content: typeof m.content === "string" ? m.content : m.content,
-        ...((m.images as any)?.length ? { images: sanitizeMedia((m.images as any)) } : {}),
-        ...(m.audio ? { audio: sanitizeMedia((m.audio as any)) } : {}),
-        ...((m.video as any)?.length ? { video: sanitizeMedia((m.video as any)) } : {}),
-        ...((m.pdf as any)?.length ? { pdf: sanitizeMedia((m.pdf as any)) } : {}),
+    content: m.content,
+        ...(m.images?.length ? { images: sanitizeMedia(m.images) } : {}),
+        ...(m.audio?.length ? { audio: sanitizeMedia(m.audio) } : {}),
+        ...(m.video?.length ? { video: sanitizeMedia(m.video) } : {}),
+        ...(m.pdf?.length ? { pdf: sanitizeMedia(m.pdf) } : {}),
   };
 }
 const RequestLogger = {
@@ -89,7 +198,7 @@ const RequestLogger = {
     responsePayload = null,
     modalities = null,
     rateLimits = null,
-  }: any) {
+  }: LogParams) {
     try {
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
       if (!db) {
@@ -183,25 +292,25 @@ const RequestLogger = {
     // Optional
     agenticIteration = null,
     rateLimits = null,
-  }: any) {
-        const inputTokens = usage ? getTotalInputTokens((usage as any)) : 0;
-        const outputTokens = usage ? (usage as any).outputTokens || 0 : 0;
-        const cacheReadInputTokens = (usage as any)?.cacheReadInputTokens || 0;
-        const cacheCreationInputTokens = (usage as any)?.cacheCreationInputTokens || 0;
-        const reasoningOutputTokens = (usage as any)?.reasoningOutputTokens || 0;
+  }: LogChatGenerationParams) {
+        const inputTokens = usage ? getTotalInputTokens(usage as Parameters<typeof getTotalInputTokens>[0]) : 0;
+        const outputTokens = usage ? usage.outputTokens || 0 : 0;
+        const cacheReadInputTokens = usage?.cacheReadInputTokens || 0;
+        const cacheCreationInputTokens = usage?.cacheCreationInputTokens || 0;
+        const reasoningOutputTokens = usage?.reasoningOutputTokens || 0;
     // Build synthetic message array for computeModalities (same function used by conversations)
     const syntheticMessages = [
             ...messages,
       {
         role: "assistant",
         content: text || null,
-                ...(images && (images as any).length > 0 ? { images } : {}),
+                ...(images && images.length > 0 ? { images } : {}),
         ...(audioRef ? { audio: audioRef } : {}),
-                ...(toolCalls && (toolCalls as any).length > 0 ? { toolCalls } : {}),
+                ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
         ...(thinking ? { thinking } : {}),
       },
     ];
-        const modalities = computeModalities((syntheticMessages as any));
+        const modalities = computeModalities(syntheticMessages as Parameters<typeof computeModalities>[0]);
     return this.log({
       requestId,
       endpoint,
@@ -216,63 +325,63 @@ const RequestLogger = {
       traceId,
       agentSessionId,
       parentAgentSessionId,
-            toolsUsed: toolCalls && (toolCalls as any).length > 0,
+            toolsUsed: toolCalls && toolCalls.length > 0,
             toolDisplayNames:
-                toolCalls && (toolCalls as any).length > 0
+                toolCalls && toolCalls.length > 0
           ? [
               ...new Set(
-                                (toolCalls as any).map(
-                                    (tc: any) => (API_TO_CANONICAL as any)[((tc as string) as any).name] || tc.name,
+                                toolCalls.map(
+                                    (tc) => (API_TO_CANONICAL as Record<string, string>)[tc.name] || tc.name,
                 ),
               ),
             ]
           : [],
       toolApiNames:
-                toolCalls && (toolCalls as any).length > 0
-                    ? [...new Set((toolCalls as any).map((tc: any) => tc.name))]
+                toolCalls && toolCalls.length > 0
+                    ? [...new Set(toolCalls.map((tc) => tc.name))]
           : [],
       success,
       errorMessage,
-      inputTokens,
-      outputTokens,
-      ...(cacheReadInputTokens > 0 && { cacheReadInputTokens }),
-      ...(cacheCreationInputTokens > 0 && { cacheCreationInputTokens }),
-      ...(reasoningOutputTokens > 0 && { reasoningOutputTokens }),
+      inputTokens: inputTokens as number,
+      outputTokens: outputTokens as number,
+      ...(Number(cacheReadInputTokens) > 0 && { cacheReadInputTokens: Number(cacheReadInputTokens) }),
+      ...(Number(cacheCreationInputTokens) > 0 && { cacheCreationInputTokens: Number(cacheCreationInputTokens) }),
+      ...(Number(reasoningOutputTokens) > 0 && { reasoningOutputTokens: Number(reasoningOutputTokens) }),
       estimatedCost,
       tokensPerSec,
-            temperature: (options as any)?.temperature ?? null,
-            maxTokens: (options as any)?.maxTokens ?? null,
-            topP: (options as any)?.topP ?? null,
-            topK: (options as any)?.topK ?? null,
-            frequencyPenalty: (options as any)?.frequencyPenalty ?? null,
-            presencePenalty: (options as any)?.presencePenalty ?? null,
-            stopSequences: (options as any)?.stopSequences ?? null,
-            messageCount: (messages as any).length,
-            inputCharacters: (messages as any).reduce(
-        (sum: any, m: any) =>
+      temperature: options?.temperature ?? null,
+      maxTokens: options?.maxTokens ?? null,
+      topP: options?.topP ?? null,
+      topK: options?.topK ?? null,
+      frequencyPenalty: options?.frequencyPenalty ?? null,
+      presencePenalty: options?.presencePenalty ?? null,
+      stopSequences: options?.stopSequences ?? null,
+      messageCount: messages?.length ?? 0,
+      inputCharacters: messages?.reduce(
+        (sum, m) =>
                     sum + (typeof m.content === "string" ? m.content.length : 0),
         0,
-      ),
+      ) ?? 0,
       outputCharacters,
       timeToGeneration:
-                timeToGenerationSec !== null ? roundMs((timeToGenerationSec as any)) : null,
-            generationTime: generationSec !== null ? roundMs((generationSec as any)) : null,
-            totalTime: totalSec !== null ? roundMs((totalSec as any)) : null,
+                timeToGenerationSec !== null ? roundMs(timeToGenerationSec) : null,
+      generationTime: generationSec !== null ? roundMs(generationSec) : null,
+      totalTime: totalSec !== null ? roundMs(totalSec) : null,
       requestPayload: {
-                messages: (messages as any).map(sanitizeMsg),
-                ...((options as any)?.tools
-                    ? { tools: (options as any).tools.map((t: any) => t.name || (t.function as any)?.name) }
+                messages: messages?.map(sanitizeMsg) ?? [],
+                ...(options?.tools
+                    ? { tools: options.tools.map((t: any) => t.name || t.function?.name) }
           : {}),
         ...(agenticIteration !== null ? { agenticIteration } : {}),
       },
       responsePayload: {
         text: text || null,
         thinking: thinking || null,
-                ...(images && (images as any).length > 0 ? { images } : {}),
+                ...(images && images.length > 0 ? { images } : {}),
                 toolCalls:
-                    toolCalls && (toolCalls as any).length > 0
-                        ? (toolCalls as any).map((tc: any) => ({
-                                name: (API_TO_CANONICAL as any)[((tc as string) as any).name] || tc.name,
+                    toolCalls && toolCalls.length > 0
+                        ? toolCalls.map((tc: any) => ({
+                                name: (API_TO_CANONICAL as Record<string, string>)[tc.name] || tc.name,
                 id: tc.id,
                 args: tc.args,
               }))
@@ -312,28 +421,28 @@ const RequestLogger = {
     requestStartMs,
     extraRequestPayload,
     extraResponsePayload,
-  }: any) {
-        const totalSec = (performance.now() - (requestStartMs as any)) / 1000;
-        const inputText = (aiMessages as any).map((m: any) => m.content).join("\n");
+  }: LogBackgroundLlmCallParams) {
+        const totalSec = (performance.now() - requestStartMs) / 1000;
+        const inputText = aiMessages.map((m) => typeof m.content === "string" ? m.content : JSON.stringify(m.content)).join("\n");
 
     // Prefer real API-reported usage over the ~4 chars/token heuristic.
     // The heuristic remains as fallback for callers that don't pass usage.
     const inputTokens = apiUsage
-            ? getTotalInputTokens((apiUsage as any))
+            ? getTotalInputTokens(apiUsage as Parameters<typeof getTotalInputTokens>[0])
       : estimateTokens(inputText);
     const outputTokens = apiUsage
-            ? (apiUsage as any).outputTokens || 0
+            ? apiUsage.outputTokens || 0
       : resultText
-                ? estimateTokens((resultText as any))
+                ? estimateTokens(resultText)
         : 0;
-        const cacheReadInputTokens = (apiUsage as any)?.cacheReadInputTokens || 0;
-        const cacheCreationInputTokens = (apiUsage as any)?.cacheCreationInputTokens || 0;
+        const cacheReadInputTokens = apiUsage?.cacheReadInputTokens || 0;
+        const cacheCreationInputTokens = apiUsage?.cacheCreationInputTokens || 0;
 
-        const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[(model as string)];
+        const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[model as string];
     let estimatedCost = null;
     if (pricing) {
       estimatedCost = calculateTextCost(
-                (apiUsage || { inputTokens, outputTokens } as any),
+                (apiUsage || { inputTokens, outputTokens }) as Parameters<typeof calculateTextCost>[0],
         pricing,
       );
     }
@@ -352,11 +461,11 @@ const RequestLogger = {
       success,
       errorMessage,
       estimatedCost,
-      inputTokens,
-      outputTokens,
-      ...(cacheReadInputTokens > 0 && { cacheReadInputTokens }),
-      ...(cacheCreationInputTokens > 0 && { cacheCreationInputTokens }),
-            tokensPerSec: calculateTokensPerSec((outputTokens as any), (totalSec as any)),
+      inputTokens: inputTokens as number,
+      outputTokens: outputTokens as number,
+      ...(Number(cacheReadInputTokens) > 0 && { cacheReadInputTokens: Number(cacheReadInputTokens) }),
+      ...(Number(cacheCreationInputTokens) > 0 && { cacheCreationInputTokens: Number(cacheCreationInputTokens) }),
+      tokensPerSec: calculateTokensPerSec(outputTokens as number, totalSec),
       inputCharacters: inputText.length,
       totalTime: roundMs(totalSec),
       modalities: { textIn: true, textOut: true },
@@ -366,7 +475,7 @@ const RequestLogger = {
       },
       responsePayload: success
         ? {
-                        textPreview: ((resultText || "") as any).slice(0, 200),
+                        textPreview: (resultText || "").slice(0, 200),
                         ...extraResponsePayload,
           }
         : { error: errorMessage },

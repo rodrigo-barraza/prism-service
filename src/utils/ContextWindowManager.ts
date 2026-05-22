@@ -1,5 +1,6 @@
 import logger from "./logger.ts";
 import { estimateTokens } from "./CostCalculator.ts";
+import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
 
 // ────────────────────────────────────────────────────────────
 // ContextWindowManager — Token-Budget Truncation
@@ -33,32 +34,45 @@ const AGGRESSIVE_TOOL_RESULT_CAP = 3000;
 /** Number of recent turns to always preserve (never compress) */
 const PROTECTED_RECENT_TURNS = 4;
 
+interface EnforceOptions {
+  maxInputTokens?: number;
+  maxOutputTokens?: number;
+  toolCount?: number;
+}
+
+interface EnforceResult {
+  messages: ChatMessage[];
+  truncated: boolean;
+  strategy: string | null;
+  estimatedTokens: number;
+}
+
 /**
  * Estimate token count for a single message.
  * Accounts for content, tool calls, tool results, thinking blocks, and images.
  */
-function estimateMessageTokens(message: string) {
+function estimateMessageTokens(message: ChatMessage): number {
   let tokens = 4; // Per-message overhead (role, formatting)
 
   // Text content
-    if ((message as any).content) {
+  if (message.content) {
     tokens += estimateTokens(
-            typeof (message as any).content === "string"
-                ? (message as any).content
-                : JSON.stringify((message as any).content),
+      typeof message.content === "string"
+        ? message.content
+        : JSON.stringify(message.content),
     );
   }
 
   // Thinking blocks
-    if ((message as any).thinking) {
-        tokens += estimateTokens((message as any).thinking);
+  if (message.thinking) {
+    tokens += estimateTokens(message.thinking);
   }
 
   // Tool calls (function name + args + results)
-    if ((message as any).toolCalls && Array.isArray((message as any).toolCalls)) {
-        for ( const tc of (message as any).toolCalls) {
+  if (message.toolCalls && Array.isArray(message.toolCalls)) {
+    for (const tc of message.toolCalls) {
       tokens += estimateTokens(tc.name || "");
-            tokens += estimateTokens((tc.args ? JSON.stringify(tc.args) : "" as any));
+      tokens += estimateTokens(tc.args ? JSON.stringify(tc.args) : "");
       if (tc.result) {
         tokens += estimateTokens(
           typeof tc.result === "string" ? tc.result : JSON.stringify(tc.result),
@@ -68,24 +82,25 @@ function estimateMessageTokens(message: string) {
   }
 
   // Tool response content (standalone tool messages)
-    if ((message as any).role === "tool" && (message as any).content) {
+  if (message.role === "tool" && message.content) {
     tokens += estimateTokens(
-            typeof (message as any).content === "string"
-                ? (message as any).content
-                : JSON.stringify((message as any).content),
+      typeof message.content === "string"
+        ? message.content
+        : JSON.stringify(message.content),
     );
   }
 
   // Images (rough: ~1000 tokens per image reference)
-    if ((message as any).images && Array.isArray((message as any).images)) {
-        tokens += (message as any).images.length * 1000;
+  if (message.images && Array.isArray(message.images)) {
+    tokens += message.images.length * 1000;
   }
 
   return tokens;
 }
-function estimateTotalTokens(messages: any) {
-    return (messages as any).reduce(
-        (sum: any, message: string) => sum + estimateMessageTokens(message),
+
+function estimateTotalTokens(messages: ChatMessage[]): number {
+  return messages.reduce(
+    (sum, message) => sum + estimateMessageTokens(message),
     0,
   );
 }
@@ -104,31 +119,30 @@ function estimateTotalTokens(messages: any) {
  * preserved in full — the LLM is actively reasoning about them.
  */
 function truncateToolResults(
-  messages: any,
-    protectedTurns: any = PROTECTED_RECENT_TURNS,
-) {
+  messages: ChatMessage[],
+  protectedTurns = PROTECTED_RECENT_TURNS,
+): ChatMessage[] {
   // Find the protection boundary (same logic as compressOldAssistantMessages)
   let userTurnsSeen = 0;
   let protectionIndex = messages.length;
 
-    for (let i = (messages as any).length - 1; i >= 0; i--) {
-        if ((messages as any)[i].role === "user") {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user") {
       userTurnsSeen++;
-            if (userTurnsSeen >= protectedTurns) {
+      if (userTurnsSeen >= protectedTurns) {
         protectionIndex = i;
         break;
       }
     }
   }
 
-    return (messages as any).map((message: string, i: any) => {
+  return messages.map((message, i) => {
     // Never truncate tool results in recent (protected) messages
-        if (i >= (protectionIndex as any)) return message;
-        if ((message as any).role !== "assistant" || !(message as any).toolCalls?.length) return message;
+    if (i >= protectionIndex) return message;
+    if (message.role !== "assistant" || !message.toolCalls?.length) return message;
 
-        // @ts-ignore - TODO: strict typing
-        const truncated = { ...message };
-        truncated.toolCalls = (message as any).toolCalls.map((tc: any) => {
+    const truncated = { ...message };
+    truncated.toolCalls = message.toolCalls.map((tc: ToolCallEntry) => {
       if (!tc.result) return tc;
 
       const resultStr =
@@ -152,44 +166,44 @@ function truncateToolResults(
  * Preserves tool call names but drops results.
  */
 function compressOldAssistantMessages(
-  messages: any,
-    protectedCount: any = PROTECTED_RECENT_TURNS,
-) {
+  messages: ChatMessage[],
+  protectedCount = PROTECTED_RECENT_TURNS,
+): ChatMessage[] {
   // Count user turns from the end to determine protection boundary
   let userTurnsSeen = 0;
   let protectionIndex = messages.length;
 
-    for (let i = (messages as any).length - 1; i >= 0; i--) {
-        if ((messages as any)[i].role === "user") {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user") {
       userTurnsSeen++;
-            if (userTurnsSeen >= protectedCount) {
+      if (userTurnsSeen >= protectedCount) {
         protectionIndex = i;
         break;
       }
     }
   }
 
-    return (messages as any).map((message: string, i: any) => {
+  return messages.map((message, i) => {
     // Never compress system messages, user messages, or protected recent messages
-        if ((message as any).role === "system" || (message as any).role === "user" || i >= (protectionIndex as any)) {
+    if (message.role === "system" || message.role === "user" || i >= protectionIndex) {
       return message;
     }
 
     // Compress assistant messages
-        if ((message as any).role === "assistant") {
-            // @ts-ignore - TODO: strict typing
-            const compressed = { ...message };
+    if (message.role === "assistant") {
+      const compressed = { ...message };
 
       // Keep a short summary of what the assistant did
       const toolNames =
-                (message as any).toolCalls?.map((tc: any) => tc.name).join(", ") || "";
-            const contentPreview = (message as any).content?.slice(0, 200) || "";
+        message.toolCalls?.map((tc: ToolCallEntry) => tc.name).join(", ") || "";
+      const contentStr = typeof message.content === "string" ? message.content : "";
+      const contentPreview = contentStr.slice(0, 200);
 
       compressed.content = `[Earlier response${toolNames ? ` — used: ${toolNames}` : ""}]${contentPreview ? `\n${contentPreview}...` : ""}`;
       compressed.thinking = undefined;
 
       if (compressed.toolCalls) {
-        compressed.toolCalls = compressed.toolCalls.map((tc: any) => ({
+        compressed.toolCalls = compressed.toolCalls.map((tc: ToolCallEntry) => ({
           ...tc,
           result: tc.result
             ? "[result truncated for context budget]"
@@ -201,10 +215,9 @@ function compressOldAssistantMessages(
     }
 
     // Compress standalone tool messages
-        if ((message as any).role === "tool") {
+    if (message.role === "tool") {
       return {
-                // @ts-ignore - TODO: strict typing
-                ...message,
+        ...message,
         content: "[tool result truncated for context budget]",
       };
     }
@@ -218,33 +231,33 @@ function compressOldAssistantMessages(
  * Keeps the system prompt, first user message (for task context),
  * and the most recent N turns.
  */
-function slidingWindowTruncation(messages: any, maxTokens: any) {
-    if ((messages as any).length <= 3) return messages;
+function slidingWindowTruncation(messages: ChatMessage[], maxTokens: number): ChatMessage[] {
+  if (messages.length <= 3) return messages;
 
   // Always keep: system message, first user message
-  const head: any[] = [];
+  const head: ChatMessage[] = [];
   let headEnd = 0;
 
-    for (let i = 0; i < (messages as any).length; i++) {
-        head.push((messages[i] as any));
+  for (let i = 0; i < messages.length; i++) {
+    head.push(messages[i]);
     headEnd = i + 1;
-        if ((messages as any)[i].role === "user") break; // Stop after first user message
+    if (messages[i].role === "user") break; // Stop after first user message
   }
 
   // Build tail from the end until we approach budget
-  const tail: any[] = [];
+  const tail: ChatMessage[] = [];
   let tailTokens = 0;
-    const headTokens = estimateTotalTokens((head as any));
-    const availableForTail = maxTokens - headTokens - 200; // 200 token buffer for marker
+  const headTokens = estimateTotalTokens(head);
+  const availableForTail = maxTokens - headTokens - 200; // 200 token buffer for marker
 
-    for (let i = (messages as any).length - 1; i >= headEnd; i--) {
-        const msgTokens = estimateMessageTokens((messages[i] as any));
+  for (let i = messages.length - 1; i >= headEnd; i--) {
+    const msgTokens = estimateMessageTokens(messages[i]);
     if (tailTokens + msgTokens > availableForTail) break;
-        tail.unshift((messages[i] as any));
+    tail.unshift(messages[i]);
     tailTokens += msgTokens;
   }
 
-    const droppedCount = (messages as any).length - head.length - tail.length;
+  const droppedCount = messages.length - head.length - tail.length;
 
   if (droppedCount > 0) {
     // Insert a context marker so the model knows history was dropped
@@ -268,18 +281,18 @@ export default class ContextWindowManager {
    * Applies truncation strategies in order of aggressiveness until
    * the estimated token count fits within the model's context window.
    */
-  static enforce(messages: any, options: any = {}) {
+  static enforce(messages: ChatMessage[], options: EnforceOptions = {}): EnforceResult {
     const {
-            maxInputTokens = 128_000,
-            maxOutputTokens = MIN_OUTPUT_RESERVE,
-            toolCount = 0,
+      maxInputTokens = 128_000,
+      maxOutputTokens = MIN_OUTPUT_RESERVE,
+      toolCount = 0,
     } = options;
 
     // Calculate the effective token budget
-        const schemaOverhead = TOOL_SCHEMA_OVERHEAD_TOKENS + (toolCount as any) * 150;
-        const outputReserve = Math.max((maxOutputTokens as any), MIN_OUTPUT_RESERVE);
+    const schemaOverhead = TOOL_SCHEMA_OVERHEAD_TOKENS + toolCount * 150;
+    const outputReserve = Math.max(maxOutputTokens, MIN_OUTPUT_RESERVE);
     const budget = Math.floor(
-            ((maxInputTokens as any) - outputReserve - schemaOverhead) * TARGET_UTILIZATION,
+      (maxInputTokens - outputReserve - schemaOverhead) * TARGET_UTILIZATION,
     );
 
     if (budget <= 0) {
@@ -343,7 +356,7 @@ export default class ContextWindowManager {
     }
 
     // Strategy 3: Sliding window — drop middle turns
-        result = slidingWindowTruncation(result, (budget as any));
+    result = slidingWindowTruncation(result, budget);
     currentTokens = estimateTotalTokens(result);
 
     logger.info(
@@ -356,10 +369,12 @@ export default class ContextWindowManager {
       estimatedTokens: currentTokens,
     };
   }
-  static estimateTokens(messages: any) {
+
+  static estimateTokens(messages: ChatMessage[]): number {
     return estimateTotalTokens(messages);
   }
-  static estimateMessageTokens(message: string) {
+
+  static estimateMessageTokens(message: ChatMessage): number {
     return estimateMessageTokens(message);
   }
 }

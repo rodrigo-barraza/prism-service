@@ -13,12 +13,55 @@ import {
 } from "../../../utils/ConversationUtilities.ts";
 import { COLLECTIONS } from "../../../constants.ts";
 import logger from "../../../utils/logger.ts";
+import { TokenUsage, MessagePayload, ToolCallPayload, LlmOptions } from "../../RequestLogger.ts";
+
+export interface FinalizerContext {
+  providerName: string;
+  resolvedModel: string;
+  modelDef?: Record<string, unknown> | null;
+  messages: MessagePayload[];
+  originalMessages?: MessagePayload[];
+  options: LlmOptions;
+  conversationId?: string | null;
+  agentSessionId?: string | null;
+  parentAgentSessionId?: string | null;
+  userMessage?: MessagePayload | null;
+  conversationMeta?: Record<string, unknown> | null;
+  traceId?: string | null;
+  project?: string | null;
+  username?: string | null;
+  clientIp?: string | null;
+  agent?: string | null;
+  workspaceRoot?: string | null;
+  requestId?: string;
+  emit?: (event: any) => void;
+  signal?: AbortSignal;
+}
+
+export interface FinalizerPayload {
+  text: string | null;
+  thinking: string | null;
+  thinkingSignature?: string | null;
+  images?: string[];
+  toolCalls?: ToolCallPayload[];
+  audioChunks?: string[];
+  audioSampleRate?: number;
+  usage?: TokenUsage | null;
+  outputCharacters?: number;
+  timeToGenerationSec?: number | null;
+  generationSec?: number | null;
+  totalSec?: number | null;
+  rateLimits?: Record<string, unknown> | null;
+  contentSegments?: unknown[];
+  textFragments?: unknown[];
+  thinkingFragments?: unknown[];
+}
 
 /**
  * Resolve the MongoDB collection for conversation persistence.
  * Agent projects go to agent_sessions; everything else to conversations.
  */
-function getCollectionOpts(project: any) {
+function getCollectionOpts(project: string | null | undefined) {
   if (AgentPersonaRegistry.isAgentProject(project)) {
     return { collection: COLLECTIONS.AGENT_SESSIONS };
   }
@@ -39,17 +82,17 @@ function getCollectionOpts(project: any) {
  * Used by all harness implementations and the /chat streaming path.
  */
 export async function finalizeTextGeneration(
-  context: any,
+  context: FinalizerContext,
   {
     text,
     thinking,
     thinkingSignature,
-    images,
-    toolCalls,
-    audioChunks,
-    audioSampleRate,
+    images = [],
+    toolCalls = [],
+    audioChunks = [],
+    audioSampleRate = 16000,
     usage,
-    outputCharacters,
+    outputCharacters = 0,
     timeToGenerationSec,
     generationSec,
     totalSec,
@@ -58,8 +101,8 @@ export async function finalizeTextGeneration(
     contentSegments,
     textFragments,
     thinkingFragments,
-  }: any,
-    overrideMessagesToAppend: any = null,
+  }: FinalizerPayload,
+    overrideMessagesToAppend: MessagePayload[] | null = null,
 ) {
   const {
     providerName,
@@ -86,27 +129,27 @@ export async function finalizeTextGeneration(
   // Agent sessions use agentSessionId as the persistence key
   const conversationId = rawConversationId ?? agentSessionId;
   // ── Cost calculation ──────────────────────────────────────────
-  let estimatedCost = null;
-  let tokensPerSec = null;
+  let estimatedCost: number | null = null;
+  let tokensPerSec: number | null = null;
   if (usage) {
-        const imageCount = (images as any).length;
-    if ((imageCount as any) > 0) {
+        const imageCount = images.length;
+    if (imageCount > 0) {
       const imgPricing =
-                getPricing(TYPES.TEXT, TYPES.IMAGE)[(resolvedModel as string)] || (modelDef as any)?.pricing;
+                getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel] || (modelDef?.pricing as Record<string, number>);
       if (imgPricing?.imageOutputPerMillion) {
         // Derive image tokens dynamically from the API-reported total.
         // The API's outputTokens already includes both text and image tokens,
         // so we estimate text tokens from the generated text length (~4 chars/token)
         // and attribute the remainder to images. This adapts to any resolution
         // (512px≈747tok, 1024px≈1120tok, 2048px≈1680tok, 4096px≈2520tok).
-                const estimatedTextOutputTokens = Math.ceil(((text as any)?.length || 0) / 4);
+                const estimatedTextOutputTokens = Math.ceil((text?.length || 0) / 4);
         const imageTokens = Math.max(
           0,
-                    (usage as any).outputTokens - estimatedTextOutputTokens,
+                    (usage.outputTokens || 0) - estimatedTextOutputTokens,
         );
-                const textOutputTokens = Math.max(0, (usage as any).outputTokens - imageTokens);
+                const textOutputTokens = Math.max(0, (usage.outputTokens || 0) - imageTokens);
         const inputCost =
-                    ((usage as any).inputTokens / 1_000_000) * (imgPricing.inputPerMillion || 0);
+                    ((usage.inputTokens || 0) / 1_000_000) * (imgPricing.inputPerMillion || 0);
         const textOutCost =
           (textOutputTokens / 1_000_000) * (imgPricing.outputPerMillion || 0);
         const imageOutCost =
@@ -115,50 +158,50 @@ export async function finalizeTextGeneration(
           (inputCost + textOutCost + imageOutCost).toFixed(8),
         );
       } else {
-                const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[(resolvedModel as string)];
-                estimatedCost = calculateTextCost((usage as any), pricing);
+                const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
+                estimatedCost = calculateTextCost(usage as Parameters<typeof calculateTextCost>[0], pricing);
       }
     } else {
-            const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[(resolvedModel as string)];
-            estimatedCost = calculateTextCost((usage as any), pricing);
+            const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
+            estimatedCost = calculateTextCost(usage as Parameters<typeof calculateTextCost>[0], pricing);
     }
-        tokensPerSec = calculateTokensPerSec((usage as any).outputTokens, generationSec, {
-            providerReported: (usage as any).tokensPerSec,
+        tokensPerSec = calculateTokensPerSec(usage.outputTokens || 0, generationSec, {
+            providerReported: usage.tokensPerSec as number | undefined,
       fallbackSec: totalSec,
     });
   }
   // ── Console logging ───────────────────────────────────────────
-    const inputTokens = getTotalInputTokens((usage as any));
-    const outputTokens = (usage as any)?.outputTokens || 0;
+    const inputTokens = usage ? getTotalInputTokens(usage as Parameters<typeof getTotalInputTokens>[0]) : 0;
+    const outputTokens = usage?.outputTokens || 0;
   const tokensPerSecStr =
     tokensPerSec !== null ? tokensPerSec.toFixed(1) : "N/A";
   const cacheInfo =
-        (usage as any)?.cacheReadInputTokens || (usage as any)?.cacheCreationInputTokens
-            ? `, cache_read: ${(usage as any).cacheReadInputTokens || 0}, cache_write: ${(usage as any).cacheCreationInputTokens || 0}`
+        usage?.cacheReadInputTokens || usage?.cacheCreationInputTokens
+            ? `, cache_read: ${usage.cacheReadInputTokens || 0}, cache_write: ${usage.cacheCreationInputTokens || 0}`
       : "";
   logger.request(
-        (project as any),
-    (username as any),
-    (clientIp as any),
+    project || "",
+    username as string,
+    clientIp || null,
     `[chat] ${providerName} ${resolvedModel} — ` +
       `in: ${inputTokens} tokens, out: ${outputTokens} tokens${cacheInfo}, ` +
       `speed: ${tokensPerSecStr} tok/s, ` +
-            `ttg: ${timeToGenerationSec !== null ? (timeToGenerationSec as any).toFixed(2) + "s" : "N/A"}, ` +
-            `generation: ${generationSec !== null ? (generationSec as any).toFixed(2) + "s" : "N/A"}, ` +
-            `total: ${(totalSec as any).toFixed(2)}s` +
+            `ttg: ${timeToGenerationSec != null ? timeToGenerationSec.toFixed(2) + "s" : "N/A"}, ` +
+            `generation: ${generationSec != null ? generationSec.toFixed(2) + "s" : "N/A"}, ` +
+            `total: ${totalSec != null ? totalSec.toFixed(2) : "0.00"}s` +
       formatCostTag(estimatedCost),
   );
   // ── Build WAV from accumulated PCM audio chunks ───────────────
-  let audioRef = null;
-    if ((audioChunks as any).length > 0) {
+  let audioRef: string | null = null;
+    if (audioChunks.length > 0) {
     try {
-            const pcmBuffers = (audioChunks as any).map((b64: any) =>
+            const pcmBuffers = audioChunks.map((b64) =>
                 Buffer.from(b64, "base64"),
       );
       const pcmData = Buffer.concat(pcmBuffers);
       const numChannels = 1;
       const bitsPerSample = 16;
-            const byteRate = (audioSampleRate as any) * numChannels * (bitsPerSample / 8);
+            const byteRate = audioSampleRate * numChannels * (bitsPerSample / 8);
       const blockAlign = numChannels * (bitsPerSample / 8);
       const wavHeader = Buffer.alloc(44);
       wavHeader.write("RIFF", 0);
@@ -168,7 +211,7 @@ export async function finalizeTextGeneration(
       wavHeader.writeUInt32LE(16, 16);
       wavHeader.writeUInt16LE(1, 20);
       wavHeader.writeUInt16LE(numChannels, 22);
-            wavHeader.writeUInt32LE((audioSampleRate as any), 24);
+            wavHeader.writeUInt32LE(audioSampleRate, 24);
       wavHeader.writeUInt32LE(byteRate, 28);
       wavHeader.writeUInt16LE(blockAlign, 32);
       wavHeader.writeUInt16LE(bitsPerSample, 34);
@@ -176,11 +219,11 @@ export async function finalizeTextGeneration(
       wavHeader.writeUInt32LE(pcmData.length, 40);
       const wavBuffer = Buffer.concat([wavHeader, pcmData]);
       const dataUrl = `data:audio/wav;base64,${wavBuffer.toString("base64")}`;
-      const { ref } = await (FileService as any).uploadFile(
+      const { ref } = await FileService.uploadFile(
         dataUrl,
         "generations",
-                (project as any | null | undefined),
-        username,
+                project as string,
+        username || "system",
       );
       audioRef = ref;
     } catch (error: unknown) {
@@ -193,11 +236,11 @@ export async function finalizeTextGeneration(
   // Placed after audio build so audioRef is available for modality detection.
   // Agentic requests are logged granularly per-iteration by AgenticLoopService,
   // so we only log here for non-agentic paths (chat, live).
-    if (!(options as any).agenticLoopEnabled) {
+    if (!options.agenticLoopEnabled) {
     RequestLogger.logChatGeneration({
       requestId,
-            endpoint: (modelDef as any)?.liveAPI ? "/live" : "/chat",
-            operation: (modelDef as any)?.liveAPI ? "live" : "chat",
+            endpoint: modelDef?.liveAPI ? "/live" : "/chat",
+            operation: modelDef?.liveAPI ? "live" : "chat",
       project,
       username,
       clientIp,
@@ -210,7 +253,7 @@ export async function finalizeTextGeneration(
       agentSessionId: agentSessionId || conversationId || null,
       traceId: traceId || null,
       success: true,
-      usage,
+      usage: usage || undefined,
       estimatedCost,
       tokensPerSec,
       timeToGenerationSec,
@@ -228,26 +271,28 @@ export async function finalizeTextGeneration(
     });
   }
   // ── Emit done event ───────────────────────────────────────────
-    if (!(signal as any)?.aborted) {
-        (emit as any)({
-      type: "done",
-      provider: providerName,
-      model: resolvedModel,
-      usage: usage || null,
-      estimatedCost,
-      tokensPerSec,
-      ...(audioRef ? { audioRef } : {}),
-      timeToGeneration:
-                timeToGenerationSec !== null ? roundMs((timeToGenerationSec as any)) : null,
-            generationTime: generationSec !== null ? roundMs((generationSec as any)) : null,
-            totalTime: roundMs((totalSec as any)),
-            ...(traceId && { traceId }),
-            ...(conversationId && { conversationId }),
-    });
+    if (!signal?.aborted) {
+        if (emit) {
+          emit({
+            type: "done",
+            provider: providerName,
+            model: resolvedModel,
+            usage: usage || null,
+            estimatedCost,
+            tokensPerSec,
+            ...(audioRef ? { audioRef } : {}),
+            timeToGeneration:
+                      timeToGenerationSec != null ? roundMs(timeToGenerationSec) : null,
+                  generationTime: generationSec != null ? roundMs(generationSec) : null,
+                  totalTime: totalSec != null ? roundMs(totalSec) : null,
+                  ...(traceId && { traceId }),
+                  ...(conversationId && { conversationId }),
+          });
+        }
   }
   // ── Conversation persistence ──────────────────────────────────
   if (conversationId) {
-    let messagesToAppend: any[] = [];
+    let messagesToAppend: MessagePayload[] = [];
     if (overrideMessagesToAppend) {
             messagesToAppend = [...overrideMessagesToAppend];
       // When the agentic loop ran multiple iterations, intermediate assistant
@@ -258,8 +303,8 @@ export async function finalizeTextGeneration(
       // Only include segments on single-iteration turns where the final
       // message is the sole assistant message — segments preserve the
       // thinking ↔ tools ↔ text interleaving for that case.
-            const hasIntermediateToolMessages = (overrideMessagesToAppend as any).some(
-                (m: any) => m.role === "assistant" && (m.toolCalls as any)?.length > 0,
+            const hasIntermediateToolMessages = overrideMessagesToAppend.some(
+                (m) => m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0,
       );
       // Append the final LLM response block (contains telemetry and final text step)
             messagesToAppend.push({
@@ -267,7 +312,7 @@ export async function finalizeTextGeneration(
         content: text,
                 ...(thinking && { thinking }),
                 ...(thinkingSignature && { thinkingSignature }),
-                ...((images as any).length > 0 && { images }),
+                ...(images.length > 0 && { images }),
         ...(audioRef && { audio: audioRef }),
         // Include toolCalls on the final message if no intermediate message
         // already persists them. The regular agentic loop embeds toolCalls in
@@ -275,12 +320,12 @@ export async function finalizeTextGeneration(
         // native MCP tool calls (e.g. LM Studio) bypass that path — without
         // this, tool calls vanish on page refresh.
         ...(!hasIntermediateToolMessages &&
-                    (toolCalls as any).length > 0 && { toolCalls }),
+                    toolCalls.length > 0 && { toolCalls }),
         model: resolvedModel,
         provider: providerName,
         timestamp: new Date().toISOString(),
         usage: usage || null,
-                totalTime: roundMs((totalSec as any)),
+                totalTime: totalSec != null ? roundMs(totalSec as number) : null,
         tokensPerSec,
         estimatedCost,
         // Display segment metadata — preserves interleaving order for Prism Client.
@@ -288,22 +333,22 @@ export async function finalizeTextGeneration(
         // otherwise intermediate messages already carry their own content and
         // the segments would cause duplicate rendering on page refresh.
         ...(!hasIntermediateToolMessages &&
-                    (contentSegments as any)?.length > 0 && { contentSegments }),
+                    contentSegments?.length ? { contentSegments } : {}),
         ...(!hasIntermediateToolMessages &&
-                    (textFragments as any)?.length > 0 && { textFragments }),
+                    textFragments?.length ? { textFragments } : {}),
         ...(!hasIntermediateToolMessages &&
-                    (thinkingFragments as any)?.length > 0 && { thinkingFragments }),
+                    thinkingFragments?.length ? { thinkingFragments } : {}),
         // Generation settings — source of truth per request
         generationSettings: {
-                    temperature: (options as any).temperature,
-                    maxTokens: (options as any).maxTokens,
-                    thinkingEnabled: (options as any).thinkingEnabled || false,
-                    ...((options as any).reasoningEffort && {
-                        reasoningEffort: (options as any).reasoningEffort,
-          }),
-                    ...((options as any).thinkingBudget && {
-                        thinkingBudget: (options as any).thinkingBudget,
-          }),
+                    temperature: options.temperature,
+                    maxTokens: options.maxTokens,
+                    thinkingEnabled: options.thinkingEnabled || false,
+                    ...(options.reasoningEffort ? {
+                        reasoningEffort: options.reasoningEffort,
+          } : {}),
+                    ...(options.thinkingBudget ? {
+                        thinkingBudget: options.thinkingBudget,
+          } : {}),
         },
       });
     } else {
@@ -313,9 +358,9 @@ export async function finalizeTextGeneration(
       // message is already persisted from the first call.
       if (userMessage && conversationMeta) {
         messagesToAppend.push({
-          role: "user",
           ...userMessage,
-                    timestamp: (userMessage as any).timestamp || new Date().toISOString(),
+          role: "user",
+                    timestamp: userMessage.timestamp || new Date().toISOString(),
         });
       }
       messagesToAppend.push({
@@ -323,27 +368,27 @@ export async function finalizeTextGeneration(
         content: text,
                 ...(thinking && { thinking }),
                 ...(thinkingSignature && { thinkingSignature }),
-                ...((images as any).length > 0 && { images }),
+                ...(images.length > 0 && { images }),
         ...(audioRef && { audio: audioRef }),
-                ...((toolCalls as any).length > 0 && { toolCalls }),
+                ...(toolCalls.length > 0 && { toolCalls }),
         model: resolvedModel,
         provider: providerName,
         timestamp: new Date().toISOString(),
         usage: usage || null,
-                totalTime: roundMs((totalSec as any)),
+                totalTime: totalSec != null ? roundMs(totalSec as number) : null,
         tokensPerSec,
         estimatedCost,
         // Generation settings — source of truth per request
         generationSettings: {
-                    temperature: (options as any).temperature,
-                    maxTokens: (options as any).maxTokens,
-                    thinkingEnabled: (options as any).thinkingEnabled || false,
-                    ...((options as any).reasoningEffort && {
-                        reasoningEffort: (options as any).reasoningEffort,
-          }),
-                    ...((options as any).thinkingBudget && {
-                        thinkingBudget: (options as any).thinkingBudget,
-          }),
+                    temperature: options.temperature,
+                    maxTokens: options.maxTokens,
+                    thinkingEnabled: options.thinkingEnabled || false,
+                    ...(options.reasoningEffort ? {
+                        reasoningEffort: options.reasoningEffort,
+          } : {}),
+                    ...(options.thinkingBudget ? {
+                        thinkingBudget: options.thinkingBudget,
+          } : {}),
         },
       });
     }
@@ -354,7 +399,7 @@ export async function finalizeTextGeneration(
         }
       : undefined;
     // Merge parentAgentSessionId, workspaceRoot, and agent into meta for persistence
-    let finalMeta = meta;
+    let finalMeta: Record<string, unknown> | undefined = meta as Record<string, unknown> | undefined;
     if (parentAgentSessionId) {
             finalMeta = { ...(finalMeta || {}), parentAgentSessionId };
     }
@@ -365,13 +410,13 @@ export async function finalizeTextGeneration(
             finalMeta = { ...(finalMeta || {}), agent };
     }
     appendAndFinalize(
-            (conversationId as any),
-      (project as any),
-      (username as any),
+      conversationId || "",
+      project || "",
+      username as string,
       // @ts-ignore - TODO: strict typing
       messagesToAppend,
       finalMeta,
-            getCollectionOpts((project as any)),
+            getCollectionOpts(project),
     );
   }
 }

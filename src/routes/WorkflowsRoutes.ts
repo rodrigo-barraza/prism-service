@@ -1,5 +1,5 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { ObjectId } from "mongodb";
 import logger from "../utils/logger.ts";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
@@ -7,6 +7,14 @@ import FileService from "../services/FileService.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import { assembleGraph } from "../services/WorkflowAssembler.ts";
 import { COLLECTIONS } from "../constants.ts";
+
+import { Db } from "mongodb";
+
+interface CustomRequest extends Request {
+  db: Db;
+  project?: string;
+  username?: string;
+}
 
 const router = Router();
 router.use(requireDb);
@@ -21,16 +29,16 @@ const MEDIA_FIELDS = ["images", "audio", "video", "pdf"];
  * Non-data-URL strings (minio://, http://, etc.) pass through unchanged.
  */
 async function uploadIfDataUrl(
-  value: any,
-    category: any = "uploads",
-    project: any = null,
+  value: unknown,
+    category: string = "uploads",
+    project: string | null = null,
     username: string | null = null,
 ) {
-    if (typeof value === "string" && (value as any).startsWith("data:")) {
+    if (typeof value === "string" && (value as string).startsWith("data:")) {
     try {
-      const { ref } = await (FileService as any).uploadFile(
+      const { ref } = await (FileService).uploadFile(
         value,
-                (category as any),
+                (category),
         project,
         username,
       );
@@ -49,15 +57,15 @@ async function uploadIfDataUrl(
  * used by ConversationService for chat messages.
  */
 async function extractWorkflowFiles(
-  nodes: any,
-    project: any = null,
+  nodes: unknown[],
+    project: string | null = null,
     username: string | null = null,
 ) {
-  if (!Array.isArray(nodes) || !(FileService as any).isExternalStorage()) return nodes;
+  if (!Array.isArray(nodes) || !(FileService).isExternalStorage()) return nodes;
 
-  const processed: any[] = [];
+  const processed: Record<string, unknown>[] = [];
     for ( const node of nodes) {
-    const updated = { ...node };
+    const updated = { ...(node as Record<string, unknown>) };
 
     // 1. Node-level content (asset input nodes store content as a data URL)
     if (
@@ -74,21 +82,21 @@ async function extractWorkflowFiles(
 
     // 2. Messages array (conversation / model nodes)
     if (Array.isArray(updated.messages)) {
-      const newMessages: any[] = [];
+      const newMessages: Record<string, unknown>[] = [];
             for ( const message of updated.messages) {
-        const m = { ...message };
+        const m = { ...(message as Record<string, unknown>) };
                 for ( const field of MEDIA_FIELDS) {
           const value = m[field];
           if (Array.isArray(value)) {
-            const array: any[] = [];
+            const array: string[] = [];
                         for ( const item of value) {
               array.push(
                                 (await uploadIfDataUrl(item, ("uploads" as any), project, username) as any),
               );
             }
-            m[field] = array;
+            (m as Record<string, unknown>)[field] = array;
           } else if (typeof value === "string" && value.startsWith("data:")) {
-                        m[field] = await uploadIfDataUrl((value as any), ("uploads" as any), project, username);
+                        (m as Record<string, unknown>)[field] = await uploadIfDataUrl((value as string), ("uploads" as any), project, username);
           }
         }
         newMessages.push(m);
@@ -101,7 +109,7 @@ async function extractWorkflowFiles(
       updated.receivedOutputs &&
       typeof updated.receivedOutputs === "object"
     ) {
-      const newReceived: any = {};
+      const newReceived: Record<string, unknown> = {};
             for ( const [mod, data] of Object.entries(updated.receivedOutputs)) {
                 newReceived[mod] = await uploadIfDataUrl(
                     (data as any),
@@ -123,43 +131,43 @@ async function extractWorkflowFiles(
  * Shape: { [nodeId]: { [modality]: dataUrl | messagesArray } }
  */
 async function extractNodeResultFiles(
-  nodeResults: any,
-    project: any = null,
+  nodeResults: Record<string, unknown>,
+    project: string | null = null,
     username: string | null = null,
 ) {
   if (
     !nodeResults ||
     typeof nodeResults !== "object" ||
-    !(FileService as any).isExternalStorage()
+    !(FileService).isExternalStorage()
   )
     return nodeResults;
 
-  const processed: any = {};
+  const processed: Record<string, unknown> = {};
     for ( const [nodeId, outputs] of Object.entries(nodeResults)) {
     if (!outputs || typeof outputs !== "object") {
             processed[nodeId] = outputs;
       continue;
     }
-    const newOutputs: any = {};
+    const newOutputs: Record<string, unknown> = {};
         for ( const [mod, data] of Object.entries(outputs)) {
       // conversation modality is an array of message objects with nested media
       if (mod === "conversation" && Array.isArray(data)) {
-        const msgs: any[] = [];
+        const msgs: Record<string, unknown>[] = [];
                 for ( const message of data) {
-          const m = { ...message };
+          const m = { ...(message as Record<string, unknown>) };
                     for ( const field of MEDIA_FIELDS) {
             const value = m[field];
             if (Array.isArray(value)) {
-              const array: any[] = [];
+              const array: string[] = [];
                             for ( const item of value) {
                 array.push(
                                     (await uploadIfDataUrl(item, ("uploads" as any), project, username) as any),
                 );
               }
-              m[field] = array;
+              (m as Record<string, unknown>)[field] = array;
             } else if (typeof value === "string" && value.startsWith("data:")) {
-              m[field] = await uploadIfDataUrl(
-                                (value as any),
+              (m as Record<string, unknown>)[field] = await uploadIfDataUrl(
+                                (value as string),
                 ("uploads" as any),
                 project,
                 username,
@@ -187,9 +195,9 @@ async function extractNodeResultFiles(
  * Convert a minio:// ref to an HTTP /files/ URL.
  * Non-minio strings (data URLs, http URLs, etc.) pass through unchanged.
  */
-function resolveMinioRef(value: any, baseUrl: any) {
-    if (typeof value === "string" && (value as any).startsWith("minio://")) {
-        const key = (value as any).replace("minio://", "");
+function resolveMinioRef(value: unknown, baseUrl: any) {
+    if (typeof value === "string" && (value as string).startsWith("minio://")) {
+        const key = (value as string).replace("minio://", "");
     // Use direct MinIO URL when available, otherwise proxy through Prism
     const minioBase = MinioWrapper.getBucketUrl();
     if (minioBase) return `${minioBase}/${key}`;
@@ -202,35 +210,35 @@ function resolveMinioRef(value: any, baseUrl: any) {
  * Walk a workflow document and replace all minio:// refs with HTTP /files/ URLs
  * so the frontend receives browser-renderable URLs directly.
  */
-function resolveWorkflowFileRefs(workflow: any, baseUrl: any) {
+function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: string) {
   // Resolve nodes
   if (Array.isArray(workflow.nodes)) {
         for ( const node of workflow.nodes) {
       // Node-level content (asset input nodes)
-      if (typeof node.content === "string") {
-        node.content = resolveMinioRef(node.content, baseUrl);
+      if (typeof (node as Record<string, unknown>).content === "string") {
+        (node as Record<string, unknown>).content = resolveMinioRef((node as Record<string, unknown>).content, baseUrl);
       }
 
       // Messages array (conversation / model nodes)
-      if (Array.isArray(node.messages)) {
-                for ( const message of node.messages) {
+      if (Array.isArray((node as Record<string, unknown>).messages)) {
+                for ( const message of ((node as Record<string, unknown>).messages as Record<string, unknown>[])) {
                     for ( const field of MEDIA_FIELDS) {
-            const value = message[field];
+            const value = (message as Record<string, unknown>)[field];
             if (Array.isArray(value)) {
-              message[field] = value.map((item: any) =>
+              (message as Record<string, unknown>)[field] = value.map((item: any) =>
                 resolveMinioRef(item, baseUrl),
               );
             } else if (typeof value === "string") {
-                            message[field] = resolveMinioRef((value as any), baseUrl);
+                            (message as Record<string, unknown>)[field] = resolveMinioRef((value as string), baseUrl);
             }
           }
         }
       }
 
       // Viewer receivedOutputs
-      if (node.receivedOutputs && typeof node.receivedOutputs === "object") {
-                for ( const [mod, data] of Object.entries(node.receivedOutputs)) {
-                    node.receivedOutputs[mod] = resolveMinioRef((data as any), baseUrl);
+      if ((node as Record<string, unknown>).receivedOutputs && typeof (node as Record<string, unknown>).receivedOutputs === "object") {
+                for ( const [mod, data] of Object.entries((node as Record<string, unknown>).receivedOutputs as Record<string, unknown>)) {
+                    ((node as Record<string, unknown>).receivedOutputs as Record<string, unknown>)[mod] = resolveMinioRef((data as any), baseUrl);
         }
       }
     }
@@ -245,18 +253,18 @@ function resolveWorkflowFileRefs(workflow: any, baseUrl: any) {
         if (mod === "conversation" && Array.isArray(data)) {
                     for ( const message of data) {
                         for ( const field of MEDIA_FIELDS) {
-              const value = message[field];
+              const value = (message as Record<string, unknown>)[field];
               if (Array.isArray(value)) {
-                message[field] = value.map((item: any) =>
+                (message as Record<string, unknown>)[field] = value.map((item: any) =>
                   resolveMinioRef(item, baseUrl),
                 );
               } else if (typeof value === "string") {
-                                message[field] = resolveMinioRef((value as any), baseUrl);
+                                (message as Record<string, unknown>)[field] = resolveMinioRef((value as string), baseUrl);
               }
             }
           }
         } else {
-                    outputs[mod] = resolveMinioRef((data as any), baseUrl);
+                    (outputs as Record<string, unknown>)[mod] = resolveMinioRef((data as any), baseUrl);
         }
       }
     }
@@ -264,9 +272,9 @@ function resolveWorkflowFileRefs(workflow: any, baseUrl: any) {
 
   return workflow;
 }
-function getBaseUrl(req: any) {
-    const proto = (req as any).headers["x-forwarded-proto"] || req.protocol || "http";
-    const host = (req as any).headers["x-forwarded-host"] || (req as any).get("host");
+function getBaseUrl(req: Request) {
+    const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
+    const host = req.headers["x-forwarded-host"] || req.get("host");
   return `${proto}://${host}`;
 }
 
@@ -275,22 +283,22 @@ function getBaseUrl(req: any) {
  * Single source of truth for providers and modalities.
  * Cost is computed separately from linked conversations (PATCH endpoint).
  */
-function computeWorkflowMeta(nodes: any) {
+function computeWorkflowMeta(nodes: Record<string, unknown>[]) {
   const providers = [
     ...new Set(
             (nodes || [])
-        .filter((n: any) => !n.nodeType && n.provider)
-        .map((n: any) => n.provider),
+        .filter((n: Record<string, unknown>) => !(n as Record<string, unknown>).nodeType && (n as Record<string, unknown>).provider)
+        .map((n: Record<string, unknown>) => (n as Record<string, unknown>).provider as string),
     ),
   ];
-  const modalities: any = {};
+  const modalities: Record<string, boolean> = {};
     for ( const n of nodes || []) {
     // Only include boundary nodes: input assets define workflow inputs,
     // viewer nodes define workflow outputs
-    if (n.nodeType === "input") {
-            for ( const t of n.outputTypes || []) modalities[`${t}In`] = true;
-    } else if (n.nodeType === "viewer") {
-            for ( const t of n.inputTypes || []) modalities[`${t}Out`] = true;
+    if ((n as Record<string, unknown>).nodeType === "input") {
+            for ( const t of ((n as Record<string, unknown>).outputTypes as string[]) || []) modalities[`${t}In`] = true;
+    } else if ((n as Record<string, unknown>).nodeType === "viewer") {
+            for ( const t of ((n as Record<string, unknown>).inputTypes as string[]) || []) modalities[`${t}Out`] = true;
     }
   }
   return { providers, modalities };
@@ -302,7 +310,7 @@ function computeWorkflowMeta(nodes: any) {
  */
 router.get(
   "/",
-  asyncHandler(async (req: any, res: any, next: any) => {
+  asyncHandler(async (req: CustomRequest, res: Response, next: NextFunction) => {
     try {
             const { db } = req;
 
@@ -330,13 +338,13 @@ router.get(
  */
 router.get(
   "/:id",
-  asyncHandler(async (req: any, res: any, next: any) => {
+  asyncHandler(async (req: CustomRequest, res: Response, next: NextFunction) => {
     try {
             const { db } = req;
 
-      let filter: any;
+      let filter: Record<string, unknown>;
       try {
-                filter = { _id: new ObjectId(req.params.id) };
+                filter = { _id: new ObjectId(req.params.id as string) };
       } catch {
         filter = { workflowId: req.params.id };
       }
@@ -346,7 +354,7 @@ router.get(
         return res.status(404).json({ error: "Workflow not found" });
 
             const baseUrl = getBaseUrl((req as any));
-            resolveWorkflowFileRefs(workflow, (baseUrl as any));
+            resolveWorkflowFileRefs(workflow, baseUrl);
 
       res.json(workflow);
     } catch (error: unknown) {
@@ -368,7 +376,7 @@ router.get(
  */
 router.post(
   "/",
-  asyncHandler(async (req: any, res: any, next: any) => {
+  asyncHandler(async (req: CustomRequest, res: Response, next: NextFunction) => {
     try {
             const { db } = req;
 
@@ -391,19 +399,19 @@ router.post(
 
       const processedNodes = await extractWorkflowFiles(
         nodes,
-                (project as any | undefined),
-        (username as any | undefined),
+                project,
+        username,
       );
       const processedResults = await extractNodeResultFiles(
         nodeResults,
-                (project as any | undefined),
-        (username as any | undefined),
+                project,
+        username,
       );
 
       const now = new Date().toISOString();
       const finalNodes = processedNodes || nodes;
 
-            const meta = computeWorkflowMeta((finalNodes as any));
+            const meta = computeWorkflowMeta(finalNodes as Record<string, unknown>[]);
 
       // Compute totalCost from linked conversations (source of truth for cost)
       let totalCost = 0;
@@ -415,7 +423,7 @@ router.post(
           .project({ totalCost: 1 })
           .toArray();
         totalCost = conversations.reduce(
-                    (sum: any, c: any) => sum + (c.totalCost || 0),
+                    (sum: number, c: Record<string, unknown>) => sum + ((c.totalCost as number) || 0),
           0,
         );
       }
@@ -449,13 +457,13 @@ router.post(
  */
 router.put(
   "/:id",
-  asyncHandler(async (req: any, res: any, next: any) => {
+  asyncHandler(async (req: CustomRequest, res: Response, next: NextFunction) => {
     try {
             const { db } = req;
 
-      let filter: any;
+      let filter: Record<string, unknown>;
       try {
-                filter = { _id: new ObjectId(req.params.id) };
+                filter = { _id: new ObjectId(req.params.id as string) };
       } catch {
         filter = { workflowId: req.params.id };
       }
@@ -464,7 +472,7 @@ router.put(
       const username = req.username || null;
       const body = { ...req.body };
       if (Array.isArray(body.nodes)) {
-                body.nodes = await extractWorkflowFiles(body.nodes, (project as any | undefined), (username as any | undefined));
+                body.nodes = await extractWorkflowFiles(body.nodes, project, username);
         body.nodeCount = body.nodes.length;
 
         // Recompute metadata
@@ -473,8 +481,8 @@ router.put(
       if (body.nodeResults && typeof body.nodeResults === "object") {
         body.nodeResults = await extractNodeResultFiles(
           body.nodeResults,
-                    (project as any | undefined),
-          (username as any | undefined),
+                    project,
+          username,
         );
       }
       if (Array.isArray(body.edges)) body.edgeCount = body.edges.length;
@@ -507,13 +515,13 @@ router.put(
  */
 router.patch(
   "/:id/conversations",
-  asyncHandler(async (req: any, res: any, next: any) => {
+  asyncHandler(async (req: CustomRequest, res: Response, next: NextFunction) => {
     try {
             const { db } = req;
 
-      let filter: any;
+      let filter: Record<string, unknown>;
       try {
-                filter = { _id: new ObjectId(req.params.id) };
+                filter = { _id: new ObjectId(req.params.id as string) };
       } catch {
         filter = { workflowId: req.params.id };
       }
@@ -526,7 +534,7 @@ router.patch(
       }
 
       const result = await db.collection(WORKFLOWS_COL).updateOne(filter, {
-        $push: { conversationIds: { $each: conversationIds } },
+        $push: { conversationIds: { $each: conversationIds } } as any,
         $set: { updatedAt: new Date().toISOString() },
       });
 
@@ -544,7 +552,7 @@ router.patch(
           .project({ totalCost: 1 })
           .toArray();
         const totalCost = conversations.reduce(
-                    (sum: any, c: any) => sum + (c.totalCost || 0),
+                    (sum: number, c: Record<string, unknown>) => sum + ((c.totalCost as number) || 0),
           0,
         );
         await db.collection(WORKFLOWS_COL).updateOne(filter, {
@@ -568,13 +576,13 @@ router.patch(
  */
 router.delete(
   "/:id",
-  asyncHandler(async (req: any, res: any, next: any) => {
+  asyncHandler(async (req: CustomRequest, res: Response, next: NextFunction) => {
     try {
             const { db } = req;
 
-      let filter: any;
+      let filter: Record<string, unknown>;
       try {
-                filter = { _id: new ObjectId(req.params.id) };
+                filter = { _id: new ObjectId(req.params.id as string) };
       } catch {
         filter = { workflowId: req.params.id };
       }

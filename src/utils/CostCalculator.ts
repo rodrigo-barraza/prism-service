@@ -1,10 +1,41 @@
 /**
+ * CostCalculator — token estimation and cost calculation utilities.
+ *
+ * Centralises pricing logic across all provider types:
+ * text-to-text, audio-to-text, live API sessions, and image generation.
+ */
+
+import type { TokenUsage } from "../types/admin.ts";
+
+// ── Pricing interfaces ──────────────────────────────────────
+
+export interface TextPricing {
+  inputPerMillion?: number;
+  outputPerMillion?: number;
+  cachedInputPerMillion?: number;
+  cacheWriteInputPerMillion?: number;
+}
+
+export interface AudioPricing extends TextPricing {
+  perMinute?: number;
+  audioInputPerMillion?: number;
+  audioOutputPerMillion?: number;
+}
+
+export interface ImagePricing extends TextPricing {
+  imageInputPerMillion?: number;
+  imageOutputPerMillion?: number;
+}
+
+// ── Token estimation ────────────────────────────────────────
+
+/**
  * Estimate token count from a text string using the ~4 chars/token heuristic.
  * Accurate enough for budget enforcement without requiring a real tokenizer.
  */
-export function estimateTokens(text: any) {
+export function estimateTokens(text: string | null | undefined): number {
   if (!text) return 0;
-    return Math.ceil((text as any).length / 4);
+  return Math.ceil(text.length / 4);
 }
 
 /**
@@ -12,21 +43,23 @@ export function estimateTokens(text: any) {
  * Providers like Anthropic and Google split prompt tokens into
  * new + cache_read + cache_write. This aggregates all three.
  */
-export function getTotalInputTokens(usage: any) {
+export function getTotalInputTokens(usage: TokenUsage | null | undefined): number {
   if (!usage) return 0;
   return (
-        (usage.inputTokens || 0) +
+    (usage.inputTokens || 0) +
     (usage.cacheReadInputTokens || 0) +
     (usage.cacheCreationInputTokens || 0)
   );
 }
-export function createUsageAccumulator() {
+
+export function createUsageAccumulator(): Required<Omit<TokenUsage, "totalTokens">> {
   return {
     inputTokens: 0,
     outputTokens: 0,
     cacheReadInputTokens: 0,
     cacheCreationInputTokens: 0,
     reasoningOutputTokens: 0,
+    tokensPerSec: 0,
   };
 }
 
@@ -35,39 +68,44 @@ export function createUsageAccumulator() {
  * Centralises the `target.X += source.X || 0` pattern that was duplicated
  * across AgenticLoopService, chat.js, and StreamChunkDispatcher.
  */
-export function mergeUsage(target: any, source: any) {
+export function mergeUsage(
+  target: Required<Omit<TokenUsage, "totalTokens">> | TokenUsage,
+  source: TokenUsage | null | undefined,
+): Required<Omit<TokenUsage, "totalTokens">> | TokenUsage {
   if (!source) return target;
-    (target as any).inputTokens += source.inputTokens || 0;
-    (target as any).outputTokens += source.outputTokens || 0;
-    (target as any).cacheReadInputTokens += source.cacheReadInputTokens || 0;
-    (target as any).cacheCreationInputTokens += source.cacheCreationInputTokens || 0;
-    (target as any).reasoningOutputTokens += source.reasoningOutputTokens || 0;
+  target.inputTokens = (target.inputTokens ?? 0) + (source.inputTokens || 0);
+  target.outputTokens = (target.outputTokens ?? 0) + (source.outputTokens || 0);
+  target.cacheReadInputTokens = (target.cacheReadInputTokens ?? 0) + (source.cacheReadInputTokens || 0);
+  target.cacheCreationInputTokens = (target.cacheCreationInputTokens ?? 0) + (source.cacheCreationInputTokens || 0);
+  target.reasoningOutputTokens = (target.reasoningOutputTokens ?? 0) + (source.reasoningOutputTokens || 0);
   return target;
 }
+
+// ── Cost calculation ────────────────────────────────────────
 
 /**
  * Calculate the estimated cost for a text-to-text request.
  * Supports Anthropic prompt caching: cache reads at reduced rate,
  * cache writes at premium rate.
  */
-export function calculateTextCost(usage: any, pricing: any) {
+export function calculateTextCost(usage: TokenUsage | null | undefined, pricing: TextPricing | null | undefined): number | null {
   if (!pricing || !usage) return null;
 
   let cost =
-        ((usage as any).inputTokens / 1_000_000) * (pricing.inputPerMillion || 0) +
-        ((usage as any).outputTokens / 1_000_000) * (pricing.outputPerMillion || 0);
+    ((usage.inputTokens || 0) / 1_000_000) * (pricing.inputPerMillion || 0) +
+    ((usage.outputTokens || 0) / 1_000_000) * (pricing.outputPerMillion || 0);
 
   // Cache read tokens (Anthropic: 0.1x base rate)
   if (usage.cacheReadInputTokens && pricing.cachedInputPerMillion) {
     cost +=
-            (usage.cacheReadInputTokens / 1_000_000) * pricing.cachedInputPerMillion;
+      (usage.cacheReadInputTokens / 1_000_000) * pricing.cachedInputPerMillion;
   }
 
   // Cache write tokens (Anthropic: 1.25x base rate)
   if (usage.cacheCreationInputTokens && pricing.cacheWriteInputPerMillion) {
     cost +=
-            (usage.cacheCreationInputTokens / 1_000_000) *
-            pricing.cacheWriteInputPerMillion;
+      (usage.cacheCreationInputTokens / 1_000_000) *
+      pricing.cacheWriteInputPerMillion;
   }
 
   return parseFloat(cost.toFixed(8));
@@ -77,13 +115,16 @@ export function calculateTextCost(usage: any, pricing: any) {
  * Calculate the estimated cost for an audio-to-text request.
  * Supports two strategies — per-minute pricing takes priority.
  */
-export function calculateAudioCost(usage: any, pricing: any) {
+export function calculateAudioCost(
+  usage: (TokenUsage & { durationSeconds?: number }) | null | undefined,
+  pricing: AudioPricing | null | undefined,
+): number | null {
   if (!pricing || !usage) return null;
 
   // Strategy 1: per-minute pricing
   if (pricing.perMinute && usage.durationSeconds) {
     return parseFloat(
-            ((usage.durationSeconds / 60) * pricing.perMinute).toFixed(8),
+      ((usage.durationSeconds / 60) * pricing.perMinute).toFixed(8),
     );
   }
 
@@ -91,9 +132,9 @@ export function calculateAudioCost(usage: any, pricing: any) {
   if (pricing.audioInputPerMillion && usage.inputTokens) {
     return parseFloat(
       (
-                (usage.inputTokens / 1_000_000) * pricing.audioInputPerMillion +
-                ((usage.outputTokens || 0) / 1_000_000) *
-                    (pricing.outputPerMillion || 0)
+        (usage.inputTokens / 1_000_000) * pricing.audioInputPerMillion +
+        ((usage.outputTokens || 0) / 1_000_000) *
+          (pricing.outputPerMillion || 0)
       ).toFixed(8),
     );
   }
@@ -107,7 +148,7 @@ export function calculateAudioCost(usage: any, pricing: any) {
  * use audioInputPerMillion and output tokens should use
  * audioOutputPerMillion when available.
  */
-export function calculateLiveCost(usage: any, pricing: any) {
+export function calculateLiveCost(usage: TokenUsage | null | undefined, pricing: AudioPricing | null | undefined): number | null {
   if (!pricing || !usage) return null;
 
   const inputRate =
@@ -117,8 +158,8 @@ export function calculateLiveCost(usage: any, pricing: any) {
 
   return parseFloat(
     (
-            ((usage as any).inputTokens / 1_000_000) * inputRate +
-            ((usage as any).outputTokens / 1_000_000) * outputRate
+      ((usage.inputTokens || 0) / 1_000_000) * inputRate +
+      ((usage.outputTokens || 0) / 1_000_000) * outputRate
     ).toFixed(8),
   );
 }
@@ -131,11 +172,11 @@ export function calculateLiveCost(usage: any, pricing: any) {
  *   - OpenAI 1024×1024 high-quality ≈ 1056 tokens
  */
 export function calculateImageCost(
-  prompt: any,
-  pricing: any,
-    inputImages: any = 0,
-    outputImageTokens: any = 1120,
-) {
+  prompt: string | null | undefined,
+  pricing: ImagePricing | null | undefined,
+  inputImages = 0,
+  outputImageTokens = 1120,
+): number | null {
   if (!pricing || !prompt) return null;
 
   const estimatedInputTokens = estimateTokens(prompt);
@@ -144,19 +185,19 @@ export function calculateImageCost(
 
   // Input text cost
   if (pricing.inputPerMillion) {
-        cost += (estimatedInputTokens / 1_000_000) * pricing.inputPerMillion;
+    cost += (estimatedInputTokens / 1_000_000) * pricing.inputPerMillion;
   }
 
   // Input image cost (for edit requests)
-    if (inputImages > 0 && pricing.imageInputPerMillion) {
-        cost += ((inputImages * 258) / 1_000_000) * pricing.imageInputPerMillion;
+  if (inputImages > 0 && pricing.imageInputPerMillion) {
+    cost += ((inputImages * 258) / 1_000_000) * pricing.imageInputPerMillion;
   }
 
   // Output image cost
   if (pricing.imageOutputPerMillion) {
-        cost += (outputImageTokens / 1_000_000) * pricing.imageOutputPerMillion;
+    cost += (outputImageTokens / 1_000_000) * pricing.imageOutputPerMillion;
   } else if (pricing.outputPerMillion) {
-        cost += (outputImageTokens / 1_000_000) * pricing.outputPerMillion;
+    cost += (outputImageTokens / 1_000_000) * pricing.outputPerMillion;
   }
 
   return cost > 0 ? parseFloat(cost.toFixed(8)) : null;

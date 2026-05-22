@@ -1,4 +1,4 @@
-import { ProviderOptions, ChatMessage, ChatMessageContent } from "../types/ProviderTypes.ts";
+import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
 import { sleep } from "@rodrigo-barraza/utilities-library";
 // ─────────────────────────────────────────────────────────────
 // LM Studio provider — Fully native /api/v1/chat
@@ -28,6 +28,8 @@ import {
   fetchOpenAICompat,
   parseSSEStream,
   MEDIA_STRATEGIES,
+  type PreparedMessage,
+  type OpenAICompletionResponse,
 } from "../utils/openai-compat.ts";
 import { COORDINATOR_ONLY_TOOLS } from "../services/CoordinatorPrompt.ts";
 // ── Native /api/v1/chat SSE stream parser ────────────────────
@@ -233,13 +235,13 @@ function safeParseJSON(str: unknown) {
 // no built-in multi-turn message array. We serialize prior conversation turns
 // as formatted text context so the model retains conversational memory.
 // For the last user turn with images, we use the array format with type: "text"|"image".
-function buildNativeInput(messages: ChatMessage[]) {
+function buildNativeInput(messages: PreparedMessage[]) {
   // Separate system, conversation history, and the last user message
-  const nonSystemMessages = messages.filter((m: ChatMessage) => m.role !== "system");
+  const nonSystemMessages = messages.filter((m) => m.role !== "system");
   if (nonSystemMessages.length === 0) return "";
   const lastUser = [...nonSystemMessages]
     .reverse()
-    .find((m: ChatMessage) => m.role === "user");
+    .find((m) => m.role === "user");
   if (!lastUser) return "";
   // Find the index of the last user message to separate history from current turn
   const lastUserIdx = nonSystemMessages.lastIndexOf(lastUser);
@@ -255,8 +257,8 @@ function buildNativeInput(messages: ChatMessage[]) {
           ? message.content
           : Array.isArray(message.content)
             ? message.content
-                                .filter((c: ChatMessageContent) => c.type === "text")
-                .map((c: ChatMessageContent) => c.text)
+                                .filter((c) => c.type === "text")
+                .map((c) => (c as { type: string; text?: string }).text || "")
                 .join("\n")
             : "";
       if (text) lines.push(`[${role}]: ${text}`);
@@ -273,15 +275,15 @@ function buildNativeInput(messages: ChatMessage[]) {
     const parts: Array<Record<string, unknown>> = [];
     // Prepend history as a text part if present
     let textContent = lastUser.content
-      .filter((c: ChatMessageContent) => c.type === "text")
-      .map((c: ChatMessageContent) => c.text)
+      .filter((c) => c.type === "text")
+      .map((c) => (c as { type: string; text?: string }).text || "")
       .join("\n");
     if (historyPrefix) textContent = historyPrefix + textContent;
     if (textContent) parts.push({ type: "text", content: textContent });
     // Add images
         for ( const c of lastUser.content) {
-      if (c.type === "image_url" && c.image_url?.url) {
-        parts.push({ type: "image", data_url: c.image_url.url });
+      if (c.type === "image_url" && (c as { type: string; image_url?: { url: string } }).image_url?.url) {
+        parts.push({ type: "image", data_url: (c as { type: string; image_url: { url: string } }).image_url.url });
       }
     }
     return parts;
@@ -338,7 +340,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           `${baseUrl}/v1/chat/completions`,
           payload,
         );
-        const data = await response.json();
+        const data = (await response.json()) as OpenAICompletionResponse;
         const { text, thinking, usage, toolCalls } =
           processNonStreamingResponse(data);
         const result: Record<string, unknown> = { text, thinking, usage };
@@ -673,8 +675,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         // This lets the model analyze video content as a sequence of frames,
         // which is the standard approach for Gemma 4 and other VLMs.
         const hasVideo = messages.some((m: ChatMessage) => {
-          const msg = m as unknown as Record<string, unknown>;
-          return msg.video && (msg.video as string[]).length > 0;
+          const msg = m as Record<string, any>;
+          return "video" in msg && Array.isArray(msg.video) && msg.video.length > 0;
         });
         if (hasVideo) {
           yield { type: "status", message: "Extracting video frames…" };
@@ -713,7 +715,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           store: false,
         };
         // Extract system prompt from messages
-        const systemMsg = prepared.find((m: ChatMessage) => m.role === "system");
+        const systemMsg = prepared.find((m) => m.role === "system");
         if (systemMsg?.content) {
           (nativePayload as Record<string, unknown>).system_prompt = systemMsg.content;
         }
@@ -843,7 +845,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
      * @private
      */
     async *_streamOpenAICompat(
-      prepared: ChatMessage[],
+      prepared: PreparedMessage[],
       model: string,
       options: ProviderOptions,
       baseUrl: string,
@@ -876,13 +878,13 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           logger.warn(
             `[LM-Studio] OpenAI-compat: tool count (${tools.length}) exceeds safe limit for ctx=${contextLength}. Capping at ${maxTools}.`,
           );
-          (payload as Record<string, unknown>).tools = tools.slice(0, maxTools);
+          (payload as Record<string, any>).tools = tools.slice(0, maxTools);
         } else {
-          (payload as Record<string, unknown>).tools = tools;
+          (payload as Record<string, any>).tools = tools;
         }
       }
       logger.info(
-        `[LM-Studio] OpenAI-compat streaming (agentic): model=${model}, tools=${((payload as Record<string, unknown>).tools as unknown[] | undefined)?.length || 0}/${options.tools?.length || 0}, ctx=${options._loadedContextLength || "unset"}`,
+        `[LM-Studio] OpenAI-compat streaming (agentic): model=${model}, tools=${((payload as Record<string, any>).tools as any[] | undefined)?.length || 0}/${options.tools?.length || 0}, ctx=${options._loadedContextLength || "unset"}`,
       );
       yield { type: "status", message: "Starting…", phase: "starting" };
       const response = await fetch(`${baseUrl}/v1/chat/completions`, {
@@ -1086,11 +1088,11 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         // Enrich each model with resolved architecture params for VRAM estimation
         if ((data as Record<string, unknown>)?.data) {
           for (const model of (data as Record<string, unknown>).data as Array<Record<string, unknown>>) {
-            const arch = model.architecture;
-            const params = model.params_string;
-            const sizeBytes = model.size_bytes || 0;
+            const arch = model.architecture as string | undefined;
+            const params = model.params_string as string | undefined;
+            const sizeBytes = (model.size_bytes as number) || 0;
             const bpw = (model.quantization as Record<string, unknown>)?.bits_per_weight as number || 4;
-            model.archParams = resolveArchParams(arch, params, sizeBytes, bpw);
+            model.archParams = resolveArchParams(arch ?? null, params ?? null, sizeBytes, bpw);
           }
         }
         return data as Record<string, unknown>;

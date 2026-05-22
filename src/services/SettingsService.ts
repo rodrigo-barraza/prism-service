@@ -4,24 +4,6 @@ import { MONGO_DB_NAME } from "../../config.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
 
-// ─── Default Settings ─────────────────────────────────────────────────────────
-
-const DEFAULTS = {
-  memory: {
-    extractionProvider: "",
-    extractionModel: "",
-    consolidationProvider: "",
-    consolidationModel: "",
-    embeddingProvider: "",
-    embeddingModel: "",
-  },
-  agents: {
-    subagentProvider: "",
-    subagentModel: "",
-    harness: "standard",
-  },
-};
-
 // ─── In-memory cache ──────────────────────────────────────────────────────────
 // Hot path: MemoryService + EmbeddingService read these on every call.
 // Cache is invalidated on update() and lazily populated on first get().
@@ -45,6 +27,22 @@ interface SettingsData {
 }
 
 let _cache: SettingsData | null = null;
+
+const DEFAULTS: SettingsData = {
+  memory: {
+    extractionProvider: "",
+    extractionModel: "",
+    consolidationProvider: "",
+    consolidationModel: "",
+    embeddingProvider: "",
+    embeddingModel: "",
+  },
+  agents: {
+    subagentProvider: "",
+    subagentModel: "",
+    harness: "standard",
+  },
+};
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
@@ -72,7 +70,7 @@ const SettingsService = {
     }
 
     // Deep merge: defaults ← stored
-    _cache = deepMerge(DEFAULTS as unknown as Record<string, unknown>, (document.data || {}) as Record<string, unknown>) as unknown as SettingsData;
+    _cache = deepMerge(DEFAULTS as any, document.data || {}) as SettingsData;
     return _cache;
   },
   async getSection<K extends keyof SettingsData>(section: K): Promise<SettingsData[K]> {
@@ -87,7 +85,7 @@ const SettingsService = {
     if (!collection) throw new Error("Database not available");
 
     const current = await this.get();
-    const merged = deepMerge(current as unknown as Record<string, unknown>, data);
+    const merged = deepMerge(current as any, data) as SettingsData;
 
     await collection.updateOne(
       { _key: "global" },
@@ -105,7 +103,7 @@ const SettingsService = {
     );
 
     // Invalidate cache
-    _cache = merged as unknown as SettingsData;
+    _cache = merged;
     logger.info("[SettingsService] Settings updated and cache refreshed");
     return merged;
   },

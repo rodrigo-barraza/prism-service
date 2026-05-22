@@ -1,5 +1,6 @@
 import ConversationService from "../services/ConversationService.ts";
 import logger from "./logger.ts";
+import type { ChatMessage } from "../types/admin.ts";
 
 // ─── Conversation persistence helpers ───────────────────────
 
@@ -21,9 +22,9 @@ export function markGenerating(
     username,
     generating,
     opts,
-  ).catch((error: any) =>
+  ).catch((error: unknown) =>
     logger.error(
-      `Failed to ${generating ? "set" : "clear"} isGenerating: ${error.message}`,
+      `Failed to ${generating ? "set" : "clear"} isGenerating: ${(error as Error).message}`,
     ),
   );
 }
@@ -40,8 +41,8 @@ export function appendAndFinalize(
   conversationId: string | null | undefined,
   project: string,
   username: string,
-  messagesToAppend: any[],
-  meta: any,
+  messagesToAppend: ChatMessage[],
+  meta: Record<string, unknown> | null | undefined,
   opts: { collection?: string } = {},
 ): void {
   if (!conversationId) return;
@@ -63,10 +64,10 @@ export function appendAndFinalize(
         opts,
       ),
     )
-    .catch((error: any) => {
+    .catch((error: unknown) => {
       logger.error(
         `Failed to append ${messagesToAppend?.length ?? 0} messages to ${conversationId} ` +
-          `(project=${project}, collection=${opts?.collection || "conversations"}): ${error.message}`,
+          `(project=${project}, collection=${opts?.collection || "conversations"}): ${(error as Error).message}`,
       );
 
       // Always clear isGenerating even on failure — prevents sessions
@@ -77,9 +78,9 @@ export function appendAndFinalize(
         username,
         false,
         opts,
-      ).catch((clearErr: any) =>
+      ).catch((clearErr: unknown) =>
         logger.error(
-          `Failed to clear isGenerating after append failure: ${clearErr.message}`,
+          `Failed to clear isGenerating after append failure: ${(clearErr as Error).message}`,
         ),
       );
     });

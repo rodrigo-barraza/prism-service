@@ -29,6 +29,10 @@ export interface ChatMessage {
   toolCalls?: Array<{ id?: string; name: string; args: Record<string, unknown> }>;
   thinking?: string;
   thinkingSignature?: string;
+  /** Tool result correlation — maps this message to the tool_use that produced it. */
+  tool_call_id?: string;
+  /** Generic message ID — fallback for tool correlation. */
+  id?: string;
 }
 
 export interface ProviderResponse {

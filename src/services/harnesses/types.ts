@@ -8,7 +8,9 @@
 
 // ── Usage & Cost ────────────────────────────────────────────
 
-export interface UsageAccumulator {
+import type { TokenUsage } from "../RequestLogger.ts";
+
+export interface UsageAccumulator extends TokenUsage {
   inputTokens: number;
   outputTokens: number;
   cacheReadInputTokens: number;

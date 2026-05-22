@@ -6,6 +6,134 @@
 
 import { getDataUrlMimeType } from "./media.ts";
 import { ThinkTagParser, extractThinkTags } from "./ThinkTagParser.ts";
+import type { ProviderOptions, ChatMessageContent } from "../types/ProviderTypes.ts";
+import type { TokenUsage, ToolCallEntry } from "../types/admin.ts";
+
+// ── Types ────────────────────────────────────────────────────
+
+/**
+ * Input message shape consumed by openai-compat adapter functions.
+ * This is intentionally wider than ProviderTypes.ChatMessage because
+ * messages arrive from conversation storage with diverse fields
+ * (tool results, media attachments, etc.) that need normalization.
+ */
+export interface InputMessage {
+  role: string;
+  content?: string | ChatMessageContent[];
+  name?: string;
+  // Tool correlation (used by tool result messages)
+  tool_call_id?: string;
+  id?: string;
+  // Assistant tool calls
+  toolCalls?: ToolCallEntry[];
+  // Media attachments
+  images?: string[];
+  audio?: string[];
+  video?: string[];
+  pdf?: string[];
+  // Thinking
+  thinking?: string;
+  thinkingSignature?: string;
+}
+
+interface OpenAIToolCall {
+  id?: string;
+  index?: number;
+  type?: string;
+  function?: { name?: string; arguments?: string };
+  name?: string;
+  arguments?: string;
+}
+
+interface OpenAIMessage {
+  role: string;
+  content?: string | null;
+  tool_calls?: OpenAIToolCall[];
+  reasoning_content?: string;
+  reasoning?: string;
+}
+
+interface OpenAIUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  prompt_tokens_details?: { cached_tokens?: number };
+  completion_tokens_details?: { reasoning_tokens?: number };
+}
+
+export interface OpenAICompletionResponse {
+  choices?: Array<{
+    message?: OpenAIMessage;
+    delta?: OpenAIMessage & { tool_calls?: OpenAIToolCall[] };
+    finish_reason?: string;
+  }>;
+  usage?: OpenAIUsage;
+}
+
+interface OpenAIToolFunction {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+export type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } }
+  | { type: "video_url"; video_url: { url: string } }
+  | { type: "input_audio"; input_audio: { data: string; format: string } };
+
+export interface PreparedMessage {
+  role: string;
+  name?: string;
+  content: string | ContentPart[] | null;
+  tool_call_id?: string;
+  tool_calls?: Array<{
+    id: string;
+    type: string;
+    function: { name: string; arguments: string };
+  }>;
+}
+
+interface SSEParseOptions {
+  signal?: AbortSignal;
+  thinkingEnabled?: boolean;
+  onUsage?: (json: OpenAICompletionResponse, usage: TokenUsage) => void;
+  onChunkJson?: (json: OpenAICompletionResponse) => void;
+}
+
+interface PendingToolCall {
+  id: string;
+  name: string;
+  args: string;
+}
+
+interface PayloadDefaults {
+  temperature?: number;
+  maxTokens?: number;
+}
+
+interface FetchOptions {
+  signal?: AbortSignal;
+}
+
+/** Union of event types yielded by parseSSEStream. */
+export type SSEStreamChunk =
+  | string
+  | { type: "thinking"; content: string }
+  | {
+      type: "toolCall";
+      id: string | null;
+      name: string;
+      args: Record<string, unknown>;
+      result?: unknown;
+      status?: "calling" | "done" | "error";
+      native?: boolean;
+    }
+  | { type: "toolCallDelta"; characters: number }
+  | { type: "usage"; usage: TokenUsage }
+  | { type: "status"; message: string; phase?: string; progress?: number };
 
 // ── Tool Conversion ─────────────────────────────────────────
 
@@ -14,10 +142,16 @@ import { ThinkTagParser, extractThinkTags } from "./ThinkTagParser.ts";
  * Input:  [{ name, description, parameters }]
  * Output: [{ type: "function", function: { name, description, parameters } }]
  */
-export function convertToolsToOpenAI(tools: any) {
+interface ToolInput {
+  name: string;
+  description?: string;
+  parameters?: Record<string, unknown>;
+}
+
+export function convertToolsToOpenAI(tools: ToolInput[] | undefined | null): OpenAIToolFunction[] | null {
   if (!tools || !Array.isArray(tools) || tools.length === 0) return null;
-  return tools.map((t: any) => ({
-    type: "function",
+  return tools.map((t) => ({
+    type: "function" as const,
     function: {
       name: t.name,
       description: t.description || "",
@@ -35,8 +169,8 @@ export function convertToolsToOpenAI(tools: any) {
  * Returns a plain object with only the non-undefined fields set.
  */
 export function buildPayloadParams(
-  options: any,
-  { temperature = 0.7, maxTokens = -1 }: any = {},
+  options: ProviderOptions,
+  { temperature = 0.7, maxTokens = -1 }: PayloadDefaults = {},
 ) {
   return {
     temperature:
@@ -66,20 +200,20 @@ export function buildPayloadParams(
  * Handles both nested OpenAI format ({ function: { name, arguments } })
  * and flat llama.cpp format ({ name, arguments }).
  */
-export function extractToolCallsFromMessage(message: string) {
-    if (!(message as any)?.tool_calls || (message as any).tool_calls.length === 0) return null;
+export function extractToolCallsFromMessage(message: OpenAIMessage | null | undefined): ToolCallEntry[] | null {
+  if (!message?.tool_calls || message.tool_calls.length === 0) return null;
 
-    return (message as any).tool_calls.map((tc: any) => {
-        const fnName = (tc.function as any)?.name || tc.name || "";
-        const fnArgs = (tc.function as any)?.arguments || tc.arguments || "{}";
-    let args = {};
+  return message.tool_calls.map((tc) => {
+    const fnName = tc.function?.name || tc.name || "";
+    const fnArgs = tc.function?.arguments || tc.arguments || "{}";
+    let args: Record<string, unknown> = {};
     try {
-      args = JSON.parse((fnArgs as any));
+      args = JSON.parse(fnArgs);
     } catch {
       /* ignore */
     }
     return {
-      id: tc.id,
+      id: tc.id || null,
       name: fnName,
       args,
     };
@@ -97,30 +231,31 @@ export function extractToolCallsFromMessage(message: string) {
  * The cache field uses the same key as Anthropic (cacheReadInputTokens) so
  * CostCalculator, RequestLogger, and console logging handle it uniformly.
  */
-export function normalizeUsage(rawUsage: any) {
-  const usage = {
+export function normalizeUsage(rawUsage: OpenAIUsage | null | undefined): TokenUsage {
+  const usage: TokenUsage = {
     inputTokens: rawUsage?.prompt_tokens ?? 0,
     outputTokens: rawUsage?.completion_tokens ?? 0,
   };
 
   // KV cache hits — reported by LM Studio and OpenAI
-    const cachedTokens = (rawUsage?.prompt_tokens_details as any)?.cached_tokens;
-  if ((cachedTokens as any) > 0) {
-        (usage as any).cacheReadInputTokens = cachedTokens;
+  const cachedTokens = rawUsage?.prompt_tokens_details?.cached_tokens;
+  if (cachedTokens && cachedTokens > 0) {
+    usage.cacheReadInputTokens = cachedTokens;
     // Adjust inputTokens to reflect only the non-cached portion,
     // mirroring Anthropic's convention where inputTokens excludes cache hits
-        usage.inputTokens = Math.max(0, usage.inputTokens - (cachedTokens as any));
+    usage.inputTokens = Math.max(0, (usage.inputTokens ?? 0) - cachedTokens);
   }
 
   // Reasoning token breakdown
-    const reasoningTokens = (rawUsage?.completion_tokens_details as any)?.reasoning_tokens;
-  if ((reasoningTokens as any) > 0) {
-        (usage as any).reasoningOutputTokens = reasoningTokens;
+  const reasoningTokens = rawUsage?.completion_tokens_details?.reasoning_tokens;
+  if (reasoningTokens && reasoningTokens > 0) {
+    usage.reasoningOutputTokens = reasoningTokens;
   }
 
   return usage;
 }
-export const EMPTY_USAGE = { inputTokens: 0, outputTokens: 0 };
+
+export const EMPTY_USAGE: TokenUsage = { inputTokens: 0, outputTokens: 0 };
 
 // ── Message Preparation ─────────────────────────────────────
 
@@ -137,6 +272,12 @@ export const MEDIA_STRATEGIES = {
   IMAGES_ONLY: "images_only",
 };
 
+interface ExpandVideoOptions {
+  fps?: number;
+  maxFrames?: number;
+  quality?: number;
+}
+
 /**
  * Pre-process messages to expand video attachments into image frames.
  *
@@ -148,25 +289,26 @@ export const MEDIA_STRATEGIES = {
  * Call this BEFORE prepareOpenAICompatMessages() for providers that need
  * video-as-frames support.
  */
-export async function expandVideoToFrames(messages: any, options: any = {}) {
+export async function expandVideoToFrames(messages: InputMessage[], options: ExpandVideoOptions = {}): Promise<InputMessage[]> {
   const { extractVideoFrames, getDataUrlMimeType } = await import("./media.js");
 
-    for ( const message of messages) {
+  for (const message of messages) {
     // Collect video data URLs from both `video` and `images` arrays.
     // The frontend may place video files in `images` if it doesn't
     // categorize by MIME type (backwards compatibility).
-    const videoUrls: any[] = [];
-    const keptImages: any[] = [];
+    const videoUrls: string[] = [];
+    const keptImages: string[] = [];
 
     // Check explicit video field
-    if (message.video && Array.isArray(message.video)) {
-      videoUrls.push(...message.video);
-      delete message.video;
+    const msg = message as InputMessage & { video?: string[] };
+    if (msg.video && Array.isArray(msg.video)) {
+      videoUrls.push(...msg.video);
+      delete msg.video;
     }
 
     // Check images field for misclassified video data URLs
     if (message.images && Array.isArray(message.images)) {
-            for ( const dataUrl of message.images) {
+      for (const dataUrl of message.images) {
         const mime = getDataUrlMimeType(dataUrl);
         if (mime && mime.startsWith("video/")) {
           videoUrls.push(dataUrl);
@@ -179,10 +321,10 @@ export async function expandVideoToFrames(messages: any, options: any = {}) {
 
     if (videoUrls.length === 0) continue;
 
-    const allFrames: any[] = [];
-        for ( const videoDataUrl of videoUrls) {
-            const frames = await extractVideoFrames((videoDataUrl as any), options);
-            allFrames.push(...frames);
+    const allFrames: string[] = [];
+    for (const videoDataUrl of videoUrls) {
+      const frames = await extractVideoFrames(videoDataUrl, options) as string[];
+      allFrames.push(...frames);
     }
 
     if (allFrames.length > 0) {
@@ -200,12 +342,12 @@ export async function expandVideoToFrames(messages: any, options: any = {}) {
  * audio/video/PDF based on the media strategy.
  */
 export function prepareOpenAICompatMessages(
-  messages: any,
-  { mediaStrategy = MEDIA_STRATEGIES.IMAGES_ONLY }: any = {},
-) {
-    return (messages as any).map((m: any) => {
-    const base = { role: m.role };
-        if (m.name) (base as any).name = m.name;
+  messages: InputMessage[],
+  { mediaStrategy = MEDIA_STRATEGIES.IMAGES_ONLY }: { mediaStrategy?: string } = {},
+): PreparedMessage[] {
+  return messages.map((m, _i) => {
+    const base: { role: string; name?: string } = { role: m.role };
+    if (m.name) base.name = m.name;
 
     // Tool result messages — include tool_call_id for correlation
     if (m.role === "tool") {
@@ -214,16 +356,16 @@ export function prepareOpenAICompatMessages(
         tool_call_id: m.tool_call_id || m.id || "",
         content:
           typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-      };
+      } as PreparedMessage;
     }
 
     // Assistant messages with tool calls — include tool_calls in OpenAI format
-        if (m.role === "assistant" && m.toolCalls && (m.toolCalls as any).length > 0) {
+    if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
       return {
         ...base,
         // Per OpenAI spec, content must be null when tool_calls are present
-                content: (m.content as any)?.trim() || null,
-                tool_calls: (m.toolCalls as any).map((tc: any, i: any) => ({
+        content: (typeof m.content === "string" ? m.content.trim() : "") || null,
+        tool_calls: m.toolCalls.map((tc: ToolCallEntry, i: number) => ({
           id: tc.id || `call_${i}`,
           type: "function",
           function: {
@@ -234,58 +376,63 @@ export function prepareOpenAICompatMessages(
                 : JSON.stringify(tc.args || {}),
           },
         })),
-      };
+      } as PreparedMessage;
     }
 
     // Collect media content based on strategy
-    const content: string[] = [];
+    const content: ContentPart[] = [];
 
     if (mediaStrategy === MEDIA_STRATEGIES.IMAGES_ONLY) {
       // Simple image-only handling (lm-studio)
-            if (m.images && (m.images as any).length > 0) {
-                for ( const dataUrl of m.images) {
-                    content.push(({ type: "image_url", image_url: { url: dataUrl } } as any));
+      if (m.images && m.images.length > 0) {
+        for (const dataUrl of m.images) {
+          content.push({ type: "image_url", image_url: { url: dataUrl } });
         }
       }
     } else {
       // Full media handling (vllm, llama-cpp)
-            for ( const field of ["images", "audio", "video", "pdf"]) {
-        const array = m[field];
-        if (!array || !Array.isArray(array) || array.length === 0) continue;
+      const mediaFields: Array<{ key: string; values: string[] | undefined }> = [
+        { key: "images", values: m.images },
+        { key: "audio", values: m.audio },
+        { key: "video", values: m.video },
+        { key: "pdf", values: m.pdf },
+      ];
+      for (const { values: array } of mediaFields) {
+        if (!array || array.length === 0) continue;
 
-                for ( const dataUrl of array) {
+        for (const dataUrl of array) {
           const mime = getDataUrlMimeType(dataUrl);
 
           if (mime && mime.startsWith("image/")) {
-                        content.push(({ type: "image_url", image_url: { url: dataUrl } } as any));
+            content.push({ type: "image_url", image_url: { url: dataUrl } });
           } else if (mime && mime.startsWith("video/")) {
             if (mediaStrategy === MEDIA_STRATEGIES.FULL_MULTIMODAL) {
-                            content.push(({ type: "video_url", video_url: { url: dataUrl } } as any));
+              content.push({ type: "video_url", video_url: { url: dataUrl } });
             } else {
-                            content.push(({
-                                            type: "text",
-                                            text: "[Attached video file — video input not supported by this model]",
-                                          } as any));
+              content.push({
+                type: "text",
+                text: "[Attached video file — video input not supported by this model]",
+              });
             }
           } else if (mime && mime.startsWith("audio/")) {
             if (mediaStrategy === MEDIA_STRATEGIES.FULL_MULTIMODAL) {
               const base64Data = dataUrl.split(";base64,")[1] || "";
               const audioFormat = mime.split("/")[1] || "wav";
-                            content.push(({
-                                            type: "input_audio",
-                                            input_audio: { data: base64Data, format: audioFormat },
-                                          } as any));
+              content.push({
+                type: "input_audio",
+                input_audio: { data: base64Data, format: audioFormat },
+              });
             } else {
-                            content.push(({
-                                            type: "text",
-                                            text: "[Attached audio file — audio input not supported by this model]",
-                                          } as any));
+              content.push({
+                type: "text",
+                text: "[Attached audio file — audio input not supported by this model]",
+              });
             }
           } else if (mime === "application/pdf") {
-                        content.push(({
-                                      type: "text",
-                                      text: "[Attached PDF document — PDF input not supported by this model]",
-                                    } as any));
+            content.push({
+              type: "text",
+              text: "[Attached PDF document — PDF input not supported by this model]",
+            });
           } else if (
             mime &&
             (mime.startsWith("text/") || mime === "application/json")
@@ -293,32 +440,33 @@ export function prepareOpenAICompatMessages(
             try {
               const base64 = dataUrl.split(";base64,")[1];
               const decoded = Buffer.from(base64, "base64").toString("utf-8");
-                            content.push(({
-                                            type: "text",
-                                            text: `[Attached file (${mime})]:\n${decoded}`,
-                                          } as any));
+              content.push({
+                type: "text",
+                text: `[Attached file (${mime})]:\n${decoded}`,
+              });
             } catch {
-                            content.push(({
-                                            type: "text",
-                                            text: `[Attached file (${mime}): unable to decode]`,
-                                          } as any));
+              content.push({
+                type: "text",
+                text: `[Attached file (${mime}): unable to decode]`,
+              });
             }
           } else {
             // Fallback — try image_url passthrough for any types
-                        content.push(({ type: "image_url", image_url: { url: dataUrl } } as any));
+            content.push({ type: "image_url", image_url: { url: dataUrl } });
           }
         }
       }
     }
 
     if (content.length > 0) {
-      if (m.content) {
-                content.push(({ type: "text", text: m.content } as any));
-      }
-      return { ...base, content };
+        const textContent = typeof m.content === "string" ? m.content : "";
+        if (textContent) {
+          content.push({ type: "text", text: textContent });
+        }
+      return { ...base, content } as PreparedMessage;
     }
 
-    return { ...base, content: m.content ?? "" };
+    return { ...base, content: (typeof m.content === "string" ? m.content : "") || "" } as PreparedMessage;
   });
 }
 
@@ -331,14 +479,17 @@ export function prepareOpenAICompatMessages(
  * When thinkingEnabled is false, thinking content is folded into the text
  * output and the `thinking` field is null.
  */
-export function processNonStreamingResponse(data: any, options: any = {}) {
-    const message = data.choices?.[0]?.message;
+export function processNonStreamingResponse(
+  data: OpenAICompletionResponse,
+  options: { thinkingEnabled?: boolean } = {},
+) {
+  const message = data.choices?.[0]?.message;
   const rawText = message?.content || "";
 
   // When thinking is disabled, return raw text without parsing <think> tags
-    if (options.thinkingEnabled === false) {
-        const usage = normalizeUsage((data.usage as any));
-    const toolCalls = extractToolCallsFromMessage(message);
+  if (options.thinkingEnabled === false) {
+    const usage = normalizeUsage(data.usage);
+    const toolCalls = extractToolCallsFromMessage(message ?? null);
     return { text: rawText, thinking: null, usage, toolCalls };
   }
 
@@ -347,8 +498,8 @@ export function processNonStreamingResponse(data: any, options: any = {}) {
   const { thinking: tagThinking, text } = extractThinkTags(rawText);
   const thinking = nativeThinking || tagThinking;
 
-    const usage = normalizeUsage((data.usage as any));
-  const toolCalls = extractToolCallsFromMessage(message);
+  const usage = normalizeUsage(data.usage);
+  const toolCalls = extractToolCallsFromMessage(message ?? null);
 
   return { text, thinking, usage, toolCalls };
 }
@@ -367,47 +518,49 @@ export function processNonStreamingResponse(data: any, options: any = {}) {
  * and <think> tag content) is yielded as plain text strings instead of
  * { type: "thinking" } events.
  */
-export async function* parseSSEStream(reader: any, options: any = {}) {
+export async function* parseSSEStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  options: SSEParseOptions = {},
+): AsyncGenerator<SSEStreamChunk> {
   const decoder = new TextDecoder();
   let buffer = "";
-  let usage = null;
-    const suppressThinking = options.thinkingEnabled === false;
+  let usage: TokenUsage | null = null;
+  const suppressThinking = options.thinkingEnabled === false;
   // Skip ThinkTagParser entirely when thinking is disabled — no overhead
   const thinkParser = suppressThinking ? null : new ThinkTagParser();
-  const pendingToolCalls: any = {};
+  const pendingToolCalls: Record<number, PendingToolCall> = {};
 
   try {
     while (true) {
-            if ((options.signal as any)?.aborted) {
-                (reader as any).cancel();
+      if (options.signal?.aborted) {
+        reader.cancel();
         break;
       }
-            const { done, value } = await (reader as any).read();
+      const { done, value } = await reader.read();
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
-            // @ts-ignore - TODO: strict typing
-            buffer = lines.pop(); // keep incomplete line in buffer
+      buffer = lines.pop() || ""; // keep incomplete line in buffer
 
-            for ( const line of lines) {
+      for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith(":")) continue; // skip empty lines / comments
         if (trimmed === "data: [DONE]") continue;
         if (!trimmed.startsWith("data: ")) continue;
 
         try {
-          const json = JSON.parse(trimmed.slice(6));
+          const json = JSON.parse(trimmed.slice(6)) as OpenAICompletionResponse;
 
           // Extract usage if present (some servers send it on the last chunk)
           if (json.usage) {
             usage = normalizeUsage(json.usage);
             // Let provider handle extensions (e.g. llama.cpp timings)
-                        if (options.onUsage) options.onUsage(json, usage);
+            if (options.onUsage) options.onUsage(json, usage);
           }
 
           // Let provider handle custom fields
-                    if (options.onChunkJson) options.onChunkJson(json);
+          if (options.onChunkJson) options.onChunkJson(json);
 
           const delta = json.choices?.[0]?.delta;
 
@@ -428,9 +581,8 @@ export async function* parseSSEStream(reader: any, options: any = {}) {
               yield content;
             } else {
               // Parse <think> tags from the streamed content
-                            // @ts-ignore - TODO: strict typing
-                            const parts = thinkParser.feed(content);
-                            for ( const part of parts) {
+              const parts = thinkParser!.feed(content);
+              for (const part of parts) {
                 if (part.type === "thinking") {
                   yield { type: "thinking", content: part.content };
                 } else {
@@ -445,21 +597,21 @@ export async function* parseSSEStream(reader: any, options: any = {}) {
           // during tool call argument streaming.
           if (delta?.tool_calls) {
             let deltaChars = 0;
-                        for ( const tc of delta.tool_calls) {
-              const index = tc.index;
-                            if (!pendingToolCalls[index]) {
-                                pendingToolCalls[index] = {
+            for (const tc of delta.tool_calls) {
+              const index = tc.index ?? 0;
+              if (!pendingToolCalls[index]) {
+                pendingToolCalls[index] = {
                   id: tc.id || "",
                   name: tc.function?.name || tc.name || "",
                   args: "",
                 };
               }
-                            if (tc.id) (pendingToolCalls as any)[index].id = tc.id;
+              if (tc.id) pendingToolCalls[index].id = tc.id;
               const chunkName = tc.function?.name || tc.name;
-                            if (chunkName) (pendingToolCalls as any)[index].name = chunkName;
+              if (chunkName) pendingToolCalls[index].name = chunkName;
               const chunkArgs = tc.function?.arguments || tc.arguments;
               if (chunkArgs) {
-                                (pendingToolCalls as any)[index].args += chunkArgs;
+                pendingToolCalls[index].args += chunkArgs;
                 deltaChars += chunkArgs.length;
               }
             }
@@ -473,17 +625,17 @@ export async function* parseSSEStream(reader: any, options: any = {}) {
           // If finish_reason indicates tool calls, yield accumulated tool calls
           const finishReason = json.choices?.[0]?.finish_reason;
           if (finishReason === "tool_calls" || finishReason === "tool") {
-                        for ( const tc of Object.values(pendingToolCalls)) {
-              let args = {};
+            for (const tc of Object.values(pendingToolCalls)) {
+              let args: Record<string, unknown> = {};
               try {
-                                args = JSON.parse((tc as any).args || "{}");
+                args = JSON.parse(tc.args || "{}");
               } catch {
                 /* ignore */
               }
               yield {
                 type: "toolCall",
-                                id: (tc as any).id,
-                                name: (tc as any).name,
+                id: tc.id,
+                name: tc.name,
                 args,
               };
             }
@@ -497,7 +649,7 @@ export async function* parseSSEStream(reader: any, options: any = {}) {
     // Flush any remaining buffered content from the think parser
     if (thinkParser) {
       const remaining = thinkParser.flush();
-            for ( const part of remaining) {
+      for (const part of remaining) {
         if (part.type === "thinking") {
           yield { type: "thinking", content: part.content };
         } else {
@@ -523,16 +675,18 @@ export async function* parseSSEStream(reader: any, options: any = {}) {
  * Make a fetch request to an OpenAI-compatible endpoint and handle
  * error responses consistently.
  *
-
-
  * @throws {Error} With a parsed error message from the API
  */
-export async function fetchOpenAICompat(url: string, payload: any, options: any = {}) {
+export async function fetchOpenAICompat(
+  url: string,
+  payload: Record<string, unknown>,
+  options: FetchOptions = {},
+): Promise<Response> {
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-        ...(options.signal && { signal: options.signal }),
+    ...(options.signal && { signal: options.signal }),
   });
 
   if (!response.ok) {

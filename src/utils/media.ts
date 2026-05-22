@@ -10,10 +10,10 @@ import sharp from "sharp";
 import logger from "./logger.ts";
 
 // ── ffmpeg availability (cached per process) ────────────────
-let _ffmpegAvailable: any = null;
-async function isFfmpegAvailable() {
-    if (_ffmpegAvailable !== null) return _ffmpegAvailable;
-  return new Promise((resolve: any) => {
+let _ffmpegAvailable: boolean | null = null;
+async function isFfmpegAvailable(): Promise<boolean> {
+  if (_ffmpegAvailable !== null) return _ffmpegAvailable;
+  return new Promise<boolean>((resolve) => {
     execFile("ffmpeg", ["-version"], { timeout: 5_000 }, (error: Error | null) => {
       _ffmpegAvailable = !error;
       if (!_ffmpegAvailable) {
@@ -21,7 +21,7 @@ async function isFfmpegAvailable() {
           "[media] ffmpeg not found on PATH — GIF animation and video frame extraction will be degraded",
         );
       }
-      (resolve as any)(_ffmpegAvailable);
+      resolve(_ffmpegAvailable);
     });
   });
 }
@@ -180,7 +180,7 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
         `output_${Math.round(cumulativeScale * 100)}.gif`,
       );
 
-      await new Promise<void>((resolve: any, reject: any) => {
+      await new Promise<void>((resolve, reject) => {
         execFile(
           "ffmpeg",
           [
@@ -196,12 +196,12 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
           { timeout: 30_000 },
           (error: Error | null, _stdout: string | Buffer, stderr: string | Buffer) => {
             if (error)
-              (reject as any)(
+              reject(
                 new Error(
-                  `ffmpeg GIF resize failed: ${stderr?.slice(-200) || error.message}`,
+                  `ffmpeg GIF resize failed: ${stderr?.toString().slice(-200) || error.message}`,
                 ),
               );
-            else (resolve as any)();
+            else resolve();
           },
         );
       });
@@ -222,7 +222,7 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
 
     // Final fallback: tiny GIF
     const fallbackPath = join(tmpDir, "output_fallback.gif");
-    await new Promise<void>((resolve: any, reject: any) => {
+    await new Promise<void>((resolve, reject) => {
       execFile(
         "ffmpeg",
         [
@@ -238,12 +238,12 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
         { timeout: 30_000 },
         (error: Error | null, _stdout: string | Buffer, stderr: string | Buffer) => {
           if (error)
-            (reject as any)(
+            reject(
               new Error(
-                `ffmpeg GIF fallback resize failed: ${stderr?.slice(-200) || error.message}`,
+                `ffmpeg GIF fallback resize failed: ${stderr?.toString().slice(-200) || error.message}`,
               ),
             );
-          else (resolve as any)();
+          else resolve();
         },
       );
     });
@@ -289,14 +289,13 @@ async function compressWithSharp(base64Data: string, maxBytes: number) {
         mediaType: "image/jpeg",
       };
     }
-        // @ts-ignore - TODO: strict typing
-        buffer = compressed;
+    buffer = Buffer.from(compressed);
   }
 
   // Step 2: progressive resize (shrink by 25% each iteration)
   const metadata = await sharp(buffer).metadata();
-  let width = metadata.width;
-  let height = metadata.height;
+  let width = metadata.width || 0;
+  let height = metadata.height || 0;
 
   for (let i = 0; i < 6; i++) {
     width = Math.round(width * 0.75);
@@ -409,7 +408,7 @@ export async function extractVideoFrames(videoDataUrl: string, options: { fps?: 
     await writeFile(inputPath, videoBuffer);
 
     // Extract frames with ffmpeg
-    const ffmpegStderr = await new Promise((resolve: any, reject: any) => {
+    const ffmpegStderr = await new Promise<string>((resolve, reject) => {
       execFile(
         "ffmpeg",
         [
@@ -428,13 +427,13 @@ export async function extractVideoFrames(videoDataUrl: string, options: { fps?: 
         { timeout: 30_000 },
         (error: Error | null, _stdout: string | Buffer, stderr: string | Buffer) => {
           if (error) {
-            (reject as any)(
+            reject(
               new Error(
-                `ffmpeg failed (${fileSizeMB} MB ${ext}): ${stderr?.slice(-200) || error.message}`,
+                `ffmpeg failed (${fileSizeMB} MB ${ext}): ${stderr?.toString().slice(-200) || error.message}`,
               ),
             );
           } else {
-            (resolve as any)(stderr);
+            resolve(stderr?.toString() || "");
           }
         },
       );
@@ -455,7 +454,7 @@ export async function extractVideoFrames(videoDataUrl: string, options: { fps?: 
 
     if (frames.length === 0) {
       // ffmpeg ran but produced no frames — extract error details
-            const durationMatch = (ffmpegStderr as any)?.match(/Duration: ([^,]+)/);
+      const durationMatch = ffmpegStderr?.match(/Duration: ([^,]+)/);
       const duration = durationMatch?.[1] || "any";
       throw new Error(
         `ffmpeg produced 0 frames from ${fileSizeMB} MB ${ext} video (duration: ${duration}). ` +

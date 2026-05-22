@@ -17,6 +17,8 @@ declare global {
       clientIp?: string;
       username?: string;
       workspaceId?: string;
+      workspaceRoot?: string;
+      agent?: string;
       files?: unknown;
       file?: unknown;
       db: import("mongodb").Db;

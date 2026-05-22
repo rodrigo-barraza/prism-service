@@ -35,7 +35,7 @@ router.post(
         messages,
         participants,
         sourceMessageId,
-        traceId: traceId || null,
+        traceId: traceId || undefined,
         project: req.project,
         endpoint: "/memory/extract",
       });
@@ -57,7 +57,7 @@ router.post(
   "/search",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { guildId, userIds, queryText, limit, traceId } = req.body;
+      const { guildId, userIds, queryText, limit, traceId } = req.body as { guildId?: string, userIds?: string[], queryText: string, limit?: number, traceId?: string };
 
       if (!guildId || !queryText) {
         return res.status(400).json({
@@ -71,7 +71,7 @@ router.post(
         userIds,
         queryText,
         limit: limit || 10,
-        traceId: traceId || null,
+        traceId: traceId || undefined,
         project: req.project,
         endpoint: "/memory/search",
       });
@@ -92,7 +92,7 @@ router.get(
   "/list/:guildId/:userId",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { guildId, userId } = req.params;
+      const { guildId, userId } = req.params as { guildId: string, userId: string };
       const limit = parseInt(req.query.limit as string) || 50;
       const skip = parseInt(req.query.skip as string) || 0;
 
