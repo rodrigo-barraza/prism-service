@@ -43,7 +43,8 @@ import {
 } from "../utils/ConversationUtilities.ts";
 import { handleSseRequest, handleJsonRequest } from "../utils/SseUtilities.ts";
 import { SseEvent } from "../types/SseTypes.ts";
-import { ChatRequestSchema } from "../types/index.ts";
+import { ChatRequestSchema, ChatRequest } from "../types/index.ts";
+import type { ConversationMessage, EmitFn, ToolSchema } from "../services/harnesses/types.ts";
 
 const router = express.Router();
 // ─── converts refs for providers & storage ──────────────────
@@ -59,26 +60,26 @@ const router = express.Router();
  *  - minio://...       → download from MinIO (original unchanged), provider gets data URL
  *  - http(s)://...     → fetch (original unchanged), provider gets data URL
  */
-async function resolveImageRefs(messages: any[], project: any, username: string) {
+async function resolveImageRefs(messages: ConversationMessage[], project: string, username: string) {
   // Deep copy for the provider — images will be data URLs
-  const providerMessages = messages.map((m: any) => ({ ...m }));
+  const providerMessages = messages.map((m) => ({ ...m }));
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
     // ── Resolve media array fields: images, audio, video, pdf ──
-    for (const field of ["images", "audio", "video", "pdf"]) {
-      const array = (message as any)[field];
+    for (const field of ["images", "audio", "video", "pdf"] as const) {
+      const array = (message as Record<string, unknown>)[field];
       if (array && Array.isArray(array) && array.length > 0) {
-        const providerArr: any[] = [];
-        const storageArr: any[] = [];
+        const providerArr: string[] = [];
+        const storageArr: string[] = [];
         await Promise.all(
-          array.map(async (ref: any, j: number) => {
+          array.map(async (ref: string, j: number) => {
             const resolved = await resolveMediaRef(ref, project, username);
             providerArr[j] = resolved.providerRef;
             storageArr[j] = resolved.storageRef;
           }),
         );
-        providerMessages[i][field] = providerArr;
-        message[field] = storageArr;
+        (providerMessages[i] as Record<string, unknown>)[field] = providerArr;
+        (message as Record<string, unknown>)[field] = storageArr;
       }
     }
   }
@@ -90,8 +91,8 @@ async function resolveImageRefs(messages: any[], project: any, username: string)
  * and reconstructs if compression changed the data.
 
  */
-async function compressDataUrlIfOversized(dataUrl: any) {
-    const match = (dataUrl as any).match(/^data:([^;]+);base64,(.+)$/);
+async function compressDataUrlIfOversized(dataUrl: string): Promise<string> {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
   if (!match) return dataUrl;
   let mimeType = match[1];
   if (!mimeType.startsWith("image/")) return dataUrl;
@@ -134,44 +135,44 @@ async function compressDataUrlIfOversized(dataUrl: any) {
     return `data:${mimeType};base64,${base64Data}`;
   }
 }
-async function resolveMediaRef(ref: any, project: any, username: string) {
+async function resolveMediaRef(ref: string, project: string, username: string) {
   // Already a base64 data URL — compress if oversized, upload to MinIO for storage
-    if ((ref as any).startsWith("data:")) {
+  if (ref.startsWith("data:")) {
     let providerRef = ref;
     // Compress oversized images before they reach any provider
         providerRef = await compressDataUrlIfOversized(providerRef);
     let storageRef = providerRef;
     try {
-      const { ref: minioRef } = await (FileService as any).uploadFile(
-                (ref as any), // Upload original to MinIO
+      const { ref: minioRef } = await FileService.uploadFile(
+        ref, // Upload original to MinIO
         "uploads",
         project,
         username,
       );
-            storageRef = minioRef;
+      storageRef = minioRef;
     } catch (error: unknown) {
             logger.error(`[chat] Failed to upload media to MinIO: ${(error as Error).message}`);
     }
     return { providerRef, storageRef };
   }
   // MinIO reference — download for provider, keep ref for storage
-  if ((FileService as any).isMinioRef(ref)) {
+  if (FileService.isMinioRef(ref)) {
     try {
-      const key = (FileService as any).extractKey(ref);
-      const file = await (FileService as any).getFile(key);
+      const key = FileService.extractKey(ref);
+      const file = await FileService.getFile(key);
       if (!file) {
         logger.warn(`[chat] Could not resolve MinIO ref: ${ref}`);
         return { providerRef: ref, storageRef: ref };
       }
-      const chunks: any[] = [];
-            for await ( const chunk of file.stream) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of file.stream) {
         chunks.push(chunk);
       }
-            const buffer = Buffer.concat((chunks as any as readonly Uint8Array<ArrayBufferLike>[]));
+      const buffer = Buffer.concat(chunks);
       const base64 = buffer.toString("base64");
       let providerRef = `data:${file.contentType};base64,${base64}`;
       // Constrain dimensions + compress oversized images before they reach any provider
-            providerRef = await compressDataUrlIfOversized((providerRef as any));
+      providerRef = await compressDataUrlIfOversized(providerRef);
       return {
         providerRef,
         storageRef: ref,
@@ -184,9 +185,9 @@ async function resolveMediaRef(ref: any, project: any, username: string) {
     }
   }
   // HTTP(S) URL — fetch for provider, keep URL for storage
-    if ((ref as any).startsWith("http://") || (ref as any).startsWith("https://")) {
+  if ((ref as string).startsWith("http://") || (ref as string).startsWith("https://")) {
     try {
-            const response = await fetch((ref as any | URL | Request));
+      const response = await fetch(ref);
       if (!response.ok) {
         logger.warn(
           `[chat] Failed to fetch media URL (${response.status}): ${ref}`,
@@ -199,7 +200,7 @@ async function resolveMediaRef(ref: any, project: any, username: string) {
       const base64 = Buffer.from(arrayBuffer).toString("base64");
       let providerRef = `data:${contentType};base64,${base64}`;
       // Compress oversized images before they reach any provider
-            providerRef = await compressDataUrlIfOversized((providerRef as any));
+      providerRef = await compressDataUrlIfOversized(providerRef);
       return {
         providerRef,
         storageRef: ref,
@@ -221,9 +222,9 @@ async function resolveMediaRef(ref: any, project: any, username: string) {
  * and handleAgent, or throws on validation failure.
  */
 async function prepareGenerationContext(
-  params: any,
-  emit: any,
-    { signal }: any = {},
+  params: Record<string, unknown>,
+  emit: EmitFn,
+  { signal }: { signal?: AbortSignal } = {},
 ) {
   const requestStart = performance.now();
   const requestId = crypto.randomUUID();
@@ -251,7 +252,7 @@ async function prepareGenerationContext(
     );
   }
 
-  const validatedParams = parseResult.data as any;
+  const validatedParams = parseResult.data;
 
   const {
     provider: _providerName,
@@ -309,66 +310,66 @@ async function prepareGenerationContext(
 
   let providerName = _providerName;
   // Build the internal options object that providers expect
-  const options = {
+  const options: Record<string, unknown> = {
     ...(tools && { tools }),
-    ...(temperature !== undefined && temperature !== null && { temperature }),
-    ...(maxTokens !== undefined && maxTokens !== null && { maxTokens }),
-    ...(topP !== undefined && topP !== null && { topP }),
-    ...(topK !== undefined && topK !== null && { topK }),
-    ...(frequencyPenalty !== undefined && frequencyPenalty !== null && { frequencyPenalty }),
-    ...(presencePenalty !== undefined && presencePenalty !== null && { presencePenalty }),
+    ...(temperature != null && { temperature }),
+    ...(maxTokens != null && { maxTokens }),
+    ...(topP != null && { topP }),
+    ...(topK != null && { topK }),
+    ...(frequencyPenalty != null && { frequencyPenalty }),
+    ...(presencePenalty != null && { presencePenalty }),
     ...(stopSequences && { stopSequences }),
-    ...(seed !== undefined && seed !== null && seed !== "" && { seed }),
-    ...(minP !== undefined && minP !== null && { minP }),
-    ...(repeatPenalty !== undefined && repeatPenalty !== null && { repeatPenalty }),
-    ...(thinkingEnabled !== undefined && thinkingEnabled !== null && { thinkingEnabled }),
+    ...(seed != null && seed !== "" && { seed }),
+    ...(minP != null && { minP }),
+    ...(repeatPenalty != null && { repeatPenalty }),
+    ...(thinkingEnabled != null && { thinkingEnabled }),
     ...(reasoningEffort && { reasoningEffort }),
     ...(thinkingLevel && { thinkingLevel }),
-    ...(thinkingBudget !== undefined && thinkingBudget !== null && { thinkingBudget }),
-    ...(webSearch !== undefined && webSearch !== null && { webSearch }),
-    ...(webFetch !== undefined && webFetch !== null && { webFetch }),
-    ...(codeExecution !== undefined && codeExecution !== null && { codeExecution }),
-    ...(urlContext !== undefined && urlContext !== null && { urlContext }),
+    ...(thinkingBudget != null && { thinkingBudget }),
+    ...(webSearch != null && { webSearch }),
+    ...(webFetch != null && { webFetch }),
+    ...(codeExecution != null && { codeExecution }),
+    ...(urlContext != null && { urlContext }),
     ...(verbosity && { verbosity }),
     ...(reasoningSummary && { reasoningSummary }),
-    ...(functionCallingEnabled !== undefined && functionCallingEnabled !== null && { functionCallingEnabled }),
-    ...(agenticLoopEnabled !== undefined && agenticLoopEnabled !== null && { agenticLoopEnabled }),
+    ...(functionCallingEnabled != null && { functionCallingEnabled }),
+    ...(agenticLoopEnabled != null && { agenticLoopEnabled }),
     ...(enabledTools && { enabledTools }),
     ...(disabledBuiltIns && { disabledBuiltIns }),
     ...(minContextLength && { minContextLength }),
-    ...(forceImageGeneration !== undefined && forceImageGeneration !== null && { forceImageGeneration }),
-    ...(responseFormat && { responseFormat }),
-    ...(serviceTier && { serviceTier }),
-    ...(textOnly !== undefined && textOnly !== null && { textOnly }),
-    ...(autoApprove !== undefined && autoApprove !== null && { autoApprove }),
-    ...(planFirst !== undefined && planFirst !== null && { planFirst }),
-    ...(maxIterations !== undefined && maxIterations !== null && { maxIterations }),
-    ...(maxWorkerIterations !== undefined && maxWorkerIterations !== null && { maxWorkerIterations }),
-    ...(agentContext && { agentContext }),
-    ...(extraParams.systemPrompt && { systemPrompt: extraParams.systemPrompt }),
+    ...(forceImageGeneration != null && { forceImageGeneration }),
+    ...(responseFormat != null && { responseFormat }),
+    ...(serviceTier != null && { serviceTier }),
+    ...(textOnly != null && { textOnly }),
+    ...(autoApprove != null && { autoApprove }),
+    ...(planFirst != null && { planFirst }),
+    ...(maxIterations != null && { maxIterations }),
+    ...(maxWorkerIterations != null && { maxWorkerIterations }),
+    ...(agentContext != null && { agentContext }),
+    ...((extraParams as Record<string, unknown>).systemPrompt ? { systemPrompt: (extraParams as Record<string, unknown>).systemPrompt } : {}),
   };
   // When thinking is explicitly disabled, strip all thinking sub-params
   // so providers don't inadvertently enable thinking by detecting them.
   if (thinkingEnabled === false) {
-    delete (options as any).reasoningEffort;
-    delete (options as any).thinkingLevel;
-    delete (options as any).thinkingBudget;
+    delete options.reasoningEffort;
+    delete options.thinkingLevel;
+    delete options.thinkingBudget;
   }
   // Local models emit thinking tokens (<think> tags) by default. Default
   // thinkingEnabled ON only when the client didn't send a value (undefined).
   // When the client explicitly sends false (thinking toggle off), respect it
   // — models can use tools without thinking.
-  LocalProviderGateway.applyLocalDefaults((providerName as any), options, {
+  LocalProviderGateway.applyLocalDefaults(providerName, options, {
     thinkingEnabled: thinkingEnabled ?? undefined,
   });
 
   // ── Strip soft-deleted messages ──────────────────────────────
-  const activeMessages = messages.filter((m: any) => !m.deleted);
+  const activeMessages = messages.filter((m) => !m.deleted);
   // ── Resolve image refs ─────────────────────────────────────
   const providerMessages = await resolveImageRefs(
-        (activeMessages as any),
-    (project as any),
-    (username as any),
+    activeMessages as ConversationMessage[],
+    project,
+    username,
   );
   // ── Multi-instance load balancing ─────────────────────────
   // When the caller sends a base provider type (e.g. "lm-studio") and
@@ -376,19 +377,19 @@ async function prepareGenerationContext(
   // each instance (with quant-level fallback) and pick the least-busy
   // usable instance. Same model resolution logic as CoordinatorService.
   let resolvedModel =
-        requestedModel || getDefaultModels(TYPES.TEXT, TYPES.TEXT)[(providerName as string)];
-    if (localModelQueue.isLocal((providerName as any))) {
-        let siblings = getInstancesByType((providerName as any));
+    requestedModel || getDefaultModels(TYPES.TEXT, TYPES.TEXT)[providerName as string];
+  if (localModelQueue.isLocal(providerName)) {
+    let siblings = getInstancesByType(providerName);
     // ── Model resolution (always) ──────────────────────────────
     // Resolve model availability across instances with quant-level
     // fallback. Also handles @quant syntax (e.g. "qwen3-32b@q4_k_m")
     // by mapping it to the actual LM Studio model key.
     const { usable, modelOverrides } = await resolveModelForInstances(
-      (resolvedModel as any),
-            (siblings as any),
+      resolvedModel,
+      siblings,
     );
-        if ((usable as any).length > 0) {
-            siblings = usable;
+    if (usable.length > 0) {
+      siblings = usable;
       // For single instance, apply model override directly
       if (siblings.length === 1) {
         const override = modelOverrides.get(siblings[0].id);
@@ -409,8 +410,8 @@ async function prepareGenerationContext(
       // Least-busy: pick the instance with the most available slots
       let bestId = providerName;
       let bestAvailable = -Infinity;
-            for ( const inst of siblings) {
-                const queueState = localModelQueue._getQueue((inst.id as any));
+      for (const inst of siblings) {
+        const queueState = localModelQueue._getQueue(inst.id);
         const available = inst.concurrency - queueState.activeCount;
         if (available > bestAvailable) {
           bestAvailable = available;
@@ -425,23 +426,23 @@ async function prepareGenerationContext(
         }
         logger.info(
           `[chat] ⚖️ Load balance: ${providerName} → ${bestId} ` +
-          `(model="${resolvedModel}", ${siblings.map((s: any) => `${s.id}:${s.concurrency - localModelQueue._getQueue(s.id).activeCount}free`).join(", ")})`,
+          `(model="${resolvedModel}", ${siblings.map((s) => `${s.id}:${s.concurrency - localModelQueue._getQueue(s.id).activeCount}free`).join(", ")})`,
         );
         providerName = bestId;
       }
     }
   }
-    const provider = getProvider((providerName as any));
+  const provider = getProvider(providerName);
   // ── Resolve model ─────────────────────────────────────────
   // resolvedModel is set earlier (before load balancing) and may have
   // been updated to a quant variant by the model availability check.
-  const modelDef = getModelByName((resolvedModel as any));
-    const isImageAPIModel = (modelDef as any)?.imageAPI && provider.generateImage;
+  const modelDef = getModelByName(resolvedModel);
+  const isImageAPIModel = (modelDef as Record<string, unknown> | null)?.imageAPI && provider.generateImage;
   // ── Local GPU mutex ──────────────────────────────────────
-  let localRelease: any;
-    if (localModelQueue.isLocal((providerName as any))) {
-        localRelease = await localModelQueue.acquire((providerName as any | undefined));
-        const queueState = localModelQueue._getQueue((providerName as any));
+  let localRelease: (() => void) | null = null;
+  if (localModelQueue.isLocal(providerName)) {
+    localRelease = await localModelQueue.acquire(providerName);
+    const queueState = localModelQueue._getQueue(providerName);
     logger.info(
       `[chat] 🔒 Acquired local GPU slot for ${resolvedModel} (${providerName}) ` +
         `(${queueState.activeCount}/${queueState.maxConcurrency} active` +
@@ -450,7 +451,7 @@ async function prepareGenerationContext(
   }
   // Derive userMessage from the last user message
   const userMessage =
-    messages?.filter((m: any) => m.role === "user").pop() || null;
+    messages?.filter((m) => m.role === "user").pop() || null;
   return {
     provider,
     providerName,
@@ -492,11 +493,11 @@ async function prepareGenerationContext(
  * Used by the /chat route and any non-agent callers.
  */
 export async function handleConversation(
-  params: any,
-  emit: any,
-    { signal }: any = {},
+  params: Record<string, unknown>,
+  emit: EmitFn,
+  { signal }: { signal?: AbortSignal } = {},
 ) {
-  let context: any;
+  let context: Awaited<ReturnType<typeof prepareGenerationContext>> | null = null;
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
@@ -517,6 +518,7 @@ export async function handleConversation(
     clientIp,
     requestStart,
     requestId,
+    modelDef,
     localRelease,
   } = context;
   // ── Conversation identity ──────────────────────────────────
@@ -524,8 +526,8 @@ export async function handleConversation(
   let conversationMeta = skipConversation ? null : incomingConversationMeta;
   if (!skipConversation && !conversationId) {
     conversationId = crypto.randomUUID();
-    const firstUserMsg = (context.rawMessages as any)
-            ?.filter((m: any) => m.role === "user")
+    const firstUserMsg = (context.rawMessages as ConversationMessage[])
+      ?.filter((m) => m.role === "user")
       .pop();
     const titleSnippet =
       (firstUserMsg?.content || "").slice(0, 100).trim() || "New Conversation";
@@ -533,7 +535,7 @@ export async function handleConversation(
   }
   const traceId = incomingTraceId || null;
   if (traceId && conversationMeta) {
-        (conversationMeta as any).traceId = traceId;
+    (conversationMeta as Record<string, unknown>).traceId = traceId;
   } else if (traceId) {
     conversationMeta = { traceId };
   }
@@ -545,64 +547,64 @@ export async function handleConversation(
         await handleImageAPIModel(fullCtx);
         return;
       }
-            if (!(context as any).provider.generateTextStream && !(context as any).provider.generateText) {
+      if (!context.provider.generateTextStream && !context.provider.generateText) {
         throw new ProviderError(
-                    (providerName as any),
+          providerName,
           `Provider "${providerName}" does not support text generation`,
           400,
         );
       }
       const useStreaming =
-                (context as any).provider.generateTextStream && (context.modelDef as any)?.streaming !== false;
+        context.provider.generateTextStream && (modelDef as Record<string, unknown> | null)?.streaming !== false;
       if (useStreaming) {
         // Native MCP tool execution — provider handles tool calling internally
         const useNativeMcp =
-                    LocalProviderGateway.isNativeMCP((providerName as any)) &&
-                    !(options as any).agenticLoopEnabled;
-                if (useNativeMcp && (options as any).functionCallingEnabled) {
+          LocalProviderGateway.isNativeMCP(providerName) &&
+          !options.agenticLoopEnabled;
+        if (useNativeMcp && options.functionCallingEnabled) {
           const builtInTools = ToolOrchestratorService.getToolSchemas();
           let tools = builtInTools;
-                    if ((options as any).enabledTools && Array.isArray((options as any).enabledTools)) {
-                        const enabledSet = new Set((options as any).enabledTools);
-                        tools = tools.filter((t: any) => enabledSet.has(t.name));
+          if (options.enabledTools && Array.isArray(options.enabledTools)) {
+            const enabledSet = new Set(options.enabledTools as string[]);
+            tools = tools.filter((t) => enabledSet.has(t.name));
           } else if (
-                        (options as any).disabledBuiltIns &&
-                        Array.isArray((options as any).disabledBuiltIns)
+            options.disabledBuiltIns &&
+            Array.isArray(options.disabledBuiltIns)
           ) {
-                        const disabledSet = new Set((options as any).disabledBuiltIns);
-                        tools = tools.filter((t: any) => !disabledSet.has(t.name));
+            const disabledSet = new Set(options.disabledBuiltIns as string[]);
+            tools = tools.filter((t) => !disabledSet.has(t.name));
           }
-                    (options as any).tools = tools;
-                    if ((context.modelDef as any)?.contextLength) {
-                        (options as any).contextLength = (context as any).modelDef.contextLength;
+          options.tools = tools;
+          if ((modelDef as Record<string, unknown> | null)?.contextLength) {
+            options.contextLength = (modelDef as Record<string, unknown>).contextLength;
           }
           logger.info(
-                        `[chat] Native MCP (${providerName}): ${tools.length} tools enabled, enabledTools=${((options as any).enabledTools || []).length}, builtIn=${builtInTools.length}, contextLength=${(options as any).contextLength || "unset"}`,
+            `[chat] Native MCP (${providerName}): ${tools.length} tools enabled, enabledTools=${(options.enabledTools as string[] || []).length}, builtIn=${builtInTools.length}, contextLength=${options.contextLength || "unset"}`,
           );
         } else if (useNativeMcp) {
           logger.warn(
-                        `[chat] Native MCP SKIPPED (${providerName}): functionCallingEnabled=${(options as any).functionCallingEnabled}, useNativeMcp=${useNativeMcp}`,
+            `[chat] Native MCP SKIPPED (${providerName}): functionCallingEnabled=${options.functionCallingEnabled}, useNativeMcp=${useNativeMcp}`,
           );
         }
         // Non-LM-Studio FC on /chat path
         if (
           !useNativeMcp &&
-                    !(options as any).agenticLoopEnabled &&
-                    (options as any).functionCallingEnabled
+          !options.agenticLoopEnabled &&
+          options.functionCallingEnabled
         ) {
           const builtInTools = ToolOrchestratorService.getToolSchemas();
           let tools = builtInTools;
-                    if ((options as any).enabledTools && Array.isArray((options as any).enabledTools)) {
-                        const enabledSet = new Set((options as any).enabledTools);
-                        tools = tools.filter((t: any) => enabledSet.has(t.name));
+          if (options.enabledTools && Array.isArray(options.enabledTools)) {
+            const enabledSet = new Set(options.enabledTools as string[]);
+            tools = tools.filter((t) => enabledSet.has(t.name));
           } else if (
-                        (options as any).disabledBuiltIns &&
-                        Array.isArray((options as any).disabledBuiltIns)
+            options.disabledBuiltIns &&
+            Array.isArray(options.disabledBuiltIns)
           ) {
-                        const disabledSet = new Set((options as any).disabledBuiltIns);
-                        tools = tools.filter((t: any) => !disabledSet.has(t.name));
+            const disabledSet = new Set(options.disabledBuiltIns as string[]);
+            tools = tools.filter((t) => !disabledSet.has(t.name));
           }
-                    (options as any).tools = tools;
+          options.tools = tools;
           logger.info(
             `[chat] FC tools injected: ${tools.length} tools enabled for ${providerName} ${resolvedModel}`,
           );
@@ -613,7 +615,7 @@ export async function handleConversation(
       }
     } finally {
       if (localRelease) {
-                localRelease();
+        localRelease();
         localRelease();
         logger.info(`[chat] 🔓 Released local GPU lock for ${resolvedModel}`);
       }
@@ -654,8 +656,8 @@ export async function handleConversation(
  *
  * Used exclusively by the /agent route.
  */
-export async function handleAgent(params: any, emit: (event: SseEvent) => void, { signal }: { signal?: AbortSignal } = {}) {
-  let context: any;
+export async function handleAgent(params: Record<string, unknown>, emit: (event: SseEvent) => void, { signal }: { signal?: AbortSignal } = {}) {
+  let context: Awaited<ReturnType<typeof prepareGenerationContext>> | null = null;
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
@@ -693,13 +695,13 @@ export async function handleAgent(params: any, emit: (event: SseEvent) => void, 
     project,
     username,
     true,
-    { ...getCollectionOpts(project), agent },
+    { ...getCollectionOpts(project), agent: agent ?? undefined },
   );
   try {
     try {
-            if (!(context as any).provider.generateTextStream && !(context as any).provider.generateText) {
+      if (!context!.provider.generateTextStream && !context!.provider.generateText) {
         throw new ProviderError(
-                    (providerName as any),
+          providerName,
           `Provider "${providerName}" does not support text generation`,
           400,
         );
@@ -712,10 +714,10 @@ export async function handleAgent(params: any, emit: (event: SseEvent) => void, 
                 resolvedModel,
                 modelDef: context.modelDef,
                 messages: context.messages,
-                originalMessages: context.originalMessages,
+                originalMessages: context.originalMessages as ConversationMessage[],
                 options,
                 agentSessionId,
-                userMessage: context.userMessage,
+                userMessage: context.userMessage as ConversationMessage | null,
                 conversationMeta,
                 traceId,
                 project,
@@ -735,11 +737,11 @@ export async function handleAgent(params: any, emit: (event: SseEvent) => void, 
       }
       // When the SSE connection is severed (user pressed stop), abort any
       // spawned workers that are still running under this coordinator session.
-            if ((signal as any)?.aborted) {
+      if (signal?.aborted) {
         try {
           const { default: CoordinatorService } =
             await import("../services/CoordinatorService.js");
-                    await CoordinatorService.abortWorkersBySession((agentSessionId as any));
+          await CoordinatorService.abortWorkersBySession(agentSessionId);
         } catch (cleanupErr: unknown) {
                     logger.warn(`[agent] Worker cleanup failed: ${(cleanupErr as Error).message}`);
         }
@@ -753,7 +755,7 @@ export async function handleAgent(params: any, emit: (event: SseEvent) => void, 
       false,
       getCollectionOpts(project),
     );
-        const totalSec = (performance.now() - (requestStart as any)) / 1000;
+    const totalSec = (performance.now() - requestStart) / 1000;
     RequestLogger.logChatGeneration({
       requestId,
       endpoint: "/agent",
@@ -775,7 +777,7 @@ export async function handleAgent(params: any, emit: (event: SseEvent) => void, 
   }
 }
 // ─── Dispatch: Image API models (e.g. GPT Image 1.5, OpenAI images) ─
-async function handleImageAPIModel(context: any) {
+async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGenerationContext>> & { conversationId?: string | null; conversationMeta?: Record<string, unknown> | null; traceId?: string | null }) {
   const {
     provider,
     providerName,
@@ -802,37 +804,37 @@ async function handleImageAPIModel(context: any) {
     true,
     getCollectionOpts(project),
   );
-    const lastUserMsg = (messages as any).filter((m: any) => m.role === "user").pop();
+  const lastUserMsg = (messages as ConversationMessage[]).filter((m) => m.role === "user").pop();
   const prompt = lastUserMsg?.content || "";
   // Collect all images from the conversation
-  const allImages: any[] = [];
-    for ( const message of (messages as any)) {
+  const allImages: string[] = [];
+  for (const message of messages as ConversationMessage[]) {
     if (message.images && message.images.length > 0) {
       allImages.push(...message.images);
     }
   }
-    const result = await (provider as any).generateImage(
+  const result = await (provider as Record<string, Function>).generateImage(
     prompt,
     allImages,
     resolvedModel,
-        (options as any)?.systemPrompt,
+    options?.systemPrompt,
   );
-    const totalSec = (performance.now() - (requestStart as any)) / 1000;
+  const totalSec = (performance.now() - requestStart) / 1000;
   // Cost calculation
   const imgPricing =
-        getPricing(TYPES.TEXT, TYPES.IMAGE)[(resolvedModel as string)] || (modelDef as any)?.pricing;
+    getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel as string] || (modelDef as Record<string, unknown> | null)?.pricing;
   const outputImgTokens =
-        (modelDef as any)?.imageTokensPerImage || (providerName === "openai" ? 1056 : 1120);
+    (modelDef as Record<string, unknown> | null)?.imageTokensPerImage as number || (providerName === "openai" ? 1056 : 1120);
   const estimatedCost = calculateImageCost(
     prompt,
     imgPricing,
-        (allImages.length as any),
-    (outputImgTokens as any),
+    allImages.length,
+    outputImgTokens,
   );
   logger.request(
-        (project as any),
-    (username as any),
-    (clientIp as any),
+    project,
+    username,
+    clientIp,
     `[chat/image-api] ${providerName} ${resolvedModel} — ` +
       `total: ${totalSec.toFixed(2)}s` +
       formatCostTag(estimatedCost),
@@ -843,10 +845,10 @@ async function handleImageAPIModel(context: any) {
     try {
       const mimeType = result.mimeType || "image/png";
       const dataUrl = `data:${mimeType};base64,${result.imageData}`;
-      const { ref } = await (FileService as any).uploadFile(
+      const { ref } = await FileService.uploadFile(
         dataUrl,
         "generations",
-                (project as any | null | undefined),
+        project,
         username,
       );
       minioRef = ref;
@@ -859,7 +861,7 @@ async function handleImageAPIModel(context: any) {
   // Estimate token counts for tracking
   const estimatedInputTokens =
     estimateTokens(prompt) +
-        allImages.length * ((modelDef as any)?.imageTokensPerImage || 1120);
+    allImages.length * ((modelDef as Record<string, unknown> | null)?.imageTokensPerImage as number || 1120);
   RequestLogger.log({
     requestId,
     endpoint: "/chat",
@@ -881,36 +883,36 @@ async function handleImageAPIModel(context: any) {
   });
   // Emit events
   if (result.text) {
-        (emit as any)({ type: "chunk", content: result.text });
+    emit({ type: "chunk", content: result.text });
   }
-    (emit as any)({
+  emit({
     type: "image",
     data: result.imageData,
     mimeType: result.mimeType || "image/png",
     minioRef,
   });
-    (emit as any)({
+  emit({
     type: "done",
     usage: result.usage || null,
     estimatedCost,
     totalTime: totalSec,
-        ...(traceId && { traceId }),
-        ...(conversationId && { conversationId }),
+    ...(traceId && { traceId }),
+    ...(conversationId && { conversationId }),
   });
   // Link conversation to session
   // Auto-append to conversation
   if (conversationId) {
-    const messagesToAppend: any[] = [];
+    const messagesToAppend: ConversationMessage[] = [];
     // Only append the user message on the first call for this turn
     // (indicated by conversationMeta). Follow-up tool iterations reuse
     // the same conversationId but omit conversationMeta, so the user
     // message is already persisted from the first call.
     if (userMessage && conversationMeta) {
       messagesToAppend.push({
-        role: "user",
         ...userMessage,
-                timestamp: (userMessage as any).timestamp || new Date().toISOString(),
-      });
+        role: "user",
+        timestamp: (userMessage as ConversationMessage).timestamp || new Date().toISOString(),
+      } as ConversationMessage);
     }
     const assistantImages = minioRef ? [minioRef] : [];
     messagesToAppend.push({
@@ -944,7 +946,14 @@ async function handleImageAPIModel(context: any) {
 // Imported at the top of this file via:
 //   import { finalizeTextGeneration, getCollectionOpts } from "../services/harnesses/lifecycle/Finalizer.ts";
 
-async function handleStreamingText(context: any) {
+type GenerationContext = Awaited<ReturnType<typeof prepareGenerationContext>> & {
+  conversationId?: string | null;
+  conversationMeta?: Record<string, unknown> | null;
+  traceId?: string | null;
+  agentSessionId?: string | null;
+};
+
+async function handleStreamingText(context: GenerationContext) {
   const {
     provider,
     providerName,
@@ -968,20 +977,20 @@ async function handleStreamingText(context: any) {
     getCollectionOpts(project),
   );
   const stream =
-        (modelDef as any)?.liveAPI && (provider as any).generateTextStreamLive
-            ? (provider as any).generateTextStreamLive(messages, resolvedModel, {
-                    ...options,
+    (modelDef as Record<string, unknown> | null)?.liveAPI && (provider as Record<string, Function>).generateTextStreamLive
+      ? (provider as Record<string, Function>).generateTextStreamLive(messages, resolvedModel, {
+          ...options,
           signal,
         })
-            : (provider as any).generateTextStream(messages, resolvedModel, {
-                    ...options,
+      : (provider as Record<string, Function>).generateTextStream(messages, resolvedModel, {
+          ...options,
           signal,
         });
   const ss = createStreamState();
-    ss.requestStart = requestStart;
-    for await ( const chunk of stream) {
+  (ss as Record<string, unknown>).requestStart = requestStart;
+  for await (const chunk of stream) {
     // Client disconnected — abort the upstream provider stream
-        if ((signal as any)?.aborted) {
+    if (signal?.aborted) {
       if (typeof stream.return === "function") stream.return();
       logger.info(
         `[chat] Client disconnected, aborting stream for ${providerName} ${resolvedModel}`,
@@ -1003,56 +1012,56 @@ async function handleStreamingText(context: any) {
   const MAX_FC_ITERATIONS = 10;
   let fcIteration = 0;
   while (
-        (options as any).functionCallingEnabled &&
+    options.functionCallingEnabled &&
     ss.toolCalls.length > 0 &&
-    ss.toolCalls.some(
-      (tc: any) => !tc.result && tc.status !== "done" && tc.status !== "error",
+    (ss.toolCalls as Record<string, unknown>[]).some(
+      (tc) => !tc.result && tc.status !== "done" && tc.status !== "error",
     ) &&
     fcIteration < MAX_FC_ITERATIONS &&
-        !(signal as any)?.aborted
+    !signal?.aborted
   ) {
     fcIteration++;
-    const pendingCalls = ss.toolCalls.filter(
-      (tc: any) => !tc.result && tc.status !== "done" && tc.status !== "error",
+    const pendingCalls = (ss.toolCalls as Record<string, unknown>[]).filter(
+      (tc) => !tc.result && tc.status !== "done" && tc.status !== "error",
     );
     if (pendingCalls.length === 0) break;
     logger.info(
       `[chat/FC] Iteration ${fcIteration}: executing ${pendingCalls.length} tool call(s)`,
     );
     // Execute all pending tool calls
-        for ( const tc of pendingCalls) {
-            (emit as any)({
+    for (const tc of pendingCalls) {
+      emit({
         type: "toolCall",
-                id: (tc as any).id,
-                name: (tc as any).name,
-                args: (tc as any).args,
+        id: tc.id,
+        name: tc.name,
+        args: tc.args,
         status: "calling",
       });
       try {
-                const result = await ToolOrchestratorService.executeTool(
-                    (tc as any).name,
-                    (tc as any).args,
+        const result = await ToolOrchestratorService.executeTool(
+          tc.name as string,
+          tc.args as Record<string, unknown>,
           { project, username },
         );
-                (tc as any).result = result;
-                (tc as any).status = result?.error ? "error" : "done";
-                (emit as any)({
+        tc.result = result;
+        tc.status = result?.error ? "error" : "done";
+        emit({
           type: "toolCall",
-                    id: (tc as any).id,
-                    name: (tc as any).name,
-                    args: (tc as any).args,
+          id: tc.id,
+          name: tc.name,
+          args: tc.args,
           result,
-                    status: (tc as any).status,
+          status: tc.status,
         });
       } catch (error: unknown) {
-                (tc as any).result = { error: (error as Error).message };
-                (tc as any).status = "error";
-                (emit as any)({
+        tc.result = { error: (error as Error).message };
+        tc.status = "error";
+        emit({
           type: "toolCall",
-                    id: (tc as any).id,
-                    name: (tc as any).name,
-                    args: (tc as any).args,
-                    result: (tc as any).result,
+          id: tc.id,
+          name: tc.name,
+          args: tc.args,
+          result: tc.result,
           status: "error",
         });
       }
@@ -1061,7 +1070,7 @@ async function handleStreamingText(context: any) {
     const assistantToolMsg = {
       role: "assistant",
       content: ss.text || "",
-      toolCalls: ss.toolCalls.map((tc: any) => ({
+      toolCalls: (ss.toolCalls as Record<string, unknown>[]).map((tc) => ({
         id: tc.id,
         name: tc.name,
         args: tc.args,
@@ -1071,9 +1080,9 @@ async function handleStreamingText(context: any) {
         ? { thinkingSignature: ss.thinkingSignature }
         : {}),
     };
-    const toolResultMsgs = ss.toolCalls
-      .filter((tc: any) => tc.result)
-      .map((tc: any) => ({
+    const toolResultMsgs = (ss.toolCalls as Record<string, unknown>[])
+      .filter((tc) => tc.result)
+      .map((tc) => ({
         role: "tool",
         tool_call_id: tc.id,
         name: tc.name,
@@ -1081,30 +1090,30 @@ async function handleStreamingText(context: any) {
           typeof tc.result === "string" ? tc.result : JSON.stringify(tc.result),
       }));
     // Re-call provider with tool results appended
-        const updatedMessages = [...messages, assistantToolMsg, ...toolResultMsgs];
+    const updatedMessages = [...messages, assistantToolMsg, ...toolResultMsgs];
     // Reset accumulators for the follow-up stream
     ss.text = "";
     ss.thinking = "";
     ss.thinkingSignature = "";
     ss.toolCalls.length = 0;
-        const followUpStream = (provider as any).generateTextStream(
+    const followUpStream = (provider as Record<string, Function>).generateTextStream(
       updatedMessages,
       resolvedModel,
       {
-                ...options,
+        ...options,
         signal,
       },
     );
     // Use dispatchChunk with a custom usage merger for follow-up iteration
-    const usageMerger = (followUpUsage: any) => {
+    const usageMerger = (followUpUsage: Record<string, number>) => {
       if (ss.usage) {
         mergeUsage(ss.usage, followUpUsage);
       } else {
-                ss.usage = followUpUsage;
+        (ss as Record<string, unknown>).usage = followUpUsage;
       }
     };
-        for await ( const chunk of followUpStream) {
-            if ((signal as any)?.aborted) {
+    for await (const chunk of followUpStream) {
+      if (signal?.aborted) {
         if (typeof followUpStream.return === "function")
           followUpStream.return();
         break;
@@ -1121,11 +1130,11 @@ async function handleStreamingText(context: any) {
     if (ss.usage) {
       emit({
         type: "usage_update",
-        usage: { ...(ss.usage as any), requests: fcIteration + 1 },
+        usage: { ...(ss.usage as Record<string, unknown>), requests: fcIteration + 1 },
       });
     }
     // Update messages ref for potential next iteration
-        (messages as any).push(assistantToolMsg, ...toolResultMsgs);
+    (messages as Record<string, unknown>[]).push(assistantToolMsg, ...toolResultMsgs);
   }
   // Build normalized result for shared finalization
   const now = performance.now();
@@ -1140,18 +1149,18 @@ async function handleStreamingText(context: any) {
     usage: ss.usage,
     outputCharacters: ss.outputCharacters,
     timeToGenerationSec: ss.firstTokenTime
-            ? (ss.firstTokenTime - (requestStart as any)) / 1000
+      ? (ss.firstTokenTime - requestStart) / 1000
       : null,
     generationSec:
       ss.firstTokenTime && ss.generationEnd
         ? (ss.generationEnd - ss.firstTokenTime) / 1000
         : null,
-        totalSec: (now - (requestStart as any)) / 1000,
+    totalSec: (now - requestStart) / 1000,
     rateLimits: ss.rateLimits,
   });
 }
 // ─── Dispatch: Non-streaming text generation (fallback) ─────
-async function handleNonStreamingText(context: any) {
+async function handleNonStreamingText(context: GenerationContext) {
   const {
     provider,
     resolvedModel,
@@ -1178,14 +1187,14 @@ async function handleNonStreamingText(context: any) {
     ? `sub-${context.requestId || crypto.randomUUID()}`
     : null;
   if (subRequestId && context.agentSessionId) {
-        (SessionGenerationTracker as any).register((context.agentSessionId as any), subRequestId, {
-            provider: context.providerName,
+    SessionGenerationTracker.register(context.agentSessionId, subRequestId, {
+      provider: context.providerName,
       model: resolvedModel,
       source: "tool-sub-request",
     });
   }
   const generationStart = performance.now();
-    const genResult = await (provider as any).generateText(
+  const genResult = await (provider as Record<string, Function>).generateText(
     messages,
     resolvedModel,
     options,
@@ -1195,22 +1204,22 @@ async function handleNonStreamingText(context: any) {
   if (subRequestId && context.agentSessionId) {
     const outTokens = genResult.usage?.outputTokens || 0;
     if (outTokens > 0) {
-            (SessionGenerationTracker as any).update((subRequestId as any), {
+      SessionGenerationTracker.update(subRequestId, {
         outputTokens: outTokens,
       });
     }
-        (SessionGenerationTracker as any).complete((subRequestId as any));
+    SessionGenerationTracker.complete(subRequestId);
   }
   // Emit chunk/thinking/toolCall events before finalization
   if (genResult.text) {
-        (emit as any)({ type: "chunk", content: genResult.text });
+    emit({ type: "chunk", content: genResult.text });
   }
   if (genResult.thinking) {
-        (emit as any)({ type: "thinking", content: genResult.thinking });
+    emit({ type: "thinking", content: genResult.thinking });
   }
   if (genResult.toolCalls && genResult.toolCalls.length > 0) {
-        for ( const tc of genResult.toolCalls) {
-            (emit as any)({
+    for (const tc of genResult.toolCalls) {
+      emit({
         type: "toolCall",
         id: tc.id || null,
         name: tc.name,
@@ -1220,31 +1229,31 @@ async function handleNonStreamingText(context: any) {
     }
   }
   // Handle images from the generation result (e.g. Gemini image models)
-  const images: any[] = [];
+  const images: string[] = [];
   if (genResult.images && genResult.images.length > 0) {
-        for ( const image of genResult.images) {
+    for (const image of genResult.images) {
       let minioRef = null;
       if (image.data) {
         try {
           const mimeType = image.mimeType || "image/png";
           const dataUrl = `data:${mimeType};base64,${image.data}`;
-          const { ref } = await (FileService as any).uploadFile(
+          const { ref } = await FileService.uploadFile(
             dataUrl,
             "generations",
-                        (project as any | null | undefined),
+            project,
             username,
           );
           minioRef = ref;
         } catch (uploadErr: unknown) {
           logger.error(
-                        `[chat/non-stream] MinIO upload failed: ${(uploadErr as Error).message}`,
+            `[chat/non-stream] MinIO upload failed: ${(uploadErr as Error).message}`,
           );
         }
         images.push(
-                    (minioRef || `data:${image.mimeType || "image/png"};base64,${image.data}` as any),
+          minioRef || `data:${image.mimeType || "image/png"};base64,${image.data}`,
         );
       }
-            (emit as any)({
+      emit({
         type: "image",
         data: image.data,
         mimeType: image.mimeType,
@@ -1258,7 +1267,7 @@ async function handleNonStreamingText(context: any) {
     thinking: genResult.thinking || "",
     images,
     toolCalls:
-      genResult.toolCalls?.map((tc: any) => ({
+      genResult.toolCalls?.map((tc: Record<string, unknown>) => ({
         id: tc.id || null,
         name: tc.name,
         args: tc.args || {},
@@ -1268,9 +1277,9 @@ async function handleNonStreamingText(context: any) {
     audioSampleRate: 24000,
     usage: genResult.usage || { inputTokens: 0, outputTokens: 0 },
     outputCharacters: genResult.text ? genResult.text.length : 0,
-        timeToGenerationSec: (generationStart - (requestStart as any)) / 1000,
+    timeToGenerationSec: (generationStart - requestStart) / 1000,
     generationSec: (now - generationStart) / 1000,
-        totalSec: (now - (requestStart as any)) / 1000,
+    totalSec: (now - requestStart) / 1000,
     rateLimits: genResult.rateLimits || null,
   });
 }
