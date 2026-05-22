@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import type { Readable } from "stream";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import logger from "../utils/logger.ts";
 const MIME_TO_EXT: Record<string, string> = {
@@ -36,8 +37,8 @@ export interface FileServiceInterface {
     project?: string | null,
     username?: string | null,
   ): Promise<{ ref: string; size: number; contentType: string }>;
-  getFile(key: string): Promise<{ stream: any; contentType: string } | null>;
-  isMinioRef(ref: any): ref is string;
+  getFile(key: string): Promise<{ stream: Readable; contentType: string } | null>;
+  isMinioRef(ref: unknown): ref is string;
   extractKey(ref: string): string;
 }
 
@@ -104,7 +105,7 @@ const FileService: FileServiceInterface = {
       contentType,
     };
   },
-  async getFile(key: string): Promise<{ stream: any; contentType: string } | null> {
+  async getFile(key: string): Promise<{ stream: Readable; contentType: string } | null> {
     if (!MinioWrapper.isAvailable()) return null;
 
     // Helper to fetch stat + stream for a given key
@@ -112,7 +113,7 @@ const FileService: FileServiceInterface = {
       const stat = (await MinioWrapper.stat(k)) as MinioStatResult | null | undefined;
       const stream = await MinioWrapper.get(k);
       return {
-        stream,
+        stream: stream as Readable,
         contentType:
           stat?.metaData?.["content-type"] || "application/octet-stream",
       };
@@ -125,7 +126,7 @@ const FileService: FileServiceInterface = {
       return null;
     }
   },
-  isMinioRef(ref: any): ref is string {
+  isMinioRef(ref: unknown): ref is string {
     return typeof ref === "string" && ref.startsWith("minio://");
   },
   extractKey(ref: string): string {

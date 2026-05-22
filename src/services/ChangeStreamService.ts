@@ -1,8 +1,10 @@
+import type { Db, ChangeStreamDocument } from "mongodb";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS, CHANGE_STREAM_RECONNECT_MS, CHANGE_STREAM_RETRY_MS } from "../constants.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
+import { errorMessage } from "../utils/errorMessage.ts";
 
 /**
  * ChangeStreamService — watches MongoDB collections via Change Streams
@@ -13,14 +15,27 @@ import { registerCleanup } from "../utils/CleanupRegistry.ts";
  * `available = false` — callers should fall back to polling.
  */
 
+// ── Types ───────────────────────────────────────────────────
 
-const listeners = new Set();
+export interface ChangeStreamEventPayload {
+  collection: string;
+  operationType: string;
+  documentId: string | null;
+  id: string | null;
+  updatedFields: string[] | null;
+  timestamp: string;
+  isGenerating?: boolean;
+}
 
+export type ChangeStreamCallback = (payload: ChangeStreamEventPayload) => void;
 
-const streams = new Map();
+// ── State ───────────────────────────────────────────────────
+
+const listeners = new Set<ChangeStreamCallback>();
+const streams = new Map<string, ReturnType<ReturnType<Db["collection"]>["watch"]>>();
 
 let available = false;
-let staleGeneratingInterval: any = null;
+let staleGeneratingInterval: ReturnType<typeof setInterval> | null = null;
 
 // Collections to watch
 const WATCHED_COLLECTIONS = [COLLECTIONS.CONVERSATIONS, COLLECTIONS.REQUESTS];
@@ -29,20 +44,26 @@ const WATCHED_COLLECTIONS = [COLLECTIONS.CONVERSATIONS, COLLECTIONS.REQUESTS];
  * Attempt to open a Change Stream on a single collection.
  * Returns the stream if successful, null otherwise.
  */
-function openStream(db: any, collectionName: string) {
+function openStream(db: Db, collectionName: string) {
   try {
-        const collection = (db as any).collection(collectionName);
+    const collection = db.collection(collectionName);
     const stream = collection.watch([], { fullDocument: "updateLookup" });
 
-    stream.on("change", (event: any) => {
-      const payload = {
+    stream.on("change", (event: ChangeStreamDocument) => {
+      const documentKey = "documentKey" in event ? event.documentKey as Record<string, unknown> : undefined;
+      const fullDocument = "fullDocument" in event ? event.fullDocument as Record<string, unknown> | null : null;
+      const updateDescription = "updateDescription" in event ? event.updateDescription as {
+        updatedFields?: Record<string, unknown>;
+      } | null : null;
+
+      const payload: ChangeStreamEventPayload = {
         collection: collectionName,
         operationType: event.operationType,
-                documentId: (event.documentKey as any)?._id?.toString() || null,
+        documentId: documentKey?._id?.toString() || null,
         // For inserts/updates, include the document ID field if available
-                id: (event.fullDocument as any)?.id || null,
-                updatedFields: (event.updateDescription as any)?.updatedFields
-                    ? Object.keys((event.updateDescription as any).updatedFields)
+        id: (fullDocument?.id as string) || null,
+        updatedFields: updateDescription?.updatedFields
+          ? Object.keys(updateDescription.updatedFields)
           : null,
         timestamp: new Date().toISOString(),
       };
@@ -50,33 +71,33 @@ function openStream(db: any, collectionName: string) {
       // Enrich with isGenerating state for conversations
       if (collectionName === COLLECTIONS.CONVERSATIONS) {
         if (
-                    (event.updateDescription as any)?.updatedFields?.isGenerating !== undefined
+          updateDescription?.updatedFields?.isGenerating !== undefined
         ) {
-                    (payload as any).isGenerating =
-                        (event.updateDescription as any).updatedFields.isGenerating;
-                } else if ((event.fullDocument as any)?.isGenerating !== undefined) {
-                    (payload as any).isGenerating = (event as any).fullDocument.isGenerating;
+          payload.isGenerating =
+            updateDescription.updatedFields.isGenerating as boolean;
+        } else if (fullDocument?.isGenerating !== undefined) {
+          payload.isGenerating = fullDocument.isGenerating as boolean;
         }
       }
 
       // Broadcast to all registered listeners
-            for ( const listener of listeners) {
+      for (const listener of listeners) {
         try {
-                    (listener as any)(payload);
+          listener(payload);
         } catch (error: unknown) {
-                    logger.error(`ChangeStream listener error: ${(error as Error).message}`);
+          logger.error(`ChangeStream listener error: ${errorMessage(error)}`);
         }
       }
     });
 
-    stream.on("error", (error: any) => {
+    stream.on("error", (error: Error) => {
       logger.error(`ChangeStream error on ${collectionName}: ${error.message}`);
       // Attempt to re-open after a delay
       streams.delete(collectionName);
       setTimeout(() => {
         const db = MongoWrapper.getDb(MONGO_DB_NAME);
         if (db) {
-                    const reopened = openStream((db as any), collectionName);
+          const reopened = openStream(db, collectionName);
           if (reopened) {
             streams.set(collectionName, reopened);
             logger.info(`ChangeStream re-opened on ${collectionName}`);
@@ -115,7 +136,7 @@ const ChangeStreamService = {
       await testStream.close();
     } catch (error: unknown) {
       logger.warn(
-                `Change Streams not available (${(error as Error).message}). ` +
+        `Change Streams not available (${errorMessage(error)}). ` +
           "Admin dashboard will fall back to polling. " +
           "To enable Change Streams, configure MongoDB as a replica set.",
       );
@@ -124,8 +145,8 @@ const ChangeStreamService = {
     }
 
     // Open streams on all watched collections
-        for ( const col of WATCHED_COLLECTIONS) {
-            const stream = openStream((db as any), col);
+    for (const col of WATCHED_COLLECTIONS) {
+      const stream = openStream(db, col);
       if (stream) {
         streams.set(col, stream);
         logger.info(`ChangeStream active: ${col}`);
@@ -160,14 +181,14 @@ const ChangeStreamService = {
       }
     }, CHANGE_STREAM_RECONNECT_MS);
   },
-  subscribe(callback: any) {
+  subscribe(callback: ChangeStreamCallback) {
     listeners.add(callback);
   },
-  unsubscribe(callback: any) {
+  unsubscribe(callback: ChangeStreamCallback) {
     listeners.delete(callback);
   },
   async close() {
-        for ( const [name, stream] of streams) {
+    for (const [name, stream] of streams) {
       try {
         await stream.close();
         logger.info(`ChangeStream closed: ${name}`);
@@ -177,9 +198,8 @@ const ChangeStreamService = {
     }
     streams.clear();
     listeners.clear();
-        if (staleGeneratingInterval) {
-      // @ts-ignore - TODO: strict typing
-      clearInterval((staleGeneratingInterval as any | number | Timeout | undefined));
+    if (staleGeneratingInterval) {
+      clearInterval(staleGeneratingInterval);
       staleGeneratingInterval = null;
     }
     available = false;

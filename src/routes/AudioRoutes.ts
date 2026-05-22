@@ -11,6 +11,8 @@ import FileService from "../services/FileService.ts";
 import logger from "../utils/logger.ts";
 import RequestLogger from "../services/RequestLogger.ts";
 import {} from "../utils/utilities.ts";
+import { errorMessage } from "../utils/errorMessage.ts";
+import type { ChatMessage } from "../types/admin.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -37,19 +39,7 @@ interface VoiceParams {
   clientIp?: string | null;
 }
 
-interface ConversationMessage {
-  role: string;
-  content: string;
-  audio?: string;
-  model?: string;
-  provider?: string;
-  voice?: string;
-  images?: string[];
-  timestamp: string;
-  totalTime?: number;
-  estimatedCost?: number;
-  usage?: Record<string, unknown>;
-}
+
 
 const router = express.Router();
 // ─── used by both REST and WebSocket ────────────────────────
@@ -182,9 +172,9 @@ export async function handleVoice(
         );
         audioRef = ref;
       } catch (error: unknown) {
-        logger.error(`Failed to upload TTS audio: ${(error as Error).message}`);
+        logger.error(`Failed to upload TTS audio: ${errorMessage(error)}`);
       }
-      const messagesToAppend: ConversationMessage[] = [];
+      const messagesToAppend: ChatMessage[] = [];
       // Derive user message from text
       messagesToAppend.push({
         role: "user",
@@ -249,10 +239,10 @@ export async function handleVoice(
       model: model || null,
       traceId: traceId || null,
       success: false,
-      errorMessage: (error as Error).message,
+      errorMessage: errorMessage(error),
       totalTime: totalSec,
     });
-    emitJSON({ type: "error", message: (error as Error).message });
+    emitJSON({ type: "error", message: errorMessage(error) });
     throw error;
   }
 }
@@ -459,9 +449,9 @@ router.post(
           );
           audioRef = ref;
         } catch (error: unknown) {
-          logger.error(`Failed to upload STT audio: ${(error as Error).message}`);
+          logger.error(`Failed to upload STT audio: ${errorMessage(error)}`);
         }
-        const messagesToAppend: ConversationMessage[] = [
+        const messagesToAppend: ChatMessage[] = [
           {
             role: "user",
             content: transcriptionPrompt || "Transcribe this audio",
@@ -539,7 +529,7 @@ router.post(
         conversationId,
         traceId: traceId || null,
         success: false,
-        errorMessage: (error as Error).message,
+        errorMessage: errorMessage(error),
         totalTime: totalSec,
       });
       next(error);

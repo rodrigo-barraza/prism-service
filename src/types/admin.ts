@@ -261,4 +261,5 @@ export interface ChatMessage {
   thinkingSignature?: string;
   deleted?: boolean;
   tool_call_id?: string;
+  [key: string]: unknown;
 }

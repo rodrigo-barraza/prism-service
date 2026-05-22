@@ -710,7 +710,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
       const { default: AgenticLoopService } =
         await import("../services/AgenticLoopService.js");
       await AgenticLoopService.runAgenticLoop({
-                provider: context.provider,
+        provider: context.provider as import("../services/harnesses/types.ts").LLMProvider,
                 providerName,
                 resolvedModel,
                 modelDef: context.modelDef,

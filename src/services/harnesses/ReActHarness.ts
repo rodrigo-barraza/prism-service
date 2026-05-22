@@ -20,7 +20,7 @@ import {
 import PlanningModeService from "../PlanningModeService.ts";
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
 
-import type { ConversationMessage, ToolSchema } from "./types.ts";
+import type { ConversationMessage, ToolCall, ToolSchema } from "./types.ts";
 
 const MAX_TOOL_ITERATIONS = 25;
 const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
@@ -101,12 +101,7 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       // ── beforePrompt hook (iteration 1 only) ──────────────
       if (state.iterations === 1) {
-        // @ts-ignore - TODO: strict typing
-        interface HookContextType extends any {
-          _injectedSkills?: any[];
-        }
-        const hookContext: HookContextType = {
-          // @ts-ignore - TODO: strict typing
+        const hookContext: Record<string, unknown> & { messages: ConversationMessage[]; _injectedSkills?: string[] } = {
           messages: currentMessages,
           project,
           username,
@@ -117,7 +112,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           enabledTools: this.tools.resolvedEnabledTools,
           workspaceRoot: workspaceRoot || undefined,
         };
-                await hooks.run(("beforePrompt" as any), (hookContext as any));
+        await hooks.run("beforePrompt" as Parameters<typeof hooks.run>[0], hookContext as Parameters<typeof hooks.run>[1]);
 
         if (
           Array.isArray(hookContext._injectedSkills) &&
@@ -131,12 +126,12 @@ export default class ReActHarness extends BaseAgenticHarness {
         }
 
         if (state.planModeActive) {
-                    PlanningModeService.injectPlanningInstruction((currentMessages as any));
+          PlanningModeService.injectPlanningInstruction(currentMessages);
         }
       }
 
       // ── Build pass options ─────────────────────────────────
-      const passOptions: any = {
+      const passOptions: Record<string, unknown> = {
         ...options,
         project,
         agent,
@@ -147,14 +142,14 @@ export default class ReActHarness extends BaseAgenticHarness {
           (tool: ToolSchema) => tool.name === "exit_plan_mode",
         );
         logger.info(
-          `[PlanningMode] Sending ${(passOptions.tools as ToolSchema[]).length} tools to provider: ${(passOptions.tools as ToolSchema[]).map((tool: any) => (tool as any).name).join(", ")}`,
+          `[PlanningMode] Sending ${(passOptions.tools as ToolSchema[]).length} tools to provider: ${(passOptions.tools as ToolSchema[]).map((tool: ToolSchema) => tool.name).join(", ")}`,
         );
       } else {
         passOptions.tools = this.tools.finalTools;
       }
 
       const allowedToolNames = new Set(
-        ((passOptions.tools as ToolSchema[]) || []).map((tool: any) => (tool as any).name),
+        ((passOptions.tools as ToolSchema[]) || []).map((tool: ToolSchema) => tool.name),
       );
 
       // ── Context window enforcement ─────────────────────────
@@ -172,23 +167,23 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       // ── Stream LLM response ────────────────────────────────
       const stream = this.createProviderStream(currentMessages, passOptions);
-      await this.consumeStream(stream, pass, (allowedToolNames as any as Set<string>));
+      await this.consumeStream(stream, pass, allowedToolNames);
 
       // ── Finalize tracker for this pass ─────────────────────
       if (pass.usage.outputTokens > 0) {
-                (SessionGenerationTracker as any).update((passRequestId as any), {
+        SessionGenerationTracker.update(passRequestId, {
           outputTokens: pass.usage.outputTokens,
         });
       }
       const finalInputTokens =
         pass.usage.inputTokens || pass.usage.promptTokens || 0;
       if (finalInputTokens > 0) {
-                (SessionGenerationTracker as any).update((passRequestId as any), {
+        SessionGenerationTracker.update(passRequestId, {
           inputTokens: finalInputTokens,
         });
       }
       this.emitGenerationProgress();
-            (SessionGenerationTracker as any).complete((passRequestId as any));
+      SessionGenerationTracker.complete(passRequestId);
 
       if (signal?.aborted) break;
 
@@ -279,7 +274,7 @@ export default class ReActHarness extends BaseAgenticHarness {
         );
 
         const exitPlanToolCall = pass.pendingToolCalls.find(
-          (toolCall: any) => (toolCall as any).name === "exit_plan_mode",
+          (toolCall) => toolCall.name === "exit_plan_mode",
         );
         if (exitPlanToolCall) {
           const { shouldContinueLoop } = await handleExitPlanMode(
@@ -303,16 +298,16 @@ export default class ReActHarness extends BaseAgenticHarness {
           ...(pass.thinkingSignature && {
             thinkingSignature: pass.thinkingSignature,
           }),
-          toolCalls: pass.pendingToolCalls.map((toolCall: any) => {
+          toolCalls: pass.pendingToolCalls.map((toolCall: ToolCall) => {
             const matchingResult = results.find(
-              (result: any) => (result as any).id === (toolCall as any).id,
+              (result) => result.id === toolCall.id,
             );
             return {
-              id: (toolCall as any).id || null,
-              responsesItemId: (toolCall as any).responsesItemId || undefined,
-              name: (toolCall as any).name,
-              args: (toolCall as any).args,
-              thoughtSignature: (toolCall as any).thoughtSignature || undefined,
+              id: toolCall.id || null,
+              responsesItemId: toolCall.responsesItemId || undefined,
+              name: toolCall.name,
+              args: toolCall.args,
+              thoughtSignature: toolCall.thoughtSignature || undefined,
               result: matchingResult ? matchingResult.result : null,
             };
           }),
@@ -320,11 +315,11 @@ export default class ReActHarness extends BaseAgenticHarness {
         currentMessages.push(assistantMessage);
 
         currentMessages = currentMessages.filter(
-          (message: any) =>
+          (message) =>
             !(
-              (message as any).role === "assistant" &&
-              !(message as any).content?.trim() &&
-              (!(message as any).toolCalls || (message as any).toolCalls.length === 0)
+              message.role === "assistant" &&
+              !message.content?.trim() &&
+              (!message.toolCalls || message.toolCalls.length === 0)
             ),
         );
         continue;

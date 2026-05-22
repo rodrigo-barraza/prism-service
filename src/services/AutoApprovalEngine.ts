@@ -1,4 +1,5 @@
 import logger from "../utils/logger.ts";
+import type { ToolCall, AgenticContext } from "./harnesses/types.ts";
 
 /**
  * Tool approval tiers — deterministic, rule-based permission system.
@@ -11,10 +12,12 @@ export const APPROVAL_TIERS = {
   AUTO: 1,
   WRITE: 2,
   DANGER: 3,
-};
+} as const;
+
+type ApprovalTier = typeof APPROVAL_TIERS[keyof typeof APPROVAL_TIERS];
 
 /** Default tier assignments for built-in tools */
-const DEFAULT_TIER_MAP = {
+const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   // Tier 1 — read-only
   read_file: APPROVAL_TIERS.AUTO,
   list_directory: APPROVAL_TIERS.AUTO,
@@ -88,11 +91,27 @@ const DEFAULT_TIER_MAP = {
   run_command: APPROVAL_TIERS.DANGER,
 };
 
-const TIER_LABELS = {
+const TIER_LABELS: Record<number, string> = {
   [APPROVAL_TIERS.AUTO]: "auto",
   [APPROVAL_TIERS.WRITE]: "write",
   [APPROVAL_TIERS.DANGER]: "danger",
 };
+
+export interface ApprovalResult {
+  approved: boolean;
+  tier: ApprovalTier;
+  tierLabel: string;
+  reason: string;
+}
+
+export interface ApprovedToolCall extends Omit<ToolCall, '_approval'> {
+  _approval: ApprovalResult;
+}
+
+export interface AutoApprovalEngineOptions {
+  fullAuto?: boolean;
+  tierOverrides?: Record<string, ApprovalTier>;
+}
 
 /**
  * AutoApprovalEngine — determines whether a tool call should auto-execute
@@ -101,25 +120,28 @@ const TIER_LABELS = {
  * Registered as a `beforeToolCall` hook in AgentHooks.
  */
 export default class AutoApprovalEngine {
-  constructor(options: any = {}) {
-        (this as any).fullAuto = options.fullAuto || false;
-        (this as any).tierOverrides = options.tierOverrides || {};
+  private fullAuto: boolean;
+  private tierOverrides: Record<string, ApprovalTier>;
+
+  constructor(options: AutoApprovalEngineOptions = {}) {
+    this.fullAuto = options.fullAuto || false;
+    this.tierOverrides = options.tierOverrides || {};
   }
-  getTier(toolName: any) {
-        if ((this as any).tierOverrides[toolName] !== undefined) {
-            return (this as any).tierOverrides[toolName];
+  getTier(toolName: string): ApprovalTier {
+    if (this.tierOverrides[toolName] !== undefined) {
+      return this.tierOverrides[toolName];
     }
-        return (DEFAULT_TIER_MAP as any)[(toolName as string)] ?? APPROVAL_TIERS.WRITE; // Unknown tools default to Tier 2
+    return DEFAULT_TIER_MAP[toolName] ?? APPROVAL_TIERS.WRITE; // Unknown tools default to Tier 2
   }
-  getTierLabel(toolName: any) {
+  getTierLabel(toolName: string): string {
     return TIER_LABELS[this.getTier(toolName)] || "write";
   }
-  check(toolCall: any) {
-        const tier = this.getTier((toolCall.name as any));
+  check(toolCall: ToolCall): ApprovalResult {
+    const tier = this.getTier(toolCall.name);
     const tierLabel = TIER_LABELS[tier] || "write";
 
     // Full Auto mode: everything runs
-        if ((this as any).fullAuto) {
+    if (this.fullAuto) {
       return { approved: true, tier, tierLabel, reason: "full_auto" };
     }
 
@@ -131,11 +153,11 @@ export default class AutoApprovalEngine {
     // Tier 2 and 3: require approval
     return { approved: false, tier, tierLabel, reason: "requires_approval" };
   }
-  checkBatch(toolCalls: any) {
-    const autoApproved: any[] = [];
-    const needsApproval: any[] = [];
+  checkBatch(toolCalls: ToolCall[]): { autoApproved: ApprovedToolCall[]; needsApproval: ApprovedToolCall[] } {
+    const autoApproved: ApprovedToolCall[] = [];
+    const needsApproval: ApprovedToolCall[] = [];
 
-        for ( const tc of toolCalls) {
+    for (const tc of toolCalls) {
       const result = this.check(tc);
       if (result.approved) {
         autoApproved.push({ ...tc, _approval: result });
@@ -146,14 +168,14 @@ export default class AutoApprovalEngine {
 
     if (needsApproval.length > 0) {
       logger.info(
-        `[AutoApproval] ${autoApproved.length} auto-approved, ${needsApproval.length} need approval: ${needsApproval.map((t: any) => t.name).join(", ")}`,
+        `[AutoApproval] ${autoApproved.length} auto-approved, ${needsApproval.length} need approval: ${needsApproval.map((t) => t.name).join(", ")}`,
       );
     }
 
     return { autoApproved, needsApproval };
   }
   createHook() {
-    return async (toolCall: any, _ctx: any) => {
+    return async (toolCall: ToolCall, _ctx: AgenticContext) => {
       return this.check(toolCall);
     };
   }

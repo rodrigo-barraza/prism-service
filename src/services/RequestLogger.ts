@@ -370,7 +370,7 @@ const RequestLogger = {
       requestPayload: {
                 messages: messages?.map(sanitizeMsg) ?? [],
                 ...(options?.tools
-                    ? { tools: options.tools.map((t: any) => t.name || t.function?.name) }
+                    ? { tools: options.tools.map((t: { name?: string; function?: { name: string } }) => t.name || t.function?.name) }
           : {}),
         ...(agenticIteration !== null ? { agenticIteration } : {}),
       },
@@ -380,7 +380,7 @@ const RequestLogger = {
                 ...(images && images.length > 0 ? { images } : {}),
                 toolCalls:
                     toolCalls && toolCalls.length > 0
-                        ? toolCalls.map((tc: any) => ({
+                        ? toolCalls.map((tc) => ({
                                 name: (API_TO_CANONICAL as Record<string, string>)[tc.name] || tc.name,
                 id: tc.id,
                 args: tc.args,

@@ -3,18 +3,58 @@ import FileService from "./FileService.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
+import { errorMessage } from "../utils/errorMessage.ts";
+import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
 
 const DEFAULT_COLLECTION = COLLECTIONS.CONVERSATIONS;
+
+// ── Conversation Metadata ───────────────────────────────────
+
+export interface ConversationMeta {
+  title?: string;
+  systemPrompt?: string;
+  settings?: ConversationSettings;
+  traceId?: string | null;
+  parentAgentSessionId?: string | null;
+  workspaceRoot?: string | null;
+  synthetic?: boolean;
+  agent?: string | null;
+}
+
+export interface ConversationSettings {
+  provider?: string;
+  model?: string;
+  systemPrompt?: string;
+  [key: string]: unknown;
+}
+
+export interface ConversationPatchInput {
+  title?: string;
+  messages?: ChatMessage[];
+  systemPrompt?: string;
+  settings?: ConversationSettings;
+}
+
+export interface ConversationPatchFields {
+  updatedAt: string;
+  title?: string;
+  messages?: ChatMessage[];
+  modalities?: Record<string, boolean>;
+  providers?: string[];
+  totalCost?: number;
+  systemPrompt?: string;
+  settings?: ConversationSettings;
+}
 
 export interface ConversationServiceInterface {
   appendMessages(
     conversationId: string,
     project: string,
     username: string,
-    newMessages: any[],
-    conversationMeta?: any,
+    newMessages: ChatMessage[],
+    conversationMeta?: ConversationMeta | null,
     options?: { collection?: string },
-  ): Promise<any>;
+  ): Promise<Record<string, unknown>>;
   setGenerating(
     conversationId: string,
     project: string,
@@ -29,13 +69,13 @@ export interface ConversationServiceInterface {
  * Replaces inline data with minio:// refs when MinIO is available.
  */
 export async function extractFiles(
-  messages: any[],
+  messages: ChatMessage[],
   project: string | null = null,
   username: string | null = null,
-): Promise<any[]> {
+): Promise<ChatMessage[]> {
   if (!messages || !FileService.isExternalStorage()) return messages;
 
-  const processed: any[] = [];
+  const processed: ChatMessage[] = [];
   for (const message of messages) {
     const updated = { ...message };
 
@@ -44,7 +84,7 @@ export async function extractFiles(
       const category = message.role === "assistant" ? "generations" : "uploads";
       const newImages: string[] = [];
       for (const image of message.images) {
-        if (FileService.isMinioRef(image) || image.startsWith("http")) {
+        if (image.startsWith("minio://") || image.startsWith("http")) {
           newImages.push(image);
           continue;
         }
@@ -58,7 +98,7 @@ export async function extractFiles(
             );
             newImages.push(ref);
           } catch (error: unknown) {
-            logger.error(`Failed to upload file: ${(error as Error).message}`);
+            logger.error(`Failed to upload file: ${errorMessage(error)}`);
             newImages.push(image);
           }
         } else {
@@ -84,7 +124,7 @@ export async function extractFiles(
         );
         updated.audio = ref;
       } catch (error: unknown) {
-        logger.error(`Failed to upload audio: ${(error as Error).message}`);
+        logger.error(`Failed to upload audio: ${errorMessage(error)}`);
       }
     }
 
@@ -96,7 +136,7 @@ export async function extractFiles(
 /**
  * Compute input/output modalities from messages for lightweight querying.
  */
-export function computeModalities(messages: any[]): Record<string, boolean> {
+export function computeModalities(messages: ChatMessage[]): Record<string, boolean> {
   const mod = {
     textIn: false,
     textOut: false,
@@ -119,14 +159,14 @@ export function computeModalities(messages: any[]): Record<string, boolean> {
     const isUser = m.role === "user";
     const isAssistant = m.role === "assistant";
     if (m.content && (isUser || isAssistant)) {
-      if (isUser && !m.liveTranscription) mod.textIn = true;
+      if (isUser && !(m as Record<string, unknown>).liveTranscription) mod.textIn = true;
       if (isAssistant) mod.textOut = true;
     }
     // Tool calls are structured text output
-    if (isAssistant && m.toolCalls?.length > 0) {
+    if (isAssistant && m.toolCalls && m.toolCalls.length > 0) {
       mod.textOut = true;
     }
-    if (m.images?.length > 0 || m.image) {
+    if ((m.images && m.images.length > 0) || (m as Record<string, unknown>).image) {
       if (isUser) mod.imageIn = true;
       if (isAssistant) mod.imageOut = true;
     }
@@ -135,9 +175,9 @@ export function computeModalities(messages: any[]): Record<string, boolean> {
       if (isAssistant) mod.audioOut = true;
     }
     if (
-      m.documents?.length > 0 ||
+      ((m as Record<string, unknown>).documents as string[] | undefined)?.length ||
       m.images?.some(
-        (ref: any) =>
+        (ref: string) =>
           typeof ref === "string" &&
           (ref.endsWith(".pdf") || ref.endsWith(".txt")),
       )
@@ -146,7 +186,7 @@ export function computeModalities(messages: any[]): Record<string, boolean> {
     }
 
     // Classify tool calls by type
-    if (m.toolCalls?.length > 0) {
+    if (m.toolCalls && m.toolCalls.length > 0) {
       for (const tc of m.toolCalls) {
         const name = (tc.name || "").toLowerCase();
         if (WEB_SEARCH_NAMES.has(name)) {
@@ -194,11 +234,13 @@ export function computeModalities(messages: any[]): Record<string, boolean> {
 /**
  * Extract unique providers from messages and settings.
  */
-export function extractProviders(messages: any[], settings: any): string[] {
+export function extractProviders(messages: ChatMessage[], settings: ConversationSettings | null): string[] {
   const providers = new Set<string>();
   for (const m of messages || []) {
     if (m.deleted) continue;
-    if (m.provider) providers.add(m.provider.toLowerCase());
+    if ((m as Record<string, unknown>).provider) {
+      providers.add(((m as Record<string, unknown>).provider as string).toLowerCase());
+    }
   }
   if (settings?.provider) providers.add(settings.provider.toLowerCase());
   return [...providers];
@@ -207,11 +249,12 @@ export function extractProviders(messages: any[], settings: any): string[] {
 /**
  * Compute total estimated cost across all messages.
  */
-export function computeTotalCost(messages: any[]): number {
+export function computeTotalCost(messages: ChatMessage[]): number {
   let total = 0;
   for (const m of messages || []) {
     if (m.deleted) continue;
-    if (m.estimatedCost) total += m.estimatedCost;
+    const cost = (m as Record<string, unknown>).estimatedCost;
+    if (typeof cost === "number") total += cost;
   }
   return total;
 }
@@ -225,13 +268,13 @@ export function buildConversationPatchFields({
   messages,
   systemPrompt,
   settings,
-}: any): Record<string, any> {
-  const setFields: Record<string, any> = { updatedAt: new Date().toISOString() };
+}: ConversationPatchInput): ConversationPatchFields {
+  const setFields: ConversationPatchFields = { updatedAt: new Date().toISOString() };
   if (title !== undefined) setFields.title = title;
   if (messages !== undefined) {
     setFields.messages = messages;
     setFields.modalities = computeModalities(messages);
-    setFields.providers = extractProviders(messages, settings);
+    setFields.providers = extractProviders(messages, settings || null);
     setFields.totalCost = computeTotalCost(messages);
   }
   if (systemPrompt !== undefined) setFields.systemPrompt = systemPrompt;
@@ -255,10 +298,10 @@ const ConversationService: ConversationServiceInterface = {
     conversationId: string,
     project: string,
     username: string,
-    newMessages: any[],
-    conversationMeta: any = null,
+    newMessages: ChatMessage[],
+    conversationMeta: ConversationMeta | null = null,
     { collection = DEFAULT_COLLECTION }: { collection?: string } = {},
-  ): Promise<any> {
+  ): Promise<Record<string, unknown>> {
     const traceId = conversationMeta?.traceId || null;
     const col = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
     const isAgentSession = collection === COLLECTIONS.AGENT_SESSIONS;
@@ -273,7 +316,7 @@ const ConversationService: ConversationServiceInterface = {
     const now = new Date().toISOString();
 
     // Build $set fields for metadata
-    const setFields: Record<string, any> = { updatedAt: now };
+    const setFields: Record<string, unknown> = { updatedAt: now };
     if (traceId) setFields.traceId = traceId;
 
     if (conversationMeta) {
@@ -306,14 +349,14 @@ const ConversationService: ConversationServiceInterface = {
       : conversationMeta?.systemPrompt || "";
     const parentId = conversationMeta?.parentAgentSessionId || null;
 
-    const setOnInsertBase: Record<string, any> = {
+    const setOnInsertBase: Record<string, unknown> = {
       title: conversationMeta?.title || "New Conversation",
       ...(!isAgentSession && { systemPrompt: metaSysPrompt }),
       settings: isAgentSession
         ? { ...metaSettings }
         : { ...metaSettings, systemPrompt: metaSysPrompt },
       modalities: computeModalities([]),
-      providers: extractProviders([], metaSettings),
+      providers: extractProviders([], metaSettings as ConversationSettings),
       totalCost: 0,
       isGenerating: true,
       ...(conversationMeta?.synthetic && { synthetic: true }),
@@ -344,7 +387,7 @@ const ConversationService: ConversationServiceInterface = {
         $push: { messages: { $each: processedMessages } },
         $set: setFields,
         $setOnInsert: setOnInsert,
-      } as any,
+      } as import("mongodb").Document,
       { upsert: true },
     );
 
@@ -361,9 +404,9 @@ const ConversationService: ConversationServiceInterface = {
 
     // 3. Recompute derived fields and persist
     const derived = {
-      modalities: computeModalities(conversation.messages),
-      providers: extractProviders(conversation.messages, conversation.settings),
-      totalCost: computeTotalCost(conversation.messages),
+      modalities: computeModalities(conversation.messages as ChatMessage[]),
+      providers: extractProviders(conversation.messages as ChatMessage[], conversation.settings as ConversationSettings),
+      totalCost: computeTotalCost(conversation.messages as ChatMessage[]),
     };
     await col.updateOne(
       { id: conversationId, project, username },

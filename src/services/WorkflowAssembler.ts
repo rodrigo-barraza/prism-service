@@ -1,4 +1,17 @@
 import { getModelByName } from "../config.ts";
+import type {
+  WorkflowStep,
+  WorkflowMessage,
+  GraphNode,
+  GraphEdge,
+  NodeResult,
+  NodeResultMap,
+  AssembledGraph,
+  ResolvedModalities,
+  InputNode,
+  ModelNode,
+  ViewerNode,
+} from "../types/workflow.ts";
 
 // ─── LAYOUT CONSTANTS ───────────────────────────────────────
 
@@ -15,25 +28,25 @@ const VIEWER_X_OFFSET = MODEL_X_OFFSET + 350;
  * These steps are shown in the graph but don't get viewers or chain edges,
  * keeping the graph clean and focused on meaningful output.
  */
-function isUtilityStep(step: any) {
+function isUtilityStep(step: WorkflowStep): boolean {
   const label = step.label || "";
   // 🧠 prefix = internal decision steps (Emoji React, Image Detection, Fetch Count, etc.)
-    return (label as any).startsWith("🧠");
+  return label.startsWith("🧠");
 }
 
 /**
  * Build compound port IDs for a conversation input node.
  * Format: "{messageIndex}.{modality}" e.g. "0.text", "1.text", "1.image"
  */
-function buildConversationPorts(messages: any, supportedModalities: any = ["text"]) {
-  const ports: any[] = [];
-    for (let i = 0; i < (messages as any).length; i++) {
+function buildConversationPorts(messages: WorkflowMessage[], supportedModalities: string[] = ["text"]): string[] {
+  const ports: string[] = [];
+  for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
-        ports.push((`${i}.text` as any));
-        if ((message as any).role === "user" || (message as any).role === "assistant") {
-            for ( const mod of supportedModalities) {
+    ports.push(`${i}.text`);
+    if (message.role === "user" || message.role === "assistant") {
+      for (const mod of supportedModalities) {
         if (mod !== "text") {
-                    ports.push((`${i}.${mod}` as any));
+          ports.push(`${i}.${mod}`);
         }
       }
     }
@@ -45,8 +58,8 @@ function buildConversationPorts(messages: any, supportedModalities: any = ["text
  * Resolve a model's input/output types from the Prism config.
  * Falls back to step-derived values if the model isn't found in config.
  */
-function resolveModelModalities(step: any) {
-    const configModel = getModelByName((step.model as any));
+function resolveModelModalities(step: WorkflowStep): ResolvedModalities {
+  const configModel = step.model ? getModelByName(step.model) : null;
   const isImageGen = step.outputType === "image";
 
   if (configModel) {
@@ -58,8 +71,8 @@ function resolveModelModalities(step: any) {
       modelType:
         configModel.modelType || (isImageGen ? "image" : "conversation"),
       supportsSystemPrompt:
-                (configModel as any).supportsSystemPrompt !== undefined
-          ?             (configModel as any).supportsSystemPrompt
+        (configModel as Record<string, unknown>).supportsSystemPrompt !== undefined
+          ? (configModel as Record<string, unknown>).supportsSystemPrompt as boolean
           : (configModel.outputTypes?.includes("text") ?? true),
     };
   }
@@ -91,20 +104,20 @@ function resolveModelModalities(step: any) {
  * Utility steps (🧠 prefix) are shown in the graph but without viewers
  * or chain edges, keeping the visualization focused on output.
  */
-function assembleGraph(steps: any) {
+function assembleGraph(steps: WorkflowStep[]): AssembledGraph {
   if (!Array.isArray(steps) || steps.length === 0) {
     return { nodes: [], edges: [], nodeResults: {} };
   }
 
-    const allNodes: any[] = [];
-    const allEdges: any[] = [];
-  const nodeResults: any = {};
+  const allNodes: GraphNode[] = [];
+  const allEdges: GraphEdge[] = [];
+  const nodeResults: NodeResultMap = {};
 
   // Track the last non-utility model ID for chain edges
-    let prevOutputModelId: any = null;
+  let prevOutputModelId: string | null = null;
 
-    steps.forEach((step: any, i: any) => {
-        const baseX = 80 + i * STEP_WIDTH;
+  steps.forEach((step: WorkflowStep, i: number) => {
+    const baseX = 80 + i * STEP_WIDTH;
     const baseY = 80;
     const stepPrefix = `s${i}`;
     let inputY = baseY;
@@ -123,7 +136,7 @@ function assembleGraph(steps: any) {
         inputTypes: [],
         outputTypes: ["text"],
         position: { x: baseX + INPUT_X_OFFSET, y: inputY },
-      });
+      } as InputNode);
       inputY += 200;
     }
 
@@ -138,30 +151,30 @@ function assembleGraph(steps: any) {
         inputTypes: [],
         outputTypes: ["text"],
         position: { x: baseX + INPUT_X_OFFSET, y: inputY },
-      });
+      } as InputNode);
       inputY += 200;
     }
 
     // ── 3. Conversation Node ──
     const convId = `${stepPrefix}_conv`;
-    const messages: any[] = [];
+    const messages: WorkflowMessage[] = [];
     if (step.systemPrompt)
       messages.push({ role: "system", content: step.systemPrompt });
-    const userMsg = { role: "user", content: step.input || "" };
+    const userMsg: WorkflowMessage = { role: "user", content: step.input || "" };
     messages.push(userMsg);
     if (step.output) {
-      const assistantMsg = { role: "assistant", content: step.output };
-            if (step.outputImageRef) (assistantMsg as any).images = [step.outputImageRef];
+      const assistantMsg: WorkflowMessage & { images?: string[] } = { role: "assistant", content: step.output };
+      if (step.outputImageRef) assistantMsg.images = [step.outputImageRef];
       messages.push(assistantMsg);
     }
 
     // Derive conversation supported modalities from the model's raw input types
     const supportedModalities = (modalities.rawInputTypes || ["text"]).filter(
-            (t: any) => t !== "conversation",
+      (t: string) => t !== "conversation",
     );
     const convInputTypes = buildConversationPorts(
-            (messages as any),
-      (supportedModalities as any),
+      messages,
+      supportedModalities,
     );
 
     allNodes.push({
@@ -174,7 +187,7 @@ function assembleGraph(steps: any) {
       inputTypes: convInputTypes,
       outputTypes: ["conversation"],
       position: { x: baseX + CONV_X_OFFSET, y: baseY + 100 },
-    });
+    } as InputNode);
 
     // Wire inputs → conversation node
     const sysIdx = 0;
@@ -204,7 +217,7 @@ function assembleGraph(steps: any) {
     allNodes.push({
       id: modelId,
       modelName: step.model || "any",
-            provider: (step.type as any)?.toLowerCase() || "any",
+      provider: step.type?.toLowerCase() || "any",
       displayName: modalities.label || step.model || "Step",
       modelType: modalities.modelType,
       inputTypes: ["conversation"],
@@ -217,7 +230,7 @@ function assembleGraph(steps: any) {
         timestamp: step.timestamp,
         index: step.index,
       },
-    });
+    } as ModelNode);
 
     // Wire conversation → model
     allEdges.push({
@@ -229,26 +242,26 @@ function assembleGraph(steps: any) {
     });
 
     // Store model results
-    const result: any = {};
-        if (step.output) result.text = step.output;
-        if (step.outputImageRef) result.image = step.outputImageRef;
-        nodeResults[modelId] = result;
+    const result: NodeResult = {};
+    if (step.output) result.text = step.output;
+    if (step.outputImageRef) result.image = step.outputImageRef;
+    nodeResults[modelId] = result;
 
     // ── 5. Output Viewer ──
     {
       const viewerId = `${stepPrefix}_viewer`;
-      const viewerResult: any = {};
-            if (step.output) viewerResult.text = step.output;
-            if (step.outputImageRef) viewerResult.image = step.outputImageRef;
+      const viewerResult: NodeResult = {};
+      if (step.output) viewerResult.text = step.output;
+      if (step.outputImageRef) viewerResult.image = step.outputImageRef;
 
       allNodes.push({
         id: viewerId,
         nodeType: "viewer",
         modality: null,
-                content: viewerResult.text || viewerResult.image || null,
-                contentType: viewerResult.image
+        content: viewerResult.text || viewerResult.image || null,
+        contentType: viewerResult.image
           ? "image"
-          :             viewerResult.text
+          : viewerResult.text
             ? "text"
             : null,
         receivedOutputs: viewerResult,
@@ -258,7 +271,7 @@ function assembleGraph(steps: any) {
           x: baseX + VIEWER_X_OFFSET,
           y: baseY + 100,
         },
-      });
+      } as ViewerNode);
 
       // Connect model outputs to viewer
       if (step.output) {
@@ -280,11 +293,11 @@ function assembleGraph(steps: any) {
         });
       }
 
-            nodeResults[viewerId] = viewerResult;
+      nodeResults[viewerId] = viewerResult;
     }
 
     // ── 6. Chain edge from previous output model → this model (non-utility only) ──
-        if (!utility && prevOutputModelId) {
+    if (!utility && prevOutputModelId) {
       allEdges.push({
         id: `chain_${prevOutputModelId}_to_${modelId}`,
         sourceNodeId: prevOutputModelId,
@@ -300,7 +313,7 @@ function assembleGraph(steps: any) {
     }
   });
 
-    return { nodes: allNodes, edges: allEdges, nodeResults };
+  return { nodes: allNodes, edges: allEdges, nodeResults };
 }
 
 export { assembleGraph };

@@ -37,7 +37,7 @@ export function blockUnauthorizedToolCalls(
   _state: AgenticLoopState,
 ): { allBlocked: boolean } {
   const blockedToolCalls = pendingToolCalls.filter(
-    (toolCall: unknown) => (toolCall as any).name !== "exit_plan_mode",
+    (toolCall) => toolCall.name !== "exit_plan_mode",
   );
 
   if (blockedToolCalls.length === 0) {
@@ -45,7 +45,7 @@ export function blockUnauthorizedToolCalls(
   }
 
   const blockedToolNames = blockedToolCalls
-    .map((toolCall: unknown) => (toolCall as any).name)
+    .map((toolCall) => toolCall.name)
     .join(", ");
 
   logger.warn(
@@ -99,7 +99,7 @@ export async function handleExitPlanMode(
   const { options, emit, signal, agentSessionId } = context;
 
   const planText = state.planModeText.trim() || pass.streamedText.trim();
-    const planSteps = PlanningModeService.extractSteps((planText as any));
+  const planSteps = PlanningModeService.extractSteps(planText);
 
   logger.info(
     `[PlanningMode] exit_plan_mode called — planText=${planText.length} chars, steps=${planSteps.length}, autoApprove=${!!options.autoApprove}`,
@@ -117,17 +117,17 @@ export async function handleExitPlanMode(
     planApproved = true;
     logger.info("[PlanningMode] Auto-approved plan (autoApprove=true)");
   } else {
-    planApproved = await new Promise<boolean>((resolve: unknown) => {
+    planApproved = await new Promise<boolean>((resolve) => {
       const timeoutId = setTimeout(() => {
         pendingApprovals.delete(agentSessionId);
-        (resolve as any)(false);
+        resolve(false);
       }, PLAN_APPROVAL_TIMEOUT_MS);
 
       pendingApprovals.set(agentSessionId, {
         resolve: (value: boolean) => {
           clearTimeout(timeoutId);
           pendingApprovals.delete(agentSessionId);
-          (resolve as any)(value);
+          resolve(value);
         },
         type: "plan",
       });
@@ -149,8 +149,8 @@ export async function handleExitPlanMode(
 
   // Inject approved plan text into the exit_plan_mode result
   const exitResult = toolResults.find(
-    (result: unknown) =>
-      (result as any).id === exitPlanToolCall.id || (result as any).name === "exit_plan_mode",
+    (result) =>
+      result.id === exitPlanToolCall.id || result.name === "exit_plan_mode",
   );
   if (exitResult) {
     exitResult.result = {
@@ -161,7 +161,7 @@ export async function handleExitPlanMode(
 
   state.planModeActive = false;
   state.planModeText = "";
-    PlanningModeService.stripPlanningInstruction((currentMessages as any));
+  PlanningModeService.stripPlanningInstruction(currentMessages);
   emit({ type: "status", message: "plan_mode_exited" });
 
   return { shouldContinueLoop: true };
@@ -175,13 +175,13 @@ export function checkForPlanModeEntry(
   emit: EmitFn,
 ): void {
   const hasEnterPlanMode = executedToolCalls.some(
-    (toolCall: unknown) => (toolCall as any).name === "enter_plan_mode",
+    (toolCall) => toolCall.name === "enter_plan_mode",
   );
 
   if (hasEnterPlanMode) {
     state.planModeActive = true;
     state.planModeText = "";
-        PlanningModeService.injectPlanningInstruction((currentMessages as any));
+    PlanningModeService.injectPlanningInstruction(currentMessages);
     emit({ type: "status", message: "plan_mode_entered" });
   }
 }

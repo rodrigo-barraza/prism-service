@@ -1,4 +1,5 @@
 import logger from "../utils/logger.ts";
+import type { ConversationMessage } from "./harnesses/types.ts";
 
 /**
  * Planning instruction injected into the system message when planFirst=true.
@@ -40,14 +41,14 @@ export default class PlanningModeService {
    * Inject the planning instruction into the system message.
    * Called once before the agentic loop starts when planFirst=true.
    */
-  static injectPlanningInstruction(messages: any) {
-        const systemMsg = (messages as any).find((m: any) => m.role === "system");
+  static injectPlanningInstruction(messages: ConversationMessage[]) {
+    const systemMsg = messages.find((m) => m.role === "system");
     if (systemMsg) {
       // Idempotency: don't append twice
-      if (systemMsg.content.includes("PLANNING MODE ACTIVE")) return;
-      systemMsg.content = systemMsg.content + PLANNING_INSTRUCTION;
+      if (systemMsg.content?.includes("PLANNING MODE ACTIVE")) return;
+      systemMsg.content = (systemMsg.content || "") + PLANNING_INSTRUCTION;
     } else {
-            (messages as any).unshift({
+      messages.unshift({
         role: "system",
         content: PLANNING_INSTRUCTION.trim(),
       });
@@ -62,21 +63,21 @@ export default class PlanningModeService {
    * Strip the planning instruction from the system message.
    * Called when exiting plan mode so execution doesn't carry stale constraints.
    */
-  static stripPlanningInstruction(messages: any) {
-        const systemMsg = (messages as any).find((m: any) => m.role === "system");
-    if (systemMsg && systemMsg.content.includes("PLANNING MODE ACTIVE")) {
+  static stripPlanningInstruction(messages: ConversationMessage[]) {
+    const systemMsg = messages.find((m) => m.role === "system");
+    if (systemMsg && systemMsg.content?.includes("PLANNING MODE ACTIVE")) {
       systemMsg.content = systemMsg.content.replace(PLANNING_INSTRUCTION, "");
       logger.info(
         "[PlanningMode] Stripped planning instruction from system prompt",
       );
     }
   }
-  static extractSteps(planText: any) {
+  static extractSteps(planText: string): string[] {
     const stepRegex = /^\d+\.\s+(.+)$/gm;
-    const steps: any[] = [];
-    let match: any;
-        while ((match = stepRegex.exec((planText as any))) !== null) {
-            steps.push((match as any)[1].trim());
+    const steps: string[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = stepRegex.exec(planText)) !== null) {
+      steps.push(match[1].trim());
     }
     return steps;
   }

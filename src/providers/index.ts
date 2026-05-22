@@ -6,13 +6,21 @@ import inworldProvider from "./inworld.ts";
 import ActiveGenerationTracker from "../services/ActiveGenerationTracker.ts";
 import { getInstanceProvider, isInstance } from "./instance-registry.ts";
 
+/**
+ * Loose provider shape — each provider exports an object with various
+ * generate/transcribe methods. We don't enumerate every possible method
+ * because providers are heterogeneous (cloud vs local, text vs audio).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Provider = Record<string, any>;
+
 // Static cloud providers — local providers are resolved via instance registry
-const providers = {
-  openai: openaiProvider,
-  anthropic: anthropicProvider,
-  google: googleProvider,
-  elevenlabs: elevenlabsProvider,
-  inworld: inworldProvider,
+const providers: Record<string, Provider> = {
+  openai: openaiProvider as Provider,
+  anthropic: anthropicProvider as Provider,
+  google: googleProvider as Provider,
+  elevenlabs: elevenlabsProvider as Provider,
+  inworld: inworldProvider as Provider,
 };
 
 /**
@@ -21,10 +29,10 @@ const providers = {
  * wrapped with ActiveGenerationTracker increment/decrement.
  */
 const TRACKED_PREFIXES = ["generate", "transcribe"];
-function isTrackedMethod(name: any) {
+function isTrackedMethod(name: string | symbol): boolean {
   return (
     typeof name === "string" &&
-        TRACKED_PREFIXES.some(((p: any) => (name as any).startsWith(p) as any as (value: string, index: number, array: string[]) => any))
+    TRACKED_PREFIXES.some((p) => name.startsWith(p))
   );
 }
 
@@ -32,9 +40,9 @@ function isTrackedMethod(name: any) {
  * Wrap an async generator (generateTextStream, generateTextStreamLive)
  * so the tracker stays incremented for the entire iteration lifetime.
  */
-async function* wrapAsyncGenerator(gen: any) {
+async function* wrapAsyncGenerator(gen: AsyncIterable<unknown>): AsyncGenerator<unknown> {
   try {
-        yield* gen;
+    yield* gen;
   } finally {
     ActiveGenerationTracker.decrement();
   }
@@ -47,20 +55,20 @@ async function* wrapAsyncGenerator(gen: any) {
  * - Async generators (streams): decrement when the iterator finishes/returns
  * - Promises (generateText, generateImage, etc.): decrement on settle
  */
-function wrapProvider(provider: any) {
+function wrapProvider(provider: Provider): Provider {
   return new Proxy(provider, {
-        get(target: any, prop: any, receiver: any) {
-            const value = Reflect.get(target, (prop as any as PropertyKey), receiver);
+    get(target: Provider, prop: string | symbol, receiver: unknown): unknown {
+      const value = Reflect.get(target, prop, receiver);
       if (typeof value !== "function" || !isTrackedMethod(prop)) {
         return value;
       }
 
       // Return a wrapper that tracks the call
-            return function trackedProviderCall(...args: any) {
+      return function trackedProviderCall(...args: unknown[]): unknown {
         ActiveGenerationTracker.increment();
-        let result: any;
+        let result: unknown;
         try {
-          result = value.apply(target, args);
+          result = (value as (...a: unknown[]) => unknown).apply(target, args);
         } catch (error: unknown) {
           // Synchronous throw (rare but possible)
           ActiveGenerationTracker.decrement();
@@ -68,14 +76,16 @@ function wrapProvider(provider: any) {
         }
 
         // Async generator — wrap the iterator
-                // @ts-ignore - TODO: strict typing
-                if (result && typeof result[((Symbol as string) as any).asyncIterator] === "function") {
-          return wrapAsyncGenerator(result);
+        if (
+          result &&
+          typeof (result as Record<symbol, unknown>)[Symbol.asyncIterator] === "function"
+        ) {
+          return wrapAsyncGenerator(result as AsyncIterable<unknown>);
         }
 
         // Promise — decrement on settle
-        if (result && typeof result.then === "function") {
-          result.then(
+        if (result && typeof (result as Promise<unknown>).then === "function") {
+          (result as Promise<unknown>).then(
             () => ActiveGenerationTracker.decrement(),
             () => ActiveGenerationTracker.decrement(),
           );
@@ -91,20 +101,20 @@ function wrapProvider(provider: any) {
 }
 
 /** Per-name proxy cache so we don't create a new Proxy on every getProvider call. */
-const wrappedCache = new Map();
+const wrappedCache = new Map<string, Provider>();
 
-export function getProvider(name: any) {
+export function getProvider(name: string): Provider {
   // Check instance registry first (local providers + multi-instance)
-    if (isInstance((name as any))) {
-    if (wrappedCache.has(name)) return wrappedCache.get(name);
-        const instanceProvider = getInstanceProvider((name as any));
-        const wrapped = wrapProvider((instanceProvider as any));
+  if (isInstance(name)) {
+    if (wrappedCache.has(name)) return wrappedCache.get(name)!;
+    const instanceProvider = getInstanceProvider(name);
+    const wrapped = wrapProvider(instanceProvider as Provider);
     wrappedCache.set(name, wrapped);
     return wrapped;
   }
 
   // Fall through to static cloud providers
-    const provider = (providers as any)[(name as string)];
+  const provider = providers[name];
   if (!provider) {
     const available = [...Object.keys(providers), "(+ local instances)"].join(
       ", ",
@@ -113,14 +123,14 @@ export function getProvider(name: any) {
   }
 
   // Return cached proxy
-  if (wrappedCache.has(name)) return wrappedCache.get(name);
+  if (wrappedCache.has(name)) return wrappedCache.get(name)!;
 
-  const wrapped = wrapProvider((provider as any));
+  const wrapped = wrapProvider(provider);
   wrappedCache.set(name, wrapped);
   return wrapped;
 }
 
-export function listProviders() {
+export function listProviders(): string[] {
   return Object.keys(providers);
 }
 

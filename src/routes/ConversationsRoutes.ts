@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import ConversationService, {
   buildConversationPatchFields,
+  type ConversationPatchInput,
 } from "../services/ConversationService.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
@@ -32,9 +33,9 @@ interface ConversationDocument {
   isGenerating?: boolean;
   traceId?: string | null;
   synthetic?: boolean;
-  messages: any[];
+  messages: Record<string, unknown>[];
   systemPrompt?: string;
-  settings?: Record<string, any>;
+  settings?: Record<string, unknown>;
 }
 
 interface WorkflowDocument {
@@ -69,7 +70,7 @@ router.get(
 
       const { limit, cursor } = parsed.data;
 
-      const filter: Record<string, any> = { project, username };
+      const filter: Record<string, unknown> = { project, username };
       if (cursor) {
         // updatedAt is stored as ISO-8601 strings — compare string-to-string
         // to match BSON type and allow index range scan
@@ -186,11 +187,11 @@ router.post(
 
       const { messages, conversationMeta } = parsed.data;
 
-      const conversation = await (ConversationService as any).appendMessages(
+      const conversation = await ConversationService.appendMessages(
         conversationId,
         project,
         username,
-        messages,
+        messages as import("../types/admin.ts").ChatMessage[],
         conversationMeta || null,
       );
 
@@ -222,7 +223,7 @@ router.patch(
         return res.status(400).json({ error: parsed.error.format() });
       }
 
-      const setFields = buildConversationPatchFields(parsed.data);
+      const setFields = buildConversationPatchFields(parsed.data as unknown as ConversationPatchInput);
 
       const result = await db
         .collection<ConversationDocument>(COLLECTION)

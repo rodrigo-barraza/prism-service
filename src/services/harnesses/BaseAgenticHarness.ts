@@ -16,6 +16,7 @@ import { MONGO_DB_NAME } from "../../../config.ts";
 import { COLLECTIONS } from "../../constants.ts";
 import { finalizeTextGeneration, type FinalizerContext } from "./lifecycle/Finalizer.ts";
 import logger from "../../utils/logger.ts";
+import { errorMessage as getErrorMessage } from "../../utils/errorMessage.ts";
 
 import type AgenticLoopState from "../AgenticLoopState.ts";
 import type AgentHooks from "../AgentHooks.ts";
@@ -25,6 +26,8 @@ import type {
   PassState,
   ChunkAction,
   ConversationMessage,
+  StreamChunk,
+  ToolCall,
 } from "./types.ts";
 
 /**
@@ -83,8 +86,8 @@ export default class BaseAgenticHarness {
   emitGenerationProgress(): void {
     const { emit } = this.ctx;
     const state = this.state;
-    const stats = (SessionGenerationTracker as any).getSessionStats(
-            (this.trackerSessionId as any),
+    const stats = SessionGenerationTracker.getSessionStats(
+      this.trackerSessionId,
     );
     if (stats.activeRequests > 0 || stats.totalOutputTokens > 0) {
       state.hwmOutputTokens = Math.max(
@@ -137,7 +140,7 @@ export default class BaseAgenticHarness {
     toolCount: number,
   ): ConversationMessage[] {
     const { modelDef, options, emit } = this.ctx;
-        const contextResult = ContextWindowManager.enforce((messages as any), {
+    const contextResult = ContextWindowManager.enforce(messages as Parameters<typeof ContextWindowManager.enforce>[0], {
       maxInputTokens: modelDef?.maxInputTokens || 128_000,
       maxOutputTokens: options.maxTokens || 8192,
       toolCount,
@@ -162,10 +165,10 @@ export default class BaseAgenticHarness {
    */
   createProviderStream(
     messages: ConversationMessage[],
-    passOptions: any,
-  ): AsyncIterable<any> {
+    passOptions: Record<string, unknown>,
+  ): AsyncIterable<unknown> {
     const { provider, resolvedModel, modelDef, signal } = this.ctx;
-        const expandedMessages = expandMessagesForFC((messages as any), {
+    const expandedMessages = expandMessagesForFC(messages as Parameters<typeof expandMessagesForFC>[0], {
       filterDeleted: false,
     });
     return modelDef?.liveAPI && provider.generateTextStreamLive
@@ -186,14 +189,14 @@ export default class BaseAgenticHarness {
    * Handles abort signals and stream teardown.
    */
   public async consumeStream(
-    stream: AsyncIterable<any>,
+    stream: AsyncIterable<unknown>,
     pass: PassState,
     allowedToolNames: Set<string>,
   ): Promise<void> {
     for await (const chunk of stream) {
       const result = await this.processStreamChunk(chunk, pass, allowedToolNames);
       if (result.action === "break") {
-        const returnable = stream as AsyncGenerator<any>;
+        const returnable = stream as AsyncGenerator<unknown>;
         if (typeof returnable.return === "function") returnable.return(undefined);
         break;
       }
@@ -206,7 +209,7 @@ export default class BaseAgenticHarness {
   registerTrackerRequest(passRequestId: string): void {
     const { providerName, resolvedModel, parentAgentSessionId, agentSessionId } =
       this.ctx;
-        (SessionGenerationTracker as any).register((this.trackerSessionId as any), passRequestId, {
+    SessionGenerationTracker.register(this.trackerSessionId, passRequestId, {
       provider: providerName,
       model: resolvedModel,
       source: parentAgentSessionId ? "worker" : "orchestrator",
@@ -225,25 +228,27 @@ export default class BaseAgenticHarness {
    *   `break`    — abort signal received
    */
   processStreamChunk(
-    chunk: any,
+    chunk: unknown,
     pass: PassState,
     allowedToolNames: Set<string>,
   ): ChunkAction | Promise<ChunkAction> {
     const { emit, signal } = this.ctx;
     const state = this.state;
-    const c = chunk as any;
+    // Cast to a loose typed object — we branch on `type` below
+    const c = chunk as StreamChunk;
 
     // Abort check
     if (signal?.aborted) return { action: "break" };
 
     // ── Usage event ──────────────────────────────────────
     if (c?.type === "usage") {
-            mergeUsage((state.overallUsage as any), c.usage);
-            mergeUsage((pass.usage as any), c.usage);
+      mergeUsage(state.overallUsage, c.usage as Parameters<typeof mergeUsage>[1]);
+      mergeUsage(pass.usage, c.usage as Parameters<typeof mergeUsage>[1]);
+      const usageObj = c.usage as Record<string, number> | undefined;
       const reportedInput =
-        c.usage?.inputTokens || c.usage?.promptTokens || 0;
-      if (reportedInput > 0) {
-                (SessionGenerationTracker as any).update((pass.requestId as any), {
+        usageObj?.inputTokens || usageObj?.promptTokens || 0;
+      if (reportedInput > 0 && pass.requestId) {
+        SessionGenerationTracker.update(pass.requestId, {
           inputTokens: reportedInput,
         });
       }
@@ -252,7 +257,7 @@ export default class BaseAgenticHarness {
 
     // ── Rate limits ──────────────────────────────────────
     if (c?.type === "rateLimits") {
-      state.lastRateLimits = c.rateLimits;
+      state.lastRateLimits = c.rateLimits || null;
       return { action: "continue" };
     }
 
@@ -260,8 +265,8 @@ export default class BaseAgenticHarness {
     if (c?.type === "thinking") {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
-      state.streamedThinking += c.content;
-      pass.streamedThinking += c.content;
+      state.streamedThinking += c.content || "";
+      pass.streamedThinking += c.content || "";
       // Display segment tracking
       if (state.lastDisplaySegType !== "thinking") {
         state.displaySegments.push({
@@ -273,15 +278,17 @@ export default class BaseAgenticHarness {
       }
       state.displayThinkingFragments[
         state.displayThinkingFragments.length - 1
-      ] += c.content;
-      state.overallOutputCharacters += c.content.length;
-      (SessionGenerationTracker as any).recordChunkTiming(
-                (pass.requestId as any),
-        c.content.length,
-      );
+      ] += c.content || "";
+      state.overallOutputCharacters += (c.content || "").length;
+      if (pass.requestId) {
+        SessionGenerationTracker.recordChunkTiming(
+          pass.requestId,
+          (c.content || "").length,
+        );
+      }
       emit({
         type: "thinking",
-        content: c.content,
+        content: c.content || "",
         outputCharacters: state.overallOutputCharacters,
       });
       this.maybeEmitProgress();
@@ -290,7 +297,7 @@ export default class BaseAgenticHarness {
 
     // ── Thinking signature (Anthropic) ───────────────────
     if (c?.type === "thinking_signature") {
-      pass.thinkingSignature = c.signature;
+      pass.thinkingSignature = c.signature || "";
       return { action: "continue" };
     }
 
@@ -298,11 +305,13 @@ export default class BaseAgenticHarness {
     if (c?.type === "toolCallDelta") {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
-      state.overallOutputCharacters += c.characters;
-      (SessionGenerationTracker as any).recordChunkTiming(
-                (pass.requestId as any),
-        c.characters,
-      );
+      state.overallOutputCharacters += c.characters as number;
+      if (pass.requestId) {
+        SessionGenerationTracker.recordChunkTiming(
+          pass.requestId,
+          c.characters as number,
+        );
+      }
       this.maybeEmitProgress();
       return { action: "continue" };
     }
@@ -311,10 +320,12 @@ export default class BaseAgenticHarness {
     if (c?.type === "toolCall") {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
-      (SessionGenerationTracker as any).recordChunkTiming(
-                (pass.requestId as any),
-        JSON.stringify(c.args || {}).length,
-      );
+      if (pass.requestId) {
+        SessionGenerationTracker.recordChunkTiming(
+          pass.requestId,
+          JSON.stringify(c.args || {}).length,
+        );
+      }
       this.maybeEmitProgress();
 
       // Native MCP tool calls: pass through directly
@@ -323,15 +334,15 @@ export default class BaseAgenticHarness {
           const tcId = c.id || `ntc-${state.streamedToolCalls.length}`;
           state.streamedToolCalls.push({
             id: tcId,
-            name: c.name,
+            name: c.name || "",
             args: c.args || {},
           });
           this._trackToolDisplaySegment(tcId);
         } else if (c.status === "done" || c.status === "error") {
           const existing = state.streamedToolCalls.find(
-            (tc: any) =>
-              (c.id && (tc as any).id === c.id) ||
-              (!c.id && (tc as any).name === c.name),
+            (tc) =>
+              (c.id && tc.id === c.id) ||
+              (!c.id && tc.name === c.name),
           );
           if (existing) {
             existing.result = c.result;
@@ -352,18 +363,19 @@ export default class BaseAgenticHarness {
       }
 
       // Schema enforcement
-      if (!allowedToolNames.has(c.name)) {
+      const toolName = c.name || "";
+      if (!allowedToolNames.has(toolName)) {
         logger.warn(
-          `[AgenticLoop] Dropped tool call "${c.name}" — not in schema: [${[...allowedToolNames].join(", ")}]`,
+          `[AgenticLoop] Dropped tool call "${toolName}" — not in schema: [${[...allowedToolNames].join(", ")}]`,
         );
         return { action: "skip" };
       }
 
       const stdTcId = c.id || `tc-${state.streamedToolCalls.length}`;
-      const tc = {
+      const tc: ToolCall = {
         id: stdTcId,
         responsesItemId: c.responsesItemId || undefined,
-        name: c.name,
+        name: toolName,
         args: c.args || {},
         thoughtSignature: c.thoughtSignature || undefined,
       };
@@ -372,7 +384,7 @@ export default class BaseAgenticHarness {
       this._trackToolDisplaySegment(stdTcId);
       emit({
         type: "tool_execution",
-        tool: { name: c.name, args: c.args || {}, id: stdTcId },
+        tool: { name: toolName, args: c.args || {}, id: stdTcId },
         status: "calling",
       });
       return { action: "toolCall", tc };
@@ -427,7 +439,7 @@ export default class BaseAgenticHarness {
     pass.outputCharacters += rawChunkStr.length;
     pass.streamedText += rawChunkStr;
     // Strip tool call XML markup leaked by some local models
-    const cleanedPassText = stripToolCallMarkup((pass.streamedText as any));
+    const cleanedPassText = stripToolCallMarkup(pass.streamedText);
     const chunkStr = cleanedPassText.slice((pass.finalStreamedText || "").length);
     pass.finalStreamedText = cleanedPassText;
     state.finalStreamedText = cleanedPassText;
@@ -443,10 +455,12 @@ export default class BaseAgenticHarness {
     }
     state.displayTextFragments[state.displayTextFragments.length - 1] +=
       chunkStr;
-    (SessionGenerationTracker as any).recordChunkTiming(
-            (pass.requestId as any),
-      rawChunkStr.length,
-    );
+    if (pass.requestId) {
+      SessionGenerationTracker.recordChunkTiming(
+        pass.requestId,
+        rawChunkStr.length,
+      );
+    }
     if (chunkStr)
       emit({
         type: "chunk",
@@ -472,7 +486,7 @@ export default class BaseAgenticHarness {
       traceId,
     } = this.ctx;
     const state = this.state;
-    const pricing = (getPricing as (...args: string[]) => Record<string, Record<string, number>>)(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
+    const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
 
     const passTotalSec = (performance.now() - pass.start) / 1000;
     const passGenerationSec =
@@ -480,10 +494,10 @@ export default class BaseAgenticHarness {
         ? (pass.generationEnd - pass.firstTokenTime) / 1000
         : null;
     const passTokensPerSec = calculateTokensPerSec(
-            (pass.usage.outputTokens as any),
-      (passGenerationSec as any),
+      pass.usage.outputTokens,
+      passGenerationSec,
     );
-        const passEstimatedCost = calculateTextCost((pass.usage as any), pricing);
+    const passEstimatedCost = calculateTextCost(pass.usage as Parameters<typeof calculateTextCost>[0], pricing);
 
     RequestLogger.logChatGeneration({
       requestId: `${this.ctx.requestId}-${state.iterations}`,
@@ -525,7 +539,7 @@ export default class BaseAgenticHarness {
   // ── Per-iteration pass state factory ──────────────────────
 
   /** Create a fresh per-iteration pass state object. */
-  createPassState(passOptions: any): PassState {
+  createPassState(passOptions: Record<string, unknown>): PassState {
     return {
       streamedText: "",
       finalStreamedText: "",
@@ -575,7 +589,7 @@ export default class BaseAgenticHarness {
       `[AgenticLoop] finalize: session=${agentSessionId} project=${project} ` +
         `originalMsgCount=${state.originalMessageCount} currentMsgs=${currentMessages.length} ` +
         `newTurnMsgs=${newTurnMessages.length} ` +
-        `roles=[${newTurnMessages.map((message: any) => (message as any).role).join(",")}] ` +
+        `roles=[${newTurnMessages.map((m) => m.role).join(",")}] ` +
         `text=${(state.finalStreamedText || "").length}chars`,
     );
 
@@ -588,7 +602,7 @@ export default class BaseAgenticHarness {
         toolCalls: state.streamedToolCalls,
         audioChunks: state.streamedAudioChunks,
         audioSampleRate: state.audioSampleRate,
-        usage: state.overallUsage as any,
+        usage: state.overallUsage as Parameters<typeof finalizeTextGeneration>[1]["usage"],
         outputCharacters: state.overallOutputCharacters,
         timeToGenerationSec: state.overallFirstTokenTime
           ? (state.overallFirstTokenTime - requestStart) / 1000
@@ -603,12 +617,12 @@ export default class BaseAgenticHarness {
         textFragments: cleanTextFragments,
         thinkingFragments: cleanThinkingFragments,
       },
-            (newTurnMessages as any),
+      newTurnMessages as Parameters<typeof finalizeTextGeneration>[2],
     );
 
     // Persist worker snapshots for coordinator sessions
     if (
-      state.streamedToolCalls.some((tc: any) => (tc as any).name === "team_create") &&
+      state.streamedToolCalls.some((tc) => tc.name === "team_create") &&
       agentSessionId
     ) {
       try {
@@ -636,14 +650,13 @@ export default class BaseAgenticHarness {
           );
         }
       } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? (error as Error).message : String(error);
-        logger.error(`[AgenticLoop] Failed to persist workers: ${errorMessage}`);
+        logger.error(`[AgenticLoop] Failed to persist workers: ${getErrorMessage(error)}`);
       }
     }
 
     // afterResponse hook (fire-and-forget)
     hooks
-            .run(("afterResponse" as any), (context as any), {
+      .run("afterResponse" as Parameters<typeof hooks.run>[0], context, {
         text: state.finalStreamedText,
         thinking: state.streamedThinking,
         toolCalls: state.streamedToolCalls,
@@ -665,7 +678,7 @@ export default class BaseAgenticHarness {
     if (!pass.firstTokenTime) {
       pass.firstTokenTime = performance.now();
       const ttftSec = (pass.firstTokenTime - pass.start) / 1000;
-            (SessionGenerationTracker as any).update((pass.requestId as any), { ttft: ttftSec });
+      if (pass.requestId) SessionGenerationTracker.update(pass.requestId, { ttft: ttftSec });
       this.ctx.emit({
         type: "status",
         message: "generation_started",
@@ -691,7 +704,7 @@ export default class BaseAgenticHarness {
   }
 
   private async _handleImageChunk(
-    chunk: any,
+    chunk: Record<string, unknown>,
     pass: PassState,
   ): Promise<ChunkAction> {
     const { emit, project, username } = this.ctx;
@@ -701,7 +714,7 @@ export default class BaseAgenticHarness {
       try {
         const mimeType = chunk.mimeType || "image/png";
         const dataUrl = `data:${mimeType};base64,${chunk.data}`;
-        const { ref } = await (FileService as any).uploadFile(
+        const { ref } = await FileService.uploadFile(
           dataUrl,
           "generations",
           project,
@@ -709,8 +722,7 @@ export default class BaseAgenticHarness {
         );
         minioRef = ref;
       } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? (error as Error).message : String(error);
-        logger.error(`MinIO upload failed: ${errorMessage}`);
+        logger.error(`MinIO upload failed: ${getErrorMessage(error)}`);
       }
       const imgRef =
         minioRef ||

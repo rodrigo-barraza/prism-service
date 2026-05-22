@@ -30,48 +30,80 @@
 const MIN_ELAPSED_SEC = 0.5; // 500ms minimum sample window
 const MIN_TOKENS_FOR_RATE = 10; // minimum tokens before reporting rate
 
-/**
- * @property {string} requestId
- * @property {string} agentSessionId
- * @property {number} startTime        - performance.now() when request began
- * @property {number} firstTokenTime   - performance.now() of first token (null until first token)
- * @property {number} lastTokenTime    - performance.now() of most recent token
- * @property {number} outputTokens     - running output token count (per-iteration)
- * @property {number} chunkCount       - running count of streamed chunks
- * @property {number} outputCharacters - cumulative output character count (used for token estimation)
- * @property {number} inputTokens      - input token count (set from provider usage)
- * @property {number|null} ttft        - time to first token in seconds (null until first token)
- * @property {string} provider
- * @property {string} model
- * @property {string} source           - "orchestrator" | "worker" | "tool-sub-request"
- * @property {string|null} workerId    - worker agent ID (null for orchestrator/sub-requests)
- */
+// ── Interfaces ──────────────────────────────────────────────
 
-/** @type {Map<string, ActiveRequest>} requestId → ActiveRequest */
-const activeRequests = new Map();
+interface ActiveRequest {
+  requestId: string;
+  agentSessionId: string;
+  startTime: number;
+  firstTokenTime: number | null;
+  lastTokenTime: number | null;
+  outputTokens: number;
+  chunkCount: number;
+  outputCharacters: number;
+  inputTokens: number;
+  ttft: number | null;
+  provider: string;
+  model: string;
+  source: string;
+  workerId: string | null;
+}
 
-/** @type {Map<string, Set<string>>} agentSessionId → Set<requestId> */
-const sessionIndex = new Map();
+interface SessionAccumulator {
+  completedOutputTokens: number;
+  completedInputTokens: number;
+  ttftSamples: number[];
+  completedTokPerSecSamples: number[];
+}
 
-/**
- * @property {number} completedOutputTokens   - cumulative output tokens from completed requests
- * @property {number} completedInputTokens    - cumulative input tokens from completed requests
- * @property {number[]} ttftSamples           - TTFT values (seconds) from each completed request
- * @property {number[]} completedTokPerSecSamples - tok/s from each completed request
- */
+interface RegisterOptions {
+  provider?: string;
+  model?: string;
+  source?: string;
+  workerId?: string | null;
+}
 
-/** @type {Map<string, SessionAccumulator>} agentSessionId → cumulative session counters */
-const sessionAccumulators = new Map();
+interface UpdateParams {
+  outputTokens?: number;
+  inputTokens?: number;
+  ttft?: number;
+}
 
-const SessionGenerationTracker = ({
-    register(
-    agentSessionId: any,
-    requestId: any,
-        { provider, model, source = "orchestrator", workerId = null }: any = {},
+interface SessionStats {
+  tokPerSec: number | null;
+  activeRequests: number;
+  totalOutputTokens: number;
+  totalInputTokens: number;
+  totalTokens: number;
+  avgTtft: number | null;
+}
+
+interface SessionGenerationTrackerInterface {
+  register(agentSessionId: string, requestId: string, options?: RegisterOptions): void;
+  update(requestId: string, params?: UpdateParams): void;
+  recordChunkTiming(requestId: string, charCount?: number): void;
+  complete(requestId: string): void;
+  getSessionStats(agentSessionId: string): SessionStats;
+  cleanup(agentSessionId: string): void;
+  hasActiveRequests(agentSessionId: string): boolean;
+  readonly totalActiveRequests: number;
+}
+
+// ── State ───────────────────────────────────────────────────
+
+const activeRequests = new Map<string, ActiveRequest>();
+const sessionIndex = new Map<string, Set<string>>();
+const sessionAccumulators = new Map<string, SessionAccumulator>();
+
+const SessionGenerationTracker: SessionGenerationTrackerInterface = {
+  register(
+    agentSessionId: string,
+    requestId: string,
+    { provider, model, source = "orchestrator", workerId = null }: RegisterOptions = {},
   ) {
     if (!agentSessionId || !requestId) return;
 
-    const entry = {
+    const entry: ActiveRequest = {
       requestId,
       agentSessionId,
       startTime: performance.now(),
@@ -85,7 +117,7 @@ const SessionGenerationTracker = ({
       provider: provider || "any",
       model: model || "any",
       source,
-      workerId,
+      workerId: workerId ?? null,
     };
 
     activeRequests.set(requestId, entry);
@@ -94,7 +126,7 @@ const SessionGenerationTracker = ({
     if (!sessionIndex.has(agentSessionId)) {
       sessionIndex.set(agentSessionId, new Set());
     }
-    sessionIndex.get(agentSessionId).add(requestId);
+    sessionIndex.get(agentSessionId)!.add(requestId);
 
     // Initialize session accumulator (idempotent — preserves across iterations)
     if (!sessionAccumulators.has(agentSessionId)) {
@@ -111,7 +143,7 @@ const SessionGenerationTracker = ({
    * Update a tracked request with new token data.
    * Called on each chunk/thinking event or on usage completion.
    */
-    update(requestId: any, { outputTokens, inputTokens, ttft }: any = {}) {
+  update(requestId: string, { outputTokens, inputTokens, ttft }: UpdateParams = {}) {
     const entry = activeRequests.get(requestId);
     if (!entry) return;
 
@@ -140,7 +172,7 @@ const SessionGenerationTracker = ({
    * undercounts tokens. Using `outputCharacters / 4` (~4 chars/token
    * for English) gives a reliable cross-provider heuristic.
    */
-    recordChunkTiming(requestId: any, charCount: any = 0) {
+  recordChunkTiming(requestId: string, charCount: number = 0) {
     const entry = activeRequests.get(requestId);
     if (!entry) return;
     const now = performance.now();
@@ -156,7 +188,7 @@ const SessionGenerationTracker = ({
    * the session accumulator so cumulative totals remain monotonically
    * non-decreasing.
    */
-  complete(requestId: any) {
+  complete(requestId: string) {
     const entry = activeRequests.get(requestId);
     if (!entry) return;
 
@@ -172,7 +204,7 @@ const SessionGenerationTracker = ({
 
     // Compute this request's tok/s from the effective token count and
     // the timing window captured during streaming.
-    let requestTokPerSec = null;
+    let requestTokPerSec: number | null = null;
     if (
       effectiveOutputTokens > 0 &&
       entry.firstTokenTime &&
@@ -214,11 +246,8 @@ const SessionGenerationTracker = ({
    * a request has accumulated at least MIN_TOKENS_FOR_RATE tokens over
    * at least MIN_ELAPSED_SEC seconds. This prevents anomalous spikes
    * from single large chunks arriving in near-zero elapsed time.
-   *
-
-   * }}
    */
-  getSessionStats(agentSessionId: any) {
+  getSessionStats(agentSessionId: string): SessionStats {
     const requestIds = sessionIndex.get(agentSessionId);
     const accumulator = sessionAccumulators.get(agentSessionId);
     const completedOutputTokens = accumulator?.completedOutputTokens || 0;
@@ -230,7 +259,7 @@ const SessionGenerationTracker = ({
       const totalIn = completedInputTokens;
       const avgTtft =
         ttftSamples.length > 0
-                    ? ttftSamples.reduce((a: any, b: any) => a + b, 0) /
+          ? ttftSamples.reduce((a: number, b: number) => a + b, 0) /
             ttftSamples.length
           : null;
       // Use the most recent completed tok/s (last iteration's rate)
@@ -256,7 +285,7 @@ const SessionGenerationTracker = ({
     let activeTtftSum = 0;
     let activeTtftCount = 0;
 
-        for ( const rid of requestIds) {
+    for (const rid of requestIds) {
       const req = activeRequests.get(rid);
       if (!req) continue;
 
@@ -302,14 +331,14 @@ const SessionGenerationTracker = ({
 
     // Average TTFT across completed + active samples
     const allTtftSum =
-            ttftSamples.reduce((a: any, b: any) => a + b, 0) + activeTtftSum;
+      ttftSamples.reduce((a: number, b: number) => a + b, 0) + activeTtftSum;
     const allTtftCount = ttftSamples.length + activeTtftCount;
     const avgTtft = allTtftCount > 0 ? allTtftSum / allTtftCount : null;
 
     // Tok/s: aggregate throughput across all active requests (sum, not average).
     // When multiple workers generate in parallel, the session-level rate
     // reflects total tokens/sec being produced across the entire session.
-    let tokPerSec = null;
+    let tokPerSec: number | null = null;
     if (generatingCount > 0) {
       tokPerSec = parseFloat(totalTokPerSec.toFixed(1));
     } else {
@@ -331,17 +360,17 @@ const SessionGenerationTracker = ({
       avgTtft: avgTtft != null ? parseFloat(avgTtft.toFixed(3)) : null,
     };
   },
-  cleanup(agentSessionId: any) {
+  cleanup(agentSessionId: string) {
     const requestIds = sessionIndex.get(agentSessionId);
     if (requestIds) {
-            for ( const rid of requestIds) {
+      for (const rid of requestIds) {
         activeRequests.delete(rid);
       }
       sessionIndex.delete(agentSessionId);
     }
     sessionAccumulators.delete(agentSessionId);
   },
-  hasActiveRequests(agentSessionId: any) {
+  hasActiveRequests(agentSessionId: string) {
     const requestIds = sessionIndex.get(agentSessionId);
     return !!(requestIds && requestIds.size > 0);
   },
@@ -350,6 +379,6 @@ const SessionGenerationTracker = ({
   get totalActiveRequests() {
     return activeRequests.size;
   },
-} as any);
+};
 
 export default SessionGenerationTracker;

@@ -206,3 +206,45 @@ export interface AgenticLoopStateInit {
   originalMessageCount?: number;
   planModeActive?: boolean;
 }
+
+// ── Stream Chunk ────────────────────────────────────────────
+
+/**
+ * Loose union of all provider stream events. We branch on `type` at
+ * runtime so a flat optional-field interface avoids verbose DU noise.
+ */
+export interface StreamChunk {
+  type?: string;
+  // Usage
+  usage?: Record<string, number>;
+  // Rate limits
+  rateLimits?: Record<string, unknown>;
+  // Thinking
+  content?: string;
+  signature?: string;
+  // Tool call delta
+  characters?: number;
+  // Tool call
+  id?: string;
+  responsesItemId?: string;
+  name?: string;
+  args?: Record<string, unknown>;
+  thoughtSignature?: string;
+  native?: boolean;
+  status?: string;
+  result?: unknown;
+  // Image
+  data?: string;
+  mimeType?: string;
+  // Executable code
+  code?: string;
+  language?: string;
+  // Code execution result
+  output?: string;
+  outcome?: string;
+  // Web search result
+  results?: unknown[];
+  // Status
+  message?: string;
+  [key: string]: unknown;
+}

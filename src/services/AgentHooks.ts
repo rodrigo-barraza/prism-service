@@ -1,8 +1,8 @@
-import { EventEmitter } from "events";
 import logger from "../utils/logger.ts";
+import { errorMessage } from "../utils/errorMessage.ts";
 
 /**
- * AgentHooks — EventEmitter-based lifecycle system for the agentic loop.
+ * AgentHooks — typed lifecycle system for the agentic loop.
  *
  * Events:
  *   beforePrompt     — Fires before each LLM call. Listeners receive (ctx) and
@@ -18,24 +18,45 @@ import logger from "../utils/logger.ts";
  * Usage:
  *   const hooks = new AgentHooks();
  *   hooks.register("beforePrompt", async (ctx) => { ... });
- *   await hooks.emit("beforePrompt", ctx);
+ *   await hooks.run("beforePrompt", ctx);
  */
-export default class AgentHooks extends EventEmitter {
+
+type HookEvent =
+  | "beforePrompt"
+  | "beforeToolCall"
+  | "afterToolCall"
+  | "afterResponse"
+  | "onError";
+
+// Hook handlers have heterogeneous signatures per event (beforePrompt receives
+// a context object, beforeToolCall receives (toolCall, ctx), afterResponse
+// receives (ctx, output), etc.). A single function type can't express this
+// without a complex generic event map, so we use a callable interface.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type HookHandler = (...args: any[]) => Promise<object | void> | object | void;
+
+interface RegisteredHook {
+  handler: HookHandler;
+  name: string;
+}
+
+export default class AgentHooks {
+  private _hooks: Map<HookEvent, RegisteredHook[]>;
+
   constructor() {
-    super();
-        (this as any)._hooks = new Map();
+    this._hooks = new Map();
   }
 
   /**
    * Register a named async hook for a lifecycle event.
    * Hooks run sequentially in registration order.
    */
-  register(event: any, handler: any, name: string) {
-        if (!(this as any)._hooks.has(event)) {
-            (this as any)._hooks.set(event, []);
+  register(event: HookEvent, handler: HookHandler, name: string): void {
+    if (!this._hooks.has(event)) {
+      this._hooks.set(event, []);
     }
-        (this as any)._hooks
-      .get(event)
+    this._hooks
+      .get(event)!
       .push({ handler, name: name || handler.name || "anonymous" });
   }
 
@@ -43,26 +64,27 @@ export default class AgentHooks extends EventEmitter {
    * Run all registered hooks for an event sequentially.
    * Each hook can mutate ctx or return a control object.
    */
-    async run(event: any, ...args: any) {
-        const hooks = (this as any)._hooks.get(event) || [];
-    let result: any;
+  async run(event: HookEvent, ...args: unknown[]): Promise<Record<string, unknown> | undefined> {
+    const hooks = this._hooks.get(event) || [];
+    let result: Record<string, unknown> | undefined;
 
-        for ( const { handler, name } of hooks) {
+    for (const { handler, name } of hooks) {
       try {
-                const hookResult = await handler(...args);
+        const hookResult = await handler(...args);
         if (hookResult && typeof hookResult === "object") {
-                    result = { ...result, ...hookResult };
+          result = { ...result, ...hookResult };
         }
       } catch (error: unknown) {
         logger.error(
-                    `[AgentHooks] Hook "${name}" on "${event}" failed: ${(error as Error).message}`,
+          `[AgentHooks] Hook "${name}" on "${event}" failed: ${errorMessage(error)}`,
         );
       }
     }
 
-        return result;
+    return result;
   }
-  hasHooks(event: any) {
-        return ((this as any)._hooks.get(event) || []).length > 0;
+
+  hasHooks(event: HookEvent): boolean {
+    return (this._hooks.get(event) || []).length > 0;
   }
 }

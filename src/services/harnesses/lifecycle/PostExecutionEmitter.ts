@@ -18,19 +18,19 @@ export function emitPostExecutionStatus(
   toolCalls: ToolCall[],
   emit: EmitFn,
 ): void {
-  if (toolCalls.some((tc: any) => (tc as any).name.startsWith("task_"))) {
+  if (toolCalls.some((tc) => tc.name.startsWith("task_"))) {
     emit({ type: "status", message: "tasks_updated" });
   }
 
   if (
     toolCalls.some(
-      (tc: unknown) => (tc as any).name === "team_create" || (tc as any).name === "stop_agent",
+      (tc) => tc.name === "team_create" || tc.name === "stop_agent",
     )
   ) {
     emit({ type: "status", message: "workers_updated" });
   }
 
-  if (toolCalls.some((tc: unknown) => (tc as any).name === "upsert_memory")) {
+  if (toolCalls.some((tc) => tc.name === "upsert_memory")) {
     emit({ type: "status", message: "memories_updated" });
   }
 }
@@ -45,9 +45,9 @@ export function processToolResultMedia(
 ): void {
   for (const tc of toolCalls) {
     const res = results.find(
-      (r: unknown) => (r as any).id === tc.id || (!(r as any).id && (r as any).name === tc.name),
+      (r) => r.id === tc.id || (!r.id && r.name === tc.name),
     );
-    const resultObj = res?.result as Record<string, any> | null;
+    const resultObj = res?.result as Record<string, unknown> | null;
     const hasError = !!resultObj?.error;
 
     emit({
@@ -63,23 +63,23 @@ export function processToolResultMedia(
     });
 
     if (resultObj?.screenshotRef) {
-      state.streamedImages.push(resultObj.screenshotRef);
-      pass.streamedImages.push(resultObj.screenshotRef);
+      state.streamedImages.push(resultObj.screenshotRef as string);
+      pass.streamedImages.push(resultObj.screenshotRef as string);
     }
 
-    if (resultObj?.image?.data) {
-      const image = resultObj.image;
+    const imageResult = resultObj?.image as Record<string, string> | undefined;
+    if (imageResult?.data) {
       const toolImgRef =
-        image.minioRef || `data:${image.mimeType};base64,${image.data}`;
+        imageResult.minioRef || `data:${imageResult.mimeType};base64,${imageResult.data}`;
       state.streamedImages.push(toolImgRef);
       pass.streamedImages.push(toolImgRef);
       emit({
         type: "image",
-        data: image.data,
-        mimeType: image.mimeType,
-        minioRef: image.minioRef,
+        data: imageResult.data,
+        mimeType: imageResult.mimeType,
+        minioRef: imageResult.minioRef,
       });
-      delete resultObj.image;
+      if (resultObj) delete resultObj.image;
     }
   }
 }
@@ -94,9 +94,9 @@ export function trackToolErrors(
 ): void {
   for (const tc of toolCalls) {
     const res = results.find(
-      (r: unknown) => (r as any).id === tc.id || (!(r as any).id && (r as any).name === tc.name),
+      (r) => r.id === tc.id || (!r.id && r.name === tc.name),
     );
-    const hasError = !!(res?.result as Record<string, any>)?.error;
+    const hasError = !!(res?.result as Record<string, unknown>)?.error;
 
     if (hasError) {
       const count = (state.toolErrorCounts.get(tc.name) || 0) + 1;

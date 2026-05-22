@@ -12,6 +12,10 @@ import {
   getTotalInputTokens,
 } from "../utils/CostCalculator.ts";
 import { TYPES, getPricing } from "../config.ts";
+import { errorMessage } from "../utils/errorMessage.ts";
+import type { ConversationMessage, ToolCall, EmitFn, AgenticContext } from "./harnesses/types.ts";
+import type { GenerateTextResult } from "../types/provider.ts";
+import type { MessagePayload } from "./RequestLogger.ts";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -99,6 +103,37 @@ interface ExtractedMemory {
   content: string;
 }
 
+interface StoredMemory {
+  type: string;
+  id: string;
+  title: string;
+}
+
+interface MemoryExtractionContext {
+  project: string;
+  username: string;
+  messages: ConversationMessage[];
+  traceId?: string | null;
+  agentSessionId?: string | null;
+  conversationId?: string | null;
+  endpoint?: string | null;
+  agent?: string | null;
+  toolCalls?: ToolCall[];
+  emit?: EmitFn | null;
+}
+
+interface MemorySettingsSection {
+  extractionProvider?: string;
+  extractionModel?: string;
+  embeddingModel?: string;
+}
+
+interface AfterResponseOutput {
+  _text?: string;
+  messages?: ConversationMessage[];
+  toolCalls?: ToolCall[];
+}
+
 // ─── MemoryExtractor ─────────────────────────────────────────────────────────
 
 /**
@@ -125,10 +160,10 @@ export default class MemoryExtractor {
     agent,
     toolCalls,
     emit,
-  }: any) {
-        if (!messages || (messages as any).length < MIN_MESSAGES_FOR_EXTRACTION) {
+  }: MemoryExtractionContext): Promise<StoredMemory[]> {
+    if (!messages || messages.length < MIN_MESSAGES_FOR_EXTRACTION) {
       logger.info(
-                `[MemoryExtractor] Skipping — only ${(messages as any)?.length || 0} messages (min: ${MIN_MESSAGES_FOR_EXTRACTION})`,
+        `[MemoryExtractor] Skipping — only ${messages?.length || 0} messages (min: ${MIN_MESSAGES_FOR_EXTRACTION})`,
       );
       return [];
     }
@@ -138,7 +173,7 @@ export default class MemoryExtractor {
     // skip extraction — the agent's explicit memory writes take precedence.
     // This prevents duplicate or conflicting memories from the extraction
     // pipeline when the agent has already decided what to remember.
-        if ((toolCalls as any)?.some((tc: any) => tc.name === "upsert_memory")) {
+    if (toolCalls?.some((tc) => tc.name === "upsert_memory")) {
       logger.info(
         `[MemoryExtractor] Skipping — main agent used upsert_memory this turn (mutual exclusion)`,
       );
@@ -147,9 +182,10 @@ export default class MemoryExtractor {
 
     try {
       // ── Resolve extraction model from settings ────────────────
-      let extractionProvider: any, extractionModel: any;
+      let extractionProvider: string | undefined;
+      let extractionModel: string | undefined;
       try {
-                const mem = await SettingsService.getSection(("memory" as any));
+        const mem = await SettingsService.getSection("memory") as MemorySettingsSection;
         extractionProvider = mem.extractionProvider;
         extractionModel = mem.extractionModel;
       } catch {
@@ -170,18 +206,18 @@ export default class MemoryExtractor {
       const provider = getProvider(extractionProvider);
 
       // Build conversation text (compact format to save tokens)
-      const conversationText = (messages as any)
-                .filter((m: any) => m.role === "user" || m.role === "assistant")
-        .map((m: any) => {
+      const conversationText = messages
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => {
           const content = m.content || "";
           // Truncate very long messages to save tokens
           const truncated =
-                        (content as any).length > 500 ? (content as any).slice(0, 500) + "..." : content;
+            content.length > 500 ? content.slice(0, 500) + "..." : content;
           return `${m.role}: ${truncated}`;
         })
         .join("\n");
 
-      const aiMessages = [
+      const aiMessages: MessagePayload[] = [
         { role: "system", content: EXTRACTION_PROMPT },
         {
           role: "user",
@@ -191,9 +227,9 @@ export default class MemoryExtractor {
 
       const requestId = crypto.randomUUID();
       const requestStart = performance.now();
-      let result: any;
+      let result: GenerateTextResult | undefined;
       let success = true;
-      let errorMessage = null;
+      let extractionError: string | null = null;
 
       try {
         result = await provider.generateText(aiMessages, extractionModel, {
@@ -202,19 +238,19 @@ export default class MemoryExtractor {
         });
       } catch (error: unknown) {
         success = false;
-                errorMessage = (error as Error).message;
+        extractionError = errorMessage(error);
         throw error;
       } finally {
         // Use real API-reported usage when available; fall back to heuristic
-                const realUsage = result?.usage || null;
-        const inputText = aiMessages.map((m: any) => m.content).join("\n");
+        const realUsage = result?.usage || null;
+        const inputText = aiMessages.map((m) => typeof m.content === "string" ? m.content : "").join("\n");
         const approxInputTokens = realUsage
-                    ? getTotalInputTokens((realUsage as any))
-                    : estimateTokens((inputText as any));
+          ? getTotalInputTokens(realUsage)
+          : estimateTokens(inputText);
         const approxOutputTokens = realUsage
-                    ? (realUsage as any).outputTokens || 0
-                    : result?.text
-                        ? estimateTokens((result.text as any))
+          ? realUsage.outputTokens || 0
+          : result?.text
+            ? estimateTokens(result.text)
             : 0;
 
         RequestLogger.logBackgroundLlmCall({
@@ -229,13 +265,13 @@ export default class MemoryExtractor {
           traceId: traceId || null,
           agentSessionId: agentSessionId || null,
           aiMessages,
-                    resultText: result?.text || "",
+          resultText: result?.text || "",
           usage: realUsage,
           success,
-          errorMessage,
+          errorMessage: extractionError,
           requestStartMs: requestStart,
           extraRequestPayload: {
-                        messageCount: (messages as any).length,
+            messageCount: messages.length,
             conversationId: conversationId || null,
           },
         });
@@ -246,8 +282,8 @@ export default class MemoryExtractor {
         // before the backend aggregation (fetchSessionStats) completes.
         if (emit && success) {
           try {
-                        const extractPricing = getPricing(TYPES.TEXT, TYPES.TEXT)[
-                            (extractionModel as string)
+            const extractPricing = getPricing(TYPES.TEXT, TYPES.TEXT)[
+              extractionModel
             ];
             const extractCost = extractPricing
               ? calculateTextCost(
@@ -258,7 +294,7 @@ export default class MemoryExtractor {
                   extractPricing,
                 )
               : null;
-                        emit({
+            emit({
               type: "usage_update",
               operation: "memory:extract",
               usage: {
@@ -274,7 +310,7 @@ export default class MemoryExtractor {
         }
       }
 
-            const memories = parseJsonFromLlmResponse((result.text as any | null | undefined)) as ExtractedMemory[] | null;
+      const memories = parseJsonFromLlmResponse(result!.text) as ExtractedMemory[] | null;
       if (!Array.isArray(memories)) {
         logger.warn("[MemoryExtractor] Response was not an array");
         return [];
@@ -282,32 +318,32 @@ export default class MemoryExtractor {
 
       // ── Store each memory via MemoryService ─────────────────────
       const agentId = agent || "CODING";
-      const stored: any[] = [];
+      const stored: StoredMemory[] = [];
 
-      for ( const mem of memories) {
+      for (const mem of memories) {
         if (!mem.content || !mem.title) continue;
 
-        // Validate type — default to "project" if any
+        // Validate type — default to "project" if unknown
         const type = CODING_MEMORY_TYPES.includes(mem.type)
           ? mem.type
           : "project";
 
         try {
-          const result = await MemoryService.store({
+          const storeResult = await MemoryService.store({
             agent: agentId,
             project,
             username,
             type,
             title: mem.title,
             content: mem.content,
-            conversationId,
-            traceId,
-            agentSessionId,
+            conversationId: conversationId || undefined,
+            traceId: traceId || undefined,
+            agentSessionId: agentSessionId || undefined,
             endpoint: endpoint || "/agent",
           });
 
-          if (result) {
-            stored.push({ type, id: result.id, title: mem.title });
+          if (storeResult) {
+            stored.push({ type, id: storeResult.id, title: mem.title });
             logger.info(
               `[MemoryExtractor] Stored [${type}] "${mem.title.substring(0, 60)}"`,
             );
@@ -317,12 +353,12 @@ export default class MemoryExtractor {
             );
           }
         } catch (error: unknown) {
-                    logger.error(`[MemoryExtractor] Storage failed: ${(error as Error).message}`);
+          logger.error(`[MemoryExtractor] Storage failed: ${errorMessage(error)}`);
         }
       }
 
       logger.info(
-        `[MemoryExtractor] Stored ${stored.length}/${memories.length} memories from conversation ${conversationId || "any"}`,
+        `[MemoryExtractor] Stored ${stored.length}/${memories.length} memories from conversation ${conversationId || "unknown"}`,
       );
 
       // Emit usage for the embedding calls that happened during storage.
@@ -333,15 +369,15 @@ export default class MemoryExtractor {
           const embedTokens = stored.length * 50; // ~50 tokens per memory title+content
           // Embedding cost: input tokens only (no output tokens)
           const embedPricing = getPricing(TYPES.TEXT, TYPES.EMBEDDING);
-                    const embedModel = (await SettingsService.getSection(("memory" as any)))
+          const embedModel = (await SettingsService.getSection("memory") as MemorySettingsSection)
             ?.embeddingModel;
-                    const embedModelPricing = embedModel
-                        ? embedPricing[embedModel]
+          const embedModelPricing = embedModel
+            ? embedPricing[embedModel]
             : null;
           const embedCost = embedModelPricing?.inputPerMillion
             ? (embedTokens / 1_000_000) * embedModelPricing.inputPerMillion
             : null;
-                    emit({
+          emit({
             type: "usage_update",
             operation: "embed:memory",
             usage: {
@@ -358,7 +394,7 @@ export default class MemoryExtractor {
 
       return stored;
     } catch (error: unknown) {
-            logger.error(`[MemoryExtractor] Failed: ${(error as Error).message}`);
+      logger.error(`[MemoryExtractor] Failed: ${errorMessage(error)}`);
       return [];
     }
   }
@@ -368,7 +404,7 @@ export default class MemoryExtractor {
    * Runs as fire-and-forget (non-blocking).
    */
   static createHook() {
-    return async (context: any, { _text, messages, toolCalls }: any) => {
+    return async (context: AgenticContext, { _text, messages, toolCalls }: AfterResponseOutput) => {
       // Fire-and-forget — don't block the response
       MemoryExtractor.extractAndStore({
         project: context.project,
@@ -376,15 +412,15 @@ export default class MemoryExtractor {
         messages: messages || context.messages,
         traceId: context.traceId,
         agentSessionId: context.agentSessionId,
-        conversationId: context.conversationId,
-        endpoint: context.endpoint || "/agent",
+        conversationId: context.conversationId as string | null,
+        endpoint: (context as Record<string, unknown>).endpoint as string | null || "/agent",
         agent: context.agent || null,
         toolCalls: toolCalls || [],
         emit: context.emit || null,
       })
-                .then((stored: any) => {
-                    if ((stored as any)?.length > 0 && context.emit) {
-                        context.emit({
+        .then((stored) => {
+          if (stored?.length > 0 && context.emit) {
+            context.emit({
               type: "status",
               message: "memories_updated",
               count: stored.length,
@@ -393,7 +429,7 @@ export default class MemoryExtractor {
 
           // Build a broadcast callback from ctx.emit for consolidation notifications
           const broadcast = context.emit
-                        ? (payload: any) => (context as any).emit(payload)
+            ? (payload: Record<string, unknown>) => context.emit(payload as { type: string; [key: string]: unknown })
             : undefined;
 
           // Check if consolidation should run (tracks session count)
@@ -401,15 +437,15 @@ export default class MemoryExtractor {
             project: context.project,
             username: context.username,
             broadcast,
-            endpoint: context.endpoint || "/agent",
+            endpoint: (context as Record<string, unknown>).endpoint as string | null || "/agent",
             agent: context.agent || null,
             traceId: context.traceId || null,
             agentSessionId: context.agentSessionId || null,
           });
         })
-        .catch((error: any) =>
+        .catch((error: unknown) =>
           logger.error(
-            `[MemoryExtractor] Background extraction failed: ${error.message}`,
+            `[MemoryExtractor] Background extraction failed: ${errorMessage(error)}`,
           ),
         );
     };

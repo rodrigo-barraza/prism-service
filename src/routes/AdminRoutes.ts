@@ -1680,7 +1680,7 @@ router.get(
 
     if (ChangeStreamService.available) {
       // Change Stream-driven: re-query stats only when conversations change
-      const onEvent = (event: Record<string, unknown>) => {
+      const onEvent = (event: import("../services/ChangeStreamService.ts").ChangeStreamEventPayload) => {
         if (event.collection === "conversations") {
           sendStats();
         }
@@ -1746,7 +1746,7 @@ router.get(
 
     if (ChangeStreamService.available) {
       // Push change events as they arrive from MongoDB
-      const onEvent = (event: Record<string, unknown>) => {
+      const onEvent = (event: import("../services/ChangeStreamService.ts").ChangeStreamEventPayload) => {
         try {
           res.write(
             `data: ${JSON.stringify({ type: "change", ...event })}\n\n`,

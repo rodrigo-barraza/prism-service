@@ -1514,7 +1514,7 @@ export default class CoordinatorService {
     let loopResult: { messages?: ConversationMessage[] } | undefined;
     try {
       loopResult = await AgenticLoopService.runAgenticLoop({
-        provider: workerProvider,
+        provider: workerProvider as import("./harnesses/types.ts").LLMProvider,
                 providerName: worker.providerName,
                 resolvedModel: worker.resolvedModel,
         modelDef: workerModelDef,
@@ -1986,7 +1986,7 @@ export default class CoordinatorService {
       worker.abortController = abortController;
 
       await AgenticLoopService.runAgenticLoop({
-        provider: workerProvider,
+        provider: workerProvider as import("./harnesses/types.ts").LLMProvider,
         providerName: resolvedProviderName,
         resolvedModel: resolvedModel!,
         modelDef: workerModelDef,
