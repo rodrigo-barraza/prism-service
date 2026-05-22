@@ -83,7 +83,7 @@ router.post(
  * Get the current status of a coordinator task.
  */
 router.get("/status/:taskId", (req: Request, res: Response) => {
-    const status = CoordinatorService.getStatus((req.params.taskId as any));
+  const status = CoordinatorService.getStatus(req.params.taskId as string);
   if (!status) {
     return res.status(404).json({ error: "Task not found" });
   }
@@ -106,7 +106,7 @@ router.post(
   "/approve-merge/:taskId",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            const result = await CoordinatorService.approveMerge((req.params.taskId as any));
+      const result = await CoordinatorService.approveMerge(req.params.taskId as string);
       if (result.error) {
         return res.status(400).json(result);
       }
@@ -126,7 +126,7 @@ router.post(
   "/abort/:taskId",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            const result = await CoordinatorService.abort((req.params.taskId as any));
+      const result = await CoordinatorService.abort(req.params.taskId as string);
       if (result.error) {
         return res.status(400).json(result);
       }
@@ -150,7 +150,7 @@ router.post(
 router.get(
   "/workers",
   asyncHandler(async (req: Request, res: Response) => {
-    const { agentSessionId } = req.query;
+    const agentSessionId = req.query.agentSessionId as string | undefined;
     let workers = CoordinatorService.listWorkers({
       parentAgentSessionId: agentSessionId,
     });
@@ -211,7 +211,7 @@ router.post(
  * Get the status of a specific chat-spawned worker.
  */
 router.get("/workers/:agentId", (req: Request, res: Response) => {
-    const status = CoordinatorService.getWorkerStatus((req.params.agentId as any));
+  const status = CoordinatorService.getWorkerStatus(req.params.agentId as string);
   if (!status) {
     return res.status(404).json({ error: "Worker not found" });
   }

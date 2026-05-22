@@ -21,6 +21,24 @@ import { createAbortController } from "../utils/AbortController.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
 import SessionGenerationTracker from "./SessionGenerationTracker.ts";
 import { resolveModelForInstances } from "../utils/ModelResolution.ts";
+import type {
+  WorkerState,
+  WorktreeDiff,
+  WorkerResult,
+  InstanceAssignment,
+  CoordinatorSpawnParams,
+  CoordinatorContext,
+  ToolsApiResponse,
+  WorktreeCreateResponse,
+  SubTask,
+  PanelWorker,
+  PanelTaskState,
+  TeamEntry,
+  TeamMember,
+  TeamMemberResult,
+} from "../types/coordinator.ts";
+import type { ConversationMessage, EmitFn, ToolCall, ToolSchema } from "./harnesses/types.ts";
+import type { InstanceEntry } from "../types/ProviderTypes.ts";
 
 // ────────────────────────────────────────────────────────────
 // CoordinatorService — Multi-Agent Orchestration
@@ -35,7 +53,7 @@ import { resolveModelForInstances } from "../utils/ModelResolution.ts";
 //      Called when the LLM invokes team_create / send_message / stop_agent
 // ────────────────────────────────────────────────────────────
 
-function getDefaultWorkspaceRoot(overrideRoot?: any) {
+function getDefaultWorkspaceRoot(overrideRoot?: string): string {
   return (
     overrideRoot ||
     ToolOrchestratorService.getWorkspaceRoot() ||
@@ -52,20 +70,20 @@ function getDefaultWorkspaceRoot(overrideRoot?: any) {
  *
  * Falls back to workspaceRoot if no git repo is found.
  */
-function resolveRepoPath(workspaceRoot: any, files: any) {
+function resolveRepoPath(workspaceRoot: string, files: string[]): string {
   if (!files?.length) return workspaceRoot;
 
   // Check if workspace root itself is a git repo
-    if (existsSync(resolve((workspaceRoot as any), ".git"))) return workspaceRoot;
+  if (existsSync(resolve(workspaceRoot, ".git"))) return workspaceRoot;
 
   // Take the first file, get its path relative to workspace root,
   // extract the first directory segment (the project dir)
-    const firstFile = resolve((files[0] as any));
-    const rel = relative((workspaceRoot as any), firstFile);
+  const firstFile = resolve(files[0]);
+  const rel = relative(workspaceRoot, firstFile);
   const firstSegment = rel.split("/")[0];
   if (!firstSegment) return workspaceRoot;
 
-    const candidate = resolve((workspaceRoot as any), firstSegment);
+  const candidate = resolve(workspaceRoot, firstSegment);
   if (existsSync(resolve(candidate, ".git"))) {
     return candidate;
   }
@@ -87,11 +105,11 @@ const DECOMPOSITION_PROVIDER = "anthropic";
  * Returns null when no subagent model is configured — callers should
  * keep the local provider (queuing) when this returns null.
  */
-async function getWorkerFallback() {
+async function getWorkerFallback(): Promise<{ provider: string; model: string } | null> {
   try {
-        const agents = await SettingsService.getSection(("agents" as any));
+    const agents = await SettingsService.getSection("agents");
     if (agents?.subagentProvider && agents?.subagentModel) {
-      return { provider: agents.subagentProvider, model: agents.subagentModel };
+      return { provider: agents.subagentProvider as string, model: agents.subagentModel as string };
     }
     return null;
   } catch {
@@ -100,10 +118,10 @@ async function getWorkerFallback() {
 }
 
 /** Active coordinator tasks keyed by taskId (manual panel flow) */
-const activeTasks = new Map();
+const activeTasks = new Map<string, PanelTaskState>();
 
 /** Active agents spawned via chat tools, keyed by agentId */
-const activeWorkers = new Map();
+const activeWorkers = new Map<string, WorkerState>();
 
 /**
  * Synchronous per-instance reservation counter.
@@ -112,7 +130,7 @@ const activeWorkers = new Map();
  * time, so the next spawn sees the correct active count.
  * Keyed by instance id (provider name).
  */
-const instanceReservations = new Map();
+const instanceReservations = new Map<string, number>();
 
 /** Counter for generating sequential agent IDs */
 let agentCounter = 0;
@@ -120,14 +138,14 @@ let agentCounter = 0;
 // Register shutdown cleanup — abort all running workers and remove worktrees
 registerCleanup(async () => {
   const running = [...activeWorkers.values()].filter(
-    (w: any) => w.status === "running",
+    (w) => w.status === "running",
   );
   if (running.length === 0) return;
 
   logger.info(
     `[Coordinator] Shutdown: aborting ${running.length} running worker(s)…`,
   );
-    for ( const worker of running) {
+  for (const worker of running) {
     worker.abortController?.abort();
     worker.status = "stopped";
     worker.durationMs = Date.now() - worker.startedAt;
@@ -135,13 +153,13 @@ registerCleanup(async () => {
 
   // Clean up worktrees in parallel
   const cleanups = running
-    .filter((w: any) => w.isolated && w.worktreePath)
-    .map((w: any) =>
-            removeWorktree((w.repoPath as any), (w.worktreePath as any))
+    .filter((w) => w.isolated && w.worktreePath)
+    .map((w) =>
+      removeWorktree(w.repoPath, w.worktreePath!)
         .then(() => {
           w.worktreePath = null;
         })
-        .catch((error: any) =>
+        .catch((error: Error) =>
           logger.warn(
             `[Coordinator] Shutdown worktree cleanup failed for ${w.agentId}: ${error.message}`,
           ),
@@ -170,10 +188,10 @@ registerCleanup(async () => {
 // Shared by both spawnFromTool (single) and createTeam (batch).
 // Selects the least-busy instance and increments the reservation
 // counter synchronously so the next call sees the updated count.
-function getActiveOn(instanceId: any) {
+function getActiveOn(instanceId: string): number {
   const reserved = instanceReservations.get(instanceId) || 0;
   const running = [...activeWorkers.values()].filter(
-    (w: any) => w.providerName === instanceId && w.status === "running",
+    (w) => w.providerName === instanceId && w.status === "running",
   ).length;
   return reserved + running;
 }
@@ -184,16 +202,16 @@ function getActiveOn(instanceId: any) {
  * are at capacity.
  */
 function selectAndReserveInstance(
-  siblings: any,
-  coordinatorInstanceId: any,
-  instanceModelOverrides: any,
-  defaultModel: any,
-) {
+  siblings: InstanceEntry[],
+  coordinatorInstanceId: string,
+  instanceModelOverrides: Map<string, string>,
+  defaultModel: string,
+): InstanceAssignment | null {
   // Debug: log the full instance state for tracing assignment decisions
-    const stateSnapshot = (siblings as any)
-    .map((s: any) => {
-            const active = getActiveOn((s.id as any));
-            return `${s.id}(concurrency=${s.concurrency}, active=${active}, free=${(s as any).concurrency - active})`;
+  const stateSnapshot = siblings
+    .map((s) => {
+      const active = getActiveOn(s.id);
+      return `${s.id}(concurrency=${s.concurrency}, active=${active}, free=${s.concurrency - active})`;
     })
     .join(", ");
   logger.info(
@@ -214,8 +232,8 @@ function selectAndReserveInstance(
   // fallback unnecessarily.
 
   // Build ordered candidate list: coordinator's instance first, then rest in order
-  const ordered: any[] = [];
-    for ( const inst of siblings) {
+  const ordered: InstanceEntry[] = [];
+  for (const inst of siblings) {
     if (inst.id === coordinatorInstanceId) {
       ordered.unshift(inst); // coordinator instance goes first
     } else {
@@ -224,10 +242,10 @@ function selectAndReserveInstance(
   }
 
   // Phase 1: find the first instance with free concurrency slots
-  let bestInstance = null;
-    for ( const inst of ordered) {
-        const active = getActiveOn((inst.id as any));
-        const available = (inst as any).concurrency - active;
+  let bestInstance: InstanceEntry | null = null;
+  for (const inst of ordered) {
+    const active = getActiveOn(inst.id);
+    const available = inst.concurrency - active;
     if (available > 0) {
       bestInstance = inst;
       break; // fill-first: take the first instance with any availability
@@ -237,18 +255,18 @@ function selectAndReserveInstance(
   // Phase 2: all instances at capacity — least-loaded overflow
   // Spread the overload evenly across instances instead of returning
   // null (which would force all overflow to cloud fallback or queue).
-    if (!bestInstance && (siblings as any).length > 0) {
+  if (!bestInstance && siblings.length > 0) {
     let minActive = Infinity;
-        for ( const inst of ordered) {
-            const active = getActiveOn((inst.id as any));
+    for (const inst of ordered) {
+      const active = getActiveOn(inst.id);
       if (active < minActive) {
         minActive = active;
         bestInstance = inst;
       }
     }
-        const overload = minActive - (bestInstance as any).concurrency;
+    const overload = minActive - bestInstance!.concurrency;
     logger.info(
-            `[Coordinator] selectAndReserveInstance: all at capacity — overflow to ${bestInstance.id} (active=${minActive}, overload=+${overload + 1})`,
+      `[Coordinator] selectAndReserveInstance: all at capacity — overflow to ${bestInstance!.id} (active=${minActive}, overload=+${overload + 1})`,
     );
   }
 
@@ -259,7 +277,7 @@ function selectAndReserveInstance(
     return null;
   }
 
-    const available = (bestInstance as any).concurrency - getActiveOn((bestInstance.id as any));
+  const available = bestInstance.concurrency - getActiveOn(bestInstance.id);
 
   // Increment reservation synchronously so the next call sees it
   instanceReservations.set(
@@ -268,7 +286,7 @@ function selectAndReserveInstance(
   );
 
   // Apply quant fallback model if the selected instance has an override
-    const model = (instanceModelOverrides as any).get(bestInstance.id) || defaultModel;
+  const model = instanceModelOverrides.get(bestInstance.id) || defaultModel;
 
   return { provider: bestInstance.id, model, slotsAvailable: available };
 }
@@ -277,7 +295,7 @@ function selectAndReserveInstance(
 // Tools-API Helpers
 // ────────────────────────────────────────────────────────────
 
-async function toolsApiPost(path: string, body: any) {
+async function toolsApiPost(path: string, body: Record<string, unknown>): Promise<ToolsApiResponse> {
   try {
     const response = await fetch(`${TOOLS_SERVICE_URL}${path}`, {
       method: "POST",
@@ -285,34 +303,34 @@ async function toolsApiPost(path: string, body: any) {
       body: JSON.stringify(body),
     });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-            return { error: (error as any).error || `API returned ${response.status}` };
+      const error = await response.json().catch(() => ({})) as ToolsApiResponse;
+      return { error: error.error || `API returned ${response.status}` };
     }
-    return await response.json();
+    return await response.json() as ToolsApiResponse;
   } catch (error: unknown) {
-        return { error: `Failed to reach tools-api: ${(error as Error).message}` };
+    return { error: `Failed to reach tools-api: ${(error as Error).message}` };
   }
 }
 
-async function createWorktree(repoPath: any, branchName: any) {
+async function createWorktree(repoPath: string, branchName: string): Promise<WorktreeCreateResponse> {
   return toolsApiPost("/agentic/git/worktree/create", {
     path: repoPath,
     branch: branchName,
-  });
+  }) as Promise<WorktreeCreateResponse>;
 }
 
-async function removeWorktree(repoPath: any, worktreePath: any) {
+async function removeWorktree(repoPath: string, worktreePath: string): Promise<ToolsApiResponse> {
   return toolsApiPost("/agentic/git/worktree/remove", {
     path: repoPath,
     worktreePath,
   });
 }
 
-async function getWorktreeDiff(repoPath: any, branch: any) {
-  return toolsApiPost("/agentic/git/worktree/diff", { path: repoPath, branch });
+async function getWorktreeDiff(repoPath: string, branch: string): Promise<ToolsApiResponse & Partial<WorktreeDiff>> {
+  return toolsApiPost("/agentic/git/worktree/diff", { path: repoPath, branch }) as Promise<ToolsApiResponse & Partial<WorktreeDiff>>;
 }
 
-async function mergeWorktree(repoPath: any, branch: any, message: string) {
+async function mergeWorktree(repoPath: string, branch: string, message: string): Promise<ToolsApiResponse> {
   return toolsApiPost("/agentic/git/worktree/merge", {
     path: repoPath,
     branch,
@@ -320,7 +338,7 @@ async function mergeWorktree(repoPath: any, branch: any, message: string) {
   });
 }
 
-async function cleanupWorktrees(repoPath: any) {
+async function cleanupWorktrees(repoPath: string): Promise<ToolsApiResponse> {
   return toolsApiPost("/agentic/git/worktree/cleanup", { path: repoPath });
 }
 
@@ -339,18 +357,18 @@ async function cleanupWorktrees(repoPath: any) {
  * If the last assistant message has no text (e.g. it was a pure tool_use),
  * walks backward to find the most recent assistant message with text.
  */
-function getLastAssistantText(messages: any) {
+function getLastAssistantText(messages: ConversationMessage[]): string {
   if (!messages?.length) return "";
-    for (let i = messages.length - 1; i >= 0; i--) {
+  for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-        if ((m as any).role !== "assistant") continue;
-        const text = (typeof (m as any).content === "string" ? (m as any).content : "").trim();
+    if (m.role !== "assistant") continue;
+    const text = (typeof m.content === "string" ? m.content : "").trim();
     if (text) return text;
   }
   return "";
 }
 
-function buildWorkerResult(worker: any) {
+function buildWorkerResult(worker: WorkerState): WorkerResult {
   const status = worker.status === "complete" ? "completed" : worker.status;
   const summary =
     status === "completed"
@@ -361,41 +379,41 @@ function buildWorkerResult(worker: any) {
 
   // Return the full last assistant message text (no truncation).
   // Like Claude Code, we trust the model to produce a concise final report.
-    const lastText = getLastAssistantText((worker.messages as any));
+  const lastText = getLastAssistantText(worker.messages || []);
 
   // Aggregate tool call names into { name: count } for frontend badge display
-  const toolNames: any = {};
-    if ((worker.toolCalls as any)?.length) {
-        for ( const tc of (worker as any).toolCalls) {
-      const name = tc.name || "any";
-            toolNames[name] = (toolNames[name] || 0) + 1;
+  const toolNames: Record<string, number> = {};
+  if (worker.toolCalls?.length) {
+    for (const tc of worker.toolCalls) {
+      const name = tc.name || "unknown";
+      toolNames[name] = (toolNames[name] || 0) + 1;
     }
   }
 
-  const result = {
+  const result: WorkerResult = {
     agent_id: worker.agentId,
     description: worker.description,
     status,
     summary,
-        result: lastText || ((worker.output || "") as any).trim() || null,
-        toolUses: (worker.toolCalls as any)?.length || 0,
+    result: lastText || (worker.output || "").trim() || null,
+    toolUses: worker.toolCalls?.length || 0,
     toolNames: Object.keys(toolNames).length > 0 ? toolNames : undefined,
     iterations: worker.iterations || 0,
     durationMs: worker.durationMs || 0,
     // Include full conversation for frontend MessageList rendering.
     // Strip system messages — they're large and not useful for display.
-        messages: ((worker.messages || []) as any).filter((m: any) => m.role !== "system"),
+    messages: (worker.messages || []).filter((m) => m.role !== "system"),
   };
 
-    if ((worker.diff as any)?.hasChanges) {
-        (result as any).diff = {
-            additions: (worker.diff as any).additions || 0,
-            deletions: (worker.diff as any).deletions || 0,
-            files: (worker.diff as any).files || [],
+  if (worker.diff?.hasChanges) {
+    result.diff = {
+      additions: worker.diff.additions || 0,
+      deletions: worker.diff.deletions || 0,
+      files: worker.diff.files || [],
     };
   }
 
-    if (worker.error) (result as any).error = worker.error;
+  if (worker.error) result.error = worker.error;
 
   return result;
 }
@@ -452,7 +470,7 @@ export default class CoordinatorService {
     assignedProvider,
     assignedModel,
     coordinatorCtx,
-  }: any) {
+  }: CoordinatorSpawnParams) {
     const {
             project,
             username,
@@ -476,7 +494,7 @@ export default class CoordinatorService {
 
     // Check concurrency limit
     const runningCount = Array.from(activeWorkers.values()).filter(
-      (w: any) => w.status === "running",
+      (w) => w.status === "running",
     ).length;
     if (runningCount >= MAX_WORKERS) {
       return {
@@ -513,12 +531,12 @@ export default class CoordinatorService {
       if (siblings.length > 1) {
         const { usable, modelOverrides } = await resolveModelForInstances(
           workerModel,
-                    (siblings as any),
+          siblings,
         );
         instanceModelOverrides = modelOverrides;
 
-                if ((usable as any).length > 0) {
-                    siblings = usable;
+        if (usable.length > 0) {
+          siblings = usable;
         } else {
           logger.warn(
             `[Coordinator] Model "${workerModel}" not available on any ${getInstanceType(providerName) || providerName} instance`,
@@ -536,9 +554,9 @@ export default class CoordinatorService {
       // instanceReservations prevents race conditions when multiple team_create
       // calls fire concurrently — the counter is incremented synchronously.
       const assigned = selectAndReserveInstance(
-                (siblings as any),
+        siblings,
         providerName,
-        (instanceModelOverrides as any),
+        instanceModelOverrides,
         workerModel,
       );
 
@@ -567,42 +585,42 @@ export default class CoordinatorService {
 
     const agentId = `agent-${(++agentCounter).toString(36)}-${crypto.randomUUID().slice(0, 4)}`;
     const branchName = `coordinator/${agentId}`;
-    const workspaceRoot = getDefaultWorkspaceRoot(coordinatorWorkspaceRoot);
+    const workspaceRoot = getDefaultWorkspaceRoot(coordinatorWorkspaceRoot ?? undefined);
 
     // Derive the git repo path from worker files.
     // If files live under a git subdirectory (e.g. /workspace/projectA/),
     // use that as the worktree source. Otherwise fall back to workspace root.
-        const repoPath = resolveRepoPath(workspaceRoot, (files as any));
+    const repoPath = resolveRepoPath(workspaceRoot, files || []);
 
     // Attempt git worktree creation — best-effort
     // Non-git workspaces gracefully degrade to shared directory mode
     let worktreePath = null;
-        const worktreeResult = await createWorktree((repoPath as any), (branchName as any));
-        if ((worktreeResult as any).error) {
-            logger.warn(
-                `[Coordinator] Worktree creation skipped for ${agentId}: ${(worktreeResult as any).error}. Running in workspace root.`,
+    const worktreeResult = await createWorktree(repoPath, branchName);
+    if (worktreeResult.error) {
+      logger.warn(
+        `[Coordinator] Worktree creation skipped for ${agentId}: ${worktreeResult.error}. Running in workspace root.`,
       );
       worktreePath = workspaceRoot;
     } else {
-            worktreePath = (worktreeResult as any).worktreePath;
+      worktreePath = worktreeResult.worktreePath || workspaceRoot;
     }
 
     const workerAgentSessionId = crypto.randomUUID();
 
-    const workerState = {
+    const workerState: WorkerState = {
       agentId,
       workerAgentSessionId,
       parentAgentSessionId,
       description,
-            branchName: (worktreeResult as any).error ? null : branchName,
+      branchName: worktreeResult.error ? null : branchName,
       worktreePath,
       repoPath,
-            isolated: !(worktreeResult as any).error, // true if running in a worktree
+      isolated: !worktreeResult.error, // true if running in a worktree
       status: "running",
       output: "",
       toolCalls: [],
-      diff: null as any,
-      error: null as string | null,
+      diff: null,
+      error: null,
       startedAt: Date.now(),
       durationMs: 0,
       totalCost: null,
@@ -629,8 +647,8 @@ export default class CoordinatorService {
 
     // Emit early so the frontend can show live status immediately
     // (before the blocking loop starts and before a result is available)
-        if ((coordinatorCtx as any).emit) {
-            (coordinatorCtx as any).emit({
+    if (coordinatorCtx.emit) {
+      coordinatorCtx.emit({
         type: "worker_status",
         workerId: agentId,
         message: "spawned",
@@ -643,8 +661,8 @@ export default class CoordinatorService {
     try {
       await CoordinatorService._runWorkerLoop(
         workerState,
-                (prompt as any),
-        (coordinatorCtx as any),
+        prompt,
+        coordinatorCtx,
       );
     } catch (error: unknown) {
       logger.error(
@@ -657,29 +675,29 @@ export default class CoordinatorService {
       // Clean up worktree on failure to prevent orphaned branches
       if (workerState.isolated && workerState.worktreePath) {
         await removeWorktree(
-                    (workerState.repoPath as any),
-          (workerState.worktreePath as any),
-        ).catch((error: any) =>
+          workerState.repoPath,
+          workerState.worktreePath,
+        ).catch((cleanupErr: unknown) =>
           logger.warn(
-            `[Coordinator] Worktree cleanup failed for ${agentId}: ${error.message}`,
+            `[Coordinator] Worktree cleanup failed for ${agentId}: ${(cleanupErr as Error).message}`,
           ),
         );
       }
 
       // Notify frontend immediately so the StatusBar stops showing "Generating..."
-            if ((coordinatorCtx as any).emit) {
-                (coordinatorCtx as any).emit({
+      if (coordinatorCtx.emit) {
+        coordinatorCtx.emit({
           type: "worker_status",
           workerId: agentId,
           message: "failed",
-                    error: (error as Error).message,
+          error: (error as Error).message,
         });
       }
     }
 
     // Notify UI that worker state changed
-        if ((coordinatorCtx as any).emit) {
-            (coordinatorCtx as any).emit({ type: "status", message: "workers_updated" });
+    if (coordinatorCtx.emit) {
+      coordinatorCtx.emit({ type: "status", message: "workers_updated" });
     }
 
     const workerResult = buildWorkerResult(workerState);
@@ -688,7 +706,7 @@ export default class CoordinatorService {
     );
     return workerResult;
   }
-  static async sendMessage(agentId: any, message: string, coordinatorCtx: any) {
+  static async sendMessage(agentId: string, message: string, coordinatorCtx: CoordinatorContext) {
     const worker = activeWorkers.get(agentId);
     if (!worker) {
       return { error: `Worker "${agentId}" not found` };
@@ -717,13 +735,13 @@ export default class CoordinatorService {
 
     logger.info(`[Coordinator] Continuing worker ${agentId} with follow-up`);
 
-        CoordinatorService._runWorkerLoop(worker, (message as any), coordinatorCtx).catch(
-      (error: any) => {
+    CoordinatorService._runWorkerLoop(worker, message, coordinatorCtx).catch(
+      (error: unknown) => {
         logger.error(
-          `[Coordinator] Worker ${agentId} continuation error: ${error.message}`,
+          `[Coordinator] Worker ${agentId} continuation error: ${(error as Error).message}`,
         );
         worker.status = "failed";
-        worker.error = error.message;
+        worker.error = (error as Error).message;
       },
     );
 
@@ -733,7 +751,7 @@ export default class CoordinatorService {
       message: "Worker continued with follow-up.",
     };
   }
-  static async stopAgent(agentId: any) {
+  static async stopAgent(agentId: string) {
     const worker = activeWorkers.get(agentId);
     if (!worker) {
       return { error: `Worker "${agentId}" not found` };
@@ -764,7 +782,7 @@ export default class CoordinatorService {
 
 
    */
-  static getTaskOutput(agentId: any) {
+  static getTaskOutput(agentId: string) {
     const worker = activeWorkers.get(agentId);
     if (!worker) {
       return {
@@ -795,12 +813,12 @@ export default class CoordinatorService {
    * Called when the coordinator's SSE connection is severed (user presses stop)
    * or explicitly via the REST endpoint.
    */
-  static async abortWorkersBySession(parentAgentSessionId: any) {
-    const stopped: any[] = [];
-    const alreadyStopped: any[] = [];
-    const cleanupPromises: any[] = [];
+  static async abortWorkersBySession(parentAgentSessionId: string) {
+    const stopped: string[] = [];
+    const alreadyStopped: string[] = [];
+    const cleanupPromises: Promise<void>[] = [];
 
-        for ( const [agentId, worker] of activeWorkers) {
+    for (const [agentId, worker] of activeWorkers) {
       if (worker.parentAgentSessionId !== parentAgentSessionId) continue;
 
       if (worker.status === "running") {
@@ -817,13 +835,13 @@ export default class CoordinatorService {
         // Queue worktree cleanup so orphaned worktrees don't accumulate
         if (worker.isolated && worker.worktreePath) {
           cleanupPromises.push(
-                        (removeWorktree as any)(worker.repoPath, worker.worktreePath)
+            removeWorktree(worker.repoPath, worker.worktreePath)
               .then(() => {
                 worker.worktreePath = null;
               })
-              .catch((error: any) =>
+              .catch((error: unknown) =>
                 logger.warn(
-                  `[Coordinator] Worktree cleanup failed for ${agentId}: ${error.message}`,
+                  `[Coordinator] Worktree cleanup failed for ${agentId}: ${(error as Error).message}`,
                 ),
               ),
           );
@@ -850,7 +868,7 @@ export default class CoordinatorService {
     // Remove all workers for this session from the in-memory Map.
     // Their state has been persisted to the agent session doc already,
     // and keeping them in the Map leads to unbounded growth.
-        for ( const [agentId, worker] of activeWorkers) {
+    for (const [agentId, worker] of activeWorkers) {
       if (worker.parentAgentSessionId === parentAgentSessionId) {
         activeWorkers.delete(agentId);
       }
@@ -858,7 +876,7 @@ export default class CoordinatorService {
 
     return { stopped, alreadyStopped };
   }
-  static getWorkerStatus(agentId: any) {
+  static getWorkerStatus(agentId: string) {
     const worker = activeWorkers.get(agentId);
     if (!worker) return null;
     return {
@@ -874,23 +892,23 @@ export default class CoordinatorService {
       error: worker.error,
     };
   }
-    static listWorkers({ parentAgentSessionId }: any = {}) {
+  static listWorkers({ parentAgentSessionId }: { parentAgentSessionId?: string } = {}) {
     let workers = Array.from(activeWorkers.values());
     if (parentAgentSessionId) {
       workers = workers.filter(
-        (w: any) => w.parentAgentSessionId === parentAgentSessionId,
+        (w) => w.parentAgentSessionId === parentAgentSessionId,
       );
     }
-    return workers.map((w: any) => ({
+    return workers.map((w) => ({
       agentId: w.agentId,
       workerAgentSessionId: w.workerAgentSessionId,
       parentAgentSessionId: w.parentAgentSessionId,
       description: w.description,
       status: w.status,
       branchName: w.branchName,
-            toolCallCount: (w.toolCalls as any)?.length || 0,
+      toolCallCount: w.toolCalls?.length || 0,
       durationMs:
-                w.status === "running" ? Date.now() - (w as any).startedAt : w.durationMs,
+        w.status === "running" ? Date.now() - w.startedAt : w.durationMs,
       totalCost: w.totalCost || null,
       usage: w.usage || null,
       traceId: w.traceId,
@@ -906,16 +924,16 @@ export default class CoordinatorService {
   // ══════════════════════════════════════════════════════════
 
   /** Active teams — keyed by team name, value is { agentIds: string[] } */
-  static _activeTeams = new Map();
+  static _activeTeams = new Map<string, TeamEntry>();
 
   /**
    * Remove all workers associated with a parent coordinator session.
    * Called when the coordinator loop completes/errors to prevent unbounded
    * growth of the in-memory activeWorkers Map.
    */
-  static cleanupSession(parentAgentSessionId: any) {
+  static cleanupSession(parentAgentSessionId: string) {
     let cleaned = 0;
-        for ( const [agentId, worker] of activeWorkers) {
+    for (const [agentId, worker] of activeWorkers) {
       if (worker.parentAgentSessionId === parentAgentSessionId) {
         activeWorkers.delete(agentId);
         cleaned++;
@@ -933,7 +951,7 @@ export default class CoordinatorService {
    * Each member is spawned via spawnFromTool and runs concurrently.
    * Returns aggregated results from all members when they all complete.
    */
-  static async createTeam(args: any, coordinatorCtx: any) {
+  static async createTeam(args: { name: string; members: TeamMember[] }, coordinatorCtx: CoordinatorContext) {
     const { name, members } = args;
     const { providerName, resolvedModel } = coordinatorCtx;
 
@@ -964,14 +982,14 @@ export default class CoordinatorService {
     // synchronous reservation increment — so they all see 0 reservations
     // and pick the same instance. Fix: resolve model availability once,
     // then assign instances in a serial loop with synchronous increments.
-        const assignments: any[] = []; // { provider, model } per member
+    const assignments: Array<{ provider: string | null; model: string | null }> = []; // { provider, model } per member
 
-        if (localModelQueue.isLocal((providerName as any))) {
-            const providerType = getInstanceType((providerName as any)) || providerName;
-            let siblings = getInstancesByType((providerType as any));
+    if (localModelQueue.isLocal(providerName)) {
+      const providerType = getInstanceType(providerName) || providerName;
+      let siblings = getInstancesByType(providerType);
 
       logger.info(
-        `[Coordinator] Team "${name}": providerName=${providerName}, providerType=${providerType}, siblings=${siblings.length} [${siblings.map((s: any) => `${s.id}(c=${s.concurrency})`).join(", ")}]`,
+        `[Coordinator] Team "${name}": providerName=${providerName}, providerType=${providerType}, siblings=${siblings.length} [${siblings.map((s) => `${s.id}(c=${s.concurrency})`).join(", ")}]`,
       );
 
       // Run model availability checks once for the entire team
@@ -980,13 +998,13 @@ export default class CoordinatorService {
 
       if (siblings.length > 1) {
         const { usable, modelOverrides } = await resolveModelForInstances(
-                    (defaultModel as any),
-          (siblings as any),
+          defaultModel,
+          siblings,
         );
         instanceModelOverrides = modelOverrides;
 
-                if ((usable as any).length > 0) {
-                    siblings = usable;
+        if (usable.length > 0) {
+          siblings = usable;
         } else {
           logger.warn(
             `[Coordinator] Model "${defaultModel}" not available on any ${providerType} instance`,
@@ -1005,9 +1023,9 @@ export default class CoordinatorService {
         // member.model overrides only work for cloud providers with well-known names.
         const memberModel = defaultModel;
         const assigned = selectAndReserveInstance(
-                    (siblings as any),
-          (providerName as any),
-          (instanceModelOverrides as any),
+          siblings,
+          providerName,
+          instanceModelOverrides,
           memberModel,
         );
 
@@ -1038,14 +1056,14 @@ export default class CoordinatorService {
     }
 
     const results = await Promise.allSettled(
-      members.map((member: any, i: number) =>
+      members.map((member: TeamMember, i: number) =>
         CoordinatorService.spawnFromTool({
           description: `[${name}] ${member.description}`,
           prompt: member.prompt,
           files: member.files,
           // For local providers, don't pass the LLM's model — the pre-assignment
           // already resolved the correct GGUF model identifier.
-          model: localModelQueue.isLocal((providerName as any))
+          model: localModelQueue.isLocal(providerName)
             ? undefined
             : member.model,
           assignedProvider: assignments[i]?.provider || undefined,
@@ -1056,7 +1074,7 @@ export default class CoordinatorService {
     );
 
     // Collect agentIds and results
-    const memberResults = results.map((r: any, i: number) => {
+    const memberResults: TeamMemberResult[] = results.map((r, i: number) => {
       if (r.status === "fulfilled") {
         return {
           index: i,
@@ -1068,14 +1086,14 @@ export default class CoordinatorService {
         index: i,
         description: members[i].description,
         status: "failed",
-        error: (r.reason as any)?.message || "Unknown error",
+        error: (r.reason as Error)?.message || "Unknown error",
       };
     });
 
     // Track team membership
     const agentIds = memberResults
-      .filter((m: any) => m.agent_id)
-      .map((m: any) => m.agent_id);
+      .filter((m) => m.agent_id)
+      .map((m) => m.agent_id!);
 
     CoordinatorService._activeTeams.set(name, {
       agentIds,
@@ -1083,7 +1101,7 @@ export default class CoordinatorService {
     });
 
     const succeeded = memberResults.filter(
-      (m: any) => m.status === "completed" || m.agent_id,
+      (m) => m.status === "completed" || m.agent_id,
     ).length;
     const failed = memberResults.length - succeeded;
 
@@ -1099,7 +1117,7 @@ export default class CoordinatorService {
       members: memberResults,
     };
   }
-  static async deleteTeam(teamName: any) {
+  static async deleteTeam(teamName: string) {
     if (!teamName || typeof teamName !== "string") {
       return { error: "'teamName' is required (string)" };
     }
@@ -1110,7 +1128,7 @@ export default class CoordinatorService {
     }
 
     const stopResults = await Promise.allSettled(
-      team.agentIds.map((agentId: any) =>
+      team.agentIds.map((agentId: string) =>
         CoordinatorService.stopAgent(agentId),
       ),
     );
@@ -1118,7 +1136,7 @@ export default class CoordinatorService {
     CoordinatorService._activeTeams.delete(teamName);
 
     const stopped = stopResults.filter(
-            (r: any) => r.status === "fulfilled" && (r.value as any)?.status === "stopped",
+      (r) => r.status === "fulfilled" && (r.value as Record<string, unknown>)?.status === "stopped",
     ).length;
 
     logger.info(
@@ -1141,7 +1159,7 @@ export default class CoordinatorService {
    * Run the worker's agentic loop in its isolated worktree.
    * @private
    */
-  static async _runWorkerLoop(worker: any, prompt: any, coordinatorCtx: any) {
+  static async _runWorkerLoop(worker: WorkerState, prompt: string, coordinatorCtx: CoordinatorContext) {
     const { default: AgenticLoopService } =
       await import("./AgenticLoopService.js");
 
@@ -1149,15 +1167,15 @@ export default class CoordinatorService {
     const commitInstructions = worker.isolated
       ? `- Commit your changes when done and report what you accomplished`
       : `- Report what you accomplished when done`;
-    const workerMessages = [
-            ...worker.messages,
+    const workerMessages: ConversationMessage[] = [
+      ...(worker.messages || []),
       {
         role: "user",
         content:
           `You are a worker agent in a multi-agent coding system.\n\n` +
           `Your workspace is: ${worker.worktreePath}\n` +
-                    ((worker.files as any)?.length
-                        ? `Focus on files: ${(worker.files as any).join(", ")}\n`
+          (worker.files?.length
+            ? `Focus on files: ${worker.files.join(", ")}\n`
             : "") +
           `\nTask:\n${prompt}\n\n` +
           `Important:\n` +
@@ -1173,20 +1191,20 @@ export default class CoordinatorService {
     // and `worker_status` with the worker's agentId for disambiguation.
     const parentEmit = coordinatorCtx.emit;
     let workerOutput = "";
-        const workerToolCalls: any[] = [];
-        let lastWorkerPhase: any = null;
+    const workerToolCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+    let lastWorkerPhase: string | null = null;
 
-        let workerFirstChunkTime: any = null;
-        let workerLastChunkTime: any = null;
+    let workerFirstChunkTime: number | null = null;
+    let workerLastChunkTime: number | null = null;
     let cumulativeOutputChars = 0; // total output characters across all bursts
     let burstOutputChars = 0; // output characters in current generation burst
-        let burstFirstChunkTime: any = null; // start of current burst
+    let burstFirstChunkTime: number | null = null; // start of current burst
     const WORKER_PROGRESS_INTERVAL = 1; // emit on every chunk — LM Studio batches SSE deltas heavily under continuous batching
     let burstChunkCount = 0; // raw chunk count for interval gating only
 
     /** Estimate tokens from character count (~4 chars/token for English). */
-    const estimateTokens = (chars: any) =>
-            chars > 0 ? Math.ceil(chars / 4) : 0;
+    const estimateTokens = (chars: number): number =>
+      chars > 0 ? Math.ceil(chars / 4) : 0;
 
     /** Build the generation_progress payload for the frontend. */
     const buildProgress = () => {
@@ -1194,7 +1212,7 @@ export default class CoordinatorService {
       // This is the ONLY source of per-worker throughput — the
       // SessionGenerationTracker aggregates across all workers
       // and must NOT be used for individual worker display.
-            const burstTokens = estimateTokens((burstOutputChars as any));
+      const burstTokens = estimateTokens(burstOutputChars);
       let workerTokPerSec = null;
             if (burstTokens > 1 && burstFirstChunkTime && workerLastChunkTime) {
         const elapsedSec = (workerLastChunkTime - burstFirstChunkTime) / 1000;
@@ -1206,12 +1224,12 @@ export default class CoordinatorService {
         message: "generation_progress",
         // Burst-scoped values — used for tok/s computation
         outputTokens: burstTokens,
-                firstChunkTime: burstFirstChunkTime,
-                lastChunkTime: workerLastChunkTime,
+        firstChunkTime: burstFirstChunkTime,
+        lastChunkTime: workerLastChunkTime,
         // Per-worker tok/s computed from burst counters
         tokPerSec: workerTokPerSec,
         // Cumulative total — used for token badge count
-                totalOutputTokens: estimateTokens((cumulativeOutputChars as any)),
+        totalOutputTokens: estimateTokens(cumulativeOutputChars),
       };
     };
 
@@ -1227,12 +1245,12 @@ export default class CoordinatorService {
     /** Emit aggregate session-level generation_progress from the tracker. */
     const emitAggregateProgress = () => {
       if (!parentEmit || !parentSessionId) return;
-            const stats = (SessionGenerationTracker as any).getSessionStats((parentSessionId as any));
+      const stats = SessionGenerationTracker.getSessionStats(parentSessionId);
       if (stats.totalOutputTokens > 0 || stats.activeRequests > 0) {
         hwmOutputTokens = Math.max(hwmOutputTokens, stats.totalOutputTokens);
         hwmInputTokens = Math.max(hwmInputTokens, stats.totalInputTokens);
         hwmTotalTokens = Math.max(hwmTotalTokens, stats.totalTokens);
-                parentEmit({
+        parentEmit!({
           type: "status",
           message: "generation_progress",
           tokPerSec: stats.tokPerSec,
@@ -1245,16 +1263,16 @@ export default class CoordinatorService {
       }
     };
 
-    const workerEmit = (event: any) => {
+    const workerEmit: EmitFn = (event) => {
       if (event.type === "chunk") {
-        workerOutput += event.content || "";
-                const chunkChars = ((event.content || "") as any).length;
+        workerOutput += (event.content as string) || "";
+        const chunkChars = ((event.content as string) || "").length;
 
         // Reset burst counters on phase transition (thinking → generating)
         // so each phase's tok/s is computed independently.
-                if (lastWorkerPhase === "thinking" && burstOutputChars > 0) {
+        if (lastWorkerPhase === "thinking" && burstOutputChars > 0) {
           if (parentEmit) {
-                        parentEmit(buildProgress());
+            parentEmit(buildProgress());
             emitAggregateProgress();
           }
           burstOutputChars = 0;
@@ -1262,19 +1280,19 @@ export default class CoordinatorService {
           burstFirstChunkTime = null;
         }
 
-        cumulativeOutputChars += (chunkChars as any);
-        burstOutputChars += (chunkChars as any);
+        cumulativeOutputChars += chunkChars;
+        burstOutputChars += chunkChars;
         burstChunkCount++;
         // Use Date.now() (not performance.now()) since these timestamps
         // cross process boundaries — the frontend needs wall-clock time
         // to compute staleness and elapsed generation time correctly.
-                if (!workerFirstChunkTime) workerFirstChunkTime = Date.now();
-                if (!burstFirstChunkTime) burstFirstChunkTime = Date.now();
+        if (!workerFirstChunkTime) workerFirstChunkTime = Date.now();
+        if (!burstFirstChunkTime) burstFirstChunkTime = Date.now();
         workerLastChunkTime = Date.now();
         // Notify the frontend that the worker is actively generating text
-                if (parentEmit && lastWorkerPhase !== "generating") {
+        if (parentEmit && lastWorkerPhase !== "generating") {
           lastWorkerPhase = "generating";
-                    parentEmit({
+          parentEmit({
             type: "worker_status",
             workerId: worker.agentId,
             message: "phase",
@@ -1288,7 +1306,7 @@ export default class CoordinatorService {
           burstChunkCount % WORKER_PROGRESS_INTERVAL === 0;
 
         if (parentEmit && shouldEmit) {
-                    parentEmit(buildProgress());
+          parentEmit(buildProgress());
           // Also emit aggregate progress for the main token badges
           emitAggregateProgress();
         }
@@ -1296,13 +1314,13 @@ export default class CoordinatorService {
         // Thinking IS active generation — the model is producing output
         // tokens during reasoning. Track thinking characters in the same
         // burst counters so per-worker tok/s is reported during thinking.
-                const thinkChars = ((event.content || "") as any).length;
+        const thinkChars = ((event.content as string) || "").length;
 
         // Reset burst counters on phase transition (generating → thinking)
         // so each phase's tok/s is computed independently.
-                if (lastWorkerPhase === "generating" && burstOutputChars > 0) {
+        if (lastWorkerPhase === "generating" && burstOutputChars > 0) {
           if (parentEmit) {
-                        parentEmit(buildProgress());
+            parentEmit(buildProgress());
             emitAggregateProgress();
           }
           burstOutputChars = 0;
@@ -1310,16 +1328,16 @@ export default class CoordinatorService {
           burstFirstChunkTime = null;
         }
 
-        cumulativeOutputChars += (thinkChars as any);
-        burstOutputChars += (thinkChars as any);
+        cumulativeOutputChars += thinkChars;
+        burstOutputChars += thinkChars;
         burstChunkCount++;
-                if (!workerFirstChunkTime) workerFirstChunkTime = Date.now();
-                if (!burstFirstChunkTime) burstFirstChunkTime = Date.now();
+        if (!workerFirstChunkTime) workerFirstChunkTime = Date.now();
+        if (!burstFirstChunkTime) burstFirstChunkTime = Date.now();
         workerLastChunkTime = Date.now();
         // Notify the frontend that the worker is in the thinking phase
-                if (parentEmit && lastWorkerPhase !== "thinking") {
+        if (parentEmit && lastWorkerPhase !== "thinking") {
           lastWorkerPhase = "thinking";
-                    parentEmit({
+          parentEmit({
             type: "worker_status",
             workerId: worker.agentId,
             message: "phase",
@@ -1332,23 +1350,23 @@ export default class CoordinatorService {
           burstChunkCount % WORKER_PROGRESS_INTERVAL === 0;
 
         if (parentEmit && shouldEmitThinking) {
-                    parentEmit(buildProgress());
+          parentEmit(buildProgress());
           emitAggregateProgress();
         }
       } else if (event.type === "tool_execution") {
         if (event.status === "calling") {
           workerToolCalls.push({
-                        name: (event.tool as any)?.name,
-                        args: (event.tool as any)?.args,
+            name: (event.tool as Record<string, unknown>)?.name as string,
+            args: (event.tool as Record<string, unknown>)?.args as Record<string, unknown>,
           });
         }
         // Emit final generation_progress before tool execution pauses generation
-                if (
+        if (
           parentEmit &&
-                    lastWorkerPhase === "generating" &&
+          lastWorkerPhase === "generating" &&
           burstOutputChars > 0
         ) {
-                    parentEmit(buildProgress());
+          parentEmit(buildProgress());
           emitAggregateProgress();
         }
         // Reset burst counters for next generation burst
@@ -1386,11 +1404,11 @@ export default class CoordinatorService {
           (event.message === "iteration_progress" ||
             event.message === "workers_updated")
         ) {
-          if (event.iteration) worker.iterations = event.iteration;
-                    parentEmit({
+          if (event.iteration) worker.iterations = event.iteration as number;
+          parentEmit({
             type: "worker_status",
             workerId: worker.agentId,
-            message: event.message,
+            message: event.message as string,
             iteration: event.iteration,
             maxIterations: event.maxIterations,
           });
@@ -1414,8 +1432,8 @@ export default class CoordinatorService {
         // Forward LM Studio lifecycle phases (loading, processing, generating)
         // Include the label text so worker StatusBars can show progress %
         if (parentEmit && event.phase) {
-          lastWorkerPhase = event.phase;
-                    parentEmit({
+          lastWorkerPhase = event.phase as string;
+          parentEmit({
             type: "worker_status",
             workerId: worker.agentId,
             message: "phase",
@@ -1426,8 +1444,8 @@ export default class CoordinatorService {
         }
       } else if (event.type === "done") {
         // Capture cost and usage from finalizeTextGeneration
-        worker.totalCost = event.estimatedCost || null;
-        worker.usage = event.usage || null;
+        worker.totalCost = (event.estimatedCost as number) || null;
+        worker.usage = (event.usage as Record<string, number>) || null;
         // Emit final generation_progress so the frontend gets a definitive
         // tok/s reading. Under continuous batching, LM Studio coalesces
         // SSE deltas so heavily that workerEmit may receive ZERO individual
@@ -1439,16 +1457,16 @@ export default class CoordinatorService {
           const finalTokPerSec = event.tokensPerSec || null;
           // Use provider-reported output tokens (authoritative) when available,
           // fall back to chars/4 estimation from accumulated characters.
-                    const estimatedOutput = estimateTokens((cumulativeOutputChars as any));
-                    const finalOutputTokens = (event.usage as any).outputTokens || estimatedOutput;
-                    const burstTokens = estimateTokens((burstOutputChars as any));
-                    parentEmit({
+          const estimatedOutput = estimateTokens(cumulativeOutputChars);
+          const finalOutputTokens = (event.usage as Record<string, number>).outputTokens || estimatedOutput;
+          const burstTokens = estimateTokens(burstOutputChars);
+          parentEmit!({
             type: "worker_status",
             workerId: worker.agentId,
             message: "generation_progress",
             outputTokens: burstTokens || finalOutputTokens,
-                        firstChunkTime: burstFirstChunkTime || workerFirstChunkTime,
-                        lastChunkTime: workerLastChunkTime || Date.now(),
+            firstChunkTime: burstFirstChunkTime || workerFirstChunkTime,
+            lastChunkTime: workerLastChunkTime || Date.now(),
             tokPerSec: finalTokPerSec,
             totalOutputTokens: finalOutputTokens,
           });
@@ -1459,7 +1477,7 @@ export default class CoordinatorService {
         // directly to the parent SSE stream so the frontend can accumulate
         // them into the session token badge in real-time.
         if (parentEmit) {
-                    parentEmit(event);
+          parentEmit(event);
         }
       }
     };
@@ -1469,31 +1487,31 @@ export default class CoordinatorService {
     // let AgenticLoopService resolve enabledTools from the persona — don't
     // override with all tools. For coding agents (no persona), build the
     // full list minus coordinator-only tools.
-    let workerEnabledTools: any;
+    let workerEnabledTools: string[] | undefined;
     if (worker.agent) {
       const { default: AgentPersonaRegistry } =
         await import("./AgentPersonaRegistry.js");
-            const persona = AgentPersonaRegistry.get((worker.agent as any));
+      const persona = AgentPersonaRegistry.get(worker.agent as string);
       if (persona?.enabledTools) {
         // Inherit the parent's persona-scoped tools
         workerEnabledTools = persona.enabledTools;
       }
     }
 
-        if (!workerEnabledTools) {
+    if (!workerEnabledTools) {
       // Default: all tools minus coordinator-only (for coding agents)
       const allSchemas = ToolOrchestratorService.getToolSchemas();
       const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
       workerEnabledTools = allSchemas
-        .map((t: any) => t.name as string)
+        .map((t: ToolSchema) => t.name)
         .filter((name: string) => !coordinatorSet.has(name));
     }
 
-        const workerProvider = getProvider((worker.providerName as any));
+    const workerProvider = getProvider(worker.providerName);
     const { getModelByName } = await import("../config.js");
-        const workerModelDef = getModelByName((worker.resolvedModel as any));
+    const workerModelDef = getModelByName(worker.resolvedModel);
 
-    let loopResult: any;
+    let loopResult: { messages?: ConversationMessage[] } | undefined;
     try {
       loopResult = await AgenticLoopService.runAgenticLoop({
         provider: workerProvider,
@@ -1519,12 +1537,12 @@ export default class CoordinatorService {
                 agent: worker.agent,
         requestStart: performance.now(),
         emit: workerEmit,
-                signal: (worker as any).abortController.signal,
+        signal: worker.abortController?.signal,
       });
     } catch (error: unknown) {
       if (
-                (error as Error).name === "AbortError" ||
-                (worker as any).abortController.signal.aborted
+        (error as Error).name === "AbortError" ||
+        worker.abortController?.signal.aborted
       ) {
         worker.status = "stopped";
       } else {
@@ -1538,10 +1556,10 @@ export default class CoordinatorService {
         const finalMessages = loopResult?.messages || workerMessages;
 
     // Always populate — including on abort/error paths
-        worker.output = getLastAssistantText((finalMessages as any)) || workerOutput;
-        worker.toolCalls = workerToolCalls;
-    worker.messages = finalMessages;
-        worker.durationMs = Date.now() - (worker as any).startedAt;
+    worker.output = getLastAssistantText(finalMessages as ConversationMessage[]) || workerOutput;
+    worker.toolCalls = workerToolCalls as ToolCall[];
+    worker.messages = finalMessages as ConversationMessage[];
+    worker.durationMs = Date.now() - worker.startedAt;
 
     // Stage and commit changes in the worktree
     await toolsApiPost("/agentic/command/run", {
@@ -1555,10 +1573,10 @@ export default class CoordinatorService {
 
     // Collect diff
     const diffResult = await getWorktreeDiff(
-            (worker.repoPath as any),
-      (worker.branchName as any),
+      worker.repoPath,
+      worker.branchName!,
     );
-        worker.diff = (diffResult as any).error ? null : diffResult;
+    worker.diff = diffResult.error ? null : (diffResult as unknown as WorktreeDiff);
     worker.status = "complete";
 
     // ── Release heavy data from completed workers ──────────────
@@ -1570,10 +1588,10 @@ export default class CoordinatorService {
     // Remove worktree now that the diff has been collected — prevents orphaned
     // worktrees from accumulating on disk across sessions.
     if (worker.isolated && worker.worktreePath) {
-            await removeWorktree((worker.repoPath as any), (worker.worktreePath as any)).catch(
-        (error: any) =>
+      await removeWorktree(worker.repoPath, worker.worktreePath).catch(
+        (error: unknown) =>
           logger.warn(
-            `[Coordinator] Post-completion worktree cleanup failed for ${worker.agentId}: ${error.message}`,
+            `[Coordinator] Post-completion worktree cleanup failed for ${worker.agentId}: ${(error as Error).message}`,
           ),
       );
     }
@@ -1582,7 +1600,7 @@ export default class CoordinatorService {
     // from "Generating..." to a completed state. Each worker finishes
     // independently — can't wait for the parent's `workers_updated` event.
     if (parentEmit) {
-            parentEmit({
+      parentEmit({
         type: "worker_status",
         workerId: worker.agentId,
         message: "complete",
@@ -1615,28 +1633,28 @@ export default class CoordinatorService {
     const coordinatorInstanceId = coordinatorCtx.providerName;
     if (workerInstanceId !== coordinatorInstanceId) {
       const othersOnSameInstance = [...activeWorkers.values()].filter(
-        (w: any) =>
+        (w) =>
           w.providerName === workerInstanceId &&
           w.agentId !== worker.agentId &&
           w.status === "running",
       );
       if (othersOnSameInstance.length === 0) {
         try {
-                    const workerProviderObj = getProvider((workerInstanceId as any));
+          const workerProviderObj = getProvider(workerInstanceId);
           if (workerProviderObj?.unloadModelByKey) {
             logger.info(
               `[Coordinator] VRAM eviction: unloading "${worker.resolvedModel}" from secondary instance ${workerInstanceId} (no active workers remain)`,
             );
             await workerProviderObj
               .unloadModelByKey(worker.resolvedModel)
-              .catch((error: any) =>
+              .catch((error: unknown) =>
                 logger.warn(
-                  `[Coordinator] VRAM eviction failed on ${workerInstanceId}: ${error.message}`,
+                  `[Coordinator] VRAM eviction failed on ${workerInstanceId}: ${(error as Error).message}`,
                 ),
               );
           }
         } catch (error: unknown) {
-                    logger.warn(`[Coordinator] VRAM eviction error: ${(error as Error).message}`);
+          logger.warn(`[Coordinator] VRAM eviction error: ${(error as Error).message}`);
         }
       } else {
         logger.info(
@@ -1655,10 +1673,16 @@ export default class CoordinatorService {
     repoPath,
     endpoint,
     agentSessionId,
-  }: any) {
-        const provider = getProvider((DECOMPOSITION_PROVIDER as any));
+  }: {
+    task: string;
+    files: string[];
+    repoPath?: string;
+    endpoint?: string;
+    agentSessionId?: string;
+  }) {
+    const provider = getProvider(DECOMPOSITION_PROVIDER);
 
-        const userMessage = `Task: ${task}\n\nTarget files:\n${(files as any).map((f: any) => `- ${f}`).join("\n")}`;
+    const userMessage = `Task: ${task}\n\nTarget files:\n${files.map((f: string) => `- ${f}`).join("\n")}`;
 
     const messages = [
       { role: "system", content: DECOMPOSITION_PROMPT },
@@ -1675,7 +1699,7 @@ export default class CoordinatorService {
         maxTokens: 2000,
         temperature: 0.2,
       })
-      .catch((error: any) => {
+      .catch((error: Error) => {
         llmSuccess = false;
         llmError = error.message;
         throw error;
@@ -1698,13 +1722,13 @@ export default class CoordinatorService {
       errorMessage: llmError,
       requestStartMs: requestStart,
       extraRequestPayload: {
-                task: (task as any).slice(0, 200),
-                fileCount: (files as any).length,
+        task: task.slice(0, 200),
+        fileCount: files.length,
       },
     });
 
     const parsed = parseJsonFromLlmResponse(result.text) as {
-      subTasks?: any[];
+      subTasks?: SubTask[];
       summary?: string;
     } | null;
     if (!parsed) {
@@ -1716,7 +1740,7 @@ export default class CoordinatorService {
 
     // Validate and cap sub-tasks
     const subTasks = (parsed.subTasks || []).slice(0, MAX_WORKERS);
-        for ( const st of subTasks) {
+    for (const st of subTasks) {
       if (!st.id) st.id = `task-${crypto.randomUUID().slice(0, 8)}`;
       st.branchName = `coordinator/${st.id}`;
     }
@@ -1730,24 +1754,30 @@ export default class CoordinatorService {
       status: "planned",
     };
   }
-  static async execute(plan: any, options: any = {}) {
+  static async execute(plan: { taskId: string; subTasks: SubTask[]; repoPath?: string }, options: {
+    provider?: string;
+    model?: string;
+    project?: string;
+    username?: string;
+    onProgress?: (taskId: string, workers: PanelWorker[]) => void;
+  } = {}) {
     const { taskId, subTasks, repoPath } = plan;
 
     if (activeTasks.has(taskId)) {
       return { error: "Task is already executing" };
     }
 
-    const taskState = {
+    const taskState: PanelTaskState = {
       taskId,
-      status: "executing",
-      repoPath,
-            workers: (subTasks as any).map((st: any) => ({
+      status: "executing" as const,
+      repoPath: repoPath || getDefaultWorkspaceRoot(),
+      workers: subTasks.map((st) => ({
         id: st.id,
         files: st.files,
         instruction: st.instruction,
-        branchName: st.branchName,
+        branchName: st.branchName || `coordinator/${st.id}`,
         worktreePath: null,
-        status: "pending",
+        status: "pending" as const,
         error: null,
         diff: null,
       })),
@@ -1759,41 +1789,41 @@ export default class CoordinatorService {
     try {
       // Phase 1: Create all worktrees
       logger.info(
-                `[Coordinator] Creating ${(subTasks as any).length} worktrees for task ${taskId}`,
+        `[Coordinator] Creating ${subTasks.length} worktrees for task ${taskId}`,
       );
 
-            for ( const worker of taskState.workers) {
-                const result = await createWorktree((repoPath as any), worker.branchName);
-                if ((result as any).error) {
+      for (const worker of taskState.workers) {
+        const result = await createWorktree(taskState.repoPath, worker.branchName);
+        if (result.error) {
           worker.status = "error";
-                    worker.error = `Worktree creation failed: ${(result as any).error}`;
-                    logger.error(
-                        `[Coordinator] Worker ${worker.id} worktree failed: ${(result as any).error}`,
+          worker.error = `Worktree creation failed: ${result.error}`;
+          logger.error(
+            `[Coordinator] Worker ${worker.id} worktree failed: ${result.error}`,
           );
           continue;
         }
-                worker.worktreePath = (result as any).worktreePath;
+        worker.worktreePath = result.worktreePath || null;
         worker.status = "ready";
       }
 
       // Phase 2: Execute workers in parallel
       const readyWorkers = taskState.workers.filter(
-        (w: any) => w.status === "ready",
+        (w) => w.status === "ready",
       );
       logger.info(
         `[Coordinator] Running ${readyWorkers.length} workers in parallel`,
       );
 
-      const workerPromises = readyWorkers.map((worker: any) =>
+      const workerPromises = readyWorkers.map((worker) =>
         CoordinatorService._runPanelWorker(worker, {
-          repoPath,
-                    provider: options.provider,
-                    model: options.model,
-                    project: options.project,
-                    username: options.username,
-          onProgress: (update: any) => {
+          repoPath: taskState.repoPath,
+          provider: options.provider,
+          model: options.model,
+          project: options.project,
+          username: options.username,
+          onProgress: (update: Partial<PanelWorker>) => {
             Object.assign(worker, update);
-                        options.onProgress?.(taskId, taskState.workers);
+            options.onProgress?.(taskId, taskState.workers);
           },
         }),
       );
@@ -1802,24 +1832,24 @@ export default class CoordinatorService {
 
       // Phase 3: Collect diffs from completed workers
       const completedWorkers = taskState.workers.filter(
-        (w: any) => w.status === "complete",
+        (w) => w.status === "complete",
       );
       logger.info(
         `[Coordinator] ${completedWorkers.length}/${taskState.workers.length} workers completed`,
       );
 
-            for ( const worker of completedWorkers) {
-                const diffResult = await getWorktreeDiff((repoPath as any), worker.branchName);
-                if ((diffResult as any).error) {
+      for (const worker of completedWorkers) {
+        const diffResult = await getWorktreeDiff(taskState.repoPath, worker.branchName);
+        if (diffResult.error) {
           worker.diff = null;
-                    worker.error = `Diff retrieval failed: ${(diffResult as any).error}`;
+          worker.error = `Diff retrieval failed: ${diffResult.error}`;
         } else {
-          worker.diff = diffResult;
+          worker.diff = diffResult as unknown as WorktreeDiff;
         }
       }
 
       taskState.status = "review";
-            options.onProgress?.(taskId, taskState.workers);
+      options.onProgress?.(taskId, taskState.workers);
 
       return {
         taskId,
@@ -1830,8 +1860,8 @@ export default class CoordinatorService {
       };
     } catch (error: unknown) {
       taskState.status = "error";
-            logger.error(`[Coordinator] Task ${taskId} failed: ${(error as Error).message}`);
-            return { error: (error as Error).message, taskId };
+      logger.error(`[Coordinator] Task ${taskId} failed: ${(error as Error).message}`);
+      return { error: (error as Error).message, taskId };
     }
   }
 
@@ -1840,7 +1870,7 @@ export default class CoordinatorService {
    * @private
    */
   static async _runPanelWorker(
-    worker: any,
+    worker: PanelWorker,
     {
       repoPath: _repoPath,
       provider: providerName,
@@ -1848,22 +1878,29 @@ export default class CoordinatorService {
       project,
       username,
       onProgress,
-    }: any,
+    }: {
+      repoPath: string;
+      provider?: string;
+      model?: string;
+      project?: string;
+      username?: string;
+      onProgress?: (update: Partial<PanelWorker>) => void;
+    },
   ) {
     worker.status = "running";
-        onProgress?.({ status: "running" });
+    onProgress?.({ status: "running" } as Partial<PanelWorker>);
 
     try {
       const { default: AgenticLoopService } =
         await import("./AgenticLoopService.js");
 
-      const workerMessages = [
+      const workerMessages: ConversationMessage[] = [
         {
           role: "user",
           content:
             `You are a worker agent in a multi-agent refactoring task.\n\n` +
             `Your workspace is: ${worker.worktreePath}\n` +
-                        `You are working on files: ${(worker as any).files.join(", ")}\n\n` +
+            `You are working on files: ${worker.files.join(", ")}\n\n` +
             `Task:\n${worker.instruction}\n\n` +
             `Important:\n` +
             `- Only modify files within your workspace\n` +
@@ -1873,44 +1910,43 @@ export default class CoordinatorService {
       ];
 
       let workerOutput = "";
-            const workerToolCalls: any[] = [];
-      const workerEmit = (event: any) => {
+      const workerToolCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+      const workerEmit: EmitFn = (event) => {
         if (event.type === "chunk") {
-          workerOutput += event.content || "";
+          workerOutput += (event.content as string) || "";
         } else if (
           event.type === "tool_execution" &&
           event.status === "calling"
         ) {
           workerToolCalls.push({
-                        name: (event.tool as any)?.name,
-                        args: (event.tool as any)?.args,
+            name: (event.tool as Record<string, unknown>)?.name as string,
+            args: (event.tool as Record<string, unknown>)?.args as Record<string, unknown>,
           });
         }
-                onProgress?.({ toolCallCount: workerToolCalls.length });
+        onProgress?.({ toolCalls: workerToolCalls } as Partial<PanelWorker>);
       };
 
       // Build enabled tools — exclude coordinator tools
       const allSchemas = ToolOrchestratorService.getToolSchemas();
       const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
       const workerEnabledTools = allSchemas
-        .map((t: any) => t.name as string)
+        .map((t: ToolSchema) => t.name)
         .filter((name: string) => !coordinatorSet.has(name));
 
       let resolvedProviderName = providerName || DECOMPOSITION_PROVIDER;
       let resolvedModel = model || COORDINATOR_DECOMPOSITION_MODEL;
 
-      // Local model guard with instance pooling — same logic as spawnFromTool:
-      // distribute workers across all instances of the same type.
-            if (localModelQueue.isLocal((resolvedProviderName as any))) {
+      // Local model guard with instance pooling
+      if (localModelQueue.isLocal(resolvedProviderName)) {
         const providerType =
-                    getInstanceType((resolvedProviderName as any)) || resolvedProviderName;
-                const siblings = getInstancesByType((providerType as any));
+          getInstanceType(resolvedProviderName) || resolvedProviderName;
+        const siblings = getInstancesByType(providerType);
         const totalSlots = siblings.reduce(
-                    (sum: any, inst: any) => sum + (inst as any).concurrency,
+          (sum: number, inst) => sum + inst.concurrency,
           0,
         );
 
-                if (totalSlots <= 1) {
+        if (totalSlots <= 1) {
           const panelFallback = await getWorkerFallback();
           if (panelFallback) {
             logger.info(
@@ -1924,11 +1960,9 @@ export default class CoordinatorService {
             );
           }
         } else {
-          // Fill-first: saturate each instance in declaration order
-          // before spilling to the next (matches PROVIDER_* array order)
-          let bestInstance = null;
-                    for ( const inst of siblings) {
-                        const active = localModelQueue._getQueue((inst.id as any)).activeCount;
+          let bestInstance: InstanceEntry | null = null;
+          for (const inst of siblings) {
+            const active = localModelQueue._getQueue(inst.id).activeCount;
             const available = inst.concurrency - active;
             if (available > 0) {
               bestInstance = inst;
@@ -1944,29 +1978,29 @@ export default class CoordinatorService {
         }
       }
 
-            const workerProvider = getProvider((resolvedProviderName as any));
+      const workerProvider = getProvider(resolvedProviderName);
       const { getModelByName } = await import("../config.js");
-            const workerModelDef = getModelByName((resolvedModel as any));
+      const workerModelDef = getModelByName(resolvedModel!);
 
       const abortController = createAbortController();
       worker.abortController = abortController;
 
       await AgenticLoopService.runAgenticLoop({
         provider: workerProvider,
-                providerName: resolvedProviderName,
-                resolvedModel,
+        providerName: resolvedProviderName,
+        resolvedModel: resolvedModel!,
         modelDef: workerModelDef,
         messages: workerMessages,
         options: {
           autoApprove: true,
           agenticLoopEnabled: true,
-                    enabledTools: workerEnabledTools,
+          enabledTools: workerEnabledTools,
           maxIterations: MAX_WORKER_ITERATIONS,
           maxTokens: 8192,
         },
         agentSessionId: `panel-worker-${worker.id}`,
-                project: project || null,
-                username: username || "system",
+        project: project || "",
+        username: username || "system",
         requestStart: performance.now(),
         emit: workerEmit,
         signal: abortController.signal,
@@ -1983,34 +2017,34 @@ export default class CoordinatorService {
       });
 
       worker.status = "complete";
-            worker.toolCalls = workerToolCalls;
+      worker.toolCalls = workerToolCalls;
       worker.output = workerOutput;
-            onProgress?.({ status: "complete" });
+      onProgress?.({ status: "complete" } as Partial<PanelWorker>);
 
       logger.info(
         `[Coordinator] Panel worker ${worker.id} completed (${workerToolCalls.length} tool calls)`,
       );
     } catch (error: unknown) {
       worker.status = "error";
-            worker.error = (error as Error).message;
-            onProgress?.({ status: "error", error: (error as Error).message });
+      worker.error = (error as Error).message;
+      onProgress?.({ status: "error", error: (error as Error).message } as Partial<PanelWorker>);
       logger.error(
-                `[Coordinator] Panel worker ${worker.id} failed: ${(error as Error).message}`,
+        `[Coordinator] Panel worker ${worker.id} failed: ${(error as Error).message}`,
       );
     }
   }
-  static async approveMerge(taskId: any) {
+  static async approveMerge(taskId: string) {
     const task = activeTasks.get(taskId);
     if (!task) return { error: "Task not found" };
     if (task.status !== "review")
       return { error: `Task is in '${task.status}' state, not 'review'` };
 
     const completedWorkers = task.workers.filter(
-            (w: any) => w.status === "complete" && (w.diff as any)?.hasChanges,
+      (w) => w.status === "complete" && w.diff?.hasChanges,
     );
-    const results: any[] = [];
+    const results: Array<{ workerId: string; merged: boolean; error: string | null }> = [];
 
-        for ( const worker of completedWorkers) {
+    for (const worker of completedWorkers) {
       const mergeResult = await mergeWorktree(
         task.repoPath || getDefaultWorkspaceRoot(),
         worker.branchName,
@@ -2019,8 +2053,8 @@ export default class CoordinatorService {
 
       results.push({
         workerId: worker.id,
-                merged: !(mergeResult as any).error,
-                error: (mergeResult as any).error || null,
+        merged: !mergeResult.error,
+        error: mergeResult.error || null,
       });
     }
 
@@ -2030,12 +2064,12 @@ export default class CoordinatorService {
     task.status = "merged";
     return { taskId, merged: results };
   }
-  static async abort(taskId: any) {
+  static async abort(taskId: string) {
     const task = activeTasks.get(taskId);
     if (!task) return { error: "Task not found" };
 
     // Abort running workers
-        for ( const worker of task.workers) {
+    for (const worker of task.workers) {
       if (worker.abortController) {
         worker.abortController.abort();
       }
@@ -2057,13 +2091,13 @@ export default class CoordinatorService {
    * Clean up worktrees for a task.
    * @private
    */
-  static async cleanup(taskId: any) {
+  static async cleanup(taskId: string) {
     const task = activeTasks.get(taskId);
     if (!task) return;
 
     const repoPath = task.repoPath || getDefaultWorkspaceRoot();
 
-        for ( const worker of task.workers) {
+    for (const worker of task.workers) {
       if (worker.worktreePath) {
         await removeWorktree(repoPath, worker.worktreePath);
         worker.worktreePath = null;
@@ -2073,14 +2107,14 @@ export default class CoordinatorService {
     // Prune stale worktree references
     await cleanupWorktrees(repoPath);
   }
-  static getStatus(taskId: any) {
+  static getStatus(taskId: string) {
     return activeTasks.get(taskId) || null;
   }
   static listTasks() {
-    return Array.from(activeTasks.values()).map((t: any) => ({
+    return Array.from(activeTasks.values()).map((t) => ({
       taskId: t.taskId,
       status: t.status,
-            workerCount: (t as any).workers.length,
+      workerCount: t.workers.length,
       startedAt: t.startedAt,
     }));
   }

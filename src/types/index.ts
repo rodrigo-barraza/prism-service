@@ -83,7 +83,13 @@ export type {
   WorktreeCreateResponse,
   SubTask,
   DecompositionResult,
+  PanelWorker,
+  PanelTaskState,
+  TeamEntry,
+  TeamMember,
+  TeamMemberResult,
 } from "./coordinator.ts";
+
 
 export type {
   DateRangeFilter,

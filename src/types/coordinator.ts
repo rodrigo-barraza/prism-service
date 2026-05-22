@@ -27,8 +27,8 @@ export interface WorkerState {
   durationMs: number;
   totalCost: number | null;
   usage: Record<string, number> | null;
-  abortController: AbortController;
-  messages: ConversationMessage[];
+  abortController: AbortController | null;
+  messages: ConversationMessage[] | null;
   files: string[];
   iterations?: number;
   // Coordinator context fields
@@ -131,9 +131,59 @@ export interface SubTask {
   files: string[];
   instruction: string;
   complexity: "low" | "medium" | "high";
+  /** Attached at runtime by CoordinatorService after decomposition. */
+  branchName?: string;
 }
 
 export interface DecompositionResult {
   subTasks: SubTask[];
   summary: string;
 }
+
+// ── Panel Flow State ────────────────────────────────────────
+
+export interface PanelWorker {
+  id: string;
+  files: string[];
+  instruction: string;
+  branchName: string;
+  worktreePath: string | null;
+  status: "pending" | "ready" | "running" | "complete" | "error";
+  error: string | null;
+  diff: WorktreeDiff | null;
+  toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
+  output?: string;
+  abortController?: AbortController;
+}
+
+export interface PanelTaskState {
+  taskId: string;
+  status: "executing" | "review" | "error" | "merged" | "aborted";
+  repoPath: string;
+  workers: PanelWorker[];
+  startedAt: string;
+}
+
+// ── Team Management ─────────────────────────────────────────
+
+export interface TeamEntry {
+  agentIds: string[];
+  createdAt: number;
+}
+
+export interface TeamMember {
+  description: string;
+  prompt: string;
+  files?: string[];
+  model?: string;
+}
+
+export interface TeamMemberResult {
+  index: number;
+  description: string;
+  agent_id?: string;
+  status?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
