@@ -1109,8 +1109,11 @@ interface ModelOptionEntry {
  */
 function getModels(inputType: string, outputType: string): ModelDefinition[] {
   return Object.values(MODELS).filter(
-    (m: unknown) =>
-      (m as any).inputTypes.includes(inputType) && (m as any).outputTypes.includes(outputType),
+    (m) => {
+      const model = m as ModelDefinition & Record<string, unknown>;
+      return (model.inputTypes as string[])?.includes(inputType) &&
+        (model.outputTypes as string[])?.includes(outputType);
+    },
   );
 }
 
@@ -1204,7 +1207,7 @@ function getPricing(inputType: string, outputType: string): Record<string, Recor
  * Returns the model object or null.
  */
 function getModelByName(name: string): ModelDefinition | null {
-  return Object.values(MODELS).find((m: unknown) => (m as any).name === name) || null;
+  return Object.values(MODELS).find((m) => (m as ModelDefinition).name === name) as ModelDefinition | null ?? null;
 }
 
 // ─── VOICES (per provider — applies to TEXT → AUDIO models) ─

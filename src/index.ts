@@ -179,11 +179,11 @@ app.use(errorHandler);
 
 // WebSocket server
 const wss = new WebSocketServer({ server });
-setupWebSocket((wss as any));
+setupWebSocket(wss);
 
 // Start
 (async () => {
-    await MongoWrapper.createClient(MONGO_DB_NAME, (MONGO_URI as any));
+    await MongoWrapper.createClient(MONGO_DB_NAME, MONGO_URI as string);
   await MemoryService.ensureIndexes();
 
   // ── Collection Rename Migration: conversations/agent_sessions → model_conversations/agent_conversations ──
@@ -202,8 +202,8 @@ setupWebSocket((wss as any));
         logger.info("Migrated MongoDB collection: agent_sessions → agent_conversations");
       }
     }
-  } catch (error: any) {
-    logger.warn("Collection migration check failed: " + error.message);
+  } catch (error: unknown) {
+    logger.warn("Collection migration check failed: " + (error as Error).message);
   }
 
   // ── Ensure collection indexes ──────────────────────────────────
@@ -319,8 +319,8 @@ setupWebSocket((wss as any));
     const { default: AgentPersonaRegistry } =
       await import("./services/AgentPersonaRegistry.js");
     const agentProjects = AgentPersonaRegistry.list()
-      .map((p: any) => {
-                const persona = AgentPersonaRegistry.get((p.id as any));
+      .map((p) => {
+        const persona = AgentPersonaRegistry.get(p.id);
         return persona?.project;
       })
       .filter(Boolean);
@@ -333,7 +333,7 @@ setupWebSocket((wss as any));
         .toArray();
       if (agentConvs.length > 0) {
         // Strip _id to avoid duplicate key errors on insert
-        const docs = agentConvs.map(({ _id, ...rest }: any) => rest);
+        const docs = agentConvs.map(({ _id, ...rest }) => rest);
         await db
           .collection("agent_conversations")
           .insertMany(docs, { ordered: false })
@@ -370,9 +370,9 @@ setupWebSocket((wss as any));
       await import("./services/AgentPersonaRegistry.js");
     const mcpDb = MongoWrapper.getDb(MONGO_DB_NAME);
     const codingProject =
-            AgentPersonaRegistryMCP.get(("CODING" as any))?.project || "coding";
+            AgentPersonaRegistryMCP.get("CODING")?.project || "coding";
     if (mcpDb) {
-            await MCPClientService.connectAllFromDB((mcpDb as any), codingProject, "admin");
+            await MCPClientService.connectAllFromDB(mcpDb, codingProject, "admin");
     }
   } catch (error: unknown) {
         logger.warn(`MCP auto-connect failed: ${(error as Error).message}`);
@@ -436,16 +436,16 @@ setupWebSocket((wss as any));
 
   // ── Background Housekeeping ────────────────────────────────
   // Boot-time run: clean up orphans from previous crashes
-  BackgroundHousekeepingService.run({ trigger: "boot" }).catch((error: any) =>
-    logger.error(`[Housekeeping] Boot-time run failed: ${error.message}`),
+  BackgroundHousekeepingService.run({ trigger: "boot" }).catch((error: unknown) =>
+    logger.error(`[Housekeeping] Boot-time run failed: ${(error as Error).message}`),
   );
 
   // Scheduled run: every 6h (independent of consolidation interval)
   const HOUSEKEEPING_INTERVAL_MS = hours(6);
   const housekeepingInterval = setInterval(() => {
     BackgroundHousekeepingService.run({ trigger: "scheduled" }).catch(
-      (error: any) =>
-        logger.error(`[Housekeeping] Scheduled run failed: ${error.message}`),
+      (error: unknown) =>
+        logger.error(`[Housekeeping] Scheduled run failed: ${(error as Error).message}`),
     );
   }, HOUSEKEEPING_INTERVAL_MS);
   registerCleanup(async () => clearInterval(housekeepingInterval));
@@ -485,17 +485,17 @@ setupWebSocket((wss as any));
       embedding: [6, 182, 212], // #06b6d4 — cyan
     };
     const coloredModalities = Object.values(TYPES)
-            .map((t: any) => {
-                const [r, g, b] = (MODALITY_COLORS as any)[(t as string)] || [255, 255, 255];
+      .map((t: string) => {
+        const [r, g, b] = (MODALITY_COLORS as Record<string, number[]>)[t] || [255, 255, 255];
         return `\x1b[38;2;${r};${g};${b}m${t}\x1b[0m`;
       })
       .join(", ");
     logger.info("Available modalities:", coloredModalities);
-        ENDPOINTS.rest.forEach(((ep: any) =>
-              logger.info(`  REST  →  http://localhost:${PORT}${ep}`) as any as (value: string, index: number, array: string[]) => void),
-    );
-        ENDPOINTS.websocket.forEach(((ep: any) =>
-              logger.info(`  WS    →  ws://localhost:${PORT}${ep}`) as any as (value: string, index: number, array: string[]) => void),
-    );
+    for (const ep of ENDPOINTS.rest) {
+      logger.info(`  REST  →  http://localhost:${PORT}${ep}`);
+    }
+    for (const ep of ENDPOINTS.websocket) {
+      logger.info(`  WS    →  ws://localhost:${PORT}${ep}`);
+    }
   });
 })();

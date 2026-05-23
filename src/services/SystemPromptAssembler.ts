@@ -168,14 +168,14 @@ export default class SystemPromptAssembler {
     const schemas = ToolOrchestratorService.getToolSchemas();
     const enabledSet = enabledTools ? new Set(enabledTools) : null;
 
-    const filtered: any[] = enabledSet
+    const filtered: Record<string, unknown>[] = enabledSet
       ? schemas.filter((t) => enabledSet.has(t.name as string))
       : schemas;
 
     if (filtered.length === 0) return "";
 
     // Group by domain
-    const groups = new Map<string, any[]>();
+    const groups = new Map<string, Record<string, unknown>[]>();
     for (const tool of filtered) {
       const domain = ((tool.domain as string) || "Other").replace(/^Agentic:\s*/i, "");
       if (!groups.has(domain)) groups.set(domain, []);
