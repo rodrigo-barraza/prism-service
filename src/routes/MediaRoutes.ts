@@ -7,7 +7,7 @@ import { GetMediaQuerySchema } from "../types/index.ts";
 
 const router = express.Router();
 router.use(requireDb);
-const CONVERSATIONS_COL = COLLECTIONS.CONVERSATIONS;
+const CONVERSATIONS_COL = COLLECTIONS.MODEL_CONVERSATIONS;
 const REQUESTS_COL = COLLECTIONS.REQUESTS;
 
 interface AggregateMediaItem {

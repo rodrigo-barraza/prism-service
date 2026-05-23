@@ -17,8 +17,6 @@ import {
 const router = express.Router();
 router.use(requireDb);
 
-const COLLECTION = COLLECTIONS.CONVERSATIONS;
-
 interface ConversationDocument {
   _id: ObjectId;
   id: string;
@@ -47,13 +45,7 @@ interface WorkflowDocument {
 
 /**
  * GET /conversations
- * List conversations for the given project with cursor-based pagination.
- *
- * Query params:
- *   limit  — page size (default 50, max 200)
- *   cursor — ISO date string (updatedAt of last item from previous page)
- *
- * Returns: { items, nextCursor, hasMore }
+ * List both direct conversations and agent sessions, merged and sorted by updatedAt.
  */
 router.get(
   "/",
@@ -72,41 +64,71 @@ router.get(
 
       const filter: Record<string, unknown> = { project, username };
       if (cursor) {
-        // updatedAt is stored as ISO-8601 strings — compare string-to-string
-        // to match BSON type and allow index range scan
         filter.updatedAt = { $lt: cursor };
       }
 
-      // Fetch limit + 1 to detect if there's a next page
-      const rows = await db
-        .collection<ConversationDocument>(COLLECTION)
-        .find(filter)
-        .project<Omit<ConversationDocument, "messages" | "systemPrompt" | "settings">>({
-          id: 1,
-          project: 1,
-          username: 1,
-          title: 1,
-          createdAt: 1,
-          updatedAt: 1,
-          modalities: 1,
-          providers: 1,
-          totalCost: 1,
-          isGenerating: 1,
-          traceId: 1,
-          synthetic: 1,
-        })
-        .sort({ updatedAt: -1 })
-        .limit(limit + 1)
-        .toArray();
+      // Fetch from both collections in parallel
+      const [convs, sessions] = await Promise.all([
+        db
+          .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
+          .find(filter)
+          .project<Omit<ConversationDocument, "messages">>({
+            id: 1,
+            project: 1,
+            username: 1,
+            title: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            modalities: 1,
+            providers: 1,
+            totalCost: 1,
+            isGenerating: 1,
+            traceId: 1,
+            synthetic: 1,
+            systemPrompt: 1,
+          })
+          .sort({ updatedAt: -1 })
+          .limit(limit + 1)
+          .toArray(),
+        db
+          .collection<any>(COLLECTIONS.AGENT_CONVERSATIONS)
+          .find(filter)
+          .project<any>({
+            id: 1,
+            project: 1,
+            username: 1,
+            title: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            modalities: 1,
+            providers: 1,
+            totalCost: 1,
+            isGenerating: 1,
+            traceId: 1,
+            agent: 1,
+            systemPrompt: 1,
+          })
+          .sort({ updatedAt: -1 })
+          .limit(limit + 1)
+          .toArray(),
+      ]);
 
-      const hasMore = rows.length > limit;
-      const items = hasMore ? rows.slice(0, limit) : rows;
+      // Merge and sort in memory by updatedAt descending
+      const merged = [
+        ...convs.map((c) => ({ ...c, type: "direct" as const })),
+        ...sessions.map((s) => ({ ...s, type: "agent" as const })),
+      ].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+
+      const hasMore = merged.length > limit;
+      const items = hasMore ? merged.slice(0, limit) : merged;
       const nextCursor = hasMore ? items[items.length - 1].updatedAt : null;
 
       res.json({ items, nextCursor, hasMore });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`Error fetching conversations: ${errorMessage}`);
+      logger.error(`Error fetching unified conversations: ${errorMessage}`);
       next(error);
     }
   }),
@@ -114,7 +136,7 @@ router.get(
 
 /**
  * GET /conversations/:id
- * Get a specific conversation.
+ * Get a specific conversation or agent session.
  */
 router.get(
   "/:id",
@@ -125,18 +147,28 @@ router.get(
       const { db } = req;
       const conversationId = req.params.id as string;
 
-      const conversation = await db
-        .collection<ConversationDocument>(COLLECTION)
+      // Check conversations first
+      let chat = await db
+        .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
         .findOne({ id: conversationId, project, username });
 
-      if (!conversation) {
-        return res.status(404).json({ error: "Conversation not found" });
+      if (chat) {
+        return res.json({ ...chat, type: "direct" });
       }
 
-      res.json(conversation);
+      // Check agent sessions next
+      chat = await db
+        .collection<any>(COLLECTIONS.AGENT_CONVERSATIONS)
+        .findOne({ id: conversationId, project, username });
+
+      if (chat) {
+        return res.json({ ...chat, type: "agent" });
+      }
+
+      res.status(404).json({ error: "Conversation not found" });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`Error fetching conversation: ${errorMessage}`);
+      logger.error(`Error fetching specific conversation: ${errorMessage}`);
       next(error);
     }
   }),
@@ -170,7 +202,7 @@ router.get(
 
 /**
  * POST /conversations/:id/messages
- * Append messages to an existing conversation (e.g. tool results after execution).
+ * Append messages to an existing conversation or agent session.
  */
 router.post(
   "/:id/messages",
@@ -178,6 +210,7 @@ router.post(
     try {
       const project = req.project || "any";
       const username = req.username || "any";
+      const { db } = req;
       const conversationId = req.params.id as string;
 
       const parsed = PostConversationMessagesBodySchema.safeParse(req.body);
@@ -187,18 +220,36 @@ router.post(
 
       const { messages, conversationMeta } = parsed.data;
 
+      // Determine which collection has this chat
+      let isAgent = false;
+      const directExists = await db
+        .collection(COLLECTIONS.MODEL_CONVERSATIONS)
+        .countDocuments({ id: conversationId, project, username });
+
+      if (directExists === 0) {
+        const agentExists = await db
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+          .countDocuments({ id: conversationId, project, username });
+        if (agentExists > 0) {
+          isAgent = true;
+        } else {
+          return res.status(404).json({ error: "Conversation not found" });
+        }
+      }
+
       const conversation = await ConversationService.appendMessages(
         conversationId,
         project,
         username,
         messages as import("../types/admin.ts").ChatMessage[],
         conversationMeta || null,
+        { collection: isAgent ? COLLECTIONS.AGENT_CONVERSATIONS : undefined }
       );
 
-      res.json(conversation);
+      res.json({ ...conversation, type: isAgent ? "agent" : "direct" });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`Error appending messages: ${errorMessage}`);
+      logger.error(`Error appending messages to conversation: ${errorMessage}`);
       next(error);
     }
   }),
@@ -206,8 +257,7 @@ router.post(
 
 /**
  * PATCH /conversations/:id
- * Update specific fields of a conversation (messages, title, systemPrompt, settings).
- * Used for non-generation mutations (edit/delete messages, rename, etc.).
+ * Update specific fields of a conversation or agent session.
  */
 router.patch(
   "/:id",
@@ -225,22 +275,37 @@ router.patch(
 
       const setFields = buildConversationPatchFields(parsed.data as unknown as ConversationPatchInput);
 
-      const result = await db
-        .collection<ConversationDocument>(COLLECTION)
+      // Try updating conversations first
+      let result = await db
+        .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
         .updateOne(
           { id: conversationId, project, username },
-          { $set: setFields },
+          { $set: setFields }
         );
 
-      if (result.matchedCount === 0) {
-        return res.status(404).json({ error: "Conversation not found" });
+      if (result.matchedCount > 0) {
+        const conversation = await db
+          .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
+          .findOne({ id: conversationId, project, username });
+        return res.json({ ...conversation, type: "direct" });
       }
 
-      const conversation = await db
-        .collection<ConversationDocument>(COLLECTION)
-        .findOne({ id: conversationId, project, username });
+      // Try updating agent sessions next
+      result = await db
+        .collection<any>(COLLECTIONS.AGENT_CONVERSATIONS)
+        .updateOne(
+          { id: conversationId, project, username },
+          { $set: setFields }
+        );
 
-      res.json(conversation);
+      if (result.matchedCount > 0) {
+        const session = await db
+          .collection<any>(COLLECTIONS.AGENT_CONVERSATIONS)
+          .findOne({ id: conversationId, project, username });
+        return res.json({ ...session, type: "agent" });
+      }
+
+      res.status(404).json({ error: "Conversation not found" });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`Error patching conversation: ${errorMessage}`);
@@ -251,7 +316,7 @@ router.patch(
 
 /**
  * DELETE /conversations/:id
- * Delete a specific conversation.
+ * Delete a specific conversation or agent session.
  */
 router.delete(
   "/:id",
@@ -262,15 +327,25 @@ router.delete(
       const { db } = req;
       const conversationId = req.params.id as string;
 
-      const result = await db
-        .collection<ConversationDocument>(COLLECTION)
+      // Try deleting from conversations first
+      let result = await db
+        .collection(COLLECTIONS.MODEL_CONVERSATIONS)
         .deleteOne({ id: conversationId, project, username });
 
-      if (result.deletedCount === 0) {
-        return res.status(404).json({ error: "Conversation not found" });
+      if (result.deletedCount > 0) {
+        return res.json({ success: true, id: conversationId, type: "direct" });
       }
 
-      res.json({ success: true, id: conversationId });
+      // Try deleting from agent sessions next
+      result = await db
+        .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+        .deleteOne({ id: conversationId, project, username });
+
+      if (result.deletedCount > 0) {
+        return res.json({ success: true, id: conversationId, type: "agent" });
+      }
+
+      res.status(404).json({ error: "Conversation not found" });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`Error deleting conversation: ${errorMessage}`);

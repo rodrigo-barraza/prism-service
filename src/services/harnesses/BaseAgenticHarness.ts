@@ -634,7 +634,7 @@ export default class BaseAgenticHarness {
         if (workers.length > 0) {
           const collection = MongoWrapper.getCollection(
             MONGO_DB_NAME,
-            COLLECTIONS.AGENT_SESSIONS,
+            COLLECTIONS.AGENT_CONVERSATIONS,
           );
           await collection.updateOne(
             { id: agentSessionId, project, username },

@@ -106,7 +106,7 @@ router.get(
 
       const countPipeline = [...pipeline, { $count: "total" }];
       const [countResult] = await db
-        .collection(COLLECTIONS.CONVERSATIONS)
+        .collection(COLLECTIONS.MODEL_CONVERSATIONS)
         .aggregate<{ total: number }>(countPipeline)
         .toArray();
       const total = countResult?.total || 0;
@@ -114,7 +114,7 @@ router.get(
       pipeline.push({ $skip: skip }, { $limit: limit });
 
       const items = await db
-        .collection(COLLECTIONS.CONVERSATIONS)
+        .collection(COLLECTIONS.MODEL_CONVERSATIONS)
         .aggregate<AggregateTextItem>(pipeline)
         .toArray();
 

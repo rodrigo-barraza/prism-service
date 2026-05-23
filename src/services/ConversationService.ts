@@ -6,7 +6,7 @@ import { COLLECTIONS } from "../constants.ts";
 import { errorMessage } from "../utils/errorMessage.ts";
 import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
 
-const DEFAULT_COLLECTION = COLLECTIONS.CONVERSATIONS;
+const DEFAULT_COLLECTION = COLLECTIONS.MODEL_CONVERSATIONS;
 
 // ── Conversation Metadata ───────────────────────────────────
 
@@ -304,7 +304,7 @@ const ConversationService: ConversationServiceInterface = {
   ): Promise<Record<string, unknown>> {
     const traceId = conversationMeta?.traceId || null;
     const col = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
-    const isAgentSession = collection === COLLECTIONS.AGENT_SESSIONS;
+    const isAgentSession = collection === COLLECTIONS.AGENT_CONVERSATIONS;
 
     // Extract files (upload base64 data to MinIO)
     const processedMessages = await extractFiles(
@@ -323,16 +323,14 @@ const ConversationService: ConversationServiceInterface = {
       if (conversationMeta.title !== undefined) {
         setFields.title = conversationMeta.title;
       }
-      if (conversationMeta.systemPrompt !== undefined && !isAgentSession) {
+      if (conversationMeta.systemPrompt !== undefined) {
         setFields.systemPrompt = conversationMeta.systemPrompt;
       }
       if (conversationMeta.settings !== undefined) {
-        setFields.settings = isAgentSession
-          ? { ...conversationMeta.settings }
-          : {
-              ...conversationMeta.settings,
-              systemPrompt: conversationMeta.systemPrompt || "",
-            };
+        setFields.settings = {
+          ...conversationMeta.settings,
+          systemPrompt: conversationMeta.systemPrompt || "",
+        };
       }
       if (conversationMeta.parentAgentSessionId) {
         setFields.parentAgentSessionId = conversationMeta.parentAgentSessionId;
@@ -344,17 +342,16 @@ const ConversationService: ConversationServiceInterface = {
 
     // Build $setOnInsert for auto-creation of new conversations
     const metaSettings = conversationMeta?.settings || {};
-    const metaSysPrompt = isAgentSession
-      ? undefined
-      : conversationMeta?.systemPrompt || "";
+    const metaSysPrompt = conversationMeta?.systemPrompt || "";
     const parentId = conversationMeta?.parentAgentSessionId || null;
 
     const setOnInsertBase: Record<string, unknown> = {
       title: conversationMeta?.title || "New Conversation",
-      ...(!isAgentSession && { systemPrompt: metaSysPrompt }),
-      settings: isAgentSession
-        ? { ...metaSettings }
-        : { ...metaSettings, systemPrompt: metaSysPrompt },
+      systemPrompt: metaSysPrompt,
+      settings: {
+        ...metaSettings,
+        systemPrompt: metaSysPrompt,
+      },
       modalities: computeModalities([]),
       providers: extractProviders([], metaSettings as ConversationSettings),
       totalCost: 0,
@@ -434,7 +431,7 @@ const ConversationService: ConversationServiceInterface = {
 
     if (generating) {
       // Upsert — create a stub if it doesn't exist yet
-      const isAgentSession = collection === COLLECTIONS.AGENT_SESSIONS;
+      const isAgentSession = collection === COLLECTIONS.AGENT_CONVERSATIONS;
       await db.collection(collection).updateOne(
         { id: conversationId, project, username },
         {
@@ -442,7 +439,7 @@ const ConversationService: ConversationServiceInterface = {
           $setOnInsert: {
             title: "New Conversation",
             messages: [],
-            ...(!isAgentSession && { systemPrompt: "" }),
+            systemPrompt: "",
             settings: {},
             modalities: computeModalities([]),
             providers: [],

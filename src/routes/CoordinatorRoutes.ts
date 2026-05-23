@@ -165,7 +165,7 @@ router.get(
         const { COLLECTIONS } = await import("../constants.js");
         const collection = MongoWrapper.getCollection(
           MONGO_DB_NAME,
-          COLLECTIONS.AGENT_SESSIONS,
+          COLLECTIONS.AGENT_CONVERSATIONS,
         );
         const session = await collection.findOne(
           { id: agentSessionId },

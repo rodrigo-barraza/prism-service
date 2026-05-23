@@ -418,7 +418,7 @@ router.post(
       const convIds = req.body.conversationIds;
       if (Array.isArray(convIds) && convIds.length > 0) {
         const conversations = await db
-          .collection(COLLECTIONS.CONVERSATIONS)
+          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
           .find({ id: { $in: convIds } })
           .project({ totalCost: 1 })
           .toArray();
@@ -547,7 +547,7 @@ router.patch(
       const allConvIds = workflow?.conversationIds || [];
       if (allConvIds.length > 0) {
         const conversations = await db
-          .collection(COLLECTIONS.CONVERSATIONS)
+          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
           .find({ id: { $in: allConvIds } })
           .project({ totalCost: 1 })
           .toArray();

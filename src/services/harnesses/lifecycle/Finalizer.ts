@@ -59,11 +59,11 @@ export interface FinalizerPayload {
 
 /**
  * Resolve the MongoDB collection for conversation persistence.
- * Agent projects go to agent_sessions; everything else to conversations.
+ * Agent projects go to agent_conversations; everything else to model_conversations.
  */
 function getCollectionOpts(project: string | null | undefined) {
   if (AgentPersonaRegistry.isAgentProject(project || "")) {
-    return { collection: COLLECTIONS.AGENT_SESSIONS };
+    return { collection: COLLECTIONS.AGENT_CONVERSATIONS };
   }
   return undefined;
 }

@@ -1,6 +1,7 @@
 import ConversationService from "../services/ConversationService.ts";
 import logger from "./logger.ts";
 import type { ChatMessage } from "../types/admin.ts";
+import { COLLECTIONS } from "../constants.ts";
 
 // ─── Conversation persistence helpers ───────────────────────
 
@@ -67,7 +68,7 @@ export function appendAndFinalize(
     .catch((error: unknown) => {
       logger.error(
         `Failed to append ${messagesToAppend?.length ?? 0} messages to ${conversationId} ` +
-          `(project=${project}, collection=${opts?.collection || "conversations"}): ${(error as Error).message}`,
+          `(project=${project}, collection=${opts?.collection || COLLECTIONS.MODEL_CONVERSATIONS}): ${(error as Error).message}`,
       );
 
       // Always clear isGenerating even on failure — prevents sessions

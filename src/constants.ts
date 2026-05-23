@@ -33,8 +33,8 @@ export const DIRECTORY_FETCH_TIMEOUT_MS = 5000;
  */
 export const COLLECTIONS = {
   REQUESTS: "requests",
-  CONVERSATIONS: "conversations",
-  AGENT_SESSIONS: "agent_sessions",
+  MODEL_CONVERSATIONS: "model_conversations",
+  AGENT_CONVERSATIONS: "agent_conversations",
   WORKFLOWS: "workflows",
   BENCHMARKS: "benchmarks",
   BENCHMARK_RUNS: "benchmark_runs",

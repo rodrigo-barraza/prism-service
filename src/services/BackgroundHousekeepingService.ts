@@ -109,13 +109,13 @@ async function clearStaleSessions(): Promise<HousekeepingSessionResult> {
 
   const [convResult, sessionResult] = await Promise.all([
     db
-      .collection(COLLECTIONS.CONVERSATIONS)
+      .collection(COLLECTIONS.MODEL_CONVERSATIONS)
       .updateMany(
         { isGenerating: true, updatedAt: { $lt: cutoff } },
         { $set: { isGenerating: false } }
       ),
     db
-      .collection(COLLECTIONS.AGENT_SESSIONS)
+      .collection(COLLECTIONS.AGENT_CONVERSATIONS)
       .updateMany(
         { isGenerating: true, updatedAt: { $lt: cutoff } },
         { $set: { isGenerating: false } }
@@ -177,10 +177,10 @@ async function pruneMinioOrphans(): Promise<number> {
     // Stream IDs instead of distinct() to avoid materializing the entire array
     const validIds = new Set<string>();
     const convCursor = db
-      .collection(COLLECTIONS.CONVERSATIONS)
+      .collection(COLLECTIONS.MODEL_CONVERSATIONS)
       .find<{ id: string }>({}, { projection: { id: 1, _id: 0 } });
     const sessionCursor = db
-      .collection(COLLECTIONS.AGENT_SESSIONS)
+      .collection(COLLECTIONS.AGENT_CONVERSATIONS)
       .find<{ id: string }>({}, { projection: { id: 1, _id: 0 } });
     for await (const document of convCursor) validIds.add(document.id);
     for await (const document of sessionCursor) validIds.add(document.id);

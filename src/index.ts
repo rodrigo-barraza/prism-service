@@ -50,7 +50,7 @@ import skillsRouter from "./routes/SkillsRoutes.ts";
 import agentMemoriesRouter from "./routes/AgentMemoriesRoutes.ts";
 import mcpServersRouter from "./routes/McpServersRoutes.ts";
 import favoritesRouter from "./routes/FavoritesRoutes.ts";
-import agentSessionsRouter from "./routes/AgentSessionsRoutes.ts";
+import conversationRouter from "./routes/ConversationExecutionRoute.ts";
 import statsRouter from "./routes/StatsRoutes.ts";
 import benchmarkRouter from "./routes/BenchmarkRoutes.ts";
 import synthesisRouter from "./routes/SynthesisRoutes.ts";
@@ -105,7 +105,7 @@ const ENDPOINTS = {
     "/agent-memories",
     "/mcp-servers",
     "/favorites",
-    "/agent-sessions",
+    "/conversation",
 
     "/stats",
     "/benchmark",
@@ -163,7 +163,7 @@ app.use("/skills", skillsRouter);
 app.use("/agent-memories", agentMemoriesRouter);
 app.use("/mcp-servers", mcpServersRouter);
 app.use("/favorites", favoritesRouter);
-app.use("/agent-sessions", agentSessionsRouter);
+app.use("/conversation", conversationRouter);
 
 app.use("/stats", statsRouter);
 app.use("/benchmark", benchmarkRouter);
@@ -185,6 +185,26 @@ setupWebSocket((wss as any));
 (async () => {
     await MongoWrapper.createClient(MONGO_DB_NAME, (MONGO_URI as any));
   await MemoryService.ensureIndexes();
+
+  // ── Collection Rename Migration: conversations/agent_sessions → model_conversations/agent_conversations ──
+  try {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (db) {
+      const collections = await db.listCollections().toArray();
+      const colNames = collections.map(c => c.name);
+
+      if (colNames.includes("conversations") && !colNames.includes("model_conversations")) {
+        await db.collection("conversations").rename("model_conversations");
+        logger.info("Migrated MongoDB collection: conversations → model_conversations");
+      }
+      if (colNames.includes("agent_sessions") && !colNames.includes("agent_conversations")) {
+        await db.collection("agent_sessions").rename("agent_conversations");
+        logger.info("Migrated MongoDB collection: agent_sessions → agent_conversations");
+      }
+    }
+  } catch (error: any) {
+    logger.warn("Collection migration check failed: " + error.message);
+  }
 
   // ── Ensure collection indexes ──────────────────────────────────
   // Critical for $lookup aggregation performance (conversations ↔ requests).
@@ -213,20 +233,20 @@ setupWebSocket((wss as any));
         // requests — success/failure filtering with time range
         db.collection("requests").createIndex({ success: 1, timestamp: -1 }),
         // conversations — used by findOne lookups and list queries
-        db.collection("conversations").createIndex({ id: 1 }, { unique: true }),
-        db.collection("conversations").createIndex({ updatedAt: -1 }),
+        db.collection("model_conversations").createIndex({ id: 1 }, { unique: true }),
+        db.collection("model_conversations").createIndex({ updatedAt: -1 }),
         db
-          .collection("conversations")
+          .collection("model_conversations")
           .createIndex({ project: 1, username: 1, updatedAt: -1 }),
-        db.collection("conversations").createIndex({ traceId: 1 }),
+        db.collection("model_conversations").createIndex({ traceId: 1 }),
 
         // agent_sessions — same indexes as conversations
         db
-          .collection("agent_sessions")
+          .collection("agent_conversations")
           .createIndex({ id: 1 }, { unique: true }),
-        db.collection("agent_sessions").createIndex({ updatedAt: -1 }),
+        db.collection("agent_conversations").createIndex({ updatedAt: -1 }),
         db
-          .collection("agent_sessions")
+          .collection("agent_conversations")
           .createIndex({ project: 1, username: 1, updatedAt: -1 }),
 
         // workflows — used by conversationIds lookup
@@ -272,7 +292,7 @@ setupWebSocket((wss as any));
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (db) {
       const { modifiedCount } = await db
-        .collection("conversations")
+        .collection("model_conversations")
         .updateMany({ isGenerating: true }, { $set: { isGenerating: false } });
       if (modifiedCount > 0) {
         logger.info(
@@ -281,7 +301,7 @@ setupWebSocket((wss as any));
       }
       // Also clear in agent_sessions
       const { modifiedCount: agentCleared } = await db
-        .collection("agent_sessions")
+        .collection("agent_conversations")
         .updateMany({ isGenerating: true }, { $set: { isGenerating: false } });
       if (agentCleared > 0) {
         logger.info(
@@ -308,18 +328,18 @@ setupWebSocket((wss as any));
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (db && agentProjects.length > 0) {
       const agentConvs = await db
-        .collection("conversations")
+        .collection("model_conversations")
         .find({ project: { $in: agentProjects } })
         .toArray();
       if (agentConvs.length > 0) {
         // Strip _id to avoid duplicate key errors on insert
         const docs = agentConvs.map(({ _id, ...rest }: any) => rest);
         await db
-          .collection("agent_sessions")
+          .collection("agent_conversations")
           .insertMany(docs, { ordered: false })
           .catch(() => {});
         await db
-          .collection("conversations")
+          .collection("model_conversations")
           .deleteMany({ project: { $in: agentProjects } });
         logger.info(
           `Migrated ${agentConvs.length} agent conversation(s) → agent_sessions`,

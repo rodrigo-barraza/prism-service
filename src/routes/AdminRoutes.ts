@@ -28,7 +28,7 @@ import os from "os";
 const router = express.Router();
 const {
   REQUESTS: REQUESTS_COL,
-  CONVERSATIONS: CONVERSATIONS_COL,
+  MODEL_CONVERSATIONS: CONVERSATIONS_COL,
   WORKFLOWS: WORKFLOWS_COL,
 } = COLLECTIONS;
 
@@ -1346,48 +1346,49 @@ router.get(
         order = "desc",
       } = req.query;
 
-       const filter: Record<string, unknown> = {};
-            if (trace) filter.traceId = trace;
-            if (project) filter.project = project;
-            if (username) filter.username = username;
-       if (search) {
+      const filter: Record<string, any> = {};
+      if (trace) filter.traceId = trace;
+      if (project) filter.project = project;
+      if (username) filter.username = username;
+
+      if (search) {
         const regex = { $regex: search, $options: "i" };
-        const orClauses: Record<string, unknown>[] = [
+        const orClauses: Record<string, any>[] = [
           { title: regex },
           { project: regex },
           { username: regex },
         ];
 
-        // IP lives on requests, not conversations — resolve matching
-        // conversationIds first, then fold them into the $or filter.
-                if (/^[\d.:a-f]+$/i.test((search as string).trim())) {
+        if (/^[\d.:a-f]+$/i.test((search as string).trim())) {
           const matchingConvIds = await db
             .collection(REQUESTS_COL)
             .distinct("conversationId", { clientIp: regex });
           if (matchingConvIds.length > 0) {
-                        orClauses.push({ id: { $in: matchingConvIds } });
+            orClauses.push({ id: { $in: matchingConvIds } });
           }
         }
-
-                filter.$or = orClauses;
+        filter.$or = orClauses;
       }
-            if (provider) filter.providers = provider;
-            if (model) filter["messages.model"] = model;
+
+      if (provider) filter.providers = provider;
+      if (model) filter["messages.model"] = model;
+
       if (from || to) {
-                filter.updatedAt = {};
-                if (from) (filter as Record<string, Record<string, unknown>>).updatedAt.$gte = from;
-                if (to) (filter as Record<string, Record<string, unknown>>).updatedAt.$lte = to;
+        filter.updatedAt = {};
+        if (from) filter.updatedAt.$gte = from;
+        if (to) filter.updatedAt.$lte = to;
       }
 
-            const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
-            const lim = parseInt(limit as string, 10);
+      const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
+      const lim = parseInt(limit as string, 10);
       const sortDir = order === "asc" ? 1 : -1;
 
-      const pipeline: Record<string, unknown>[] = [
-        ...(Object.keys(filter).length ? [{ $match: filter }] : []),
-                { $sort: { [sort as string]: sortDir as 1 | -1 } },
-        {
-          $project: {
+      // 1. Fetch matching documents from both collections in parallel
+      const [convs, sessions] = await Promise.all([
+        db
+          .collection(CONVERSATIONS_COL)
+          .find(filter)
+          .project({
             id: 1,
             project: 1,
             username: 1,
@@ -1397,146 +1398,124 @@ router.get(
             modalities: 1,
             providers: 1,
             messageCount: { $size: { $ifNull: ["$messages", []] } },
-            totalCost: {
-              $ifNull: [
-                "$totalCost",
-                {
-                  $reduce: {
-                    input: { $ifNull: ["$messages", []] },
-                    initialValue: 0,
-                    in: {
-                      $add: [
-                        "$$value",
-                        { $ifNull: ["$$this.estimatedCost", 0] },
-                      ],
-                    },
-                  },
-                },
-              ],
-            },
-          },
-        },
-        { $skip: skip },
-        { $limit: lim },
-        // Join requests for telemetry rollup
-        {
-          $lookup: {
-            from: REQUESTS_COL,
-            localField: "id",
-            foreignField: "conversationId",
-            as: "_requests",
-            pipeline: [
-              {
-                $project: {
-                  inputTokens: 1,
-                  outputTokens: 1,
-                  model: 1,
-                  tokensPerSec: 1,
-                  totalTime: 1,
-                  toolDisplayNames: 1,
-                  toolApiNames: 1,
-                },
-              },
-            ],
-          },
-        },
-        {
-          $addFields: {
-            requestCount: { $size: "$_requests" },
-            inputTokens: {
-              $reduce: {
-                input: "$_requests",
-                initialValue: 0,
-                in: {
-                  $add: ["$$value", { $ifNull: ["$$this.inputTokens", 0] }],
-                },
-              },
-            },
-            outputTokens: {
-              $reduce: {
-                input: "$_requests",
-                initialValue: 0,
-                in: {
-                  $add: ["$$value", { $ifNull: ["$$this.outputTokens", 0] }],
-                },
-              },
-            },
-            models: {
-              $setUnion: {
-                $filter: {
-                  input: "$_requests.model",
-                  cond: { $ne: ["$$this", null] },
-                },
-              },
-            },
-            toolDisplayNames: {
-              $setUnion: {
-                $reduce: {
-                  input: "$_requests",
-                  initialValue: [],
-                  in: {
-                    $concatArrays: [
-                      "$$value",
-                      { $ifNull: ["$$this.toolDisplayNames", []] },
-                    ],
-                  },
-                },
-              },
-            },
-            toolApiNames: {
-              $setUnion: {
-                $reduce: {
-                  input: "$_requests",
-                  initialValue: [],
-                  in: {
-                    $concatArrays: [
-                      "$$value",
-                      { $ifNull: ["$$this.toolApiNames", []] },
-                    ],
-                  },
-                },
-              },
-            },
-            avgTokensPerSec: {
-              $cond: [
-                { $gt: [{ $size: "$_requests" }, 0] },
-                {
-                  $avg: {
-                    $filter: {
-                      input: "$_requests.tokensPerSec",
-                      as: "tps",
-                      cond: {
-                        $and: [{ $ne: ["$$tps", null] }, { $gt: ["$$tps", 0] }],
-                      },
-                    },
-                  },
-                },
-                null,
-              ],
-            },
-            totalLatency: {
-              $reduce: {
-                input: "$_requests",
-                initialValue: 0,
-                in: {
-                  $add: ["$$value", { $ifNull: ["$$this.totalTime", 0] }],
-                },
-              },
-            },
-          },
-        },
-        // Drop raw request docs from response
-        { $project: { _requests: 0 } },
-      ];
-
-      const [docs, total] = await Promise.all([
-        db.collection(CONVERSATIONS_COL).aggregate(pipeline).toArray(),
-        db.collection(CONVERSATIONS_COL).countDocuments(filter),
+            totalCost: { $ifNull: ["$totalCost", 0] },
+          })
+          .sort({ [sort as string]: sortDir })
+          .limit(skip + lim)
+          .toArray(),
+        db
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+          .find(filter)
+          .project({
+            id: 1,
+            project: 1,
+            username: 1,
+            title: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            modalities: 1,
+            providers: 1,
+            messageCount: { $size: { $ifNull: ["$messages", []] } },
+            totalCost: { $ifNull: ["$totalCost", 0] },
+            agent: 1,
+          })
+          .sort({ [sort as string]: sortDir })
+          .limit(skip + lim)
+          .toArray(),
       ]);
 
-            res.json({ data: docs, total, page: parseInt(page as string, 10), limit: lim });
-    } catch (error: unknown) {
-            logger.error(`Admin /conversations error: ${(error as Error).message}`);
+      // 2. Count totals for both collections
+      const [totalConvs, totalSessions] = await Promise.all([
+        db.collection(CONVERSATIONS_COL).countDocuments(filter),
+        db.collection(COLLECTIONS.AGENT_CONVERSATIONS).countDocuments(filter),
+      ]);
+
+      // 3. Merge and sort
+      const merged = [
+        ...convs.map((c) => ({ ...c, type: "direct" as const })),
+        ...sessions.map((s) => ({ ...s, type: "agent" as const })),
+      ].sort((a: any, b: any) => {
+        const valA = a[sort as string];
+        const valB = b[sort as string];
+        if (valA < valB) return sortDir;
+        if (valA > valB) return -sortDir;
+        return 0;
+      });
+
+      // 4. Slice the paginated portion
+      const docs: any[] = merged.slice(skip, skip + lim);
+
+      // 5. Enrich the sliced docs with requests telemetry in a batch lookup
+      const finalDocIds = docs.map((d: any) => d.id);
+      const requests = await db
+        .collection(REQUESTS_COL)
+        .find({ conversationId: { $in: finalDocIds } })
+        .project({
+          conversationId: 1,
+          inputTokens: 1,
+          outputTokens: 1,
+          model: 1,
+          tokensPerSec: 1,
+          totalTime: 1,
+          toolDisplayNames: 1,
+          toolApiNames: 1,
+        })
+        .toArray();
+
+      const requestMap = new Map();
+      for (const r of requests) {
+        const cid = r.conversationId || "";
+        if (!requestMap.has(cid)) requestMap.set(cid, []);
+        requestMap.get(cid).push(r);
+      }
+
+      const enrichedDocs = docs.map((doc: any) => {
+        const reqs = requestMap.get(doc.id) || [];
+        const models = Array.from(new Set(reqs.map((r: any) => r.model).filter(Boolean)));
+        const toolDisplayNames = Array.from(
+          new Set(reqs.flatMap((r: any) => r.toolDisplayNames || []).filter(Boolean))
+        );
+        const toolApiNames = Array.from(
+          new Set(reqs.flatMap((r: any) => r.toolApiNames || []).filter(Boolean))
+        );
+
+        let inputTokens = 0;
+        let outputTokens = 0;
+        let totalLatency = 0;
+        let tpsSum = 0;
+        let tpsCount = 0;
+
+        for (const r of reqs) {
+          inputTokens += r.inputTokens || 0;
+          outputTokens += r.outputTokens || 0;
+          totalLatency += r.totalTime || 0;
+          if (r.tokensPerSec && r.tokensPerSec > 0) {
+            tpsSum += r.tokensPerSec;
+            tpsCount++;
+          }
+        }
+
+        return {
+          ...doc,
+          requestCount: reqs.length,
+          inputTokens,
+          outputTokens,
+          models,
+          toolDisplayNames,
+          toolApiNames,
+          avgTokensPerSec: tpsCount > 0 ? tpsSum / tpsCount : null,
+          totalLatency,
+        };
+      });
+
+      res.json({
+        data: enrichedDocs,
+        total: totalConvs + totalSessions,
+        page: parseInt(page as string, 10),
+        limit: lim,
+      });
+    } catch (error: any) {
+      logger.error("Admin /conversations error: " + error.message);
       next(error);
     }
   }),
@@ -1681,11 +1660,11 @@ router.get(
     if (ChangeStreamService.available) {
       // Change Stream-driven: re-query stats only when conversations change
       const onEvent = (event: import("../services/ChangeStreamService.ts").ChangeStreamEventPayload) => {
-        if (event.collection === "conversations") {
+        if (event.collection === CONVERSATIONS_COL || event.collection === COLLECTIONS.AGENT_CONVERSATIONS) {
           sendStats();
         }
       };
-            ChangeStreamService.subscribe(onEvent);
+      ChangeStreamService.subscribe(onEvent);
 
       // Secondary poll: catch generation activity not tracked via Change
       // Streams (benchmarks skip conversation persistence, and provider
@@ -3092,7 +3071,7 @@ router.get(
 
       const [docs, total] = await Promise.all([
         db
-          .collection(COLLECTIONS.AGENT_SESSIONS)
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .find(filter, {
             // Exclude full message history for the list view — too heavy
             projection: { messages: 0 },
@@ -3101,7 +3080,7 @@ router.get(
           .skip(skip)
           .limit(lim)
           .toArray(),
-        db.collection(COLLECTIONS.AGENT_SESSIONS).countDocuments(filter),
+        db.collection(COLLECTIONS.AGENT_CONVERSATIONS).countDocuments(filter),
       ]);
 
             res.json({ data: docs, total, page: parseInt(page as string, 10), limit: lim });
@@ -3121,7 +3100,7 @@ router.get(
       if (!db) return res.status(503).json({ error: "Database not available" });
 
       const document = await db
-        .collection(COLLECTIONS.AGENT_SESSIONS)
+        .collection(COLLECTIONS.AGENT_CONVERSATIONS)
         .findOne({ id: req.params.id });
 
       if (!document)

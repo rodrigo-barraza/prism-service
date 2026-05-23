@@ -38,7 +38,7 @@ let available = false;
 let staleGeneratingInterval: ReturnType<typeof setInterval> | null = null;
 
 // Collections to watch
-const WATCHED_COLLECTIONS = [COLLECTIONS.CONVERSATIONS, COLLECTIONS.REQUESTS];
+const WATCHED_COLLECTIONS = [COLLECTIONS.MODEL_CONVERSATIONS, COLLECTIONS.AGENT_CONVERSATIONS, COLLECTIONS.REQUESTS];
 
 /**
  * Attempt to open a Change Stream on a single collection.
@@ -69,7 +69,7 @@ function openStream(db: Db, collectionName: string) {
       };
 
       // Enrich with isGenerating state for conversations
-      if (collectionName === COLLECTIONS.CONVERSATIONS) {
+      if (collectionName === COLLECTIONS.MODEL_CONVERSATIONS || collectionName === COLLECTIONS.AGENT_CONVERSATIONS) {
         if (
           updateDescription?.updatedFields?.isGenerating !== undefined
         ) {
@@ -166,14 +166,20 @@ const ChangeStreamService = {
           Date.now() - CHANGE_STREAM_RECONNECT_MS,
         ).toISOString();
         const { modifiedCount } = await db
-          .collection(COLLECTIONS.CONVERSATIONS)
+          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
           .updateMany(
             { isGenerating: true, updatedAt: { $lt: fiveMinAgo } },
             { $set: { isGenerating: false } },
           );
-        if (modifiedCount > 0) {
+        const { modifiedCount: agentCleared } = await db
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+          .updateMany(
+            { isGenerating: true, updatedAt: { $lt: fiveMinAgo } },
+            { $set: { isGenerating: false } },
+          );
+        if (modifiedCount > 0 || agentCleared > 0) {
           logger.info(
-            `Auto-cleared ${modifiedCount} stale isGenerating flag(s)`,
+            "Auto-cleared " + (modifiedCount + agentCleared) + " stale isGenerating flag(s)"
           );
         }
       } catch {
