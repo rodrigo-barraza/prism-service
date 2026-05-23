@@ -1,8 +1,31 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { app } from './setup.ts';
+import ToolOrchestratorService from '../src/services/ToolOrchestratorService.ts';
+
+beforeAll(() => {
+  vi.spyOn(ToolOrchestratorService, 'getClientToolSchemas').mockReturnValue([
+    {
+      name: "enter_plan_mode",
+      description: "Enter plan mode",
+      domain: "Reasoning",
+      system: true,
+    },
+    {
+      name: "upsert_memory",
+      description: "Create memory",
+      domain: "Reasoning",
+      system: true,
+    },
+  ]);
+});
+
+afterAll(() => {
+  vi.restoreAllMocks();
+});
 
 describe('GET /config', () => {
+
   it('returns the full config catalog', async () => {
     const res = await request(app)
       .get('/config')
@@ -98,6 +121,8 @@ describe('GET /config/agents', () => {
     expect(luposAgent).toBeDefined();
     // Lupos agent should NOT have core system tools like enter_plan_mode
     expect(luposAgent.enabledToolNames).not.toContain('enter_plan_mode');
+    // But Lupos agent SHOULD have explicitly whitelisted system tools like upsert_memory
+    expect(luposAgent.enabledToolNames).toContain('upsert_memory');
   });
 });
 
@@ -121,7 +146,7 @@ describe('GET /config/tools', () => {
     expect(res.body.some((t: any) => t.name === 'enter_plan_mode')).toBe(true);
   });
 
-  it('does NOT include core system tools when filtered by LUPOS', async () => {
+  it('does NOT include non-whitelisted core system tools when filtered by LUPOS, but includes whitelisted ones', async () => {
     const res = await request(app)
       .get('/config/tools?agent=LUPOS')
       .expect(200);
@@ -129,5 +154,7 @@ describe('GET /config/tools', () => {
     expect(Array.isArray(res.body)).toBe(true);
     // Lupos does not have enter_plan_mode
     expect(res.body.some((t: any) => t.name === 'enter_plan_mode')).toBe(false);
+    // But Lupos has upsert_memory since we whitelisted it
+    expect(res.body.some((t: any) => t.name === 'upsert_memory')).toBe(true);
   });
 });

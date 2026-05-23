@@ -287,6 +287,7 @@ const LUPOS_ENABLED_TOOLS = [
   // Compute
   "precise_calculator",
   "execute_javascript",
+  "upsert_memory",
 ];
 
 // ── Persona Definitions ──────────────────────────────────────────
