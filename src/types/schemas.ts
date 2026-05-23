@@ -208,6 +208,8 @@ export const PutMcpServerSchema = z.object({
 export const GetConversationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   cursor: z.string().nullable().optional(),
+  agent: z.string().nullable().optional(),
+  type: z.enum(["direct", "agent", "all"]).optional().default("all"),
 });
 
 export const PostConversationMessagesBodySchema = z.object({

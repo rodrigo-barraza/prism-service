@@ -60,15 +60,17 @@ router.get(
         return res.status(400).json({ error: parsed.error.format() });
       }
 
-      const { limit, cursor } = parsed.data;
+      const { limit, cursor, agent, type = "all" } = parsed.data;
 
       const filter: Record<string, unknown> = { project, username };
       if (cursor) {
         filter.updatedAt = { $lt: cursor };
       }
 
-      // Fetch from both collections in parallel
-      const [convs, sessions] = await Promise.all([
+      let modelConversations: any[] = [];
+      let agentConversations: any[] = [];
+
+      const fetchModelConversations = () =>
         db
           .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
           .find(filter)
@@ -89,10 +91,16 @@ router.get(
           })
           .sort({ updatedAt: -1 })
           .limit(limit + 1)
-          .toArray(),
-        db
+          .toArray();
+
+      const fetchAgentConversations = () => {
+        const agentFilter = { ...filter };
+        if (agent) {
+          agentFilter.agent = agent;
+        }
+        return db
           .collection<any>(COLLECTIONS.AGENT_CONVERSATIONS)
-          .find(filter)
+          .find(agentFilter)
           .project<any>({
             id: 1,
             project: 1,
@@ -110,15 +118,29 @@ router.get(
           })
           .sort({ updatedAt: -1 })
           .limit(limit + 1)
-          .toArray(),
-      ]);
+          .toArray();
+      };
+
+      if (type === "all") {
+        const [fetchedModelConversations, fetchedAgentConversations] = await Promise.all([
+          fetchModelConversations(),
+          fetchAgentConversations(),
+        ]);
+        modelConversations = fetchedModelConversations;
+        agentConversations = fetchedAgentConversations;
+      } else if (type === "direct") {
+        modelConversations = await fetchModelConversations();
+      } else if (type === "agent") {
+        agentConversations = await fetchAgentConversations();
+      }
 
       // Merge and sort in memory by updatedAt descending
       const merged = [
-        ...convs.map((c) => ({ ...c, type: "direct" as const })),
-        ...sessions.map((s) => ({ ...s, type: "agent" as const })),
+        ...modelConversations.map((conversation) => ({ ...conversation, type: "direct" as const })),
+        ...agentConversations.map((session) => ({ ...session, type: "agent" as const })),
       ].sort(
-        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        (firstConversation, secondConversation) =>
+          new Date(secondConversation.updatedAt).getTime() - new Date(firstConversation.updatedAt).getTime()
       );
 
       const hasMore = merged.length > limit;
