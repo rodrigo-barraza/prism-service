@@ -44,7 +44,7 @@ export async function runExhaustionRecoveryPass(
   delete exhaustionOptions.tools;
 
   const enforcedMessages = harness.enforceContextWindow(currentMessages, 0);
-    const expandedMessages = expandMessagesForFC((enforcedMessages as any), {
+  const expandedMessages = expandMessagesForFC(enforcedMessages, {
     filterDeleted: false,
   });
 
@@ -81,5 +81,5 @@ export async function runExhaustionRecoveryPass(
   await harness.consumeStream(exhaustionStream, exhaustionPass, emptyToolNames);
 
   harness.emitGenerationProgress();
-    (SessionGenerationTracker as any).complete((exhaustionRequestId as any));
+  SessionGenerationTracker.complete(exhaustionRequestId);
 }

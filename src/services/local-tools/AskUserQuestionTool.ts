@@ -10,6 +10,7 @@ interface NormalizedQuestion {
   header: string | null;
   options: QuestionOption[];
   multiSelect: boolean;
+  [key: string]: unknown;
 }
 
 interface ToolContext {
@@ -18,7 +19,7 @@ interface ToolContext {
 }
 
 interface QuestionAnswer {
-  answer?: string;
+  answer?: string | string[];
   [key: string]: unknown;
 }
 

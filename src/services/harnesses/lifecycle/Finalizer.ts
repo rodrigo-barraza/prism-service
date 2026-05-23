@@ -34,7 +34,7 @@ export interface FinalizerContext {
   agent?: string | null;
   workspaceRoot?: string | null;
   requestId?: string;
-  emit?: (event: any) => void;
+  emit?: (event: Record<string, unknown>) => void;
   signal?: AbortSignal;
 }
 
@@ -413,7 +413,7 @@ export async function finalizeTextGeneration(
       conversationId || "",
       project || "",
       username as string,
-      // @ts-ignore - TODO: strict typing
+      // @ts-expect-error - MessagePayload includes extra properties not in appendAndFinalize's parameter type
       messagesToAppend,
       finalMeta,
             getCollectionOpts(project),

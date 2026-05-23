@@ -1503,7 +1503,7 @@ export default class CoordinatorService {
       const allSchemas = ToolOrchestratorService.getToolSchemas();
       const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
       workerEnabledTools = allSchemas
-        .map((t: ToolSchema) => t.name)
+        .map((t: any) => t.name)
         .filter((name: string) => !coordinatorSet.has(name));
     }
 
@@ -1930,7 +1930,7 @@ export default class CoordinatorService {
       const allSchemas = ToolOrchestratorService.getToolSchemas();
       const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
       const workerEnabledTools = allSchemas
-        .map((t: ToolSchema) => t.name)
+        .map((t: any) => t.name)
         .filter((name: string) => !coordinatorSet.has(name));
 
       let resolvedProviderName = providerName || DECOMPOSITION_PROVIDER;

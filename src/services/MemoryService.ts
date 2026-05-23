@@ -443,7 +443,7 @@ const MemoryService = {
     if (memories.length === 0) return [];
     // Compute cosine similarity and sort
     const scored = memories
-            .filter((m: Record<string, unknown>) => m.embedding && (m.embedding as any).length > 0)
+      .filter((m: Record<string, unknown>) => m.embedding && (m.embedding as number[]).length > 0)
       .map((m: Record<string, unknown>) => ({
         id: m._id,
         type: m.type || "other",
@@ -457,8 +457,8 @@ const MemoryService = {
                 ageDays: memoryAgeDays(m.createdAt as string),
                 score: cosineSimilarity(queryEmbedding as number[], m.embedding as number[]),
       }))
-            .filter((m: Record<string, unknown>) => (m as any).score > RELEVANCE_THRESHOLD)
-            .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (b.score as number) - (a.score as number))
+      .filter((m) => m.score > RELEVANCE_THRESHOLD)
+      .sort((a, b) => b.score - a.score)
             .slice(0, limit);
     logger.info(
       `[MemoryService] Search found ${scored.length} relevant memories for ${agent} (from ${memories.length} total)`,

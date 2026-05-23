@@ -28,6 +28,21 @@ interface MultimodalPart {
   };
 }
 
+interface EmbeddingOptions {
+  provider?: string;
+  model?: string;
+  taskType?: string;
+  dimensions?: number;
+  source?: string;
+  project?: string | null;
+  username?: string;
+  clientIp?: string | null;
+  endpoint?: string | null;
+  agent?: string | null;
+  traceId?: string | null;
+  agentSessionId?: string | null;
+}
+
 const EmbeddingService = {
   async generate(content: string | MultimodalPart[], options: any = {}) {
     const requestId = crypto.randomUUID();
@@ -37,9 +52,9 @@ const EmbeddingService = {
     const providerName = options.provider || embedConfig.provider;
     const resolvedModel =
       options.model ||
-      getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)?.[providerName] ||
+      (getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING) as any)?.[providerName] ||
       embedConfig.model;
-    let result: any;
+    let result: { embedding: number[]; dimensions: number } | undefined = undefined;
     let success = true;
     let errorMessage = null;
     try {
@@ -51,7 +66,7 @@ const EmbeddingService = {
           400,
         );
       }
-      const providerOptions: any = {};
+      const providerOptions: Record<string, unknown> = {};
       if (options.taskType) providerOptions.taskType = options.taskType;
       if (options.dimensions) providerOptions.dimensions = options.dimensions;
       result = await provider.generateEmbedding(
@@ -141,10 +156,13 @@ const EmbeddingService = {
         responsePayload: success
           ? {
                             dimensions: result?.dimensions || null,
-                            embeddingPreview: (result?.embedding as any)?.slice(0, 5) || null,
+            embeddingPreview: result?.embedding?.slice(0, 5) || null,
             }
           : { error: errorMessage },
       });
+    }
+    if (!result) {
+      throw new Error(`Embedding generation failed: ${errorMessage || "unknown error"}`);
     }
     return {
       embedding: result.embedding,

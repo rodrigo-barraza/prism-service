@@ -109,7 +109,7 @@ const SkillService = {
     const skills = await collection
       .find(filter)
       .sort({ usageCount: -1, name: 1 })
-            .limit(Math.min((limit as any), 100))
+      .limit(Math.min(limit as number, 100))
       .toArray();
 
     return {
@@ -180,7 +180,7 @@ const SkillService = {
     // Warn about unresolved variables
     const unresolvedMatch = prompt.match(/\{\{(\w+)\}\}/g);
     const unresolved = unresolvedMatch
-            ? [...new Set(unresolvedMatch.map((m: Record<string, any>) => (m as any).slice(2, -2)))]
+      ? [...new Set(unresolvedMatch.map((m: string) => m.slice(2, -2)))]
       : [];
 
     // Increment usage counter

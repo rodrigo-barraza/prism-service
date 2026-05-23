@@ -81,10 +81,10 @@ interface WorktreeState {
 let cachedSchemas: ToolSchemaFull[] = [];
 
 /** @type {Array} Clean schemas for LLM (without endpoint metadata) */
-let cachedAISchemas: Record<string, unknown>[] = [];
+let cachedAISchemas: ToolSchemaFull[] = [];
 
 /** @type {Array} Client-facing schemas (with domain/dataSource/labels, without endpoint) */
-let cachedClientSchemas: Record<string, unknown>[] = [];
+let cachedClientSchemas: ToolSchemaFull[] = [];
 
 /** @type {Map<string, ToolSchemaFull>} Tool name → full schema (for routing) */
 const toolMap = new Map<string, ToolSchemaFull>();

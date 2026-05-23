@@ -51,7 +51,7 @@ const CustomAgentService = {
     const collection = getCollection();
     if (!collection) throw new Error("Database not available");
 
-        const agentId = deriveAgentId((data.name as any));
+    const agentId = deriveAgentId(data.name as string);
 
     // Check for duplicate agentId
     const existing = await collection.findOne({ agentId });
@@ -89,13 +89,13 @@ const CustomAgentService = {
     if (!collection) throw new Error("Database not available");
 
     // If name changed, re-derive agentId
-    const setFields = { ...updates, updatedAt: new Date().toISOString() };
+    const setFields: Record<string, unknown> = { ...updates, updatedAt: new Date().toISOString() };
     if (updates.name) {
-            (setFields as any).agentId = deriveAgentId((updates.name as any));
+      setFields.agentId = deriveAgentId(updates.name as string);
     }
 
     // Remove _id from $set if present
-        delete (setFields as any)._id;
+    delete setFields._id;
 
     await collection.updateOne({ _id: new ObjectId(id) }, { $set: setFields });
 

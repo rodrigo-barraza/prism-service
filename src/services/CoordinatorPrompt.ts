@@ -7,10 +7,10 @@
 // Adapted from Claude Code's getCoordinatorSystemPrompt() with
 // modifications for our git-worktree-isolated architecture.
 // ────────────────────────────────────────────────────────────
-export function getCoordinatorPromptAddendum({ workerTools = [] }: Record<string, unknown> = {}) {
+export function getCoordinatorPromptAddendum({ workerTools = [] }: { workerTools?: string[] } = {}) {
   const workerToolList =
-        (workerTools as any).length > 0
-            ? (workerTools as any).sort().join(", ")
+    workerTools.length > 0
+      ? [...workerTools].sort().join(", ")
       : "all standard tools (read, write, search, shell, etc.)";
 
   return `## Coordinator Mode — Multi-Agent Orchestration

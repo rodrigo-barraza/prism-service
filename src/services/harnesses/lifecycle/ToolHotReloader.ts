@@ -34,8 +34,8 @@ export async function reloadIfCustomToolsMutated(
   username: string,
   emit: EmitFn,
 ): Promise<boolean> {
-  const hasMutations = executedToolCalls.some((toolCall: unknown) =>
-    CUSTOM_TOOL_MUTATION_NAMES.has((toolCall as any).name),
+  const hasMutations = executedToolCalls.some((toolCall) =>
+    CUSTOM_TOOL_MUTATION_NAMES.has(toolCall.name),
   );
 
   if (!hasMutations) return false;
@@ -57,27 +57,27 @@ export async function reloadIfCustomToolsMutated(
 
     // Rebuild finalTools: remove old custom tools, add fresh ones
     const builtInTools = tools.finalTools.filter(
-      (tool: unknown) => !(tool as any)._isCustom,
+      (tool) => !tool._isCustom,
     );
-    const freshSchemas = freshCustomTools.map((customTool: Record<string, any>) => ({
-      name: customTool.name,
-      description: customTool.description,
+    const freshSchemas = freshCustomTools.map((customTool: Record<string, unknown>) => ({
+      name: customTool.name as string,
+      description: customTool.description as string,
       _isCustom: true as const,
       parameters: {
         type: "object" as const,
         properties: Object.fromEntries(
-          (customTool.parameters || []).map((param: Record<string, any>) => [
+          ((customTool.parameters || []) as Record<string, unknown>[]).map((param) => [
             param.name,
             {
-              type: param.type || "string",
-              description: param.description || "",
-              ...(param.enum?.length ? { enum: param.enum } : {}),
+              type: (param.type as string) || "string",
+              description: (param.description as string) || "",
+              ...((param.enum as string[])?.length ? { enum: param.enum } : {}),
             },
           ]),
         ),
-        required: (customTool.parameters || [])
-          .filter((param: Record<string, any>) => param.required)
-          .map((param: Record<string, any>) => param.name),
+        required: ((customTool.parameters || []) as Record<string, unknown>[])
+          .filter((param) => param.required)
+          .map((param) => param.name as string),
       },
     }));
 

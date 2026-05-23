@@ -1045,7 +1045,7 @@ async function handleStreamingText(context: GenerationContext) {
           { project, username },
         );
         tc.result = result;
-        tc.status = result?.error ? "error" : "done";
+        tc.status = (result as any)?.error ? "error" : "done";
         emit({
           type: "toolCall",
           id: tc.id,

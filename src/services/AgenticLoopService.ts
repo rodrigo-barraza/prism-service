@@ -55,13 +55,13 @@ export default class AgenticLoopService {
       try {
         const { default: SettingsService } =
           await import("./SettingsService.js");
-                const agentSettings = await SettingsService.getSection(("agents" as any));
+        const agentSettings = await SettingsService.getSection("agents");
         harnessId = agentSettings?.harness || "standard";
       } catch {
         harnessId = "standard";
       }
     }
-        const HarnessClass = HarnessRegistry.get((harnessId as any));
+    const HarnessClass = HarnessRegistry.get(harnessId)!;
     logger.info(
       `[AgenticLoop] Using harness: "${HarnessClass.id}" (${HarnessClass.label})`,
     );
@@ -76,11 +76,11 @@ export default class AgenticLoopService {
       pendingQuestions.delete(agentSessionId);
       if (!parentAgentSessionId) {
         const trackerSessionId = parentAgentSessionId || agentSessionId;
-                (SessionGenerationTracker as any).cleanup((trackerSessionId as any));
+        SessionGenerationTracker.cleanup(trackerSessionId);
         try {
           const { default: CoordinatorService } =
             await import("./CoordinatorService.js");
-                    CoordinatorService.cleanupSession((agentSessionId as any));
+          CoordinatorService.cleanupSession(agentSessionId);
         } catch {
           /* CoordinatorService may not be used */
         }
@@ -128,9 +128,9 @@ export default class AgenticLoopService {
   static _setPendingQuestion(
     agentSessionId: string,
     entry: {
-      resolve: (value: any) => void;
+      resolve: (value: { answers: Array<{ answer: string | string[]; annotations?: string }> | null; timedOut?: boolean }) => void;
       question?: string;
-      questions?: any[];
+      questions?: Array<{ question: string; [key: string]: unknown }>;
       choices?: string[];
     },
   ): void {
@@ -168,7 +168,6 @@ export default class AgenticLoopService {
     label: string;
     description: string;
   }> {
-        // @ts-ignore - TODO: strict typing
-        return HarnessRegistry.list();
+    return HarnessRegistry.list() as Array<{ id: string; label: string; description: string }>;
   }
 }

@@ -1495,8 +1495,8 @@ router.get(
       ].sort((a, b) => {
         const valA = String((a as Record<string, unknown>)[sort as string] ?? "");
         const valB = String((b as Record<string, unknown>)[sort as string] ?? "");
-        if (valA < valB) return sortDir;
-        if (valA > valB) return -sortDir;
+        if (valA < valB) return -sortDir;
+        if (valA > valB) return sortDir;
         return 0;
       });
 

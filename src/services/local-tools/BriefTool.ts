@@ -39,25 +39,28 @@ export default {
   domain: "Reasoning",
   labels: ["coding"],
 
-  async execute(args: any, context: any) {
+  async execute(args: Record<string, unknown>, context: { _emit?: (event: Record<string, unknown>) => void }) {
     const { summary, keyFiles, openQuestions } = args;
     if (!summary || typeof summary !== "string") {
       return { error: "'summary' is required and must be a non-empty string" };
     }
 
+    const keyFilesArr = (keyFiles || []) as string[];
+    const openQuestionsArr = (openQuestions || []) as string[];
+
     const brief = {
       summary,
-      keyFiles: keyFiles || [],
-      openQuestions: openQuestions || [],
+      keyFiles: keyFilesArr,
+      openQuestions: openQuestionsArr,
       timestamp: new Date().toISOString(),
     };
 
     logger.info(
-            `[Brief] ${summary.length} chars, ${((keyFiles || []) as any).length} files, ${((openQuestions || []) as any).length} questions`,
+      `[Brief] ${summary.length} chars, ${keyFilesArr.length} files, ${openQuestionsArr.length} questions`,
     );
 
     if (context._emit) {
-            context._emit({ type: "brief_update", brief });
+      context._emit({ type: "brief_update", brief });
     }
 
     return { acknowledged: true, brief };

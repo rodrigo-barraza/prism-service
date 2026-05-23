@@ -70,14 +70,14 @@ const SettingsService = {
     }
 
     // Deep merge: defaults ← stored
-    _cache = deepMerge(DEFAULTS as any, document.data || {}) as SettingsData;
+    _cache = deepMerge(DEFAULTS as unknown as Record<string, unknown>, (document.data || {}) as Record<string, unknown>) as unknown as SettingsData;
     return _cache;
   },
   async getSection<K extends keyof SettingsData>(section: K): Promise<SettingsData[K]> {
     const settings = await this.get();
     return settings[section] || DEFAULTS[section];
   },
-  async update(data: any) {
+  async update(data: Partial<SettingsData>) {
     const collection = MongoWrapper.getCollection(
       MONGO_DB_NAME,
       COLLECTIONS.SETTINGS,
@@ -85,7 +85,7 @@ const SettingsService = {
     if (!collection) throw new Error("Database not available");
 
     const current = await this.get();
-    const merged = deepMerge(current as any, data) as SettingsData;
+    const merged = deepMerge(current as unknown as Record<string, unknown>, data as unknown as Record<string, unknown>) as unknown as SettingsData;
 
     await collection.updateOne(
       { _key: "global" },

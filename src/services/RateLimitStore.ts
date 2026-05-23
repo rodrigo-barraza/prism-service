@@ -47,8 +47,21 @@ const GOOGLE_STATIC_LIMITS = {
   },
 };
 
+interface RateLimitData {
+  rpm?: number | null;
+  tpm?: number | null;
+  rpd?: number | null;
+  [key: string]: unknown;
+}
+
+interface ProviderGroup {
+  dynamic: boolean;
+  note?: string;
+  models: Record<string, RateLimitData | { rateLimits: RateLimitData; updatedAt: string }>;
+}
+
 class RateLimitStore {
-  private _models: Map<string, { rateLimits: any; updatedAt: string }>;
+  private _models: Map<string, { rateLimits: RateLimitData; updatedAt: string }>;
   private _google: typeof GOOGLE_STATIC_LIMITS;
 
   constructor() {
@@ -66,7 +79,7 @@ class RateLimitStore {
    * Update the stored rate-limit snapshot for a provider + model.
    * Called after every API response that contains rate-limit headers.
    */
-  update(providerName: string, model: string, rateLimits: any): void {
+  update(providerName: string, model: string, rateLimits: RateLimitData): void {
     if (!rateLimits || !providerName || !model) return;
 
     const key = `${providerName}::${model}`;
@@ -87,7 +100,7 @@ class RateLimitStore {
    * }
    */
   getAll() {
-    const result: any = {};
+    const result: Record<string, ProviderGroup> = {};
 
     // Group dynamic models by provider
     for (const [key, value] of this._models) {

@@ -1,4 +1,5 @@
 import ReActHarness from "./ReActHarness.ts";
+import type { ConversationMessage } from "./types.ts";
 
 /**
  * HarnessRegistry — maps harness IDs to their implementation classes.
@@ -10,14 +11,21 @@ import ReActHarness from "./ReActHarness.ts";
  */
 
 
-const registry = new Map();
+interface HarnessConstructor {
+  id: string;
+  label: string;
+  description: string;
+  new (...args: unknown[]): { run(): Promise<{ messages: ConversationMessage[] }> };
+}
 
-function register(HarnessClass: Record<string, unknown>) {
+const registry = new Map<string, HarnessConstructor>();
+
+function register(HarnessClass: HarnessConstructor) {
   registry.set(HarnessClass.id, HarnessClass);
 }
 
 // ── Built-in harnesses ───────────────────────────────────────
-register((ReActHarness as any));
+register(ReActHarness as unknown as HarnessConstructor);
 
 // Future: register(SingleShotHarness);
 // Future: register(PlanExecuteHarness);
@@ -27,7 +35,7 @@ const HarnessRegistry = {
     return registry.get(id) || registry.get("standard");
   },
   list() {
-    return [...registry.values()].map((H: Record<string, unknown>) => ({
+    return [...registry.values()].map((H) => ({
       id: H.id,
       label: H.label,
       description: H.description,
