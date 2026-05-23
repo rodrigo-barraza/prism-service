@@ -44,7 +44,7 @@ interface EmbeddingOptions {
 }
 
 const EmbeddingService = {
-  async generate(content: string | MultimodalPart[], options: any = {}) {
+  async generate(content: string | MultimodalPart[], options: EmbeddingOptions = {}) {
     const requestId = crypto.randomUUID();
     const requestStart = performance.now();
     // Resolve defaults from settings when no explicit provider/model given
@@ -52,7 +52,7 @@ const EmbeddingService = {
     const providerName = options.provider || embedConfig.provider;
     const resolvedModel =
       options.model ||
-      (getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING) as any)?.[providerName] ||
+      (getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING) as Record<string, string> | undefined)?.[providerName] ||
       embedConfig.model;
     let result: { embedding: number[]; dimensions: number } | undefined = undefined;
     let success = true;
@@ -99,7 +99,7 @@ const EmbeddingService = {
             : "any";
       const inputCharacters = typeof content === "string" ? content.length : 0;
       logger.request(
-        options.project || null,
+        options.project || "",
         options.username || "system",
         options.clientIp || null,
         `[embed] ${providerName} model=${resolvedModel} source=${source} — ` +
@@ -171,7 +171,7 @@ const EmbeddingService = {
       model: resolvedModel,
     };
   },
-  async embed(text: string | MultimodalPart[], options: any = {}) {
+  async embed(text: string | MultimodalPart[], options: EmbeddingOptions = {}) {
     const result = await this.generate(text, options);
     return result.embedding;
   },

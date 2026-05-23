@@ -795,13 +795,13 @@ PERSONAS.set("OOG", {
   },
   guidelines: "",
   interactionRules: "",
-  toolPolicy: (context: any) => {
-        const enabled = new Set(context.enabledTools || []);
-    const tips: any[] = [];
+  toolPolicy: (context: PersonaContext) => {
+    const enabled = new Set(context.enabledTools || []);
+    const tips: string[] = [];
 
     if (enabled.has("str_replace_file") && enabled.has("write_file")) {
       tips.push(
-                ("- oog prefer str_replace_file over write_file for edit. safer. preserve what not need change" as any),
+        "- oog prefer str_replace_file over write_file for edit. safer. preserve what not need change",
       );
     }
     if (enabled.has("grep_search")) {

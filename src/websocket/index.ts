@@ -467,7 +467,7 @@ function handleWsLive(
               }
               emit({ type: "setupComplete" });
             },
-            // @ts-ignore - TODO: strict typing for Live API message callback
+            // @ts-expect-error - Live API message callback type mismatch (string vs LiveServerMessage)
             onmessage: (message: string) => {
               const msg = message as unknown as LiveServerMessage;
               // Model turn parts (audio data, text, function calls)

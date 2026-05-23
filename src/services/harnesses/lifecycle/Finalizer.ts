@@ -34,7 +34,7 @@ export interface FinalizerContext {
   agent?: string | null;
   workspaceRoot?: string | null;
   requestId?: string;
-  emit?: (event: Record<string, unknown>) => void;
+  emit?: (event: { type: string; [key: string]: unknown }) => void;
   signal?: AbortSignal;
 }
 
