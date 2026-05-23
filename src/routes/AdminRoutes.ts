@@ -1777,13 +1777,23 @@ router.get(
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
       if (!db) return res.status(503).json({ error: "Database not available" });
 
-      const document = await db
+      // Try fetching from model conversations first
+      let conversationDocument = await db
         .collection(CONVERSATIONS_COL)
         .findOne({ id: req.params.id });
-      if (!document)
-        return res.status(404).json({ error: "Conversation not found" });
+      if (conversationDocument) {
+        return res.json({ ...conversationDocument, type: "direct" });
+      }
 
-      res.json(document);
+      // Try fetching from agent conversations next
+      conversationDocument = await db
+        .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+        .findOne({ id: req.params.id });
+      if (conversationDocument) {
+        return res.json({ ...conversationDocument, type: "agent" });
+      }
+
+      res.status(404).json({ error: "Conversation not found" });
     } catch (error: unknown) {
             logger.error(`Admin /conversations/:id error: ${(error as Error).message}`);
       next(error);
