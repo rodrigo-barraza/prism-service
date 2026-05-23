@@ -157,4 +157,16 @@ describe('GET /config/tools', () => {
     // But Lupos has upsert_memory since we whitelisted it
     expect(res.body.some((t: any) => t.name === 'upsert_memory')).toBe(true);
   });
+
+  it('forces system: false for all tools returned for LUPOS agent so they are configurable in the UI', async () => {
+    const res = await request(app)
+      .get('/config/tools?agent=LUPOS')
+      .expect(200);
+
+    expect(Array.isArray(res.body)).toBe(true);
+    const upsertMemory = res.body.find((t: any) => t.name === 'upsert_memory');
+    expect(upsertMemory).toBeDefined();
+    // System flag should be overridden to false
+    expect(upsertMemory.system).toBe(false);
+  });
 });

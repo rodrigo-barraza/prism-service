@@ -384,7 +384,10 @@ router.get("/tools", (_req: Request, res: Response) => {
         if (agentId !== "LUPOS") {
           return res.json(schemas.filter((t: any) => enabledSet.has(t.name) || t.system === true));
         } else {
-          return res.json(schemas.filter((t: any) => enabledSet.has(t.name)));
+          // Lupos is restricted. Dynamically override system: false so they appear configurable in UI
+          const filtered = schemas.filter((t: any) => enabledSet.has(t.name));
+          const cleaned = filtered.map((t: any) => ({ ...t, system: false }));
+          return res.json(cleaned);
         }
       }
     }

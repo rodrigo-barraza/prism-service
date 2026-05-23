@@ -1,5 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
+import type { WithId, Document } from "mongodb";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import { getProvider } from "../providers/index.ts";
@@ -1348,14 +1349,14 @@ router.get(
         type,
       } = req.query;
 
-      const filter: Record<string, any> = {};
+      const filter: Record<string, unknown> = {};
       if (trace) filter.traceId = trace;
       if (project) filter.project = project;
       if (username) filter.username = username;
 
       if (search) {
         const regex = { $regex: search, $options: "i" };
-        const orClauses: Record<string, any>[] = [
+        const orClauses: Record<string, unknown>[] = [
           { title: regex },
           { project: regex },
           { username: regex },
@@ -1376,9 +1377,10 @@ router.get(
       if (model) filter["messages.model"] = model;
 
       if (from || to) {
-        filter.updatedAt = {};
-        if (from) filter.updatedAt.$gte = from;
-        if (to) filter.updatedAt.$lte = to;
+        const dateFilter: Record<string, string> = {};
+        if (from) dateFilter.$gte = from as string;
+        if (to) dateFilter.$lte = to as string;
+        filter.updatedAt = dateFilter;
       }
 
       const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
@@ -1397,10 +1399,10 @@ router.get(
         agentFilter.agent = agent;
       }
 
-      let convs: any[] = [];
-      let sessions: any[] = [];
+      let convs: Document[] = [];
+      let sessions: Document[] = [];
 
-      const queryPromises: Promise<any>[] = [];
+      const queryPromises: Promise<void>[] = [];
 
       if (shouldFetchConvs) {
         queryPromises.push(
@@ -1460,7 +1462,7 @@ router.get(
       // 2. Count totals for both collections
       let totalConvs = 0;
       let totalSessions = 0;
-      const countPromises: Promise<any>[] = [];
+      const countPromises: Promise<void>[] = [];
 
       if (shouldFetchConvs) {
         countPromises.push(
@@ -1490,19 +1492,19 @@ router.get(
       const merged = [
         ...convs.map((c) => ({ ...c, type: "direct" as const })),
         ...sessions.map((s) => ({ ...s, type: "agent" as const })),
-      ].sort((a: any, b: any) => {
-        const valA = a[sort as string];
-        const valB = b[sort as string];
+      ].sort((a, b) => {
+        const valA = String((a as Record<string, unknown>)[sort as string] ?? "");
+        const valB = String((b as Record<string, unknown>)[sort as string] ?? "");
         if (valA < valB) return sortDir;
         if (valA > valB) return -sortDir;
         return 0;
       });
 
       // 4. Slice the paginated portion
-      const docs: any[] = merged.slice(skip, skip + lim);
+      const docs = merged.slice(skip, skip + lim);
 
       // 5. Enrich the sliced docs with requests telemetry in a batch lookup
-      const finalDocIds = docs.map((d: any) => d.id);
+      const finalDocIds = docs.map((d) => (d as Document).id);
       const requests = await db
         .collection(REQUESTS_COL)
         .find({ conversationId: { $in: finalDocIds } })
@@ -1525,14 +1527,14 @@ router.get(
         requestMap.get(cid).push(r);
       }
 
-      const enrichedDocs = docs.map((doc: any) => {
-        const reqs = requestMap.get(doc.id) || [];
-        const models = Array.from(new Set(reqs.map((r: any) => r.model).filter(Boolean)));
+      const enrichedDocs = docs.map((doc: Record<string, unknown>) => {
+        const reqs = requestMap.get(doc.id) || [] as Document[];
+        const models = Array.from(new Set(reqs.map((r: Document) => r.model).filter(Boolean)));
         const toolDisplayNames = Array.from(
-          new Set(reqs.flatMap((r: any) => r.toolDisplayNames || []).filter(Boolean))
+          new Set(reqs.flatMap((r: Document) => (r.toolDisplayNames as string[]) || []).filter(Boolean))
         );
         const toolApiNames = Array.from(
-          new Set(reqs.flatMap((r: any) => r.toolApiNames || []).filter(Boolean))
+          new Set(reqs.flatMap((r: Document) => (r.toolApiNames as string[]) || []).filter(Boolean))
         );
 
         let inputTokens = 0;
@@ -1570,8 +1572,8 @@ router.get(
         page: parseInt(page as string, 10),
         limit: lim,
       });
-    } catch (error: any) {
-      logger.error("Admin /conversations error: " + error.message);
+    } catch (error: unknown) {
+      logger.error("Admin /conversations error: " + (error as Error).message);
       next(error);
     }
   }),

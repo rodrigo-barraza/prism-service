@@ -5,17 +5,97 @@ import BenchmarkService from "../services/BenchmarkService.ts";
 import logger from "../utils/logger.ts";
 import { createAbortController } from "../utils/AbortController.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
+import type { WithId, Document } from "mongodb";
 
 const router = express.Router();
 
+// ── Internal Types ──────────────────────────────────────────
+
+interface BenchmarkModelStartData {
+  provider: string;
+  model: string;
+  label: string;
+  isLocal: boolean;
+}
+
+interface RunState {
+  completedResults: Record<string, unknown>[];
+  activeModel: BenchmarkModelStartData | null;
+  totalModels: number;
+  startedAt: string;
+}
+
+interface BenchmarkResult {
+  provider: string;
+  model: string;
+  label: string;
+  thinkingEnabled: boolean;
+  toolsEnabled: boolean;
+  agent?: string | null;
+  passed: boolean;
+  error: string | null;
+  estimatedCost?: number | null;
+  latency?: number;
+  [key: string]: unknown;
+}
+
+interface BenchmarkRunSummary {
+  total: number;
+  passed: number;
+  failed: number;
+  errored: number;
+  totalCost: number;
+}
+
+interface BenchmarkRunDoc extends WithId<Document> {
+  id: string;
+  summary?: BenchmarkRunSummary;
+  models?: BenchmarkResult[];
+  completedAt?: string;
+  [key: string]: unknown;
+}
+
+interface BenchmarkDoc extends WithId<Document> {
+  id: string;
+  name: string;
+  [key: string]: unknown;
+}
+
+interface PerBenchmarkStat {
+  name: string;
+  total: number;
+  passed: number;
+  failed: number;
+  errored: number;
+}
+
+interface RunTotal {
+  totalCost: number;
+  totalLatency: number;
+  runCount: number;
+}
+
+interface LatestResult {
+  benchmarkId: string;
+  benchmarkName: string;
+  provider: string;
+  model: string;
+  label: string;
+  thinkingEnabled: boolean;
+  toolsEnabled: boolean;
+  agent: string | null;
+  passed: boolean;
+  error: string | null;
+}
+
 // Process-level registry of in-flight benchmark runs → AbortControllers
 // Used by the explicit POST /benchmark/abort/:runId endpoint.
-const activeRuns = new Map();
+const activeRuns = new Map<string, AbortController>();
 
 // Pub/sub for live benchmark progress — allows reconnecting clients
 // to receive events from an already-running benchmark.
-const runEmitters = new Map(); // benchmarkId → EventEmitter
-const runStates = new Map(); // benchmarkId → { completedResults, activeModel, startedAt }
+const runEmitters = new Map<string, EventEmitter>();
+const runStates = new Map<string, RunState>();
 
 // Shutdown cleanup — abort any running benchmarks
 registerCleanup(async () => {
@@ -35,18 +115,18 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            const benchmarks = await BenchmarkService.list((req.project as any));
+      const benchmarks = await BenchmarkService.list(req.project || null) as BenchmarkDoc[];
 
       // Attach latest run summary + cumulative cost across ALL runs
       const enriched = await Promise.all(
-        benchmarks.map(async (b: any) => {
+        benchmarks.map(async (b) => {
           const [latestRun, allRuns] = await Promise.all([
-                        BenchmarkService.getLatestRun((b.id as any), (req.project as any)),
-                        BenchmarkService.getRuns((b.id as any), (req.project as any)),
+            BenchmarkService.getLatestRun(b.id, req.project || null) as Promise<BenchmarkRunDoc | null>,
+            BenchmarkService.getRuns(b.id, req.project || null) as Promise<BenchmarkRunDoc[]>,
           ]);
           const cumulativeCost = allRuns.reduce(
-                        (sum: any, r: any) => sum + ((r.summary as any)?.totalCost || 0),
-                        0,
+            (sum, r) => sum + (r.summary?.totalCost || 0),
+            0,
           );
           return {
             ...b,
@@ -65,7 +145,7 @@ router.get(
 
       res.json({ benchmarks: enriched, count: enriched.length });
     } catch (error: unknown) {
-            logger.error(`GET /benchmark error: ${(error as Error).message}`);
+      logger.error(`GET /benchmark error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -80,7 +160,7 @@ router.get(
   "/stats",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            const benchmarks = await BenchmarkService.list((req.project as any));
+      const benchmarks = await BenchmarkService.list(req.project || null) as BenchmarkDoc[];
 
       // Phase 1: For each benchmark, find the latest result per model config.
       // getRuns() returns runs sorted by startedAt DESC, so the first
@@ -88,14 +168,14 @@ router.get(
       // Composite key: "provider:model:thinking:tools:agent" so the same
       // model with different configs appears as separate rows.
       // latestResults: Map<compositeKey, Map<benchmarkId, result>>
-      const latestResults = new Map();
+      const latestResults = new Map<string, Map<string, LatestResult>>();
       // allRunTotals: Map<compositeKey, { totalCost, totalLatency, runCount }>
-      const allRunTotals = new Map();
+      const allRunTotals = new Map<string, RunTotal>();
       // cumulativeBenchmarks: Map<"compositeKey::benchmarkId", { name, total, passed, failed, errored }>
-      const cumulativeBenchmarks = new Map();
+      const cumulativeBenchmarks = new Map<string, PerBenchmarkStat>();
 
       /** Build a composite grouping key from a result object. */
-      const makeKey = (r: any) => {
+      const makeKey = (r: BenchmarkResult) => {
         const thinking = r.thinkingEnabled ? "T" : "";
         const tools = r.toolsEnabled ? "F" : "";
         const agent = r.agent || "";
@@ -103,11 +183,11 @@ router.get(
       };
 
             for ( const b of benchmarks) {
-                const runs = await BenchmarkService.getRuns(b.id, (req.project as any));
+        const runs = await BenchmarkService.getRuns(b.id, req.project || null) as BenchmarkRunDoc[];
         const seenForBenchmark = new Set(); // track which model configs we've already recorded as "latest"
 
                 for ( const run of runs) {
-                    for ( const result of run.models || []) {
+                    for ( const result of (run.models || []) as BenchmarkResult[]) {
             const modelKey = makeKey(result);
 
             // Accumulate ALL-run cost/latency regardless of dedup
@@ -118,7 +198,7 @@ router.get(
                 runCount: 0,
               });
             }
-            const rt = allRunTotals.get(modelKey);
+            const rt = allRunTotals.get(modelKey)!;
             rt.totalCost += result.estimatedCost || 0;
             rt.totalLatency += result.latency || 0;
             rt.runCount++;
@@ -134,7 +214,7 @@ router.get(
                 errored: 0,
               });
             }
-            const callback = cumulativeBenchmarks.get(cumulKey);
+            const callback = cumulativeBenchmarks.get(cumulKey)!;
             callback.total++;
             if (result.error) callback.errored++;
             else if (result.passed) callback.passed++;
@@ -147,7 +227,7 @@ router.get(
             if (!latestResults.has(modelKey)) {
               latestResults.set(modelKey, new Map());
             }
-            latestResults.get(modelKey).set(b.id, {
+            latestResults.get(modelKey)!.set(b.id, {
               benchmarkId: b.id,
               benchmarkName: b.name,
               provider: result.provider,
@@ -165,7 +245,7 @@ router.get(
 
       // Phase 2: Build per-model-config stats from deduplicated latest results
       const models = [...latestResults.entries()].map(
-                ([modelKey, benchmarkMap]: any) => {
+        ([modelKey, benchmarkMap]: [string, Map<string, LatestResult>]) => {
           const benchmarkResults = [...benchmarkMap.values()];
           const first = benchmarkResults[0];
           const rt = allRunTotals.get(modelKey) || {
@@ -177,7 +257,7 @@ router.get(
           let passed = 0;
           let failed = 0;
           let errored = 0;
-          const perBenchmark: any[] = [];
+          const perBenchmark: (PerBenchmarkStat & { latestPassed: boolean; latestErrored: boolean })[] = [];
 
                     for ( const r of benchmarkResults) {
             if (r.error) errored++;
@@ -226,7 +306,7 @@ router.get(
 
       // Sort by pass rate descending, then by total benchmarks descending
       models.sort(
-                (a: any, b: any) => (b as any).passRate - (a as any).passRate || (b as any).total - a.total,
+        (a, b) => b.passRate - a.passRate || b.total - a.total,
       );
 
       res.json({
@@ -235,7 +315,7 @@ router.get(
         totalBenchmarks: benchmarks.length,
       });
     } catch (error: unknown) {
-            logger.error(`GET /benchmark/stats error: ${(error as Error).message}`);
+      logger.error(`GET /benchmark/stats error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -280,7 +360,7 @@ router.post(
       } = req.body;
 
       if (!name || !prompt) {
-        return res
+        res
           .status(400)
           .json({ error: "Missing required fields: name, prompt" });
       }
@@ -349,13 +429,13 @@ router.post(
           agentAssertions,
           agentAssertionOperator,
         },
-                (req.project as any),
-        (req.username as any),
+        req.project || null,
+        req.username || "anonymous",
       );
 
       res.status(201).json(benchmark);
     } catch (error: unknown) {
-            logger.error(`POST /benchmark error: ${(error as Error).message}`);
+      logger.error(`POST /benchmark error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -368,21 +448,21 @@ router.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const benchmark = await BenchmarkService.getById(
-                (req.params.id as any),
-        (req.project as any),
+        String(req.params.id),
+        req.project || null,
       );
       if (!benchmark) {
         return res.status(404).json({ error: "Benchmark not found" });
       }
 
       const latestRun = await BenchmarkService.getLatestRun(
-        benchmark.id,
-                (req.project as any),
+        benchmark.id as string,
+        req.project || null,
       );
 
       res.json({ ...benchmark, latestRun: latestRun || null });
     } catch (error: unknown) {
-            logger.error(`GET /benchmark/:id error: ${(error as Error).message}`);
+      logger.error(`GET /benchmark/:id error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -395,17 +475,17 @@ router.delete(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const existing = await BenchmarkService.getById(
-                (req.params.id as any),
-        (req.project as any),
+        String(req.params.id),
+        req.project || null,
       );
       if (!existing) {
         return res.status(404).json({ error: "Benchmark not found" });
       }
 
-            await BenchmarkService.remove((req.params.id as any), (req.project as any));
+      await BenchmarkService.remove(String(req.params.id), req.project || null);
       res.json({ deleted: true, id: req.params.id });
     } catch (error: unknown) {
-            logger.error(`DELETE /benchmark/:id error: ${(error as Error).message}`);
+      logger.error(`DELETE /benchmark/:id error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -426,8 +506,8 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     try {
       const benchmark = await BenchmarkService.getById(
-                (req.params.id as any),
-        (req.project as any),
+        String(req.params.id),
+        req.project || null,
       );
       if (!benchmark) {
         return res.status(404).json({ error: "Benchmark not found" });
@@ -449,7 +529,7 @@ router.post(
       const abortController = createAbortController();
       let clientClosed = false;
 
-      const registryKey = req.params.id;
+      const registryKey = String(req.params.id);
       activeRuns.set(registryKey, abortController);
 
       // Set up pub/sub emitter and state for live reconnection
@@ -486,7 +566,7 @@ router.post(
         abortController.abort();
       });
 
-      const send = (type: any, data: any) => {
+      const send = (type: string, data: Record<string, unknown>) => {
         if (clientClosed) return;
         try {
           res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
@@ -500,11 +580,11 @@ router.post(
       const run = await BenchmarkService.runBenchmark(
         benchmark as unknown as Parameters<typeof BenchmarkService.runBenchmark>[0],
         modelTargets,
-                (req.project as any),
-        (req.username as any),
+        req.project || null,
+        req.username || "anonymous",
         {
           signal: abortController.signal,
-          onRunStart: (info: any) => {
+          onRunStart: (info: { totalModels: number }) => {
             // Store total model count for reconnecting clients
             const state = runStates.get(registryKey);
             if (state) state.totalModels = info.totalModels;
@@ -512,9 +592,9 @@ router.post(
               type: "run_info",
               totalModels: info.totalModels,
             });
-                        send(("run_info" as any), { totalModels: info.totalModels });
+            send("run_info", { totalModels: info.totalModels });
           },
-          onModelStart: (model: any) => {
+          onModelStart: (model: BenchmarkModelStartData) => {
             const data = {
               provider: model.provider,
               model: model.model,
@@ -527,21 +607,21 @@ router.post(
             // Emit to followers
             emitter.emit("event", { type: "model_start", ...data });
             // Send to original connection
-                        send(("model_start" as any), data);
+            send("model_start", data);
           },
-          onModelComplete: (result: any) => {
+          onModelComplete: (result) => {
             // Update live state for followers
             const state = runStates.get(registryKey);
             if (state) {
-              state.completedResults.push(result);
+              state.completedResults.push({ ...result });
               state.activeModel = null;
             }
             // Emit to followers
             emitter.emit("event", { type: "model_complete", ...result });
             // Send to original connection
-                        send(("model_complete" as any), result);
+            send("model_complete", { ...result });
           },
-          onEvent: (event: any) => {
+          onEvent: (event: Record<string, unknown>) => {
             // Forward live events for real-time preview
             emitter.emit("event", event);
             // Include _sourceModel for concurrent model attribution
@@ -555,9 +635,9 @@ router.post(
               event.type === "tool_output"
             ) {
               const { type, _sourceModel, ...rest } = event;
-                            send((type as any), { ...rest, ...sourceTag });
+              send(type as string, { ...rest, ...sourceTag });
             } else {
-                            send((event.type as any), { content: event.content, ...sourceTag });
+              send(event.type as string, { content: event.content, ...sourceTag });
             }
           },
         },
@@ -566,15 +646,15 @@ router.post(
       // Emit run_complete to followers before cleanup
       emitter.emit("event", { type: "run_complete", ...run });
 
-            send(("run_complete" as any), run);
+      send("run_complete", run as unknown as Record<string, unknown>);
       if (!clientClosed) res.end();
       cleanup();
     } catch (error: unknown) {
-            logger.error(`POST /benchmark/:id/run error: ${(error as Error).message}`);
+      logger.error(`POST /benchmark/:id/run error: ${(error as Error).message}`);
       if (res.headersSent) {
         try {
           res.write(
-                        `data: ${JSON.stringify({ type: "error", message: (error as Error).message })}\n\n`,
+            `data: ${JSON.stringify({ type: "error", message: (error as Error).message })}\n\n`,
           );
           res.end();
         } catch {
@@ -590,13 +670,13 @@ router.post(
 // ─── POST /benchmark/:id/abort — Explicitly cancel a running benchmark ─
 
 router.post("/:id/abort", (req: Request, res: Response) => {
-  const controller = activeRuns.get(req.params.id);
+  const controller = activeRuns.get(String(req.params.id));
   if (controller) {
     logger.info(
       `[benchmark] Explicit abort requested for benchmark ${req.params.id}`,
     );
     controller.abort();
-    activeRuns.delete(req.params.id);
+    activeRuns.delete(String(req.params.id));
     res.json({ aborted: true });
   } else {
     res.json({
@@ -611,7 +691,7 @@ router.post("/:id/abort", (req: Request, res: Response) => {
 // so reconnecting clients can catch up immediately.
 
 router.get("/:id/active", (req: Request, res: Response) => {
-  const state = runStates.get(req.params.id);
+  const state = runStates.get(String(req.params.id));
   if (!state) {
     return res.json({ active: false });
   }
@@ -630,8 +710,8 @@ router.get("/:id/active", (req: Request, res: Response) => {
 // returned to see live progress without starting a new run.
 
 router.get("/:id/follow", (req: Request, res: Response) => {
-  const state = runStates.get(req.params.id);
-  const emitter = runEmitters.get(req.params.id);
+  const state = runStates.get(String(req.params.id));
+  const emitter = runEmitters.get(String(req.params.id));
   if (!state || !emitter) {
     return res.status(404).json({ error: "No active run for this benchmark" });
   }
@@ -668,7 +748,7 @@ router.get("/:id/follow", (req: Request, res: Response) => {
   }
 
   // Subscribe to live events going forward
-  const handler = (event: any) => {
+  const handler = (event: Record<string, unknown>) => {
     try {
       res.write(`data: ${JSON.stringify(event)}\n\n`);
     } catch {
@@ -699,17 +779,17 @@ router.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const benchmark = await BenchmarkService.getById(
-                (req.params.id as any),
-        (req.project as any),
+        String(req.params.id),
+        req.project || null,
       );
       if (!benchmark) {
         return res.status(404).json({ error: "Benchmark not found" });
       }
 
-            const runs = await BenchmarkService.getRuns(benchmark.id, (req.project as any));
+      const runs = await BenchmarkService.getRuns(benchmark.id as string, req.project || null);
       res.json({ runs, count: runs.length });
     } catch (error: unknown) {
-            logger.error(`GET /benchmark/:id/runs error: ${(error as Error).message}`);
+      logger.error(`GET /benchmark/:id/runs error: ${(error as Error).message}`);
       next(error);
     }
   }),
@@ -722,23 +802,23 @@ router.post(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const benchmark = await BenchmarkService.getById(
-                (req.params.id as any),
-        (req.project as any),
+        String(req.params.id),
+        req.project || null,
       );
       if (!benchmark) {
         return res.status(404).json({ error: "Benchmark not found" });
       }
 
       const previousRun = await BenchmarkService.getRunById(
-                (req.params.runId as any),
-        (req.project as any),
-      );
+        String(req.params.runId),
+        req.project || null,
+      ) as BenchmarkRunDoc | null;
       if (!previousRun) {
         return res.status(404).json({ error: "Run not found" });
       }
 
       // Re-run with the same model set from the previous run
-      const modelTargets = previousRun.models.map((m: any) => ({
+      const modelTargets = (previousRun.models || []).map((m: BenchmarkResult) => ({
         provider: m.provider,
         model: m.model,
       }));
@@ -746,14 +826,14 @@ router.post(
       const run = await BenchmarkService.runBenchmark(
         benchmark as unknown as Parameters<typeof BenchmarkService.runBenchmark>[0],
         modelTargets,
-                (req.project as any),
-        (req.username as any),
+        req.project || null,
+        req.username || "anonymous",
       );
 
       res.json(run);
     } catch (error: unknown) {
       logger.error(
-                `POST /benchmark/:id/runs/:runId/rerun error: ${(error as Error).message}`,
+        `POST /benchmark/:id/runs/:runId/rerun error: ${(error as Error).message}`,
       );
       next(error);
     }
