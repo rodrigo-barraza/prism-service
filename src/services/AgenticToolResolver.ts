@@ -60,6 +60,18 @@ interface ResolveParams {
 /** Coordinator tools bypass the enabledTools filter (always available) */
 const COORDINATOR_TOOL_NAMES = new Set(COORDINATOR_ONLY_TOOLS);
 
+/** Core system tools bypass the enabledTools filter (always available to all agents as part of the core cognitive architecture) */
+const CORE_SYSTEM_TOOLS = new Set([
+  "upsert_memory",
+  "task_create",
+  "task_list",
+  "task_update",
+  "precise_calculator",
+  "execute_javascript",
+  "search_tools",
+  "web_search",
+]);
+
 /** Prism-local tools bypass the enabledTools filter (always available to all agents) — derived from registry */
 let _prismLocalCache: Set<string> | null = null;
 const PRISM_LOCAL_TOOL_NAMES = {
@@ -248,6 +260,7 @@ export default class AgenticToolResolver {
           enabledSet.has(t.name) ||
           t._isCustom ||
           t.name.startsWith("mcp__") ||
+          CORE_SYSTEM_TOOLS.has(t.name) ||
           COORDINATOR_TOOL_NAMES.has(t.name) ||
           PRISM_LOCAL_TOOL_NAMES.has(t.name),
       );

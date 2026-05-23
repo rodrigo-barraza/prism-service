@@ -535,6 +535,14 @@ export default class ToolOrchestratorService {
   /** Client-facing schemas (with domain/dataSource/labels, no endpoint) — for Prism Client UI */
   static getClientToolSchemas() {
     const CORE_SYSTEM_TOOLS = new Set([
+      "upsert_memory",
+      "task_create",
+      "task_list",
+      "task_update",
+      "precise_calculator",
+      "execute_javascript",
+      "search_tools",
+      "web_search",
       "enter_plan_mode",
       "exit_plan_mode",
       "ask_user_question",
