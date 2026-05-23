@@ -11,9 +11,16 @@ import logger from "../../utils/logger.ts";
 // The registry auto-imports everything in this directory on init().
 // ────────────────────────────────────────────────────────────
 
-/** @type {Map<string, { schema: object, domain: string, labels: string[], execute: Function }>} */
-const registry = new Map();
-function register(tool: any) {
+interface InternalTool {
+  name: string;
+  schema: { name: string; description?: string; parameters?: Record<string, unknown>; [key: string]: unknown };
+  domain?: string;
+  labels?: string[];
+  execute: (args: Record<string, unknown>, context: Record<string, unknown>) => Promise<unknown>;
+}
+
+const registry = new Map<string, InternalTool>();
+function register(tool: InternalTool) {
   if (!tool.name || !tool.execute) {
     logger.warn(
       `[InternalToolRegistry] Skipping invalid tool: missing name or execute`,
@@ -55,7 +62,7 @@ async function init() {
 }
 
 // Kick off registration at module load
-init().catch((error: any) =>
+init().catch((error: Error) =>
   logger.error(`[InternalToolRegistry] Init failed: ${error.message}`),
 );
 
@@ -63,7 +70,7 @@ export default class InternalToolRegistry {
   static has(name: string) {
     return registry.has(name);
   }
-  static async execute(name: string, args: any, context: any = {}) {
+  static async execute(name: string, args: Record<string, unknown>, context: Record<string, unknown> = {}) {
     const tool = registry.get(name);
     if (!tool) {
       return { error: `Unknown internal tool: ${name}` };
@@ -71,10 +78,10 @@ export default class InternalToolRegistry {
     return tool.execute(args, context);
   }
   static getSchemas() {
-    return [...registry.values()].map((t: any) => t.schema);
+    return [...registry.values()].map((t) => t.schema);
   }
   static getClientSchemas() {
-    return [...registry.values()].map((t: any) => ({
+    return [...registry.values()].map((t) => ({
             ...t.schema,
       domain: t.domain || "Reasoning",
       labels: t.labels || ["coding"],

@@ -60,7 +60,7 @@ interface ResolveParams {
 /** Coordinator tools bypass the enabledTools filter (always available) */
 const COORDINATOR_TOOL_NAMES = new Set(COORDINATOR_ONLY_TOOLS);
 
-/** Core system tools bypass the enabledTools filter (always available to all agents except LUPOS as part of the core cognitive architecture) */
+/** Core system tools bypass the enabledTools filter (always available to all agents as part of the core cognitive architecture) */
 const CORE_SYSTEM_TOOLS = new Set([
   "upsert_memory",
   "task_create",

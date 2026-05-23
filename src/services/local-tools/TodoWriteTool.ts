@@ -45,25 +45,25 @@ export default {
   domain: "Agentic: Task Management",
   labels: ["coding"],
 
-  async execute(args: any, context: any) {
+  async execute(args: Record<string, unknown>, context: { _emit?: (event: Record<string, unknown>) => void }) {
     const { items } = args;
     if (!Array.isArray(items)) {
       return { error: "'items' must be an array of todo objects" };
     }
 
-    const normalized = items.map((item: any, i: number) => ({
+    const normalized = items.map((item: Record<string, unknown>, i: number) => ({
       id: i + 1,
-      content: item.content || "",
-      status: item.status || "pending",
-      priority: item.priority || "medium",
+      content: (item.content as string) || "",
+      status: (item.status as string) || "pending",
+      priority: (item.priority as string) || "medium",
     }));
 
     const stats = {
       total: normalized.length,
-      pending: normalized.filter((i: any) => i.status === "pending").length,
-      in_progress: normalized.filter((i: any) => i.status === "in_progress")
+      pending: normalized.filter((i) => i.status === "pending").length,
+      in_progress: normalized.filter((i) => i.status === "in_progress")
         .length,
-      completed: normalized.filter((i: any) => i.status === "completed").length,
+      completed: normalized.filter((i) => i.status === "completed").length,
     };
 
     logger.info(
@@ -71,7 +71,7 @@ export default {
     );
 
     if (context._emit) {
-            context._emit({ type: "todo_update", items: normalized, stats });
+      context._emit({ type: "todo_update", items: normalized, stats });
     }
 
     return { acknowledged: true, items: normalized, stats };

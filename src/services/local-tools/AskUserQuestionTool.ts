@@ -1,5 +1,32 @@
 import logger from "../../utils/logger.ts";
 
+interface QuestionOption {
+  label: string;
+  preview: string | null;
+}
+
+interface NormalizedQuestion {
+  question: string;
+  header: string | null;
+  options: QuestionOption[];
+  multiSelect: boolean;
+}
+
+interface ToolContext {
+  agentSessionId?: string;
+  _emit?: (event: Record<string, unknown>) => void;
+}
+
+interface QuestionAnswer {
+  answer?: string;
+  [key: string]: unknown;
+}
+
+interface QuestionResult {
+  answers: QuestionAnswer[] | null;
+  timedOut?: boolean;
+}
+
 export default {
   name: "ask_user_question",
   schema: {
@@ -86,33 +113,6 @@ export default {
   domain: "Agentic: Control Flow",
   labels: ["coding"],
 
-interface QuestionOption {
-  label: string;
-  preview: string | null;
-}
-
-interface NormalizedQuestion {
-  question: string;
-  header: string | null;
-  options: QuestionOption[];
-  multiSelect: boolean;
-}
-
-interface ToolContext {
-  agentSessionId?: string;
-  _emit?: (event: Record<string, unknown>) => void;
-}
-
-interface QuestionAnswer {
-  answer?: string;
-  [key: string]: unknown;
-}
-
-interface QuestionResult {
-  answers: QuestionAnswer[] | null;
-  timedOut?: boolean;
-}
-
   async execute(args: Record<string, unknown>, context: ToolContext) {
     const { question, choices, context: questionContext, questions } = args;
 
@@ -121,7 +121,7 @@ interface QuestionResult {
     if (questions && Array.isArray(questions) && questions.length > 0) {
       // Multi-question mode — validate uniqueness
       const seen = new Set<string>();
-      for ( const q of questions as Record<string, unknown>[]) {
+      for (const q of questions as Record<string, unknown>[]) {
         if (!q.question || typeof q.question !== "string") {
           return {
             error:
@@ -138,7 +138,7 @@ interface QuestionResult {
         const qOptions = q.options as Record<string, unknown>[] | undefined;
         if (qOptions && qOptions.length > 0) {
           const labelsSeen = new Set<string>();
-          for ( const opt of qOptions) {
+          for (const opt of qOptions) {
             if (labelsSeen.has(opt.label as string)) {
               return {
                 error: `Duplicate option label "${opt.label}" in question "${(q.question as string).slice(0, 40)}"`,

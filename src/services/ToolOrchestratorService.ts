@@ -572,12 +572,12 @@ export default class ToolOrchestratorService {
       system: true,
     }));
 
-    const internalClient = InternalToolRegistry.getClientSchemas().map((t: any) => ({
+    const internalClient = InternalToolRegistry.getClientSchemas().map((t) => ({
       ...t,
       system: CORE_SYSTEM_TOOLS.has(t.name) || t.domain === "Reasoning" || t.domain === "Coordinator",
     }));
 
-    const clientSchemasEnriched = cachedClientSchemas.map((t: any) => ({
+    const clientSchemasEnriched = cachedClientSchemas.map((t) => ({
       ...t,
       system: CORE_SYSTEM_TOOLS.has(t.name) || t.domain === "Reasoning" || t.domain === "Coordinator",
     }));

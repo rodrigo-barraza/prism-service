@@ -5,6 +5,23 @@ import logger from "../../utils/logger.ts";
 // speculative or risky changes. The active worktree state is
 // managed by ToolOrchestratorService (activeWorktrees map).
 
+interface ToolContext {
+  agentSessionId?: string;
+  _emit?: (event: Record<string, unknown>) => void;
+  [key: string]: unknown;
+}
+
+interface WorktreeCreateResult {
+  worktreePath?: string;
+  error?: string;
+}
+
+interface WorktreeMergeResult {
+  error?: string;
+  diff?: unknown;
+  [key: string]: unknown;
+}
+
 const enterWorktree = {
   name: "enter_worktree",
   schema: {
@@ -30,7 +47,7 @@ const enterWorktree = {
   domain: "Agentic: Git Isolation",
   labels: ["coding", "git"],
 
-  async execute(args: any, context: any) {
+  async execute(args: Record<string, unknown>, context: ToolContext) {
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
     const { resolve } = await import("node:path");
@@ -44,7 +61,7 @@ const enterWorktree = {
       };
     }
 
-        const worktreeState = ToolOrchestratorService.getWorktreeState((sessionId as any));
+    const worktreeState = ToolOrchestratorService.getWorktreeState(sessionId);
     if (worktreeState) {
       return {
         error: `Already in a worktree (branch: ${worktreeState.branchName}). Call exit_worktree first.`,
@@ -56,50 +73,50 @@ const enterWorktree = {
       return { error: "No workspace root configured" };
     }
 
-        const repoPath = existsSync(resolve((workspaceRoot as any), ".git"))
+    const repoPath = existsSync(resolve(workspaceRoot, ".git"))
       ? workspaceRoot
       : workspaceRoot;
 
-        const branchName = `worktree/${(sessionId as any).slice(0, 8)}-${Date.now().toString(36)}`;
+    const branchName = `worktree/${sessionId.slice(0, 8)}-${Date.now().toString(36)}`;
 
     // Create worktree via tools-api
     const createResult = await ToolOrchestratorService._proxyPost(
       "/agentic/git/worktree/create",
       { path: repoPath, branch: branchName },
       context,
-    );
+    ) as WorktreeCreateResult;
 
-        if ((createResult as any).error) {
-            return { error: `Failed to create worktree: ${(createResult as any).error}` };
+    if (createResult.error) {
+      return { error: `Failed to create worktree: ${createResult.error}` };
     }
 
     // Store the worktree state
-        ToolOrchestratorService._setWorktree((sessionId as any), {
+    ToolOrchestratorService._setWorktree(sessionId, {
       originalRoot: workspaceRoot,
-            worktreePath: (createResult as any).worktreePath,
+      worktreePath: createResult.worktreePath!,
       branchName,
       repoPath,
     });
 
-        logger.info(
-            `[Worktree] enter: ${branchName} → ${(createResult as any).worktreePath}`,
+    logger.info(
+      `[Worktree] enter: ${branchName} → ${createResult.worktreePath}`,
     );
 
     if (context._emit) {
-            context._emit({
+      context._emit({
         type: "status",
         message: "worktree_entered",
         branch: branchName,
-                path: (createResult as any).worktreePath,
+        path: createResult.worktreePath,
       });
     }
 
     return {
       acknowledged: true,
       branch: branchName,
-            worktreePath: (createResult as any).worktreePath,
+      worktreePath: createResult.worktreePath,
       reason: args.reason || null,
-            message: `Now working in isolated worktree. All file operations are redirected to ${(createResult as any).worktreePath}. Call exit_worktree with action 'merge' or 'discard' when done.`,
+      message: `Now working in isolated worktree. All file operations are redirected to ${createResult.worktreePath}. Call exit_worktree with action 'merge' or 'discard' when done.`,
     };
   },
 };
@@ -133,12 +150,12 @@ const exitWorktree = {
   domain: "Agentic: Git Isolation",
   labels: ["coding", "git"],
 
-  async execute(args: any, context: any) {
+  async execute(args: Record<string, unknown>, context: ToolContext) {
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
 
     const sessionId = context.agentSessionId;
-        const wt = ToolOrchestratorService.getWorktreeState((sessionId as any));
+    const wt = ToolOrchestratorService.getWorktreeState(sessionId);
     if (!sessionId || !wt) {
       return {
         error: "Not currently in a worktree. Call enter_worktree first.",
@@ -146,14 +163,14 @@ const exitWorktree = {
     }
 
     const { action, commitMessage } = args;
-    let mergeResult = null;
+    let mergeResult: WorktreeMergeResult | null = null;
 
     if (action === "merge") {
       const diffResult = await ToolOrchestratorService._proxyPost(
         "/agentic/git/worktree/diff",
         { path: wt.repoPath, branch: wt.branchName },
         context,
-      );
+      ) as Record<string, unknown>;
 
       mergeResult = await ToolOrchestratorService._proxyPost(
         "/agentic/git/worktree/merge",
@@ -163,15 +180,15 @@ const exitWorktree = {
           message: commitMessage || `Merge worktree: ${wt.branchName}`,
         },
         context,
-      );
+      ) as WorktreeMergeResult;
 
-            if ((mergeResult as any).error) {
-                return {
-                    error: `Merge failed: ${(mergeResult as any).error}. Worktree preserved at ${wt.worktreePath}. Resolve conflicts and try again, or exit_worktree with action 'discard'.`,
+      if (mergeResult.error) {
+        return {
+          error: `Merge failed: ${mergeResult.error}. Worktree preserved at ${wt.worktreePath}. Resolve conflicts and try again, or exit_worktree with action 'discard'.`,
         };
       }
 
-            (mergeResult as any).diff = (diffResult as any).error ? null : diffResult;
+      mergeResult.diff = diffResult.error ? null : diffResult;
     }
 
     // Remove the worktree (both merge and discard)
@@ -181,12 +198,12 @@ const exitWorktree = {
       context,
     );
 
-        ToolOrchestratorService._clearWorktree((sessionId as any));
+    ToolOrchestratorService._clearWorktree(sessionId);
 
     logger.info(`[Worktree] exit: ${action} — ${wt.branchName}`);
 
     if (context._emit) {
-            context._emit({
+      context._emit({
         type: "status",
         message: "worktree_exited",
         action,

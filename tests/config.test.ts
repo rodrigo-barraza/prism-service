@@ -158,7 +158,7 @@ describe('GET /config/tools', () => {
     expect(res.body.some((t: any) => t.name === 'upsert_memory')).toBe(true);
   });
 
-  it('forces system: false for all tools returned for LUPOS agent so they are configurable in the UI', async () => {
+  it('preserves system: true for whitelisted core system tools returned for LUPOS agent', async () => {
     const res = await request(app)
       .get('/config/tools?agent=LUPOS')
       .expect(200);
@@ -166,7 +166,7 @@ describe('GET /config/tools', () => {
     expect(Array.isArray(res.body)).toBe(true);
     const upsertMemory = res.body.find((t: any) => t.name === 'upsert_memory');
     expect(upsertMemory).toBeDefined();
-    // System flag should be overridden to false
-    expect(upsertMemory.system).toBe(false);
+    // System flag should be preserved as true
+    expect(upsertMemory.system).toBe(true);
   });
 });

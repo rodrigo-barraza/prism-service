@@ -1,5 +1,12 @@
 import logger from "../../utils/logger.ts";
 
+interface ToolContext {
+  agentSessionId?: string;
+  project?: string;
+  _emit?: (event: Record<string, unknown>) => void;
+  [key: string]: unknown;
+}
+
 // ── Skill Tools ────────────────────────────────────────────
 // CRUD operations for reusable workflow skills.
 // Delegates to SkillService for MongoDB persistence.
@@ -57,7 +64,7 @@ const skillCreate = {
   },
   domain: "Agentic: Skills",
   labels: ["coding", "automation"],
-  async execute(args: any) {
+  async execute(args: Record<string, unknown>) {
     const { default: SkillService } = await import("../SkillService.js");
     return SkillService.create(args);
   },
@@ -89,11 +96,11 @@ const skillExecute = {
   },
   domain: "Agentic: Skills",
   labels: ["coding", "automation"],
-  async execute(args: any, context: any) {
+  async execute(args: Record<string, unknown>, context: ToolContext) {
     const { default: SkillService } = await import("../SkillService.js");
     const prepared = await SkillService.prepare(
-            (args.skillId as any),
-      (args.variables || {} as any),
+      args.skillId as Record<string, unknown>,
+      (args.variables || {}) as Record<string, unknown>,
     );
     if (prepared.error) return prepared;
 
@@ -111,8 +118,7 @@ const skillExecute = {
           {
             description: `Skill: ${prepared.name}`,
             prompt: prepared.prompt,
-                        // @ts-ignore - TODO: strict typing
-                        model: prepared.config.model || undefined,
+            model: (prepared.config as Record<string, unknown>)?.model as string || undefined,
           },
         ],
       },
@@ -140,9 +146,9 @@ const skillList = {
   },
   domain: "Agentic: Skills",
   labels: ["coding", "automation"],
-  async execute(args: any, context: any) {
+  async execute(args: Record<string, unknown>, context: ToolContext) {
     const { default: SkillService } = await import("../SkillService.js");
-        return SkillService.list({ project: args.project || context.project });
+    return SkillService.list({ project: (args.project as string) || context.project });
   },
 };
 
@@ -161,9 +167,9 @@ const skillDelete = {
   },
   domain: "Agentic: Skills",
   labels: ["coding", "automation"],
-  async execute(args: any) {
+  async execute(args: Record<string, unknown>) {
     const { default: SkillService } = await import("../SkillService.js");
-        return SkillService.delete((args.skillId as any));
+    return SkillService.delete(args.skillId as Record<string, unknown>);
   },
 };
 
