@@ -9,11 +9,11 @@ import {} from "../utils/utilities.ts";
 import { initSseResponse } from "../utils/SseUtilities.ts";
 const router = express.Router();
 /** Resolve instance ID from request — supports ?instance=lm-studio-2 */
-function resolveInstanceId(req: Record<string, unknown>) {
-    const id = (req as any).query.instance || (req.body as any)?.instance || "lm-studio";
+function resolveInstanceId(req: Request) {
+    const id = (req.query.instance as string) || (req.body as Record<string, unknown>)?.instance || "lm-studio";
   // Validate it's actually a registered instance
-  if (!isInstance(id)) return "lm-studio";
-  return id;
+  if (!isInstance(id as string)) return "lm-studio";
+  return id as string;
 }
 /**
  * GET /lm-studio/models
@@ -23,7 +23,7 @@ router.get(
   "/models",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            const instanceId = resolveInstanceId((req as any));
+      const instanceId = resolveInstanceId(req);
       const provider = getProvider(instanceId);
       const data = await provider.listModels();
       res.json(data);
@@ -54,7 +54,7 @@ router.post(
           .status(400)
           .json({ error: "Missing 'model' in request body" });
       }
-            const instanceId = resolveInstanceId((req as any));
+      const instanceId = resolveInstanceId(req);
       const provider = getProvider(instanceId);
       // Build load options from request body
       const loadOptions: Record<string, unknown> = {};
@@ -121,7 +121,7 @@ router.post(
       aborted = true;
     });
     try {
-            const instanceId = resolveInstanceId((req as any));
+      const instanceId = resolveInstanceId(req);
       const provider = getProvider(instanceId);
       send({ type: "start", model });
       // Build load options
@@ -196,8 +196,8 @@ router.post(
       await loadPromise;
       if (aborted) return res.end();
       if (loadError) {
-                logger.error(`[load-stream] loadModel failed: ${(loadError as any).message}`);
-                send({ type: "error", message: (loadError as any).message });
+        logger.error(`[load-stream] loadModel failed: ${(loadError as Error).message}`);
+        send({ type: "error", message: (loadError as Error).message });
       } else {
         send({ type: "progress", progress: 1 });
         send({ type: "complete" });
@@ -226,7 +226,7 @@ router.post(
           error: "Missing 'instance_id' in request body",
         });
       }
-            const instanceId = resolveInstanceId((req as any));
+      const instanceId = resolveInstanceId(req);
       const provider = getProvider(instanceId);
       const data = await provider.unloadModel(instance_id);
       res.json(data);
@@ -260,7 +260,7 @@ router.post(
       // Delegate to gateway — it handles the full fetch → estimate pipeline.
       // Fall back to direct gguf-arch if we need raw model data (e.g. for
       // custom gpuLayers values from the slider).
-            const instanceId = resolveInstanceId((req as any));
+      const instanceId = resolveInstanceId(req);
       const provider = getProvider(instanceId);
       const result = await provider.listModels();
       const allModels = result?.data || result?.models || [];

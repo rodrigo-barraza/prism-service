@@ -57,22 +57,22 @@ router.post(
       }
 
       // Build content for provider — text-only vs multimodal
-      let content: string | any[];
+      let content: string | Record<string, unknown>[];
       const isMultimodal =
         (images && images.length > 0) || audio || video || pdf;
 
       if (!isMultimodal && text) {
         content = text;
       } else {
-        const parts: any[] = [];
+        const parts: Record<string, unknown>[] = [];
 
         if (text) {
           parts.push({ text });
         }
 
-        const parseDataUrl = (data: any, fallbackMime: any) => {
-                    if (typeof data === "string" && (data as any).includes(";base64,")) {
-                        const segments = (data as any).split(";base64,");
+        const parseDataUrl = (data: string, fallbackMime: string) => {
+          if (typeof data === "string" && data.includes(";base64,")) {
+            const segments = data.split(";base64,");
             return {
               data: segments[1],
               mimeType: segments[0].replace("data:", ""),
@@ -83,23 +83,23 @@ router.post(
 
         if (images && images.length > 0) {
                     for ( const image of images) {
-                        const { data, mimeType } = parseDataUrl(image, ("image/jpeg" as any));
+            const { data, mimeType } = parseDataUrl(image, "image/jpeg");
             parts.push({ inlineData: { data, mimeType } });
           }
         }
 
         if (audio) {
-                    const { data, mimeType } = parseDataUrl(audio, ("audio/mpeg" as any));
+          const { data, mimeType } = parseDataUrl(audio, "audio/mpeg");
           parts.push({ inlineData: { data, mimeType } });
         }
 
         if (video) {
-                    const { data, mimeType } = parseDataUrl(video, ("video/mp4" as any));
+          const { data, mimeType } = parseDataUrl(video, "video/mp4");
           parts.push({ inlineData: { data, mimeType } });
         }
 
         if (pdf) {
-                    const { data, mimeType } = parseDataUrl(pdf, ("application/pdf" as any));
+          const { data, mimeType } = parseDataUrl(pdf, "application/pdf");
           parts.push({ inlineData: { data, mimeType } });
         }
 

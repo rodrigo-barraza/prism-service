@@ -74,7 +74,7 @@ async function extractWorkflowFiles(
     ) {
       updated.content = await uploadIfDataUrl(
         updated.content,
-                ("uploads" as any),
+        "uploads",
         project,
         username,
       );
@@ -91,12 +91,12 @@ async function extractWorkflowFiles(
             const array: string[] = [];
                         for ( const item of value) {
               array.push(
-                                (await uploadIfDataUrl(item, ("uploads" as any), project, username) as any),
+                (await uploadIfDataUrl(item, "uploads", project, username) as string),
               );
             }
             (m as Record<string, unknown>)[field] = array;
           } else if (typeof value === "string" && value.startsWith("data:")) {
-                        (m as Record<string, unknown>)[field] = await uploadIfDataUrl((value as string), ("uploads" as any), project, username);
+            (m as Record<string, unknown>)[field] = await uploadIfDataUrl(value as string, "uploads", project, username);
           }
         }
         newMessages.push(m);
@@ -111,9 +111,9 @@ async function extractWorkflowFiles(
     ) {
       const newReceived: Record<string, unknown> = {};
             for ( const [mod, data] of Object.entries(updated.receivedOutputs)) {
-                newReceived[mod] = await uploadIfDataUrl(
-                    (data as any),
-          ("uploads" as any),
+        newReceived[mod] = await uploadIfDataUrl(
+          data,
+          "uploads",
           project,
           username,
         );
@@ -161,14 +161,14 @@ async function extractNodeResultFiles(
               const array: string[] = [];
                             for ( const item of value) {
                 array.push(
-                                    (await uploadIfDataUrl(item, ("uploads" as any), project, username) as any),
+                    (await uploadIfDataUrl(item, "uploads", project, username) as string),
                 );
               }
               (m as Record<string, unknown>)[field] = array;
             } else if (typeof value === "string" && value.startsWith("data:")) {
               (m as Record<string, unknown>)[field] = await uploadIfDataUrl(
                                 (value as string),
-                ("uploads" as any),
+                "uploads",
                 project,
                 username,
               );
@@ -180,7 +180,7 @@ async function extractNodeResultFiles(
       } else {
                 newOutputs[mod] = await uploadIfDataUrl(
           data,
-                    ("uploads" as any),
+          "uploads",
           project,
           username,
         );
@@ -195,7 +195,7 @@ async function extractNodeResultFiles(
  * Convert a minio:// ref to an HTTP /files/ URL.
  * Non-minio strings (data URLs, http URLs, etc.) pass through unchanged.
  */
-function resolveMinioRef(value: unknown, baseUrl: any) {
+function resolveMinioRef(value: unknown, baseUrl: string) {
     if (typeof value === "string" && (value as string).startsWith("minio://")) {
         const key = (value as string).replace("minio://", "");
     // Use direct MinIO URL when available, otherwise proxy through Prism
@@ -225,7 +225,7 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: str
                     for ( const field of MEDIA_FIELDS) {
             const value = (message as Record<string, unknown>)[field];
             if (Array.isArray(value)) {
-              (message as Record<string, unknown>)[field] = value.map((item: any) =>
+              (message as Record<string, unknown>)[field] = value.map((item: unknown) =>
                 resolveMinioRef(item, baseUrl),
               );
             } else if (typeof value === "string") {
@@ -238,7 +238,7 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: str
       // Viewer receivedOutputs
       if ((node as Record<string, unknown>).receivedOutputs && typeof (node as Record<string, unknown>).receivedOutputs === "object") {
                 for ( const [mod, data] of Object.entries((node as Record<string, unknown>).receivedOutputs as Record<string, unknown>)) {
-                    ((node as Record<string, unknown>).receivedOutputs as Record<string, unknown>)[mod] = resolveMinioRef((data as any), baseUrl);
+            ((node as Record<string, unknown>).receivedOutputs as Record<string, unknown>)[mod] = resolveMinioRef(data, baseUrl);
         }
       }
     }
@@ -246,7 +246,7 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: str
 
   // Resolve nodeResults: { [nodeId]: { [modality]: value | messagesArray } }
   if (workflow.nodeResults && typeof workflow.nodeResults === "object") {
-        for ( const outputs of Object.values(workflow.nodeResults) as any[]) {
+    for ( const outputs of Object.values(workflow.nodeResults) as Record<string, unknown>[]) {
       if (!outputs || typeof outputs !== "object") continue;
             for ( const [mod, data] of Object.entries(outputs)) {
         // conversation modality is an array of message objects with nested media
@@ -255,7 +255,7 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: str
                         for ( const field of MEDIA_FIELDS) {
               const value = (message as Record<string, unknown>)[field];
               if (Array.isArray(value)) {
-                (message as Record<string, unknown>)[field] = value.map((item: any) =>
+                (message as Record<string, unknown>)[field] = value.map((item: unknown) =>
                   resolveMinioRef(item, baseUrl),
                 );
               } else if (typeof value === "string") {
@@ -264,7 +264,7 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: str
             }
           }
         } else {
-                    (outputs as Record<string, unknown>)[mod] = resolveMinioRef((data as any), baseUrl);
+            (outputs as Record<string, unknown>)[mod] = resolveMinioRef(data, baseUrl);
         }
       }
     }
@@ -353,7 +353,7 @@ router.get(
       if (!workflow)
         return res.status(404).json({ error: "Workflow not found" });
 
-            const baseUrl = getBaseUrl((req as any));
+      const baseUrl = getBaseUrl(req);
             resolveWorkflowFileRefs(workflow, baseUrl);
 
       res.json(workflow);
@@ -534,6 +534,7 @@ router.patch(
       }
 
       const result = await db.collection(WORKFLOWS_COL).updateOne(filter, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MongoDB PushOperator typing is overly strict for dynamic schemas
         $push: { conversationIds: { $each: conversationIds } } as any,
         $set: { updatedAt: new Date().toISOString() },
       });

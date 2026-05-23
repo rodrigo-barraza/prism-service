@@ -69,18 +69,18 @@ router.put(
       }
 
       // Get the old doc to unregister the old agentId if name changed
-            const oldDoc = await CustomAgentService.get((id as any));
+      const oldDoc = await CustomAgentService.get(String(id));
       if (!oldDoc) {
         return res.status(404).json({ error: "Agent not found" });
       }
 
-            const updated = await CustomAgentService.update((id as any), updates);
+      const updated = await CustomAgentService.update(String(id), updates);
 
       // Unregister old ID if it changed, then register new
       if (updated && oldDoc.agentId !== updated.agentId!) {
         AgentPersonaRegistry.unregister(oldDoc.agentId);
       }
-            AgentPersonaRegistry.registerCustom((updated as any));
+      AgentPersonaRegistry.registerCustom(updated as Record<string, unknown>);
 
       res.json(updated);
     } catch (error: unknown) {
@@ -101,12 +101,12 @@ router.delete(
       const { id } = req.params;
 
       // Get the doc first so we know the agentId to unregister
-            const document = await CustomAgentService.get((id as any));
+      const document = await CustomAgentService.get(String(id));
       if (!document) {
         return res.status(404).json({ error: "Agent not found" });
       }
 
-            await CustomAgentService.delete((id as any));
+      await CustomAgentService.delete(String(id));
       AgentPersonaRegistry.unregister(document.agentId);
 
       res.json({ success: true });

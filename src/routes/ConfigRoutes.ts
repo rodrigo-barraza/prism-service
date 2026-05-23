@@ -87,7 +87,7 @@ function resolveEnabledToolsToSet(enabledTools: string[] | undefined) {
   return resolved;
 }
 
-/** Keep only available provider keys in a models map. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- polymorphic model maps from multiple sources
 function filterByAvailableProviders(modelsMap: Record<string, any[]>) {
   const filtered: Record<string, any[]> = {};
   for (const [provider, models] of Object.entries(modelsMap)) {
@@ -166,6 +166,7 @@ function lookupArenaScores(modelName: string) {
  * Enrich all models in a provider map with arena scores from ARENA_SCORES.
  * Merges with any existing arena data on the model (existing takes priority).
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mutates heterogeneous model objects from different providers
 function enrichModelsWithArenaScores(modelsMap: Record<string, any[]>) {
   for (const provider of Object.keys(modelsMap)) {
     for (const model of modelsMap[provider]) {
@@ -226,7 +227,7 @@ router.get(
     // Build the dynamic Tool Calling system prompt
     const schemas = ToolOrchestratorService.getToolSchemas() || [];
     const toolNames = schemas
-      .map((s: any) => s.name || s.function?.name)
+      .map((s: Record<string, unknown>) => (s.name as string) || (s.function as Record<string, unknown>)?.name)
       .filter((name): name is string => typeof name === "string")
       .map((name: string) => {
         return name.replace(/^get_/, "").replace(/_/g, " ");
@@ -341,7 +342,7 @@ router.get("/agents", (_req: Request, res: Response) => {
 
     if (!isWildcard && a.id !== "LUPOS") {
       const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
-      const systemToolNames = clientSchemas.filter((t: any) => t.system === true).map((t: any) => t.name);
+      const systemToolNames = clientSchemas.filter((t) => t.system === true).map((t) => t.name);
 
       const unionSet = new Set([...finalToolNames, ...systemToolNames]);
       finalToolsCount = unionSet.size;
@@ -382,11 +383,11 @@ router.get("/tools", (_req: Request, res: Response) => {
       // null = wildcard ("*") → return all schemas unfiltered
       if (enabledSet !== null) {
         if (agentId !== "LUPOS") {
-          return res.json(schemas.filter((t: any) => enabledSet.has(t.name) || t.system === true));
+          return res.json(schemas.filter((t) => enabledSet.has(t.name) || t.system === true));
         } else {
           // Lupos is restricted. Dynamically override system: false so they appear configurable in UI
-          const filtered = schemas.filter((t: any) => enabledSet.has(t.name));
-          const cleaned = filtered.map((t: any) => ({ ...t, system: false }));
+          const filtered = schemas.filter((t) => enabledSet.has(t.name));
+          const cleaned = filtered.map((t) => ({ ...t, system: false }));
           return res.json(cleaned);
         }
       }

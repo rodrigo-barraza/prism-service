@@ -21,11 +21,11 @@ interface VramBenchmarkDocument {
   bitsPerWeight?: number;
   fileSizeGB?: number;
   fileSizeBytes?: number;
-  archParams?: any;
+  archParams?: Record<string, unknown>;
   modality?: string;
   settings?: {
     label?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   baselineVramMiB?: number;
   loadedVramMiB?: number;
@@ -34,22 +34,22 @@ interface VramBenchmarkDocument {
   estimatedGiB?: number;
   deltaGiB?: number;
   fitsInVram?: boolean;
-  generation?: any;
+  generation?: Record<string, unknown>;
   tokensPerSecond?: number;
   loadTimeMs?: number;
-  gpu?: any;
+  gpu?: Record<string, unknown>;
   ttft?: number;
-  cpuRam?: any;
-  vramDuringGen?: any;
+  cpuRam?: Record<string, unknown>;
+  vramDuringGen?: Record<string, unknown>;
   gpuBandwidth?: number;
   hysteresis?: number;
   system?: {
     hostname?: string;
-    os?: any;
-    gpu?: any;
-    cpu?: any;
-    ram?: any;
-    motherboard?: any;
+    os?: Record<string, unknown>;
+    gpu?: Record<string, unknown>;
+    cpu?: Record<string, unknown>;
+    ram?: Record<string, unknown>;
+    motherboard?: Record<string, unknown>;
   };
   createdAt: Date | string;
   error?: string | null;

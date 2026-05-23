@@ -122,15 +122,15 @@ router.post(
       ...req.body,
       functionCallingEnabled: true,
       agenticLoopEnabled: true,
-      project: (req as any).project,
-      username: (req as any).username,
-      clientIp: (req as any).clientIp,
-      agent: req.body.agent || (req as any).agent || null,
+      project: req.project,
+      username: req.username,
+      clientIp: req.clientIp,
+      agent: req.body.agent || req.agent || null,
       // Multi-workspace: override the default workspace root when the user has
       // selected a non-default workspace in the Prism Client sidebar. Sources:
       //   1. x-workspace-root header (set by Prism Client's serviceHeaders.js)
       //   2. body.workspaceRoot (for server-to-server / API callers)
-      workspaceRoot: (req as any).workspaceRoot || req.body.workspaceRoot || null,
+      workspaceRoot: req.workspaceRoot || req.body.workspaceRoot || null,
     };
 
     if (req.query.stream !== "false") {

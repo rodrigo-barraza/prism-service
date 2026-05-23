@@ -99,11 +99,11 @@ router.post(
         ...req.body,
         functionCallingEnabled: true,
         agenticLoopEnabled: true,
-        project: (req as any).project,
-        username: (req as any).username,
-        clientIp: (req as any).clientIp,
-        agent: req.body.agent || (req as any).agent || null,
-        workspaceRoot: (req as any).workspaceRoot || req.body.workspaceRoot || null,
+        project: req.project,
+        username: req.username,
+        clientIp: req.clientIp,
+        agent: req.body.agent || req.agent || null,
+        workspaceRoot: req.workspaceRoot || req.body.workspaceRoot || null,
       };
 
       if (req.query.stream !== "false") {

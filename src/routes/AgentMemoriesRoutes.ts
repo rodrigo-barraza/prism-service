@@ -61,8 +61,8 @@ router.get(
     try {
       const project = req.project;
       const agent = req.query.agent || null;
-            const limit = parseInt((req.query.limit as any)) || 100;
-            const skip = parseInt((req.query.skip as any)) || 0;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const skip = parseInt(req.query.skip as string) || 0;
 
       const result = await MemoryService.list({ agent: agent as string, project: project as string, limit: Number(limit), skip: Number(skip) });
       res.json(result);
@@ -81,7 +81,7 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            const deleted = await MemoryService.remove((req.params.id as any));
+      const deleted = await MemoryService.remove(String(req.params.id));
       if (!deleted) {
         return res.status(404).json({ error: "Memory not found" });
       }
@@ -120,11 +120,11 @@ router.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const project = req.project;
-            const limit = parseInt((req.query.limit as any)) || 10;
+      const limit = parseInt(req.query.limit as string) || 10;
 
       const history = await MemoryConsolidationService.getHistory(
-                (project as any),
-        (limit as any),
+        project as string,
+        limit,
       );
       res.json({ history });
     } catch (error: unknown) {

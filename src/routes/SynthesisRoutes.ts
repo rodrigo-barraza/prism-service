@@ -20,8 +20,8 @@ interface SynthesisDocument {
   userPersona: string;
   category: string;
   targetTurns: number;
-  seedMessages: any[];
-  settings: Record<string, any>;
+  seedMessages: Record<string, unknown>[];
+  settings: Record<string, unknown>;
   conversationId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -159,7 +159,7 @@ router.patch(
         return res.status(400).json({ error: parsed.error.format() });
       }
 
-      const setFields: Record<string, any> = {
+      const setFields: Record<string, unknown> = {
         ...parsed.data,
         updatedAt: new Date().toISOString(),
       };

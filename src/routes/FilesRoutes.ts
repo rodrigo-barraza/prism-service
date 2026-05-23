@@ -20,7 +20,7 @@ router.post(
         return res.status(400).json({ error: "Missing required field: data" });
       }
 
-      const result = await (FileService as any).uploadFile(data);
+      const result = await FileService.uploadFile(data);
       res.json(result);
     } catch (error: unknown) {
             logger.error(`File upload error: ${(error as Error).message}`);
@@ -45,14 +45,14 @@ router.get(
         return res.status(400).json({ error: "Missing file key" });
       }
 
-      const result = await (FileService as any).getFile(key);
+      const result = await FileService.getFile(key);
       if (!result) {
         return res.status(404).json({ error: "File not found" });
       }
 
       res.setHeader("Content-Type", result.contentType);
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-            (result as any).stream.pipe(res);
+      result.stream.pipe(res);
     } catch (error: unknown) {
             logger.error(`File retrieval error: ${(error as Error).message}`);
       next(error);

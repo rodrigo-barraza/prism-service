@@ -1,6 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
-import { ObjectId } from "mongodb";
+import { ObjectId, type Document } from "mongodb";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import ConversationService, {
   buildConversationPatchFields,
@@ -67,8 +67,8 @@ router.get(
         filter.updatedAt = { $lt: cursor };
       }
 
-      let modelConversations: any[] = [];
-      let agentConversations: any[] = [];
+      let modelConversations: Document[] = [];
+      let agentConversations: Document[] = [];
 
       const fetchModelConversations = () =>
         db
@@ -99,9 +99,9 @@ router.get(
           agentFilter.agent = agent;
         }
         return db
-          .collection<any>(COLLECTIONS.AGENT_CONVERSATIONS)
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .find(agentFilter)
-          .project<any>({
+          .project({
             id: 1,
             project: 1,
             username: 1,
@@ -138,14 +138,15 @@ router.get(
       const merged = [
         ...modelConversations.map((conversation) => ({ ...conversation, type: "direct" as const })),
         ...agentConversations.map((session) => ({ ...session, type: "agent" as const })),
-      ].sort(
+      ] as (Document & { type: string })[];
+      merged.sort(
         (firstConversation, secondConversation) =>
-          new Date(secondConversation.updatedAt).getTime() - new Date(firstConversation.updatedAt).getTime()
+          new Date(secondConversation.updatedAt as string).getTime() - new Date(firstConversation.updatedAt as string).getTime()
       );
 
       const hasMore = merged.length > limit;
       const items = hasMore ? merged.slice(0, limit) : merged;
-      const nextCursor = hasMore ? items[items.length - 1].updatedAt : null;
+      const nextCursor = hasMore ? (items[items.length - 1].updatedAt as string) : null;
 
       res.json({ items, nextCursor, hasMore });
     } catch (error: unknown) {
@@ -179,12 +180,12 @@ router.get(
       }
 
       // Check agent sessions next
-      chat = await db
-        .collection<any>(COLLECTIONS.AGENT_CONVERSATIONS)
+      const agentChat = await db
+        .collection(COLLECTIONS.AGENT_CONVERSATIONS)
         .findOne({ id: conversationId, project, username });
 
-      if (chat) {
-        return res.json({ ...chat, type: "agent" });
+      if (agentChat) {
+        return res.json({ ...agentChat, type: "agent" });
       }
 
       res.status(404).json({ error: "Conversation not found" });
@@ -314,7 +315,7 @@ router.patch(
 
       // Try updating agent sessions next
       result = await db
-        .collection<any>(COLLECTIONS.AGENT_CONVERSATIONS)
+        .collection(COLLECTIONS.AGENT_CONVERSATIONS)
         .updateOne(
           { id: conversationId, project, username },
           { $set: setFields }
@@ -322,7 +323,7 @@ router.patch(
 
       if (result.matchedCount > 0) {
         const session = await db
-          .collection<any>(COLLECTIONS.AGENT_CONVERSATIONS)
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .findOne({ id: conversationId, project, username });
         return res.json({ ...session, type: "agent" });
       }

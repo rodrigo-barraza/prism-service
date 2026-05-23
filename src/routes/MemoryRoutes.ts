@@ -119,7 +119,7 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-            const deleted = await MemoryService.delete((req.params.id as any));
+      const deleted = await MemoryService.delete(String(req.params.id));
       res.json({ deleted });
     } catch (error: unknown) {
             logger.error(`[memory/delete] ${(error as Error).message}`);
