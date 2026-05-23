@@ -372,7 +372,44 @@ setupWebSocket(wss);
     const codingProject =
             AgentPersonaRegistryMCP.get("CODING")?.project || "coding";
     if (mcpDb) {
-            await MCPClientService.connectAllFromDB(mcpDb, codingProject, "admin");
+      // Seed default MCP servers from environment variable if provided
+      if (process.env.DEFAULT_MCP_SERVERS) {
+        try {
+          const defaults = JSON.parse(process.env.DEFAULT_MCP_SERVERS);
+          if (Array.isArray(defaults)) {
+            for (const serverConfig of defaults) {
+              const { name, displayName, transport, url, command, args, env, headers, enabled } = serverConfig;
+              if (!name || !transport) continue;
+
+              await mcpDb.collection("mcp_servers").updateOne(
+                { project: codingProject, username: "admin", name },
+                {
+                  $setOnInsert: {
+                    createdAt: new Date(),
+                  },
+                  $set: {
+                    displayName: displayName || name,
+                    transport,
+                    url: url || "",
+                    command: command || "",
+                    args: args || [],
+                    env: env || {},
+                    headers: headers || {},
+                    enabled: enabled !== false,
+                    updatedAt: new Date(),
+                  }
+                },
+                { upsert: true }
+              );
+            }
+            logger.info(`Seeded ${defaults.length} default MCP server(s) from environment`);
+          }
+        } catch (seedErr: any) {
+          logger.warn(`Failed to parse/seed DEFAULT_MCP_SERVERS: ${seedErr.message}`);
+        }
+      }
+
+      await MCPClientService.connectAllFromDB(mcpDb, codingProject, "admin");
     }
   } catch (error: unknown) {
         logger.warn(`MCP auto-connect failed: ${(error as Error).message}`);
