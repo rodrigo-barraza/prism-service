@@ -1344,6 +1344,8 @@ router.get(
         to,
         sort = "updatedAt",
         order = "desc",
+        agent,
+        type,
       } = req.query;
 
       const filter: Record<string, any> = {};
@@ -1383,52 +1385,106 @@ router.get(
       const lim = parseInt(limit as string, 10);
       const sortDir = order === "asc" ? 1 : -1;
 
-      // 1. Fetch matching documents from both collections in parallel
-      const [convs, sessions] = await Promise.all([
-        db
-          .collection(CONVERSATIONS_COL)
-          .find(filter)
-          .project({
-            id: 1,
-            project: 1,
-            username: 1,
-            title: 1,
-            createdAt: 1,
-            updatedAt: 1,
-            modalities: 1,
-            providers: 1,
-            messageCount: { $size: { $ifNull: ["$messages", []] } },
-            totalCost: { $ifNull: ["$totalCost", 0] },
-          })
-          .sort({ [sort as string]: sortDir })
-          .limit(skip + lim)
-          .toArray(),
-        db
-          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .find(filter)
-          .project({
-            id: 1,
-            project: 1,
-            username: 1,
-            title: 1,
-            createdAt: 1,
-            updatedAt: 1,
-            modalities: 1,
-            providers: 1,
-            messageCount: { $size: { $ifNull: ["$messages", []] } },
-            totalCost: { $ifNull: ["$totalCost", 0] },
-            agent: 1,
-          })
-          .sort({ [sort as string]: sortDir })
-          .limit(skip + lim)
-          .toArray(),
-      ]);
+      // Determine which collections to fetch based on agent and type filters
+      const isDirectOnly = type === "direct" || agent === "NONE";
+      const isAgentOnly = agent && agent !== "NONE" && agent !== "ALL";
+
+      const shouldFetchConvs = !isAgentOnly;
+      const shouldFetchSessions = !isDirectOnly;
+
+      const agentFilter = { ...filter };
+      if (isAgentOnly) {
+        agentFilter.agent = agent;
+      }
+
+      let convs: any[] = [];
+      let sessions: any[] = [];
+
+      const queryPromises: Promise<any>[] = [];
+
+      if (shouldFetchConvs) {
+        queryPromises.push(
+          db
+            .collection(CONVERSATIONS_COL)
+            .find(filter)
+            .project({
+              id: 1,
+              project: 1,
+              username: 1,
+              title: 1,
+              createdAt: 1,
+              updatedAt: 1,
+              modalities: 1,
+              providers: 1,
+              messageCount: { $size: { $ifNull: ["$messages", []] } },
+              totalCost: { $ifNull: ["$totalCost", 0] },
+            })
+            .sort({ [sort as string]: sortDir })
+            .limit(skip + lim)
+            .toArray()
+            .then((res) => {
+              convs = res;
+            })
+        );
+      }
+
+      if (shouldFetchSessions) {
+        queryPromises.push(
+          db
+            .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+            .find(agentFilter)
+            .project({
+              id: 1,
+              project: 1,
+              username: 1,
+              title: 1,
+              createdAt: 1,
+              updatedAt: 1,
+              modalities: 1,
+              providers: 1,
+              messageCount: { $size: { $ifNull: ["$messages", []] } },
+              totalCost: { $ifNull: ["$totalCost", 0] },
+              agent: 1,
+            })
+            .sort({ [sort as string]: sortDir })
+            .limit(skip + lim)
+            .toArray()
+            .then((res) => {
+              sessions = res;
+            })
+        );
+      }
+
+      await Promise.all(queryPromises);
 
       // 2. Count totals for both collections
-      const [totalConvs, totalSessions] = await Promise.all([
-        db.collection(CONVERSATIONS_COL).countDocuments(filter),
-        db.collection(COLLECTIONS.AGENT_CONVERSATIONS).countDocuments(filter),
-      ]);
+      let totalConvs = 0;
+      let totalSessions = 0;
+      const countPromises: Promise<any>[] = [];
+
+      if (shouldFetchConvs) {
+        countPromises.push(
+          db
+            .collection(CONVERSATIONS_COL)
+            .countDocuments(filter)
+            .then((res) => {
+              totalConvs = res;
+            })
+        );
+      }
+
+      if (shouldFetchSessions) {
+        countPromises.push(
+          db
+            .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+            .countDocuments(agentFilter)
+            .then((res) => {
+              totalSessions = res;
+            })
+        );
+      }
+
+      await Promise.all(countPromises);
 
       // 3. Merge and sort
       const merged = [

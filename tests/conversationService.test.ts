@@ -303,7 +303,7 @@ describe("ConversationService.appendMessages", () => {
       );
 
       expect(result.messages).toHaveLength(2);
-      expect(result.title).toBe("New Conversation");
+      expect(result.title).toBe("Hello");
     });
 
     it("should update title from conversationMeta", async () => {

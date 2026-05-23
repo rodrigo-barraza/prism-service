@@ -400,11 +400,26 @@ const ConversationService: ConversationServiceInterface = {
     }
 
     // 3. Recompute derived fields and persist
-    const derived = {
+    const derived: Record<string, any> = {
       modalities: computeModalities(conversation.messages as ChatMessage[]),
       providers: extractProviders(conversation.messages as ChatMessage[], conversation.settings as ConversationSettings),
       totalCost: computeTotalCost(conversation.messages as ChatMessage[]),
     };
+
+    // Auto-derive a descriptive title from the first user message if the current title is missing or is 'New Conversation'
+    if (!conversation.title || conversation.title === "New Conversation") {
+      const firstUserMsg = (conversation.messages as ChatMessage[])?.find(
+        (m) => m.role === "user"
+      );
+      if (firstUserMsg?.content) {
+        const titleSnippet = firstUserMsg.content.slice(0, 100).trim();
+        if (titleSnippet) {
+          derived.title = titleSnippet;
+          conversation.title = titleSnippet; // Update local memory representation
+        }
+      }
+    }
+
     await col.updateOne(
       { id: conversationId, project, username },
       { $set: derived },
