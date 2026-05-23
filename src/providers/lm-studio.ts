@@ -675,7 +675,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         // This lets the model analyze video content as a sequence of frames,
         // which is the standard approach for Gemma 4 and other VLMs.
         const hasVideo = messages.some((m: ChatMessage) => {
-          const msg = m as Record<string, any>;
+          const msg = m as unknown as Record<string, unknown>;
           return "video" in msg && Array.isArray(msg.video) && msg.video.length > 0;
         });
         if (hasVideo) {
@@ -878,13 +878,13 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           logger.warn(
             `[LM-Studio] OpenAI-compat: tool count (${tools.length}) exceeds safe limit for ctx=${contextLength}. Capping at ${maxTools}.`,
           );
-          (payload as Record<string, any>).tools = tools.slice(0, maxTools);
+          (payload as Record<string, unknown>).tools = tools.slice(0, maxTools);
         } else {
-          (payload as Record<string, any>).tools = tools;
+          (payload as Record<string, unknown>).tools = tools;
         }
       }
       logger.info(
-        `[LM-Studio] OpenAI-compat streaming (agentic): model=${model}, tools=${((payload as Record<string, any>).tools as any[] | undefined)?.length || 0}/${options.tools?.length || 0}, ctx=${options._loadedContextLength || "unset"}`,
+        `[LM-Studio] OpenAI-compat streaming (agentic): model=${model}, tools=${((payload as Record<string, unknown>).tools as unknown[] | undefined)?.length || 0}/${options.tools?.length || 0}, ctx=${options._loadedContextLength || "unset"}`,
       );
       yield { type: "status", message: "Starting…", phase: "starting" };
       const response = await fetch(`${baseUrl}/v1/chat/completions`, {

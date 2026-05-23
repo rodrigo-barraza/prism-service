@@ -16,11 +16,11 @@ const elevenlabsProvider = ({
   name: "elevenlabs",
 
   async generateSpeech(
-    text: any,
-        voiceId: any = DEFAULT_VOICES.elevenlabs,
+    text: string,
+    voiceId: string = DEFAULT_VOICES.elevenlabs,
     options: ProviderOptions = {},
   ) {
-        (logger.provider as any)(("ElevenLabs" as any), (`generateSpeech voiceId=${voiceId}` as any));
+    logger.provider("ElevenLabs", `generateSpeech voiceId=${voiceId}`);
     try {
       const apiKey = getApiKey();
       const response = await fetch(
@@ -59,11 +59,11 @@ const elevenlabsProvider = ({
     }
   },
   async *generateSpeechStream(
-    textStream: any,
-        voiceId: any = DEFAULT_VOICES.elevenlabs,
+    textStream: AsyncIterable<string>,
+    voiceId: string = DEFAULT_VOICES.elevenlabs,
     options: ProviderOptions = {},
   ) {
-        (logger.provider as any)(("ElevenLabs" as any), (`generateSpeechStream voiceId=${voiceId}` as any));
+    logger.provider("ElevenLabs", `generateSpeechStream voiceId=${voiceId}`);
     const apiKey = getApiKey();
     const modelId =
             options.modelId || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).elevenlabs;
@@ -74,9 +74,9 @@ const elevenlabsProvider = ({
     });
 
     // Wait for connection
-        await new Promise((resolve: any, reject: any) => {
-            ws.on("open", resolve);
-            ws.on("error", reject);
+    await new Promise<void>((resolve, reject) => {
+      ws.on("open", resolve);
+      ws.on("error", reject);
     });
 
     // Send initial config
@@ -92,13 +92,13 @@ const elevenlabsProvider = ({
     );
 
     // Message queue for yielding in order
-        const messageQueue: any[] = [];
-        let resolveMessage: any = null;
+    const messageQueue: { audio?: string; isFinal?: boolean }[] = [];
+    let resolveMessage: (() => void) | null = null;
     let ended = false;
     let error = null;
 
-    ws.on("message", (data: any) => {
-            const response = JSON.parse((data as any));
+    ws.on("message", (data: WebSocket.RawData) => {
+      const response = JSON.parse(data.toString());
       messageQueue.push(response);
             if (resolveMessage) {
         const resolve = resolveMessage;
@@ -112,7 +112,7 @@ const elevenlabsProvider = ({
             if (resolveMessage) resolveMessage();
     });
 
-    ws.on("error", (wsError: any) => {
+    ws.on("error", (wsError: Error) => {
       error = wsError;
             if (resolveMessage) resolveMessage();
     });
@@ -123,9 +123,9 @@ const elevenlabsProvider = ({
         let buffer = "";
                 for await ( const chunk of textStream) {
           buffer += chunk;
-          let match: any;
-                    while ((match = buffer.match(/([.!?]+)\s/))) {
-                        const cutIndex = match.index + (match as any)[0].length;
+          let match: RegExpMatchArray | null;
+          while ((match = buffer.match(/([.!?]+)\s/))) {
+            const cutIndex = match.index! + match[0].length;
             const sentence = buffer.slice(0, cutIndex);
             buffer = buffer.slice(cutIndex);
             if (ws.readyState === WebSocket.OPEN) {
@@ -160,7 +160,7 @@ const elevenlabsProvider = ({
     try {
       while (true) {
         if (messageQueue.length > 0) {
-                    const message = messageQueue.shift();
+          const message = messageQueue.shift()!;
                     if (message.audio) {
                         yield Buffer.from(message.audio, "base64");
           }
@@ -169,9 +169,9 @@ const elevenlabsProvider = ({
           }
         } else {
           if (error)
-                        throw new ProviderError("elevenlabs", (error as any).message, 500, error);
+            throw new ProviderError("elevenlabs", (error as Error).message, 500, error);
           if (ended) break;
-                    await new Promise(((r: any) => (resolveMessage = r) as any as (resolve: (value: any) => void, reject: (reason?: any) => void) => void));
+          await new Promise<void>((r) => { resolveMessage = r; });
         }
       }
     } finally {
@@ -180,6 +180,6 @@ const elevenlabsProvider = ({
       }
     }
   },
-} as any);
+});
 
 export default elevenlabsProvider;

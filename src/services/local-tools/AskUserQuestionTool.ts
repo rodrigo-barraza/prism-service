@@ -86,15 +86,42 @@ export default {
   domain: "Agentic: Control Flow",
   labels: ["coding"],
 
-  async execute(args: any, context: any) {
+interface QuestionOption {
+  label: string;
+  preview: string | null;
+}
+
+interface NormalizedQuestion {
+  question: string;
+  header: string | null;
+  options: QuestionOption[];
+  multiSelect: boolean;
+}
+
+interface ToolContext {
+  agentSessionId?: string;
+  _emit?: (event: Record<string, unknown>) => void;
+}
+
+interface QuestionAnswer {
+  answer?: string;
+  [key: string]: unknown;
+}
+
+interface QuestionResult {
+  answers: QuestionAnswer[] | null;
+  timedOut?: boolean;
+}
+
+  async execute(args: Record<string, unknown>, context: ToolContext) {
     const { question, choices, context: questionContext, questions } = args;
 
     // ── Normalize into questions array ─────────────────
-    let normalizedQuestions: any;
+    let normalizedQuestions: NormalizedQuestion[];
     if (questions && Array.isArray(questions) && questions.length > 0) {
       // Multi-question mode — validate uniqueness
-      const seen = new Set();
-            for ( const q of questions) {
+      const seen = new Set<string>();
+      for ( const q of questions as Record<string, unknown>[]) {
         if (!q.question || typeof q.question !== "string") {
           return {
             error:
@@ -103,42 +130,43 @@ export default {
         }
         if (seen.has(q.question)) {
           return {
-            error: `Duplicate question text: "${q.question.slice(0, 60)}"`,
+            error: `Duplicate question text: "${(q.question as string).slice(0, 60)}"`,
           };
         }
         seen.add(q.question);
         // Validate option label uniqueness within each question
-        if (q.options?.length > 0) {
-          const labelsSeen = new Set();
-                    for ( const opt of q.options) {
-            if (labelsSeen.has(opt.label)) {
+        const qOptions = q.options as Record<string, unknown>[] | undefined;
+        if (qOptions && qOptions.length > 0) {
+          const labelsSeen = new Set<string>();
+          for ( const opt of qOptions) {
+            if (labelsSeen.has(opt.label as string)) {
               return {
-                error: `Duplicate option label "${opt.label}" in question "${q.question.slice(0, 40)}"`,
+                error: `Duplicate option label "${opt.label}" in question "${(q.question as string).slice(0, 40)}"`,
               };
             }
-            labelsSeen.add(opt.label);
+            labelsSeen.add(opt.label as string);
           }
         }
       }
       if (questions.length > 4) {
         return { error: "Maximum 4 questions per call" };
       }
-            normalizedQuestions = questions.map((q: any) => ({
-        question: q.question,
-                header: (q.header as any)?.slice(0, 16) || null,
-                options: ((q.options || []) as any).slice(0, 6).map((o: any) => ({
-          label: o.label,
-          preview: o.preview || null,
+      normalizedQuestions = (questions as Record<string, unknown>[]).map((q) => ({
+        question: q.question as string,
+        header: ((q.header as string) || "").slice(0, 16) || null,
+        options: ((q.options || []) as Record<string, unknown>[]).slice(0, 6).map((o) => ({
+          label: o.label as string,
+          preview: (o.preview as string) || null,
         })),
         multiSelect: !!q.multiSelect,
       }));
     } else if (question && typeof question === "string") {
       // Single question mode — backward-compatible
-            normalizedQuestions = [
+      normalizedQuestions = [
         {
           question,
           header: null,
-                    options: ((choices || []) as any).map((c: any) => ({
+          options: ((choices || []) as string[]).map((c) => ({
             label: c,
             preview: null,
           })),
@@ -159,46 +187,46 @@ export default {
       };
     }
 
-        const totalOptions = (normalizedQuestions as any).reduce(
-            (sum: any, q: any) => sum + (q as any).options.length,
+    const totalOptions = normalizedQuestions.reduce(
+      (sum, q) => sum + q.options.length,
       0,
     );
     logger.info(
       `[AskUserQuestion] ${normalizedQuestions.length} question(s), ` +
         `${totalOptions} total options — ` +
-                `"${(normalizedQuestions as any)[0].question.slice(0, 60)}${(normalizedQuestions as any)[0].question.length > 60 ? "..." : ""}"`,
+        `"${normalizedQuestions[0].question.slice(0, 60)}${normalizedQuestions[0].question.length > 60 ? "..." : ""}"`,
     );
 
     // Emit the SSE event with the full questions array
     if (context._emit) {
-            context._emit({
+      context._emit({
         type: "user_question",
         // Full multi-question payload
         questions: normalizedQuestions,
         // Backward-compat fields for simple consumers
-                question: (normalizedQuestions as any)[0].question,
-                choices: (normalizedQuestions as any)[0].options.map((o: any) => o.label),
+        question: normalizedQuestions[0].question,
+        choices: normalizedQuestions[0].options.map((o) => o.label),
         context: questionContext || null,
       });
     }
 
     const { default: AgenticLoopService } =
       await import("../AgenticLoopService.js");
-        const result = await new Promise((resolve: any) => {
+    const result = await new Promise<QuestionResult>((resolve) => {
       const timeoutId = setTimeout(
-                () => resolve({ answers: null, timedOut: true }),
+        () => resolve({ answers: null, timedOut: true }),
         300_000,
       );
-            AgenticLoopService._setPendingQuestion((sessionId as any), {
-        resolve: (value: any) => {
+      AgenticLoopService._setPendingQuestion(sessionId, {
+        resolve: (value: QuestionResult) => {
           clearTimeout(timeoutId);
-                    resolve(value);
+          resolve(value);
         },
         questions: normalizedQuestions,
       });
     });
 
-        if ((result as any).timedOut) {
+    if (result.timedOut) {
       logger.warn(`[AskUserQuestion] Timed out after 5 minutes`);
       return {
         answers: null,
@@ -207,18 +235,18 @@ export default {
       };
     }
 
-        logger.info(
-            `[AskUserQuestion] Answered: ${JSON.stringify((result as any).answers).slice(0, 200)}`,
+    logger.info(
+      `[AskUserQuestion] Answered: ${JSON.stringify(result.answers).slice(0, 200)}`,
     );
 
     // Return structured response
     return {
-            questions: (normalizedQuestions as any).map((q: any) => q.question),
-            answers: (result as any).answers,
+      questions: normalizedQuestions.map((q) => q.question),
+      answers: result.answers,
       // Backward-compat for simple single-question consumers
-            answer: Array.isArray((result as any).answers)
-                ? (result as any).answers[0]?.answer
-                : (result as any).answers,
+      answer: Array.isArray(result.answers)
+        ? result.answers[0]?.answer
+        : result.answers,
     };
   },
 };

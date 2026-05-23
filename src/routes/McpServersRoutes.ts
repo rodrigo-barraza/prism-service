@@ -153,7 +153,7 @@ router.put(
         return res.status(400).json({ error: parsed.error.format() });
       }
 
-      const updates: Record<string, any> = {
+      const updates: Record<string, unknown> = {
         ...parsed.data,
         updatedAt: new Date(),
       };

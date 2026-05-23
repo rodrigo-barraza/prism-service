@@ -46,7 +46,7 @@ const PROVIDER_ARRAYS = {
 
 const registry = new Map<string, InstanceEntry>();
 function registerType(type: string, instances: ProviderInstanceConfig[]) {
-    const factory = (FACTORIES as any)[type];
+  const factory = FACTORIES[type as keyof typeof FACTORIES];
   if (!factory) return;
 
   for (let i = 0; i < instances.length; i++) {
@@ -66,7 +66,7 @@ function registerType(type: string, instances: ProviderInstanceConfig[]) {
       instanceNumber,
       provider,
     };
-        if (nickname) (entry as any).nickname = nickname;
+    if (nickname) (entry as Record<string, unknown>).nickname = nickname;
 
     registry.set(id, entry);
 

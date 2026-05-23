@@ -19,8 +19,8 @@ function getApiKey() {
  * Each line is a JSON object with `result.audioContent` (base64) and
  * optionally `result.timestampInfo`.
  */
-async function* parseNdjsonStream(body: any) {
-    const reader = (body as any).getReader();
+async function* parseNdjsonStream(body: ReadableStream<Uint8Array>) {
+  const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
@@ -58,11 +58,11 @@ const inworldProvider = ({
    * Returns a Node Readable stream suitable for piping to an HTTP response.
    */
   async generateSpeech(
-    text: any,
-        voice: any = DEFAULT_VOICES.inworld,
+    text: string,
+    voice: string = DEFAULT_VOICES.inworld,
     options: ProviderOptions = {},
   ) {
-        (logger.provider as any)(("Inworld" as any), (`generateSpeech voice=${voice}` as any));
+    logger.provider("Inworld", `generateSpeech voice=${voice}`);
 
     try {
       const apiKey = getApiKey();
@@ -96,7 +96,7 @@ const inworldProvider = ({
 
       // Collect base64 audio chunks from the NDJSON stream into a Node Readable
       async function* audioChunks() {
-                for await ( const result of parseNdjsonStream((response.body as any))) {
+        for await ( const result of parseNdjsonStream(response.body as ReadableStream<Uint8Array>)) {
           if (result.audioContent) {
             yield Buffer.from(result.audioContent, "base64");
           }
@@ -121,11 +121,11 @@ const inworldProvider = ({
    * @yields {Buffer} PCM audio chunks.
    */
   async *generateSpeechStream(
-    textStream: any,
-        voice: any = DEFAULT_VOICES.inworld,
+    textStream: AsyncIterable<string>,
+    voice: string = DEFAULT_VOICES.inworld,
     options: ProviderOptions = {},
   ) {
-        (logger.provider as any)(("Inworld" as any), (`generateSpeechStream voice=${voice}` as any));
+    logger.provider("Inworld", `generateSpeechStream voice=${voice}`);
 
     const apiKey = getApiKey();
     const model =
@@ -172,7 +172,7 @@ const inworldProvider = ({
         );
       }
 
-            for await ( const result of parseNdjsonStream((response.body as any))) {
+      for await ( const result of parseNdjsonStream(response.body as ReadableStream<Uint8Array>)) {
         if (result.audioContent) {
           yield Buffer.from(result.audioContent, "base64");
         }
@@ -185,6 +185,6 @@ const inworldProvider = ({
       controller.abort();
     }
   },
-} as any);
+});
 
 export default inworldProvider;
