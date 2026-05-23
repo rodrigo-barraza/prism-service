@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import logger from "../utils/logger.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
 import type { Db } from "mongodb";
@@ -23,7 +24,7 @@ interface MCPRawTool {
 
 export interface MCPServerConfig {
   name: string;
-  transport: "stdio" | "streamable-http";
+  transport: "stdio" | "streamable-http" | "sse";
   command?: string;
   args?: string[];
   env?: Record<string, string>;
@@ -34,7 +35,7 @@ export interface MCPServerConfig {
 
 interface MCPConnection {
   client: Client;
-  transport: StdioClientTransport | StreamableHTTPClientTransport;
+  transport: StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport;
   tools: MCPToolSchema[];
   mcpTools: MCPRawTool[];
   config: MCPServerConfig;
@@ -135,7 +136,7 @@ function parseMCPToolName(fullName: string): { serverName: string; toolName: str
 /**
  * Create the appropriate transport based on server config.
  */
-function createTransport(config: MCPServerConfig): StdioClientTransport | StreamableHTTPClientTransport {
+function createTransport(config: MCPServerConfig): StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport {
   if (config.transport === "stdio") {
     return new StdioClientTransport({
       command: config.command!,
@@ -147,6 +148,15 @@ function createTransport(config: MCPServerConfig): StdioClientTransport | Stream
   if (config.transport === "streamable-http") {
     const url = new URL(config.url!);
     return new StreamableHTTPClientTransport(url, {
+      requestInit: {
+        headers: config.headers || {},
+      },
+    });
+  }
+
+  if (config.transport === "sse") {
+    const url = new URL(config.url!);
+    return new SSEClientTransport(url, {
       requestInit: {
         headers: config.headers || {},
       },
