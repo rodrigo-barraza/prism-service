@@ -534,15 +534,53 @@ export default class ToolOrchestratorService {
 
   /** Client-facing schemas (with domain/dataSource/labels, no endpoint) — for Prism Client UI */
   static getClientToolSchemas() {
+    const CORE_SYSTEM_TOOLS = new Set([
+      "upsert_memory",
+      "task_create",
+      "task_list",
+      "task_update",
+      "search_tools",
+      "precise_calculator",
+      "execute_javascript",
+      "web_search",
+      "think",
+      "sleep",
+      "enter_plan_mode",
+      "exit_plan_mode",
+      "ask_user_question",
+      "todo_write",
+      "brief_tool",
+      "mcp_tools",
+      "skill_tools",
+      "worktree_tools",
+      "team_create",
+      "send_message",
+      "stop_agent",
+      "task_output",
+      "team_delete",
+    ]);
+
     // Coordinator tools are Prism-local — add domain metadata for UI grouping
     const coordinatorClient = COORDINATOR_TOOL_SCHEMAS.map((t) => ({
       ...t,
       domain: "Coordinator",
       labels: ["coding", "orchestration"],
+      system: true,
     }));
-        return [
-            ...cachedClientSchemas,
-      ...InternalToolRegistry.getClientSchemas(),
+
+    const internalClient = InternalToolRegistry.getClientSchemas().map((t: any) => ({
+      ...t,
+      system: CORE_SYSTEM_TOOLS.has(t.name) || t.domain === "Reasoning" || t.domain === "Coordinator",
+    }));
+
+    const clientSchemasEnriched = cachedClientSchemas.map((t: any) => ({
+      ...t,
+      system: CORE_SYSTEM_TOOLS.has(t.name) || t.domain === "Reasoning" || t.domain === "Coordinator",
+    }));
+
+    return [
+      ...clientSchemasEnriched,
+      ...internalClient,
       ...coordinatorClient,
     ];
   }
