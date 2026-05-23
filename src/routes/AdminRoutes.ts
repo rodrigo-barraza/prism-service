@@ -3070,6 +3070,7 @@ router.get(
         page = 1,
         limit = 50,
         project,
+        agent,
         from,
         to,
         sort = "updatedAt",
@@ -3078,6 +3079,7 @@ router.get(
 
       const filter: Record<string, unknown> = {};
             if (project) filter.project = project;
+            if (agent) filter.agent = agent;
       if (from || to) {
                 filter.updatedAt = {};
                 if (from) (filter as Record<string, Record<string, unknown>>).updatedAt.$gte = from;
