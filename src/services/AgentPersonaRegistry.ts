@@ -849,7 +849,7 @@ oog have memory tool (upsert_memory). oog use proactively:
 
     return sections.join("\n\n");
   },
-  enabledTools: CODING_ENABLED_TOOLS,
+  enabledTools: [...CODING_ENABLED_TOOLS, "start_bonfire"],
   capabilities: "",
   usesDirectoryTree: true,
   usesCodingGuidelines: true,
