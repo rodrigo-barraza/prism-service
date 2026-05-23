@@ -335,6 +335,19 @@ router.get("/agents", (_req: Request, res: Response) => {
     const resolvedTools = resolveEnabledToolsToSet(persona?.enabledTools);
     // null sentinel means "*" wildcard → all tools
     const isWildcard = resolvedTools === null;
+
+    let finalToolsCount = isWildcard ? -1 : resolvedTools.size;
+    let finalToolNames = isWildcard ? ["*"] : [...(resolvedTools || [])];
+
+    if (!isWildcard && a.id !== "LUPOS") {
+      const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
+      const systemToolNames = clientSchemas.filter((t: any) => t.system === true).map((t: any) => t.name);
+
+      const unionSet = new Set([...finalToolNames, ...systemToolNames]);
+      finalToolsCount = unionSet.size;
+      finalToolNames = [...unionSet];
+    }
+
     return {
       id: a.id,
       name: a.name,
@@ -344,8 +357,8 @@ router.get("/agents", (_req: Request, res: Response) => {
       color: persona?.color || "",
       backgroundImage: persona?.backgroundImage || "",
       project: persona?.project,
-      toolCount: isWildcard ? -1 : resolvedTools.size,
-      enabledToolNames: isWildcard ? ["*"] : [...(resolvedTools || [])],
+      toolCount: finalToolsCount,
+      enabledToolNames: finalToolNames,
       canSpawnWorkers: COORDINATOR_ONLY_TOOLS.includes("team_create"),
       usesDirectoryTree: persona?.usesDirectoryTree || false,
       usesCodingGuidelines: persona?.usesCodingGuidelines || false,
@@ -368,7 +381,11 @@ router.get("/tools", (_req: Request, res: Response) => {
       const enabledSet = resolveEnabledToolsToSet(persona.enabledTools);
       // null = wildcard ("*") → return all schemas unfiltered
       if (enabledSet !== null) {
-        return res.json(schemas.filter((t: any) => enabledSet.has(t.name)));
+        if (agentId !== "LUPOS") {
+          return res.json(schemas.filter((t: any) => enabledSet.has(t.name) || t.system === true));
+        } else {
+          return res.json(schemas.filter((t: any) => enabledSet.has(t.name)));
+        }
       }
     }
   }

@@ -79,3 +79,55 @@ describe('GET /config', () => {
     expect(list).toContain('inworld');
   });
 });
+
+describe('GET /config/agents', () => {
+  it('returns the list of agents with core system tools included for non-Lupos agents', async () => {
+    const res = await request(app)
+      .get('/config/agents')
+      .expect(200);
+
+    expect(Array.isArray(res.body)).toBe(true);
+    
+    const codingAgent = res.body.find((a: any) => a.id === 'CODING');
+    expect(codingAgent).toBeDefined();
+    // Non-Lupos agent should have core system tools like enter_plan_mode
+    expect(codingAgent.enabledToolNames).toContain('enter_plan_mode');
+    expect(codingAgent.toolCount).toBeGreaterThan(0);
+
+    const luposAgent = res.body.find((a: any) => a.id === 'LUPOS');
+    expect(luposAgent).toBeDefined();
+    // Lupos agent should NOT have core system tools like enter_plan_mode
+    expect(luposAgent.enabledToolNames).not.toContain('enter_plan_mode');
+  });
+});
+
+describe('GET /config/tools', () => {
+  it('returns all tools by default', async () => {
+    const res = await request(app)
+      .get('/config/tools')
+      .expect(200);
+
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.some((t: any) => t.name === 'enter_plan_mode')).toBe(true);
+  });
+
+  it('includes core system tools when filtered by a non-Lupos agent like CODING', async () => {
+    const res = await request(app)
+      .get('/config/tools?agent=CODING')
+      .expect(200);
+
+    expect(Array.isArray(res.body)).toBe(true);
+    // Should contain system tools
+    expect(res.body.some((t: any) => t.name === 'enter_plan_mode')).toBe(true);
+  });
+
+  it('does NOT include core system tools when filtered by LUPOS', async () => {
+    const res = await request(app)
+      .get('/config/tools?agent=LUPOS')
+      .expect(200);
+
+    expect(Array.isArray(res.body)).toBe(true);
+    // Lupos does not have enter_plan_mode
+    expect(res.body.some((t: any) => t.name === 'enter_plan_mode')).toBe(false);
+  });
+});
