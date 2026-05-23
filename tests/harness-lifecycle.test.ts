@@ -423,7 +423,7 @@ describe("Finalizer", () => {
   describe("getCollectionOpts", () => {
     it("should return agent_sessions collection for agent projects", () => {
       const result = getCollectionOpts("agent_coding");
-      expect(result).toEqual({ collection: "agent_sessions" });
+      expect(result).toEqual({ collection: "agent_conversations" });
     });
 
     it("should return undefined for non-agent projects", () => {
