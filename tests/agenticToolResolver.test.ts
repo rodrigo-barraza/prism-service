@@ -26,10 +26,10 @@ const MOCK_TOOLS_API_SCHEMAS = [
     endpoint: { method: "POST", path: "/agentic/file/write" },
   },
   {
-    name: "web_search",
-    description: "Search the web",
+    name: "get_weather",
+    description: "Get the weather",
     parameters: { type: "object", properties: {} },
-    endpoint: { method: "POST", path: "/agentic/web/search" },
+    endpoint: { method: "POST", path: "/weather" },
   },
 ];
 
@@ -226,7 +226,7 @@ describe("AgenticToolResolver — custom tool handling", () => {
     expect(toolNames).toContain("write_file");
 
     // Built-in tools NOT in persona's enabledTools: should be filtered OUT
-    expect(toolNames).not.toContain("web_search");
+    expect(toolNames).not.toContain("get_weather");
 
     // Custom tools: should BYPASS the filter and be present
     expect(toolNames).toContain("get_week_of_year");
@@ -237,7 +237,7 @@ describe("AgenticToolResolver — custom tool handling", () => {
     // disabledBuiltIns mode: client sends a list of tools to disable
     const { finalTools } = await AgenticToolResolver.resolve({
       options: {
-        disabledBuiltIns: ["web_search"],
+        disabledBuiltIns: ["get_weather"],
       },
       agent: "CODING",
       project: "coding",
@@ -248,7 +248,7 @@ describe("AgenticToolResolver — custom tool handling", () => {
     const toolNames = finalTools.map((t) => t.name);
 
     // Disabled built-in should be gone
-    expect(toolNames).not.toContain("web_search");
+    expect(toolNames).not.toContain("get_weather");
 
     // Custom tools should survive
     expect(toolNames).toContain("get_week_of_year");
