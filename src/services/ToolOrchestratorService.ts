@@ -582,10 +582,20 @@ export default class ToolOrchestratorService {
       system: CORE_SYSTEM_TOOLS.has(t.name) || t.domain === "Reasoning" || t.domain === "Coordinator",
     }));
 
+    const mcpClient = ToolOrchestratorService.getMCPToolSchemas().map((t) => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters,
+      domain: `Model Context Protocol: ${t._mcpServer}`,
+      labels: ["mcp", t._mcpServer],
+      system: false,
+    }));
+
     return [
       ...clientSchemasEnriched,
       ...internalClient,
       ...coordinatorClient,
+      ...mcpClient,
     ];
   }
 
