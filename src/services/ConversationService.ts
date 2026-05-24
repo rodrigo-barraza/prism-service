@@ -63,6 +63,11 @@ export interface ConversationServiceInterface {
     generating: boolean,
     options?: { collection?: string; agent?: string },
   ): Promise<void>;
+  getSessionStats(
+    sessionId: string,
+    project: string,
+    username: string,
+  ): Promise<Record<string, unknown> | null>;
 }
 
 /**
@@ -480,6 +485,144 @@ const ConversationService: ConversationServiceInterface = {
           { $set: { isGenerating: false, updatedAt: now } },
         );
     }
+  },
+
+  async getSessionStats(
+    sessionId: string,
+    project: string,
+    username: string,
+  ): Promise<Record<string, unknown> | null> {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!db) return null;
+
+    // Recursively discover all descendant session IDs (multi-level workers)
+    const allSessionIds = new Set([sessionId]);
+    let frontier = [sessionId];
+    for (let depth = 0; depth < 10 && frontier.length > 0; depth++) {
+      const childIds = await db
+        .collection(COLLECTIONS.REQUESTS)
+        .distinct("agentSessionId", {
+          parentAgentSessionId: { $in: frontier },
+          agentSessionId: { $nin: [...allSessionIds] },
+          project,
+          username,
+        });
+      if (childIds.length === 0) break;
+      const newIds = childIds.filter(Boolean);
+      for (const id of newIds) allSessionIds.add(id);
+      frontier = newIds;
+    }
+
+    const requests = await db
+      .collection(COLLECTIONS.REQUESTS)
+      .find({
+        agentSessionId: { $in: [...allSessionIds] },
+        project,
+        username,
+      })
+      .project({
+        estimatedCost: 1,
+        inputTokens: 1,
+        outputTokens: 1,
+        cacheReadInputTokens: 1,
+        cacheCreationInputTokens: 1,
+        reasoningOutputTokens: 1,
+        provider: 1,
+        model: 1,
+        operation: 1,
+        timestamp: 1,
+        modalities: 1,
+        toolApiNames: 1,
+        success: 1,
+        agentSessionId: 1,
+        parentAgentSessionId: 1,
+      })
+      .toArray();
+
+    if (requests.length === 0) {
+      return null;
+    }
+
+    // Aggregate
+    const providers = new Set();
+    const models = new Set();
+    const operations = new Set();
+    let totalCost = 0;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let totalCacheReadInputTokens = 0;
+    let totalCacheCreationInputTokens = 0;
+    let totalReasoningOutputTokens = 0;
+    const mergedModalities: Record<string, boolean> = {};
+    const toolCounts: Record<string, number> = {};
+
+    for (const r of requests) {
+      totalCost += r.estimatedCost || 0;
+      totalInputTokens += r.inputTokens || 0;
+      totalOutputTokens += r.outputTokens || 0;
+      totalCacheReadInputTokens += r.cacheReadInputTokens || 0;
+      totalCacheCreationInputTokens += r.cacheCreationInputTokens || 0;
+      totalReasoningOutputTokens += r.reasoningOutputTokens || 0;
+      if (r.provider) providers.add(r.provider);
+      if (r.model) models.add(r.model);
+      if (r.operation) operations.add(r.operation);
+      // Merge modalities
+      if (r.modalities) {
+        for (const [k, v] of Object.entries(r.modalities)) {
+          if (v) mergedModalities[k] = true;
+        }
+      }
+      // Count tool usage
+      if (r.toolApiNames && r.toolApiNames.length > 0) {
+        for (const name of r.toolApiNames) {
+          toolCounts[name] = (toolCounts[name] || 0) + 1;
+        }
+      }
+    }
+
+    const workerRequestCount = requests.filter(
+      (r) => r.agentSessionId !== sessionId,
+    ).length;
+
+    const createdAt = (requests as Record<string, unknown>[]).reduce(
+      (min: string | null, r) => (!min || (r.timestamp as string) < min ? (r.timestamp as string) : min),
+      null as string | null,
+    );
+    const updatedAt = (requests as Record<string, unknown>[]).reduce(
+      (max: string | null, r) => (!max || (r.timestamp as string) > max ? (r.timestamp as string) : max),
+      null as string | null,
+    );
+
+    // Wall-clock elapsed time: from first request to last request (includes workers)
+    const totalElapsedTime =
+      createdAt && updatedAt
+        ? Math.max(
+            0,
+            (new Date(updatedAt as string).getTime() - new Date(createdAt as string).getTime()) /
+              1000,
+          )
+        : 0;
+
+    return {
+      agentSessionId: sessionId,
+      requestCount: requests.length,
+      workerRequestCount,
+      totalCost,
+      totalInputTokens,
+      totalOutputTokens,
+      totalTokens: totalInputTokens + totalOutputTokens,
+      totalCacheReadInputTokens,
+      totalCacheCreationInputTokens,
+      totalReasoningOutputTokens,
+      providers: [...providers],
+      models: [...models],
+      operations: [...operations],
+      modalities: mergedModalities,
+      toolCounts,
+      totalElapsedTime,
+      createdAt,
+      updatedAt,
+    };
   },
 };
 
