@@ -282,6 +282,7 @@ export default class SystemPromptAssembler {
         traceId: traceId || undefined,
         agentSessionId: agentSessionId || undefined,
         endpoint: endpoint || "/agent",
+        username: _username || undefined,
       });
 
       if (!memories || memories.length === 0) return "";

@@ -67,6 +67,7 @@ export interface MemorySearchParams {
   traceId?: string;
   agentSessionId?: string;
   endpoint?: string;
+  username?: string;
 }
 
 export interface MemoryListParams {
@@ -91,6 +92,7 @@ export interface EmbedOptions {
   agentSessionId?: string;
   endpoint?: string;
   agent?: string;
+  username?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -277,6 +279,7 @@ const MemoryService = {
             if (agentSessionId) embedOpts.agentSessionId = agentSessionId;
             if (endpoint) embedOpts.endpoint = endpoint;
             if (agent) embedOpts.agent = agent;
+            if (username) embedOpts.username = username;
             embedding = await generateEmbedding(embedText, embedOpts);
     }
     // Duplicate detection — compare against existing memories for the same agent
@@ -404,6 +407,7 @@ const MemoryService = {
     traceId,
     agentSessionId,
     endpoint,
+    username,
   }: MemorySearchParams) {
     if (!agent)
       throw new Error("MemoryService.search requires an agent identifier");
@@ -415,6 +419,7 @@ const MemoryService = {
         if (project) embeddingOpts.project = project;
         if (endpoint) embeddingOpts.endpoint = endpoint;
         if (agent) embeddingOpts.agent = agent;
+        if (username) embeddingOpts.username = username;
         const queryEmbedding = await generateEmbedding(queryText, embeddingOpts);
     // Build the filter — always scoped by agent
     const filter: Record<string, unknown> = { agent };
