@@ -1125,20 +1125,20 @@ function getModels(inputType: string, outputType: string): ModelDefinition[] {
 function getModelOptions(inputType: string, outputType: string): Record<string, ModelOptionEntry[]> {
   const opts: Record<string, ModelOptionEntry[]> = {};
   for (const m of getModels(inputType, outputType)) {
-    const mAny = m as ModelDefinition & Record<string, unknown>;
-    if (mAny.listed !== false) {
+    const modelRecord = m as ModelDefinition & Record<string, unknown>;
+    if (modelRecord.listed !== false) {
       const entry: ModelOptionEntry = { name: m.name, label: m.label };
-      if (mAny.thinking) entry.thinking = true;
+      if (modelRecord.thinking) entry.thinking = true;
       if (m.inputTypes?.includes(TYPES.IMAGE)) entry.vision = true;
-      if (mAny.webSearch) entry.webSearch = mAny.webSearch as boolean | string;
+      if (modelRecord.webSearch) entry.webSearch = modelRecord.webSearch as boolean | string;
       if (m.inputTypes) entry.inputTypes = m.inputTypes;
       if (m.outputTypes) entry.outputTypes = m.outputTypes;
-      if (mAny.tools) entry.tools = mAny.tools as string[];
-      if (mAny.pricing) entry.pricing = mAny.pricing as Record<string, number>;
-      if (mAny.arena) entry.arena = mAny.arena as Record<string, number>;
-      if (mAny.maxInputTokens) entry.contextLength = mAny.maxInputTokens as number;
-      if (mAny.maxOutputTokens) entry.maxOutputTokens = mAny.maxOutputTokens as number;
-      if (mAny.assistantImages === false) entry.assistantImages = false;
+      if (modelRecord.tools) entry.tools = modelRecord.tools as string[];
+      if (modelRecord.pricing) entry.pricing = modelRecord.pricing as Record<string, number>;
+      if (modelRecord.arena) entry.arena = modelRecord.arena as Record<string, number>;
+      if (modelRecord.maxInputTokens) entry.contextLength = modelRecord.maxInputTokens as number;
+      if (modelRecord.maxOutputTokens) entry.maxOutputTokens = modelRecord.maxOutputTokens as number;
+      if (modelRecord.assistantImages === false) entry.assistantImages = false;
       // JSON mode: OpenAI + Google support response_format / responseMimeType
       if (
         m.modelType === MODEL_TYPES.CONVERSATION &&
@@ -1146,24 +1146,24 @@ function getModelOptions(inputType: string, outputType: string): Record<string, 
       ) {
         entry.jsonMode = true;
       }
-      if (mAny.codeExecution) entry.codeExecution = true;
-      if (mAny.webFetch) entry.webFetch = true;
-      if (mAny.urlContext) entry.urlContext = true;
-      if (mAny.defaultTemperature !== undefined)
-        entry.defaultTemperature = mAny.defaultTemperature as number;
-      if (mAny.verbosity) entry.verbosity = true;
-      if (mAny.reasoningSummary) entry.reasoningSummary = true;
-      if (mAny.responsesAPI) entry.responsesAPI = true;
-      if (mAny.size) entry.size = mAny.size as string;
+      if (modelRecord.codeExecution) entry.codeExecution = true;
+      if (modelRecord.webFetch) entry.webFetch = true;
+      if (modelRecord.urlContext) entry.urlContext = true;
+      if (modelRecord.defaultTemperature !== undefined)
+        entry.defaultTemperature = modelRecord.defaultTemperature as number;
+      if (modelRecord.verbosity) entry.verbosity = true;
+      if (modelRecord.reasoningSummary) entry.reasoningSummary = true;
+      if (modelRecord.responsesAPI) entry.responsesAPI = true;
+      if (modelRecord.size) entry.size = modelRecord.size as string;
       if (m.modelType) entry.modelType = m.modelType;
-      if (mAny.liveAPI) entry.liveAPI = true;
-      if (mAny.thinkingLevels) entry.thinkingLevels = mAny.thinkingLevels as string[];
-      if (mAny.mediaLimits) entry.mediaLimits = mAny.mediaLimits as Record<string, unknown>;
-      if (mAny.year) entry.year = mAny.year as number;
+      if (modelRecord.liveAPI) entry.liveAPI = true;
+      if (modelRecord.thinkingLevels) entry.thinkingLevels = modelRecord.thinkingLevels as string[];
+      if (modelRecord.mediaLimits) entry.mediaLimits = modelRecord.mediaLimits as Record<string, unknown>;
+      if (modelRecord.year) entry.year = modelRecord.year as number;
       // System prompt support: true for chat models, false for image-only/TTS/embedding APIs
       entry.supportsSystemPrompt =
-        mAny.supportsSystemPrompt !== undefined
-          ? mAny.supportsSystemPrompt as boolean
+        modelRecord.supportsSystemPrompt !== undefined
+          ? modelRecord.supportsSystemPrompt as boolean
           : m.outputTypes.includes(TYPES.TEXT);
       (opts[m.provider] ??= []).push(entry);
     }
@@ -1179,8 +1179,8 @@ function getModelOptions(inputType: string, outputType: string): Record<string, 
 function getDefaultModels(inputType: string, outputType: string): Record<string, string> {
   const defaults: Record<string, string> = {};
   for (const m of getModels(inputType, outputType)) {
-    const mAny = m as ModelDefinition & Record<string, unknown>;
-    if (mAny.default) {
+    const modelRecord = m as ModelDefinition & Record<string, unknown>;
+    if (modelRecord.default) {
       defaults[m.provider] = m.name;
     }
   }
@@ -1194,9 +1194,9 @@ function getDefaultModels(inputType: string, outputType: string): Record<string,
 function getPricing(inputType: string, outputType: string): Record<string, Record<string, number>> {
   const pricing: Record<string, Record<string, number>> = {};
   for (const m of getModels(inputType, outputType)) {
-    const mAny = m as ModelDefinition & Record<string, unknown>;
-    if (mAny.pricing) {
-      pricing[m.name] = mAny.pricing as Record<string, number>;
+    const modelRecord = m as ModelDefinition & Record<string, unknown>;
+    if (modelRecord.pricing) {
+      pricing[m.name] = modelRecord.pricing as Record<string, number>;
     }
   }
   return pricing;

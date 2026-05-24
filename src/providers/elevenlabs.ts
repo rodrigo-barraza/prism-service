@@ -67,9 +67,9 @@ const elevenlabsProvider = ({
     const apiKey = getApiKey();
     const modelId =
             options.modelId || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).elevenlabs;
-    const wsUrl = `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input?model_id=${modelId}`;
+    const websocketUrl = `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input?model_id=${modelId}`;
 
-    const ws = new WebSocket(wsUrl, {
+    const ws = new WebSocket(websocketUrl, {
       headers: { "xi-api-key": apiKey },
     });
 

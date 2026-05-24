@@ -187,10 +187,10 @@ async function* parseNativeSSEStream(reader: ReadableStreamDefaultReader<Uint8Ar
           }
           // ── Error event ──
           else if (type === "error") {
-            const errMsg = json.error?.message || JSON.stringify(json.error);
-            logger.warn(`[LM-Studio] Stream error: ${errMsg}`);
+            const errorMessage = json.error?.message || JSON.stringify(json.error);
+            logger.warn(`[LM-Studio] Stream error: ${errorMessage}`);
             // Yield as text so the client sees the error
-            yield `\n\n⚠️ **LM Studio Error:** ${errMsg}`;
+            yield `\n\n⚠️ **LM Studio Error:** ${errorMessage}`;
           }
           // ── Chat end with stats ──
           else if (type === "chat.end") {
@@ -528,15 +528,15 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                     eval_batch_size: LM_STUDIO_EVAL_BATCH_SIZE,
                   };
                     if (options.minContextLength) {
-                    const maxCtx =
+                    const maxContextLength =
                       (modelEntry as Record<string, unknown>)?.max_context_length as number ||
                       LM_STUDIO_DEFAULT_MAX_CONTEXT;
                     (loadOpts as Record<string, unknown>).context_length = Math.min(
                       options.minContextLength as number,
-                      maxCtx,
+                      maxContextLength,
                     );
                     logger.info(
-                      `[LM-Studio] Loading with context_length=${(loadOpts as Record<string, unknown>).context_length} (min=${options.minContextLength}, max=${maxCtx})`,
+                      `[LM-Studio] Loading with context_length=${(loadOpts as Record<string, unknown>).context_length} (min=${options.minContextLength}, max=${maxContextLength})`,
                     );
                   }
                   // Start load (non-blocking) and poll for progress
