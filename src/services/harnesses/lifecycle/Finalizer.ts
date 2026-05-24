@@ -135,6 +135,9 @@ export async function finalizeTextGeneration(
  */
 function swapMsgContent(msg: MessagePayload) {
   if (msg.role === "user" && typeof msg.content === "string") {
+    if (msg.rawContent?.startsWith("[System Context]") || msg.rawContent?.startsWith("[System Context - Local Time:")) {
+      return;
+    }
     if (msg.rawContent) {
       const dirty = msg.content;
       msg.content = msg.rawContent;
