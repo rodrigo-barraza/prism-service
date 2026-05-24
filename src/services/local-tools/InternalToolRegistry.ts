@@ -46,8 +46,8 @@ async function init() {
     import("./McpTools.js"),
   ]);
 
-    for ( const mod of modules) {
-    const tools = mod.default;
+    for ( const toolModule of modules) {
+    const tools = toolModule.default;
     // Modules can export a single tool or an array of tools
     if (Array.isArray(tools)) {
             for ( const tool of tools) register(tool);

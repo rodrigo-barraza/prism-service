@@ -609,15 +609,15 @@ function handleWsLive(
                       }),
                     );
 
-                    for (const res of results) {
+                    for (const toolResult of results) {
                       emit({
                         type: "tool_execution",
                         tool: {
-                          name: res.name,
-                          id: res.id,
-                          result: res.result,
+                          name: toolResult.name,
+                          id: toolResult.id,
+                          result: toolResult.result,
                         },
-                        status: res.result?.error ? "error" : "done",
+                        status: toolResult.result?.error ? "error" : "done",
                       });
                     }
 

@@ -145,11 +145,11 @@ const ChangeStreamService = {
     }
 
     // Open streams on all watched collections
-    for (const col of WATCHED_COLLECTIONS) {
-      const stream = openStream(db, col);
+    for (const collectionName of WATCHED_COLLECTIONS) {
+      const stream = openStream(db, collectionName);
       if (stream) {
-        streams.set(col, stream);
-        logger.info(`ChangeStream active: ${col}`);
+        streams.set(collectionName, stream);
+        logger.info(`ChangeStream active: ${collectionName}`);
       }
     }
 

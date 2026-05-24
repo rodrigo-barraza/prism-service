@@ -1740,9 +1740,9 @@ export default class CoordinatorService {
 
     // Validate and cap sub-tasks
     const subTasks = (parsed.subTasks || []).slice(0, MAX_WORKERS);
-    for (const st of subTasks) {
-      if (!st.id) st.id = `task-${crypto.randomUUID().slice(0, 8)}`;
-      st.branchName = `coordinator/${st.id}`;
+    for (const subTask of subTasks) {
+      if (!subTask.id) subTask.id = `task-${crypto.randomUUID().slice(0, 8)}`;
+      subTask.branchName = `coordinator/${subTask.id}`;
     }
 
     return {

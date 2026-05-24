@@ -118,18 +118,18 @@ export default class AgenticLoopState {
     const cleanTextFragments: string[] = [];
     const cleanThinkingFragments: string[] = [];
 
-    for (const seg of this.displaySegments) {
-      if (seg.type === "text") {
-        const trimmed = this.displayTextFragments[seg.fragmentIndex]?.trim();
+    for (const segment of this.displaySegments) {
+      if (segment.type === "text") {
+        const trimmed = this.displayTextFragments[segment.fragmentIndex]?.trim();
         if (!trimmed) continue;
         cleanSegments.push({
           type: "text",
           fragmentIndex: cleanTextFragments.length,
         });
         cleanTextFragments.push(trimmed);
-      } else if (seg.type === "thinking") {
+      } else if (segment.type === "thinking") {
         const trimmed =
-          this.displayThinkingFragments[seg.fragmentIndex]?.trim();
+          this.displayThinkingFragments[segment.fragmentIndex]?.trim();
         if (!trimmed) continue;
         cleanSegments.push({
           type: "thinking",
@@ -137,7 +137,7 @@ export default class AgenticLoopState {
         });
         cleanThinkingFragments.push(trimmed);
       } else {
-        cleanSegments.push(seg); // tools segments pass through
+        cleanSegments.push(segment); // tools segments pass through
       }
     }
 
