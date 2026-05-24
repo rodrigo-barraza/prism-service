@@ -141,7 +141,7 @@ const EmbeddingService = {
               else if (mime === "application/pdf") modalities.docIn = true;
             }
           }
-          return mod;
+          return modalities;
         })(),
         requestPayload: {
           source,

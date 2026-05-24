@@ -542,9 +542,9 @@ router.get(
 
       // Collect all distinct conversationIds to look up workflow links
       const allConvIds = new Set();
-            for ( const r of results) {
-                for ( const conversationId of r._convIds || []) {
-          if (conversationId) allConvIds.add(cid);
+      for (const r of results) {
+        for (const conversationId of r._convIds || []) {
+          if (conversationId) allConvIds.add(conversationId);
         }
       }
 
@@ -596,7 +596,7 @@ router.get(
           const traceSet = new Set();
           for (const conversationId of convIds) {
             workflowCount += wfByConv[conversationId] || 0;
-            if (traceByConv[conversationId]) traceSet.add(traceByConv[cid]);
+            if (traceByConv[conversationId]) traceSet.add(traceByConv[conversationId]);
           }
           return {
             model: (r._id as { model: string }).model,

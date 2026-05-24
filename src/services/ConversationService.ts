@@ -234,7 +234,7 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
       modalities.thinking = true;
     }
   }
-  return mod;
+  return modalities;
 }
 
 /**
@@ -309,7 +309,7 @@ const ConversationService: ConversationServiceInterface = {
     { collection = DEFAULT_COLLECTION }: { collection?: string } = {},
   ): Promise<Record<string, unknown>> {
     const traceId = conversationMeta?.traceId || null;
-    const collection = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
+    const dbCollection = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
     const isAgentSession = collection === COLLECTIONS.AGENT_CONVERSATIONS;
 
     // Extract files (upload base64 data to MinIO)
@@ -384,7 +384,7 @@ const ConversationService: ConversationServiceInterface = {
     }
 
     // 1. Atomic upsert: push messages + set metadata in a single operation
-    await collection.updateOne(
+    await dbCollection.updateOne(
       { id: conversationId, project, username },
       {
         $push: { messages: { $each: processedMessages } },
@@ -395,7 +395,7 @@ const ConversationService: ConversationServiceInterface = {
     );
 
     // 2. Single re-read to compute derived fields
-    const conversation = await collection.findOne({
+    const conversation = await dbCollection.findOne({
       id: conversationId,
       project,
       username,
@@ -426,7 +426,7 @@ const ConversationService: ConversationServiceInterface = {
       }
     }
 
-    await collection.updateOne(
+    await dbCollection.updateOne(
       { id: conversationId, project, username },
       { $set: derived },
     );
