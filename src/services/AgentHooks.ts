@@ -1,5 +1,5 @@
 import logger from "../utils/logger.ts";
-import { errorMessage } from "../utils/errorMessage.ts";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
 /**
  * AgentHooks — typed lifecycle system for the agentic loop.

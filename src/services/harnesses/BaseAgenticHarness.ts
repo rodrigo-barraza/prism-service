@@ -16,7 +16,7 @@ import { MONGO_DB_NAME } from "../../../config.ts";
 import { COLLECTIONS } from "../../constants.ts";
 import { finalizeTextGeneration, type FinalizerContext } from "./lifecycle/Finalizer.ts";
 import logger from "../../utils/logger.ts";
-import { errorMessage as getErrorMessage } from "../../utils/errorMessage.ts";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
 import type AgenticLoopState from "../AgenticLoopState.ts";
 import type AgentHooks from "../AgentHooks.ts";
@@ -650,7 +650,7 @@ export default class BaseAgenticHarness {
           );
         }
       } catch (error: unknown) {
-        logger.error(`[AgenticLoop] Failed to persist workers: ${getErrorMessage(error)}`);
+        logger.error(`[AgenticLoop] Failed to persist workers: ${errorMessage(error)}`);
       }
     }
 
@@ -722,7 +722,7 @@ export default class BaseAgenticHarness {
         );
         minioRef = ref;
       } catch (error: unknown) {
-        logger.error(`MinIO upload failed: ${getErrorMessage(error)}`);
+        logger.error(`MinIO upload failed: ${errorMessage(error)}`);
       }
       const imgRef =
         minioRef ||

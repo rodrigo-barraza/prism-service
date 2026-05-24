@@ -12,7 +12,7 @@ import {
   getTotalInputTokens,
 } from "../utils/CostCalculator.ts";
 import { TYPES, getPricing } from "../config.ts";
-import { errorMessage } from "../utils/errorMessage.ts";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import type { ConversationMessage, ToolCall, EmitFn, AgenticContext } from "./harnesses/types.ts";
 import type { GenerateTextResult } from "../types/provider.ts";
 import type { MessagePayload } from "./RequestLogger.ts";
