@@ -2,6 +2,7 @@ import ToolOrchestratorService from "./ToolOrchestratorService.ts";
 import MemoryService from "./MemoryService.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import EmbeddingService from "./EmbeddingService.ts";
+import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { TOOLS_SERVICE_URL, MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
@@ -164,14 +165,67 @@ export default class SystemPromptAssembler {
    *   - Name + first sentence of description (capability summary)
    *   - Full parameter listing with required markers
    */
-  buildToolDescriptions(enabledTools?: string[]): string {
-    const schemas = ToolOrchestratorService.getToolSchemas();
-    const enabledSet = enabledTools ? new Set(enabledTools) : null;
+  buildToolDescriptions(enabledTools?: string[], agentId?: string | null): string {
+    const schemas = ToolOrchestratorService.getClientToolSchemas();
+    if (!enabledTools) {
+      return this._formatToolDescriptions(schemas);
+    }
 
-    const filtered: Record<string, unknown>[] = enabledSet
-      ? schemas.filter((t) => enabledSet.has(t.name as string))
-      : schemas;
+    const hasPrefixed = enabledTools.some(
+      (e) => e.startsWith("label:") || e.startsWith("domain:"),
+    );
 
+    const enabledSet = new Set<string>();
+    if (hasPrefixed) {
+      for (const entry of enabledTools) {
+        if (entry.startsWith("label:")) {
+          const label = entry.slice(6);
+          for (const t of schemas) {
+            if (t.labels?.includes(label)) enabledSet.add(t.name);
+          }
+        } else if (entry.startsWith("domain:")) {
+          const domain = entry.slice(7);
+          for (const t of schemas) {
+            if (t.domain === domain) enabledSet.add(t.name);
+          }
+        } else {
+          enabledSet.add(entry);
+        }
+      }
+    } else {
+      for (const entry of enabledTools) {
+        enabledSet.add(entry);
+      }
+    }
+
+    // Define the core system, coordinator, and local tools
+    const CORE_SYSTEM_TOOLS = new Set([
+      "upsert_memory",
+      "task_create",
+      "task_list",
+      "task_update",
+      "precise_calculator",
+      "execute_javascript",
+      "search_tools",
+      "web_search",
+    ]);
+    const COORDINATOR_TOOL_NAMES = new Set(COORDINATOR_ONLY_TOOLS);
+    const PRISM_LOCAL_TOOL_NAMES = InternalToolRegistry.getNames();
+
+    const filtered = schemas.filter(
+      (t) =>
+        enabledSet.has(t.name as string) ||
+        (agentId !== "LUPOS" && (
+          CORE_SYSTEM_TOOLS.has(t.name as string) ||
+          COORDINATOR_TOOL_NAMES.has(t.name as string) ||
+          PRISM_LOCAL_TOOL_NAMES.has(t.name as string)
+        ))
+    );
+
+    return this._formatToolDescriptions(filtered);
+  }
+
+  _formatToolDescriptions(filtered: Record<string, unknown>[]): string {
     if (filtered.length === 0) return "";
 
     // Group by domain
@@ -429,13 +483,60 @@ export default class SystemPromptAssembler {
     // This ensures every persona (CODING, LUPOS, future agents) gets the
     // same domain-grouped tool documentation in its system prompt.
     {
-      const toolDescs = this.buildToolDescriptions(context.enabledTools);
+      const toolDescs = this.buildToolDescriptions(context.enabledTools, agentId);
       if (toolDescs) {
-        const schemas = ToolOrchestratorService.getToolSchemas();
-        const count = context.enabledTools
-          ? schemas.filter((t) => new Set(context.enabledTools).has(t.name as string))
-              .length
-          : schemas.length;
+        const schemas = ToolOrchestratorService.getClientToolSchemas();
+        let count = schemas.length;
+        if (context.enabledTools) {
+          const hasPrefixed = context.enabledTools.some(
+            (e) => e.startsWith("label:") || e.startsWith("domain:"),
+          );
+          const enabledSet = new Set<string>();
+          if (hasPrefixed) {
+            for (const entry of context.enabledTools) {
+              if (entry.startsWith("label:")) {
+                const label = entry.slice(6);
+                for (const t of schemas) {
+                  if (t.labels?.includes(label)) enabledSet.add(t.name);
+                }
+              } else if (entry.startsWith("domain:")) {
+                const domain = entry.slice(7);
+                for (const t of schemas) {
+                  if (t.domain === domain) enabledSet.add(t.name);
+                }
+              } else {
+                enabledSet.add(entry);
+              }
+            }
+          } else {
+            for (const entry of context.enabledTools) {
+              enabledSet.add(entry);
+            }
+          }
+
+          const CORE_SYSTEM_TOOLS = new Set([
+            "upsert_memory",
+            "task_create",
+            "task_list",
+            "task_update",
+            "precise_calculator",
+            "execute_javascript",
+            "search_tools",
+            "web_search",
+          ]);
+          const COORDINATOR_TOOL_NAMES = new Set(COORDINATOR_ONLY_TOOLS);
+          const PRISM_LOCAL_TOOL_NAMES = InternalToolRegistry.getNames();
+
+          count = schemas.filter(
+            (t) =>
+              enabledSet.has(t.name as string) ||
+              (agentId !== "LUPOS" && (
+                CORE_SYSTEM_TOOLS.has(t.name as string) ||
+                COORDINATOR_TOOL_NAMES.has(t.name as string) ||
+                PRISM_LOCAL_TOOL_NAMES.has(t.name as string)
+              ))
+          ).length;
+        }
         sections.push(`## Available Tools (${count})\n` + toolDescs);
       }
     }
