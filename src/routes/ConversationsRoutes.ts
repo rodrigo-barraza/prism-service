@@ -134,6 +134,68 @@ router.get(
         agentConversations = await fetchAgentConversations();
       }
 
+      // Enrich agent sessions with authoritative totalCost from request logs.
+      // The document-level totalCost (from message estimatedCost sums) can be
+      // stale or incomplete — the requests collection is the source of truth.
+      if (agentConversations.length > 0) {
+        const sessionIds = agentConversations
+          .map((s) => (s as Record<string, unknown>).id as string)
+          .filter(Boolean);
+
+        if (sessionIds.length > 0) {
+          try {
+            const costAgg = await db
+              .collection(COLLECTIONS.REQUESTS)
+              .aggregate<{ _id: string; totalCost: number }>([
+                {
+                  $match: {
+                    $or: [
+                      { agentSessionId: { $in: sessionIds } },
+                      { parentAgentSessionId: { $in: sessionIds } },
+                    ],
+                    project,
+                    username,
+                  },
+                },
+                {
+                  // Group under the parent session when present, otherwise
+                  // use the request's own agentSessionId (top-level request).
+                  $group: {
+                    _id: {
+                      $cond: [
+                        {
+                          $and: [
+                            { $ne: ["$parentAgentSessionId", null] },
+                            { $in: ["$parentAgentSessionId", sessionIds] },
+                          ],
+                        },
+                        "$parentAgentSessionId",
+                        "$agentSessionId",
+                      ],
+                    },
+                    totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },
+                  },
+                },
+              ])
+              .toArray();
+
+            if (costAgg.length > 0) {
+              const costMap = new Map(costAgg.map((r) => [r._id, r.totalCost]));
+              for (const session of agentConversations) {
+                const sid = (session as Record<string, unknown>).id as string;
+                const realCost = costMap.get(sid);
+                if (realCost !== undefined && realCost > 0) {
+                  (session as Record<string, unknown>).totalCost = realCost;
+                }
+              }
+            }
+          } catch (costError: unknown) {
+            // Non-fatal — fall back to document-level totalCost
+            logger.warn(`Failed to enrich agent session costs: ${costError instanceof Error ? costError.message : String(costError)}`);
+          }
+        }
+      }
+
       // Merge and sort in memory by updatedAt descending
       const merged = [
         ...modelConversations.map((conversation) => ({ ...conversation, type: "direct" as const })),
