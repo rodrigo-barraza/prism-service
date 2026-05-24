@@ -82,6 +82,7 @@ export default class ReActHarness extends BaseAgenticHarness {
     const { hooks, approvalEngine } = createStandardHooks({
       workspaceRoot: workspaceRoot || undefined,
       autoApprove: options.autoApprove === true,
+      policies: options.policies,
     });
 
     if (options.planFirst) {

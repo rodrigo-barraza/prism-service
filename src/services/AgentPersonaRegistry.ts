@@ -1,5 +1,6 @@
 import logger from "../utils/logger.ts";
 import { L } from "./ToolTaxonomyConstants.ts";
+import type { PolicyRule, PolicyDecision } from "./PolicyEngine.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -7,6 +8,22 @@ interface PersonaContext {
   enabledTools?: string[];
   agentContext?: Record<string, unknown>;
   [key: string]: unknown;
+}
+
+/**
+ * Serialized policy format stored in MongoDB for custom agents.
+ * The `when` predicate function can't be serialized, so we store a
+ * regex `pattern` and `field` that get reconstructed into a `when`
+ * function at registration time.
+ */
+interface SerializedPolicy {
+  tool: string;
+  decision: string;
+  name?: string;
+  /** Regex pattern to test against the argument field. */
+  pattern?: string;
+  /** Which argument field to test the pattern against (default: "command"). */
+  field?: string;
 }
 
 interface Persona {
@@ -25,6 +42,8 @@ interface Persona {
   interactionRules: string;
   toolPolicy: string | ((context: PersonaContext) => string);
   enabledTools: string[];
+  /** Declarative tool call policies (serialized for custom agents). */
+  policies?: PolicyRule[];
   capabilities: string;
   usesDirectoryTree: boolean;
   usesCodingGuidelines: boolean;
@@ -1367,6 +1386,30 @@ const AgentPersonaRegistry = {
   registerCustom(doc: Record<string, unknown>) {
     if (!doc?.agentId || typeof doc.agentId !== 'string') return;
 
+    // Reconstruct PolicyRules from serialized format
+    const rawPolicies = Array.isArray(doc.policies) ? doc.policies as SerializedPolicy[] : [];
+    const policies: PolicyRule[] = rawPolicies.map((p) => {
+      const rule: PolicyRule = {
+        tool: p.tool || "*",
+        decision: (p.decision as PolicyDecision) || "ASK_USER",
+        name: p.name || `${p.decision}(${p.tool})`,
+      };
+      // Reconstruct `when` predicate from pattern string
+      if (p.pattern && typeof p.pattern === "string") {
+        try {
+          const regex = new RegExp(p.pattern);
+          const field = p.field || "command";
+          rule.when = (args: Record<string, unknown>) =>
+            regex.test(String(args[field] ?? ""));
+        } catch {
+          logger.warn(
+            `[AgentPersonaRegistry] Invalid regex pattern "${p.pattern}" in policy for agent ${doc.agentId}`,
+          );
+        }
+      }
+      return rule;
+    });
+
     const persona: Persona = {
       id: doc.agentId as string,
       name: (doc.name as string) || doc.agentId as string,
@@ -1382,6 +1425,7 @@ const AgentPersonaRegistry = {
       interactionRules: "",
       toolPolicy: (doc.toolPolicy as string) || "",
       enabledTools: Array.isArray(doc.enabledTools) ? doc.enabledTools as string[] : [],
+      policies: policies.length > 0 ? policies : undefined,
       capabilities: "",
       usesDirectoryTree: (doc.usesDirectoryTree as boolean) || false,
       usesCodingGuidelines: (doc.usesCodingGuidelines as boolean) || false,
@@ -1389,7 +1433,7 @@ const AgentPersonaRegistry = {
 
     PERSONAS.set(doc.agentId as string, persona);
     logger.info(
-      `[AgentPersonaRegistry] Registered custom agent: "${doc.name}" (${doc.agentId}) with ${persona.enabledTools.length} tools`,
+      `[AgentPersonaRegistry] Registered custom agent: "${doc.name}" (${doc.agentId}) with ${persona.enabledTools.length} tools, ${policies.length} policies`,
     );
   },
   unregister(agentId: string) {

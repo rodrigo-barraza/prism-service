@@ -709,6 +709,17 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
       }
       const { default: AgenticLoopService } =
         await import("../services/AgenticLoopService.js");
+
+      // Inject persona-level policies into options (if the agent has them)
+      if (agent && !options.policies) {
+        const { default: AgentPersonaRegistry } =
+          await import("../services/AgentPersonaRegistry.js");
+        const persona = AgentPersonaRegistry.get(agent);
+        if (persona?.policies && persona.policies.length > 0) {
+          options.policies = persona.policies;
+        }
+      }
+
       await AgenticLoopService.runAgenticLoop({
         provider: context.provider as import("../services/harnesses/types.ts").LLMProvider,
                 providerName,

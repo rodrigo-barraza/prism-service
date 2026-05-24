@@ -5,6 +5,7 @@ import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
 import { errorMessage } from "../utils/errorMessage.ts";
 import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
+import type { MessagePayload } from "./RequestLogger.ts";
 
 const DEFAULT_COLLECTION = COLLECTIONS.MODEL_CONVERSATIONS;
 
@@ -51,7 +52,7 @@ export interface ConversationServiceInterface {
     conversationId: string,
     project: string,
     username: string,
-    newMessages: ChatMessage[],
+    newMessages: Array<ChatMessage | MessagePayload>,
     conversationMeta?: ConversationMeta | null,
     options?: { collection?: string },
   ): Promise<Record<string, unknown>>;
@@ -69,21 +70,26 @@ export interface ConversationServiceInterface {
  * Replaces inline data with minio:// refs when MinIO is available.
  */
 export async function extractFiles(
-  messages: ChatMessage[],
+  messages: Array<ChatMessage | MessagePayload>,
   project: string | null = null,
   username: string | null = null,
-): Promise<ChatMessage[]> {
+): Promise<Array<ChatMessage | MessagePayload>> {
   if (!messages || !FileService.isExternalStorage()) return messages;
 
-  const processed: ChatMessage[] = [];
+  const processed: Array<ChatMessage | MessagePayload> = [];
   for (const message of messages) {
-    const updated = { ...message };
+    const updated = { ...message } as ChatMessage | MessagePayload;
 
     // Handle images
     if (message.images && message.images.length > 0) {
       const category = message.role === "assistant" ? "generations" : "uploads";
       const newImages: string[] = [];
-      for (const image of message.images) {
+      for (const rawImage of message.images) {
+        if (typeof rawImage !== "string") {
+          newImages.push(String(rawImage));
+          continue;
+        }
+        const image = rawImage;
         if (image.startsWith("minio://") || image.startsWith("http")) {
           newImages.push(image);
           continue;
@@ -298,7 +304,7 @@ const ConversationService: ConversationServiceInterface = {
     conversationId: string,
     project: string,
     username: string,
-    newMessages: ChatMessage[],
+    newMessages: Array<ChatMessage | MessagePayload>,
     conversationMeta: ConversationMeta | null = null,
     { collection = DEFAULT_COLLECTION }: { collection?: string } = {},
   ): Promise<Record<string, unknown>> {

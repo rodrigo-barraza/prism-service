@@ -121,6 +121,8 @@ export interface ModelDef {
   [key: string]: unknown;
 }
 
+import type { PolicyRule } from "../PolicyEngine.ts";
+
 // ── Agentic Options ─────────────────────────────────────────
 
 export interface AgenticOptions {
@@ -141,6 +143,8 @@ export interface AgenticOptions {
   maxWorkerIterations?: number;
   minContextLength?: number;
   tools?: ToolSchema[];
+  /** Declarative tool call policies (allow/deny/askUser with argument predicates). */
+  policies?: PolicyRule[];
   [key: string]: unknown;
 }
 

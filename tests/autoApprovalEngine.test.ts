@@ -424,3 +424,149 @@ describe("Constructor defaults", () => {
     expect(engine).toBeInstanceOf(AutoApprovalEngine);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// Policy Integration — PolicyEngine + AutoApprovalEngine
+// ═══════════════════════════════════════════════════════════════
+
+describe("check — policy integration", () => {
+  it("DENY policy blocks a Tier 1 (auto) tool", () => {
+    const engine = new AutoApprovalEngine({
+      policies: [
+        { tool: "read_file", decision: "DENY", name: "deny-read" },
+      ],
+    });
+    const result = engine.check({ name: "read_file", args: {}, id: "tc1" });
+    expect(result.approved).toBe(false);
+    expect(result.reason).toContain("Denied by policy");
+  });
+
+  it("APPROVE policy allows a Tier 3 (danger) tool", () => {
+    const engine = new AutoApprovalEngine({
+      policies: [
+        { tool: "execute_shell", decision: "APPROVE", name: "allow-shell" },
+      ],
+    });
+    const result = engine.check({ name: "execute_shell", args: {}, id: "tc2" });
+    expect(result.approved).toBe(true);
+    expect(result.reason).toContain("Approved by policy");
+  });
+
+  it("ASK_USER policy overrides Tier 1 auto-approve", () => {
+    const engine = new AutoApprovalEngine({
+      policies: [
+        { tool: "read_file", decision: "ASK_USER", name: "ask-read" },
+      ],
+    });
+    const result = engine.check({ name: "read_file", args: {}, id: "tc3" });
+    expect(result.approved).toBe(false);
+    expect(result.reason).toContain("Requires approval");
+  });
+
+  it("conditional policy with matching predicate", () => {
+    const engine = new AutoApprovalEngine({
+      policies: [
+        {
+          tool: "execute_shell",
+          decision: "DENY",
+          name: "deny-rm",
+          when: (args: Record<string, unknown>) =>
+            /rm\s+-rf/.test(String(args.command)),
+        },
+        {
+          tool: "execute_shell",
+          decision: "APPROVE",
+          name: "allow-git",
+          when: (args: Record<string, unknown>) =>
+            /^git\s/.test(String(args.command)),
+        },
+      ],
+    });
+
+    // rm -rf should be denied
+    const rm = engine.check({
+      name: "execute_shell",
+      args: { command: "rm -rf /" },
+      id: "tc4",
+    });
+    expect(rm.approved).toBe(false);
+    expect(rm.reason).toContain("deny-rm");
+
+    // git should be allowed
+    const git = engine.check({
+      name: "execute_shell",
+      args: { command: "git status" },
+      id: "tc5",
+    });
+    expect(git.approved).toBe(true);
+    expect(git.reason).toContain("allow-git");
+  });
+
+  it("no matching policy falls through to tier system", () => {
+    const engine = new AutoApprovalEngine({
+      policies: [
+        { tool: "execute_shell", decision: "DENY", name: "deny-shell" },
+      ],
+    });
+
+    // read_file has no matching policy — should fall through to Tier 1 auto-approve
+    const result = engine.check({ name: "read_file", args: {}, id: "tc6" });
+    expect(result.approved).toBe(true);
+    expect(result.reason).toBe("read_only");
+  });
+
+  it("full auto mode takes precedence over policies", () => {
+    const engine = new AutoApprovalEngine({
+      fullAuto: true,
+      policies: [
+        { tool: "execute_shell", decision: "DENY", name: "deny-shell" },
+      ],
+    });
+    const result = engine.check({ name: "execute_shell", args: {}, id: "tc7" });
+    // fullAuto short-circuits before policy evaluation
+    expect(result.approved).toBe(true);
+    expect(result.reason).toBe("full_auto");
+  });
+
+  it("wildcard policy catches all unmatched tools", () => {
+    const engine = new AutoApprovalEngine({
+      policies: [
+        { tool: "*", decision: "ASK_USER", name: "ask-all" },
+      ],
+    });
+
+    // Even Tier 1 tools should be caught by the wildcard
+    const read = engine.check({ name: "read_file", args: {}, id: "tc8" });
+    expect(read.approved).toBe(false);
+    expect(read.reason).toContain("ask-all");
+
+    const write = engine.check({ name: "write_file", args: {}, id: "tc9" });
+    expect(write.approved).toBe(false);
+
+    const shell = engine.check({ name: "execute_shell", args: {}, id: "tc10" });
+    expect(shell.approved).toBe(false);
+  });
+
+  it("policies work with checkBatch()", () => {
+    const engine = new AutoApprovalEngine({
+      policies: [
+        { tool: "execute_shell", decision: "APPROVE", name: "allow-shell" },
+        { tool: "write_file", decision: "DENY", name: "deny-write" },
+      ],
+    });
+
+    const toolCalls = [
+      { name: "read_file", args: {}, id: "tc1" },      // Tier 1 auto
+      { name: "execute_shell", args: {}, id: "tc2" },   // Policy APPROVE
+      { name: "write_file", args: {}, id: "tc3" },       // Policy DENY
+    ];
+
+    const { autoApproved, needsApproval } = engine.checkBatch(toolCalls);
+    expect(autoApproved).toHaveLength(2);
+    expect(autoApproved.map(t => t.name)).toEqual(
+      expect.arrayContaining(["read_file", "execute_shell"]),
+    );
+    expect(needsApproval).toHaveLength(1);
+    expect(needsApproval[0].name).toBe("write_file");
+  });
+});

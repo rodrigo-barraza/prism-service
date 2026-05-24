@@ -50,6 +50,7 @@ export const COLLECTIONS = {
   SETTINGS: "settings",
   CUSTOM_AGENTS: "custom_agents",
   WORKSPACES: "workspaces",
+  TOOL_CONTEXT: "tool_context",
 };
 
 /**

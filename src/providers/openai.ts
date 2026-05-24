@@ -438,7 +438,6 @@ const openaiProvider = {
     }
 
     // Temperature/topP only work with reasoning.effort=none
-    // @ts-expect-error — OpenAI SDK types lag behind API: "none" is valid for reasoningEffort
     if (options.reasoningEffort === "none") {
       if (options.temperature !== undefined)
         payload.temperature = options.temperature;
@@ -713,7 +712,6 @@ const openaiProvider = {
     }
 
     // Temperature/topP only work with reasoning.effort=none
-    // @ts-expect-error — OpenAI SDK types lag behind API: "none" is valid for reasoningEffort
     if (options.reasoningEffort === "none") {
       if (options.temperature !== undefined)
         payload.temperature = options.temperature;
@@ -1085,8 +1083,7 @@ const openaiProvider = {
         response = await getClient().images.generate({
           model,
           prompt,
-          // @ts-expect-error — OpenAI SDK types lag behind API: output_format accepts "png"
-          output_format: "png" as "url" | "b64_json",
+          output_format: "png",
           size: "1024x1024",
           quality: "high",
         });
