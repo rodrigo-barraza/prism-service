@@ -5,7 +5,6 @@ import { getProvider } from "../providers/index.ts";
 import { isInstance } from "../providers/instance-registry.ts";
 import logger from "../utils/logger.ts";
 import LocalProviderGateway from "../services/LocalProviderGateway.ts";
-import {} from "../utils/utilities.ts";
 import { initSseResponse } from "../utils/SseUtilities.ts";
 const router = express.Router();
 /** Resolve instance ID from request — supports ?instance=lm-studio-2 */

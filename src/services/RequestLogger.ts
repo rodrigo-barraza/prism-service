@@ -8,7 +8,6 @@ import {
   calculateTextCost,
 } from "../utils/CostCalculator.ts";
 import { computeModalities } from "./ConversationService.ts";
-import {} from "../utils/utilities.ts";
 import { COLLECTIONS } from "../constants.ts";
 import { TYPES, getPricing } from "../config.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";

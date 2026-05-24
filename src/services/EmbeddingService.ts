@@ -7,7 +7,6 @@ import { ProviderError } from "../utils/errors.ts";
 import RequestLogger from "./RequestLogger.ts";
 import logger from "../utils/logger.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";
-import {} from "../utils/utilities.ts";
 import SettingsService from "./SettingsService.ts";
 /** Resolve the current embedding provider + model from settings. */
 async function getEmbeddingConfig() {

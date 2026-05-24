@@ -7,7 +7,7 @@ import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import { cosineSimilarity } from "../utils/math.ts";
-import { parseJsonFromLlmResponse } from "../utils/utilities.ts";
+import { parseJsonFromLlmResponse } from "@rodrigo-barraza/utilities-library";
 import { COLLECTIONS } from "../constants.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import SettingsService from "./SettingsService.ts";

@@ -12,7 +12,7 @@ import {
   getInstanceType,
 } from "../providers/instance-registry.ts";
 import RequestLogger from "./RequestLogger.ts";
-import { parseJsonFromLlmResponse } from "../utils/utilities.ts";
+import { parseJsonFromLlmResponse } from "@rodrigo-barraza/utilities-library";
 import localModelQueue from "./LocalModelQueue.ts";
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
 import { COORDINATOR_ONLY_TOOLS } from "./CoordinatorPrompt.ts";

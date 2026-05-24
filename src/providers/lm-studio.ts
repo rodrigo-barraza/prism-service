@@ -16,7 +16,6 @@ import {
   LM_STUDIO_DEFAULT_MAX_CONTEXT,
 } from "../../config.ts";
 import { TYPES, getDefaultModels } from "../config.ts";
-import {} from "../utils/utilities.ts";
 // Default MCP server URL for ephemeral tool integrations (vault-resolved)
 const DEFAULT_MCP_SERVER_URL = TOOLS_SERVICE_URL;
 import {
