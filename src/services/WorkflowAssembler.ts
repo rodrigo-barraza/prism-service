@@ -44,9 +44,9 @@ function buildConversationPorts(messages: WorkflowMessage[], supportedModalities
     const message = messages[i];
     ports.push(`${i}.text`);
     if (message.role === "user" || message.role === "assistant") {
-      for (const mod of supportedModalities) {
-        if (mod !== "text") {
-          ports.push(`${i}.${mod}`);
+      for (const modality of supportedModalities) {
+        if (modality !== "text") {
+          ports.push(`${i}.${modality}`);
         }
       }
     }
