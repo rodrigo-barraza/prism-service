@@ -155,8 +155,8 @@ const exitWorktree = {
       await import("../ToolOrchestratorService.js");
 
     const sessionId = context.agentSessionId;
-    const wt = ToolOrchestratorService.getWorktreeState(sessionId);
-    if (!sessionId || !wt) {
+    const worktreeState = ToolOrchestratorService.getWorktreeState(sessionId);
+    if (!sessionId || !worktreeState) {
       return {
         error: "Not currently in a worktree. Call enter_worktree first.",
       };
@@ -168,23 +168,23 @@ const exitWorktree = {
     if (action === "merge") {
       const diffResult = await ToolOrchestratorService._proxyPost(
         "/agentic/git/worktree/diff",
-        { path: wt.repoPath, branch: wt.branchName },
+        { path: worktreeState.repoPath, branch: worktreeState.branchName },
         context,
       ) as Record<string, unknown>;
 
       mergeResult = await ToolOrchestratorService._proxyPost(
         "/agentic/git/worktree/merge",
         {
-          path: wt.repoPath,
-          branch: wt.branchName,
-          message: commitMessage || `Merge worktree: ${wt.branchName}`,
+          path: worktreeState.repoPath,
+          branch: worktreeState.branchName,
+          message: commitMessage || `Merge worktree: ${worktreeState.branchName}`,
         },
         context,
       ) as WorktreeMergeResult;
 
       if (mergeResult.error) {
         return {
-          error: `Merge failed: ${mergeResult.error}. Worktree preserved at ${wt.worktreePath}. Resolve conflicts and try again, or exit_worktree with action 'discard'.`,
+          error: `Merge failed: ${mergeResult.error}. Worktree preserved at ${worktreeState.worktreePath}. Resolve conflicts and try again, or exit_worktree with action 'discard'.`,
         };
       }
 
@@ -194,32 +194,32 @@ const exitWorktree = {
     // Remove the worktree (both merge and discard)
     await ToolOrchestratorService._proxyPost(
       "/agentic/git/worktree/remove",
-      { path: wt.repoPath, worktreePath: wt.worktreePath, deleteBranch: true },
+      { path: worktreeState.repoPath, worktreePath: worktreeState.worktreePath, deleteBranch: true },
       context,
     );
 
     ToolOrchestratorService._clearWorktree(sessionId);
 
-    logger.info(`[Worktree] exit: ${action} — ${wt.branchName}`);
+    logger.info(`[Worktree] exit: ${action} — ${worktreeState.branchName}`);
 
     if (context._emit) {
       context._emit({
         type: "status",
         message: "worktree_exited",
         action,
-        branch: wt.branchName,
+        branch: worktreeState.branchName,
       });
     }
 
     return {
       acknowledged: true,
       action,
-      branch: wt.branchName,
+      branch: worktreeState.branchName,
       merged: action === "merge" ? mergeResult : undefined,
       message:
         action === "merge"
-          ? `Changes from ${wt.branchName} merged into main branch. Workspace restored.`
-          : `Worktree ${wt.branchName} discarded. All changes removed. Workspace restored.`,
+          ? `Changes from ${worktreeState.branchName} merged into main branch. Workspace restored.`
+          : `Worktree ${worktreeState.branchName} discarded. All changes removed. Workspace restored.`,
     };
   },
 };

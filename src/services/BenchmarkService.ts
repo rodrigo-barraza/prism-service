@@ -362,39 +362,39 @@ async function runSingleModel(
         }),
       },
       (event: SseEvent) => {
-        const e = event as SseEvent & BenchmarkEvent;
-        events.push(e);
+        const benchmarkEvent = event as SseEvent & BenchmarkEvent;
+        events.push(benchmarkEvent);
         // Forward chunk/thinking/tool events in real-time for live preview
         if (
-          e.type === "chunk" ||
-          e.type === "thinking" ||
-          e.type === "toolCall" ||
-          e.type === "tool_execution" ||
-          e.type === "tool_output"
+          benchmarkEvent.type === "chunk" ||
+          benchmarkEvent.type === "thinking" ||
+          benchmarkEvent.type === "toolCall" ||
+          benchmarkEvent.type === "tool_execution" ||
+          benchmarkEvent.type === "tool_output"
         ) {
           if (onEvent) {
             try {
-              onEvent(e);
+              onEvent(benchmarkEvent);
             } catch {
               /* noop */
             }
           }
         }
         // Log every event for debugging
-        if (e.type === "chunk") {
+        if (benchmarkEvent.type === "chunk") {
           logger.info(
-            `[benchmark]   📦 ${model.model} chunk (${e.content?.length || 0} chars)`,
+            `[benchmark]   📦 ${model.model} chunk (${benchmarkEvent.content?.length || 0} chars)`,
           );
-        } else if (e.type === "error") {
+        } else if (benchmarkEvent.type === "error") {
           logger.error(
-            `[benchmark]   ❌ ${model.model} error: ${e.message}`,
+            `[benchmark]   ❌ ${model.model} error: ${benchmarkEvent.message}`,
           );
-        } else if (e.type === "done") {
+        } else if (benchmarkEvent.type === "done") {
           logger.info(
-            `[benchmark]   ✅ ${model.model} done — usage: ${JSON.stringify(e.usage || null)}, cost: ${e.estimatedCost ?? "N/A"}`,
+            `[benchmark]   ✅ ${model.model} done — usage: ${JSON.stringify(benchmarkEvent.usage || null)}, cost: ${benchmarkEvent.estimatedCost ?? "N/A"}`,
           );
         } else {
-          logger.info(`[benchmark]   📨 ${model.model} event: ${e.type}`);
+          logger.info(`[benchmark]   📨 ${model.model} event: ${benchmarkEvent.type}`);
         }
       },
       { signal },

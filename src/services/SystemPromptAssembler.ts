@@ -373,45 +373,45 @@ export default class SystemPromptAssembler {
     // Only injected when the caller provides agentContext (e.g. Lupos
     // sends Discord server/channel/participant info, trending data, etc.)
     if (context.agentContext) {
-      const ac = context.agentContext;
+      const agentCtx = context.agentContext;
 
       // Structured context blocks — each is a pre-formatted text block
       // assembled by the caller (Lupos/Prism Client/etc.)
-      if (ac.discordContext) {
-        sections.push(ac.discordContext as string);
+      if (agentCtx.discordContext) {
+        sections.push(agentCtx.discordContext as string);
       }
-      if (ac.serverContext) {
-        sections.push(ac.serverContext as string);
+      if (agentCtx.serverContext) {
+        sections.push(agentCtx.serverContext as string);
       }
-      if (ac.imageContext) {
-        sections.push(ac.imageContext as string);
+      if (agentCtx.imageContext) {
+        sections.push(agentCtx.imageContext as string);
       }
-      if (ac.clockCrewContext) {
-        sections.push(ac.clockCrewContext as string);
+      if (agentCtx.clockCrewContext) {
+        sections.push(agentCtx.clockCrewContext as string);
       }
 
       // Stickers kiosk context — stage flow, emotion state, visual context
-      if (ac.stickersContext) {
-        sections.push(ac.stickersContext as string);
+      if (agentCtx.stickersContext) {
+        sections.push(agentCtx.stickersContext as string);
       }
-      if (ac.emotionContext) {
-        sections.push(ac.emotionContext as string);
+      if (agentCtx.emotionContext) {
+        sections.push(agentCtx.emotionContext as string);
       }
-      if (ac.visualContext) {
-        sections.push(ac.visualContext as string);
+      if (agentCtx.visualContext) {
+        sections.push(agentCtx.visualContext as string);
       }
 
       // Discord IDs — explicitly inject so discord tools get the correct IDs
       // (the LLM cannot infer these from guild/channel names alone)
-      if (ac.guildId) {
-        let idsBlock = `# Discord IDs\n- Guild ID: ${ac.guildId}`;
-        if (ac.channelId) idsBlock += `\n- Channel ID: ${ac.channelId}`;
+      if (agentCtx.guildId) {
+        let idsBlock = `# Discord IDs\n- Guild ID: ${agentCtx.guildId}`;
+        if (agentCtx.channelId) idsBlock += `\n- Channel ID: ${agentCtx.channelId}`;
         sections.push(idsBlock);
       }
 
       // Lights context — current light states, night lock, automation mode
-      if (ac.lightsContext) {
-        sections.push(ac.lightsContext as string);
+      if (agentCtx.lightsContext) {
+        sections.push(agentCtx.lightsContext as string);
       }
     }
 

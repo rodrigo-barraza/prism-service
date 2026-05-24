@@ -236,8 +236,8 @@ function buildUrlFromEndpoint(endpoint: ToolEndpoint, args: Record<string, unkno
     params.set("fields", fieldsStr);
   }
 
-  const qs = params.toString();
-  return `${TOOLS_SERVICE_URL}${path}${qs ? `?${qs}` : ""}`;
+  const queryString = params.toString();
+  return `${TOOLS_SERVICE_URL}${path}${queryString ? `?${queryString}` : ""}`;
 }
 
 const ARG_REMAPS = {
@@ -280,11 +280,11 @@ async function executeToolGeneric(name: string, args: Record<string, unknown> = 
     // Worktree path rewriting — redirect file paths to the worktree directory
     // when the session has an active worktree.
     if (context.agentSessionId && activeWorktrees.has(context.agentSessionId)) {
-      const wt = activeWorktrees.get(context.agentSessionId)!;
+      const worktreeState = activeWorktrees.get(context.agentSessionId)!;
       const rewritePath = (p: unknown): unknown => {
         if (typeof p !== "string") return p;
-        if (p.startsWith(wt.originalRoot)) {
-          return wt.worktreePath + p.slice(wt.originalRoot.length);
+        if (p.startsWith(worktreeState.originalRoot)) {
+          return worktreeState.worktreePath + p.slice(worktreeState.originalRoot.length);
         }
         return p;
       };
@@ -298,7 +298,7 @@ async function executeToolGeneric(name: string, args: Record<string, unknown> = 
       if (body.directory) body.directory = rewritePath(body.directory);
 
       // Inject workspace override header so tools-api sandbox validation passes
-      contextHeaders["X-Workspace-Override"] = wt.worktreePath;
+      contextHeaders["X-Workspace-Override"] = worktreeState.worktreePath;
     }
 
     return fetchJsonPost(url, body, contextHeaders, context.signal);

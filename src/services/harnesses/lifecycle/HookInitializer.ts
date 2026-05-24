@@ -1,4 +1,4 @@
-import AgentHooks from "../../AgentHooks.ts";
+import AgentHooks, { type HookHandler } from "../../AgentHooks.ts";
 import AutoApprovalEngine from "../../AutoApprovalEngine.ts";
 import SystemPromptAssembler from "../../SystemPromptAssembler.ts";
 import MemoryExtractor from "../../MemoryExtractor.ts";
@@ -37,7 +37,7 @@ export function createStandardHooks({
   });
   hooks.register(
     "beforeToolCall" as Parameters<typeof hooks.register>[0],
-    approvalEngine.createHook(),
+    approvalEngine.createHook() as HookHandler,
     "AutoApprovalEngine",
     "decide",
   );
@@ -47,14 +47,14 @@ export function createStandardHooks({
   });
   hooks.register(
     "beforePrompt" as Parameters<typeof hooks.register>[0],
-    assembler.createHook(),
+    assembler.createHook() as HookHandler,
     "SystemPromptAssembler",
     "transform",
   );
 
   hooks.register(
     "afterResponse" as Parameters<typeof hooks.register>[0],
-    MemoryExtractor.createHook(),
+    MemoryExtractor.createHook() as HookHandler,
     "MemoryExtractor",
     "inspect",
   );

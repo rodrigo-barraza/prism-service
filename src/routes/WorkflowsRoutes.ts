@@ -1,6 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response, NextFunction } from "express";
-import { ObjectId } from "mongodb";
+import { ObjectId, type Document, type Db } from "mongodb";
 import logger from "../utils/logger.ts";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import FileService from "../services/FileService.ts";
@@ -8,7 +8,6 @@ import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import { assembleGraph } from "../services/WorkflowAssembler.ts";
 import { COLLECTIONS } from "../constants.ts";
 
-import { Db } from "mongodb";
 
 interface CustomRequest extends Request {
   db: Db;
@@ -84,9 +83,9 @@ async function extractWorkflowFiles(
     if (Array.isArray(updated.messages)) {
       const newMessages: Record<string, unknown>[] = [];
             for ( const message of updated.messages) {
-        const m = { ...(message as Record<string, unknown>) };
+        const sanitizedMessage = { ...(message as Record<string, unknown>) };
                 for ( const field of MEDIA_FIELDS) {
-          const value = m[field];
+          const value = sanitizedMessage[field];
           if (Array.isArray(value)) {
             const array: string[] = [];
                         for ( const item of value) {
@@ -94,12 +93,12 @@ async function extractWorkflowFiles(
                 (await uploadIfDataUrl(item, "uploads", project, username) as string),
               );
             }
-            (m as Record<string, unknown>)[field] = array;
+            (sanitizedMessage as Record<string, unknown>)[field] = array;
           } else if (typeof value === "string" && value.startsWith("data:")) {
-            (m as Record<string, unknown>)[field] = await uploadIfDataUrl(value as string, "uploads", project, username);
+            (sanitizedMessage as Record<string, unknown>)[field] = await uploadIfDataUrl(value as string, "uploads", project, username);
           }
         }
-        newMessages.push(m);
+        newMessages.push(sanitizedMessage);
       }
       updated.messages = newMessages;
     }
@@ -154,9 +153,9 @@ async function extractNodeResultFiles(
       if (mod === "conversation" && Array.isArray(data)) {
         const msgs: Record<string, unknown>[] = [];
                 for ( const message of data) {
-          const m = { ...(message as Record<string, unknown>) };
+          const sanitizedMessage = { ...(message as Record<string, unknown>) };
                     for ( const field of MEDIA_FIELDS) {
-            const value = m[field];
+            const value = sanitizedMessage[field];
             if (Array.isArray(value)) {
               const array: string[] = [];
                             for ( const item of value) {
@@ -164,9 +163,9 @@ async function extractNodeResultFiles(
                     (await uploadIfDataUrl(item, "uploads", project, username) as string),
                 );
               }
-              (m as Record<string, unknown>)[field] = array;
+              (sanitizedMessage as Record<string, unknown>)[field] = array;
             } else if (typeof value === "string" && value.startsWith("data:")) {
-              (m as Record<string, unknown>)[field] = await uploadIfDataUrl(
+              (sanitizedMessage as Record<string, unknown>)[field] = await uploadIfDataUrl(
                                 (value as string),
                 "uploads",
                 project,
@@ -174,7 +173,7 @@ async function extractNodeResultFiles(
               );
             }
           }
-          msgs.push(m);
+          msgs.push(sanitizedMessage);
         }
                 newOutputs[mod] = msgs;
       } else {
@@ -534,8 +533,8 @@ router.patch(
       }
 
       const result = await db.collection(WORKFLOWS_COL).updateOne(filter, {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MongoDB PushOperator typing is overly strict for dynamic schemas
-        $push: { conversationIds: { $each: conversationIds } } as any,
+        // MongoDB PushOperator typing is overly strict for dynamic schemas — cast to Document
+        $push: { conversationIds: { $each: conversationIds } } as Document,
         $set: { updatedAt: new Date().toISOString() },
       });
 

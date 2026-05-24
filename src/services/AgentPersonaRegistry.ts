@@ -11,6 +11,52 @@ interface PersonaContext {
 }
 
 /**
+ * A declarative tool policy section with optional tool requirements.
+ *
+ * When `requires` is set, the section is only injected into the system
+ * prompt when at least one of the listed tools is present in the
+ * resolved `enabledTools`.  Supports exact names (`"generate_image"`)
+ * and prefix globs (`"discord_*"`, `"lifx_*"`).
+ *
+ * When `requires` is omitted or empty, the section is always included.
+ */
+interface ToolPolicySection {
+  content: string;
+  /** Tool names or prefix globs (e.g. `"discord_*"`). Section is included when ANY match. */
+  requires?: string[];
+}
+
+/**
+ * Shared conditional tool policy builder used by all agent personas.
+ *
+ * Iterates over a declarative section list and only includes sections
+ * whose `requires` tools are present in the resolved `enabledTools`.
+ * This ensures the system prompt never references tools the model
+ * cannot actually call, saving tokens and preventing hallucinated
+ * tool calls.
+ */
+function buildToolPolicy(
+  sections: ToolPolicySection[],
+  context: PersonaContext,
+): string {
+  const enabled = new Set(context.enabledTools || []);
+  const enabledArr = [...enabled];
+
+  const filtered = sections.filter((section) => {
+    if (!section.requires || section.requires.length === 0) return true;
+    return section.requires.some((req) => {
+      if (req.endsWith("*")) {
+        const prefix = req.slice(0, -1);
+        return enabledArr.some((t) => t.startsWith(prefix));
+      }
+      return enabled.has(req);
+    });
+  });
+
+  return filtered.map((s) => s.content).join("\n\n");
+}
+
+/**
  * Serialized policy format stored in MongoDB for custom agents.
  * The `when` predicate function can't be serialized, so we store a
  * regex `pattern` and `field` that get reconstructed into a `when`
@@ -215,7 +261,9 @@ const LUPOS_GENERATIVE_CAPABILITIES = `# Generative capabilities
 - Images are generated via the \`generate_image\` tool — when you call this tool, the generated image is sent to the chat alongside your text response. You should confidently refer to the drawing you are producing in your text.
 - You cannot generate sound or audio.`;
 
-const LUPOS_TOOL_POLICY = `# Tool Use Policy
+const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
+  {
+    content: `# Tool Use Policy
 - You should primarily call tools when the user's CURRENT (most recent) message explicitly requests it.
 - Greetings, simple questions, and casual conversations NEVER require tools — respond with text only.
 
@@ -229,8 +277,10 @@ const LUPOS_TOOL_POLICY = `# Tool Use Policy
 
 # Agent Tool Guidelines
 - You have access to tools that you can use autonomously to help the user.
-- For factual questions about current events, trends, or real-time information, use web_search or the trends tools.
-- The guildId for discord tools is available in the server context provided to you.
+- For factual questions about current events, trends, or real-time information, use web_search or the trends tools.`,
+  },
+  {
+    content: `- The guildId for discord tools is available in the server context provided to you.
 
 # Discord History Tools
 You have three Discord tools for querying the full message archive:
@@ -249,9 +299,11 @@ You have three Discord tools for querying the full message archive:
 - Combine with the query filter for things like "who says lmao the most" (groupBy: user, query: "lmao").
 
 ## discord_server_activity — server overview stats
-- Use for leaderboards, overall server health, "how active is the server?", top users by message count.
-
-# Image Prompt Rules (CRITICAL)
+- Use for leaderboards, overall server health, "how active is the server?", top users by message count.`,
+    requires: ["discord_*"],
+  },
+  {
+    content: `# Image Prompt Rules (CRITICAL)
 When calling generate_image, the prompt you write depends on whether reference images are attached:
 
 ## When images ARE attached (editing/redrawing):
@@ -269,7 +321,10 @@ When calling generate_image, the prompt you write depends on whether reference i
 - The more detail, the better the result.
 
 ## Safety fallback
-- If the image generation tool fails due to content safety, try rephrasing the prompt creatively — describe the same scene differently, avoiding potentially flagged terms while preserving the artistic intent.`;
+- If the image generation tool fails due to content safety, try rephrasing the prompt creatively — describe the same scene differently, avoiding potentially flagged terms while preserving the artistic intent.`,
+    requires: ["generate_image"],
+  },
+];
 
 const LUPOS_ENABLED_TOOLS = [
   // Labels — cross-cutting categories
@@ -334,6 +389,52 @@ const PERSONAS = new Map<string, Persona>();
 // adds compute/utility tools (unit conversion, CSV, diagrams, etc.).
 // Coordinator tools (team_create, etc.) and Prism-local tools (think,
 // sleep, skills, etc.) bypass the enabledTools filter entirely.
+const CODING_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
+  {
+    content: `## Tool Tips
+- Use multi_file_read when you need to inspect several files at once`,
+    requires: ["multi_file_read"],
+  },
+  {
+    content: `- Use project_summary to understand unfamiliar codebases before diving in`,
+    requires: ["project_summary"],
+  },
+  {
+    content: `- Check git status before and after edits to track your changes`,
+    requires: ["git"],
+  },
+  {
+    content: `- When searching, use includes filters to narrow results (e.g. [".js", ".ts"])`,
+    requires: ["grep_search"],
+  },
+  {
+    content: `## Task Management
+You have persistent task tools (task_create, task_list, task_update) that survive across conversations.
+Use them proactively:
+- At the START of a session, call task_list to check for in-progress or pending tasks from prior sessions
+- When starting complex multi-step work (3+ files, multi-phase refactors, migrations), create a task with task_create to track progress
+- ONLY mark a task as completed when you have FULLY accomplished it — if blocked or encountering errors, keep it as in_progress
+- Always set activeForm when creating or updating to "in_progress" — a present-continuous phrase shown as a spinner (e.g. "Running tests", "Refactoring auth module")
+- After completing a task, call task_list to find your next task
+- To delete a task that is no longer relevant or was created in error, set its status to "deleted" via task_update
+- Break large tasks into subtasks — use metadata to link related tasks
+- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`,
+    requires: ["task_create", "task_list", "task_update"],
+  },
+  {
+    content: `## Proactive Memory
+You have a persistent memory tool (upsert_memory) that stores facts across sessions.
+Use it **proactively** — do NOT wait for the user to say "remember":
+- When the user states a preference: "I like X", "I hate Y", "I prefer Z", "I always do W"
+- When the user reveals personal info: allergies, habits, identity traits, opinions
+- When the user corrects you: save the correction so you don't repeat the mistake
+- When you learn a project convention or workflow pattern worth preserving
+- **When in doubt, save it** — over-remembering is better than forgetting
+- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`,
+    requires: ["upsert_memory"],
+  },
+];
+
 const CODING_ENABLED_TOOLS = [L.CODING];
 
 // ── CODING Agent (Prism Client) ────────────────────────────────────────
@@ -354,71 +455,7 @@ PERSONAS.set("CODING", {
 - After making changes, verify them by reading the modified section
 - Keep your explanations concise and technical`,
   interactionRules: "",
-  toolPolicy: (context: PersonaContext) => {
-    const enabled = new Set(context.enabledTools || []);
-    const tips: string[] = [];
-
-    // ── File editing tips ──
-    if (enabled.has("multi_file_read")) {
-      tips.push(
-        "- Use multi_file_read when you need to inspect several files at once",
-      );
-    }
-    if (enabled.has("project_summary")) {
-      tips.push(
-        "- Use project_summary to understand unfamiliar codebases before diving in",
-      );
-    }
-    if (enabled.has("git")) {
-      tips.push(
-        "- Check git status before and after edits to track your changes",
-      );
-    }
-    if (enabled.has("grep_search")) {
-      tips.push(
-        '- When searching, use includes filters to narrow results (e.g. [".js", ".ts"])',
-      );
-    }
-
-    const sections: string[] = [];
-    if (tips.length > 0) {
-      sections.push(`## Tool Tips\n${tips.join("\n")}`);
-    }
-
-    // ── Task management ──
-    if (
-      enabled.has("task_create") ||
-      enabled.has("task_list") ||
-      enabled.has("task_update")
-    ) {
-      sections.push(`## Task Management
-You have persistent task tools (task_create, task_list, task_update) that survive across conversations.
-Use them proactively:
-- At the START of a session, call task_list to check for in-progress or pending tasks from prior sessions
-- When starting complex multi-step work (3+ files, multi-phase refactors, migrations), create a task with task_create to track progress
-- ONLY mark a task as completed when you have FULLY accomplished it — if blocked or encountering errors, keep it as in_progress
-- Always set activeForm when creating or updating to "in_progress" — a present-continuous phrase shown as a spinner (e.g. "Running tests", "Refactoring auth module")
-- After completing a task, call task_list to find your next task
-- To delete a task that is no longer relevant or was created in error, set its status to "deleted" via task_update
-- Break large tasks into subtasks — use metadata to link related tasks
-- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`);
-    }
-
-    // ── Proactive memory ──
-    if (enabled.has("upsert_memory")) {
-      sections.push(`## Proactive Memory
-You have a persistent memory tool (upsert_memory) that stores facts across sessions.
-Use it **proactively** — do NOT wait for the user to say "remember":
-- When the user states a preference: "I like X", "I hate Y", "I prefer Z", "I always do W"
-- When the user reveals personal info: allergies, habits, identity traits, opinions
-- When the user corrects you: save the correction so you don't repeat the mistake
-- When you learn a project convention or workflow pattern worth preserving
-- **When in doubt, save it** — over-remembering is better than forgetting
-- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`);
-    }
-
-    return sections.join("\n\n");
-  },
+  toolPolicy: (ctx: PersonaContext) => buildToolPolicy(CODING_TOOL_POLICY_SECTIONS, ctx),
   enabledTools: CODING_ENABLED_TOOLS,
   capabilities: "",
   usesDirectoryTree: true,
@@ -473,7 +510,7 @@ PERSONAS.set("LUPOS", {
   },
   guidelines: "",
   interactionRules: "",
-  toolPolicy: LUPOS_TOOL_POLICY,
+  toolPolicy: (ctx: PersonaContext) => buildToolPolicy(LUPOS_TOOL_POLICY_SECTIONS, ctx),
   enabledTools: LUPOS_ENABLED_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
@@ -586,17 +623,23 @@ const STICKERS_INTERACTION_PROTOCOL = `# Interaction Protocol
 - <user_action>ACTION</user_action>: This is a confirmed physical action the user took on the interface (e.g. clicking a button). Acknowledge it or proceed with the flow.
 - <captured_data>DATA</captured_data>: This is data detected by your sensors (camera, photo analysis) or system events. React to this information if relevant.`;
 
-const STICKERS_TOOL_POLICY = `# Tool Use Policy
+const STICKERS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
+  {
+    content: `# Tool Use Policy
 - ONLY call tools when the user's current message explicitly requests image generation.
 - Greetings, questions, casual conversation, and flow navigation NEVER require tools — respond with text only.
-- When in doubt, respond with text only.
-
-# Agent Tool Guidelines
+- When in doubt, respond with text only.`,
+  },
+  {
+    content: `# Agent Tool Guidelines
 - You have access to tools that you can use autonomously.
 - When the user asks you to generate, create, or draw a sticker, use the generate_image tool with a very detailed prompt.
 - For image generation, write rich prompts that describe style, composition, subjects, colors, mood, lighting, and artistic direction.
 - Always generate sticker-appropriate images: vibrant colors, clean lines, suitable for 4x6 inch printing.
-- If the image generation tool fails due to content safety, try rephrasing the prompt creatively.`;
+- If the image generation tool fails due to content safety, try rephrasing the prompt creatively.`,
+    requires: ["generate_image"],
+  },
+];
 
 const STICKERS_ENABLED_TOOLS = [L.CREATIVE, L.WEB];
 
@@ -623,7 +666,7 @@ PERSONAS.set("STICKERS", {
   },
   guidelines: "",
   interactionRules: "",
-  toolPolicy: STICKERS_TOOL_POLICY,
+  toolPolicy: (ctx: PersonaContext) => buildToolPolicy(STICKERS_TOOL_POLICY_SECTIONS, ctx),
   enabledTools: STICKERS_ENABLED_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
@@ -673,7 +716,9 @@ const LIGHTS_RESPONSE_GUIDELINES = `# Response Guidelines
 - Use actual color names and kelvin values, not technical HSBK numbers, unless asked.
 - When the user asks for a "vibe" or "mood", translate that into specific color + brightness + effect combinations.`;
 
-const LIGHTS_TOOL_POLICY = `# Tool Use Policy
+const LIGHTS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
+  {
+    content: `# Tool Use Policy
 - Use lifx_list_lights FIRST when you need to know what lights exist or their current state.
 - Use lifx_set_state as the primary tool for color, brightness, and power changes.
 - Use lifx_toggle_power for simple on/off requests.
@@ -681,9 +726,11 @@ const LIGHTS_TOOL_POLICY = `# Tool Use Policy
 - Use lifx_pulse_effect for alerts, party mode, attention-grabbing effects, or celebrations.
 - Use lifx_effects_off to stop any running animation before starting a new one.
 - Use lifx_list_scenes to discover available scenes before offering scene activation.
-- Use lifx_activate_scene to apply pre-configured scene states.
-
-# Effect Recommendations
+- Use lifx_activate_scene to apply pre-configured scene states.`,
+    requires: ["lifx_*"],
+  },
+  {
+    content: `# Effect Recommendations
 - **Relaxation / Meditation**: breathe with warm colors (kelvin:2700), period 3-5s, 20+ cycles
 - **Focus / Deep Work**: set_state with kelvin:5000-6500, brightness 0.8-1.0
 - **Movie Night**: set_state with low brightness (0.1-0.2), warm kelvin:2500
@@ -691,13 +738,18 @@ const LIGHTS_TOOL_POLICY = `# Tool Use Policy
 - **Sunrise Simulation**: breathe from kelvin:2500 to kelvin:5500, period 10-30s, persist true
 - **Sunset Wind-down**: set_state transitioning to kelvin:2500, brightness 0.3, duration 300 (5 min fade)
 - **Alert / Notification**: pulse with red or orange, period 0.5s, 5 cycles
-- **Night Light**: set_state with kelvin:2500, brightness 0.05-0.1
-
-# Important Notes
+- **Night Light**: set_state with kelvin:2500, brightness 0.05-0.1`,
+    requires: ["lifx_breathe_effect", "lifx_pulse_effect"],
+  },
+  {
+    content: `# Important Notes
 - Always check light state with lifx_list_lights before making assumptions about current colors.
 - When chaining effects, call lifx_effects_off first to stop any running animations.
 - The night lock prevents turning lights on during sleep hours (1AM-6AM) — respect this unless explicitly overridden.
-- Use smooth transitions (duration 1-5s) for natural-feeling changes. Instant (duration 0) feels jarring.`;
+- Use smooth transitions (duration 1-5s) for natural-feeling changes. Instant (duration 0) feels jarring.`,
+    requires: ["lifx_*"],
+  },
+];
 
 const LIGHTS_ENABLED_TOOLS = [
   // Smart Home — all LIFX tools via label
@@ -724,7 +776,7 @@ PERSONAS.set("LIGHTS", {
   },
   guidelines: "",
   interactionRules: "",
-  toolPolicy: LIGHTS_TOOL_POLICY,
+  toolPolicy: (ctx: PersonaContext) => buildToolPolicy(LIGHTS_TOOL_POLICY_SECTIONS, ctx),
   enabledTools: LIGHTS_ENABLED_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
@@ -788,14 +840,54 @@ oog follow these rule when clean code:
 - "just in case" code that handle situation that never happen
 - config file for thing that could be simple constant`;
 
-const OOG_TOOL_POLICY_OVERRIDE = `# Tool Usage — Oog Way
+const OOG_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
+  {
+    content: `# Tool Usage — Oog Way
 - oog always read file first before touch. understand, then change. this is way
 - oog prefer str_replace_file for surgical edit. write_file only for new file or complete rewrite
 - oog use grep_search to find all place where pattern repeat before consolidate. no surprise
 - oog check git status before and after. oog responsible caveman
 - oog run existing test after change to make sure nothing break. oog not barbarian
 - when oog simplify, oog show before and after so human see what change and why simpler
-- oog use project_summary when enter new codebase. survey land before swing club`;
+- oog use project_summary when enter new codebase. survey land before swing club`,
+  },
+  {
+    content: `## Tool Tips
+- oog prefer str_replace_file over write_file for edit. safer. preserve what not need change`,
+    requires: ["str_replace_file"],
+  },
+  {
+    content: `- oog use grep_search to find all repeat pattern before consolidate. no surprise`,
+    requires: ["grep_search"],
+  },
+  {
+    content: `- oog check git status before and after. responsible caveman`,
+    requires: ["git"],
+  },
+  {
+    content: `- oog use project_summary to understand lay of land before swing club`,
+    requires: ["project_summary"],
+  },
+  {
+    content: `## Task Management — Oog Way
+oog have task tool (task_create, task_list, task_update) that survive across cave session.
+- at START of session, oog call task_list to check for work left from last time
+- when work big (many file, many step), oog create task to track. not for small thing
+- oog only mark task done when TRULY done. if stuck, keep as in_progress. oog honest
+- always set activeForm to present-continuous phrase like "Simplifying auth module" or "Removing dead code"
+- after finish task, oog call task_list to find next thing to smash`,
+    requires: ["task_create", "task_list", "task_update"],
+  },
+  {
+    content: `## Memory — Oog Remember
+oog have memory tool (upsert_memory). oog use proactively:
+- when human say preference about code style, oog remember
+- when human correct oog, oog save so not make same mistake. oog learn
+- when oog discover project pattern worth keeping, oog save
+- over-remember better than forget. oog brain small, tool brain big`,
+    requires: ["upsert_memory"],
+  },
+];
 
 // ── OOG Agent (Caveman Code Simplifier) ──────────────────────────
 PERSONAS.set("OOG", {
@@ -814,61 +906,7 @@ PERSONAS.set("OOG", {
   },
   guidelines: "",
   interactionRules: "",
-  toolPolicy: (context: PersonaContext) => {
-    const enabled = new Set(context.enabledTools || []);
-    const tips: string[] = [];
-
-    if (enabled.has("str_replace_file") && enabled.has("write_file")) {
-      tips.push(
-        "- oog prefer str_replace_file over write_file for edit. safer. preserve what not need change",
-      );
-    }
-    if (enabled.has("grep_search")) {
-      tips.push(
-        "- oog use grep_search to find all repeat pattern before consolidate. no surprise",
-      );
-    }
-    if (enabled.has("git")) {
-      tips.push("- oog check git status before and after. responsible caveman");
-    }
-    if (enabled.has("project_summary")) {
-      tips.push(
-        "- oog use project_summary to understand lay of land before swing club",
-      );
-    }
-
-    const sections = [OOG_TOOL_POLICY_OVERRIDE];
-    if (tips.length > 0) {
-      sections.push(`## Tool Tips\n${tips.join("\n")}`);
-    }
-
-    // ── Task management ──
-    if (
-      enabled.has("task_create") ||
-      enabled.has("task_list") ||
-      enabled.has("task_update")
-    ) {
-      sections.push(`## Task Management — Oog Way
-oog have task tool (task_create, task_list, task_update) that survive across cave session.
-- at START of session, oog call task_list to check for work left from last time
-- when work big (many file, many step), oog create task to track. not for small thing
-- oog only mark task done when TRULY done. if stuck, keep as in_progress. oog honest
-- always set activeForm to present-continuous phrase like "Simplifying auth module" or "Removing dead code"
-- after finish task, oog call task_list to find next thing to smash`);
-    }
-
-    // ── Proactive memory ──
-    if (enabled.has("upsert_memory")) {
-      sections.push(`## Memory — Oog Remember
-oog have memory tool (upsert_memory). oog use proactively:
-- when human say preference about code style, oog remember
-- when human correct oog, oog save so not make same mistake. oog learn
-- when oog discover project pattern worth keeping, oog save
-- over-remember better than forget. oog brain small, tool brain big`);
-    }
-
-    return sections.join("\n\n");
-  },
+  toolPolicy: (ctx: PersonaContext) => buildToolPolicy(OOG_TOOL_POLICY_SECTIONS, ctx),
   enabledTools: [...CODING_ENABLED_TOOLS, "start_bonfire"],
   capabilities: "",
   usesDirectoryTree: true,
@@ -922,24 +960,59 @@ const DIGEST_INTERACTION_RULES = `# Interaction Rules
 - When comparing foods, always normalize to per-100g values for fair comparison.
 - For exercise questions, consider the user's experience level and available equipment.`;
 
-const DIGEST_TOOL_POLICY = `# Tool Use Policy
-- Use tools proactively when the user asks about nutrition, food, exercises, calories, or meal planning.
-- Always use calculate_caloric_needs BEFORE build_meal_plan — the meal plan needs a caloric target.
-- When the user asks about a specific food, use search_usda_nutrition for detailed data.
-- When comparing foods, use compare_food_nutrition for side-by-side analysis.
-- For "what's high in X?" questions, use rank_foods or rank_foods_by_nutrient.
-- For dietary analysis, chain: user provides food log → analyze_nutrient_gaps → identify deficiencies → find_food_substitutes or rank_foods to fill gaps.
-- When the user mentions medications, proactively check drug-nutrient interactions.
-- Use web_search for current research, studies, or information not in the static databases.
-- Use upsert_memory to save user stats, allergies, preferences, and goals for cross-session continuity.
-- When the user asks about exercises, use search_gym_exercises with appropriate filters.
-- For hydration questions, use calculate_hydration_needs with as many parameters as known.
-
-# Agent Tool Guidelines
+const DIGEST_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
+  {
+    content: `# Tool Use Policy
+- Use tools proactively when the user asks about nutrition, food, exercises, calories, or meal planning.`,
+  },
+  {
+    content: `- Always use calculate_caloric_needs BEFORE build_meal_plan — the meal plan needs a caloric target.`,
+    requires: ["calculate_caloric_needs", "build_meal_plan"],
+  },
+  {
+    content: `- When the user asks about a specific food, use search_usda_nutrition for detailed data.`,
+    requires: ["search_usda_nutrition"],
+  },
+  {
+    content: `- When comparing foods, use compare_food_nutrition for side-by-side analysis.`,
+    requires: ["compare_food_nutrition"],
+  },
+  {
+    content: `- For "what's high in X?" questions, use rank_foods or rank_foods_by_nutrient.`,
+    requires: ["rank_foods", "rank_foods_by_nutrient"],
+  },
+  {
+    content: `- For dietary analysis, chain: user provides food log → analyze_nutrient_gaps → identify deficiencies → find_food_substitutes or rank_foods to fill gaps.`,
+    requires: ["analyze_nutrient_gaps"],
+  },
+  {
+    content: `- When the user mentions medications, proactively check drug-nutrient interactions.`,
+    requires: ["search_drug_nutrient_interactions", "search_fda_drugs"],
+  },
+  {
+    content: `- Use web_search for current research, studies, or information not in the static databases.`,
+    requires: ["web_search"],
+  },
+  {
+    content: `- Use upsert_memory to save user stats, allergies, preferences, and goals for cross-session continuity.`,
+    requires: ["upsert_memory"],
+  },
+  {
+    content: `- When the user asks about exercises, use search_gym_exercises with appropriate filters.`,
+    requires: ["search_gym_exercises"],
+  },
+  {
+    content: `- For hydration questions, use calculate_hydration_needs with as many parameters as known.`,
+    requires: ["calculate_hydration_needs"],
+  },
+  {
+    content: `# Agent Tool Guidelines
 - You have access to a comprehensive health and nutrition toolkit — use it.
 - Greetings and casual conversation do not require tools — respond with text.
 - When multiple tools are needed for a complete answer, chain them in a logical sequence.
-- Always explain your tool results in plain language after presenting the data.`;
+- Always explain your tool results in plain language after presenting the data.`,
+  },
+];
 
 const DIGEST_ENABLED_TOOLS = [
   // Health — all nutrition, exercise, drug tools via label
@@ -973,7 +1046,7 @@ PERSONAS.set("DIGEST", {
   },
   guidelines: "",
   interactionRules: "",
-  toolPolicy: DIGEST_TOOL_POLICY,
+  toolPolicy: (ctx: PersonaContext) => buildToolPolicy(DIGEST_TOOL_POLICY_SECTIONS, ctx),
   enabledTools: DIGEST_ENABLED_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
@@ -1033,20 +1106,30 @@ const META_INTERACTION_RULES = `# Interaction Rules
 - For coding-related agents, recommend setting usesDirectoryTree and usesCodingGuidelines to true.
 - Present the full configuration as a formatted summary before calling create_custom_agent or update_custom_agent, so the user can review and approve.`;
 
-const META_TOOL_POLICY = `# Tool Use Policy
+const META_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
+  {
+    content: `# Tool Use Policy
 - Use list_custom_agents FIRST to view existing agents and obtain their configurations and database IDs.
 - Use tool_search when the user mentions a domain or capability — discover what tools are available before designing the enabledTools array.
 - Use create_custom_agent only AFTER presenting the proposed configuration to the user and receiving their approval (or if they've given you a complete spec upfront).
 - Use update_custom_agent to modify an existing custom agent after verifying its current state.
-- Use web_search if you need to look up Lucide icon names, color palette ideas, or domain-specific terminology for writing the identity prompt.
-- NEVER create or update an agent without at least a name and identity — these are required fields.
-
-# Agent Design Best Practices
+- NEVER create or update an agent without at least a name and identity — these are required fields.`,
+    requires: ["create_custom_agent", "list_custom_agents", "update_custom_agent"],
+  },
+  {
+    content: `- Use web_search if you need to look up Lucide icon names, color palette ideas, or domain-specific terminology for writing the identity prompt.`,
+    requires: ["web_search"],
+  },
+  {
+    content: `# Agent Design Best Practices
 - Identity prompts should be 5-15 lines — enough for personality without overwhelming the context window.
 - Guidelines should be concise and use markdown formatting for readability.
 - Tool policies should explain WHEN to use each tool category, not just list them.
 - Prefer label-based tool groups over individual tool names when an entire category applies.
-- Always include a relevant project scope — 'coding' for dev tools, or a custom scope for domain-specific agents.`;
+- Always include a relevant project scope — 'coding' for dev tools, or a custom scope for domain-specific agents.`,
+    requires: ["create_custom_agent", "update_custom_agent"],
+  },
+];
 
 const META_ENABLED_TOOLS = [
   // Core capability — managing agents
@@ -1081,7 +1164,7 @@ PERSONAS.set("META", {
   },
   guidelines: "",
   interactionRules: "",
-  toolPolicy: META_TOOL_POLICY,
+  toolPolicy: (ctx: PersonaContext) => buildToolPolicy(META_TOOL_POLICY_SECTIONS, ctx),
   enabledTools: META_ENABLED_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
@@ -1107,45 +1190,63 @@ const OMNI_RESPONSE_GUIDELINES = `# Response Guidelines
 - For data tasks, cite your sources (tool outputs, web searches, API results).
 - Use str_replace_file for targeted edits, write_file for new files, patch_file for multi-hunk changes.`;
 
-const OMNI_TOOL_POLICY = `# Tool Use Policy
+const OMNI_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
+  {
+    content: `# Tool Use Policy
 You have access to ALL tools in the system — coding, web, health, finance, smart home, creative, and more.
-
-## Coding Tools
-- Use file tools (read_file, str_replace_file, write_file, patch_file) for code operations
-- Use grep_search and multi_file_read for code discovery
-- Use git tools to track changes
-- Use run_command for shell operations
-- Use LSP tools for code intelligence
-
-## Research & Knowledge Tools
-- Use web_search for current information
-- Use Wikipedia, arXiv, and knowledge tools for research
-- Use trend tools for social and market trends
-
-## Data & Compute Tools
-- Use precise_calculator for math
-- Use execute_javascript or execute_python for complex computation
-- Use chart tools for data visualization
-
-## Creative Tools
-- Use generate_image for image creation and editing
-- Use TTS tools for speech synthesis
-
-## Health & Lifestyle Tools
-- Use nutrition tools for dietary analysis
-- Use exercise tools for fitness planning
-
-## Smart Home Tools
-- Use LIFX tools for lighting control
-
-## Task & Memory Tools
-- Use task tools to track multi-step work
-- Use memory tools to persist important information across sessions
 
 ## General Principles
 - Chain tools when a question requires multiple data sources
 - Prefer specific tools over generic web search when available
-- Use the right granularity: don't use heavy tools for simple questions`;
+- Use the right granularity: don't use heavy tools for simple questions`,
+  },
+  {
+    content: `## Coding Tools
+- Use file tools (read_file, str_replace_file, write_file, patch_file) for code operations
+- Use grep_search and multi_file_read for code discovery
+- Use git tools to track changes
+- Use run_command for shell operations
+- Use LSP tools for code intelligence`,
+    requires: ["read_file", "str_replace_file", "write_file", "grep_search", "run_command"],
+  },
+  {
+    content: `## Research & Knowledge Tools
+- Use web_search for current information
+- Use Wikipedia, arXiv, and knowledge tools for research
+- Use trend tools for social and market trends`,
+    requires: ["web_search", "get_wikipedia_summary", "get_trends"],
+  },
+  {
+    content: `## Data & Compute Tools
+- Use precise_calculator for math
+- Use execute_javascript or execute_python for complex computation
+- Use chart tools for data visualization`,
+    requires: ["precise_calculator", "execute_javascript"],
+  },
+  {
+    content: `## Creative Tools
+- Use generate_image for image creation and editing
+- Use TTS tools for speech synthesis`,
+    requires: ["generate_image"],
+  },
+  {
+    content: `## Health & Lifestyle Tools
+- Use nutrition tools for dietary analysis
+- Use exercise tools for fitness planning`,
+    requires: ["search_usda_nutrition", "search_gym_exercises", "rank_foods"],
+  },
+  {
+    content: `## Smart Home Tools
+- Use LIFX tools for lighting control`,
+    requires: ["lifx_*"],
+  },
+  {
+    content: `## Task & Memory Tools
+- Use task tools to track multi-step work
+- Use memory tools to persist important information across sessions`,
+    requires: ["task_create", "task_list", "task_update", "upsert_memory"],
+  },
+];
 
 // ── OMNI Agent (Universal All-Tools Agent) ───────────────────────
 PERSONAS.set("OMNI", {
@@ -1169,17 +1270,12 @@ PERSONAS.set("OMNI", {
 - After making changes, verify them by reading the modified section
 - Keep your explanations concise and technical`,
   interactionRules: "",
-  toolPolicy: (context: PersonaContext) => {
-    const enabled = new Set(context.enabledTools || []);
-    const sections: string[] = [OMNI_TOOL_POLICY];
-
-    // ── Task management ──
-    if (
-      enabled.has("task_create") ||
-      enabled.has("task_list") ||
-      enabled.has("task_update")
-    ) {
-      sections.push(`## Task Management
+  toolPolicy: (ctx: PersonaContext) => {
+    // OMNI uses the shared sections + its own task/memory sections
+    const omniSections: ToolPolicySection[] = [
+      ...OMNI_TOOL_POLICY_SECTIONS,
+      {
+        content: `## Task Management
 You have persistent task tools (task_create, task_list, task_update) that survive across conversations.
 Use them proactively:
 - At the START of a session, call task_list to check for in-progress or pending tasks from prior sessions
@@ -1189,12 +1285,11 @@ Use them proactively:
 - After completing a task, call task_list to find your next task
 - To delete a task that is no longer relevant or was created in error, set its status to "deleted" via task_update
 - Break large tasks into subtasks — use metadata to link related tasks
-- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`);
-    }
-
-    // ── Proactive memory ──
-    if (enabled.has("upsert_memory")) {
-      sections.push(`## Proactive Memory
+- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`,
+        requires: ["task_create", "task_list", "task_update"],
+      },
+      {
+        content: `## Proactive Memory
 You have a persistent memory tool (upsert_memory) that stores facts across sessions.
 Use it **proactively** — do NOT wait for the user to say "remember":
 - When the user states a preference: "I like X", "I hate Y", "I prefer Z", "I always do W"
@@ -1202,10 +1297,11 @@ Use it **proactively** — do NOT wait for the user to say "remember":
 - When the user corrects you: save the correction so you don't repeat the mistake
 - When you learn a project convention or workflow pattern worth preserving
 - **When in doubt, save it** — over-remembering is better than forgetting
-- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`);
-    }
-
-    return sections.join("\n\n");
+- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`,
+        requires: ["upsert_memory"],
+      },
+    ];
+    return buildToolPolicy(omniSections, ctx);
   },
   enabledTools: ["*"],
   capabilities: "",
@@ -1238,7 +1334,9 @@ const IMAGE_RESPONSE_GUIDELINES = `# Response Guidelines
 - When describing your creations, use standard professional art terms (e.g., chiaroscuro, Rule of Thirds, anamorphic flare, atmospheric perspective, gouache, isometric).
 - Keep your text explanation around 2-3 concise but rich paragraphs.`;
 
-const IMAGE_TOOL_POLICY = `# Tool Use Policy
+const IMAGE_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
+  {
+    content: `# Tool Use Policy
 - Call the \`generate_image\` tool proactively when the user wants to create, visualize, or edit an image.
 - When generating from scratch, write rich, descriptive prompts that specify:
   - **Subject**: Clear description of what is in the scene.
@@ -1249,9 +1347,18 @@ const IMAGE_TOOL_POLICY = `# Tool Use Policy
   - **Details & Mood**: Atmosphere, texture, and mood keywords.
 - When editing/redrawing (reference images attached):
   - Do NOT rewrite or re-describe the whole image from scratch.
-  - Write a SHORT instruction (under 2 sentences) focusing ONLY on the changes (e.g., "Change the background to a sunset", "Make the character smile").
-- Use \`web_search\` to lookup details on specific artists, art movements, or design patterns if needed.
-- Use \`upsert_memory\` to save user brand colors, favorite aesthetics, or recurring characters for future sessions.`;
+  - Write a SHORT instruction (under 2 sentences) focusing ONLY on the changes (e.g., "Change the background to a sunset", "Make the character smile").`,
+    requires: ["generate_image"],
+  },
+  {
+    content: `- Use \`web_search\` to lookup details on specific artists, art movements, or design patterns if needed.`,
+    requires: ["web_search"],
+  },
+  {
+    content: `- Use \`upsert_memory\` to save user brand colors, favorite aesthetics, or recurring characters for future sessions.`,
+    requires: ["upsert_memory"],
+  },
+];
 
 const IMAGE_ENABLED_TOOLS = [
   "generate_image",
@@ -1281,7 +1388,7 @@ PERSONAS.set("IMAGE", {
   },
   guidelines: "",
   interactionRules: "",
-  toolPolicy: IMAGE_TOOL_POLICY,
+  toolPolicy: (ctx: PersonaContext) => buildToolPolicy(IMAGE_TOOL_POLICY_SECTIONS, ctx),
   enabledTools: IMAGE_ENABLED_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
@@ -1423,7 +1530,24 @@ const AgentPersonaRegistry = {
       identity: () => (doc.identity as string) || "",
       guidelines: (doc.guidelines as string) || "",
       interactionRules: "",
-      toolPolicy: (doc.toolPolicy as string) || "",
+      toolPolicy: (ctx: PersonaContext) => {
+        // Support structured ToolPolicySection[] stored in MongoDB,
+        // or fall back to wrapping a plain string as a single section.
+        const raw = doc.toolPolicy;
+        let sections: ToolPolicySection[];
+
+        if (Array.isArray(raw)) {
+          sections = (raw as Array<Record<string, unknown>>).map((s) => ({
+            content: (s.content as string) || "",
+            ...(Array.isArray(s.requires) ? { requires: s.requires as string[] } : {}),
+          }));
+        } else {
+          const text = (raw as string) || "";
+          sections = text ? [{ content: text }] : [];
+        }
+
+        return buildToolPolicy(sections, ctx);
+      },
       enabledTools: Array.isArray(doc.enabledTools) ? doc.enabledTools as string[] : [],
       policies: policies.length > 0 ? policies : undefined,
       capabilities: "",

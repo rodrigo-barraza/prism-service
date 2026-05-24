@@ -2508,9 +2508,9 @@ router.get(
       }
 
       mergedItems.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
-        const ta = a.timestamp || "";
-        const tb = b.timestamp || "";
-        return ta < tb ? 1 : ta > tb ? -1 : 0;
+        const timestampA = a.timestamp || "";
+        const timestampB = b.timestamp || "";
+        return timestampA < timestampB ? 1 : timestampA > timestampB ? -1 : 0;
       });
 
       const total = mergedItems.length;

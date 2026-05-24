@@ -9,6 +9,7 @@ import {
   getModelOptions,
   getDefaultModels,
 } from "../config.ts";
+import type { ModelOptionEntry } from "../config.ts";
 import { listInstances } from "../providers/instance-registry.ts";
 import { ARENA_SCORES } from "../arrays.ts";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
@@ -87,9 +88,8 @@ function resolveEnabledToolsToSet(enabledTools: string[] | undefined) {
   return resolved;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- polymorphic model maps from multiple sources
-function filterByAvailableProviders(modelsMap: Record<string, any[]>) {
-  const filtered: Record<string, any[]> = {};
+function filterByAvailableProviders(modelsMap: Record<string, ModelOptionEntry[]>) {
+  const filtered: Record<string, ModelOptionEntry[]> = {};
   for (const [provider, models] of Object.entries(modelsMap)) {
     if (AVAILABLE_PROVIDERS.has(provider)) {
       filtered[provider] = models;
@@ -133,24 +133,24 @@ function lookupArenaScores(modelName: string) {
     let bestLen = 0;
 
     for (const [arenaName, score] of Object.entries(scores)) {
-      const an = arenaName.toLowerCase();
+      const normalizedArenaName = arenaName.toLowerCase();
 
       // Exact match on raw key or cleaned key
-      if (key === an || cleaned === an) {
+      if (key === normalizedArenaName || cleaned === normalizedArenaName) {
         bestMatch = score as number;
         break;
       }
 
       // Check both directions of startsWith/includes using cleaned key
       const matched =
-        cleaned.startsWith(an) ||
-        an.startsWith(cleaned) ||
-        key.includes(an) ||
-        an.includes(cleaned);
+        cleaned.startsWith(normalizedArenaName) ||
+        normalizedArenaName.startsWith(cleaned) ||
+        key.includes(normalizedArenaName) ||
+        normalizedArenaName.includes(cleaned);
 
-      if (matched && an.length > bestLen) {
+      if (matched && normalizedArenaName.length > bestLen) {
         bestMatch = score as number;
-        bestLen = an.length;
+        bestLen = normalizedArenaName.length;
       }
     }
 
@@ -166,8 +166,7 @@ function lookupArenaScores(modelName: string) {
  * Enrich all models in a provider map with arena scores from ARENA_SCORES.
  * Merges with any existing arena data on the model (existing takes priority).
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mutates heterogeneous model objects from different providers
-function enrichModelsWithArenaScores(modelsMap: Record<string, any[]>) {
+function enrichModelsWithArenaScores(modelsMap: Record<string, ModelOptionEntry[]>) {
   for (const provider of Object.keys(modelsMap)) {
     for (const model of modelsMap[provider]) {
       const scores = lookupArenaScores(model.name);
@@ -312,7 +311,7 @@ localConfigRouter.get("/", async (_req: Request, res: Response) => {
   const models = (await LocalProviderGateway.discoverModels({
     timeoutMs: 3000,
     enrich: true,
-  })) as Record<string, any[]>;
+  })) as Record<string, ModelOptionEntry[]>;
 
   // Enrich each instance's models with arena scores
   for (const key of Object.keys(models)) {

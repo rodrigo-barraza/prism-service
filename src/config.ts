@@ -1070,7 +1070,7 @@ const MODELS = {
 export type ModelDefinition = (typeof MODELS)[keyof typeof MODELS];
 
 /** Client-facing model option entry returned by getModelOptions(). */
-interface ModelOptionEntry {
+export interface ModelOptionEntry {
   name: string;
   label: string;
   thinking?: boolean;

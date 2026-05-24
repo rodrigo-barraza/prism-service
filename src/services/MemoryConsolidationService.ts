@@ -150,12 +150,12 @@ function daysSince(isoDate: string) {
  * Returns arrays of memory groups (each group has 2+ memories).
  */
 function findClusters(memories: MemoryDoc[], threshold: number = CLUSTER_THRESHOLD): MemoryDoc[][] {
-  const n = memories.length;
-  if (n < 2) return [];
+  const memoryCount = memories.length;
+  if (memoryCount < 2) return [];
 
   // Union-Find
-  const parent = Array.from({ length: n }, (_, i) => i);
-  const rank = new Array(n).fill(0);
+  const parent = Array.from({ length: memoryCount }, (_, i) => i);
+  const rank = new Array(memoryCount).fill(0);
 
   function find(x: number): number {
     if (parent[x] !== x) {
@@ -179,8 +179,8 @@ function findClusters(memories: MemoryDoc[], threshold: number = CLUSTER_THRESHO
   }
 
   // Pairwise comparison — O(n²) but fine for <500 memories
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
+  for (let i = 0; i < memoryCount; i++) {
+    for (let j = i + 1; j < memoryCount; j++) {
       if (!memories[i].embedding || !memories[j].embedding) continue;
       const sim = cosineSimilarity(
         memories[i].embedding!,
@@ -194,7 +194,7 @@ function findClusters(memories: MemoryDoc[], threshold: number = CLUSTER_THRESHO
 
   // Group by root
   const groups = new Map<number, MemoryDoc[]>();
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < memoryCount; i++) {
     const root = find(i);
     if (!groups.has(root)) {
       groups.set(root, []);
