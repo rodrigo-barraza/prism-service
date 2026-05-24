@@ -7,7 +7,7 @@ import EmbeddingService from "./EmbeddingService.ts";
 import RequestLogger from "./RequestLogger.ts";
 import logger from "../utils/logger.ts";
 import { cosineSimilarity } from "../utils/math.ts";
-import { parseJsonFromLlmResponse } from "../utils/utilities.ts";
+import { parseJsonFromLlmResponse } from "@rodrigo-barraza/utilities-library";
 import { COLLECTIONS } from "../constants.ts";
 import SettingsService from "./SettingsService.ts";
 // ─── Constants ────────────────────────────────────────────────────────────────

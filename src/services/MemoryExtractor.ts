@@ -5,7 +5,7 @@ import MemoryConsolidationService from "./MemoryConsolidationService.ts";
 import RequestLogger from "./RequestLogger.ts";
 import SettingsService from "./SettingsService.ts";
 import logger from "../utils/logger.ts";
-import { parseJsonFromLlmResponse } from "../utils/utilities.ts";
+import { parseJsonFromLlmResponse } from "@rodrigo-barraza/utilities-library";
 import {
   estimateTokens,
   calculateTextCost,

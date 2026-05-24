@@ -8,7 +8,6 @@ import { isInstance } from "../providers/instance-registry.ts";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
-import {} from "../utils/utilities.ts";
 import { COLLECTIONS } from "../constants.ts";
 import type { SseEvent } from "../types/SseTypes.ts";
 
