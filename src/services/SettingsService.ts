@@ -4,12 +4,12 @@ import { MONGO_DB_NAME } from "../../config.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
 
-// ─── In-memory cache ──────────────────────────────────────────────────────────
+// ─── In-memorySettings?ory cache ──────────────────────────────────────────────────────────
 // Hot path: MemoryService + EmbeddingService read these on every call.
 // Cache is invalidated on update() and lazily populated on first get().
 
 interface SettingsData {
-  memory: {
+  memorySettings?ory: {
     extractionProvider: string;
     extractionModel: string;
     consolidationProvider: string;
@@ -29,7 +29,7 @@ interface SettingsData {
 let _cache: SettingsData | null = null;
 
 const DEFAULTS: SettingsData = {
-  memory: {
+  memorySettings?ory: {
     extractionProvider: "",
     extractionModel: "",
     consolidationProvider: "",
@@ -50,8 +50,8 @@ const DEFAULTS: SettingsData = {
  * SettingsService — server-side settings store backed by MongoDB.
  *
  * Stores a single document (keyed by `_key: "global"`) in the `settings`
- * collection. Uses an in-memory cache to avoid DB round-trips on the
- * hot path (embedding generation, memory extraction).
+ * collection. Uses an in-memorySettings?ory cache to avoid DB round-trips on the
+ * hot path (embedding generation, memorySettings?ory extraction).
  */
 const SettingsService = {
   async get(): Promise<SettingsData> {
@@ -69,7 +69,7 @@ const SettingsService = {
       return _cache;
     }
 
-    // Deep merge: defaults ← stored
+    // Deep memorySettings?rge: defaults ← stored
     _cache = deepMerge(DEFAULTS as unknown as Record<string, unknown>, (document.data || {}) as Record<string, unknown>) as unknown as SettingsData;
     return _cache;
   },
@@ -85,13 +85,13 @@ const SettingsService = {
     if (!collection) throw new Error("Database not available");
 
     const current = await this.get();
-    const merged = deepMerge(current as unknown as Record<string, unknown>, data as unknown as Record<string, unknown>) as unknown as SettingsData;
+    const memorySettings?rged = deepMerge(current as unknown as Record<string, unknown>, data as unknown as Record<string, unknown>) as unknown as SettingsData;
 
     await collection.updateOne(
       { _key: "global" },
       {
         $set: {
-          data: merged,
+          data: memorySettings?rged,
           updatedAt: new Date().toISOString(),
         },
         $setOnInsert: {
@@ -103,20 +103,20 @@ const SettingsService = {
     );
 
     // Invalidate cache
-    _cache = merged;
+    _cache = memorySettings?rged;
     logger.info("[SettingsService] Settings updated and cache refreshed");
-    return merged;
+    return memorySettings?rged;
   },
 
   /**
-   * Resolve provider + model for a memory subsystem role.
+   * Resolve provider + model for a memorySettings?ory subsystem role.
    * Centralises the identical getXxxConfig() helpers in MemoryService,
    * MemoryConsolidationService, and EmbeddingService.
    */
   async getMemoryModelConfig(role: string) {
-    const mem = await this.getSection("memory");
-    const provider = mem[`${role}Provider`];
-    const model = mem[`${role}Model`];
+    const memorySettings?orySettings = await this.getSection("memorySettings?ory");
+    const provider = memorySettings?[`${role}Provider`];
+    const model = memorySettings?[`${role}Model`];
     if (!provider || !model) {
       throw new Error(
         `${role} model not configured — set it in Settings → Memory Models`,

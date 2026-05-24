@@ -1074,12 +1074,12 @@ class LocalProviderGateway {
     const sizeBytes = modelData.size_bytes || 0;
     if (!sizeBytes) return null;
 
-    const bpw = modelData.quantization?.bits_per_weight || 4;
+    const bitsPerWeight = modelData.quantization?.bits_per_weight || 4;
     const archParams = resolveArchParams(
       modelData.architecture || "",
       modelData.params_string || "",
       sizeBytes,
-      bpw,
+      bitsPerWeight,
     );
     const totalLayers = archParams.layers;
 

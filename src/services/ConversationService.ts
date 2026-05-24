@@ -143,7 +143,7 @@ export async function extractFiles(
  * Compute input/output modalities from messages for lightweight querying.
  */
 export function computeModalities(messages: ChatMessage[]): Record<string, boolean> {
-  const mod = {
+  const modalities = {
     textIn: false,
     textOut: false,
     imageIn: false,
@@ -165,20 +165,20 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
     const isUser = m.role === "user";
     const isAssistant = m.role === "assistant";
     if (m.content && (isUser || isAssistant)) {
-      if (isUser && !(m as Record<string, unknown>).liveTranscription) mod.textIn = true;
-      if (isAssistant) mod.textOut = true;
+      if (isUser && !(m as Record<string, unknown>).liveTranscription) modalities.textIn = true;
+      if (isAssistant) modalities.textOut = true;
     }
     // Tool calls are structured text output
     if (isAssistant && m.toolCalls && m.toolCalls.length > 0) {
-      mod.textOut = true;
+      modalities.textOut = true;
     }
     if ((m.images && m.images.length > 0) || (m as Record<string, unknown>).image) {
-      if (isUser) mod.imageIn = true;
-      if (isAssistant) mod.imageOut = true;
+      if (isUser) modalities.imageIn = true;
+      if (isAssistant) modalities.imageOut = true;
     }
     if (m.audio) {
-      if (isUser) mod.audioIn = true;
-      if (isAssistant) mod.audioOut = true;
+      if (isUser) modalities.audioIn = true;
+      if (isAssistant) modalities.audioOut = true;
     }
     if (
       ((m as Record<string, unknown>).documents as string[] | undefined)?.length ||
@@ -188,7 +188,7 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
           (ref.endsWith(".pdf") || ref.endsWith(".txt")),
       )
     ) {
-      mod.docIn = true;
+      modalities.docIn = true;
     }
 
     // Classify tool calls by type
@@ -196,11 +196,11 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
       for (const tc of m.toolCalls) {
         const name = (tc.name || "").toLowerCase();
         if (WEB_SEARCH_NAMES.has(name)) {
-          mod.webSearch = true;
+          modalities.webSearch = true;
         } else if (CODE_EXEC_NAMES.has(name)) {
-          mod.codeExecution = true;
+          modalities.codeExecution = true;
         } else {
-          mod.functionCalling = true;
+          modalities.functionCalling = true;
         }
       }
     }
@@ -211,7 +211,7 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
       typeof m.content === "string" &&
       m.content.includes("> **Sources:**")
     ) {
-      mod.webSearch = true;
+      modalities.webSearch = true;
     }
 
     // Detect inline code execution blocks (from streaming)
@@ -220,18 +220,18 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
       typeof m.content === "string" &&
       m.content.includes("```exec-")
     ) {
-      mod.codeExecution = true;
+      modalities.codeExecution = true;
     }
 
     // Tool result messages — mark as function calling
     // (web_search and code_execution results are inlined, not stored as role:"tool")
     if (m.role === "tool") {
-      mod.functionCalling = true;
+      modalities.functionCalling = true;
     }
 
     // Detect thinking / reasoning
     if (isAssistant && m.thinking) {
-      mod.thinking = true;
+      modalities.thinking = true;
     }
   }
   return mod;
@@ -309,7 +309,7 @@ const ConversationService: ConversationServiceInterface = {
     { collection = DEFAULT_COLLECTION }: { collection?: string } = {},
   ): Promise<Record<string, unknown>> {
     const traceId = conversationMeta?.traceId || null;
-    const col = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
+    const collection = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
     const isAgentSession = collection === COLLECTIONS.AGENT_CONVERSATIONS;
 
     // Extract files (upload base64 data to MinIO)
@@ -384,7 +384,7 @@ const ConversationService: ConversationServiceInterface = {
     }
 
     // 1. Atomic upsert: push messages + set metadata in a single operation
-    await col.updateOne(
+    await collection.updateOne(
       { id: conversationId, project, username },
       {
         $push: { messages: { $each: processedMessages } },
@@ -395,7 +395,7 @@ const ConversationService: ConversationServiceInterface = {
     );
 
     // 2. Single re-read to compute derived fields
-    const conversation = await col.findOne({
+    const conversation = await collection.findOne({
       id: conversationId,
       project,
       username,
@@ -426,7 +426,7 @@ const ConversationService: ConversationServiceInterface = {
       }
     }
 
-    await col.updateOne(
+    await collection.updateOne(
       { id: conversationId, project, username },
       { $set: derived },
     );

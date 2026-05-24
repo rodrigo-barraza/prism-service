@@ -79,8 +79,8 @@ function resolveRepoPath(workspaceRoot: string, files: string[]): string {
   // Take the first file, get its path relative to workspace root,
   // extract the first directory segment (the project dir)
   const firstFile = resolve(files[0]);
-  const rel = relative(workspaceRoot, firstFile);
-  const firstSegment = rel.split("/")[0];
+  const relativePath = relative(workspaceRoot, firstFile);
+  const firstSegment = relativePath.split("/")[0];
   if (!firstSegment) return workspaceRoot;
 
   const candidate = resolve(workspaceRoot, firstSegment);
