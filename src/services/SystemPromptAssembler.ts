@@ -172,7 +172,7 @@ export default class SystemPromptAssembler {
     }
 
     const hasPrefixed = enabledTools.some(
-      (e) => e.startsWith("label:") || e.startsWith("domain:"),
+      (enabledTool) => enabledTool.startsWith("label:") || enabledTool.startsWith("domain:"),
     );
 
     const enabledSet = new Set<string>();
@@ -180,13 +180,13 @@ export default class SystemPromptAssembler {
       for (const entry of enabledTools) {
         if (entry.startsWith("label:")) {
           const label = entry.slice(6);
-          for (const t of schemas) {
-            if (t.labels?.includes(label)) enabledSet.add(t.name);
+          for (const toolSchema of schemas) {
+            if (toolSchema.labels?.includes(label)) enabledSet.add(toolSchema.name);
           }
         } else if (entry.startsWith("domain:")) {
           const domain = entry.slice(7);
-          for (const t of schemas) {
-            if (t.domain === domain) enabledSet.add(t.name);
+          for (const toolSchema of schemas) {
+            if (toolSchema.domain === domain) enabledSet.add(toolSchema.name);
           }
         } else {
           enabledSet.add(entry);
@@ -212,25 +212,25 @@ export default class SystemPromptAssembler {
     const COORDINATOR_TOOL_NAMES = new Set(COORDINATOR_ONLY_TOOLS);
     const PRISM_LOCAL_TOOL_NAMES = InternalToolRegistry.getNames();
 
-    const filtered = schemas.filter(
-      (t) =>
-        enabledSet.has(t.name as string) ||
+    const filteredSchemas = schemas.filter(
+      (toolSchema) =>
+        enabledSet.has(toolSchema.name as string) ||
         (agentId !== "LUPOS" && (
-          CORE_SYSTEM_TOOLS.has(t.name as string) ||
-          COORDINATOR_TOOL_NAMES.has(t.name as string) ||
-          PRISM_LOCAL_TOOL_NAMES.has(t.name as string)
+          CORE_SYSTEM_TOOLS.has(toolSchema.name as string) ||
+          COORDINATOR_TOOL_NAMES.has(toolSchema.name as string) ||
+          PRISM_LOCAL_TOOL_NAMES.has(toolSchema.name as string)
         ))
     );
 
-    return this._formatToolDescriptions(filtered);
+    return this._formatToolDescriptions(filteredSchemas);
   }
 
-  _formatToolDescriptions(filtered: Record<string, unknown>[]): string {
-    if (filtered.length === 0) return "";
+  _formatToolDescriptions(filteredSchemas: Record<string, unknown>[]): string {
+    if (filteredSchemas.length === 0) return "";
 
     // Group by domain
     const groups = new Map<string, Record<string, unknown>[]>();
-    for (const tool of filtered) {
+    for (const tool of filteredSchemas) {
       const domain = ((tool.domain as string) || "Other").replace(/^Agentic:\s*/i, "");
       if (!groups.has(domain)) groups.set(domain, []);
       groups.get(domain)!.push(tool);
@@ -240,20 +240,20 @@ export default class SystemPromptAssembler {
     const sections: string[] = [];
     for (const [domain, domainTools] of groups) {
       const entries = domainTools.map((tool) => {
-        const desc = (tool.description as string) || "";
+        const description = (tool.description as string) || "";
 
-        const params = (tool.parameters as Record<string, unknown>)?.properties as Record<string, Record<string, unknown>> || {};
-        const paramNames = Object.keys(params);
+        const parameters = (tool.parameters as Record<string, unknown>)?.properties as Record<string, Record<string, unknown>> || {};
+        const parameterNames = Object.keys(parameters);
         const required = ((tool.parameters as Record<string, unknown>)?.required || []) as string[];
-        const paramStr = paramNames
-          .map((p) => {
-            const isReq = required.includes(p);
-            const paramDesc = (params[p].description as string) || "";
-            return `  - ${p}${isReq ? " (required)" : ""}: ${paramDesc}`;
+        const parameterString = parameterNames
+          .map((parameterName) => {
+            const isRequired = required.includes(parameterName);
+            const parameterDescription = (parameters[parameterName].description as string) || "";
+            return `  - ${parameterName}${isRequired ? " (required)" : ""}: ${parameterDescription}`;
           })
           .join("\n");
 
-        return `### ${tool.name}\n${desc}\n${paramStr}`;
+        return `### ${tool.name}\n${description}\n${parameterString}`;
       });
 
       sections.push(`**${domain}**\n${entries.join("\n\n")}`);
@@ -483,26 +483,26 @@ export default class SystemPromptAssembler {
     // This ensures every persona (CODING, LUPOS, future agents) gets the
     // same domain-grouped tool documentation in its system prompt.
     {
-      const toolDescs = this.buildToolDescriptions(context.enabledTools, agentId);
-      if (toolDescs) {
+      const toolDescriptions = this.buildToolDescriptions(context.enabledTools, agentId);
+      if (toolDescriptions) {
         const schemas = ToolOrchestratorService.getClientToolSchemas();
         let count = schemas.length;
         if (context.enabledTools) {
           const hasPrefixed = context.enabledTools.some(
-            (e) => e.startsWith("label:") || e.startsWith("domain:"),
+            (enabledTool) => enabledTool.startsWith("label:") || enabledTool.startsWith("domain:"),
           );
           const enabledSet = new Set<string>();
           if (hasPrefixed) {
             for (const entry of context.enabledTools) {
               if (entry.startsWith("label:")) {
                 const label = entry.slice(6);
-                for (const t of schemas) {
-                  if (t.labels?.includes(label)) enabledSet.add(t.name);
+                for (const toolSchema of schemas) {
+                  if (toolSchema.labels?.includes(label)) enabledSet.add(toolSchema.name);
                 }
               } else if (entry.startsWith("domain:")) {
                 const domain = entry.slice(7);
-                for (const t of schemas) {
-                  if (t.domain === domain) enabledSet.add(t.name);
+                for (const toolSchema of schemas) {
+                  if (toolSchema.domain === domain) enabledSet.add(toolSchema.name);
                 }
               } else {
                 enabledSet.add(entry);
@@ -528,16 +528,16 @@ export default class SystemPromptAssembler {
           const PRISM_LOCAL_TOOL_NAMES = InternalToolRegistry.getNames();
 
           count = schemas.filter(
-            (t) =>
-              enabledSet.has(t.name as string) ||
+            (toolSchema) =>
+              enabledSet.has(toolSchema.name as string) ||
               (agentId !== "LUPOS" && (
-                CORE_SYSTEM_TOOLS.has(t.name as string) ||
-                COORDINATOR_TOOL_NAMES.has(t.name as string) ||
-                PRISM_LOCAL_TOOL_NAMES.has(t.name as string)
+                CORE_SYSTEM_TOOLS.has(toolSchema.name as string) ||
+                COORDINATOR_TOOL_NAMES.has(toolSchema.name as string) ||
+                PRISM_LOCAL_TOOL_NAMES.has(toolSchema.name as string)
               ))
           ).length;
         }
-        sections.push(`## Available Tools (${count})\n` + toolDescs);
+        sections.push(`## Available Tools (${count})\n` + toolDescriptions);
       }
     }
 
