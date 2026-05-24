@@ -158,8 +158,8 @@ function evaluate(
       return norm(response).startsWith(norm(expected));
     case MATCH_MODES.REGEX: {
       try {
-        const re = new RegExp(expected, "i");
-        return re.test(response);
+        const regex = new RegExp(expected, "i");
+        return regex.test(response);
       } catch {
         logger.warn(`[benchmark] Invalid regex: ${expected}`);
         return false;

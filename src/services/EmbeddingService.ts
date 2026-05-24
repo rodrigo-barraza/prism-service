@@ -128,17 +128,17 @@ const EmbeddingService = {
         inputCharacters,
         totalTime: roundMs(totalSec),
         modalities: (() => {
-          const mod: Record<string, boolean> = { embeddingOut: true };
+          const modalities: Record<string, boolean> = { embeddingOut: true };
           if (typeof content === "string") {
-            mod.textIn = true;
+            modalities.textIn = true;
           } else if (Array.isArray(content)) {
             for (const part of content) {
-              if (part.text) mod.textIn = true;
+              if (part.text) modalities.textIn = true;
               const mime = part.inlineData?.mimeType || "";
-              if (mime.startsWith("image/")) mod.imageIn = true;
-              else if (mime.startsWith("audio/")) mod.audioIn = true;
-              else if (mime.startsWith("video/")) mod.videoIn = true;
-              else if (mime === "application/pdf") mod.docIn = true;
+              if (mime.startsWith("image/")) modalities.imageIn = true;
+              else if (mime.startsWith("audio/")) modalities.audioIn = true;
+              else if (mime.startsWith("video/")) modalities.videoIn = true;
+              else if (mime === "application/pdf") modalities.docIn = true;
             }
           }
           return mod;

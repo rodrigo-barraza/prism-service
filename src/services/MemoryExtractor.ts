@@ -185,9 +185,9 @@ export default class MemoryExtractor {
       let extractionProvider: string | undefined;
       let extractionModel: string | undefined;
       try {
-        const mem = await SettingsService.getSection("memory") as MemorySettingsSection;
-        extractionProvider = mem.extractionProvider;
-        extractionModel = mem.extractionModel;
+        const memorySettings = await SettingsService.getSection("memory") as MemorySettingsSection;
+        extractionProvider = memorySettings.extractionProvider;
+        extractionModel = memorySettings.extractionModel;
       } catch {
         // Settings not configured — skip extraction silently
         logger.info(

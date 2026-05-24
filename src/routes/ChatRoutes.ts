@@ -995,8 +995,8 @@ async function handleStreamingText(context: GenerationContext) {
           ...options,
           signal,
         });
-  const ss = createStreamState();
-  ss.requestStart = requestStart;
+  const streamState = createStreamState();
+  streamState.requestStart = requestStart;
   for await (const chunk of stream) {
     // Client disconnected — abort the upstream provider stream
     if (signal?.aborted) {
@@ -1022,15 +1022,15 @@ async function handleStreamingText(context: GenerationContext) {
   let fcIteration = 0;
   while (
     options.functionCallingEnabled &&
-    ss.toolCalls.length > 0 &&
-    ss.toolCalls.some(
+    streamState.toolCalls.length > 0 &&
+    streamState.toolCalls.some(
       (tc) => !tc.result && tc.status !== "done" && tc.status !== "error",
     ) &&
     fcIteration < MAX_FC_ITERATIONS &&
     !signal?.aborted
   ) {
     fcIteration++;
-    const pendingCalls = ss.toolCalls.filter(
+    const pendingCalls = streamState.toolCalls.filter(
       (tc) => !tc.result && tc.status !== "done" && tc.status !== "error",
     );
     if (pendingCalls.length === 0) break;
@@ -1078,18 +1078,18 @@ async function handleStreamingText(context: GenerationContext) {
     // Build tool result messages for the provider
     const assistantToolMsg = {
       role: "assistant",
-      content: ss.text || "",
-      toolCalls: ss.toolCalls.map((tc) => ({
+      content: streamState.text || "",
+      toolCalls: streamState.toolCalls.map((tc) => ({
         id: tc.id,
         name: tc.name,
         args: tc.args,
       })),
-      ...(ss.thinking ? { thinking: ss.thinking } : {}),
-      ...(ss.thinkingSignature
-        ? { thinkingSignature: ss.thinkingSignature }
+      ...(streamState.thinking ? { thinking: streamState.thinking } : {}),
+      ...(streamState.thinkingSignature
+        ? { thinkingSignature: streamState.thinkingSignature }
         : {}),
     };
-    const toolResultMsgs = ss.toolCalls
+    const toolResultMsgs = streamState.toolCalls
       .filter((tc) => tc.result)
       .map((tc) => ({
         role: "tool",
@@ -1101,10 +1101,10 @@ async function handleStreamingText(context: GenerationContext) {
     // Re-call provider with tool results appended
     const updatedMessages = [...messages, assistantToolMsg, ...toolResultMsgs];
     // Reset accumulators for the follow-up stream
-    ss.text = "";
-    ss.thinking = "";
-    ss.thinkingSignature = "";
-    ss.toolCalls.length = 0;
+    streamState.text = "";
+    streamState.thinking = "";
+    streamState.thinkingSignature = "";
+    streamState.toolCalls.length = 0;
     const followUpStream = (provider as Record<string, Function>).generateTextStream(
       updatedMessages,
       resolvedModel,
@@ -1115,10 +1115,10 @@ async function handleStreamingText(context: GenerationContext) {
     );
     // Use dispatchChunk with a custom usage merger for follow-up iteration
     const usageMerger = (followUpUsage: TokenUsage) => {
-      if (ss.usage) {
-        mergeUsage(ss.usage, followUpUsage);
+      if (streamState.usage) {
+        mergeUsage(streamState.usage, followUpUsage);
       } else {
-        ss.usage = followUpUsage;
+        streamState.usage = followUpUsage;
       }
     };
     for await (const chunk of followUpStream) {
@@ -1136,10 +1136,10 @@ async function handleStreamingText(context: GenerationContext) {
     }
     // Emit intermediate usage update so the frontend has authoritative
     // per-iteration token counts instead of relying on chunk heuristics
-    if (ss.usage) {
+    if (streamState.usage) {
       emit({
         type: "usage_update",
-        usage: { ...(ss.usage as Record<string, unknown>), requests: fcIteration + 1 },
+        usage: { ...(streamState.usage as Record<string, unknown>), requests: fcIteration + 1 },
       });
     }
     // Update messages ref for potential next iteration
@@ -1148,13 +1148,13 @@ async function handleStreamingText(context: GenerationContext) {
   // Build normalized result for shared finalization
   const now = performance.now();
   await finalizeTextGeneration(context, {
-    text: ss.text,
-    thinking: ss.thinking,
+    text: streamState.text,
+    thinking: streamState.thinking,
     images: ss.images,
-    toolCalls: ss.toolCalls.map((tc): ToolCallPayload => ({ name: tc.name, id: tc.id, args: tc.args as Record<string, unknown> })),
+    toolCalls: streamState.toolCalls.map((tc): ToolCallPayload => ({ name: tc.name, id: tc.id, args: tc.args as Record<string, unknown> })),
     audioChunks: ss.audioChunks,
     audioSampleRate: ss.audioSampleRate,
-    usage: ss.usage as FinalizerTokenUsage | null,
+    usage: streamState.usage as FinalizerTokenUsage | null,
     outputCharacters: ss.outputCharacters,
     timeToGenerationSec: ss.firstTokenTime
       ? (ss.firstTokenTime - requestStart) / 1000

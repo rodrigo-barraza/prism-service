@@ -575,16 +575,16 @@ const openaiProvider = {
       if (message.tool_calls && message.tool_calls.length > 0) {
         result.toolCalls = message.tool_calls.map((tc) => {
           if (tc.type === "function") {
-            const fn = tc.function;
+            const toolFunction = tc.function;
             let args: Record<string, unknown> = {};
             try {
-              args = JSON.parse(fn.arguments || "{}");
+              args = JSON.parse(toolFunction.arguments || "{}");
             } catch {
               /* ignore */
             }
             return {
               id: tc.id,
-              name: fn.name || "",
+              name: toolFunction.name || "",
               args,
             };
           }
@@ -749,30 +749,30 @@ const openaiProvider = {
       if (options.signal?.aborted) break;
       // Text delta from output_text
       if (event.type === "response.output_text.delta") {
-        const ev = event as OpenAI.Responses.ResponseTextDeltaEvent;
-        yield ev.delta || "";
+        const typedEvent = event as OpenAI.Responses.ResponseTextDeltaEvent;
+        yield typedEvent.delta || "";
       }
       // Reasoning / thinking summary delta
       if (event.type === "response.reasoning_summary_text.delta") {
-        const ev = event as OpenAI.Responses.ResponseReasoningSummaryTextDeltaEvent;
-        yield { type: "thinking", content: ev.delta || "" };
+        const typedEvent = event as OpenAI.Responses.ResponseReasoningSummaryTextDeltaEvent;
+        yield { type: "thinking", content: typedEvent.delta || "" };
       }
       // Image generation completed
       if (event.type === "response.image_generation_call.completed") {
-        const ev = event as OpenAI.Responses.ResponseImageGenCallCompletedEvent & { result?: string };
-        if (ev.result) {
+        const typedEvent = event as OpenAI.Responses.ResponseImageGenCallCompletedEvent & { result?: string };
+        if (typedEvent.result) {
           yield {
             type: "image",
-            data: ev.result,
+            data: typedEvent.result,
             mimeType: "image/png",
           };
         }
       }
       // Track function call metadata from output_item.added
       if (event.type === "response.output_item.added") {
-        const ev = event as OpenAI.Responses.ResponseOutputItemAddedEvent;
-        if (ev.item?.type === "function_call") {
-          const item = ev.item as OpenAI.Responses.ResponseFunctionToolCall;
+        const typedEvent = event as OpenAI.Responses.ResponseOutputItemAddedEvent;
+        if (typedEvent.item?.type === "function_call") {
+          const item = typedEvent.item as OpenAI.Responses.ResponseFunctionToolCall;
           if (item.id) {
             pendingFunctions[item.id] = {
               name: item.name,
@@ -784,9 +784,9 @@ const openaiProvider = {
       }
       // Accumulate argument deltas (keyed by item_id)
       if (event.type === "response.function_call_arguments.delta") {
-        const ev = event as OpenAI.Responses.ResponseFunctionCallArgumentsDeltaEvent;
-        const entry = pendingFunctions[ev.item_id];
-        const partial = ev.delta || "";
+        const typedEvent = event as OpenAI.Responses.ResponseFunctionCallArgumentsDeltaEvent;
+        const entry = pendingFunctions[typedEvent.item_id];
+        const partial = typedEvent.delta || "";
         if (entry) {
           entry.args += partial;
         }
@@ -798,13 +798,13 @@ const openaiProvider = {
       }
       // Function call completed (Responses API)
       if (event.type === "response.function_call_arguments.done") {
-        const ev = event as OpenAI.Responses.ResponseFunctionCallArgumentsDoneEvent & { call_id?: string };
-        const tracked = pendingFunctions[ev.item_id];
-        const name = tracked?.name || ev.name || "unknown";
-        const callId = tracked?.callId || ev.call_id || ev.item_id;
+        const typedEvent = event as OpenAI.Responses.ResponseFunctionCallArgumentsDoneEvent & { call_id?: string };
+        const tracked = pendingFunctions[typedEvent.item_id];
+        const name = tracked?.name || typedEvent.name || "unknown";
+        const callId = tracked?.callId || typedEvent.call_id || typedEvent.item_id;
         let args: Record<string, unknown> = {};
         try {
-          args = JSON.parse(ev.arguments || tracked?.args || "{}");
+          args = JSON.parse(typedEvent.arguments || tracked?.args || "{}");
         } catch {
           /* ignore */
         }
@@ -812,20 +812,20 @@ const openaiProvider = {
           type: "toolCall",
           id: callId,
           // Responses API internal item ID (starts with "fc_")
-          responsesItemId: ev.item_id,
+          responsesItemId: typedEvent.item_id,
           name,
           args,
         };
         // Clean up
-        delete pendingFunctions[ev.item_id];
+        delete pendingFunctions[typedEvent.item_id];
       }
       // Completed response — extract usage
       if (event.type === "response.completed") {
-        const ev = event as OpenAI.Responses.ResponseCompletedEvent;
-        if (ev.response?.usage) {
+        const typedEvent = event as OpenAI.Responses.ResponseCompletedEvent;
+        if (typedEvent.response?.usage) {
           usage = {
-            inputTokens: ev.response.usage.input_tokens ?? 0,
-            outputTokens: ev.response.usage.output_tokens ?? 0,
+            inputTokens: typedEvent.response.usage.input_tokens ?? 0,
+            outputTokens: typedEvent.response.usage.output_tokens ?? 0,
           };
         }
       }

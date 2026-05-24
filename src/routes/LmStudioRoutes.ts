@@ -186,10 +186,10 @@ router.post(
         await sleep(300);
         if (loadDone || aborted) break;
         const elapsed = Date.now() - startTime;
-        const pct = Math.min(0.95, elapsed / (elapsed + EXPECTED_LOAD_MS));
-        if (pct > lastPct + 0.005) {
-          lastPct = pct;
-          send({ type: "progress", progress: parseFloat(pct.toFixed(3)) });
+        const percentage = Math.min(0.95, elapsed / (elapsed + EXPECTED_LOAD_MS));
+        if (percentage > lastPct + 0.005) {
+          lastPct = percentage;
+          send({ type: "progress", progress: parseFloat(percentage.toFixed(3)) });
         }
       }
       await loadPromise;

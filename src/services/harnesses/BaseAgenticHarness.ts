@@ -372,22 +372,22 @@ export default class BaseAgenticHarness {
       }
 
       const stdTcId = streamChunk.id || `tc-${state.streamedToolCalls.length}`;
-      const tc: ToolCall = {
+      const toolCall: ToolCall = {
         id: stdTcId,
         responsesItemId: streamChunk.responsesItemId || undefined,
         name: toolName,
         args: streamChunk.args || {},
         thoughtSignature: streamChunk.thoughtSignature || undefined,
       };
-      pass.pendingToolCalls.push(tc);
-      state.streamedToolCalls.push({ ...tc });
+      pass.pendingToolCalls.push(toolCall);
+      state.streamedToolCalls.push({ ...toolCall });
       this._trackToolDisplaySegment(stdTcId);
       emit({
         type: "tool_execution",
         tool: { name: toolName, args: streamChunk.args || {}, id: stdTcId },
         status: "calling",
       });
-      return { action: "toolCall", tc };
+      return { action: "toolCall", tc: toolCall };
     }
 
     // ── Image ────────────────────────────────────────────

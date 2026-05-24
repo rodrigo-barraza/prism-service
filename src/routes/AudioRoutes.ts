@@ -274,9 +274,9 @@ router.post(
             /* JSON events not needed for dataUrl format */
           },
         );
-        const ct = resultContentType || "audio/mpeg";
-        const audioDataUrl = `data:${ct};base64,${Buffer.concat(audioChunks).toString("base64")}`;
-        return res.json({ audioDataUrl, contentType: ct });
+        const audioContentType = resultContentType || "audio/mpeg";
+        const audioDataUrl = `data:${audioContentType};base64,${Buffer.concat(audioChunks).toString("base64")}`;
+        return res.json({ audioDataUrl, contentType: audioContentType });
       }
       // ── Default: stream binary audio chunks ──
       let contentType = "audio/mpeg";

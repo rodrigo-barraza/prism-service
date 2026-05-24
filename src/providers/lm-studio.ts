@@ -83,11 +83,11 @@ async function* parseNativeSSEStream(reader: ReadableStreamDefaultReader<Uint8Ar
               phase: "loading",
             };
           } else if (type === "model_load.progress") {
-            const pct =
+            const percentage =
               json.progress != null ? Math.round(json.progress * 100) : 0;
             yield {
               type: "status",
-              message: `Loading model… ${pct}%`,
+              message: `Loading model… ${percentage}%`,
               phase: "loading",
             };
           } else if (type === "model_load.end") {
@@ -107,10 +107,10 @@ async function* parseNativeSSEStream(reader: ReadableStreamDefaultReader<Uint8Ar
             };
           } else if (type === "prompt_processing.progress") {
             const progress = json.progress != null ? json.progress : 0;
-            const pct = Math.round(progress * 100);
+            const percentage = Math.round(progress * 100);
             yield {
               type: "status",
-              message: `Processing prompt… ${pct}%`,
+              message: `Processing prompt… ${percentage}%`,
               phase: "processing",
               progress,
             };
@@ -572,17 +572,17 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                     }
                     if (loadDone) break;
                     const elapsed = Date.now() - startTime;
-                    const pct = Math.min(
+                    const percentage = Math.min(
                       95,
                       Math.round(
                         (elapsed / (elapsed + EXPECTED_LOAD_MS)) * 100,
                       ),
                     );
-                    if (pct > lastPct) {
-                      lastPct = pct;
+                    if (percentage > lastPct) {
+                      lastPct = percentage;
                       yield {
                         type: "status",
-                        message: `Loading model… ${pct}%`,
+                        message: `Loading model… ${percentage}%`,
                         phase: "loading",
                       };
                     }
@@ -1090,8 +1090,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
             const arch = model.architecture as string | undefined;
             const params = model.params_string as string | undefined;
             const sizeBytes = (model.size_bytes as number) || 0;
-            const bpw = (model.quantization as Record<string, unknown>)?.bits_per_weight as number || 4;
-            model.archParams = resolveArchParams(arch ?? null, params ?? null, sizeBytes, bpw);
+            const bitsPerWeight = (model.quantization as Record<string, unknown>)?.bits_per_weight as number || 4;
+            model.archParams = resolveArchParams(arch ?? null, params ?? null, sizeBytes, bitsPerWeight);
           }
         }
         return data as Record<string, unknown>;

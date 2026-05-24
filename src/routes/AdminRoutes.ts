@@ -72,7 +72,7 @@ router.get(
       }
 
       const skip = (parseInt((page as string), 10) - 1) * parseInt((limit as string), 10);
-      const lim = parseInt((limit as string), 10);
+      const parsedLimit = parseInt((limit as string), 10);
       const sortDir = order === "asc" ? 1 : -1;
 
       const [docs, total] = await Promise.all([
@@ -83,12 +83,12 @@ router.get(
           })
                     .sort({ [sort as string]: sortDir as 1 | -1 })
           .skip(skip)
-          .limit(lim)
+          .limit(parsedLimit)
           .toArray(),
         db.collection(REQUESTS_COL).countDocuments(filter),
       ]);
 
-      res.json({ data: docs, total, page: parseInt((page as string), 10), limit: lim });
+      res.json({ data: docs, total, page: parseInt((page as string), 10), limit: parsedLimit });
     } catch (error: unknown) {
             logger.error(`Admin /requests error: ${(error as Error).message}`);
       next(error);
@@ -543,8 +543,8 @@ router.get(
       // Collect all distinct conversationIds to look up workflow links
       const allConvIds = new Set();
             for ( const r of results) {
-                for ( const cid of r._convIds || []) {
-          if (cid) allConvIds.add(cid);
+                for ( const conversationId of r._convIds || []) {
+          if (conversationId) allConvIds.add(cid);
         }
       }
 
@@ -594,9 +594,9 @@ router.get(
           const conversationCount = convIds.length;
           let workflowCount = 0;
           const traceSet = new Set();
-          for (const cid of convIds) {
-            workflowCount += wfByConv[cid] || 0;
-            if (traceByConv[cid]) traceSet.add(traceByConv[cid]);
+          for (const conversationId of convIds) {
+            workflowCount += wfByConv[conversationId] || 0;
+            if (traceByConv[conversationId]) traceSet.add(traceByConv[cid]);
           }
           return {
             model: (r._id as { model: string }).model,
@@ -1384,7 +1384,7 @@ router.get(
       }
 
       const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
-      const lim = parseInt(limit as string, 10);
+      const parsedLimit = parseInt(limit as string, 10);
       const sortDir = order === "asc" ? 1 : -1;
 
       // Determine which collections to fetch based on agent and type filters
@@ -1422,7 +1422,7 @@ router.get(
               totalCost: { $ifNull: ["$totalCost", 0] },
             })
             .sort({ [sort as string]: sortDir })
-            .limit(skip + lim)
+            .limit(skip + parsedLimit)
             .toArray()
             .then((res) => {
               convs = res;
@@ -1449,7 +1449,7 @@ router.get(
               agent: 1,
             })
             .sort({ [sort as string]: sortDir })
-            .limit(skip + lim)
+            .limit(skip + parsedLimit)
             .toArray()
             .then((res) => {
               sessions = res;
@@ -1501,7 +1501,7 @@ router.get(
       });
 
       // 4. Slice the paginated portion
-      const docs = merged.slice(skip, skip + lim);
+      const docs = merged.slice(skip, skip + parsedLimit);
 
       // 5. Enrich the sliced docs with requests telemetry in a batch lookup
       const finalDocIds = docs.map((d) => (d as Document).id);
@@ -1522,9 +1522,9 @@ router.get(
 
       const requestMap = new Map();
       for (const r of requests) {
-        const cid = r.conversationId || "";
-        if (!requestMap.has(cid)) requestMap.set(cid, []);
-        requestMap.get(cid).push(r);
+        const conversationId = r.conversationId || "";
+        if (!requestMap.has(conversationId)) requestMap.set(conversationId, []);
+        requestMap.get(conversationId).push(r);
       }
 
       const enrichedDocs = docs.map((doc: Record<string, unknown>) => {
@@ -1570,7 +1570,7 @@ router.get(
         data: enrichedDocs,
         total: totalConvs + totalSessions,
         page: parseInt(page as string, 10),
-        limit: lim,
+        limit: parsedLimit,
       });
     } catch (error: unknown) {
       logger.error("Admin /conversations error: " + (error as Error).message);
@@ -2118,12 +2118,12 @@ router.post(
       }
 
       const sizeBytes = modelData.size_bytes || 0;
-      const bpw = modelData.quantization?.bits_per_weight || 4;
+      const bitsPerWeight = modelData.quantization?.bits_per_weight || 4;
       const archParams = resolveArchParams(
         modelData.architecture,
         modelData.params_string,
         sizeBytes,
-        bpw,
+        bitsPerWeight,
       );
       const totalLayers = archParams.layers;
 
@@ -2196,7 +2196,7 @@ router.get(
       }
 
             const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
-            const lim = parseInt(limit as string, 10);
+            const parsedLimit = parseInt(limit as string, 10);
       const sortDir = order === "asc" ? 1 : -1;
 
       const [docs, total] = await Promise.all([
@@ -2225,12 +2225,12 @@ router.get(
           })
                     .sort({ [sort as string]: sortDir as 1 | -1 })
           .skip(skip)
-          .limit(lim)
+          .limit(parsedLimit)
           .toArray(),
         db.collection(WORKFLOWS_COL).countDocuments(filter),
       ]);
 
-            res.json({ data: docs, total, page: parseInt(page as string, 10), limit: lim });
+            res.json({ data: docs, total, page: parseInt(page as string, 10), limit: parsedLimit });
     } catch (error: unknown) {
             logger.error(`Admin GET /workflows error: ${(error as Error).message}`);
       next(error);
@@ -2283,7 +2283,7 @@ router.get(
         to,
       } = req.query;
             const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
-            const lim = parseInt(limit as string, 10);
+            const parsedLimit = parseInt(limit as string, 10);
 
       // Get distinct projects and usernames for filter dropdowns
       const [convProjects, convUsernames, reqProjects, reqUsernames] =
@@ -2514,7 +2514,7 @@ router.get(
       });
 
       const total = mergedItems.length;
-      const paginatedItems = mergedItems.slice(skip, skip + lim);
+      const paginatedItems = mergedItems.slice(skip, skip + parsedLimit);
 
       const data = paginatedItems.map((item: Record<string, unknown>) => ({
         url: item.url,
@@ -2533,7 +2533,7 @@ router.get(
         data,
         total,
                 page: parseInt(page as string, 10),
-        limit: lim,
+        limit: parsedLimit,
         projects: allProjects,
         usernames: allUsernames,
       });
@@ -2562,7 +2562,7 @@ router.get(
         to,
       } = req.query;
             const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
-            const lim = parseInt(limit as string, 10);
+            const parsedLimit = parseInt(limit as string, 10);
 
       const preMatch: Record<string, unknown> = {};
             if (project) preMatch.project = project;
@@ -2616,7 +2616,7 @@ router.get(
         .toArray();
       const total = countResult?.total || 0;
 
-            pipeline.push({ $skip: skip }, { $limit: lim });
+            pipeline.push({ $skip: skip }, { $limit: parsedLimit });
 
       const items = await db
         .collection(CONVERSATIONS_COL)
@@ -2637,7 +2637,7 @@ router.get(
         timestamp: item.timestamp,
       }));
 
-            res.json({ data, total, page: parseInt(page as string, 10), limit: lim });
+            res.json({ data, total, page: parseInt(page as string, 10), limit: parsedLimit });
     } catch (error: unknown) {
             logger.error(`Admin /text error: ${(error as Error).message}`);
       next(error);
@@ -2674,7 +2674,7 @@ router.get(
       }
 
             const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
-            const lim = parseInt(limit as string, 10);
+            const parsedLimit = parseInt(limit as string, 10);
       const sortDir = order === "asc" ? 1 : -1;
 
       const pipeline: Record<string, unknown>[] = [
@@ -2816,7 +2816,7 @@ router.get(
       const countPipeline: Record<string, unknown>[] = [...pipeline, { $count: "total" }];
 
       // Add pagination to the data pipeline
-            pipeline.push({ $skip: skip }, { $limit: lim });
+            pipeline.push({ $skip: skip }, { $limit: parsedLimit });
 
       const [docs, countResult] = await Promise.all([
         db.collection(REQUESTS_COL).aggregate(pipeline).toArray(),
@@ -2824,7 +2824,7 @@ router.get(
       ]);
       const total = countResult[0]?.total || 0;
 
-            res.json({ data: docs, total, page: parseInt(page as string, 10), limit: lim });
+            res.json({ data: docs, total, page: parseInt(page as string, 10), limit: parsedLimit });
     } catch (error: unknown) {
             logger.error(`Admin /traces error: ${(error as Error).message}`);
       next(error);
@@ -3134,7 +3134,7 @@ router.get(
       }
 
             const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
-            const lim = parseInt(limit as string, 10);
+            const parsedLimit = parseInt(limit as string, 10);
       const sortDir = order === "asc" ? 1 : -1;
 
       const [docs, total] = await Promise.all([
@@ -3146,12 +3146,12 @@ router.get(
           })
           .sort({ [sort as string]: sortDir })
           .skip(skip)
-          .limit(lim)
+          .limit(parsedLimit)
           .toArray(),
         db.collection(COLLECTIONS.AGENT_CONVERSATIONS).countDocuments(filter),
       ]);
 
-            res.json({ data: docs, total, page: parseInt(page as string, 10), limit: lim });
+            res.json({ data: docs, total, page: parseInt(page as string, 10), limit: parsedLimit });
     } catch (error: unknown) {
             logger.error(`Admin /agent-sessions error: ${(error as Error).message}`);
       next(error);
