@@ -312,11 +312,11 @@ async function prepareMessages(messages: ChatMessage[]) {
           typeof prev.content === "string"
             ? [{ type: "text", text: prev.content }]
             : prev.content;
-        const curBlocks =
+        const currentBlocks =
           typeof cur.content === "string"
             ? [{ type: "text", text: cur.content }]
             : cur.content;
-        prev.content = [...prevBlocks, ...curBlocks];
+        prev.content = [...prevBlocks, ...currentBlocks];
       }
     } else {
       acc.push({ ...cur });

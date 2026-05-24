@@ -250,11 +250,11 @@ function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.Response
       for (const tc of m.toolCalls) {
         // Responses API requires the function_call id to start with "fc_"
         // responsesItemId is the fc_ prefixed ID from the streaming handler
-        const fcId = tc.responsesItemId || tc.id || `fc_${Date.now()}`;
+        const functionCallId = tc.responsesItemId || tc.id || `fc_${Date.now()}`;
         result.push({
           type: "function_call",
-          id: fcId,
-          call_id: tc.id || fcId,
+          id: functionCallId,
+          call_id: tc.id || functionCallId,
           name: tc.name,
           arguments:
             typeof tc.args === "string"

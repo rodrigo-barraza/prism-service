@@ -293,12 +293,12 @@ async function convertMessages(messages: ConversationMsg[]): Promise<Content[]> 
     // Assistant messages with tool calls — include functionCall parts
     if (item.role === "assistant" && item.toolCalls) {
       for (const tc of item.toolCalls) {
-        const fcPart: Part = { functionCall: { name: tc.name, args: tc.args || {} } };
+        const functionCallPart: Part = { functionCall: { name: tc.name, args: tc.args || {} } };
         // Preserve thoughtSignature (sibling of functionCall, required by Gemini)
         if (tc.thoughtSignature) {
-          fcPart.thoughtSignature = tc.thoughtSignature;
+          functionCallPart.thoughtSignature = tc.thoughtSignature;
         }
-        parts.push(fcPart);
+        parts.push(functionCallPart);
       }
     }
 
@@ -690,16 +690,16 @@ const googleProvider = {
             }
           },
           onerror: (e: unknown) => {
-            const errObj = e as Record<string, unknown> | null;
-            const innerErr = (errObj?.error ?? null) as Record<string, unknown> | null;
-            const errMsg = (innerErr?.message as string) || (errObj?.message as string) || "unknown error";
+            const errorObject = e as Record<string, unknown> | null;
+            const innerErr = (errorObject?.error ?? null) as Record<string, unknown> | null;
+            const errorMessage = (innerErr?.message as string) || (errorObject?.message as string) || "unknown error";
             logger.error(
-              `[Google Live API] Error: ${errMsg}`,
+              `[Google Live API] Error: ${errorMessage}`,
             );
             done = true;
             enqueue({
               type: "error",
-              message: errMsg,
+              message: errorMessage,
             });
           },
           onclose: () => {

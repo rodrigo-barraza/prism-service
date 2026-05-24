@@ -797,10 +797,10 @@ function handleWsLive(
               }
             },
             onerror: (e: Event & { error?: { message?: string }; message?: string }) => {
-              const errMsg =
+              const errorMessage =
                 e?.error?.message || e?.message || "Live API error";
               logger.error(
-                `[Live API] Error (${project}/${username}): ${errMsg}`,
+                `[Live API] Error (${project}/${username}): ${errorMessage}`,
               );
               // Clear isGenerating flag on error
               if (activeConversationId) {
@@ -811,7 +811,7 @@ function handleWsLive(
                   false,
                 ).catch(() => {});
               }
-              emit({ type: "error", message: errMsg });
+              emit({ type: "error", message: errorMessage });
             },
             onclose: () => {
               logger.info(
