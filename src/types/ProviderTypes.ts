@@ -56,7 +56,7 @@ export interface ProviderOptions {
   thinkingEnabled?: boolean;
   thinkingLevel?: string;
   thinkingBudget?: number | string;
-  reasoningEffort?: 'low' | 'medium' | 'high';
+  reasoningEffort?: 'none' | 'low' | 'medium' | 'high';
   signal?: AbortSignal;
   webSearch?: boolean | string;
   webFetch?: boolean;

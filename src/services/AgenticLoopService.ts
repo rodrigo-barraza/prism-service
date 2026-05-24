@@ -3,6 +3,7 @@ import AgenticLoopState from "./AgenticLoopState.ts";
 import HarnessRegistry from "./harnesses/HarnessRegistry.ts";
 import { pendingApprovals, pendingQuestions } from "./ApprovalRegistry.ts";
 import SessionGenerationTracker from "./SessionGenerationTracker.ts";
+import ToolContext from "./ToolContext.ts";
 import logger from "../utils/logger.ts";
 
 import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
@@ -69,11 +70,14 @@ export default class AgenticLoopService {
     // 4. Instantiate and run
     const harness = new HarnessClass(context, state, resolvedTools);
     try {
+      // Restore any persisted tool state from MongoDB (e.g. after server restart)
+      await ToolContext.ensureLoaded(agentSessionId);
       return await harness.run();
     } finally {
       // Clean up
       pendingApprovals.delete(agentSessionId);
       pendingQuestions.delete(agentSessionId);
+      ToolContext.cleanup(agentSessionId);
       if (!parentAgentSessionId) {
         const trackerSessionId = parentAgentSessionId || agentSessionId;
         SessionGenerationTracker.cleanup(trackerSessionId);

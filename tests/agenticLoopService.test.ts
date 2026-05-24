@@ -42,6 +42,11 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
         }),
       }),
     }),
+    getCollection: vi.fn().mockReturnValue({
+      findOne: vi.fn().mockResolvedValue(null),
+      updateOne: vi.fn().mockResolvedValue({ modifiedCount: 0 }),
+      deleteOne: vi.fn().mockResolvedValue({ deletedCount: 0 }),
+    }),
   },
 }));
 

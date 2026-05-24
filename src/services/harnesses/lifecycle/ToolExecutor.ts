@@ -1,4 +1,5 @@
 import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
+import ToolContext from "../../ToolContext.ts";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type AgentHooks from "../../AgentHooks.ts";
@@ -73,6 +74,7 @@ export async function executeToolBatch(
             agentSessionId,
             iteration: state.iterations,
             workspaceRoot,
+            _toolState: ToolContext.getStore(agentSessionId),
           },
         );
         await hooks.run("afterToolCall", toolCall, result, context);
@@ -99,6 +101,7 @@ export async function executeToolBatch(
           _maxWorkerIterations: context.options?.maxWorkerIterations,
           _minContextLength: context.options?.minContextLength,
           workspaceRoot,
+          _toolState: ToolContext.getStore(agentSessionId),
         },
       );
       await hooks.run("afterToolCall", toolCall, result, context);

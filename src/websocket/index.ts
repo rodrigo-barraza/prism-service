@@ -467,9 +467,8 @@ function handleWsLive(
               }
               emit({ type: "setupComplete" });
             },
-            // @ts-expect-error - Live API message callback type mismatch (string vs LiveServerMessage)
-            onmessage: (message: string) => {
-              const msg = message as unknown as LiveServerMessage;
+            onmessage: (msgRaw: unknown) => {
+              const msg = msgRaw as LiveServerMessage;
               // Model turn parts (audio data, text, function calls)
               if (msg.serverContent?.modelTurn?.parts) {
                 if (!passFirstTokenTime) {

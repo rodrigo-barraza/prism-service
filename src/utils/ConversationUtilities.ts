@@ -1,6 +1,7 @@
 import ConversationService from "../services/ConversationService.ts";
 import logger from "./logger.ts";
 import type { ChatMessage } from "../types/admin.ts";
+import type { MessagePayload } from "../services/RequestLogger.ts";
 import { COLLECTIONS } from "../constants.ts";
 
 // ─── Conversation persistence helpers ───────────────────────
@@ -42,7 +43,7 @@ export function appendAndFinalize(
   conversationId: string | null | undefined,
   project: string,
   username: string,
-  messagesToAppend: ChatMessage[],
+  messagesToAppend: Array<ChatMessage | MessagePayload>,
   meta: Record<string, unknown> | null | undefined,
   opts: { collection?: string } = {},
 ): void {

@@ -413,7 +413,6 @@ export async function finalizeTextGeneration(
       conversationId || "",
       project || "",
       username as string,
-      // @ts-expect-error - MessagePayload includes extra properties not in appendAndFinalize's parameter type
       messagesToAppend,
       finalMeta,
             getCollectionOpts(project),

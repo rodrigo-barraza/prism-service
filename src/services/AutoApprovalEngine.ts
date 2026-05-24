@@ -1,5 +1,7 @@
 import logger from "../utils/logger.ts";
 import type { ToolCall, AgenticContext } from "./harnesses/types.ts";
+import PolicyEngine from "./PolicyEngine.ts";
+import type { PolicyRule } from "./PolicyEngine.ts";
 
 /**
  * Tool approval tiers — deterministic, rule-based permission system.
@@ -111,6 +113,8 @@ export interface ApprovedToolCall extends Omit<ToolCall, '_approval'> {
 export interface AutoApprovalEngineOptions {
   fullAuto?: boolean;
   tierOverrides?: Record<string, ApprovalTier>;
+  /** Declarative policies evaluated before the tier system. */
+  policies?: PolicyRule[];
 }
 
 /**
@@ -122,10 +126,12 @@ export interface AutoApprovalEngineOptions {
 export default class AutoApprovalEngine {
   private fullAuto: boolean;
   private tierOverrides: Record<string, ApprovalTier>;
+  private policies: PolicyRule[];
 
   constructor(options: AutoApprovalEngineOptions = {}) {
     this.fullAuto = options.fullAuto || false;
     this.tierOverrides = options.tierOverrides || {};
+    this.policies = options.policies || [];
   }
   getTier(toolName: string): ApprovalTier {
     if (this.tierOverrides[toolName] !== undefined) {
@@ -143,6 +149,26 @@ export default class AutoApprovalEngine {
     // Full Auto mode: everything runs
     if (this.fullAuto) {
       return { approved: true, tier, tierLabel, reason: "full_auto" };
+    }
+
+    // ── Policy evaluation (takes precedence over tier system) ──
+    if (this.policies.length > 0) {
+      const policyResult = PolicyEngine.evaluate(
+        this.policies,
+        toolCall.name,
+        toolCall.args as Record<string, unknown>,
+      );
+      if (policyResult) {
+        switch (policyResult.decision) {
+          case "APPROVE":
+            return { approved: true, tier, tierLabel, reason: policyResult.reason };
+          case "DENY":
+            return { approved: false, tier, tierLabel, reason: policyResult.reason };
+          case "ASK_USER":
+            return { approved: false, tier, tierLabel, reason: policyResult.reason };
+        }
+      }
+      // No policy matched — fall through to tier system
     }
 
     // Tier 1: always auto-approve
