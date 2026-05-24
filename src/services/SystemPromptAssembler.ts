@@ -518,7 +518,7 @@ export default class SystemPromptAssembler {
         skillNames.push(s.name);
         return `### ${s.name}\n${s.content}`;
       });
-      skillsText = `## Project Skills (${skills.length})\n` + skillBlocks.join("\n\n");
+      skillsText = `[Project Skills]\n` + skillBlocks.join("\n\n");
     }
 
     // ── 9. Session Memory (embedding search) ────────────────────
@@ -538,7 +538,7 @@ export default class SystemPromptAssembler {
         },
       );
       if (memories) {
-        memoriesText = `## Agent Memory\n` + memories;
+        memoriesText = `[Agent Memory]\n` + memories;
       }
     }
 
