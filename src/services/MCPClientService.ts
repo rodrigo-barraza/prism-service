@@ -24,6 +24,8 @@ interface MCPRawTool {
   inputSchema?: Record<string, unknown>;
   domain?: string;
   labels?: string[];
+  /** MCP-standard extension point — survives Zod validation unlike top-level custom fields */
+  _meta?: Record<string, unknown>;
 }
 
 export interface MCPServerConfig {
@@ -112,6 +114,13 @@ registerCleanup(async () => {
  * Namespaces the tool name with the server prefix.
  */
 function mcpToolToSchema(serverName: string, mcpTool: MCPRawTool): MCPToolSchema {
+  // Extract domain/labels from _meta (MCP-standard extension point) as fallback.
+  // Top-level custom fields get stripped by the MCP SDK's Zod validation,
+  // but _meta is an official passthrough record that survives parsing.
+  const meta = mcpTool._meta || {};
+  const domain = mcpTool.domain || (typeof meta.domain === "string" ? meta.domain : undefined);
+  const labels = mcpTool.labels || (Array.isArray(meta.labels) ? meta.labels as string[] : undefined);
+
   return {
     name: `${MCP_PREFIX}${serverName}${MCP_DELIMITER}${mcpTool.name}`,
     description: mcpTool.description || "",
@@ -119,8 +128,8 @@ function mcpToolToSchema(serverName: string, mcpTool: MCPRawTool): MCPToolSchema
     // Metadata for UI display
     _mcpServer: serverName,
     _mcpOriginalName: mcpTool.name,
-    domain: mcpTool.domain,
-    labels: mcpTool.labels,
+    domain,
+    labels,
   };
 }
 
