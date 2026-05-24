@@ -34,14 +34,14 @@ export function truncateToolResult(result: unknown, maxChars = 8000): unknown {
     const sliced = result.slice(0, 10);
     sliced.push({ _truncated: `Showing 10 of ${result.length}` });
     const serialized = JSON.stringify(sliced);
-    return serialized.length > maxChars ? str.slice(0, maxChars) + "…}" : sliced;
+    return serialized.length > maxChars ? serialized.slice(0, maxChars) + "…}" : sliced;
   }
 
   // If result has a known array wrapper, cap items at 10
   const trimmed = { ...(result as Record<string, unknown>) };
   for (const key of TRUNCATABLE_ARRAY_KEYS) {
     const items = trimmed[key];
-    if (Array.isArray(arr) && items.length > 10) {
+    if (Array.isArray(items) && items.length > 10) {
       const total = items.length;
       trimmed[key] = items.slice(0, 10);
       trimmed[`_${key}Truncated`] = `Showing 10 of ${total}`;
@@ -50,7 +50,7 @@ export function truncateToolResult(result: unknown, maxChars = 8000): unknown {
 
   const serialized = JSON.stringify(trimmed);
   if (serialized.length <= maxChars) return trimmed;
-  return str.slice(0, maxChars) + "…}";
+  return serialized.slice(0, maxChars) + "…}";
 }
 
 interface ExpandOptions {

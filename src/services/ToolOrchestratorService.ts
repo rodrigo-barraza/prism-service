@@ -1147,7 +1147,7 @@ export default class ToolOrchestratorService {
         }
       }
       const queryString = params.toString();
-      const url = `${toolDef.endpoint}${qs ? `?${queryString}` : ""}`;
+      const url = `${toolDef.endpoint}${queryString ? `?${queryString}` : ""}`;
       const response = await fetch(url, { headers });
       if (!response.ok) {
         return { error: `API returned ${response.status}: ${response.statusText}` };

@@ -1008,7 +1008,7 @@ async function handleStreamingText(context: GenerationContext) {
     }
     await dispatchChunk(
       chunk,
-      ss,
+      streamState,
       { emit, project, username },
       { logPrefix: "chat/stream" },
     );
@@ -1129,7 +1129,7 @@ async function handleStreamingText(context: GenerationContext) {
       }
       await dispatchChunk(
         chunk,
-        ss,
+        streamState,
         { emit, project, username },
         { onUsage: usageMerger, logPrefix: "chat/FC" },
       );
@@ -1150,21 +1150,21 @@ async function handleStreamingText(context: GenerationContext) {
   await finalizeTextGeneration(context, {
     text: streamState.text,
     thinking: streamState.thinking,
-    images: ss.images,
+    images: streamState.images,
     toolCalls: streamState.toolCalls.map((tc): ToolCallPayload => ({ name: tc.name, id: tc.id, args: tc.args as Record<string, unknown> })),
-    audioChunks: ss.audioChunks,
-    audioSampleRate: ss.audioSampleRate,
+    audioChunks: streamState.audioChunks,
+    audioSampleRate: streamState.audioSampleRate,
     usage: streamState.usage as FinalizerTokenUsage | null,
-    outputCharacters: ss.outputCharacters,
-    timeToGenerationSec: ss.firstTokenTime
-      ? (ss.firstTokenTime - requestStart) / 1000
+    outputCharacters: streamState.outputCharacters,
+    timeToGenerationSec: streamState.firstTokenTime
+      ? (streamState.firstTokenTime - requestStart) / 1000
       : null,
     generationSec:
-      ss.firstTokenTime && ss.generationEnd
-        ? (ss.generationEnd - ss.firstTokenTime) / 1000
+      streamState.firstTokenTime && streamState.generationEnd
+        ? (streamState.generationEnd - streamState.firstTokenTime) / 1000
         : null,
     totalSec: (now - requestStart) / 1000,
-    rateLimits: ss.rateLimits as Record<string, unknown> | null,
+    rateLimits: streamState.rateLimits as Record<string, unknown> | null,
   });
 }
 // ─── Dispatch: Non-streaming text generation (fallback) ─────
