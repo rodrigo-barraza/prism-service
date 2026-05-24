@@ -20,6 +20,7 @@ import {
   mergeUsage,
 } from "../utils/CostCalculator.ts";
 import type { TokenUsage } from "../types/admin.ts";
+import type { ToolCallPayload, TokenUsage as FinalizerTokenUsage } from "../services/RequestLogger.ts";
 import logger from "../utils/logger.ts";
 import RequestLogger from "../services/RequestLogger.ts";
 import FileService from "../services/FileService.ts";
@@ -953,10 +954,6 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
     );
   }
 }
-// ─── Post-generation finalization ────────────────────────────
-// Moved to src/services/harnesses/lifecycle/Finalizer.ts
-// Imported at the top of this file via:
-//   import { finalizeTextGeneration, getCollectionOpts } from "../services/harnesses/lifecycle/Finalizer.ts";
 
 type GenerationContext = Awaited<ReturnType<typeof prepareGenerationContext>> & {
   conversationId?: string | null;
@@ -1056,7 +1053,7 @@ async function handleStreamingText(context: GenerationContext) {
           { project, username },
         );
         tc.result = result;
-        tc.status = (result as any)?.error ? "error" : "done";
+        tc.status = (result && typeof result === "object" && "error" in result && result.error) ? "error" : "done";
         emit({
           type: "toolCall",
           id: tc.id,
@@ -1154,10 +1151,10 @@ async function handleStreamingText(context: GenerationContext) {
     text: ss.text,
     thinking: ss.thinking,
     images: ss.images,
-    toolCalls: ss.toolCalls as any,
+    toolCalls: ss.toolCalls.map((tc): ToolCallPayload => ({ name: tc.name, id: tc.id, args: tc.args as Record<string, unknown> })),
     audioChunks: ss.audioChunks,
     audioSampleRate: ss.audioSampleRate,
-    usage: ss.usage as any,
+    usage: ss.usage as FinalizerTokenUsage | null,
     outputCharacters: ss.outputCharacters,
     timeToGenerationSec: ss.firstTokenTime
       ? (ss.firstTokenTime - requestStart) / 1000

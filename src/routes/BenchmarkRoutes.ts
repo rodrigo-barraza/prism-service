@@ -6,6 +6,7 @@ import logger from "../utils/logger.ts";
 import { createAbortController } from "../utils/AbortController.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
 import type { WithId, Document } from "mongodb";
+import type { TextAssertion } from "../types/benchmark.ts";
 
 const router = express.Router();
 
@@ -198,10 +199,10 @@ router.get(
                 runCount: 0,
               });
             }
-            const rt = allRunTotals.get(modelKey)!;
-            rt.totalCost += result.estimatedCost || 0;
-            rt.totalLatency += result.latency || 0;
-            rt.runCount++;
+            const runTotal = allRunTotals.get(modelKey)!;
+            runTotal.totalCost += result.estimatedCost || 0;
+            runTotal.totalLatency += result.latency || 0;
+            runTotal.runCount++;
 
             // Accumulate ALL-run per-benchmark stats (for detail cards)
             const cumulKey = `${modelKey}::${b.id}`;
@@ -248,7 +249,7 @@ router.get(
         ([modelKey, benchmarkMap]: [string, Map<string, LatestResult>]) => {
           const benchmarkResults = [...benchmarkMap.values()];
           const first = benchmarkResults[0];
-          const rt = allRunTotals.get(modelKey) || {
+          const runTotal = allRunTotals.get(modelKey) || {
             totalCost: 0,
             totalLatency: 0,
             runCount: 0,
@@ -294,11 +295,11 @@ router.get(
             passed,
             failed,
             errored,
-            totalCost: rt.totalCost,
-            totalLatency: rt.totalLatency,
-            runCount: rt.runCount,
+            totalCost: runTotal.totalCost,
+            totalLatency: runTotal.totalLatency,
+            runCount: runTotal.runCount,
             passRate: total > 0 ? passed / total : 0,
-            avgLatency: rt.runCount > 0 ? rt.totalLatency / rt.runCount : 0,
+            avgLatency: runTotal.runCount > 0 ? runTotal.totalLatency / runTotal.runCount : 0,
             benchmarks: perBenchmark,
           };
         },
@@ -369,7 +370,7 @@ router.post(
       if (
         benchmarkMode !== "agent" &&
         !expectedValue &&
-        (!assertions || !assertions.some((a: any) => a.expectedValue))
+        (!assertions || !assertions.some((a: TextAssertion) => a.expectedValue))
       ) {
         return res.status(400).json({
           error:

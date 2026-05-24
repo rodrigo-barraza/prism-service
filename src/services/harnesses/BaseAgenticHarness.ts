@@ -235,16 +235,16 @@ export default class BaseAgenticHarness {
     const { emit, signal } = this.ctx;
     const state = this.state;
     // Cast to a loose typed object — we branch on `type` below
-    const c = chunk as StreamChunk;
+    const streamChunk = chunk as StreamChunk;
 
     // Abort check
     if (signal?.aborted) return { action: "break" };
 
     // ── Usage event ──────────────────────────────────────
-    if (c?.type === "usage") {
-      mergeUsage(state.overallUsage, c.usage as Parameters<typeof mergeUsage>[1]);
-      mergeUsage(pass.usage, c.usage as Parameters<typeof mergeUsage>[1]);
-      const usageObj = c.usage as Record<string, number> | undefined;
+    if (streamChunk?.type === "usage") {
+      mergeUsage(state.overallUsage, streamChunk.usage as Parameters<typeof mergeUsage>[1]);
+      mergeUsage(pass.usage, streamChunk.usage as Parameters<typeof mergeUsage>[1]);
+      const usageObj = streamChunk.usage as Record<string, number> | undefined;
       const reportedInput =
         usageObj?.inputTokens || usageObj?.promptTokens || 0;
       if (reportedInput > 0 && pass.requestId) {
@@ -256,17 +256,17 @@ export default class BaseAgenticHarness {
     }
 
     // ── Rate limits ──────────────────────────────────────
-    if (c?.type === "rateLimits") {
-      state.lastRateLimits = c.rateLimits || null;
+    if (streamChunk?.type === "rateLimits") {
+      state.lastRateLimits = streamChunk.rateLimits || null;
       return { action: "continue" };
     }
 
     // ── Thinking ─────────────────────────────────────────
-    if (c?.type === "thinking") {
+    if (streamChunk?.type === "thinking") {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
-      state.streamedThinking += c.content || "";
-      pass.streamedThinking += c.content || "";
+      state.streamedThinking += streamChunk.content || "";
+      pass.streamedThinking += streamChunk.content || "";
       // Display segment tracking
       if (state.lastDisplaySegType !== "thinking") {
         state.displaySegments.push({
@@ -278,17 +278,17 @@ export default class BaseAgenticHarness {
       }
       state.displayThinkingFragments[
         state.displayThinkingFragments.length - 1
-      ] += c.content || "";
-      state.overallOutputCharacters += (c.content || "").length;
+      ] += streamChunk.content || "";
+      state.overallOutputCharacters += (streamChunk.content || "").length;
       if (pass.requestId) {
         SessionGenerationTracker.recordChunkTiming(
           pass.requestId,
-          (c.content || "").length,
+          (streamChunk.content || "").length,
         );
       }
       emit({
         type: "thinking",
-        content: c.content || "",
+        content: streamChunk.content || "",
         outputCharacters: state.overallOutputCharacters,
       });
       this.maybeEmitProgress();
@@ -296,20 +296,20 @@ export default class BaseAgenticHarness {
     }
 
     // ── Thinking signature (Anthropic) ───────────────────
-    if (c?.type === "thinking_signature") {
-      pass.thinkingSignature = c.signature || "";
+    if (streamChunk?.type === "thinking_signature") {
+      pass.thinkingSignature = streamChunk.signature || "";
       return { action: "continue" };
     }
 
     // ── Tool call argument delta ─────────────────────────
-    if (c?.type === "toolCallDelta") {
+    if (streamChunk?.type === "toolCallDelta") {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
-      state.overallOutputCharacters += c.characters as number;
+      state.overallOutputCharacters += streamChunk.characters as number;
       if (pass.requestId) {
         SessionGenerationTracker.recordChunkTiming(
           pass.requestId,
-          c.characters as number,
+          streamChunk.characters as number,
         );
       }
       this.maybeEmitProgress();
@@ -317,53 +317,53 @@ export default class BaseAgenticHarness {
     }
 
     // ── Tool call ────────────────────────────────────────
-    if (c?.type === "toolCall") {
+    if (streamChunk?.type === "toolCall") {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
       if (pass.requestId) {
         SessionGenerationTracker.recordChunkTiming(
           pass.requestId,
-          JSON.stringify(c.args || {}).length,
+          JSON.stringify(streamChunk.args || {}).length,
         );
       }
       this.maybeEmitProgress();
 
       // Native MCP tool calls: pass through directly
-      if (c.native) {
-        if (c.status === "calling") {
-          const tcId = c.id || `ntc-${state.streamedToolCalls.length}`;
+      if (streamChunk.native) {
+        if (streamChunk.status === "calling") {
+          const tcId = streamChunk.id || `ntc-${state.streamedToolCalls.length}`;
           state.streamedToolCalls.push({
             id: tcId,
-            name: c.name || "",
-            args: c.args || {},
+            name: streamChunk.name || "",
+            args: streamChunk.args || {},
           });
           this._trackToolDisplaySegment(tcId);
-        } else if (c.status === "done" || c.status === "error") {
+        } else if (streamChunk.status === "done" || streamChunk.status === "error") {
           const existing = state.streamedToolCalls.find(
             (tc) =>
-              (c.id && tc.id === c.id) ||
-              (!c.id && tc.name === c.name),
+              (streamChunk.id && tc.id === streamChunk.id) ||
+              (!streamChunk.id && tc.name === streamChunk.name),
           );
           if (existing) {
-            existing.result = c.result;
-            existing.status = c.status;
-            if (c.args && Object.keys(c.args).length > 0)
-              existing.args = c.args;
+            existing.result = streamChunk.result;
+            existing.status = streamChunk.status;
+            if (streamChunk.args && Object.keys(streamChunk.args).length > 0)
+              existing.args = streamChunk.args;
           }
         }
         emit({
           type: "toolCall",
-          id: c.id || null,
-          name: c.name,
-          args: c.args || {},
-          result: c.result || undefined,
-          status: c.status || "calling",
+          id: streamChunk.id || null,
+          name: streamChunk.name,
+          args: streamChunk.args || {},
+          result: streamChunk.result || undefined,
+          status: streamChunk.status || "calling",
         });
         return { action: "continue" };
       }
 
       // Schema enforcement
-      const toolName = c.name || "";
+      const toolName = streamChunk.name || "";
       if (!allowedToolNames.has(toolName)) {
         logger.warn(
           `[AgenticLoop] Dropped tool call "${toolName}" — not in schema: [${[...allowedToolNames].join(", ")}]`,
@@ -371,62 +371,62 @@ export default class BaseAgenticHarness {
         return { action: "skip" };
       }
 
-      const stdTcId = c.id || `tc-${state.streamedToolCalls.length}`;
+      const stdTcId = streamChunk.id || `tc-${state.streamedToolCalls.length}`;
       const tc: ToolCall = {
         id: stdTcId,
-        responsesItemId: c.responsesItemId || undefined,
+        responsesItemId: streamChunk.responsesItemId || undefined,
         name: toolName,
-        args: c.args || {},
-        thoughtSignature: c.thoughtSignature || undefined,
+        args: streamChunk.args || {},
+        thoughtSignature: streamChunk.thoughtSignature || undefined,
       };
       pass.pendingToolCalls.push(tc);
       state.streamedToolCalls.push({ ...tc });
       this._trackToolDisplaySegment(stdTcId);
       emit({
         type: "tool_execution",
-        tool: { name: toolName, args: c.args || {}, id: stdTcId },
+        tool: { name: toolName, args: streamChunk.args || {}, id: stdTcId },
         status: "calling",
       });
       return { action: "toolCall", tc };
     }
 
     // ── Image ────────────────────────────────────────────
-    if (c?.type === "image") {
-      return this._handleImageChunk(c, pass);
+    if (streamChunk?.type === "image") {
+      return this._handleImageChunk(streamChunk, pass);
     }
 
     // ── Pass-through events ──────────────────────────────
-    if (c?.type === "executableCode") {
+    if (streamChunk?.type === "executableCode") {
       emit({
         type: "executableCode",
-        code: c.code,
-        language: c.language,
+        code: streamChunk.code,
+        language: streamChunk.language,
       });
       return { action: "continue" };
     }
-    if (c?.type === "codeExecutionResult") {
+    if (streamChunk?.type === "codeExecutionResult") {
       emit({
         type: "codeExecutionResult",
-        output: c.output,
-        outcome: c.outcome,
+        output: streamChunk.output,
+        outcome: streamChunk.outcome,
       });
       return { action: "continue" };
     }
-    if (c?.type === "webSearchResult") {
-      emit({ type: "webSearchResult", results: c.results });
+    if (streamChunk?.type === "webSearchResult") {
+      emit({ type: "webSearchResult", results: streamChunk.results });
       return { action: "continue" };
     }
-    if (c?.type === "audio") {
-      emit({ type: "audio", data: c.data, mimeType: c.mimeType });
-      if (c.data) state.streamedAudioChunks.push(c.data);
-      if (c.mimeType) {
-        const rateMatch = c.mimeType.match(/rate=(\d+)/);
+    if (streamChunk?.type === "audio") {
+      emit({ type: "audio", data: streamChunk.data, mimeType: streamChunk.mimeType });
+      if (streamChunk.data) state.streamedAudioChunks.push(streamChunk.data);
+      if (streamChunk.mimeType) {
+        const rateMatch = streamChunk.mimeType.match(/rate=(\d+)/);
         if (rateMatch) state.audioSampleRate = parseInt(rateMatch[1], 10);
       }
       return { action: "continue" };
     }
-    if (c?.type === "status") {
-      const { type: _t, ...statusRest } = c;
+    if (streamChunk?.type === "status") {
+      const { type: _t, ...statusRest } = streamChunk;
       emit({ type: "status", ...statusRest });
       return { action: "continue" };
     }

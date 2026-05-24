@@ -54,8 +54,7 @@ type HookCategory = "inspect" | "decide" | "transform";
 // a context object, beforeToolCall receives (toolCall, ctx), afterResponse
 // receives (ctx, output), etc.). A single function type can't express this
 // without a complex generic event map, so we use a callable interface.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type HookHandler = (...args: any[]) => Promise<object | void> | object | void;
+type HookHandler = (...args: unknown[]) => Promise<object | void> | object | void;
 
 interface RegisteredHook {
   handler: HookHandler;
@@ -63,7 +62,7 @@ interface RegisteredHook {
   category: HookCategory;
 }
 
-export type { HookCategory };
+export type { HookCategory, HookHandler };
 
 export default class AgentHooks {
   private _hooks: Map<HookEvent, RegisteredHook[]>;

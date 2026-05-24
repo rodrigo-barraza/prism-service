@@ -4,6 +4,7 @@ import http from "http";
 import { WebSocketServer } from "ws";
 
 import { errorHandler } from "./utils/errors.ts";
+import { errorMessage } from "./utils/errorMessage.ts";
 import logger from "./utils/logger.ts";
 import { listProviders } from "./providers/index.ts";
 import { TYPES } from "./config.ts";
@@ -203,7 +204,7 @@ setupWebSocket(wss);
       }
     }
   } catch (error: unknown) {
-    logger.warn("Collection migration check failed: " + (error as Error).message);
+    logger.warn("Collection migration check failed: " + errorMessage(error));
   }
 
   // ── Ensure collection indexes ──────────────────────────────────
@@ -284,7 +285,7 @@ setupWebSocket(wss);
       logger.success("Database indexes ensured");
     }
   } catch (error: unknown) {
-        logger.error(`Failed to ensure indexes: ${(error as Error).message}`);
+        logger.error(`Failed to ensure indexes: ${errorMessage(error)}`);
   }
 
   // Clear any stale isGenerating flags left over from a previous crash/restart
@@ -310,7 +311,7 @@ setupWebSocket(wss);
       }
     }
   } catch (error: unknown) {
-        logger.error(`Failed to clear stale isGenerating flags: ${(error as Error).message}`);
+        logger.error(`Failed to clear stale isGenerating flags: ${errorMessage(error)}`);
   }
 
   // ── One-time migration: conversations → agent_sessions ──────────
@@ -347,7 +348,7 @@ setupWebSocket(wss);
       }
     }
   } catch (error: unknown) {
-        logger.error(`Agent session migration failed: ${(error as Error).message}`);
+        logger.error(`Agent session migration failed: ${errorMessage(error)}`);
   }
 
   // Load custom agents from database into the persona registry
@@ -356,7 +357,7 @@ setupWebSocket(wss);
       await import("./services/AgentPersonaRegistry.js");
     await AgentPersonaRegistryCustom.loadCustomAgents();
   } catch (error: unknown) {
-        logger.warn(`Custom agent loading failed: ${(error as Error).message}`);
+        logger.warn(`Custom agent loading failed: ${errorMessage(error)}`);
   }
 
   // Initialize Change Streams (requires replica set — graceful fallback)
@@ -404,15 +405,15 @@ setupWebSocket(wss);
             }
             logger.info(`Seeded ${defaults.length} default MCP server(s) from environment`);
           }
-        } catch (seedErr: any) {
-          logger.warn(`Failed to parse/seed DEFAULT_MCP_SERVERS: ${seedErr.message}`);
+        } catch (seedErr: unknown) {
+          logger.warn(`Failed to parse/seed DEFAULT_MCP_SERVERS: ${errorMessage(seedErr)}`);
         }
       }
 
       await MCPClientService.connectAllFromDB(mcpDb, codingProject, "admin");
     }
   } catch (error: unknown) {
-        logger.warn(`MCP auto-connect failed: ${(error as Error).message}`);
+        logger.warn(`MCP auto-connect failed: ${errorMessage(error)}`);
   }
 
   // ── Scheduled Memory Consolidation ─────────────────
@@ -455,14 +456,14 @@ setupWebSocket(wss);
             });
           } catch (error: unknown) {
             logger.error(
-                            `[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${(error as Error).message}`,
+                            `[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${errorMessage(error)}`,
             );
           }
         }
       }
     } catch (error: unknown) {
       logger.error(
-                `[AutoDream] Scheduled consolidation sweep failed: ${(error as Error).message}`,
+                `[AutoDream] Scheduled consolidation sweep failed: ${errorMessage(error)}`,
       );
     }
   }, CONSOLIDATION_INTERVAL_MS);
@@ -474,7 +475,7 @@ setupWebSocket(wss);
   // ── Background Housekeeping ────────────────────────────────
   // Boot-time run: clean up orphans from previous crashes
   BackgroundHousekeepingService.run({ trigger: "boot" }).catch((error: unknown) =>
-    logger.error(`[Housekeeping] Boot-time run failed: ${(error as Error).message}`),
+    logger.error(`[Housekeeping] Boot-time run failed: ${errorMessage(error)}`),
   );
 
   // Scheduled run: every 6h (independent of consolidation interval)
@@ -482,7 +483,7 @@ setupWebSocket(wss);
   const housekeepingInterval = setInterval(() => {
     BackgroundHousekeepingService.run({ trigger: "scheduled" }).catch(
       (error: unknown) =>
-        logger.error(`[Housekeeping] Scheduled run failed: ${(error as Error).message}`),
+        logger.error(`[Housekeeping] Scheduled run failed: ${errorMessage(error)}`),
     );
   }, HOUSEKEEPING_INTERVAL_MS);
   registerCleanup(async () => clearInterval(housekeepingInterval));
@@ -513,7 +514,7 @@ setupWebSocket(wss);
     logger.success(`Prism the AI Gateway is running on port ${PORT}`);
     logger.info("Available providers:", listProviders().join(", "));
     // Modality colors matching Prism Client's MODALITY_COLORS
-    const MODALITY_COLORS = {
+    const MODALITY_COLORS: Record<string, number[]> = {
       text: [99, 102, 241], // #6366f1 — indigo
       image: [16, 185, 129], // #10b981 — emerald
       audio: [245, 158, 11], // #f59e0b — amber
@@ -523,7 +524,7 @@ setupWebSocket(wss);
     };
     const coloredModalities = Object.values(TYPES)
       .map((t: string) => {
-        const [r, g, b] = (MODALITY_COLORS as Record<string, number[]>)[t] || [255, 255, 255];
+        const [r, g, b] = MODALITY_COLORS[t] || [255, 255, 255];
         return `\x1b[38;2;${r};${g};${b}m${t}\x1b[0m`;
       })
       .join(", ");

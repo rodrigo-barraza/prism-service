@@ -406,7 +406,7 @@ const ConversationService: ConversationServiceInterface = {
     }
 
     // 3. Recompute derived fields and persist
-    const derived: Record<string, any> = {
+    const derived: Record<string, unknown> = {
       modalities: computeModalities(conversation.messages as ChatMessage[]),
       providers: extractProviders(conversation.messages as ChatMessage[], conversation.settings as ConversationSettings),
       totalCost: computeTotalCost(conversation.messages as ChatMessage[]),

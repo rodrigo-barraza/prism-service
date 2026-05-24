@@ -399,36 +399,36 @@ async function fetchHuggingFaceMetadata(modelId: string): Promise<HuggingFaceMet
 async function enrichWithHuggingFace(entry: ModelEntry, modelKey: string): Promise<ModelEntry> {
   if (!modelKey.includes("/")) return entry;
 
-  const hf = await fetchHuggingFaceMetadata(modelKey).catch(() => null);
-  if (!hf) return entry;
+  const huggingFaceMeta = await fetchHuggingFaceMetadata(modelKey).catch(() => null);
+  if (!huggingFaceMeta) return entry;
 
   // Vision/video/audio override from HF tags
   if (
-    hf.pipelineTag === "image-text-to-text" ||
-    hf.tags.includes("multimodal") ||
-    hf.tags.includes("vision")
+    huggingFaceMeta.pipelineTag === "image-text-to-text" ||
+    huggingFaceMeta.tags.includes("multimodal") ||
+    huggingFaceMeta.tags.includes("vision")
   ) {
     entry.vision = true;
     if (!entry.inputTypes.includes(TYPES.IMAGE)) {
       entry.inputTypes.push(TYPES.IMAGE);
     }
   }
-  if (hf.pipelineTag === "video-text-to-text" || hf.tags.includes("video")) {
+  if (huggingFaceMeta.pipelineTag === "video-text-to-text" || huggingFaceMeta.tags.includes("video")) {
     if (!entry.inputTypes.includes(TYPES.VIDEO)) {
       entry.inputTypes.push(TYPES.VIDEO);
     }
   }
-  if (hf.pipelineTag === "audio-text-to-text" || hf.tags.includes("audio")) {
+  if (huggingFaceMeta.pipelineTag === "audio-text-to-text" || huggingFaceMeta.tags.includes("audio")) {
     if (!entry.inputTypes.includes(TYPES.AUDIO)) {
       entry.inputTypes.push(TYPES.AUDIO);
     }
   }
 
   // Metadata overrides
-  if (hf.totalParams) entry.params = formatParams(hf.totalParams) || undefined;
-  if (hf.totalSize) entry.size = formatBytes(hf.totalSize);
-  if (hf.architectures?.length > 0) entry.architecture = hf.architectures[0];
-  if (hf.author) entry.publisher = hf.author;
+  if (huggingFaceMeta.totalParams) entry.params = formatParams(huggingFaceMeta.totalParams) || undefined;
+  if (huggingFaceMeta.totalSize) entry.size = formatBytes(huggingFaceMeta.totalSize);
+  if (huggingFaceMeta.architectures?.length > 0) entry.architecture = huggingFaceMeta.architectures[0];
+  if (huggingFaceMeta.author) entry.publisher = huggingFaceMeta.author;
 
   return entry;
 }

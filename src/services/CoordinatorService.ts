@@ -360,9 +360,9 @@ async function cleanupWorktrees(repoPath: string): Promise<ToolsApiResponse> {
 function getLastAssistantText(messages: ConversationMessage[]): string {
   if (!messages?.length) return "";
   for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m.role !== "assistant") continue;
-    const text = (typeof m.content === "string" ? m.content : "").trim();
+    const message = messages[i];
+    if (message.role !== "assistant") continue;
+    const text = (typeof message.content === "string" ? message.content : "").trim();
     if (text) return text;
   }
   return "";
