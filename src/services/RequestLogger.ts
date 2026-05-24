@@ -105,6 +105,7 @@ export interface ToolCallPayload {
 export interface MessagePayload {
   role: string;
   content?: string | unknown[] | null;
+  rawContent?: string;
   images?: string[] | unknown[];
   audio?: string | unknown[];
   video?: string | unknown[];
