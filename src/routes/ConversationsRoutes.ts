@@ -185,7 +185,16 @@ router.get(
         .findOne({ id: conversationId, project, username });
 
       if (agentChat) {
-        return res.json({ ...agentChat, type: "agent" });
+        const stats = await ConversationService.getSessionStats(
+          conversationId,
+          project,
+          username,
+        );
+        return res.json({
+          ...agentChat,
+          stats: stats || undefined,
+          type: "agent",
+        });
       }
 
       res.status(404).json({ error: "Conversation not found" });
