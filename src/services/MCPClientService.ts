@@ -14,12 +14,16 @@ export interface MCPToolSchema {
   parameters: Record<string, unknown>;
   _mcpServer: string;
   _mcpOriginalName: string;
+  domain?: string;
+  labels?: string[];
 }
 
 interface MCPRawTool {
   name: string;
   description?: string;
   inputSchema?: Record<string, unknown>;
+  domain?: string;
+  labels?: string[];
 }
 
 export interface MCPServerConfig {
@@ -115,6 +119,8 @@ function mcpToolToSchema(serverName: string, mcpTool: MCPRawTool): MCPToolSchema
     // Metadata for UI display
     _mcpServer: serverName,
     _mcpOriginalName: mcpTool.name,
+    domain: mcpTool.domain,
+    labels: mcpTool.labels,
   };
 }
 

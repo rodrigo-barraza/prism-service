@@ -586,8 +586,8 @@ export default class ToolOrchestratorService {
       name: t.name,
       description: t.description,
       parameters: t.parameters,
-      domain: `Model Context Protocol: ${t._mcpServer}`,
-      labels: ["mcp", t._mcpServer],
+      domain: t.domain || `Model Context Protocol: ${t._mcpServer}`,
+      labels: t.labels || ["mcp", t._mcpServer],
       system: false,
     }));
 
