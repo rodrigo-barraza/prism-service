@@ -512,18 +512,18 @@ export default class SystemPromptAssembler {
       },
     );
     const skillNames: string[] = [];
+    let skillsText = "";
     if (skills.length > 0) {
       const skillBlocks = skills.map((s) => {
         skillNames.push(s.name);
         return `### ${s.name}\n${s.content}`;
       });
-      sections.push(
-        `## Project Skills (${skills.length})\n` + skillBlocks.join("\n\n"),
-      );
+      skillsText = `## Project Skills (${skills.length})\n` + skillBlocks.join("\n\n");
     }
 
     // ── 9. Session Memory (embedding search) ────────────────────
     const memoryQuery = queryText || context.project || "";
+    let memoriesText = "";
 
     if (memoryQuery) {
       const memories = await this.fetchMemories(
@@ -538,11 +538,16 @@ export default class SystemPromptAssembler {
         },
       );
       if (memories) {
-        sections.push(`## Agent Memory\n` + memories);
+        memoriesText = `## Agent Memory\n` + memories;
       }
     }
 
-    return { prompt: sections.join("\n\n"), skillNames };
+    return {
+      prompt: sections.join("\n\n"),
+      skillNames,
+      skillsText,
+      memoriesText,
+    };
   }
 
   /**
@@ -555,7 +560,12 @@ export default class SystemPromptAssembler {
   createHook() {
     return async (context: AssemblerContext) => {
       try {
-        const { prompt: systemPrompt, skillNames } = await this.assemble(context);
+        const {
+          prompt: systemPrompt,
+          skillNames,
+          skillsText,
+          memoriesText,
+        } = await this.assemble(context);
         if (!systemPrompt) return;
 
         // Expose skill names on ctx for downstream emission
@@ -571,19 +581,46 @@ export default class SystemPromptAssembler {
           context.messages?.unshift({ role: "system", content: systemPrompt });
         }
 
-        // Inject dynamic time/date context into the latest user message to keep the agent time-aware
-        // while preserving prefix-cache validity of the static system prompt
+        // Prepend dynamic context (time, skills, memories) directly into the latest user message
+        // to keep the agent time-aware and memory-aware while preserving prefix-cache validity of the system prompt
         if (context.messages) {
           const userMessages = context.messages.filter((m) => m.role === "user");
           const lastUserMsg = userMessages[userMessages.length - 1];
           if (lastUserMsg && typeof lastUserMsg.content === "string") {
-            const timeString = `[System Context - Local Time: ${new Date().toLocaleString("en-US", { dateStyle: "full", timeStyle: "long" })}]\n\n`;
-            if (!lastUserMsg.content.startsWith("[System Context - Local Time:")) {
+            const contextLines: string[] = [];
+
+            // 1. Local Time
+            contextLines.push(
+              `- Local Time: ${new Date().toLocaleString("en-US", {
+                dateStyle: "full",
+                timeStyle: "long",
+              })}`,
+            );
+
+            // 2. Active Project Context
+            if (context.project) {
+              contextLines.push(`- Active Project: ${context.project}`);
+            }
+
+            let systemContextBlock = `[System Context]\n${contextLines.join("\n")}\n\n`;
+
+            // 3. Dynamic Skills
+            if (skillsText) {
+              systemContextBlock += `${skillsText}\n\n`;
+            }
+
+            // 4. Dynamic Memories
+            if (memoriesText) {
+              systemContextBlock += `${memoriesText}\n\n`;
+            }
+
+            // Prevent double injection if already injected
+            if (!lastUserMsg.content.startsWith("[System Context]")) {
               const msgIdx = context.messages.indexOf(lastUserMsg);
               if (msgIdx !== -1) {
                 context.messages[msgIdx] = {
                   ...lastUserMsg,
-                  content: timeString + lastUserMsg.content,
+                  content: systemContextBlock + `[User Message]\n${lastUserMsg.content}`,
                 };
               }
             }
@@ -591,7 +628,7 @@ export default class SystemPromptAssembler {
         }
 
         logger.info(
-          `[SystemPromptAssembler] Assembled ${systemPrompt.length} char system prompt for agent="${context.agent || "DIRECT"}" (${skillNames.length} skills)`,
+          `[SystemPromptAssembler] Assembled ${systemPrompt.length} char static system prompt for agent="${context.agent || "DIRECT"}" (${skillNames.length} skills injected into user context)`,
         );
       } catch (error: unknown) {
         logger.error(
