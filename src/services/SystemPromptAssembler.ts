@@ -618,9 +618,11 @@ export default class SystemPromptAssembler {
             if (!lastUserMsg.content.startsWith("[System Context]")) {
               const msgIdx = context.messages.indexOf(lastUserMsg);
               if (msgIdx !== -1) {
+                const originalContent = lastUserMsg.content;
                 context.messages[msgIdx] = {
                   ...lastUserMsg,
-                  content: systemContextBlock + `[User Message]\n${lastUserMsg.content}`,
+                  rawContent: originalContent,
+                  content: systemContextBlock + `[User Message]\n${originalContent}`,
                 };
               }
             }

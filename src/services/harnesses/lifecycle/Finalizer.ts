@@ -128,6 +128,58 @@ export async function finalizeTextGeneration(
   } = context;
   // Agent sessions use agentSessionId as the persistence key
   const conversationId = rawConversationId ?? agentSessionId;
+
+/**
+ * Swap content and rawContent if present to ensure the database and caller get clean text.
+ * Fallback to regex parsing for legacy/unmigrated messages to populate rawContent and clean content.
+ */
+function swapMsgContent(msg: MessagePayload) {
+  if (msg.role === "user" && typeof msg.content === "string") {
+    if (msg.rawContent) {
+      const dirty = msg.content;
+      msg.content = msg.rawContent;
+      msg.rawContent = dirty;
+    } else if (msg.content.startsWith("[System Context]")) {
+      const dirty = msg.content;
+      let clean = msg.content;
+      const splitIdx = msg.content.indexOf("\n\n[User Message]\n");
+      if (splitIdx !== -1) {
+        clean = msg.content.substring(splitIdx + "\n\n[User Message]\n".length);
+      } else {
+        const altSplit = msg.content.indexOf("[User Message]\n");
+        if (altSplit !== -1) {
+          clean = msg.content.substring(altSplit + "[User Message]\n".length);
+        }
+      }
+      msg.content = clean;
+      msg.rawContent = dirty;
+    } else if (msg.content.startsWith("[System Context - Local Time:")) {
+      const dirty = msg.content;
+      let clean = msg.content;
+      const index = msg.content.indexOf("]\n\n");
+      if (index !== -1) {
+        clean = msg.content.slice(index + 3);
+      }
+      msg.content = clean;
+      msg.rawContent = dirty;
+    }
+  }
+}
+
+  // Swap content and rawContent if present to ensure the database and caller get clean text
+  if (messages) {
+    for (const msg of messages) {
+      swapMsgContent(msg);
+    }
+  }
+  if (overrideMessagesToAppend) {
+    for (const msg of overrideMessagesToAppend) {
+      swapMsgContent(msg);
+    }
+  }
+  if (userMessage) {
+    swapMsgContent(userMessage);
+  }
   // ── Cost calculation ──────────────────────────────────────────
   let estimatedCost: number | null = null;
   let tokensPerSec: number | null = null;
@@ -409,20 +461,11 @@ export async function finalizeTextGeneration(
     if (agent) {
             finalMeta = { ...(finalMeta || {}), agent };
     }
-    // Sanitize any system context time prefixes from user messages before database persistence
+    // Ensure all user messages to append are properly swapped/sanitized
     const sanitizedMessagesToAppend = messagesToAppend.map((msg) => {
-      if (msg.role === "user" && typeof msg.content === "string") {
-        if (msg.content.startsWith("[System Context - Local Time:")) {
-          const index = msg.content.indexOf("]\n\n");
-          if (index !== -1) {
-            return {
-              ...msg,
-              content: msg.content.slice(index + 3),
-            };
-          }
-        }
-      }
-      return msg;
+      const cloned = { ...msg };
+      swapMsgContent(cloned);
+      return cloned;
     });
 
     appendAndFinalize(
