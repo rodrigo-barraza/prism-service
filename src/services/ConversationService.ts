@@ -3,7 +3,7 @@ import FileService from "./FileService.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
-import { errorMessage } from "../utils/errorMessage.ts";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
 import type { MessagePayload } from "./RequestLogger.ts";
 

@@ -4,7 +4,7 @@ import http from "http";
 import { WebSocketServer } from "ws";
 
 import { errorHandler } from "./utils/errors.ts";
-import { errorMessage } from "./utils/errorMessage.ts";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import logger from "./utils/logger.ts";
 import { listProviders } from "./providers/index.ts";
 import { TYPES } from "./config.ts";

@@ -4,7 +4,7 @@ import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS, CHANGE_STREAM_RECONNECT_MS, CHANGE_STREAM_RETRY_MS } from "../constants.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
-import { errorMessage } from "../utils/errorMessage.ts";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
 /**
  * ChangeStreamService — watches MongoDB collections via Change Streams

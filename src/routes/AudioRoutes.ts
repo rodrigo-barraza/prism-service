@@ -1,5 +1,5 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import { formatCostTag, roundMs } from "@rodrigo-barraza/utilities-library";
+import { formatCostTag, roundMs, errorMessage } from "@rodrigo-barraza/utilities-library";
 import express, { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
@@ -11,7 +11,7 @@ import FileService from "../services/FileService.ts";
 import logger from "../utils/logger.ts";
 import RequestLogger from "../services/RequestLogger.ts";
 import {} from "../utils/utilities.ts";
-import { errorMessage } from "../utils/errorMessage.ts";
+
 import type { ChatMessage } from "../types/admin.ts";
 
 // ── Types ────────────────────────────────────────────────────
