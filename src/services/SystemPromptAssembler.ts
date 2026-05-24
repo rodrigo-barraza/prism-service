@@ -482,9 +482,8 @@ export default class SystemPromptAssembler {
     // ── 6. Environment ───────────────────────────────────────────
     sections.push(
       `## Environment\n` +
-        `- Date/Time: ${new Date().toLocaleString("en-US", { dateStyle: "full", timeStyle: "long" })}\n` +
         `- OS: Linux (WSL2)\n` +
-                `- Workspace: ${this.workspaceRoot}`,
+        `- Workspace: ${this.workspaceRoot}`,
     );
 
     // ── 7. Project Structure (cached) ────────────────────────────
@@ -570,6 +569,25 @@ export default class SystemPromptAssembler {
           context.messages![systemIdx].content = systemPrompt;
         } else {
           context.messages?.unshift({ role: "system", content: systemPrompt });
+        }
+
+        // Inject dynamic time/date context into the latest user message to keep the agent time-aware
+        // while preserving prefix-cache validity of the static system prompt
+        if (context.messages) {
+          const userMessages = context.messages.filter((m) => m.role === "user");
+          const lastUserMsg = userMessages[userMessages.length - 1];
+          if (lastUserMsg && typeof lastUserMsg.content === "string") {
+            const timeString = `[System Context - Local Time: ${new Date().toLocaleString("en-US", { dateStyle: "full", timeStyle: "long" })}]\n\n`;
+            if (!lastUserMsg.content.startsWith("[System Context - Local Time:")) {
+              const msgIdx = context.messages.indexOf(lastUserMsg);
+              if (msgIdx !== -1) {
+                context.messages[msgIdx] = {
+                  ...lastUserMsg,
+                  content: timeString + lastUserMsg.content,
+                };
+              }
+            }
+          }
         }
 
         logger.info(

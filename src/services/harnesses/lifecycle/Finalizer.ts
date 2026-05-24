@@ -409,11 +409,27 @@ export async function finalizeTextGeneration(
     if (agent) {
             finalMeta = { ...(finalMeta || {}), agent };
     }
+    // Sanitize any system context time prefixes from user messages before database persistence
+    const sanitizedMessagesToAppend = messagesToAppend.map((msg) => {
+      if (msg.role === "user" && typeof msg.content === "string") {
+        if (msg.content.startsWith("[System Context - Local Time:")) {
+          const index = msg.content.indexOf("]\n\n");
+          if (index !== -1) {
+            return {
+              ...msg,
+              content: msg.content.slice(index + 3),
+            };
+          }
+        }
+      }
+      return msg;
+    });
+
     appendAndFinalize(
       conversationId || "",
       project || "",
       username as string,
-      messagesToAppend,
+      sanitizedMessagesToAppend,
       finalMeta,
             getCollectionOpts(project),
     );
