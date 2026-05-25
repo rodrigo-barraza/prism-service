@@ -52,6 +52,7 @@ export const COLLECTIONS = {
   WORKSPACES: "workspaces",
   TOOL_CONTEXT: "tool_context",
   SCHEDULED_TASKS: "scheduled_tasks",
+  CONVERSATION_TIMERS: "conversation_timers",
 };
 
 /**

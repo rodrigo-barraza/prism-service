@@ -484,6 +484,15 @@ setupWebSocket(wss);
     logger.error("Failed to initialize Scheduled Tasks daemon: " + errorMessage(error));
   }
 
+  // ── Conversation Timers Background Daemon ──────────────
+  try {
+    const { default: ConversationTimerService } = await import("./services/ConversationTimerService.ts");
+    await ConversationTimerService.init();
+    registerCleanup(async () => ConversationTimerService.destroy());
+  } catch (error: unknown) {
+    logger.error("Failed to initialize Conversation Timers daemon: " + errorMessage(error));
+  }
+
   // ── Background Housekeeping ────────────────────────────────
   // Boot-time run: clean up orphans from previous crashes
   BackgroundHousekeepingService.run({ trigger: "boot" }).catch((error: unknown) =>

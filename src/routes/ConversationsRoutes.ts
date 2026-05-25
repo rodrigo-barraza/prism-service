@@ -8,6 +8,7 @@ import ConversationService, {
 } from "../services/ConversationService.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
+import ConversationTimerService from "../services/ConversationTimerService.ts";
 import {
   GetConversationsQuerySchema,
   PostConversationMessagesBodySchema,
@@ -440,6 +441,38 @@ router.delete(
       next(error);
     }
   }),
+);
+
+/**
+ * GET /conversations/:id/timers
+ * List all active scheduled timers for this conversation.
+ */
+router.get(
+  "/:id/timers",
+  asyncHandler(async (req: Request, res: Response) => {
+    const project = req.project || "any";
+    const username = req.username || "any";
+    const conversationId = req.params.id as string;
+
+    const activeTimers = await ConversationTimerService.listActiveTimers(conversationId, project, username);
+    res.json(activeTimers);
+  })
+);
+
+/**
+ * POST /conversations/:id/timers/:timerId/cancel
+ * Cancel a specific scheduled timer.
+ */
+router.post(
+  "/:id/timers/:timerId/cancel",
+  asyncHandler(async (req: Request, res: Response) => {
+    const project = req.project || "any";
+    const username = req.username || "any";
+    const timerId = req.params.timerId as string;
+
+    const wasCancelled = await ConversationTimerService.cancelTimer(timerId, project, username);
+    res.json({ success: wasCancelled });
+  })
 );
 
 export default router;

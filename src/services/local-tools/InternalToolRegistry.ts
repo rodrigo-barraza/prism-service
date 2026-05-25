@@ -44,6 +44,7 @@ async function init() {
     import("./BriefTool.js"),
     import("./AskUserQuestionTool.js"),
     import("./McpTools.js"),
+    import("./ReminderTools.js"),
   ]);
 
     for ( const toolModule of modules) {
