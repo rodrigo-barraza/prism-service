@@ -77,6 +77,7 @@ export interface MemoryListParams {
   userId?: string;
   limit?: number;
   skip?: number;
+  type?: string;
 }
 
 export interface MemoryUpdateParams {
@@ -471,13 +472,14 @@ const MemoryService = {
     return scored;
   },
   // ── List ────────────────────────────────────────────────────────────────────
-  async list({ agent, project, guildId, userId, limit = 50, skip = 0 }: MemoryListParams) {
+  async list({ agent, project, guildId, userId, limit = 50, skip = 0, type }: MemoryListParams) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     const filter: Record<string, unknown> = {};
         if (agent) filter.agent = agent;
         if (project) filter.project = project;
         if (guildId) filter.guildId = guildId;
         if (userId) filter.aboutUserId = userId;
+        if (type) filter.type = type;
     const [memories, total] = await Promise.all([
       collection
         .find(filter, { projection: { embedding: 0 } })

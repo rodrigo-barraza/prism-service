@@ -63,8 +63,15 @@ router.get(
       const agent = req.query.agent || null;
       const limit = parseInt(req.query.limit as string) || 100;
       const skip = parseInt(req.query.skip as string) || 0;
+      const type = req.query.type as string || null;
 
-      const result = await MemoryService.list({ agent: agent as string, project: project as string, limit: Number(limit), skip: Number(skip) });
+      const result = await MemoryService.list({
+        agent: agent as string,
+        project: project as string,
+        limit: Number(limit),
+        skip: Number(skip),
+        type: type ? String(type) : undefined,
+      });
       res.json(result);
     } catch (error: unknown) {
             logger.error(`[agent-memories] ${(error as Error).message}`);
