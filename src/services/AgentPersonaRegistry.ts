@@ -1355,6 +1355,10 @@ const IMAGE_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
     requires: ["web_search"],
   },
   {
+    content: `- Use \`convert_image_to_ascii\` when the user or agent wants to represent an image as stylized ASCII text art. You can customize character width, contrast, or density inversion, and render the resulting dynamic HTML preview page in your response using the \`![ASCII Art](asciiEmbedUrl)\` markdown syntax so the user sees the styled interactive canvas inline.`,
+    requires: ["convert_image_to_ascii"],
+  },
+  {
     content: `- Use \`upsert_memory\` to save user brand colors, favorite aesthetics, or recurring characters for future sessions.`,
     requires: ["upsert_memory"],
   },
