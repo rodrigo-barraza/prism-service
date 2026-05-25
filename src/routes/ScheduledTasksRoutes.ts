@@ -34,7 +34,10 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const project: string = typeof req.project === "string" ? req.project : "direct";
     const username: string = typeof req.username === "string" ? req.username : "system";
-    const { name, prompt, agent, provider, model, scheduleType, scheduleTime, scheduleDay, cronExpression } = req.body;
+    let { name, prompt, agent, provider, model, scheduleType, scheduleTime, scheduleDay, cronExpression } = req.body;
+
+    provider = provider || "anthropic";
+    model = model || "claude-sonnet-4-5-20250929";
 
     if (!name || !prompt || !provider || !model || !scheduleType) {
       return res.status(400).json({ error: "Missing required fields: name, prompt, provider, model, scheduleType" });
@@ -117,9 +120,10 @@ router.post(
     const { id } = req.params;
     const project: string = typeof req.project === "string" ? req.project : "direct";
     const username: string = typeof req.username === "string" ? req.username : "system";
+    const { payload } = req.body;
 
     try {
-      const result = await ScheduledTaskService.triggerTask(id as string, project as string, username as string);
+      const result = await ScheduledTaskService.triggerTask(id as string, project as string, username as string, payload);
       res.json(result);
     } catch (error: unknown) {
       logger.error(`[ScheduledTasks][TRIGGER] Error triggering task ${id}: ${(error as Error).message}`);
