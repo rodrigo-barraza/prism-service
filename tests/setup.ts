@@ -23,6 +23,59 @@ vi.mock('../config.ts', () => ({
     MONGO_DB_NAME: 'prism-test',
 }));
 
+// ── Mock global fetch for tools-api ───────────────────────────────────
+const originalFetch = global.fetch;
+global.fetch = vi.fn().mockImplementation(async (url, init) => {
+    const urlString = String(url);
+    if (urlString.includes('/admin/tool-schemas')) {
+        return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            json: async () => [
+                {
+                    name: 'get_weather',
+                    description: 'Get weather details',
+                    parameters: { type: 'object', properties: {} },
+                    domain: 'Weather',
+                    labels: ['weather'],
+                    endpoint: { path: '/weather' }
+                }
+            ],
+        } as any;
+    }
+    if (urlString.includes('/admin/config')) {
+        return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            json: async () => ({
+                workspaceRoots: ['/home/rodrigo/development'],
+                staticRoots: ['/home/rodrigo/development']
+            }),
+        } as any;
+    }
+    if (urlString.includes('/health')) {
+        return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            json: async () => ({ status: 'ok' }),
+        } as any;
+    }
+    try {
+        if (originalFetch) {
+            return await originalFetch(url, init);
+        }
+    } catch (e) {}
+    return {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        json: async () => ({ error: 'Fetch failed in test harness' }),
+    } as any;
+});
+
 // ── Mock MongoDB wrapper to avoid real connections ────────────────────
 vi.mock('../src/wrappers/MongoWrapper.ts', () => ({
     default: {
