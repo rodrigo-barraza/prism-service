@@ -24,6 +24,9 @@ interface SettingsData {
     harness: string;
     [key: string]: string;
   };
+  security: {
+    allowEnvFiles: boolean;
+  };
 }
 
 let _cache: SettingsData | null = null;
@@ -41,6 +44,9 @@ const DEFAULTS: SettingsData = {
     subagentProvider: "",
     subagentModel: "",
     harness: "standard",
+  },
+  security: {
+    allowEnvFiles: false,
   },
 };
 
