@@ -17,7 +17,7 @@ export interface ScheduledTask {
   agent: string | null;
   provider: string;
   model: string;
-  scheduleType: "hourly" | "daily" | "weekly" | "cron";
+  scheduleType: "hourly" | "daily" | "weekly" | "cron" | "trigger";
   scheduleTime?: string; // "HH:MM" e.g. "09:00"
   scheduleDay?: number; // 0-6 (Sunday to Saturday)
   cronExpression?: string; // e.g. "0 9 * * *"
@@ -174,7 +174,7 @@ const ScheduledTaskService = {
    * Programmatically executes a scheduled task in the background.
    * Decoupled completely from live WebSockets/browser clients.
    */
-  async executeTask(task: ScheduledTask): Promise<void> {
+  async executeTask(task: ScheduledTask, payload?: Record<string, unknown>): Promise<void> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
@@ -197,6 +197,12 @@ const ScheduledTaskService = {
       // Best-effort
     }
 
+    // Build the final prompt with optional payload context
+    let finalPrompt = task.prompt;
+    if (payload && Object.keys(payload).length > 0) {
+      finalPrompt += `\n\nTrigger payload: ${JSON.stringify(payload)}`;
+    }
+
     // 1. Create agent session stub document
     await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).insertOne({
       id: agentSessionId,
@@ -206,7 +212,7 @@ const ScheduledTaskService = {
       messages: [
         {
           role: "user",
-          content: task.prompt,
+          content: finalPrompt,
           timestamp: nowISO,
         },
       ],
@@ -247,14 +253,14 @@ const ScheduledTaskService = {
         messages: [
           {
             role: "user",
-            content: task.prompt,
+            content: finalPrompt,
             timestamp: nowISO,
           } as ConversationMessage,
         ],
         originalMessages: [
           {
             role: "user",
-            content: task.prompt,
+            content: finalPrompt,
             timestamp: nowISO,
           } as ConversationMessage,
         ],
@@ -266,7 +272,7 @@ const ScheduledTaskService = {
         agentSessionId,
         userMessage: {
           role: "user",
-          content: task.prompt,
+          content: finalPrompt,
           timestamp: nowISO,
         } as ConversationMessage,
         conversationMeta: {
@@ -356,15 +362,22 @@ const ScheduledTaskService = {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
-    const result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).deleteOne({ id, project, username });
+    let result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).deleteOne({ id, project, username });
+    if ((result.deletedCount ?? 0) === 0) {
+      result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).deleteOne({ name: id, project, username });
+    }
     return (result.deletedCount ?? 0) > 0;
   },
 
-  async triggerTask(id: string, project: string, username: string): Promise<{ success: boolean; agentSessionId: string }> {
+  async triggerTask(id: string, project: string, username: string, payload?: Record<string, unknown>): Promise<{ success: boolean; agentSessionId: string }> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
-    const task = (await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOne({ id, project, username })) as unknown as ScheduledTask;
+    let task = (await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOne({ id, project, username })) as unknown as ScheduledTask;
+    if (!task) {
+      // Fallback: look up by name
+      task = (await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOne({ name: id, project, username })) as unknown as ScheduledTask;
+    }
     if (!task) {
       throw new Error(`Scheduled Task not found: ${id}`);
     }
@@ -372,7 +385,7 @@ const ScheduledTaskService = {
     const agentSessionId = crypto.randomUUID();
     
     // Fire-and-forget background execution
-    this.executeTask({ ...task, id: task.id }).catch((err: unknown) => {
+    this.executeTask({ ...task, id: task.id }, payload).catch((err: unknown) => {
       logger.error(`[ScheduledTasks] Manual trigger failed for task "${task.name}": ${(err as Error).message}`);
     });
 
