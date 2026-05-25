@@ -99,7 +99,7 @@ const skillExecute = {
   async execute(args: Record<string, unknown>, context: ToolContext) {
     const { default: SkillService } = await import("../SkillService.js");
     const prepared = await SkillService.prepare(
-      args.skillId as Record<string, unknown>,
+      args.skillId as string,
       (args.variables || {}) as Record<string, unknown>,
     );
     if (prepared.error) return prepared;
@@ -169,7 +169,7 @@ const skillDelete = {
   labels: ["coding", "automation"],
   async execute(args: Record<string, unknown>) {
     const { default: SkillService } = await import("../SkillService.js");
-    return SkillService.delete(args.skillId as Record<string, unknown>);
+    return SkillService.delete(args.skillId as string);
   },
 };
 
