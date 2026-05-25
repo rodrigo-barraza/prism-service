@@ -1,6 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
-import type { WithId, Document } from "mongodb";
+import type { Document } from "mongodb";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import { getProvider } from "../providers/index.ts";
@@ -270,8 +270,9 @@ router.get(
 
       // Traces: count distinct traceIds from requests that match filters
       const traceMatch: Record<string, unknown> = { traceId: { $ne: null } };
-            if (project) traceMatch.project = project;
+      if (project) traceMatch.project = project;
       if (from || to) {
+        traceMatch.timestamp = {} as Record<string, unknown>;
         if (from) (traceMatch.timestamp as Record<string, unknown>).$gte = from;
         if (to) (traceMatch.timestamp as Record<string, unknown>).$lte = to;
       }
