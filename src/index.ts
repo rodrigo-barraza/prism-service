@@ -60,6 +60,7 @@ import coordinatorRouter from "./routes/CoordinatorRoutes.ts";
 import settingsRouter from "./routes/SettingsRoutes.ts";
 import customAgentsRouter from "./routes/CustomAgentsRoutes.ts";
 import workspacesRouter from "./routes/WorkspacesRoutes.ts";
+import scheduledTasksRouter from "./routes/ScheduledTasksRoutes.ts";
 
 const app = express();
 const server = http.createServer(app);
@@ -116,6 +117,7 @@ const ENDPOINTS = {
     "/settings",
     "/custom-agents",
     "/workspaces",
+    "/scheduled-tasks",
   ],
   websocket: ["/ws/chat", "/ws/text-to-audio"],
   admin: ["/admin", "/admin/lm-studio"],
@@ -174,6 +176,7 @@ app.use("/coordinator", coordinatorRouter);
 app.use("/settings", settingsRouter);
 app.use("/custom-agents", customAgentsRouter);
 app.use("/workspaces", workspacesRouter);
+app.use("/scheduled-tasks", scheduledTasksRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);
@@ -471,6 +474,15 @@ setupWebSocket(wss);
   logger.info(
     `[AutoDream] Scheduled consolidation every ${CONSOLIDATION_INTERVAL_MS / 3_600_000}h`,
   );
+
+  // ── Scheduled Tasks Background Daemon ──────────────────
+  try {
+    const { default: ScheduledTaskService } = await import("./services/ScheduledTaskService.ts");
+    await ScheduledTaskService.init();
+    registerCleanup(async () => ScheduledTaskService.destroy());
+  } catch (error: unknown) {
+    logger.error("Failed to initialize Scheduled Tasks daemon: " + errorMessage(error));
+  }
 
   // ── Background Housekeeping ────────────────────────────────
   // Boot-time run: clean up orphans from previous crashes
