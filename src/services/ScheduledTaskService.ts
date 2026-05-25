@@ -307,12 +307,75 @@ const ScheduledTaskService = {
 
   // ─── CRUD REST Helpers ─────────────────────────────────────────────────────────
 
+  // Helper to determine if a project is a client UI project and build an appropriate query filter
+  async _getQueryFilter(id: string, project: string, username: string): Promise<Record<string, any>> {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    let isClientProject = true;
+
+    if (project && db) {
+      // Check if project is a registered workspace root
+      const workspaceExists = await db.collection("workspaces").findOne({ name: project });
+      if (workspaceExists) {
+        isClientProject = false;
+      } else {
+        // Fallback: check registered agent projects
+        const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.ts");
+        const agentProjects = AgentPersonaRegistry.list().map((p) => {
+          const persona = AgentPersonaRegistry.get(p.id);
+          return persona?.project;
+        }).filter(Boolean);
+        
+        if (agentProjects.includes(project)) {
+          isClientProject = false;
+        }
+      }
+    }
+
+    const filter: Record<string, any> = { id };
+    if (!isClientProject) {
+      filter.project = project;
+    }
+    if (username && username !== "any" && username !== "all" && !isClientProject) {
+      filter.username = username;
+    }
+    return filter;
+  },
+
   async listTasks(project: string, username: string): Promise<ScheduledTask[]> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return [];
+
+    let isClientProject = true;
+    if (project && db) {
+      // Check if project is a registered workspace root
+      const workspaceExists = await db.collection("workspaces").findOne({ name: project });
+      if (workspaceExists) {
+        isClientProject = false;
+      } else {
+        // Fallback: check registered agent projects
+        const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.ts");
+        const agentProjects = AgentPersonaRegistry.list().map((p) => {
+          const persona = AgentPersonaRegistry.get(p.id);
+          return persona?.project;
+        }).filter(Boolean);
+        
+        if (agentProjects.includes(project)) {
+          isClientProject = false;
+        }
+      }
+    }
+
+    const query: Record<string, any> = {};
+    if (!isClientProject) {
+      query.project = project;
+    }
+    if (username && username !== "any" && username !== "all" && !isClientProject) {
+      query.username = username;
+    }
+
     return (await db
       .collection(COLLECTIONS.SCHEDULED_TASKS)
-      .find({ project, username })
+      .find(query)
       .sort({ createdAt: -1 })
       .toArray()) as unknown as ScheduledTask[];
   },
@@ -345,8 +408,9 @@ const ScheduledTaskService = {
     delete (cleanUpdates as any).id;
     delete (cleanUpdates as any).createdAt;
 
+    const filter = await this._getQueryFilter(id, project, username);
     const result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOneAndUpdate(
-      { id, project, username },
+      filter,
       { $set: cleanUpdates },
       { returnDocument: "after" }
     );
@@ -362,9 +426,13 @@ const ScheduledTaskService = {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
-    let result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).deleteOne({ id, project, username });
+    const filter = await this._getQueryFilter(id, project, username);
+    let result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).deleteOne(filter);
     if ((result.deletedCount ?? 0) === 0) {
-      result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).deleteOne({ name: id, project, username });
+      const nameFilter = { ...filter };
+      delete nameFilter.id;
+      (nameFilter as any).name = id;
+      result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).deleteOne(nameFilter);
     }
     return (result.deletedCount ?? 0) > 0;
   },
@@ -373,10 +441,14 @@ const ScheduledTaskService = {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
-    let task = (await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOne({ id, project, username })) as unknown as ScheduledTask;
+    const filter = await this._getQueryFilter(id, project, username);
+    let task = (await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOne(filter)) as unknown as ScheduledTask;
     if (!task) {
       // Fallback: look up by name
-      task = (await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOne({ name: id, project, username })) as unknown as ScheduledTask;
+      const nameFilter = { ...filter };
+      delete nameFilter.id;
+      (nameFilter as any).name = id;
+      task = (await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOne(nameFilter)) as unknown as ScheduledTask;
     }
     if (!task) {
       throw new Error(`Scheduled Task not found: ${id}`);
