@@ -58,6 +58,8 @@ interface MemoryFetchOptions {
   agentSessionId?: string | null;
   endpoint?: string;
   _username?: string;
+  guildId?: string;
+  userIds?: string[];
 }
 
 interface SkillFetchOptions {
@@ -271,7 +273,7 @@ export default class SystemPromptAssembler {
     agent: string,
     project: string | null,
     queryText: string,
-    { traceId, agentSessionId, endpoint, _username }: MemoryFetchOptions = {},
+    { traceId, agentSessionId, endpoint, _username, guildId, userIds }: MemoryFetchOptions = {},
   ): Promise<string> {
     try {
       const memories = await MemoryService.search({
@@ -283,6 +285,8 @@ export default class SystemPromptAssembler {
         agentSessionId: agentSessionId || undefined,
         endpoint: endpoint || "/agent",
         username: _username || undefined,
+        guildId: guildId || undefined,
+        userIds: userIds || undefined,
       });
 
       if (!memories || memories.length === 0) return "";
@@ -468,6 +472,20 @@ export default class SystemPromptAssembler {
       if (agentCtx.lightsContext) {
         sections.push(agentCtx.lightsContext as string);
       }
+
+      // Somatic state — Lupos's simulated physical & emotional state
+      if (agentCtx.somaticState) {
+        const somatic = agentCtx.somaticState as Record<string, { level: number; label?: string; name?: string }>;
+        const entries = Object.entries(somatic);
+        if (entries.length > 0) {
+          let block = `# Your Current Physical & Emotional State`;
+          for (const [key, state] of entries) {
+            const display = state.label || state.name || `Level ${state.level}`;
+            block += `\n- ${key.charAt(0).toUpperCase() + key.slice(1)}: ${display} (${state.level}/100)`;
+          }
+          sections.push(block);
+        }
+      }
     }
 
     // ── 3. Tool Policy (persona-specific) ────────────────────────
@@ -628,6 +646,11 @@ export default class SystemPromptAssembler {
     let memoriesText = "";
 
     if (memoryQuery) {
+      // Extract Discord scoping from agentContext for LUPOS memory search
+      const agentCtxForMemory = context.agentContext || {};
+      const memoryGuildId = agentCtxForMemory.guildId as string | undefined;
+      const memoryUserIds = agentCtxForMemory.participantUserIds as string[] | undefined;
+
       const memories = await this.fetchMemories(
         agentId,
         context.project || null,
@@ -637,6 +660,8 @@ export default class SystemPromptAssembler {
           agentSessionId: context.agentSessionId,
           endpoint: "/agent",
           _username: context.username,
+          guildId: memoryGuildId,
+          userIds: memoryUserIds,
         },
       );
       if (memories) {
