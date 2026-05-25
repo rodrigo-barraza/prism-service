@@ -1355,7 +1355,7 @@ const IMAGE_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
     requires: ["web_search"],
   },
   {
-    content: `- Use \`convert_image_to_ascii\` when the user or agent wants to represent an image as stylized ASCII text art. You can customize character width, contrast, or density inversion, and render the resulting dynamic HTML preview page in your response using the \`![ASCII Art](asciiEmbedUrl)\` markdown syntax so the user sees the styled interactive canvas inline.`,
+    content: `- Use \`convert_image_to_ascii\` when the user or agent wants to represent an image as stylized ASCII text art. You can customize character width, contrast, or density inversion. You MUST output the resulting raw ASCII string directly in your text response inside a fenced code block (\`\`\`) so it is rendered in a monospace block.`,
     requires: ["convert_image_to_ascii"],
   },
   {

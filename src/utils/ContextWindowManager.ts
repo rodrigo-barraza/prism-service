@@ -124,7 +124,7 @@ function truncateToolResults(
 ): ChatMessage[] {
   // Find the protection boundary (same logic as compressOldAssistantMessages)
   let userTurnsSeen = 0;
-  let protectionIndex = messages.length;
+  let protectionIndex = 0;
 
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "user") {
@@ -171,7 +171,7 @@ function compressOldAssistantMessages(
 ): ChatMessage[] {
   // Count user turns from the end to determine protection boundary
   let userTurnsSeen = 0;
-  let protectionIndex = messages.length;
+  let protectionIndex = 0;
 
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "user") {
