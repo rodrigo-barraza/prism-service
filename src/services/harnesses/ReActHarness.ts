@@ -20,7 +20,7 @@ import {
 import PlanningModeService from "../PlanningModeService.ts";
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
 
-import type { ConversationMessage, ToolCall, ToolSchema } from "./types.ts";
+import type { ConversationMessage, ToolCall, ToolSchema, ToolResult } from "./types.ts";
 
 const MAX_TOOL_ITERATIONS = 25;
 const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
@@ -230,27 +230,35 @@ export default class ReActHarness extends BaseAgenticHarness {
           approvalEngine,
         );
 
+        let results: ToolResult[] = [];
         if (!approved) {
-          this.logIteration(pass, currentMessages);
-          break;
+          results = pass.pendingToolCalls.map((toolCall) => ({
+            name: toolCall.name,
+            id: toolCall.id,
+            result: {
+              success: false,
+              error: "USER_REJECTED",
+              message: "Tool execution was manually rejected by the user.",
+            },
+          }));
+        } else {
+          if (approveAll) {
+            options.autoApprove = true;
+          }
+
+          // ── Execute tools in parallel ─────────────────────────
+          // Attach currentMessages to context so ToolExecutor can pass them
+          // to tools-api (needed by tools like generate_image that inspect conversation)
+          context._currentMessages = currentMessages;
+
+          results = await executeToolBatch(
+            pass.pendingToolCalls,
+            context,
+            this.tools,
+            hooks,
+            state,
+          );
         }
-
-        if (approveAll) {
-          options.autoApprove = true;
-        }
-
-        // ── Execute tools in parallel ─────────────────────────
-        // Attach currentMessages to context so ToolExecutor can pass them
-        // to tools-api (needed by tools like generate_image that inspect conversation)
-        context._currentMessages = currentMessages;
-
-        const results = await executeToolBatch(
-          pass.pendingToolCalls,
-          context,
-          this.tools,
-          hooks,
-          state,
-        );
 
         // ── Post-execution: media, errors, status ─────────────
         processToolResultMedia(
