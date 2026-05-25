@@ -32,6 +32,9 @@ const CONVERSATION_LIST_PROJECTION = {
   synthetic: 1,
   agent: 1,
   systemPrompt: 1,
+  model: 1,
+  modelNames: 1,
+  settings: 1,
 } as const;
 
 interface ConversationDocument {

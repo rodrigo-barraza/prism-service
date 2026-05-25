@@ -699,11 +699,6 @@ export default class SystemPromptAssembler {
               })}`,
             );
 
-            // 2. Active Project Context
-            if (context.project) {
-              contextLines.push(`- Active Project: ${context.project}`);
-            }
-
             let systemContextBlock = `[System Context]\n${contextLines.join("\n")}\n\n`;
 
             // 3. Dynamic Skills
