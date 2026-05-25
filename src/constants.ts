@@ -51,6 +51,7 @@ export const COLLECTIONS = {
   CUSTOM_AGENTS: "custom_agents",
   WORKSPACES: "workspaces",
   TOOL_CONTEXT: "tool_context",
+  SCHEDULED_TASKS: "scheduled_tasks",
 };
 
 /**

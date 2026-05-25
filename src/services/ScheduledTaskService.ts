@@ -1,0 +1,383 @@
+import crypto from "crypto";
+import MongoWrapper from "../wrappers/MongoWrapper.ts";
+import { MONGO_DB_NAME } from "../../config.ts";
+import { COLLECTIONS } from "../constants.ts";
+import AgenticLoopService from "./AgenticLoopService.ts";
+import { getProvider } from "../providers/index.ts";
+import { getModelByName } from "../config.ts";
+import logger from "../utils/logger.ts";
+import { SseEvent } from "../types/SseTypes.ts";
+import { ConversationMessage } from "./harnesses/types.ts";
+
+export interface ScheduledTask {
+  id: string;
+  name: string;
+  project: string;
+  prompt: string;
+  agent: string | null;
+  provider: string;
+  model: string;
+  scheduleType: "hourly" | "daily" | "weekly" | "cron";
+  scheduleTime?: string; // "HH:MM" e.g. "09:00"
+  scheduleDay?: number; // 0-6 (Sunday to Saturday)
+  cronExpression?: string; // e.g. "0 9 * * *"
+  enabled: boolean;
+  lastRunMinute?: string; // "YYYY-MM-DDTHH:mm"
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Simple Zero-Dependency Cron Matcher ───────────────────────────────────────
+
+function matchCronField(pattern: string, value: number): boolean {
+  if (pattern === "*") return true;
+  if (pattern.includes(",")) {
+    return pattern.split(",").some((p) => matchCronField(p, value));
+  }
+  if (pattern.includes("/")) {
+    const [range, stepStr] = pattern.split("/");
+    const step = parseInt(stepStr, 10);
+    if (isNaN(step)) return false;
+    if (range === "*") {
+      return value % step === 0;
+    }
+    const [startStr] = range.split("-");
+    const start = parseInt(startStr, 10);
+    return !isNaN(start) && value >= start && (value - start) % step === 0;
+  }
+  if (pattern.includes("-")) {
+    const [startStr, endStr] = pattern.split("-");
+    const start = parseInt(startStr, 10);
+    const end = parseInt(endStr, 10);
+    return !isNaN(start) && !isNaN(end) && value >= start && value <= end;
+  }
+  return parseInt(pattern, 10) === value;
+}
+
+export function matchCron(expression: string, date: Date = new Date()): boolean {
+  const parts = expression.trim().split(/\s+/);
+  if (parts.length !== 5) return false;
+  const [min, hour, dom, month, dow] = parts;
+
+  return (
+    matchCronField(min, date.getMinutes()) &&
+    matchCronField(hour, date.getHours()) &&
+    matchCronField(dom, date.getDate()) &&
+    matchCronField(month, date.getMonth() + 1) &&
+    matchCronField(dow, date.getDay())
+  );
+}
+
+// ─── Scheduler Daemon & CRUD Logic ─────────────────────────────────────────────
+
+let tickingInterval: ReturnType<typeof setInterval> | null = null;
+
+const ScheduledTaskService = {
+  /**
+   * Initializes the scheduler. Runs a tick loop every 60 seconds.
+   */
+  async init(): Promise<void> {
+    if (tickingInterval) {
+      clearInterval(tickingInterval);
+    }
+
+    logger.info("[ScheduledTasks] Initializing Background Scheduler Daemon…");
+
+    // Align tick to the next local minute boundary for timing precision
+    const secondsToNextMinute = 60 - new Date().getSeconds();
+    setTimeout(() => {
+      this.tick().catch((err: unknown) =>
+        logger.error(`[ScheduledTasks] Initial tick error: ${(err as Error).message}`),
+      );
+
+      tickingInterval = setInterval(() => {
+        this.tick().catch((err: unknown) =>
+          logger.error(`[ScheduledTasks] Tick error: ${(err as Error).message}`),
+        );
+      }, 60000);
+    }, secondsToNextMinute * 1000);
+
+    logger.success("[ScheduledTasks] Background Scheduler Daemon started successfully.");
+  },
+
+  /**
+   * Clears the scheduler tick loop.
+   */
+  destroy(): void {
+    if (tickingInterval) {
+      clearInterval(tickingInterval);
+      tickingInterval = null;
+      logger.info("[ScheduledTasks] Background Scheduler Daemon stopped.");
+    }
+  },
+
+  /**
+   * Core tick logic: scans MongoDB for enabled tasks and triggers any that are due.
+   */
+  async tick(): Promise<void> {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!db) return;
+
+    const now = new Date();
+    const currentMin = now.getMinutes();
+    const currentHour = now.getHours();
+    const currentDay = now.getDay(); // 0 = Sunday, 6 = Saturday
+
+    const minuteKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}T${String(currentHour).padStart(2, "0")}:${String(currentMin).padStart(2, "0")}`;
+
+    // Fetch enabled tasks that have not run yet in this exact minute
+    const tasks = (await db
+      .collection(COLLECTIONS.SCHEDULED_TASKS)
+      .find({ enabled: true, lastRunMinute: { $ne: minuteKey } })
+      .toArray()) as unknown as ScheduledTask[];
+
+    if (tasks.length === 0) return;
+
+    for (const task of tasks) {
+      let isDue = false;
+
+      try {
+        if (task.scheduleType === "cron" && task.cronExpression) {
+          isDue = matchCron(task.cronExpression, now);
+        } else if (task.scheduleType === "hourly") {
+          // Default to run at minute 0 of every hour
+          isDue = currentMin === 0;
+        } else if (task.scheduleType === "daily" && task.scheduleTime) {
+          const [sh, sm] = task.scheduleTime.split(":").map(Number);
+          isDue = currentHour === sh && currentMin === sm;
+        } else if (task.scheduleType === "weekly" && task.scheduleTime && task.scheduleDay != null) {
+          const [sh, sm] = task.scheduleTime.split(":").map(Number);
+          isDue = currentDay === task.scheduleDay && currentHour === sh && currentMin === sm;
+        }
+
+        if (isDue) {
+          logger.info(`[ScheduledTasks] Task "${task.name}" (${task.id}) is due to run.`);
+          
+          // Mark as run for this minute key to prevent double execution in cluster setups
+          await db.collection(COLLECTIONS.SCHEDULED_TASKS).updateOne(
+            { id: task.id },
+            { $set: { lastRunMinute: minuteKey, updatedAt: new Date().toISOString() } }
+          );
+
+          // Trigger execution in the background asynchronously
+          this.executeTask(task).catch((err: unknown) =>
+            logger.error(`[ScheduledTasks] Execution failed for task "${task.name}": ${(err as Error).message}`),
+          );
+        }
+      } catch (err: unknown) {
+        logger.error(`[ScheduledTasks] Failed to parse/check task "${task.name}": ${(err as Error).message}`);
+      }
+    }
+  },
+
+  /**
+   * Programmatically executes a scheduled task in the background.
+   * Decoupled completely from live WebSockets/browser clients.
+   */
+  async executeTask(task: ScheduledTask): Promise<void> {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!db) throw new Error("Database not connected");
+
+    const agentSessionId = crypto.randomUUID();
+    const traceId = crypto.randomUUID();
+    const nowISO = new Date().toISOString();
+
+    logger.info(`[ScheduledTasks] Executing task "${task.name}" under Session ID: ${agentSessionId}`);
+
+    // Determine default workspace root path if available
+    let workspacePath: string | null = null;
+    try {
+      const workspaceDoc = await db.collection(COLLECTIONS.WORKSPACES).findOne({
+        name: task.project
+      });
+      if (workspaceDoc?.path) {
+        workspacePath = workspaceDoc.path as string;
+      }
+    } catch {
+      // Best-effort
+    }
+
+    // 1. Create agent session stub document
+    await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).insertOne({
+      id: agentSessionId,
+      project: task.project,
+      username: "system",
+      title: task.name,
+      messages: [
+        {
+          role: "user",
+          content: task.prompt,
+          timestamp: nowISO,
+        },
+      ],
+      systemPrompt: "",
+      settings: {
+        provider: task.provider,
+        model: task.model,
+        agent: task.agent || null,
+        workspaceRoot: workspacePath,
+      },
+      modalities: { textIn: true, textOut: false },
+      providers: [task.provider.toLowerCase()],
+      totalCost: 0,
+      isGenerating: true,
+      createdAt: nowISO,
+      updatedAt: nowISO,
+    });
+
+    const mockEmit = (event: SseEvent) => {
+      logger.debug(`[ScheduledTasks][${task.name}][Event] type=${event.type}`);
+    };
+
+    // 2. Resolve provider and model definitions
+    const provider = getProvider(task.provider);
+    const modelDef = getModelByName(task.model);
+
+    if (!provider) {
+      throw new Error(`Provider not found: ${task.provider}`);
+    }
+
+    // 3. Trigger AgenticLoopService
+    try {
+      await AgenticLoopService.runAgenticLoop({
+        provider: provider as any as import("./harnesses/types.ts").LLMProvider,
+        providerName: task.provider,
+        resolvedModel: task.model,
+        modelDef,
+        messages: [
+          {
+            role: "user",
+            content: task.prompt,
+            timestamp: nowISO,
+          } as ConversationMessage,
+        ],
+        originalMessages: [
+          {
+            role: "user",
+            content: task.prompt,
+            timestamp: nowISO,
+          } as ConversationMessage,
+        ],
+        options: {
+          agenticLoopEnabled: true,
+          functionCallingEnabled: true,
+          planFirst: false,
+        },
+        agentSessionId,
+        userMessage: {
+          role: "user",
+          content: task.prompt,
+          timestamp: nowISO,
+        } as ConversationMessage,
+        conversationMeta: {
+          title: task.name,
+          agent: task.agent || null,
+          workspaceRoot: workspacePath,
+        },
+        traceId,
+        project: task.project,
+        username: "system",
+        clientIp: "127.0.0.1",
+        agent: task.agent || null,
+        workspaceRoot: workspacePath,
+        requestId: crypto.randomUUID(),
+        requestStart: performance.now(),
+        emit: mockEmit,
+      });
+
+      logger.success(`[ScheduledTasks] Task "${task.name}" completed execution successfully.`);
+    } catch (err: unknown) {
+      logger.error(`[ScheduledTasks] Agent loop error for task "${task.name}": ${(err as Error).message}`);
+      
+      // Ensure the generated session is not stuck as "generating"
+      await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).updateOne(
+        { id: agentSessionId },
+        { $set: { isGenerating: false, updatedAt: new Date().toISOString() } },
+      ).catch(() => {});
+
+      throw err;
+    }
+  },
+
+  // ─── CRUD REST Helpers ─────────────────────────────────────────────────────────
+
+  async listTasks(project: string, username: string): Promise<ScheduledTask[]> {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!db) return [];
+    return (await db
+      .collection(COLLECTIONS.SCHEDULED_TASKS)
+      .find({ project, username })
+      .sort({ createdAt: -1 })
+      .toArray()) as unknown as ScheduledTask[];
+  },
+
+  async createTask(data: Omit<ScheduledTask, "id" | "createdAt" | "updatedAt"> & { username: string }): Promise<ScheduledTask> {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!db) throw new Error("Database not connected");
+
+    const nowISO = new Date().toISOString();
+    const task: ScheduledTask = {
+      ...data,
+      id: crypto.randomUUID(),
+      createdAt: nowISO,
+      updatedAt: nowISO,
+    };
+
+    await db.collection(COLLECTIONS.SCHEDULED_TASKS).insertOne(task);
+    return task;
+  },
+
+  async updateTask(id: string, project: string, username: string, updates: Partial<ScheduledTask>): Promise<ScheduledTask> {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!db) throw new Error("Database not connected");
+
+    const nowISO = new Date().toISOString();
+    const cleanUpdates = {
+      ...updates,
+      updatedAt: nowISO,
+    };
+    delete (cleanUpdates as any).id;
+    delete (cleanUpdates as any).createdAt;
+
+    const result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOneAndUpdate(
+      { id, project, username },
+      { $set: cleanUpdates },
+      { returnDocument: "after" }
+    );
+
+    if (!result) {
+      throw new Error(`Scheduled Task not found: ${id}`);
+    }
+
+    return result as unknown as ScheduledTask;
+  },
+
+  async deleteTask(id: string, project: string, username: string): Promise<boolean> {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!db) throw new Error("Database not connected");
+
+    const result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).deleteOne({ id, project, username });
+    return (result.deletedCount ?? 0) > 0;
+  },
+
+  async triggerTask(id: string, project: string, username: string): Promise<{ success: boolean; agentSessionId: string }> {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!db) throw new Error("Database not connected");
+
+    const task = (await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOne({ id, project, username })) as unknown as ScheduledTask;
+    if (!task) {
+      throw new Error(`Scheduled Task not found: ${id}`);
+    }
+
+    const agentSessionId = crypto.randomUUID();
+    
+    // Fire-and-forget background execution
+    this.executeTask({ ...task, id: task.id }).catch((err: unknown) => {
+      logger.error(`[ScheduledTasks] Manual trigger failed for task "${task.name}": ${(err as Error).message}`);
+    });
+
+    return { success: true, agentSessionId };
+  }
+};
+
+export default ScheduledTaskService;
