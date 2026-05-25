@@ -17,9 +17,10 @@ export interface ScheduledTask {
   agent: string | null;
   provider: string;
   model: string;
-  scheduleType: "hourly" | "daily" | "weekly" | "cron" | "trigger";
+  scheduleType: "hourly" | "daily" | "weekly" | "cron" | "trigger" | "once";
   scheduleTime?: string; // "HH:MM" e.g. "09:00"
   scheduleDay?: number; // 0-6 (Sunday to Saturday)
+  scheduleDate?: string; // "YYYY-MM-DD" e.g. "2026-05-25"
   cronExpression?: string; // e.g. "0 9 * * *"
   enabled: boolean;
   lastRunMinute?: string; // "YYYY-MM-DDTHH:mm"
@@ -148,15 +149,31 @@ const ScheduledTaskService = {
         } else if (task.scheduleType === "weekly" && task.scheduleTime && task.scheduleDay != null) {
           const [sh, sm] = task.scheduleTime.split(":").map(Number);
           isDue = currentDay === task.scheduleDay && currentHour === sh && currentMin === sm;
+        } else if (task.scheduleType === "once" && task.scheduleTime && task.scheduleDate) {
+          const [sh, sm] = task.scheduleTime.split(":").map(Number);
+          const [yr, mn, dy] = task.scheduleDate.split("-").map(Number);
+          isDue = now.getFullYear() === yr &&
+                  (now.getMonth() + 1) === mn &&
+                  now.getDate() === dy &&
+                  currentHour === sh &&
+                  currentMin === sm;
         }
 
         if (isDue) {
           logger.info(`[ScheduledTasks] Task "${task.name}" (${task.id}) is due to run.`);
           
+          const updateFields: Record<string, any> = {
+            lastRunMinute: minuteKey,
+            updatedAt: new Date().toISOString()
+          };
+          if (task.scheduleType === "once") {
+            updateFields.enabled = false;
+          }
+
           // Mark as run for this minute key to prevent double execution in cluster setups
           await db.collection(COLLECTIONS.SCHEDULED_TASKS).updateOne(
             { id: task.id },
-            { $set: { lastRunMinute: minuteKey, updatedAt: new Date().toISOString() } }
+            { $set: updateFields }
           );
 
           // Trigger execution in the background asynchronously
