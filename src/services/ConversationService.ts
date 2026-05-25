@@ -411,10 +411,22 @@ const ConversationService: ConversationServiceInterface = {
     }
 
     // 3. Recompute derived fields and persist
+    const modelNamesSet = new Set<string>();
+    for (const m of (conversation.messages as ChatMessage[]) || []) {
+      if (m.deleted) continue;
+      if (m.role === "assistant" && m.model) {
+        modelNamesSet.add(m.model as string);
+      }
+    }
+    if (modelNamesSet.size === 0 && conversation.settings?.model) {
+      modelNamesSet.add(conversation.settings.model as string);
+    }
+
     const derived: Record<string, unknown> = {
       modalities: computeModalities(conversation.messages as ChatMessage[]),
       providers: extractProviders(conversation.messages as ChatMessage[], conversation.settings as ConversationSettings),
       totalCost: computeTotalCost(conversation.messages as ChatMessage[]),
+      modelNames: Array.from(modelNamesSet),
     };
 
     // Auto-derive a descriptive title from the first user message if the current title is missing or is 'New Conversation'
