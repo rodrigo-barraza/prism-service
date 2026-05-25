@@ -29,21 +29,21 @@ const MEDIA_FIELDS = ["images", "audio", "video", "pdf"];
  */
 async function uploadIfDataUrl(
   value: unknown,
-    category: string = "uploads",
-    project: string | null = null,
-    username: string | null = null,
+  category = "uploads",
+  project: string | null = null,
+  username: string | null = null,
 ) {
-    if (typeof value === "string" && (value as string).startsWith("data:")) {
+  if (typeof value === "string" && value.startsWith("data:")) {
     try {
-      const { ref } = await (FileService).uploadFile(
+      const { ref } = await FileService.uploadFile(
         value,
-                (category),
+        category,
         project,
         username,
       );
       return ref;
     } catch (error: unknown) {
-            logger.error(`Workflow file upload failed: ${(error as Error).message}`);
+      logger.error(`Workflow file upload failed: ${(error as Error).message}`);
       return value;
     }
   }
@@ -52,18 +52,18 @@ async function uploadIfDataUrl(
 
 /**
  * Walk all workflow nodes and upload any base64 data URLs to MinIO,
- * replacing them with minio:// refs.  Mirrors the extractFiles pattern
+ * replacing them with minio:// refs. Mirrors the extractFiles pattern
  * used by ConversationService for chat messages.
  */
 async function extractWorkflowFiles(
   nodes: unknown[],
-    project: string | null = null,
-    username: string | null = null,
+  project: string | null = null,
+  username: string | null = null,
 ) {
-  if (!Array.isArray(nodes) || !(FileService).isExternalStorage()) return nodes;
+  if (!Array.isArray(nodes) || !FileService.isExternalStorage()) return nodes;
 
   const processed: Record<string, unknown>[] = [];
-    for ( const node of nodes) {
+  for (const node of nodes) {
     const updated = { ...(node as Record<string, unknown>) };
 
     // 1. Node-level content (asset input nodes store content as a data URL)
@@ -82,20 +82,20 @@ async function extractWorkflowFiles(
     // 2. Messages array (conversation / model nodes)
     if (Array.isArray(updated.messages)) {
       const newMessages: Record<string, unknown>[] = [];
-            for ( const message of updated.messages) {
+      for (const message of updated.messages) {
         const sanitizedMessage = { ...(message as Record<string, unknown>) };
-                for ( const field of MEDIA_FIELDS) {
+        for (const field of MEDIA_FIELDS) {
           const value = sanitizedMessage[field];
           if (Array.isArray(value)) {
             const array: string[] = [];
-                        for ( const item of value) {
+            for (const item of value) {
               array.push(
-                (await uploadIfDataUrl(item, "uploads", project, username) as string),
+                await uploadIfDataUrl(item, "uploads", project, username) as string,
               );
             }
-            (sanitizedMessage as Record<string, unknown>)[field] = array;
+            sanitizedMessage[field] = array;
           } else if (typeof value === "string" && value.startsWith("data:")) {
-            (sanitizedMessage as Record<string, unknown>)[field] = await uploadIfDataUrl(value as string, "uploads", project, username);
+            sanitizedMessage[field] = await uploadIfDataUrl(value, "uploads", project, username);
           }
         }
         newMessages.push(sanitizedMessage);
@@ -109,7 +109,7 @@ async function extractWorkflowFiles(
       typeof updated.receivedOutputs === "object"
     ) {
       const newReceived: Record<string, unknown> = {};
-            for ( const [mod, data] of Object.entries(updated.receivedOutputs)) {
+      for (const [mod, data] of Object.entries(updated.receivedOutputs)) {
         newReceived[mod] = await uploadIfDataUrl(
           data,
           "uploads",
@@ -131,42 +131,43 @@ async function extractWorkflowFiles(
  */
 async function extractNodeResultFiles(
   nodeResults: Record<string, unknown>,
-    project: string | null = null,
-    username: string | null = null,
+  project: string | null = null,
+  username: string | null = null,
 ) {
   if (
     !nodeResults ||
     typeof nodeResults !== "object" ||
-    !(FileService).isExternalStorage()
-  )
+    !FileService.isExternalStorage()
+  ) {
     return nodeResults;
+  }
 
   const processed: Record<string, unknown> = {};
-    for ( const [nodeId, outputs] of Object.entries(nodeResults)) {
+  for (const [nodeId, outputs] of Object.entries(nodeResults)) {
     if (!outputs || typeof outputs !== "object") {
-            processed[nodeId] = outputs;
+      processed[nodeId] = outputs;
       continue;
     }
     const newOutputs: Record<string, unknown> = {};
-        for ( const [mod, data] of Object.entries(outputs)) {
+    for (const [mod, data] of Object.entries(outputs)) {
       // conversation modality is an array of message objects with nested media
       if (mod === "conversation" && Array.isArray(data)) {
         const msgs: Record<string, unknown>[] = [];
-                for ( const message of data) {
+        for (const message of data) {
           const sanitizedMessage = { ...(message as Record<string, unknown>) };
-                    for ( const field of MEDIA_FIELDS) {
+          for (const field of MEDIA_FIELDS) {
             const value = sanitizedMessage[field];
             if (Array.isArray(value)) {
               const array: string[] = [];
-                            for ( const item of value) {
+              for (const item of value) {
                 array.push(
-                    (await uploadIfDataUrl(item, "uploads", project, username) as string),
+                  await uploadIfDataUrl(item, "uploads", project, username) as string,
                 );
               }
-              (sanitizedMessage as Record<string, unknown>)[field] = array;
+              sanitizedMessage[field] = array;
             } else if (typeof value === "string" && value.startsWith("data:")) {
-              (sanitizedMessage as Record<string, unknown>)[field] = await uploadIfDataUrl(
-                                (value as string),
+              sanitizedMessage[field] = await uploadIfDataUrl(
+                value,
                 "uploads",
                 project,
                 username,
@@ -175,9 +176,9 @@ async function extractNodeResultFiles(
           }
           msgs.push(sanitizedMessage);
         }
-                newOutputs[mod] = msgs;
+        newOutputs[mod] = msgs;
       } else {
-                newOutputs[mod] = await uploadIfDataUrl(
+        newOutputs[mod] = await uploadIfDataUrl(
           data,
           "uploads",
           project,
@@ -185,7 +186,7 @@ async function extractNodeResultFiles(
         );
       }
     }
-        processed[nodeId] = newOutputs;
+    processed[nodeId] = newOutputs;
   }
   return processed;
 }
@@ -195,8 +196,8 @@ async function extractNodeResultFiles(
  * Non-minio strings (data URLs, http URLs, etc.) pass through unchanged.
  */
 function resolveMinioRef(value: unknown, baseUrl: string) {
-    if (typeof value === "string" && (value as string).startsWith("minio://")) {
-        const key = (value as string).replace("minio://", "");
+  if (typeof value === "string" && value.startsWith("minio://")) {
+    const key = value.replace("minio://", "");
     // Use direct MinIO URL when available, otherwise proxy through Prism
     const minioBase = MinioWrapper.getBucketUrl();
     if (minioBase) return `${minioBase}/${key}`;
@@ -212,7 +213,7 @@ function resolveMinioRef(value: unknown, baseUrl: string) {
 function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: string) {
   // Resolve nodes
   if (Array.isArray(workflow.nodes)) {
-        for ( const node of workflow.nodes) {
+    for (const node of workflow.nodes) {
       // Node-level content (asset input nodes)
       if (typeof (node as Record<string, unknown>).content === "string") {
         (node as Record<string, unknown>).content = resolveMinioRef((node as Record<string, unknown>).content, baseUrl);
@@ -220,15 +221,15 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: str
 
       // Messages array (conversation / model nodes)
       if (Array.isArray((node as Record<string, unknown>).messages)) {
-                for ( const message of ((node as Record<string, unknown>).messages as Record<string, unknown>[])) {
-                    for ( const field of MEDIA_FIELDS) {
+        for (const message of ((node as Record<string, unknown>).messages as Record<string, unknown>[])) {
+          for (const field of MEDIA_FIELDS) {
             const value = (message as Record<string, unknown>)[field];
             if (Array.isArray(value)) {
               (message as Record<string, unknown>)[field] = value.map((item: unknown) =>
                 resolveMinioRef(item, baseUrl),
               );
             } else if (typeof value === "string") {
-                            (message as Record<string, unknown>)[field] = resolveMinioRef((value as string), baseUrl);
+              (message as Record<string, unknown>)[field] = resolveMinioRef(value, baseUrl);
             }
           }
         }
@@ -236,8 +237,8 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: str
 
       // Viewer receivedOutputs
       if ((node as Record<string, unknown>).receivedOutputs && typeof (node as Record<string, unknown>).receivedOutputs === "object") {
-                for ( const [mod, data] of Object.entries((node as Record<string, unknown>).receivedOutputs as Record<string, unknown>)) {
-            ((node as Record<string, unknown>).receivedOutputs as Record<string, unknown>)[mod] = resolveMinioRef(data, baseUrl);
+        for (const [mod, data] of Object.entries((node as Record<string, unknown>).receivedOutputs as Record<string, unknown>)) {
+          ((node as Record<string, unknown>).receivedOutputs as Record<string, unknown>)[mod] = resolveMinioRef(data, baseUrl);
         }
       }
     }
@@ -245,25 +246,25 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: str
 
   // Resolve nodeResults: { [nodeId]: { [modality]: value | messagesArray } }
   if (workflow.nodeResults && typeof workflow.nodeResults === "object") {
-    for ( const outputs of Object.values(workflow.nodeResults) as Record<string, unknown>[]) {
+    for (const outputs of Object.values(workflow.nodeResults) as Record<string, unknown>[]) {
       if (!outputs || typeof outputs !== "object") continue;
-            for ( const [mod, data] of Object.entries(outputs)) {
+      for (const [mod, data] of Object.entries(outputs)) {
         // conversation modality is an array of message objects with nested media
         if (mod === "conversation" && Array.isArray(data)) {
-                    for ( const message of data) {
-                        for ( const field of MEDIA_FIELDS) {
+          for (const message of data) {
+            for (const field of MEDIA_FIELDS) {
               const value = (message as Record<string, unknown>)[field];
               if (Array.isArray(value)) {
                 (message as Record<string, unknown>)[field] = value.map((item: unknown) =>
                   resolveMinioRef(item, baseUrl),
                 );
               } else if (typeof value === "string") {
-                                (message as Record<string, unknown>)[field] = resolveMinioRef((value as string), baseUrl);
+                (message as Record<string, unknown>)[field] = resolveMinioRef(value, baseUrl);
               }
             }
           }
         } else {
-            (outputs as Record<string, unknown>)[mod] = resolveMinioRef(data, baseUrl);
+          (outputs as Record<string, unknown>)[mod] = resolveMinioRef(data, baseUrl);
         }
       }
     }
@@ -271,9 +272,10 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: str
 
   return workflow;
 }
+
 function getBaseUrl(req: Request) {
-    const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
-    const host = req.headers["x-forwarded-host"] || req.get("host");
+  const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
+  const host = req.headers["x-forwarded-host"] || req.get("host");
   return `${proto}://${host}`;
 }
 
@@ -285,19 +287,19 @@ function getBaseUrl(req: Request) {
 function computeWorkflowMeta(nodes: Record<string, unknown>[]) {
   const providers = [
     ...new Set(
-            (nodes || [])
-        .filter((n: Record<string, unknown>) => !(n as Record<string, unknown>).nodeType && (n as Record<string, unknown>).provider)
-        .map((n: Record<string, unknown>) => (n as Record<string, unknown>).provider as string),
+      (nodes || [])
+        .filter((n: Record<string, unknown>) => !n.nodeType && n.provider)
+        .map((n: Record<string, unknown>) => n.provider as string),
     ),
   ];
   const modalities: Record<string, boolean> = {};
-    for ( const n of nodes || []) {
+  for (const n of nodes || []) {
     // Only include boundary nodes: input assets define workflow inputs,
     // viewer nodes define workflow outputs
-    if ((n as Record<string, unknown>).nodeType === "input") {
-            for ( const t of ((n as Record<string, unknown>).outputTypes as string[]) || []) modalities[`${t}In`] = true;
-    } else if ((n as Record<string, unknown>).nodeType === "viewer") {
-            for ( const t of ((n as Record<string, unknown>).inputTypes as string[]) || []) modalities[`${t}Out`] = true;
+    if (n.nodeType === "input") {
+      for (const t of (n.outputTypes as string[]) || []) modalities[`${t}In`] = true;
+    } else if (n.nodeType === "viewer") {
+      for (const t of (n.inputTypes as string[]) || []) modalities[`${t}Out`] = true;
     }
   }
   return { providers, modalities };

@@ -17,6 +17,23 @@ import {
 const router = express.Router();
 router.use(requireDb);
 
+const CONVERSATION_LIST_PROJECTION = {
+  id: 1,
+  project: 1,
+  username: 1,
+  title: 1,
+  createdAt: 1,
+  updatedAt: 1,
+  modalities: 1,
+  providers: 1,
+  totalCost: 1,
+  isGenerating: 1,
+  traceId: 1,
+  synthetic: 1,
+  agent: 1,
+  systemPrompt: 1,
+} as const;
+
 interface ConversationDocument {
   _id: ObjectId;
   id: string;
@@ -74,21 +91,9 @@ router.get(
         db
           .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
           .find(filter)
-          .project<Omit<ConversationDocument, "messages">>({
-            id: 1,
-            project: 1,
-            username: 1,
-            title: 1,
-            createdAt: 1,
-            updatedAt: 1,
-            modalities: 1,
-            providers: 1,
-            totalCost: 1,
-            isGenerating: 1,
-            traceId: 1,
-            synthetic: 1,
-            systemPrompt: 1,
-          })
+          .project<Omit<ConversationDocument, "messages">>(
+            CONVERSATION_LIST_PROJECTION as unknown as import("mongodb").Document
+          )
           .sort({ updatedAt: -1 })
           .limit(limit + 1)
           .toArray();
@@ -101,21 +106,7 @@ router.get(
         return db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .find(agentFilter)
-          .project({
-            id: 1,
-            project: 1,
-            username: 1,
-            title: 1,
-            createdAt: 1,
-            updatedAt: 1,
-            modalities: 1,
-            providers: 1,
-            totalCost: 1,
-            isGenerating: 1,
-            traceId: 1,
-            agent: 1,
-            systemPrompt: 1,
-          })
+          .project(CONVERSATION_LIST_PROJECTION as unknown as import("mongodb").Document)
           .sort({ updatedAt: -1 })
           .limit(limit + 1)
           .toArray();

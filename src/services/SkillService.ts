@@ -123,7 +123,7 @@ const SkillService = {
 
 
    */
-  async get(skillId: Record<string, unknown>) {
+  async get(skillId: string) {
     const collection = getCollection();
     if (!collection) return null;
     const document = await collection.findOne({ skillId });
@@ -132,10 +132,8 @@ const SkillService = {
 
   /**
    * Delete a skill by skillId.
-
-
    */
-  async delete(skillId: Record<string, unknown>) {
+  async delete(skillId: string) {
     const collection = getCollection();
     if (!collection) return { error: "Database not available" };
 
@@ -157,7 +155,7 @@ const SkillService = {
    * The caller (ToolOrchestratorService) is responsible for actually
    * running the agentic loop with the returned config.
    */
-  async prepare(skillId: Record<string, unknown>, variables: Record<string, unknown> = {}) {
+  async prepare(skillId: string, variables: Record<string, unknown> = {}) {
     const collection = getCollection();
     if (!collection) return { error: "Database not available" };
 
@@ -170,7 +168,7 @@ const SkillService = {
 
     // Interpolate variables into the prompt template
     let prompt = document.prompt;
-        for ( const [key, value] of Object.entries(variables)) {
+    for (const [key, value] of Object.entries(variables)) {
       prompt = prompt.replace(
         new RegExp(`\\{\\{${key}\\}\\}`, "g"),
         String(value),
