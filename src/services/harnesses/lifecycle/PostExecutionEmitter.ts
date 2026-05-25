@@ -18,19 +18,19 @@ export function emitPostExecutionStatus(
   toolCalls: ToolCall[],
   emit: EmitFn,
 ): void {
-  if (toolCalls.some((tc) => tc.name.startsWith("task_"))) {
+  if (toolCalls.some((toolCall) => toolCall.name.startsWith("task_"))) {
     emit({ type: "status", message: "tasks_updated" });
   }
 
   if (
     toolCalls.some(
-      (tc) => tc.name === "team_create" || tc.name === "stop_agent",
+      (toolCall) => toolCall.name === "team_create" || toolCall.name === "stop_agent",
     )
   ) {
     emit({ type: "status", message: "workers_updated" });
   }
 
-  if (toolCalls.some((tc) => tc.name === "upsert_memory")) {
+  if (toolCalls.some((toolCall) => toolCall.name === "upsert_memory")) {
     emit({ type: "status", message: "memories_updated" });
   }
 }
@@ -43,9 +43,9 @@ export function processToolResultMedia(
   pass: PassState,
   emit: EmitFn,
 ): void {
-  for (const tc of toolCalls) {
+  for (const toolCall of toolCalls) {
     const res = results.find(
-      (r) => r.id === tc.id || (!r.id && r.name === tc.name),
+      (r) => r.id === toolCall.id || (!r.id && r.name === toolCall.name),
     );
     const resultObj = res?.result as Record<string, unknown> | null;
     const hasError = !!resultObj?.error;
@@ -53,10 +53,10 @@ export function processToolResultMedia(
     emit({
       type: "tool_execution",
       tool: {
-        name: tc.name,
-        args: tc.args || {},
-        id: tc.id,
-        responsesItemId: tc.responsesItemId,
+        name: toolCall.name,
+        args: toolCall.args || {},
+        id: toolCall.id,
+        responsesItemId: toolCall.responsesItemId,
         result: resultObj,
       },
       status: hasError ? "error" : "done",
@@ -92,26 +92,26 @@ export function trackToolErrors(
   maxConsecutiveErrors: number,
   emit: EmitFn,
 ): void {
-  for (const tc of toolCalls) {
+  for (const toolCall of toolCalls) {
     const res = results.find(
-      (r) => r.id === tc.id || (!r.id && r.name === tc.name),
+      (r) => r.id === toolCall.id || (!r.id && r.name === toolCall.name),
     );
     const hasError = !!(res?.result as Record<string, unknown>)?.error;
 
     if (hasError) {
-      const count = (state.toolErrorCounts.get(tc.name) || 0) + 1;
-      state.toolErrorCounts.set(tc.name, count);
+      const count = (state.toolErrorCounts.get(toolCall.name) || 0) + 1;
+      state.toolErrorCounts.set(toolCall.name, count);
       if (count >= maxConsecutiveErrors) {
         logger.warn(
-          `[AgenticLoop] Tool "${tc.name}" hit error limit (${count}), skipping in future iterations`,
+          `[AgenticLoop] Tool "${toolCall.name}" hit error limit (${count}), skipping in future iterations`,
         );
         emit({
           type: "status",
-          message: `Tool "${tc.name}" failed ${count} times consecutively — skipping`,
+          message: `Tool "${toolCall.name}" failed ${count} times consecutively — skipping`,
         });
       }
     } else {
-      state.toolErrorCounts.delete(tc.name);
+      state.toolErrorCounts.delete(toolCall.name);
     }
   }
 }

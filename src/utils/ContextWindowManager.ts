@@ -70,12 +70,12 @@ function estimateMessageTokens(message: ChatMessage): number {
 
   // Tool calls (function name + args + results)
   if (message.toolCalls && Array.isArray(message.toolCalls)) {
-    for (const tc of message.toolCalls) {
-      tokens += estimateTokens(tc.name || "");
-      tokens += estimateTokens(tc.args ? JSON.stringify(tc.args) : "");
-      if (tc.result) {
+    for (const toolCall of message.toolCalls) {
+      tokens += estimateTokens(toolCall.name || "");
+      tokens += estimateTokens(toolCall.args ? JSON.stringify(toolCall.args) : "");
+      if (toolCall.result) {
         tokens += estimateTokens(
-          typeof tc.result === "string" ? tc.result : JSON.stringify(tc.result),
+          typeof toolCall.result === "string" ? toolCall.result : JSON.stringify(toolCall.result),
         );
       }
     }
@@ -142,15 +142,15 @@ function truncateToolResults(
     if (message.role !== "assistant" || !message.toolCalls?.length) return message;
 
     const truncated = { ...message };
-    truncated.toolCalls = message.toolCalls.map((tc: ToolCallEntry) => {
-      if (!tc.result) return tc;
+    truncated.toolCalls = message.toolCalls.map((toolCall: ToolCallEntry) => {
+      if (!toolCall.result) return toolCall;
 
       const resultStr =
-        typeof tc.result === "string" ? tc.result : JSON.stringify(tc.result);
-      if (resultStr.length <= AGGRESSIVE_TOOL_RESULT_CAP) return tc;
+        typeof toolCall.result === "string" ? toolCall.result : JSON.stringify(toolCall.result);
+      if (resultStr.length <= AGGRESSIVE_TOOL_RESULT_CAP) return toolCall;
 
       return {
-        ...tc,
+        ...toolCall,
         result:
           resultStr.slice(0, AGGRESSIVE_TOOL_RESULT_CAP) +
           `\n...[truncated ${resultStr.length - AGGRESSIVE_TOOL_RESULT_CAP} chars]`,
@@ -195,7 +195,7 @@ function compressOldAssistantMessages(
 
       // Keep a short summary of what the assistant did
       const toolNames =
-        message.toolCalls?.map((tc: ToolCallEntry) => tc.name).join(", ") || "";
+        message.toolCalls?.map((toolCall: ToolCallEntry) => toolCall.name).join(", ") || "";
       const contentStr = typeof message.content === "string" ? message.content : "";
       const contentPreview = contentStr.slice(0, 200);
 
@@ -203,9 +203,9 @@ function compressOldAssistantMessages(
       compressed.thinking = undefined;
 
       if (compressed.toolCalls) {
-        compressed.toolCalls = compressed.toolCalls.map((tc: ToolCallEntry) => ({
-          ...tc,
-          result: tc.result
+        compressed.toolCalls = compressed.toolCalls.map((toolCall: ToolCallEntry) => ({
+          ...toolCall,
+          result: toolCall.result
             ? "[result truncated for context budget]"
             : undefined,
         }));

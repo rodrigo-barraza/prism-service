@@ -107,22 +107,22 @@ export class ThinkTagParser {
     return results;
   }
 
-  /** Check if the end of str is a partial match for "<think>" */
-  private _partialStartTag(str: string): number {
+  /** Check if the end of text is a partial match for "<think>" */
+  private _partialStartTag(text: string): number {
     const tag = "<think>";
-    for (let len = Math.min(tag.length - 1, str.length); len >= 1; len--) {
-      if (str.endsWith(tag.slice(0, len))) {
+    for (let len = Math.min(tag.length - 1, text.length); len >= 1; len--) {
+      if (text.endsWith(tag.slice(0, len))) {
         return len;
       }
     }
     return 0;
   }
 
-  /** Check if the end of str is a partial match for "</think>" */
-  private _partialEndTag(str: string): number {
+  /** Check if the end of text is a partial match for "</think>" */
+  private _partialEndTag(text: string): number {
     const tag = "</think>";
-    for (let len = Math.min(tag.length - 1, str.length); len >= 1; len--) {
-      if (str.endsWith(tag.slice(0, len))) {
+    for (let len = Math.min(tag.length - 1, text.length); len >= 1; len--) {
+      if (text.endsWith(tag.slice(0, len))) {
         return len;
       }
     }

@@ -116,15 +116,15 @@ function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletio
           role: "assistant",
           ...(m.name ? { name: m.name } : {}),
           content: m.content?.trim() || null,
-          tool_calls: m.toolCalls.map((tc, i) => ({
-            id: tc.id || `call_${i}`,
+          tool_calls: m.toolCalls.map((toolCall, i) => ({
+            id: toolCall.id || `call_${i}`,
             type: "function" as const,
             function: {
-              name: tc.name,
+              name: toolCall.name,
               arguments:
-                typeof tc.args === "string"
-                  ? tc.args
-                  : JSON.stringify(tc.args || {}),
+                typeof toolCall.args === "string"
+                  ? toolCall.args
+                  : JSON.stringify(toolCall.args || {}),
             },
           })),
         };
@@ -247,19 +247,19 @@ function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.Response
         } as OpenAI.Responses.ResponseInputItem);
       }
       // Each tool call becomes a function_call output item
-      for (const tc of m.toolCalls) {
+      for (const toolCall of m.toolCalls) {
         // Responses API requires the function_call id to start with "fc_"
         // responsesItemId is the fc_ prefixed ID from the streaming handler
-        const functionCallId = tc.responsesItemId || tc.id || `fc_${Date.now()}`;
+        const functionCallId = toolCall.responsesItemId || toolCall.id || `fc_${Date.now()}`;
         result.push({
           type: "function_call",
           id: functionCallId,
-          call_id: tc.id || functionCallId,
-          name: tc.name,
+          call_id: toolCall.id || functionCallId,
+          name: toolCall.name,
           arguments:
-            typeof tc.args === "string"
-              ? tc.args
-              : JSON.stringify(tc.args || {}),
+            typeof toolCall.args === "string"
+              ? toolCall.args
+              : JSON.stringify(toolCall.args || {}),
         } as OpenAI.Responses.ResponseFunctionToolCall as unknown as OpenAI.Responses.ResponseInputItem);
       }
       continue;
@@ -573,9 +573,9 @@ const openaiProvider = {
         },
       };
       if (message.tool_calls && message.tool_calls.length > 0) {
-        result.toolCalls = message.tool_calls.map((tc) => {
-          if (tc.type === "function") {
-            const toolFunction = tc.function;
+        result.toolCalls = message.tool_calls.map((toolCall) => {
+          if (toolCall.type === "function") {
+            const toolFunction = toolCall.function;
             let args: Record<string, unknown> = {};
             try {
               args = JSON.parse(toolFunction.arguments || "{}");
@@ -583,13 +583,13 @@ const openaiProvider = {
               /* ignore */
             }
             return {
-              id: tc.id,
+              id: toolCall.id,
               name: toolFunction.name || "",
               args,
             };
           }
           return {
-            id: tc.id,
+            id: toolCall.id,
             name: "",
             args: {},
           };
@@ -967,20 +967,20 @@ const openaiProvider = {
       // Accumulate tool call deltas
       if (delta?.tool_calls) {
         let deltaChars = 0;
-        for (const tc of delta.tool_calls) {
-          const index = tc.index;
+        for (const toolCall of delta.tool_calls) {
+          const index = toolCall.index;
           if (!pendingToolCalls[index]) {
             pendingToolCalls[index] = {
-              id: tc.id || "",
-              name: tc.function?.name || "",
+              id: toolCall.id || "",
+              name: toolCall.function?.name || "",
               args: "",
             };
           }
-          if (tc.id) pendingToolCalls[index].id = tc.id;
-          if (tc.function?.name) pendingToolCalls[index].name = tc.function.name;
-          if (tc.function?.arguments) {
-            pendingToolCalls[index].args += tc.function.arguments;
-            deltaChars += tc.function.arguments.length;
+          if (toolCall.id) pendingToolCalls[index].id = toolCall.id;
+          if (toolCall.function?.name) pendingToolCalls[index].name = toolCall.function.name;
+          if (toolCall.function?.arguments) {
+            pendingToolCalls[index].args += toolCall.function.arguments;
+            deltaChars += toolCall.function.arguments.length;
           }
         }
         // Yield progress event so generation throughput tracking stays
@@ -992,17 +992,17 @@ const openaiProvider = {
 
       // If finish_reason is "tool_calls", yield accumulated tool calls
       if (chunk.choices[0]?.finish_reason === "tool_calls") {
-        for (const tc of Object.values(pendingToolCalls)) {
+        for (const toolCall of Object.values(pendingToolCalls)) {
           let args: Record<string, unknown> = {};
           try {
-            args = JSON.parse(tc.args || "{}");
+            args = JSON.parse(toolCall.args || "{}");
           } catch {
             /* ignore */
           }
           yield {
             type: "toolCall",
-            id: tc.id,
-            name: tc.name,
+            id: toolCall.id,
+            name: toolCall.name,
             args,
           };
         }
