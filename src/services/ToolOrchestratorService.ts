@@ -803,6 +803,32 @@ export default class ToolOrchestratorService {
       }
     }
 
+    // Inject the actual image from conversation context into image-consuming tools.
+    // Models cannot reliably reproduce base64 data in tool arguments — they truncate it,
+    // producing corrupt image buffers. Extract the real image from the last user message
+    // and set it as the `input` arg so the tools-service receives valid data.
+    const IMAGE_INPUT_TOOLS = ["convert_image_to_ascii", "manipulate_image"];
+    if (IMAGE_INPUT_TOOLS.includes(name) && context.messages) {
+      for (let i = context.messages.length - 1; i >= 0; i--) {
+        const message = context.messages[i];
+        if (
+          message.role === "user" &&
+          message.images &&
+          Array.isArray(message.images) &&
+          message.images.length > 0
+        ) {
+          const firstImage = message.images[0];
+          if (typeof firstImage === "string" && (firstImage.startsWith("http") || firstImage.startsWith("data:"))) {
+            logger.info(
+              `[ToolOrchestrator] ${name}: injecting conversation image as 'input' (${firstImage.startsWith("data:") ? `${(firstImage.length / 1024).toFixed(0)} KB base64` : firstImage.substring(0, 80)})`,
+            );
+            args = { ...args, input: firstImage };
+          }
+          break;
+        }
+      }
+    }
+
     const result = await executeToolGeneric(name, args, context);
 
     // Post-process: upload generated images to MinIO
