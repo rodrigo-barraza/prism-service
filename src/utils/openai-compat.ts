@@ -203,9 +203,9 @@ export function buildPayloadParams(
 export function extractToolCallsFromMessage(message: OpenAIMessage | null | undefined): ToolCallEntry[] | null {
   if (!message?.tool_calls || message.tool_calls.length === 0) return null;
 
-  return message.tool_calls.map((tc) => {
-    const fnName = tc.function?.name || tc.name || "";
-    const fnArgs = tc.function?.arguments || tc.arguments || "{}";
+  return message.tool_calls.map((toolCall) => {
+    const fnName = toolCall.function?.name || toolCall.name || "";
+    const fnArgs = toolCall.function?.arguments || toolCall.arguments || "{}";
     let args: Record<string, unknown> = {};
     try {
       args = JSON.parse(fnArgs);
@@ -213,7 +213,7 @@ export function extractToolCallsFromMessage(message: OpenAIMessage | null | unde
       /* ignore */
     }
     return {
-      id: tc.id || null,
+      id: toolCall.id || null,
       name: fnName,
       args,
     };
@@ -365,15 +365,15 @@ export function prepareOpenAICompatMessages(
         ...base,
         // Per OpenAI spec, content must be null when tool_calls are present
         content: (typeof m.content === "string" ? m.content.trim() : "") || null,
-        tool_calls: m.toolCalls.map((tc: ToolCallEntry, i: number) => ({
-          id: tc.id || `call_${i}`,
+        tool_calls: m.toolCalls.map((toolCall: ToolCallEntry, i: number) => ({
+          id: toolCall.id || `call_${i}`,
           type: "function",
           function: {
-            name: tc.name,
+            name: toolCall.name,
             arguments:
-              typeof tc.args === "string"
-                ? tc.args
-                : JSON.stringify(tc.args || {}),
+              typeof toolCall.args === "string"
+                ? toolCall.args
+                : JSON.stringify(toolCall.args || {}),
           },
         })),
       } as PreparedMessage;
@@ -597,19 +597,19 @@ export async function* parseSSEStream(
           // during tool call argument streaming.
           if (delta?.tool_calls) {
             let deltaChars = 0;
-            for (const tc of delta.tool_calls) {
-              const index = tc.index ?? 0;
+            for (const toolCall of delta.tool_calls) {
+              const index = toolCall.index ?? 0;
               if (!pendingToolCalls[index]) {
                 pendingToolCalls[index] = {
-                  id: tc.id || "",
-                  name: tc.function?.name || tc.name || "",
+                  id: toolCall.id || "",
+                  name: toolCall.function?.name || toolCall.name || "",
                   args: "",
                 };
               }
-              if (tc.id) pendingToolCalls[index].id = tc.id;
-              const chunkName = tc.function?.name || tc.name;
+              if (toolCall.id) pendingToolCalls[index].id = toolCall.id;
+              const chunkName = toolCall.function?.name || toolCall.name;
               if (chunkName) pendingToolCalls[index].name = chunkName;
-              const chunkArgs = tc.function?.arguments || tc.arguments;
+              const chunkArgs = toolCall.function?.arguments || toolCall.arguments;
               if (chunkArgs) {
                 pendingToolCalls[index].args += chunkArgs;
                 deltaChars += chunkArgs.length;
@@ -625,17 +625,17 @@ export async function* parseSSEStream(
           // If finish_reason indicates tool calls, yield accumulated tool calls
           const finishReason = json.choices?.[0]?.finish_reason;
           if (finishReason === "tool_calls" || finishReason === "tool") {
-            for (const tc of Object.values(pendingToolCalls)) {
+            for (const toolCall of Object.values(pendingToolCalls)) {
               let args: Record<string, unknown> = {};
               try {
-                args = JSON.parse(tc.args || "{}");
+                args = JSON.parse(toolCall.args || "{}");
               } catch {
                 /* ignore */
               }
               yield {
                 type: "toolCall",
-                id: tc.id,
-                name: tc.name,
+                id: toolCall.id,
+                name: toolCall.name,
                 args,
               };
             }

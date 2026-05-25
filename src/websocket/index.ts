@@ -590,22 +590,22 @@ function handleWsLive(
                     }
 
                     const results: ToolResult[] = await Promise.all(
-                      functionCalls.map(async (tc) => {
+                      functionCalls.map(async (toolCall) => {
                         let result: Record<string, unknown> = {};
-                        const customDef = customToolMap.get(tc.name);
+                        const customDef = customToolMap.get(toolCall.name);
                         if (customDef) {
                           result =
                             await ToolOrchestratorService.executeCustomTool(
                               customDef,
-                              tc.args,
+                              toolCall.args,
                             ) as Record<string, unknown>;
                         } else {
                           result = await ToolOrchestratorService.executeTool(
-                            tc.name,
-                            tc.args,
+                            toolCall.name,
+                            toolCall.args,
                           ) as Record<string, unknown>;
                         }
-                        return { id: tc.id, name: tc.name, result };
+                        return { id: toolCall.id, name: toolCall.name, result };
                       }),
                     );
 
