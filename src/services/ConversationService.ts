@@ -198,8 +198,8 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
 
     // Classify tool calls by type
     if (m.toolCalls && m.toolCalls.length > 0) {
-      for (const tc of m.toolCalls) {
-        const name = (tc.name || "").toLowerCase();
+      for (const toolCall of m.toolCalls) {
+        const name = (toolCall.name || "").toLowerCase();
         if (WEB_SEARCH_NAMES.has(name)) {
           modalities.webSearch = true;
         } else if (CODE_EXEC_NAMES.has(name)) {

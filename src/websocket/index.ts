@@ -468,7 +468,7 @@ function handleWsLive(
               emit({ type: "setupComplete" });
             },
             onmessage: (msgRaw: unknown) => {
-              const msg = msgRaw as LiveServerMessage;
+              const serverMessage = msgRaw as LiveServerMessage;
               // Model turn parts (audio data, text, function calls)
               if (msg.serverContent?.modelTurn?.parts) {
                 if (!passFirstTokenTime) {

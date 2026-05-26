@@ -46,12 +46,12 @@ function createMockCollection() {
       const insertKeys = Object.keys($setOnInsert);
       const conflicts = insertKeys.filter((k) => setKeys.has(k));
       if (conflicts.length > 0) {
-        const err = new Error(
+        const error = new Error(
           `Updating the path '${conflicts[0]}' would create a conflict at '${conflicts[0]}'`,
         ) as any;
-        err.name = "MongoServerError";
-        err.code = 40;
-        throw err;
+        error.name = "MongoServerError";
+        error.code = 40;
+        throw error;
       }
 
       // Find or create doc
