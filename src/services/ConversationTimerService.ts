@@ -369,8 +369,11 @@ const ConversationTimerService = {
       logger.success(`[ConversationTimers] Background loop completed successfully for conversation ${timer.conversationId}`);
     } catch (error: unknown) {
       logger.error(`[ConversationTimers] Background loop error on conversation ${timer.conversationId}: ${(error as Error).message}`);
-      
-      // Make sure the conversation is not left stuck in "generating" state
+      throw error;
+    } finally {
+      // Always clear isGenerating — both success and error paths.
+      // Without this, the conversation document stays permanently stuck
+      // with isGenerating: true after a successful timer execution.
       await ConversationService.setGenerating(
         timer.conversationId,
         timer.project,
@@ -378,8 +381,6 @@ const ConversationTimerService = {
         false,
         { collection: COLLECTIONS.AGENT_CONVERSATIONS }
       ).catch(() => {});
-
-      throw error;
     }
   },
 };
