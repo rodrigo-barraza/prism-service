@@ -116,27 +116,27 @@ export default class AgenticToolResolver {
     const customToolMap = new Map<string, CustomToolDoc>();
     const dynamicTools: ToolSchema[] = [...toolsApiSchemas];
 
-    for (const t of customToolsData) {
-      customToolMap.set(t.name, t);
+    for (const tool of customToolsData) {
+      customToolMap.set(tool.name, tool);
       dynamicTools.push({
-        name: t.name,
-        description: t.description,
+        name: tool.name,
+        description: tool.description,
         _isCustom: true,
         parameters: {
           type: "object",
           properties: Object.fromEntries(
-            (t.parameters || []).map((p) => [
-              p.name,
+            (tool.parameters || []).map((provider) => [
+              provider.name,
               {
-                type: p.type || "string",
-                description: p.description || "",
-                ...(p.enum?.length ? { enum: p.enum } : {}),
+                type: provider.type || "string",
+                description: provider.description || "",
+                ...(provider.enum?.length ? { enum: provider.enum } : {}),
               },
             ]),
           ),
-          required: (t.parameters || [])
-            .filter((p) => p.required)
-            .map((p) => p.name),
+          required: (tool.parameters || [])
+            .filter((provider) => provider.required)
+            .map((provider) => provider.name),
         },
       });
     }
@@ -145,8 +145,8 @@ export default class AgenticToolResolver {
     const mcpTools = ToolOrchestratorService.getMCPToolSchemas();
     if (mcpTools.length > 0) {
       // Strip internal metadata before passing to LLM
-      for (const t of mcpTools) {
-        const { _mcpServer, _mcpOriginalName, ...schema } = t;
+      for (const tool of mcpTools) {
+        const { _mcpServer, _mcpOriginalName, ...schema } = tool;
         dynamicTools.push(schema);
       }
       logger.info(
@@ -175,13 +175,13 @@ export default class AgenticToolResolver {
         for (const entry of baseTools) {
           if (entry.startsWith("label:")) {
             const label = entry.slice(6);
-            for (const t of clientSchemas) {
-              if (t.labels?.includes(label)) expandedSet.add(t.name);
+            for (const tool of clientSchemas) {
+              if (tool.labels?.includes(label)) expandedSet.add(tool.name);
             }
           } else if (entry.startsWith("domain:")) {
             const domain = entry.slice(7);
-            for (const t of clientSchemas) {
-              if (t.domain === domain) expandedSet.add(t.name);
+            for (const tool of clientSchemas) {
+              if (tool.domain === domain) expandedSet.add(tool.name);
             }
           } else {
             expandedSet.add(entry);
@@ -194,7 +194,7 @@ export default class AgenticToolResolver {
         );
       } else {
         resolvedEnabledTools = dynamicTools
-          .map((t) => t.name)
+          .map((tool) => tool.name)
           .filter((name) => !disabledSet.has(name));
         logger.info(
           `[AgenticLoop] disabledBuiltIns mode (no persona): ${disabledSet.size} disabled → ${resolvedEnabledTools.length} enabled tools`,
@@ -233,13 +233,13 @@ export default class AgenticToolResolver {
         for (const entry of resolvedEnabledTools) {
           if (entry.startsWith("label:")) {
             const label = entry.slice(6);
-            for (const t of clientSchemas) {
-              if (t.labels?.includes(label)) enabledSet.add(t.name);
+            for (const tool of clientSchemas) {
+              if (tool.labels?.includes(label)) enabledSet.add(tool.name);
             }
           } else if (entry.startsWith("domain:")) {
             const domain = entry.slice(7);
-            for (const t of clientSchemas) {
-              if (t.domain === domain) enabledSet.add(t.name);
+            for (const tool of clientSchemas) {
+              if (tool.domain === domain) enabledSet.add(tool.name);
             }
           } else {
             enabledSet.add(entry);
@@ -253,8 +253,8 @@ export default class AgenticToolResolver {
       }
 
       const preFilterCustom = finalTools
-        .filter((t) => t._isCustom)
-        .map((t) => t.name);
+        .filter((tool) => tool._isCustom)
+        .map((tool) => tool.name);
       finalTools = finalTools.filter(
         (t) =>
           enabledSet.has(t.name) ||
@@ -267,8 +267,8 @@ export default class AgenticToolResolver {
           )),
       );
       const postFilterCustom = finalTools
-        .filter((t) => t._isCustom)
-        .map((t) => t.name);
+        .filter((tool) => tool._isCustom)
+        .map((tool) => tool.name);
       if (preFilterCustom.length > 0) {
         logger.info(
           `[AgenticToolResolver] Custom tools: pre-filter=[${preFilterCustom.join(", ")}] post-filter=[${postFilterCustom.join(", ")}] (enabledSet has ${enabledSet.size} entries)`,
@@ -278,18 +278,18 @@ export default class AgenticToolResolver {
 
     // ── Native tool collision prevention ────────────────────────
     if (options.webSearch) {
-      finalTools = finalTools.filter((t) => t.name !== "web_search");
+      finalTools = finalTools.filter((tool) => tool.name !== "web_search");
     }
 
     if (modelDef?.outputTypes?.includes(TYPES.IMAGE)) {
-      finalTools = finalTools.filter((t) => t.name !== "generate_image");
+      finalTools = finalTools.filter((tool) => tool.name !== "generate_image");
     }
 
     if (modelDef?.inputTypes?.includes(TYPES.IMAGE)) {
-      finalTools = finalTools.filter((t) => t.name !== "describe_image");
+      finalTools = finalTools.filter((tool) => tool.name !== "describe_image");
     }
 
-    const finalCustomCount = finalTools.filter((t) => t._isCustom).length;
+    const finalCustomCount = finalTools.filter((tool) => tool._isCustom).length;
     logger.info(
       `[AgenticToolResolver] Final: ${finalTools.length} tools (${finalCustomCount} custom, ${customToolMap.size} in map)`,
     );

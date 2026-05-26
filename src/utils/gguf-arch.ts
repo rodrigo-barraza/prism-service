@@ -210,13 +210,13 @@ export function resolveArchParams(
   const archKey = architecture?.toLowerCase() || "";
   const variants = ARCH_DB[archKey];
   if (variants) {
-    for (const v of variants) {
-      if (billions >= v.minB && billions < v.maxB) {
+    for (const value of variants) {
+      if (billions >= value.minB && billions < value.maxB) {
         return {
-          layers: v.layers,
-          kvHeads: v.kvHeads,
-          headDim: v.headDim,
-          attnRatio: v.attnRatio ?? 1.0,
+          layers: value.layers,
+          kvHeads: value.kvHeads,
+          headDim: value.headDim,
+          attnRatio: value.attnRatio ?? 1.0,
           isKnown: true,
         };
       }

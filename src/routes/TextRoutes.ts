@@ -139,11 +139,11 @@ router.get(
         limit,
         providers: [
           ...new Set(
-            data.map((d) => d.model?.split("/")[0]).filter(Boolean),
+            data.map((item) => item.model?.split("/")[0]).filter(Boolean),
           ),
         ].sort(),
         models: [
-          ...new Set(data.map((d) => d.model).filter(Boolean)),
+          ...new Set(data.map((item) => item.model).filter(Boolean)),
         ].sort(),
       });
     } catch (error: unknown) {

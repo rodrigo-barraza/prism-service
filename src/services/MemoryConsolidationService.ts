@@ -299,12 +299,12 @@ If no consolidation is needed, return: { "actions": [], "summary": "No consolida
  */
 function partitionConversationalMemories(memories: MemoryDoc[]): Map<string, MemoryDoc[]> {
   const partitions = new Map<string, MemoryDoc[]>();
-  for (const m of memories) {
-    const about = m.aboutUserId || "_unknown";
-    const source = m.sourceUserId || "_unknown";
+  for (const message of memories) {
+    const about = message.aboutUserId || "_unknown";
+    const source = message.sourceUserId || "_unknown";
     const key = `${about}::${source}`;
     if (!partitions.has(key)) partitions.set(key, []);
-    partitions.get(key)!.push(m);
+    partitions.get(key)!.push(message);
   }
   return partitions;
 }
@@ -314,10 +314,10 @@ function partitionConversationalMemories(memories: MemoryDoc[]): Map<string, Mem
  * Only fast-decaying categories (gaming, work, achievement) are flagged.
  */
 function findStaleConversationalMemories(memories: MemoryDoc[]): MemoryDoc[] {
-  return memories.filter((m) => {
-    const threshold = CONVERSATIONAL_STALENESS_CONFIG[m.type];
+  return memories.filter((message) => {
+    const threshold = CONVERSATIONAL_STALENESS_CONFIG[message.type];
     if (!threshold) return false; // durable types (personal, preference, etc.) are never stale
-    return daysSince(m.createdAt) > threshold;
+    return daysSince(message.createdAt) > threshold;
   });
 }
 
@@ -354,16 +354,16 @@ function buildConversationalBatchInput(
       sections.push(
         `### Cluster ${i + 1} (${cluster.length} facts, likely overlap):`,
       );
-      cluster.forEach((m) => {
-        sections.push(formatConversationalMemoryEntry(m));
+      cluster.forEach((message) => {
+        sections.push(formatConversationalMemoryEntry(message));
       });
       sections.push("");
     });
   }
   if (staleBatch.length > 0) {
     sections.push("## Potentially Stale Facts\n");
-    staleBatch.forEach((m) => {
-      sections.push(formatConversationalMemoryEntry(m));
+    staleBatch.forEach((message) => {
+      sections.push(formatConversationalMemoryEntry(message));
     });
   }
   if (sections.length === 0) {
@@ -384,8 +384,8 @@ function buildBatchInput(clusterBatch: MemoryDoc[][], staleBatch: MemoryDoc[]): 
       sections.push(
         `### Cluster ${i + 1} (${cluster.length} memories, likely overlap):`,
       );
-      cluster.forEach((m) => {
-        sections.push(formatMemoryEntry(m));
+      cluster.forEach((message) => {
+        sections.push(formatMemoryEntry(message));
       });
       sections.push("");
     });
@@ -394,8 +394,8 @@ function buildBatchInput(clusterBatch: MemoryDoc[][], staleBatch: MemoryDoc[]): 
     sections.push(
       "## Potentially Stale Memories (>30 days old, ephemeral types)\n",
     );
-    staleBatch.forEach((m) => {
-      sections.push(formatMemoryEntry(m));
+    staleBatch.forEach((message) => {
+      sections.push(formatMemoryEntry(message));
     });
   }
   if (sections.length === 0) {
@@ -637,9 +637,9 @@ async function recordHistory(
   const db = MongoWrapper.getDb(MONGO_DB_NAME);
   if (!db) return;
   const mergeCount = actions
-    .filter((a) => a.type === "merge")
-    .reduce((sum, a) => sum + (a.sourceIds?.length || 0), 0);
-  const deleteCount = actions.filter((a) => a.type === "delete").length;
+    .filter((first) => first.type === "merge")
+    .reduce((sum, first) => sum + (first.sourceIds?.length || 0), 0);
+  const deleteCount = actions.filter((first) => first.type === "delete").length;
   await db.collection(HISTORY_COLLECTION).insertOne({
     project,
     runAt: new Date().toISOString(),
@@ -649,14 +649,14 @@ async function recordHistory(
       memoriesBefore -
       mergeCount -
       deleteCount +
-      actions.filter((a) => a.type === "merge").length,
+      actions.filter((first) => first.type === "merge").length,
     actionsApplied: actions.length,
-    actions: actions.map((a) => ({
-      type: a.type,
-      ...(a.sourceIds && { sourceIds: a.sourceIds }),
-      ...(a.merged && { mergedTitle: a.merged.title }),
-      ...(a.id && { deletedId: a.id }),
-      reason: a.reason || "",
+    actions: actions.map((first) => ({
+      type: first.type,
+      ...(first.sourceIds && { sourceIds: first.sourceIds }),
+      ...(first.merged && { mergedTitle: first.merged.title }),
+      ...(first.id && { deletedId: first.id }),
+      reason: first.reason || "",
     })),
     summary,
     durationMs,
@@ -726,7 +726,7 @@ async function processBatch(
     { role: "user", content: input },
   ];
 
-  const inputText = aiMessages.map((m) => m.content).join("\n");
+  const inputText = aiMessages.map((message) => message.content).join("\n");
   const approxInputTokens = estimateTokens(inputText);
   logger.info(
     `[MemoryConsolidation] ${batchLabel} Input: ~${approxInputTokens} tokens`,
@@ -919,7 +919,7 @@ const MemoryConsolidationService = {
     const provider = getProvider(consolidationProvider);
 
     // Build a lookup map for metadata preservation during merges
-    const memoryLookup = new Map<string, MemoryDoc>(allMemories.map((m) => [m.id, m]));
+    const memoryLookup = new Map<string, MemoryDoc>(allMemories.map((message) => [message.id, message]));
 
     let allActions: ConsolidationAction[] = [];
     let batches: ConsolidationBatch[] = [];
@@ -945,8 +945,8 @@ const MemoryConsolidationService = {
         // Embeddings (1536-dim float arrays, ~12KB each) are only needed
         // for cosine similarity in findClusters(). Strip them now so
         // GC can reclaim before the LLM batch loop.
-        for (const m of memories) {
-          m.embedding = null;
+        for (const message of memories) {
+          message.embedding = null;
         }
 
         if (partitionClusters.length === 0 && partitionStale.length === 0)
@@ -1015,19 +1015,19 @@ const MemoryConsolidationService = {
       // Embeddings (1536-dim float arrays, ~12KB each) are only needed
       // for cosine similarity in findClusters(). Strip them now so
       // GC can reclaim before the LLM batch loop.
-      for (const m of allMemories) {
-        m.embedding = null;
+      for (const message of allMemories) {
+        message.embedding = null;
       }
 
       logger.info(
         `[MemoryConsolidation] Found ${clusters.length} clusters from ${allMemories.length} memories`,
       );
 
-      const staleMemories = allMemories.filter((m) => {
-        const age = daysSince(m.createdAt);
+      const staleMemories = allMemories.filter((message) => {
+        const age = daysSince(message.createdAt);
         return (
           age > STALENESS_DAYS &&
-          (m.type === "project" || m.type === "reference")
+          (message.type === "project" || message.type === "reference")
         );
       });
       logger.info(

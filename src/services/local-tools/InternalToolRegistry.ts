@@ -79,13 +79,13 @@ export default class InternalToolRegistry {
     return tool.execute(args, context);
   }
   static getSchemas() {
-    return [...registry.values()].map((t) => t.schema);
+    return [...registry.values()].map((tool) => tool.schema);
   }
   static getClientSchemas() {
-    return [...registry.values()].map((t) => ({
-            ...t.schema,
-      domain: t.domain || "Reasoning",
-      labels: t.labels || ["coding"],
+    return [...registry.values()].map((tool) => ({
+            ...tool.schema,
+      domain: tool.domain || "Reasoning",
+      labels: tool.labels || ["coding"],
     }));
   }
 

@@ -183,12 +183,12 @@ export default class AutoApprovalEngine {
     const autoApproved: ApprovedToolCall[] = [];
     const needsApproval: ApprovedToolCall[] = [];
 
-    for (const tc of toolCalls) {
-      const result = this.check(tc);
+    for (const toolCall of toolCalls) {
+      const result = this.check(toolCall);
       if (result.approved) {
-        autoApproved.push({ ...tc, _approval: result });
+        autoApproved.push({ ...toolCall, _approval: result });
       } else {
-        needsApproval.push({ ...tc, _approval: result });
+        needsApproval.push({ ...toolCall, _approval: result });
       }
     }
 

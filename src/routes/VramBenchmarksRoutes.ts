@@ -81,8 +81,8 @@ router.get(
       if (parsedQuery.hostname) {
         filter["system.hostname"] = parsedQuery.hostname;
       }
-      if (parsedQuery.ctx !== undefined) {
-        filter.contextLength = parsedQuery.ctx;
+      if (parsedQuery.context !== undefined) {
+        filter.contextLength = parsedQuery.context;
       }
       if (parsedQuery.provider) {
         filter.provider = parsedQuery.provider;
@@ -201,20 +201,20 @@ router.get(
         .toArray();
 
       res.json(
-        machines.map((m) => ({
-          hostname: m._id,
-          gpu: m.gpu,
-          gpuVramGB: m.gpuVramMiB ? Math.round(m.gpuVramMiB / 1024) : null,
-          gpuVendor: m.gpuVendor || null,
-          gpuDriver: m.gpuDriver || null,
-          cpu: m.cpu,
-          ramGiB: m.ramGiB,
-          ramSpeedMHz: m.ramSpeedMHz || null,
-          ramType: m.ramType || null,
-          platform: m.platform || null,
-          motherboard: m.motherboard || null,
-          benchmarkCount: m.benchmarkCount,
-          lastRun: m.lastRun,
+        machines.map((message) => ({
+          hostname: message._id,
+          gpu: message.gpu,
+          gpuVramGB: message.gpuVramMiB ? Math.round(message.gpuVramMiB / 1024) : null,
+          gpuVendor: message.gpuVendor || null,
+          gpuDriver: message.gpuDriver || null,
+          cpu: message.cpu,
+          ramGiB: message.ramGiB,
+          ramSpeedMHz: message.ramSpeedMHz || null,
+          ramType: message.ramType || null,
+          platform: message.platform || null,
+          motherboard: message.motherboard || null,
+          benchmarkCount: message.benchmarkCount,
+          lastRun: message.lastRun,
         })),
       );
     } catch (error: unknown) {
@@ -239,10 +239,10 @@ router.get(
         .distinct("settings.label", { error: null })) as string[];
 
       // Sort with "default" first, then alphabetically
-      labels.sort((a, b) => {
-        if (a === "default") return -1;
+      labels.sort((firstItem, b) => {
+        if (firstItem === "default") return -1;
         if (b === "default") return 1;
-        return a.localeCompare(b);
+        return firstItem.localeCompare(b);
       });
 
       res.json(labels);
@@ -272,7 +272,7 @@ router.get(
         .collection<VramBenchmarkDocument>(COLLECTION)
         .distinct("contextLength", filter)) as number[];
 
-      contexts.sort((a, b) => a - b);
+      contexts.sort((firstItem, b) => firstItem - b);
 
       res.json(contexts);
     } catch (error: unknown) {

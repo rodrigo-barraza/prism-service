@@ -32,7 +32,7 @@ const TRACKED_PREFIXES = ["generate", "transcribe"];
 function isTrackedMethod(name: string | symbol): boolean {
   return (
     typeof name === "string" &&
-    TRACKED_PREFIXES.some((p) => name.startsWith(p))
+    TRACKED_PREFIXES.some((provider) => name.startsWith(provider))
   );
 }
 

@@ -80,8 +80,8 @@ export function findBestQuantFallback(targetModel: string, availableModels: Avai
 
   // Find all available models that share the same base name (any quant variant)
   const candidates: QuantCandidate[] = [];
-  for (const m of availableModels) {
-    const mKey = m.key || m.id || "";
+  for (const model of availableModels) {
+    const mKey = model.key || model.id || "";
     const { base, quant } = parseModelQuant(mKey);
 
     // Compare bases case-insensitively.
@@ -101,13 +101,13 @@ export function findBestQuantFallback(targetModel: string, availableModels: Avai
     // Skip identical quant (both could be null for no-quant keys)
     if (quant === targetQuant) continue;
 
-    candidates.push({ key: mKey, quant, sizeBytes: m.size_bytes || 0 });
+    candidates.push({ key: mKey, quant, sizeBytes: model.size_bytes || 0 });
   }
 
   if (candidates.length === 0) return null;
 
   // Sort by file size descending — largest file = highest quality quant
-  candidates.sort((a, b) => b.sizeBytes - a.sizeBytes);
+  candidates.sort((firstItem, b) => b.sizeBytes - firstItem.sizeBytes);
   return candidates[0].key;
 }
 
@@ -138,7 +138,7 @@ export async function resolveModelForInstances(
         ]);
 
         const models: AvailableModel[] = result?.models || result?.data || [];
-        const modelKeys = models.map((m) => m.key || m.id || "");
+        const modelKeys = models.map((model) => model.key || model.id || "");
         const exactMatch = modelKeys.includes(modelKey);
         if (exactMatch) return { exact: true, fallback: null };
 

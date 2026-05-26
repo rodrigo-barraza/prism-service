@@ -368,7 +368,7 @@ export default class SystemPromptAssembler {
             : 0,
         }))
         .filter((s) => s.score >= SKILL_RELEVANCE_THRESHOLD)
-        .sort((a, b) => b.score - a.score);
+        .sort((firstItem, b) => b.score - firstItem.score);
 
       logger.info(
         `[SystemPromptAssembler] Skills: ${scored.length}/${skills.length} above threshold (${scored.map((s) => `${s.name}:${s.score.toFixed(2)}`).join(", ")})`,
@@ -593,7 +593,7 @@ export default class SystemPromptAssembler {
         const allSchemas = ToolOrchestratorService.getToolSchemas();
         const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
         const workerTools = allSchemas
-          .map((t) => t.name as string)
+          .map((tool) => tool.name as string)
           .filter((name: string) => !coordinatorSet.has(name));
         sections.push(getCoordinatorPromptAddendum({ workerTools }));
       }
@@ -617,7 +617,7 @@ export default class SystemPromptAssembler {
     // ── 8. Project Skills (relevance-filtered) ────────────────────
     const lastUserMsg = [...(context.messages || [])]
       .reverse()
-      .find((m) => m.role === "user");
+      .find((message) => message.role === "user");
     const queryText = (lastUserMsg?.content as string) || "";
 
     const skills = await this.fetchSkills(
@@ -711,7 +711,7 @@ export default class SystemPromptAssembler {
         // Prepend dynamic context (time, skills, memories) directly into the latest user message
         // to keep the agent time-aware and memory-aware while preserving prefix-cache validity of the system prompt
         if (context.messages) {
-          const userMessages = context.messages.filter((m) => m.role === "user");
+          const userMessages = context.messages.filter((message) => message.role === "user");
           const lastUserMsg = userMessages[userMessages.length - 1];
           if (lastUserMsg && typeof lastUserMsg.content === "string") {
             const contextLines: string[] = [];

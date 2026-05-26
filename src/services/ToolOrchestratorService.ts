@@ -565,29 +565,29 @@ export default class ToolOrchestratorService {
     ]);
 
     // Coordinator tools are Prism-local — add domain metadata for UI grouping
-    const coordinatorClient = COORDINATOR_TOOL_SCHEMAS.map((t) => ({
-      ...t,
+    const coordinatorClient = COORDINATOR_TOOL_SCHEMAS.map((tool) => ({
+      ...tool,
       domain: "Coordinator",
       labels: ["coding", "orchestration"],
       system: true,
     }));
 
-    const internalClient = InternalToolRegistry.getClientSchemas().map((t) => ({
-      ...t,
-      system: CORE_SYSTEM_TOOLS.has(t.name) || t.domain === "Reasoning" || t.domain === "Coordinator",
+    const internalClient = InternalToolRegistry.getClientSchemas().map((tool) => ({
+      ...tool,
+      system: CORE_SYSTEM_TOOLS.has(tool.name) || tool.domain === "Reasoning" || tool.domain === "Coordinator",
     }));
 
-    const clientSchemasEnriched = cachedClientSchemas.map((t) => ({
-      ...t,
-      system: CORE_SYSTEM_TOOLS.has(t.name) || t.domain === "Reasoning" || t.domain === "Coordinator",
+    const clientSchemasEnriched = cachedClientSchemas.map((tool) => ({
+      ...tool,
+      system: CORE_SYSTEM_TOOLS.has(tool.name) || tool.domain === "Reasoning" || tool.domain === "Coordinator",
     }));
 
-    const mcpClient = ToolOrchestratorService.getMCPToolSchemas().map((t) => ({
-      name: t.name,
-      description: t.description,
-      parameters: t.parameters,
-      domain: t.domain || `Model Context Protocol: ${t._mcpServer}`,
-      labels: t.labels || ["mcp", t._mcpServer],
+    const mcpClient = ToolOrchestratorService.getMCPToolSchemas().map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+      domain: tool.domain || `Model Context Protocol: ${tool._mcpServer}`,
+      labels: tool.labels || ["mcp", tool._mcpServer],
       system: false,
     }));
 
@@ -687,7 +687,7 @@ export default class ToolOrchestratorService {
   }
 
   static getToolFields(toolName: string) {
-    const tool = cachedAISchemas.find((t) => t.name === toolName);
+    const tool = cachedAISchemas.find((tool) => tool.name === toolName);
     if (!tool) return null;
     const params = tool.parameters as Record<string, unknown> | undefined;
     const props = params?.properties as Record<string, Record<string, unknown>> | undefined;
@@ -695,7 +695,7 @@ export default class ToolOrchestratorService {
   }
 
   static async checkApiHealth() {
-    const toolNames = cachedSchemas.map((t) => t.name);
+    const toolNames = cachedSchemas.map((tool) => tool.name);
 
     let online = false;
     try {

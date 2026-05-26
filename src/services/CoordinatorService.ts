@@ -153,15 +153,15 @@ registerCleanup(async () => {
 
   // Clean up worktrees in parallel
   const cleanups = running
-    .filter((w) => w.isolated && w.worktreePath)
-    .map((w) =>
-      removeWorktree(w.repoPath, w.worktreePath!)
+    .filter((item) => item.isolated && item.worktreePath)
+    .map((item) =>
+      removeWorktree(item.repoPath, item.worktreePath!)
         .then(() => {
-          w.worktreePath = null;
+          item.worktreePath = null;
         })
         .catch((error: Error) =>
           logger.warn(
-            `[Coordinator] Shutdown worktree cleanup failed for ${w.agentId}: ${error.message}`,
+            `[Coordinator] Shutdown worktree cleanup failed for ${item.agentId}: ${error.message}`,
           ),
         ),
     );
@@ -384,8 +384,8 @@ function buildWorkerResult(worker: WorkerState): WorkerResult {
   // Aggregate tool call names into { name: count } for frontend badge display
   const toolNames: Record<string, number> = {};
   if (worker.toolCalls?.length) {
-    for (const tc of worker.toolCalls) {
-      const name = tc.name || "unknown";
+    for (const toolCall of worker.toolCalls) {
+      const name = toolCall.name || "unknown";
       toolNames[name] = (toolNames[name] || 0) + 1;
     }
   }
@@ -402,7 +402,7 @@ function buildWorkerResult(worker: WorkerState): WorkerResult {
     durationMs: worker.durationMs || 0,
     // Include full conversation for frontend MessageList rendering.
     // Strip system messages — they're large and not useful for display.
-    messages: (worker.messages || []).filter((m) => m.role !== "system"),
+    messages: (worker.messages || []).filter((message) => message.role !== "system"),
   };
 
   if (worker.diff?.hasChanges) {
@@ -899,23 +899,23 @@ export default class CoordinatorService {
         (w) => w.parentAgentSessionId === parentAgentSessionId,
       );
     }
-    return workers.map((w) => ({
-      agentId: w.agentId,
-      workerAgentSessionId: w.workerAgentSessionId,
-      parentAgentSessionId: w.parentAgentSessionId,
-      description: w.description,
-      status: w.status,
-      branchName: w.branchName,
-      toolCallCount: w.toolCalls?.length || 0,
+    return workers.map((worker) => ({
+      agentId: worker.agentId,
+      workerAgentSessionId: worker.workerAgentSessionId,
+      parentAgentSessionId: worker.parentAgentSessionId,
+      description: worker.description,
+      status: worker.status,
+      branchName: worker.branchName,
+      toolCallCount: worker.toolCalls?.length || 0,
       durationMs:
-        w.status === "running" ? Date.now() - w.startedAt : w.durationMs,
-      totalCost: w.totalCost || null,
-      usage: w.usage || null,
-      traceId: w.traceId,
-      providerName: w.providerName,
-      resolvedModel: w.resolvedModel,
-      files: w.files,
-      startedAt: w.startedAt,
+        worker.status === "running" ? Date.now() - worker.startedAt : worker.durationMs,
+      totalCost: worker.totalCost || null,
+      usage: worker.usage || null,
+      traceId: worker.traceId,
+      providerName: worker.providerName,
+      resolvedModel: worker.resolvedModel,
+      files: worker.files,
+      startedAt: worker.startedAt,
     }));
   }
 
@@ -1092,8 +1092,8 @@ export default class CoordinatorService {
 
     // Track team membership
     const agentIds = memberResults
-      .filter((m) => m.agent_id)
-      .map((m) => m.agent_id!);
+      .filter((message) => message.agent_id)
+      .map((message) => message.agent_id!);
 
     CoordinatorService._activeTeams.set(name, {
       agentIds,
@@ -2111,11 +2111,11 @@ export default class CoordinatorService {
     return activeTasks.get(taskId) || null;
   }
   static listTasks() {
-    return Array.from(activeTasks.values()).map((t) => ({
-      taskId: t.taskId,
-      status: t.status,
-      workerCount: t.workers.length,
-      startedAt: t.startedAt,
+    return Array.from(activeTasks.values()).map((task) => ({
+      taskId: task.taskId,
+      status: task.status,
+      workerCount: task.workers.length,
+      startedAt: task.startedAt,
     }));
   }
 }

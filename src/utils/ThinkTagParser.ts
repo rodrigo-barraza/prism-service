@@ -110,9 +110,9 @@ export class ThinkTagParser {
   /** Check if the end of text is a partial match for "<think>" */
   private _partialStartTag(text: string): number {
     const tag = "<think>";
-    for (let len = Math.min(tag.length - 1, text.length); len >= 1; len--) {
-      if (text.endsWith(tag.slice(0, len))) {
-        return len;
+    for (let length = Math.min(tag.length - 1, text.length); length >= 1; length--) {
+      if (text.endsWith(tag.slice(0, length))) {
+        return length;
       }
     }
     return 0;
@@ -121,9 +121,9 @@ export class ThinkTagParser {
   /** Check if the end of text is a partial match for "</think>" */
   private _partialEndTag(text: string): number {
     const tag = "</think>";
-    for (let len = Math.min(tag.length - 1, text.length); len >= 1; len--) {
-      if (text.endsWith(tag.slice(0, len))) {
-        return len;
+    for (let length = Math.min(tag.length - 1, text.length); length >= 1; length--) {
+      if (text.endsWith(tag.slice(0, length))) {
+        return length;
       }
     }
     return 0;

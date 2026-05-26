@@ -463,8 +463,8 @@ const MemoryService = {
                 ageDays: memoryAgeDays(m.createdAt as string),
                 score: cosineSimilarity(queryEmbedding as number[], m.embedding as number[]),
       }))
-      .filter((m) => m.score > RELEVANCE_THRESHOLD)
-      .sort((a, b) => b.score - a.score)
+      .filter((message) => message.score > RELEVANCE_THRESHOLD)
+      .sort((firstItem, b) => b.score - firstItem.score)
             .slice(0, limit);
     logger.info(
       `[MemoryService] Search found ${scored.length} relevant memories for ${agent} (from ${memories.length} total)`,

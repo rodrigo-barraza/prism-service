@@ -399,8 +399,8 @@ router.post(
 
       // Validate assertions array if provided
       if (assertions && Array.isArray(assertions)) {
-                for ( const a of assertions) {
-          if (a.matchMode && !validModes.includes(a.matchMode)) {
+                for ( const assertion of assertions) {
+          if (assertion.matchMode && !validModes.includes(assertion.matchMode)) {
             return res.status(400).json({
               error: `Invalid matchMode in assertion. Must be one of: ${validModes.join(", ")}`,
             });

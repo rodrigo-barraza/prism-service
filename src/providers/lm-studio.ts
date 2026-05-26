@@ -236,11 +236,11 @@ function safeParseJSON(str: unknown) {
 // For the last user turn with images, we use the array format with type: "text"|"image".
 function buildNativeInput(messages: PreparedMessage[]) {
   // Separate system, conversation history, and the last user message
-  const nonSystemMessages = messages.filter((m) => m.role !== "system");
+  const nonSystemMessages = messages.filter((message) => message.role !== "system");
   if (nonSystemMessages.length === 0) return "";
   const lastUser = [...nonSystemMessages]
     .reverse()
-    .find((m) => m.role === "user");
+    .find((message) => message.role === "user");
   if (!lastUser) return "";
   // Find the index of the last user message to separate history from current turn
   const lastUserIdx = nonSystemMessages.lastIndexOf(lastUser);
@@ -256,8 +256,8 @@ function buildNativeInput(messages: PreparedMessage[]) {
           ? message.content
           : Array.isArray(message.content)
             ? message.content
-                                .filter((c) => c.type === "text")
-                .map((c) => (c as { type: string; text?: string }).text || "")
+                                .filter((item) => item.type === "text")
+                .map((item) => (item as { type: string; text?: string }).text || "")
                 .join("\n")
             : "";
       if (text) lines.push(`[${role}]: ${text}`);
@@ -274,15 +274,15 @@ function buildNativeInput(messages: PreparedMessage[]) {
     const parts: Array<Record<string, unknown>> = [];
     // Prepend history as a text part if present
     let textContent = lastUser.content
-      .filter((c) => c.type === "text")
-      .map((c) => (c as { type: string; text?: string }).text || "")
+      .filter((item) => item.type === "text")
+      .map((item) => (item as { type: string; text?: string }).text || "")
       .join("\n");
     if (historyPrefix) textContent = historyPrefix + textContent;
     if (textContent) parts.push({ type: "text", content: textContent });
     // Add images
-        for ( const c of lastUser.content) {
-      if (c.type === "image_url" && (c as { type: string; image_url?: { url: string } }).image_url?.url) {
-        parts.push({ type: "image", data_url: (c as { type: string; image_url: { url: string } }).image_url.url });
+        for ( const content of lastUser.content) {
+      if (content.type === "image_url" && (content as { type: string; image_url?: { url: string } }).image_url?.url) {
+        parts.push({ type: "image", data_url: (content as { type: string; image_url: { url: string } }).image_url.url });
       }
     }
     return parts;
@@ -501,9 +501,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                 try {
                   // Unload any other loaded models first (single-model enforcement)
                   if (!needsReload) {
-                    for (const m of (models as Array<Record<string, unknown>>) || []) {
+                    for (const message of (models as Array<Record<string, unknown>>) || []) {
                       if (options.signal?.aborted) return;
-                      for (const inst of ((m as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>) || []) {
+                      for (const inst of ((message as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>) || []) {
                         yield {
                           type: "status",
                           message: "Unloading previous model…",
@@ -674,8 +674,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         // This lets the model analyze video content as a sequence of frames,
         // which is the standard approach for Gemma 4 and other VLMs.
         const hasVideo = messages.some((m: ChatMessage) => {
-          const msg = m as unknown as Record<string, unknown>;
-          return "video" in msg && Array.isArray(msg.video) && msg.video.length > 0;
+          const message = m as unknown as Record<string, unknown>;
+          return "video" in message && Array.isArray(message.video) && message.video.length > 0;
         });
         if (hasVideo) {
           yield { type: "status", message: "Extracting video frames…" };
@@ -696,8 +696,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         // Coordinator tools (team_create, etc.) are Prism-local and
         // also require this path since they can't route via MCP.
         const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
-        const hasCoordinatorTools = options.tools?.some((t) =>
-          coordinatorSet.has(t.name),
+        const hasCoordinatorTools = options.tools?.some((tool) =>
+          coordinatorSet.has(tool.name),
         );
                 if (options.agent || hasCoordinatorTools) {
           // ── OpenAI-compat path (agentic + coordinator) ─────────
@@ -714,7 +714,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           store: false,
         };
         // Extract system prompt from messages
-        const systemMsg = prepared.find((m) => m.role === "system");
+        const systemMsg = prepared.find((message) => message.role === "system");
         if (systemMsg?.content) {
           (nativePayload as Record<string, unknown>).system_prompt = systemMsg.content;
         }
@@ -747,7 +747,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         // NOTE: Each MCP tool schema averages ~500 tokens. We cap the tool count
         // to prevent context overflow. The model's loaded context determines the cap.
         if (options.tools && options.tools.length > 0) {
-          let toolNames = options.tools.map((t) => t.name);
+          let toolNames = options.tools.map((tool) => tool.name);
           // Cap tool count based on loaded model context
           // ~500 tokens/tool; reserve 50% of context for conversation
                     const contextLength =
@@ -1037,10 +1037,10 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         return { alreadyLoaded: true, contextLength: loadedCtxVal };
       }
       // Unload any other loaded models first (single-model enforcement)
-      for (const m of ensureModels || []) {
+      for (const message of ensureModels || []) {
         if (signal?.aborted)
           return { alreadyLoaded: false, contextLength: null };
-        for (const inst of ((m as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>) || []) {
+        for (const inst of ((message as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>) || []) {
           onStatus?.("Unloading previous model…");
           logger.info(
             `[LM-Studio] Auto-unloading ${inst.id} before loading ${modelKey}`,
@@ -1137,9 +1137,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
     async unloadModelByKey(modelKey: string) {
       try {
         const { models } = await this.listModels() as { models: Array<Record<string, unknown>> };
-        for (const m of models || []) {
-          if (m.key !== modelKey) continue;
-          for (const inst of (m.loaded_instances as Array<Record<string, unknown>>) || []) {
+        for (const message of models || []) {
+          if (message.key !== modelKey) continue;
+          for (const inst of (message.loaded_instances as Array<Record<string, unknown>>) || []) {
             logger.info(
               `[LM-Studio] Unloading ${inst.id} (cleanup after abort)`,
             );

@@ -1,5 +1,5 @@
 import logger from "../utils/logger.ts";
-import { L } from "./ToolTaxonomyConstants.ts";
+import { LABEL_TAGS } from "./ToolTaxonomyConstants.ts";
 import type { PolicyRule, PolicyDecision } from "./PolicyEngine.ts";
 
 // ── Types ────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ function buildToolPolicy(
     return section.requires.some((req) => {
       if (req.endsWith("*")) {
         const prefix = req.slice(0, -1);
-        return enabledArr.some((t) => t.startsWith(prefix));
+        return enabledArr.some((toolName) => toolName.startsWith(prefix));
       }
       return enabled.has(req);
     });
@@ -328,9 +328,9 @@ When calling generate_image, the prompt you write depends on whether reference i
 
 const LUPOS_ENABLED_TOOLS = [
   // Labels — cross-cutting categories
-  L.DISCORD,
-  L.MEDIA,
-  L.WEB,
+  LABEL_TAGS.DISCORD,
+  LABEL_TAGS.MEDIA,
+  LABEL_TAGS.WEB,
   // Generative
   "generate_image",
   // Trends
@@ -435,7 +435,7 @@ Use it **proactively** — do NOT wait for the user to say "remember":
   },
 ];
 
-const CODING_ENABLED_TOOLS = [L.CODING];
+const CODING_ENABLED_TOOLS = [LABEL_TAGS.CODING];
 
 // ── CODING Agent (Prism Client) ────────────────────────────────────────
 // This is the existing behavior — SystemPromptAssembler's default.
@@ -641,7 +641,7 @@ const STICKERS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
 ];
 
-const STICKERS_ENABLED_TOOLS = [L.CREATIVE, L.WEB];
+const STICKERS_ENABLED_TOOLS = [LABEL_TAGS.CREATIVE, LABEL_TAGS.WEB];
 
 // ── STICKERS Agent (Clankerbox Kiosk) ────────────────────────────
 PERSONAS.set("STICKERS", {
@@ -753,9 +753,9 @@ const LIGHTS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 
 const LIGHTS_ENABLED_TOOLS = [
   // Smart Home — all LIFX tools via label
-  L.SMART_HOME,
+  LABEL_TAGS.SMART_HOME,
   // Contextual awareness
-  L.WEB,
+  LABEL_TAGS.WEB,
   "get_weather",
 ];
 
@@ -1016,9 +1016,9 @@ const DIGEST_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 
 const DIGEST_ENABLED_TOOLS = [
   // Health — all nutrition, exercise, drug tools via label
-  L.HEALTH,
+  LABEL_TAGS.HEALTH,
   // Web & research
-  L.WEB,
+  LABEL_TAGS.WEB,
   // Compute
   "precise_calculator",
   "execute_javascript",
@@ -1139,7 +1139,7 @@ const META_ENABLED_TOOLS = [
   // Discovery — finding available tools for the agent being designed
   "tool_search",
   // Web — researching icons, colors, domain knowledge
-  L.WEB,
+  LABEL_TAGS.WEB,
 ];
 
 // ── META Agent (Meta-Agent for Persona Design) ───────────────────
@@ -1366,9 +1366,9 @@ const IMAGE_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 
 const IMAGE_ENABLED_TOOLS = [
   "generate_image",
-  L.CREATIVE,
-  L.WEB,
-  L.MEDIA,
+  LABEL_TAGS.CREATIVE,
+  LABEL_TAGS.WEB,
+  LABEL_TAGS.MEDIA,
   "upsert_memory",
 ];
 
@@ -1499,22 +1499,22 @@ const AgentPersonaRegistry = {
 
     // Reconstruct PolicyRules from serialized format
     const rawPolicies = Array.isArray(doc.policies) ? doc.policies as SerializedPolicy[] : [];
-    const policies: PolicyRule[] = rawPolicies.map((p) => {
+    const policies: PolicyRule[] = rawPolicies.map((serializedPolicy) => {
       const rule: PolicyRule = {
-        tool: p.tool || "*",
-        decision: (p.decision as PolicyDecision) || "ASK_USER",
-        name: p.name || `${p.decision}(${p.tool})`,
+        tool: serializedPolicy.tool || "*",
+        decision: (serializedPolicy.decision as PolicyDecision) || "ASK_USER",
+        name: serializedPolicy.name || `${serializedPolicy.decision}(${serializedPolicy.tool})`,
       };
       // Reconstruct `when` predicate from pattern string
-      if (p.pattern && typeof p.pattern === "string") {
+      if (serializedPolicy.pattern && typeof serializedPolicy.pattern === "string") {
         try {
-          const regex = new RegExp(p.pattern);
-          const field = p.field || "command";
+          const regex = new RegExp(serializedPolicy.pattern);
+          const field = serializedPolicy.field || "command";
           rule.when = (args: Record<string, unknown>) =>
             regex.test(String(args[field] ?? ""));
         } catch {
           logger.warn(
-            `[AgentPersonaRegistry] Invalid regex pattern "${p.pattern}" in policy for agent ${doc.agentId}`,
+            `[AgentPersonaRegistry] Invalid regex pattern "${serializedPolicy.pattern}" in policy for agent ${doc.agentId}`,
           );
         }
       }

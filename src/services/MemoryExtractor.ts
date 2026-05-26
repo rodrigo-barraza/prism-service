@@ -173,7 +173,7 @@ export default class MemoryExtractor {
     // skip extraction — the agent's explicit memory writes take precedence.
     // This prevents duplicate or conflicting memories from the extraction
     // pipeline when the agent has already decided what to remember.
-    if (toolCalls?.some((tc) => tc.name === "upsert_memory")) {
+    if (toolCalls?.some((toolCall) => toolCall.name === "upsert_memory")) {
       logger.info(
         `[MemoryExtractor] Skipping — main agent used upsert_memory this turn (mutual exclusion)`,
       );
@@ -207,13 +207,13 @@ export default class MemoryExtractor {
 
       // Build conversation text (compact format to save tokens)
       const conversationText = messages
-        .filter((m) => m.role === "user" || m.role === "assistant")
-        .map((m) => {
-          const content = m.content || "";
+        .filter((message) => message.role === "user" || message.role === "assistant")
+        .map((message) => {
+          const content = message.content || "";
           // Truncate very long messages to save tokens
           const truncated =
             content.length > 500 ? content.slice(0, 500) + "..." : content;
-          return `${m.role}: ${truncated}`;
+          return `${message.role}: ${truncated}`;
         })
         .join("\n");
 
@@ -243,7 +243,7 @@ export default class MemoryExtractor {
       } finally {
         // Use real API-reported usage when available; fall back to heuristic
         const realUsage = result?.usage || null;
-        const inputText = aiMessages.map((m) => typeof m.content === "string" ? m.content : "").join("\n");
+        const inputText = aiMessages.map((message) => typeof message.content === "string" ? message.content : "").join("\n");
         const approxInputTokens = realUsage
           ? getTotalInputTokens(realUsage)
           : estimateTokens(inputText);
@@ -320,12 +320,12 @@ export default class MemoryExtractor {
       const agentId = agent || "CODING";
       const stored: StoredMemory[] = [];
 
-      for (const mem of memories) {
-        if (!mem.content || !mem.title) continue;
+      for (const memObject of memories) {
+        if (!memObject.content || !memObject.title) continue;
 
         // Validate type — default to "project" if unknown
-        const type = CODING_MEMORY_TYPES.includes(mem.type)
-          ? mem.type
+        const type = CODING_MEMORY_TYPES.includes(memObject.type)
+          ? memObject.type
           : "project";
 
         try {
@@ -334,8 +334,8 @@ export default class MemoryExtractor {
             project,
             username,
             type,
-            title: mem.title,
-            content: mem.content,
+            title: memObject.title,
+            content: memObject.content,
             conversationId: conversationId || undefined,
             traceId: traceId || undefined,
             agentSessionId: agentSessionId || undefined,
@@ -343,13 +343,13 @@ export default class MemoryExtractor {
           });
 
           if (storeResult) {
-            stored.push({ type, id: storeResult.id, title: mem.title });
+            stored.push({ type, id: storeResult.id, title: memObject.title });
             logger.info(
-              `[MemoryExtractor] Stored [${type}] "${mem.title.substring(0, 60)}"`,
+              `[MemoryExtractor] Stored [${type}] "${memObject.title.substring(0, 60)}"`,
             );
           } else {
             logger.info(
-              `[MemoryExtractor] Skipped duplicate [${type}] "${mem.title.substring(0, 60)}"`,
+              `[MemoryExtractor] Skipped duplicate [${type}] "${memObject.title.substring(0, 60)}"`,
             );
           }
         } catch (error: unknown) {

@@ -73,13 +73,13 @@ function resolveEnabledToolsToSet(enabledTools: string[] | undefined) {
   for (const entry of enabledTools) {
     if (entry.startsWith("label:")) {
       const label = entry.slice(6);
-      for (const t of clientSchemas) {
-        if (t.labels?.includes(label)) resolved.add(t.name);
+      for (const tool of clientSchemas) {
+        if (tool.labels?.includes(label)) resolved.add(tool.name);
       }
     } else if (entry.startsWith("domain:")) {
       const domain = entry.slice(7);
-      for (const t of clientSchemas) {
-        if (t.domain === domain) resolved.add(t.name);
+      for (const tool of clientSchemas) {
+        if (tool.domain === domain) resolved.add(tool.name);
       }
     } else {
       resolved.add(entry);
@@ -213,8 +213,8 @@ router.get(
     textToTextModels = filterByAvailableProviders(textToTextModels);
     textToImageModels = filterByAvailableProviders(textToImageModels);
 
-    const availableProviderList = PROVIDER_LIST.filter((p) =>
-      AVAILABLE_PROVIDERS.has(p),
+    const availableProviderList = PROVIDER_LIST.filter((provider) =>
+      AVAILABLE_PROVIDERS.has(provider),
     );
     const availableProviderMap: Record<string, string> = {};
     for (const [key, value] of Object.entries(PROVIDERS)) {
@@ -330,8 +330,8 @@ export { localConfigRouter };
  * Returns the list of registered agent personas with metadata for the frontend picker.
  */
 router.get("/agents", (_req: Request, res: Response) => {
-  const agents = AgentPersonaRegistry.list().map((a) => {
-    const persona = AgentPersonaRegistry.get(a.id);
+  const agents = AgentPersonaRegistry.list().map((first) => {
+    const persona = AgentPersonaRegistry.get(first.id);
     const resolvedTools = resolveEnabledToolsToSet(persona?.enabledTools);
     // null sentinel means "*" wildcard → all tools
     const isWildcard = resolvedTools === null;
@@ -339,9 +339,9 @@ router.get("/agents", (_req: Request, res: Response) => {
     let finalToolsCount = isWildcard ? -1 : resolvedTools.size;
     let finalToolNames = isWildcard ? ["*"] : [...(resolvedTools || [])];
 
-    if (!isWildcard && a.id !== "LUPOS") {
+    if (!isWildcard && first.id !== "LUPOS") {
       const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
-      const systemToolNames = clientSchemas.filter((t) => t.system === true).map((t) => t.name);
+      const systemToolNames = clientSchemas.filter((tool) => tool.system === true).map((t) => t.name);
 
       const unionSet = new Set([...finalToolNames, ...systemToolNames]);
       finalToolsCount = unionSet.size;
@@ -349,10 +349,10 @@ router.get("/agents", (_req: Request, res: Response) => {
     }
 
     return {
-      id: a.id,
-      name: a.name,
+      id: first.id,
+      name: first.name,
       description: persona?.description || "",
-      custom: a.custom || false,
+      custom: first.custom || false,
       icon: persona?.icon || "",
       color: persona?.color || "",
       backgroundImage: persona?.backgroundImage || "",
@@ -382,10 +382,10 @@ router.get("/tools", (_req: Request, res: Response) => {
       // null = wildcard ("*") → return all schemas unfiltered
       if (enabledSet !== null) {
         if (agentId !== "LUPOS") {
-          return res.json(schemas.filter((t) => enabledSet.has(t.name) || t.system === true));
+          return res.json(schemas.filter((tool) => enabledSet.has(tool.name) || tool.system === true));
         } else {
           // Lupos is restricted. Preserve original system flags of whitelisted tools so its whitelisted system tools appear locked-on in the UI
-          const filtered = schemas.filter((t) => enabledSet.has(t.name));
+          const filtered = schemas.filter((tool) => enabledSet.has(tool.name));
           return res.json(filtered);
         }
       }

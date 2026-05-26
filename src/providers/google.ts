@@ -164,10 +164,10 @@ export function convertToolsToGoogle(
   if (!tools || !Array.isArray(tools) || tools.length === 0) return null;
   return [
     {
-      functionDeclarations: tools.map((t) => ({
-        name: t.name,
-        description: t.description || "",
-        parameters: sanitizeSchemaForGoogle(t.parameters || {}) as Record<string, unknown>,
+      functionDeclarations: tools.map((tool) => ({
+        name: tool.name,
+        description: tool.description || "",
+        parameters: sanitizeSchemaForGoogle(tool.parameters || {}) as Record<string, unknown>,
       })),
     },
   ];
@@ -292,11 +292,11 @@ async function convertMessages(messages: ConversationMsg[]): Promise<Content[]> 
 
     // Assistant messages with tool calls — include functionCall parts
     if (item.role === "assistant" && item.toolCalls) {
-      for (const tc of item.toolCalls) {
-        const functionCallPart: Part = { functionCall: { name: tc.name, args: tc.args || {} } };
+      for (const toolCall of item.toolCalls) {
+        const functionCallPart: Part = { functionCall: { name: toolCall.name, args: toolCall.args || {} } };
         // Preserve thoughtSignature (sibling of functionCall, required by Gemini)
-        if (tc.thoughtSignature) {
-          functionCallPart.thoughtSignature = tc.thoughtSignature;
+        if (toolCall.thoughtSignature) {
+          functionCallPart.thoughtSignature = toolCall.thoughtSignature;
         }
         parts.push(functionCallPart);
       }
@@ -325,7 +325,7 @@ const googleProvider = {
     logger.provider("Google", `generateText model=${model}`);
     try {
       const contents = await convertMessages(messages);
-      const modelDef = Object.values(MODELS).find((m) => m.name === model) as ModelDef | undefined;
+      const modelDef = Object.values(MODELS).find((mDef) => mDef.name === model) as ModelDef | undefined;
       const config = buildGenerateConfig(options, modelDef);
 
       // Web search
@@ -412,7 +412,7 @@ const googleProvider = {
     logger.provider("Google", `generateTextStream model=${model}`);
     try {
       const contents = await convertMessages(messages);
-      const modelDef = Object.values(MODELS).find((m) => m.name === model) as ModelDef | undefined;
+      const modelDef = Object.values(MODELS).find((mDef) => mDef.name === model) as ModelDef | undefined;
       const config = buildGenerateConfig(options, modelDef);
 
       // Build tools array based on enabled options
@@ -525,7 +525,7 @@ const googleProvider = {
    */
   async *generateTextStreamLive(messages: ConversationMsg[], model: string, options: ProviderOptions = {}) {
     logger.provider("Google", `generateTextStreamLive (Live API) model=${model}`);
-    const modelDef = Object.values(MODELS).find((m) => m.name === model) as ModelDef | undefined;
+    const modelDef = Object.values(MODELS).find((mDef) => mDef.name === model) as ModelDef | undefined;
     let session: Awaited<ReturnType<GoogleGenAI["live"]["connect"]>> | null = null;
     try {
       // ── Build Live API config ────────────────────────────────────
@@ -564,7 +564,7 @@ const googleProvider = {
       if (tools.length > 0) liveConfig.tools = tools;
 
       // System instruction from messages[0] if role === "system"
-      const systemMsg = messages.find((m) => m.role === "system");
+      const systemMsg = messages.find((message) => message.role === "system");
       if (systemMsg?.content) {
         liveConfig.systemInstruction = systemMsg.content;
       }
@@ -671,13 +671,13 @@ const googleProvider = {
 
             // Usage metadata
             if (message.usageMetadata) {
-              const u = message.usageMetadata;
-              if (u.promptTokenCount || u.responseTokenCount) {
+              const user = message.usageMetadata;
+              if (user.promptTokenCount || user.responseTokenCount) {
                 enqueue({
                   type: "usage",
                   usage: {
-                    inputTokens: u.promptTokenCount ?? 0,
-                    outputTokens: u.responseTokenCount ?? 0,
+                    inputTokens: user.promptTokenCount ?? 0,
+                    outputTokens: user.responseTokenCount ?? 0,
                   },
                 });
               }
@@ -733,16 +733,16 @@ const googleProvider = {
       // Build Content objects for prior history turns
       if (priorMessages.length > 0) {
         const historyTurns: Content[] = [];
-        for (const msg of priorMessages) {
+        for (const message of priorMessages) {
           const parts: Part[] = [];
 
-          if (msg.content) {
-            parts.push({ text: msg.content });
+          if (message.content) {
+            parts.push({ text: message.content });
           }
 
           if (parts.length > 0) {
             historyTurns.push({
-              role: msg.role === "assistant" ? "model" : "user",
+              role: message.role === "assistant" ? "model" : "user",
               parts,
             });
           }

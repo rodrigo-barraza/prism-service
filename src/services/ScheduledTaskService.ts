@@ -33,7 +33,7 @@ export interface ScheduledTask {
 function matchCronField(pattern: string, value: number): boolean {
   if (pattern === "*") return true;
   if (pattern.includes(",")) {
-    return pattern.split(",").some((p) => matchCronField(p, value));
+    return pattern.split(",").some((pattern) => matchCronField(pattern, value));
   }
   if (pattern.includes("/")) {
     const [range, stepStr] = pattern.split("/");
@@ -337,8 +337,8 @@ const ScheduledTaskService = {
       } else {
         // Fallback: check registered agent projects
         const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.ts");
-        const agentProjects = AgentPersonaRegistry.list().map((p) => {
-          const persona = AgentPersonaRegistry.get(p.id);
+        const agentProjects = AgentPersonaRegistry.list().map((project) => {
+          const persona = AgentPersonaRegistry.get(project.id);
           return persona?.project;
         }).filter(Boolean);
         
@@ -371,8 +371,8 @@ const ScheduledTaskService = {
       } else {
         // Fallback: check registered agent projects
         const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.ts");
-        const agentProjects = AgentPersonaRegistry.list().map((p) => {
-          const persona = AgentPersonaRegistry.get(p.id);
+        const agentProjects = AgentPersonaRegistry.list().map((project) => {
+          const persona = AgentPersonaRegistry.get(project.id);
           return persona?.project;
         }).filter(Boolean);
         

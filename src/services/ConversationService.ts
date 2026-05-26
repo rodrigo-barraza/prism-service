@@ -412,10 +412,10 @@ const ConversationService: ConversationServiceInterface = {
 
     // 3. Recompute derived fields and persist
     const modelNamesSet = new Set<string>();
-    for (const m of (conversation.messages as ChatMessage[]) || []) {
-      if (m.deleted) continue;
-      if (m.role === "assistant" && m.model) {
-        modelNamesSet.add(m.model as string);
+    for (const model of (conversation.messages as ChatMessage[]) || []) {
+      if (model.deleted) continue;
+      if (model.role === "assistant" && model.model) {
+        modelNamesSet.add(model.model as string);
       }
     }
     if (modelNamesSet.size === 0 && conversation.settings?.model) {
@@ -580,8 +580,8 @@ const ConversationService: ConversationServiceInterface = {
       if (r.operation) operations.add(r.operation);
       // Merge modalities
       if (r.modalities) {
-        for (const [k, v] of Object.entries(r.modalities)) {
-          if (v) mergedModalities[k] = true;
+        for (const [k, value] of Object.entries(r.modalities)) {
+          if (value) mergedModalities[k] = true;
         }
       }
       // Count tool usage

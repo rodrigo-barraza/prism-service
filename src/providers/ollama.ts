@@ -9,11 +9,11 @@ import { TYPES, getDefaultModels } from "../config.ts";
  * Ollama expects images as base64 strings (without the data URL prefix).
  */
 function prepareOllamaMessages(messages: ChatMessage[]) {
-  return messages.map((m: ChatMessage) => {
-    const message = { role: m.role, content: m.content || "" };
-    if (m.images && m.images.length > 0) {
+  return messages.map((messageItem: ChatMessage) => {
+    const message = { role: messageItem.role, content: messageItem.content || "" };
+    if (messageItem.images && messageItem.images.length > 0) {
       // Ollama's native API expects images as raw base64 strings
-      (message as Record<string, unknown>).images = m.images.map((dataUrl: string) => {
+      (message as Record<string, unknown>).images = messageItem.images.map((dataUrl: string) => {
         if (dataUrl.startsWith("data:")) {
           return dataUrl.split(",")[1]; // strip data:image/...;base64, prefix
         }
@@ -96,8 +96,8 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
           if (psRes.ok) {
             const psData = await psRes.json();
             const running = (psData as Record<string, unknown[]>).models || [];
-            for ( const m of running as Record<string, string>[]) {
-              const runningName = m.model || m.name;
+            for (const runningModel of running as Record<string, string>[]) {
+              const runningName = runningModel.model || runningModel.name;
               if (runningName && runningName !== model) {
                 yield { type: "status", message: `Unloading ${runningName}…` };
                 logger.info(
