@@ -134,7 +134,7 @@ const CONVERSATION_FIXTURE = {
 
 const REMINDER_MESSAGE = {
   role: "user",
-  content: "⏰ Reminder fired: Run the health check",
+  content: "🔔 Notification: Run the health check",
   timestamp: new Date().toISOString(),
 };
 
@@ -241,7 +241,7 @@ describe("ConversationTimerService.executeAgenticLoop", () => {
     expect(loopArguments.options.functionCallingEnabled).toBe(true);
     // Messages should include existing conversation + reminder
     expect(loopArguments.messages).toHaveLength(2);
-    expect(loopArguments.messages[1].content).toContain("Reminder fired");
+    expect(loopArguments.messages[1].content).toContain("Notification");
   });
 
   it("should use agent_conversations collection for setGenerating", async () => {

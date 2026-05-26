@@ -326,6 +326,48 @@ const ConversationService: ConversationServiceInterface = {
 
     const now = new Date().toISOString();
 
+    // Auto-cancel active one-shot timers for this conversation when any message (from user or assistant)
+    // is appended, provided the incoming message is NOT a reminder firing notification itself.
+    const hasIncomingUserOrAssistantMessage = processedMessages.some(
+      (message) =>
+        (message.role === "user" || message.role === "assistant") &&
+        !(
+          typeof message.content === "string" &&
+          (message.content.startsWith("⏰ Reminder fired: ") ||
+            message.content.startsWith("🔔 Notification: ") ||
+            message.content.startsWith("🏮 Reminder fired: "))
+        )
+    );
+
+    if (hasIncomingUserOrAssistantMessage) {
+      const database = MongoWrapper.getDb(MONGO_DB_NAME);
+      if (database) {
+        const timersCollection = database.collection(COLLECTIONS.CONVERSATION_TIMERS);
+        const filter = {
+          conversationId,
+          project,
+          username,
+          status: "active",
+          mode: "one_shot",
+        };
+        const update = {
+          $set: {
+            status: "cancelled",
+            updatedAt: now,
+          },
+        };
+
+        if (typeof timersCollection.updateMany === "function") {
+          await timersCollection.updateMany(filter, update);
+        } else if (typeof timersCollection.updateOne === "function") {
+          await timersCollection.updateOne(filter, update);
+        }
+        logger.info(
+          `[ConversationService] Auto-cancelled active one-shot timers for conversation ${conversationId} due to incoming message.`
+        );
+      }
+    }
+
     // Build $set fields for metadata
     const setFields: Record<string, unknown> = { updatedAt: now };
     if (traceId) setFields.traceId = traceId;

@@ -260,7 +260,7 @@ const ConversationTimerService = {
         // 2. Append timer fired message to the conversation
         const reminderMessage = {
           role: "user",
-          content: `⏰ Reminder fired: ${timer.prompt}`,
+          content: `🔔 Notification: ${timer.prompt}`,
           timestamp: nowTimestamp,
         };
 
