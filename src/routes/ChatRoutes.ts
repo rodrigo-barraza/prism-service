@@ -1151,7 +1151,7 @@ async function handleStreamingText(context: GenerationContext) {
     text: streamState.text,
     thinking: streamState.thinking,
     images: streamState.images,
-    toolCalls: streamState.toolCalls.map((tc): ToolCallPayload => ({ name: toolCall.name, id: toolCall.id, args: toolCall.args as Record<string, unknown> })),
+    toolCalls: streamState.toolCalls.map((toolCall): ToolCallPayload => ({ name: toolCall.name, id: toolCall.id, args: toolCall.args as Record<string, unknown> })),
     audioChunks: streamState.audioChunks,
     audioSampleRate: streamState.audioSampleRate,
     usage: streamState.usage as FinalizerTokenUsage | null,
@@ -1232,7 +1232,7 @@ async function handleNonStreamingText(context: GenerationContext) {
         id: toolCall.id || null,
         name: toolCall.name,
         args: toolCall.args || {},
-        thoughtSignature: tc.thoughtSignature || undefined,
+        thoughtSignature: toolCall.thoughtSignature || undefined,
       });
     }
   }
@@ -1275,11 +1275,11 @@ async function handleNonStreamingText(context: GenerationContext) {
     thinking: genResult.thinking || "",
     images,
     toolCalls:
-      genResult.toolCalls?.map((tc: Record<string, unknown>) => ({
+      genResult.toolCalls?.map((toolCall: Record<string, unknown>) => ({
         id: toolCall.id || null,
         name: toolCall.name,
         args: toolCall.args || {},
-        thoughtSignature: tc.thoughtSignature || undefined,
+        thoughtSignature: toolCall.thoughtSignature || undefined,
       })) || [],
     audioChunks: [],
     audioSampleRate: 24000,
