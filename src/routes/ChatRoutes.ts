@@ -1024,53 +1024,53 @@ async function handleStreamingText(context: GenerationContext) {
     options.functionCallingEnabled &&
     streamState.toolCalls.length > 0 &&
     streamState.toolCalls.some(
-      (tc) => !tc.result && tc.status !== "done" && tc.status !== "error",
+      (toolCall) => !toolCall.result && toolCall.status !== "done" && toolCall.status !== "error",
     ) &&
     fcIteration < MAX_FC_ITERATIONS &&
     !signal?.aborted
   ) {
     fcIteration++;
     const pendingCalls = streamState.toolCalls.filter(
-      (tc) => !tc.result && tc.status !== "done" && tc.status !== "error",
+      (toolCall) => !toolCall.result && toolCall.status !== "done" && toolCall.status !== "error",
     );
     if (pendingCalls.length === 0) break;
     logger.info(
       `[chat/FC] Iteration ${fcIteration}: executing ${pendingCalls.length} tool call(s)`,
     );
     // Execute all pending tool calls
-    for (const tc of pendingCalls) {
+    for (const toolCall of pendingCalls) {
       emit({
         type: "toolCall",
-        id: tc.id,
-        name: tc.name,
-        args: tc.args,
+        id: toolCall.id,
+        name: toolCall.name,
+        args: toolCall.args,
         status: "calling",
       });
       try {
         const result = await ToolOrchestratorService.executeTool(
-          tc.name as string,
-          tc.args as Record<string, unknown>,
+          toolCall.name as string,
+          toolCall.args as Record<string, unknown>,
           { project, username },
         );
-        tc.result = result;
-        tc.status = (result && typeof result === "object" && "error" in result && result.error) ? "error" : "done";
+        toolCall.result = result;
+        toolCall.status = (result && typeof result === "object" && "error" in result && result.error) ? "error" : "done";
         emit({
           type: "toolCall",
-          id: tc.id,
-          name: tc.name,
-          args: tc.args,
+          id: toolCall.id,
+          name: toolCall.name,
+          args: toolCall.args,
           result,
-          status: tc.status,
+          status: toolCall.status,
         });
       } catch (error: unknown) {
-        tc.result = { error: (error as Error).message };
-        tc.status = "error";
+        toolCall.result = { error: (error as Error).message };
+        toolCall.status = "error";
         emit({
           type: "toolCall",
-          id: tc.id,
-          name: tc.name,
-          args: tc.args,
-          result: tc.result,
+          id: toolCall.id,
+          name: toolCall.name,
+          args: toolCall.args,
+          result: toolCall.result,
           status: "error",
         });
       }
@@ -1079,10 +1079,10 @@ async function handleStreamingText(context: GenerationContext) {
     const assistantToolMsg = {
       role: "assistant",
       content: streamState.text || "",
-      toolCalls: streamState.toolCalls.map((tc) => ({
-        id: tc.id,
-        name: tc.name,
-        args: tc.args,
+      toolCalls: streamState.toolCalls.map((toolCall) => ({
+        id: toolCall.id,
+        name: toolCall.name,
+        args: toolCall.args,
       })),
       ...(streamState.thinking ? { thinking: streamState.thinking } : {}),
       ...(streamState.thinkingSignature
@@ -1090,13 +1090,13 @@ async function handleStreamingText(context: GenerationContext) {
         : {}),
     };
     const toolResultMsgs = streamState.toolCalls
-      .filter((tc) => tc.result)
-      .map((tc) => ({
+      .filter((toolCall) => toolCall.result)
+      .map((toolCall) => ({
         role: "tool",
-        tool_call_id: tc.id,
-        name: tc.name,
+        tool_call_id: toolCall.id,
+        name: toolCall.name,
         content:
-          typeof tc.result === "string" ? tc.result : JSON.stringify(tc.result),
+          typeof toolCall.result === "string" ? toolCall.result : JSON.stringify(toolCall.result),
       }));
     // Re-call provider with tool results appended
     const updatedMessages = [...messages, assistantToolMsg, ...toolResultMsgs];
@@ -1151,7 +1151,7 @@ async function handleStreamingText(context: GenerationContext) {
     text: streamState.text,
     thinking: streamState.thinking,
     images: streamState.images,
-    toolCalls: streamState.toolCalls.map((tc): ToolCallPayload => ({ name: tc.name, id: tc.id, args: tc.args as Record<string, unknown> })),
+    toolCalls: streamState.toolCalls.map((tc): ToolCallPayload => ({ name: toolCall.name, id: toolCall.id, args: toolCall.args as Record<string, unknown> })),
     audioChunks: streamState.audioChunks,
     audioSampleRate: streamState.audioSampleRate,
     usage: streamState.usage as FinalizerTokenUsage | null,
@@ -1226,12 +1226,12 @@ async function handleNonStreamingText(context: GenerationContext) {
     emit({ type: "thinking", content: genResult.thinking });
   }
   if (genResult.toolCalls && genResult.toolCalls.length > 0) {
-    for (const tc of genResult.toolCalls) {
+    for (const toolCall of genResult.toolCalls) {
       emit({
         type: "toolCall",
-        id: tc.id || null,
-        name: tc.name,
-        args: tc.args || {},
+        id: toolCall.id || null,
+        name: toolCall.name,
+        args: toolCall.args || {},
         thoughtSignature: tc.thoughtSignature || undefined,
       });
     }
@@ -1276,9 +1276,9 @@ async function handleNonStreamingText(context: GenerationContext) {
     images,
     toolCalls:
       genResult.toolCalls?.map((tc: Record<string, unknown>) => ({
-        id: tc.id || null,
-        name: tc.name,
-        args: tc.args || {},
+        id: toolCall.id || null,
+        name: toolCall.name,
+        args: toolCall.args || {},
         thoughtSignature: tc.thoughtSignature || undefined,
       })) || [],
     audioChunks: [],
