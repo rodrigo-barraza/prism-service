@@ -45,7 +45,7 @@ router.get(
         .sort({ createdAt: -1 })
         .toArray();
 
-      res.json(tools.map((t) => ({ ...t, id: t._id.toString() })));
+      res.json(tools.map((tool) => ({ ...tool, id: tool._id.toString() })));
     } catch (error: unknown) {
       next(error);
     }

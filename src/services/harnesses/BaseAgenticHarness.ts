@@ -622,7 +622,7 @@ export default class BaseAgenticHarness {
 
     // Persist worker snapshots for coordinator sessions
     if (
-      state.streamedToolCalls.some((tc) => tc.name === "team_create") &&
+      state.streamedToolCalls.some((toolCall) => toolCall.name === "team_create") &&
       agentSessionId
     ) {
       try {

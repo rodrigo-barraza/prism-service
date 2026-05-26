@@ -64,7 +64,7 @@ const router = express.Router();
  */
 async function resolveImageRefs(messages: ConversationMessage[], project: string, username: string) {
   // Deep copy for the provider — images will be data URLs
-  const providerMessages = messages.map((m) => ({ ...m }));
+  const providerMessages = messages.map((message) => ({ ...message }));
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
     // ── Resolve media array fields: images, audio, video, pdf ──

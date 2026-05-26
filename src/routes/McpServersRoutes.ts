@@ -241,9 +241,9 @@ router.post(
         success: true,
         serverName: result.serverName,
         toolCount: result.tools.length,
-        tools: result.tools.map((t) => ({
-          name: t.name,
-          description: t.description,
+        tools: result.tools.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
         })),
       });
     } catch (error: unknown) {

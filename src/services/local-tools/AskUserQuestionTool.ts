@@ -122,27 +122,27 @@ export default {
     if (questions && Array.isArray(questions) && questions.length > 0) {
       // Multi-question mode — validate uniqueness
       const seen = new Set<string>();
-      for (const q of questions as Record<string, unknown>[]) {
-        if (!q.question || typeof q.question !== "string") {
+      for (const query of questions as Record<string, unknown>[]) {
+        if (!query.question || typeof query.question !== "string") {
           return {
             error:
               "Each question in the 'questions' array must have a non-empty 'question' string",
           };
         }
-        if (seen.has(q.question)) {
+        if (seen.has(query.question)) {
           return {
-            error: `Duplicate question text: "${(q.question as string).slice(0, 60)}"`,
+            error: `Duplicate question text: "${(query.question as string).slice(0, 60)}"`,
           };
         }
-        seen.add(q.question);
+        seen.add(query.question);
         // Validate option label uniqueness within each question
-        const qOptions = q.options as Record<string, unknown>[] | undefined;
+        const qOptions = query.options as Record<string, unknown>[] | undefined;
         if (qOptions && qOptions.length > 0) {
           const labelsSeen = new Set<string>();
           for (const opt of qOptions) {
             if (labelsSeen.has(opt.label as string)) {
               return {
-                error: `Duplicate option label "${opt.label}" in question "${(q.question as string).slice(0, 40)}"`,
+                error: `Duplicate option label "${opt.label}" in question "${(query.question as string).slice(0, 40)}"`,
               };
             }
             labelsSeen.add(opt.label as string);
@@ -152,14 +152,14 @@ export default {
       if (questions.length > 4) {
         return { error: "Maximum 4 questions per call" };
       }
-      normalizedQuestions = (questions as Record<string, unknown>[]).map((q) => ({
-        question: q.question as string,
-        header: ((q.header as string) || "").slice(0, 16) || null,
-        options: ((q.options || []) as Record<string, unknown>[]).slice(0, 6).map((o) => ({
-          label: o.label as string,
-          preview: (o.preview as string) || null,
+      normalizedQuestions = (questions as Record<string, unknown>[]).map((query) => ({
+        question: query.question as string,
+        header: ((query.header as string) || "").slice(0, 16) || null,
+        options: ((query.options || []) as Record<string, unknown>[]).slice(0, 6).map((item) => ({
+          label: item.label as string,
+          preview: (item.preview as string) || null,
         })),
-        multiSelect: !!q.multiSelect,
+        multiSelect: !!query.multiSelect,
       }));
     } else if (question && typeof question === "string") {
       // Single question mode — backward-compatible
@@ -167,8 +167,8 @@ export default {
         {
           question,
           header: null,
-          options: ((choices || []) as string[]).map((c) => ({
-            label: c,
+          options: ((choices || []) as string[]).map((item) => ({
+            label: item,
             preview: null,
           })),
           multiSelect: false,
@@ -206,7 +206,7 @@ export default {
         questions: normalizedQuestions,
         // Backward-compat fields for simple consumers
         question: normalizedQuestions[0].question,
-        choices: normalizedQuestions[0].options.map((o) => o.label),
+        choices: normalizedQuestions[0].options.map((item) => item.label),
         context: questionContext || null,
       });
     }
@@ -242,7 +242,7 @@ export default {
 
     // Return structured response
     return {
-      questions: normalizedQuestions.map((q) => q.question),
+      questions: normalizedQuestions.map((query) => query.question),
       answers: result.answers,
       // Backward-compat for simple single-question consumers
       answer: Array.isArray(result.answers)

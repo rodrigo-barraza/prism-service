@@ -109,8 +109,8 @@ async function extractWorkflowFiles(
       typeof updated.receivedOutputs === "object"
     ) {
       const newReceived: Record<string, unknown> = {};
-      for (const [mod, data] of Object.entries(updated.receivedOutputs)) {
-        newReceived[mod] = await uploadIfDataUrl(
+      for (const [modObject, data] of Object.entries(updated.receivedOutputs)) {
+        newReceived[modObject] = await uploadIfDataUrl(
           data,
           "uploads",
           project,
@@ -149,9 +149,9 @@ async function extractNodeResultFiles(
       continue;
     }
     const newOutputs: Record<string, unknown> = {};
-    for (const [mod, data] of Object.entries(outputs)) {
+    for (const [modObject, data] of Object.entries(outputs)) {
       // conversation modality is an array of message objects with nested media
-      if (mod === "conversation" && Array.isArray(data)) {
+      if (modObject === "conversation" && Array.isArray(data)) {
         const msgs: Record<string, unknown>[] = [];
         for (const message of data) {
           const sanitizedMessage = { ...(message as Record<string, unknown>) };
@@ -176,9 +176,9 @@ async function extractNodeResultFiles(
           }
           msgs.push(sanitizedMessage);
         }
-        newOutputs[mod] = msgs;
+        newOutputs[modObject] = msgs;
       } else {
-        newOutputs[mod] = await uploadIfDataUrl(
+        newOutputs[modObject] = await uploadIfDataUrl(
           data,
           "uploads",
           project,
@@ -237,8 +237,8 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: str
 
       // Viewer receivedOutputs
       if ((node as Record<string, unknown>).receivedOutputs && typeof (node as Record<string, unknown>).receivedOutputs === "object") {
-        for (const [mod, data] of Object.entries((node as Record<string, unknown>).receivedOutputs as Record<string, unknown>)) {
-          ((node as Record<string, unknown>).receivedOutputs as Record<string, unknown>)[mod] = resolveMinioRef(data, baseUrl);
+        for (const [modObject, data] of Object.entries((node as Record<string, unknown>).receivedOutputs as Record<string, unknown>)) {
+          ((node as Record<string, unknown>).receivedOutputs as Record<string, unknown>)[modObject] = resolveMinioRef(data, baseUrl);
         }
       }
     }
@@ -248,9 +248,9 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: str
   if (workflow.nodeResults && typeof workflow.nodeResults === "object") {
     for (const outputs of Object.values(workflow.nodeResults) as Record<string, unknown>[]) {
       if (!outputs || typeof outputs !== "object") continue;
-      for (const [mod, data] of Object.entries(outputs)) {
+      for (const [modObject, data] of Object.entries(outputs)) {
         // conversation modality is an array of message objects with nested media
-        if (mod === "conversation" && Array.isArray(data)) {
+        if (modObject === "conversation" && Array.isArray(data)) {
           for (const message of data) {
             for (const field of MEDIA_FIELDS) {
               const value = (message as Record<string, unknown>)[field];
@@ -264,7 +264,7 @@ function resolveWorkflowFileRefs(workflow: Record<string, unknown>, baseUrl: str
             }
           }
         } else {
-          (outputs as Record<string, unknown>)[mod] = resolveMinioRef(data, baseUrl);
+          (outputs as Record<string, unknown>)[modObject] = resolveMinioRef(data, baseUrl);
         }
       }
     }

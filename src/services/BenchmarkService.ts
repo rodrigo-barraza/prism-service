@@ -178,13 +178,13 @@ function evaluateAssertions(response: string, benchmark: BenchmarkDoc): boolean 
   const operator = benchmark.assertionOperator || "AND";
   if (operator === "OR") {
     // Disjunction: ANY assertion must pass
-    return assertions.some((a) =>
-      evaluate(response, a.expectedValue, a.matchMode || MATCH_MODES.CONTAINS),
+    return assertions.some((assertion) =>
+      evaluate(response, assertion.expectedValue, assertion.matchMode || MATCH_MODES.CONTAINS),
     );
   }
   // Conjunction (AND): ALL assertions must pass
-  return assertions.every((a) =>
-    evaluate(response, a.expectedValue, a.matchMode || MATCH_MODES.CONTAINS),
+  return assertions.every((assertion) =>
+    evaluate(response, assertion.expectedValue, assertion.matchMode || MATCH_MODES.CONTAINS),
   );
 }
 // ─── behavioral assertions ──────────────────────────────────
@@ -240,12 +240,12 @@ function evaluateAgentAssertions(benchmark: BenchmarkDoc, executionData: Executi
   }
   const operator = benchmark.agentAssertionOperator || "AND";
   if (operator === "OR") {
-    return assertions.some((a) =>
-      evaluateSingleAgentAssertion(a, executionData),
+    return assertions.some((assertion) =>
+      evaluateSingleAgentAssertion(assertion, executionData),
     );
   }
-  return assertions.every((a) =>
-    evaluateSingleAgentAssertion(a, executionData),
+  return assertions.every((assertion) =>
+    evaluateSingleAgentAssertion(assertion, executionData),
   );
 }
 // ─── list available conversation models ─────────────────────
@@ -255,17 +255,17 @@ function evaluateAgentAssertions(benchmark: BenchmarkDoc, executionData: Executi
  */
 function getConversationModels(): ModelEntry[] {
   const results: ModelEntry[] = [];
-  for (const m of Object.values(MODELS)) {
-    if (m.modelType !== MODEL_TYPES.CONVERSATION) continue;
-    if ((m as Record<string, unknown>).listed === false) continue;
+  for (const model of Object.values(MODELS)) {
+    if (model.modelType !== MODEL_TYPES.CONVERSATION) continue;
+    if ((model as Record<string, unknown>).listed === false) continue;
     // Skip image-only output models (no text output)
-    if (!m.outputTypes?.includes("text")) continue;
+    if (!model.outputTypes?.includes("text")) continue;
     // Skip image API models (generate images, not text completions)
-    if ((m as Record<string, unknown>).imageAPI) continue;
+    if ((model as Record<string, unknown>).imageAPI) continue;
     results.push({
-      provider: m.provider,
-      model: m.name,
-      label: m.label,
+      provider: model.provider,
+      model: model.name,
+      label: model.label,
       thinkingEnabled: false,
       toolsEnabled: false,
     });
@@ -280,14 +280,14 @@ function getConversationModels(): ModelEntry[] {
  */
 function filterAvailableModels(models: ModelEntry[]): ModelEntry[] {
   const checked = new Map<string, boolean>();
-  return models.filter((m) => {
-    if (checked.has(m.provider)) return checked.get(m.provider);
+  return models.filter((model) => {
+    if (checked.has(model.provider)) return checked.get(model.provider);
     try {
-      getProvider(m.provider);
-      checked.set(m.provider, true);
+      getProvider(model.provider);
+      checked.set(model.provider, true);
       return true;
     } catch {
-      checked.set(m.provider, false);
+      checked.set(model.provider, false);
       return false;
     }
   });
@@ -448,11 +448,11 @@ async function runSingleModel(
     // - "tool_execution" with status "done" — standard agentic path (cloud providers)
     const nativeToolCalls: ToolCallResult[] = events
       .filter((e) => e.type === "toolCall" && e.status === "done")
-      .map((tc) => ({
-        id: tc.id,
-        name: tc.name,
-        args: tc.args,
-        result: tc.result,
+      .map((toolCall) => ({
+        id: toolCall.id,
+        name: toolCall.name,
+        args: toolCall.args,
+        result: toolCall.result,
         status: "done",
       }));
     const agenticToolCalls: ToolCallResult[] = events
@@ -555,15 +555,15 @@ const BenchmarkService = {
     let models: ModelEntry[];
     if (modelTargets && modelTargets.length > 0) {
       // Validate and enrich with labels
-      models = modelTargets.map((t) => {
-        const modelDefinition = getModelByName(t.model);
+      models = modelTargets.map((tool) => {
+        const modelDefinition = getModelByName(tool.model);
         return {
-          provider: t.provider,
-          model: t.model,
-          label: modelDefinition?.label || t.display_name || t.model,
-          thinkingEnabled: t.thinkingEnabled || false,
-          toolsEnabled: t.toolsEnabled || false,
-          ...(t.agent && { agent: t.agent }),
+          provider: tool.provider,
+          model: tool.model,
+          label: modelDefinition?.label || tool.display_name || tool.model,
+          thinkingEnabled: tool.thinkingEnabled || false,
+          toolsEnabled: tool.toolsEnabled || false,
+          ...(tool.agent && { agent: tool.agent }),
         };
       });
     } else {
@@ -594,10 +594,10 @@ const BenchmarkService = {
     const INTRA_PROVIDER_DELAY_MS = 100;
     // Group models by provider; local providers use their instance ID as key
     const buckets = new Map<string, ModelEntry[]>();
-    for (const m of models) {
-      const key = m.provider; // Instance IDs are already unique (lm-studio, lm-studio-2, etc.)
+    for (const model of models) {
+      const key = model.provider; // Instance IDs are already unique (lm-studio, lm-studio-2, etc.)
       if (!buckets.has(key)) buckets.set(key, []);
-      buckets.get(key)!.push(m);
+      buckets.get(key)!.push(model);
     }
     logger.info(
       `[benchmark] Executing across ${buckets.size} provider bucket(s): ${[...buckets.keys()].join(", ")}`,

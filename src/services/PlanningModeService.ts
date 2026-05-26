@@ -42,7 +42,7 @@ export default class PlanningModeService {
    * Called once before the agentic loop starts when planFirst=true.
    */
   static injectPlanningInstruction(messages: ConversationMessage[]) {
-    const systemMsg = messages.find((m) => m.role === "system");
+    const systemMsg = messages.find((message) => message.role === "system");
     if (systemMsg) {
       // Idempotency: don't append twice
       if (systemMsg.content?.includes("PLANNING MODE ACTIVE")) return;
@@ -64,7 +64,7 @@ export default class PlanningModeService {
    * Called when exiting plan mode so execution doesn't carry stale constraints.
    */
   static stripPlanningInstruction(messages: ConversationMessage[]) {
-    const systemMsg = messages.find((m) => m.role === "system");
+    const systemMsg = messages.find((message) => message.role === "system");
     if (systemMsg && systemMsg.content?.includes("PLANNING MODE ACTIVE")) {
       systemMsg.content = systemMsg.content.replace(PLANNING_INSTRUCTION, "");
       logger.info(

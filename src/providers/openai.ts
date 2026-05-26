@@ -96,27 +96,27 @@ function asErrorRecord(error: unknown): ErrorRecord {
   return error as ErrorRecord;
 }
 function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletionMessageParam[] {
-  return messages.map((m: OpenAIMsg): OpenAI.Chat.ChatCompletionMessageParam => {
+  return messages.map((message: OpenAIMsg): OpenAI.Chat.ChatCompletionMessageParam => {
     // Tool result messages — include tool_call_id for correlation
-    if (m.role === "tool") {
+    if (message.role === "tool") {
       return {
         role: "tool",
-        tool_call_id: m.tool_call_id || m.id || "",
+        tool_call_id: message.tool_call_id || message.id || "",
         content:
-          typeof m.content === "string"
-            ? m.content
-            : JSON.stringify(m.content ?? ""),
+          typeof message.content === "string"
+            ? message.content
+            : JSON.stringify(message.content ?? ""),
       };
     }
 
     // Assistant messages with tool calls — include tool_calls in OpenAI format
-    if (m.role === "assistant") {
-      if (m.toolCalls && m.toolCalls.length > 0) {
+    if (message.role === "assistant") {
+      if (message.toolCalls && message.toolCalls.length > 0) {
         return {
           role: "assistant",
-          ...(m.name ? { name: m.name } : {}),
-          content: m.content?.trim() || null,
-          tool_calls: m.toolCalls.map((toolCall, i) => ({
+          ...(message.name ? { name: message.name } : {}),
+          content: message.content?.trim() || null,
+          tool_calls: message.toolCalls.map((toolCall, i) => ({
             id: toolCall.id || `call_${i}`,
             type: "function" as const,
             function: {
@@ -131,31 +131,31 @@ function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletio
       }
       return {
         role: "assistant",
-        ...(m.name ? { name: m.name } : {}),
-        content: m.content ?? "",
+        ...(message.name ? { name: message.name } : {}),
+        content: message.content ?? "",
       };
     }
 
-    if (m.role === "system") {
+    if (message.role === "system") {
       return {
         role: "system",
-        ...(m.name ? { name: m.name } : {}),
-        content: m.content ?? "",
+        ...(message.name ? { name: message.name } : {}),
+        content: message.content ?? "",
       };
     }
 
-    if (m.role === "developer") {
+    if (message.role === "developer") {
       return {
         role: "developer",
-        ...(m.name ? { name: m.name } : {}),
-        content: m.content ?? "",
+        ...(message.name ? { name: message.name } : {}),
+        content: message.content ?? "",
       };
     }
 
     // User messages (can be multimodal)
-    if (m.images && m.images.length > 0) {
+    if (message.images && message.images.length > 0) {
       const content: OpenAI.Chat.ChatCompletionContentPart[] = [];
-      for (const mediaRef of m.images) {
+      for (const mediaRef of message.images) {
         const urlType = getUrlType(mediaRef);
 
         if (urlType === "data") {
@@ -212,20 +212,20 @@ function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletio
           );
         }
       }
-      if (m.content) {
-        content.push({ type: "text", text: m.content });
+      if (message.content) {
+        content.push({ type: "text", text: message.content });
       }
       return {
         role: "user",
-        ...(m.name ? { name: m.name } : {}),
+        ...(message.name ? { name: message.name } : {}),
         content,
       };
     }
 
     return {
       role: "user",
-      ...(m.name ? { name: m.name } : {}),
-      content: m.content ?? "",
+      ...(message.name ? { name: message.name } : {}),
+      content: message.content ?? "",
     };
   });
 }
@@ -236,18 +236,18 @@ function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletio
  */
 function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.ResponseInputItem[] {
   const result: OpenAI.Responses.ResponseInputItem[] = [];
-  for (const m of messages) {
+  for (const message of messages) {
     // Assistant message with tool calls → expand into function_call items
-    if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+    if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
       // If the assistant also produced text, include it first
-      if (m.content?.trim()) {
+      if (message.content?.trim()) {
         result.push({
           role: "assistant",
-          content: m.content,
+          content: message.content,
         } as OpenAI.Responses.ResponseInputItem);
       }
       // Each tool call becomes a function_call output item
-      for (const toolCall of m.toolCalls) {
+      for (const toolCall of message.toolCalls) {
         // Responses API requires the function_call id to start with "fc_"
         // responsesItemId is the fc_ prefixed ID from the streaming handler
         const functionCallId = toolCall.responsesItemId || toolCall.id || `fc_${Date.now()}`;
@@ -266,25 +266,25 @@ function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.Response
     }
 
     // Tool result message → function_call_output item
-    if (m.role === "tool") {
+    if (message.role === "tool") {
       result.push({
         type: "function_call_output",
-        call_id: m.tool_call_id || m.id,
+        call_id: message.tool_call_id || message.id,
         output:
-          typeof m.content === "string"
-            ? m.content
-            : JSON.stringify(m.content || ""),
+          typeof message.content === "string"
+            ? message.content
+            : JSON.stringify(message.content || ""),
       } as unknown as OpenAI.Responses.ResponseInputItem);
       continue;
     }
 
     // Standard message (system, user, assistant without tools)
-    const role = m.role === "system" ? ("developer" as const) : (m.role as "developer" | "user" | "assistant");
-    const nameObj = m.name ? { name: m.name } : {};
+    const role = message.role === "system" ? ("developer" as const) : (message.role as "developer" | "user" | "assistant");
+    const nameObj = message.name ? { name: message.name } : {};
 
-    if (m.images && m.images.length > 0) {
+    if (message.images && message.images.length > 0) {
       const content: OpenAI.Responses.ResponseInputContent[] = [];
-      for (const mediaRef of m.images) {
+      for (const mediaRef of message.images) {
         const urlType = getUrlType(mediaRef);
 
         if (urlType === "data") {
@@ -343,8 +343,8 @@ function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.Response
           );
         }
       }
-      if (m.content) {
-        content.push({ type: "input_text", text: m.content });
+      if (message.content) {
+        content.push({ type: "input_text", text: message.content });
       }
       result.push({
         role,
@@ -357,7 +357,7 @@ function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.Response
     result.push({
       role,
       ...nameObj,
-      content: m.content ?? "",
+      content: message.content ?? "",
     } as OpenAI.Responses.ResponseInputItem);
   }
   return result;
@@ -598,9 +598,9 @@ const openaiProvider = {
       if (rateLimits) result.rateLimits = rateLimits;
       return result;
     } catch (error: unknown) {
-      const err = asErrorRecord(error);
+      const errorObject = asErrorRecord(error);
       // Retry once after stripping unsupported parameters (e.g. gpt-5-nano rejects temperature)
-      if (err.status === 400 && err.message?.includes("Unsupported")) {
+      if (errorObject.status === 400 && errorObject.message?.includes("Unsupported")) {
         const unsupportedParams = [
           "temperature",
           "top_p",
@@ -612,7 +612,7 @@ const openaiProvider = {
         const payloadRecord = payload as unknown as Record<string, unknown>;
         for (const param of unsupportedParams) {
           if (
-            err.message?.includes(`'${param}'`) &&
+            errorObject.message?.includes(`'${param}'`) &&
             payloadRecord[param] !== undefined
           ) {
             logger.provider(
@@ -905,9 +905,9 @@ const openaiProvider = {
       stream = streamData;
       rateLimits = extractOpenAIRateLimits(rawStreamResponse, model);
     } catch (error: unknown) {
-      const err = asErrorRecord(error);
+      const errorObject = asErrorRecord(error);
       // Retry once after stripping unsupported parameters (e.g. gpt-5-nano rejects temperature)
-      if (err.status === 400 && err.message?.includes("Unsupported")) {
+      if (errorObject.status === 400 && errorObject.message?.includes("Unsupported")) {
         const unsupportedParams = [
           "temperature",
           "top_p",
@@ -919,7 +919,7 @@ const openaiProvider = {
         const payloadRecord = payload as unknown as Record<string, unknown>;
         for (const param of unsupportedParams) {
           if (
-            err.message?.includes(`'${param}'`) &&
+            errorObject.message?.includes(`'${param}'`) &&
             payloadRecord[param] !== undefined
           ) {
             logger.provider(

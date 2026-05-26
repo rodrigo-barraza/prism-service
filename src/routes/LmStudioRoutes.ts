@@ -148,9 +148,9 @@ router.post(
           needsLoad = false;
         } else {
           // Unload any other loaded models first (single-model enforcement)
-                    for ( const m of models || []) {
-                        for ( const inst of m.loaded_instances || []) {
-              send({ type: "unloading", model: m.key });
+                    for ( const message of models || []) {
+                        for ( const inst of message.loaded_instances || []) {
+              send({ type: "unloading", model: message.key });
               logger.info(
                 `[load-stream] Auto-unloading ${inst.id} before loading ${model}`,
               );

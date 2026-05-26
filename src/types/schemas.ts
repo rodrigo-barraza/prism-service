@@ -269,7 +269,7 @@ export const GetAgentSessionsQuerySchema = z.object({
 export const GetVramBenchmarksQuerySchema = z.object({
   settings: z.string().optional(),
   hostname: z.string().optional(),
-  ctx: z.coerce.number().int().optional(),
+  context: z.coerce.number().int().optional(),
   provider: z.string().optional(),
   limit: z.coerce.number().int().min(1).default(2000),
 });

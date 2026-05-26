@@ -338,7 +338,7 @@ const RequestLogger = {
           : [],
       toolApiNames:
                 toolCalls && toolCalls.length > 0
-                    ? [...new Set(toolCalls.map((tc) => tc.name))]
+                    ? [...new Set(toolCalls.map((toolCall) => toolCall.name))]
           : [],
       success,
       errorMessage,
@@ -380,10 +380,10 @@ const RequestLogger = {
                 ...(images && images.length > 0 ? { images } : {}),
                 toolCalls:
                     toolCalls && toolCalls.length > 0
-                        ? toolCalls.map((tc) => ({
-                                name: (API_TO_CANONICAL as Record<string, string>)[tc.name] || tc.name,
-                id: tc.id,
-                args: tc.args,
+                        ? toolCalls.map((toolCall) => ({
+                                name: (API_TO_CANONICAL as Record<string, string>)[toolCall.name] || toolCall.name,
+                id: toolCall.id,
+                args: toolCall.args,
               }))
             : null,
         ...(audioRef ? { audioRef } : {}),
@@ -423,7 +423,7 @@ const RequestLogger = {
     extraResponsePayload,
   }: LogBackgroundLlmCallParams) {
         const totalSec = (performance.now() - requestStartMs) / 1000;
-        const inputText = aiMessages.map((m) => typeof m.content === "string" ? m.content : JSON.stringify(m.content)).join("\n");
+        const inputText = aiMessages.map((message) => typeof message.content === "string" ? message.content : JSON.stringify(message.content)).join("\n");
 
     // Prefer real API-reported usage over the ~4 chars/token heuristic.
     // The heuristic remains as fallback for callers that don't pass usage.

@@ -120,7 +120,7 @@ class LocalModelQueue {
   /** Number of active slots for a specific instance. */
   get activeCount(): number {
     let total = 0;
-    for (const q of queues.values()) total += q.activeCount;
+    for (const queue of queues.values()) total += queue.activeCount;
     return total;
   }
 
@@ -132,7 +132,7 @@ class LocalModelQueue {
   /** Total requests processed across all instances. */
   get totalProcessed(): number {
     let total = 0;
-    for (const q of queues.values()) total += q.totalProcessed;
+    for (const queue of queues.values()) total += queue.totalProcessed;
     return total;
   }
 }

@@ -204,8 +204,8 @@ async function pruneMinioOrphans(): Promise<number> {
 
     // Remove orphaned prefixes
     for (const prefix of prefixes) {
-      const orphanedObjects = objects.filter((o) => {
-        const name = typeof o === "string" ? o : o?.name;
+      const orphanedObjects = objects.filter((orphanedObject) => {
+        const name = typeof orphanedObject === "string" ? orphanedObject : orphanedObject?.name;
         return name ? name.startsWith(`${prefix}/`) : false;
       });
       for (const object of orphanedObjects) {

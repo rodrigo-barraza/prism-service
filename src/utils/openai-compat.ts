@@ -150,12 +150,12 @@ interface ToolInput {
 
 export function convertToolsToOpenAI(tools: ToolInput[] | undefined | null): OpenAIToolFunction[] | null {
   if (!tools || !Array.isArray(tools) || tools.length === 0) return null;
-  return tools.map((t) => ({
+  return tools.map((tool) => ({
     type: "function" as const,
     function: {
-      name: t.name,
-      description: t.description || "",
-      parameters: t.parameters || {},
+      name: tool.name,
+      description: tool.description || "",
+      parameters: tool.parameters || {},
     },
   }));
 }
@@ -300,15 +300,15 @@ export async function expandVideoToFrames(messages: InputMessage[], options: Exp
     const keptImages: string[] = [];
 
     // Check explicit video field
-    const msg = message as InputMessage & { video?: string[] };
-    if (msg.video && Array.isArray(msg.video)) {
-      videoUrls.push(...msg.video);
-      delete msg.video;
+    const messageWithVideo = message as InputMessage & { video?: string[] };
+    if (messageWithVideo.video && Array.isArray(messageWithVideo.video)) {
+      videoUrls.push(...messageWithVideo.video);
+      delete messageWithVideo.video;
     }
 
     // Check images field for misclassified video data URLs
-    if (message.images && Array.isArray(message.images)) {
-      for (const dataUrl of message.images) {
+    if (messageWithVideo.images && Array.isArray(messageWithVideo.images)) {
+      for (const dataUrl of messageWithVideo.images) {
         const mime = getDataUrlMimeType(dataUrl);
         if (mime && mime.startsWith("video/")) {
           videoUrls.push(dataUrl);
@@ -316,7 +316,7 @@ export async function expandVideoToFrames(messages: InputMessage[], options: Exp
           keptImages.push(dataUrl);
         }
       }
-      message.images = keptImages;
+      messageWithVideo.images = keptImages;
     }
 
     if (videoUrls.length === 0) continue;
@@ -329,7 +329,7 @@ export async function expandVideoToFrames(messages: InputMessage[], options: Exp
 
     if (allFrames.length > 0) {
       // Prepend frames to images array (model card recommends media before text)
-      message.images = [...allFrames, ...(message.images || [])];
+      messageWithVideo.images = [...allFrames, ...(messageWithVideo.images || [])];
     }
   }
 
@@ -345,27 +345,27 @@ export function prepareOpenAICompatMessages(
   messages: InputMessage[],
   { mediaStrategy = MEDIA_STRATEGIES.IMAGES_ONLY }: { mediaStrategy?: string } = {},
 ): PreparedMessage[] {
-  return messages.map((m, _i) => {
-    const base: { role: string; name?: string } = { role: m.role };
-    if (m.name) base.name = m.name;
+  return messages.map((message, _i) => {
+    const base: { role: string; name?: string } = { role: message.role };
+    if (message.name) base.name = message.name;
 
     // Tool result messages — include tool_call_id for correlation
-    if (m.role === "tool") {
+    if (message.role === "tool") {
       return {
         role: "tool",
-        tool_call_id: m.tool_call_id || m.id || "",
+        tool_call_id: message.tool_call_id || message.id || "",
         content:
-          typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+          typeof message.content === "string" ? message.content : JSON.stringify(message.content),
       } as PreparedMessage;
     }
 
     // Assistant messages with tool calls — include tool_calls in OpenAI format
-    if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+    if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
       return {
         ...base,
         // Per OpenAI spec, content must be null when tool_calls are present
-        content: (typeof m.content === "string" ? m.content.trim() : "") || null,
-        tool_calls: m.toolCalls.map((toolCall: ToolCallEntry, i: number) => ({
+        content: (typeof message.content === "string" ? message.content.trim() : "") || null,
+        tool_calls: message.toolCalls.map((toolCall: ToolCallEntry, i: number) => ({
           id: toolCall.id || `call_${i}`,
           type: "function",
           function: {
@@ -384,18 +384,18 @@ export function prepareOpenAICompatMessages(
 
     if (mediaStrategy === MEDIA_STRATEGIES.IMAGES_ONLY) {
       // Simple image-only handling (lm-studio)
-      if (m.images && m.images.length > 0) {
-        for (const dataUrl of m.images) {
+      if (message.images && message.images.length > 0) {
+        for (const dataUrl of message.images) {
           content.push({ type: "image_url", image_url: { url: dataUrl } });
         }
       }
     } else {
       // Full media handling (vllm, llama-cpp)
       const mediaFields: Array<{ key: string; values: string[] | undefined }> = [
-        { key: "images", values: m.images },
-        { key: "audio", values: m.audio },
-        { key: "video", values: m.video },
-        { key: "pdf", values: m.pdf },
+        { key: "images", values: message.images },
+        { key: "audio", values: message.audio },
+        { key: "video", values: message.video },
+        { key: "pdf", values: message.pdf },
       ];
       for (const { values: array } of mediaFields) {
         if (!array || array.length === 0) continue;
@@ -459,14 +459,14 @@ export function prepareOpenAICompatMessages(
     }
 
     if (content.length > 0) {
-        const textContent = typeof m.content === "string" ? m.content : "";
+        const textContent = typeof message.content === "string" ? message.content : "";
         if (textContent) {
           content.push({ type: "text", text: textContent });
         }
       return { ...base, content } as PreparedMessage;
     }
 
-    return { ...base, content: (typeof m.content === "string" ? m.content : "") || "" } as PreparedMessage;
+    return { ...base, content: (typeof message.content === "string" ? message.content : "") || "" } as PreparedMessage;
   });
 }
 

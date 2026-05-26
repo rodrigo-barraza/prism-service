@@ -271,11 +271,11 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           throw new Error(`API error: ${response.status} ${errorText}`);
         }
         const data = await response.json() as VllmModelsResponse;
-        const models = (data.data || []).map((m) => ({
-          key: m.id,
-          display_name: m.id,
+        const models = (data.data || []).map((modelItem: VllmModel) => ({
+          key: modelItem.id,
+          display_name: modelItem.id,
           type: "llm",
-          loaded_instances: [{ id: m.id }],
+          loaded_instances: [{ id: modelItem.id }],
         }));
         return { models };
       } catch (error: unknown) {

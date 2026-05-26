@@ -87,8 +87,8 @@ registerCleanup(async () => {
   logger.info(`[MCP] Shutdown: disconnecting ${connections.size} server(s)…`);
   const names = [...connections.keys()];
   await Promise.allSettled(
-    names.map(async (n) => {
-      const conn = connections.get(n);
+    names.map(async (name) => {
+      const conn = connections.get(name);
       if (!conn) return;
       try {
         await conn.client.close();
@@ -102,7 +102,7 @@ registerCleanup(async () => {
           /* best-effort */
         }
       }
-      connections.delete(n);
+      connections.delete(name);
     }),
   );
 });
@@ -224,7 +224,7 @@ const MCPClientService = {
     }
 
     // Convert to our schema format
-    const schemas = mcpTools.map((t) => mcpToolToSchema(serverName, t));
+    const schemas = mcpTools.map((tool) => mcpToolToSchema(serverName, tool));
 
     connections.set(serverName, {
       client,
@@ -300,16 +300,16 @@ const MCPClientService = {
       if (result.isError) {
         const errorText =
           content
-            .filter((c) => c.type === "text")
-            .map((c) => c.text)
+            .filter((item) => item.type === "text")
+            .map((item) => item.text)
             .join("\n") || "MCP tool returned an error";
         return { error: errorText };
       }
 
       // Flatten content to a usable format
       const textParts = content
-        .filter((c) => c.type === "text")
-        .map((c) => c.text || "");
+        .filter((item) => item.type === "text")
+        .map((item) => item.text || "");
 
       // If there's only one text part, return it directly for cleaner output
       if (textParts.length === 1) {
@@ -372,9 +372,9 @@ const MCPClientService = {
         name,
         status: conn.status,
         toolCount: conn.tools.length,
-        tools: conn.mcpTools.map((t) => ({
-          name: t.name,
-          description: t.description,
+        tools: conn.mcpTools.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
         })),
         transport: conn.config.transport,
         connectedAt: conn.connectedAt,
@@ -430,12 +430,12 @@ const MCPClientService = {
       }));
       return { resources, serverName, count: resources.length };
     } catch (error: unknown) {
-      const err = error as Error & { code?: number };
+      const errorObject = error as Error & { code?: number };
       // Some servers don't implement resources — that's fine
       if (
-        err.message?.includes("not supported") ||
-        err.message?.includes("not implemented") ||
-        err.code === -32601
+        errorObject.message?.includes("not supported") ||
+        errorObject.message?.includes("not implemented") ||
+        errorObject.code === -32601
       ) {
         return {
           resources: [],
@@ -445,7 +445,7 @@ const MCPClientService = {
         };
       }
       return {
-        error: `Failed to list resources from "${serverName}": ${err.message}`,
+        error: `Failed to list resources from "${serverName}": ${errorObject.message}`,
       };
     }
   },
@@ -462,14 +462,14 @@ const MCPClientService = {
     try {
       const result = await conn.client.readResource({ uri });
       // MCP returns { contents: [{ uri, mimeType?, text?, blob? }] }
-      const contents = (result.contents || []).map((c) => {
-        const hasText = 'text' in c && typeof c.text === 'string';
+      const contents = (result.contents || []).map((content) => {
+        const hasText = 'text' in content && typeof content.text === 'string';
         return {
-          uri: c.uri,
-          mimeType: c.mimeType || null,
-          text: hasText ? (c as { text: string }).text : null,
+          uri: content.uri,
+          mimeType: content.mimeType || null,
+          text: hasText ? (content as { text: string }).text : null,
           // Don't return raw blob data — too large for LLM context
-          hasBlob: 'blob' in c && !!c.blob,
+          hasBlob: 'blob' in content && !!content.blob,
         };
       });
 
@@ -602,7 +602,7 @@ const MCPClientService = {
    */
   async disconnectAll() {
     const names = [...connections.keys()];
-    await Promise.allSettled(names.map((n) => this.disconnect(n)));
+    await Promise.allSettled(names.map((name) => this.disconnect(name)));
   },
 };
 

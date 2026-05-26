@@ -172,8 +172,8 @@ router.get(
 
         // Derive traces from requests — traces are no longer a collection
         const traceIds = new Set();
-                for ( const c of conversations) {
-          if (c.traceId) traceIds.add(c.traceId);
+                for ( const conversation of conversations) {
+          if (conversation.traceId) traceIds.add(conversation.traceId);
         }
         if (traceIds.size > 0) {
           // Count requests per traceId to build trace summary
@@ -423,8 +423,8 @@ router.get(
 
       // Build a project → traceCount map
       const traceMap: Record<string, number> = {};
-      for (const tc of traceCounts) {
-        traceMap[tc._id || "any"] = tc.traceCount;
+      for (const toolCall of traceCounts) {
+        traceMap[toolCall._id || "any"] = toolCall.traceCount;
       }
 
       res.json(
@@ -568,8 +568,8 @@ router.get(
             { $project: { _id: 1, workflowCount: { $size: "$wfIds" } } },
           ])
           .toArray();
-                for ( const w of wfResults) {
-                    wfByConv[w._id] = w.workflowCount;
+                for ( const workflow of wfResults) {
+                    wfByConv[workflow._id] = workflow.workflowCount;
         }
       }
 
@@ -584,8 +584,8 @@ router.get(
           })
           .project({ id: 1, traceId: 1 })
           .toArray();
-                for ( const c of convDocs) {
-                    traceByConv[c.id] = c.traceId;
+                for ( const item of convDocs) {
+                    traceByConv[item.id] = item.traceId;
         }
       }
 
@@ -684,21 +684,21 @@ router.get(
         results.map((r: Record<string, unknown>) => {
           // Count top models
           const modelCounts: Record<string, number> = {};
-          for (const m of (r._models as string[]) || []) {
-            if (m) modelCounts[m] = (modelCounts[m] || 0) + 1;
+          for (const model of (r._models as string[]) || []) {
+            if (model) modelCounts[model] = (modelCounts[model] || 0) + 1;
           }
           const topModels = Object.entries(modelCounts)
-            .sort((a, b) => b[1] - a[1])
+            .sort((firstItem, b) => b[1] - firstItem[1])
             .slice(0, 5)
             .map(([model, count]) => ({ model, count }));
 
           // Count top agents
           const agentCounts: Record<string, number> = {};
-          for (const a of (r._agents as string[]) || []) {
-            if (a) agentCounts[a] = (agentCounts[a] || 0) + 1;
+          for (const agent of (r._agents as string[]) || []) {
+            if (agent) agentCounts[agent] = (agentCounts[agent] || 0) + 1;
           }
           const topAgents = Object.entries(agentCounts)
-            .sort((a, b) => b[1] - a[1])
+            .sort((firstItem, b) => b[1] - firstItem[1])
             .slice(0, 5)
             .map(([agent, count]) => ({ agent, count }));
 
@@ -930,7 +930,7 @@ router.get(
         });
       }
 
-      const t = totals[0] || {
+      const tool = totals[0] || {
         totalCost: 0,
         totalInputTokens: 0,
         totalOutputTokens: 0,
@@ -939,11 +939,11 @@ router.get(
 
       res.json({
         totals: {
-          totalCost: t.totalCost,
-          totalInputTokens: t.totalInputTokens,
-          totalOutputTokens: t.totalOutputTokens,
-          totalRequests: t.totalRequests,
-          avgTokensPerSec: t.avgTokensPerSec,
+          totalCost: tool.totalCost,
+          totalInputTokens: tool.totalInputTokens,
+          totalOutputTokens: tool.totalOutputTokens,
+          totalRequests: tool.totalRequests,
+          avgTokensPerSec: tool.avgTokensPerSec,
         },
         byProject: byProject.map((r: Record<string, unknown>) => ({
           project: r._id || "any",
@@ -1491,10 +1491,10 @@ router.get(
 
       // 3. Merge and sort
       const merged = [
-        ...convs.map((c) => ({ ...c, type: "direct" as const })),
+        ...convs.map((item) => ({ ...item, type: "direct" as const })),
         ...sessions.map((s) => ({ ...s, type: "agent" as const })),
-      ].sort((a, b) => {
-        const valA = String((a as Record<string, unknown>)[sort as string] ?? "");
+      ].sort((firstItem, b) => {
+        const valA = String((firstItem as Record<string, unknown>)[sort as string] ?? "");
         const valB = String((b as Record<string, unknown>)[sort as string] ?? "");
         if (valA < valB) return -sortDir;
         if (valA > valB) return sortDir;
@@ -1505,7 +1505,7 @@ router.get(
       const docs = merged.slice(skip, skip + parsedLimit);
 
       // 5. Enrich the sliced docs with requests telemetry in a batch lookup
-      const finalDocIds = docs.map((d) => (d as Document).id);
+      const finalDocIds = docs.map((doc) => (doc as Document).id);
       const requests = await db
         .collection(REQUESTS_COL)
         .find({ conversationId: { $in: finalDocIds } })

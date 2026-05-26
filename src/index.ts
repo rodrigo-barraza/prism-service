@@ -323,9 +323,9 @@ setupWebSocket(wss);
     const { default: AgentPersonaRegistry } =
       await import("./services/AgentPersonaRegistry.js");
     const agentProjects = AgentPersonaRegistry.list()
-      .map((p) => {
-        const persona = AgentPersonaRegistry.get(p.id);
-        return persona?.project;
+      .map((persona) => {
+        const personaDoc = AgentPersonaRegistry.get(persona.id);
+        return personaDoc?.project;
       })
       .filter(Boolean);
 

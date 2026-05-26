@@ -97,19 +97,19 @@ export function expandMessagesForFC(
       )
     : messages;
 
-  return filtered.flatMap((m) => {
+  return filtered.flatMap((message) => {
     // Expand assistant messages with toolCalls into
     // [assistant(tool_calls), tool(result1), tool(result2), ...]
-    if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+    if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
       const assistantMsg: ExpandedMessage = {
         role: "assistant",
-        content: m.content?.toString().trim() || null,
+        content: message.content?.toString().trim() || null,
         // Preserve thinking + signature for Anthropic multi-turn round-trips
-        ...(m.thinking && { thinking: m.thinking }),
-        ...((m as ChatMessage & { thinkingSignature?: string }).thinkingSignature && {
-          thinkingSignature: (m as ChatMessage & { thinkingSignature?: string }).thinkingSignature,
+        ...(message.thinking && { thinking: message.thinking }),
+        ...((message as ChatMessage & { thinkingSignature?: string }).thinkingSignature && {
+          thinkingSignature: (message as ChatMessage & { thinkingSignature?: string }).thinkingSignature,
         }),
-        toolCalls: m.toolCalls.map((tc: ToolCallEntry) => ({
+        toolCalls: message.toolCalls.map((tc: ToolCallEntry) => ({
           id: tc.id,
           name: tc.name,
           args: tc.args,
@@ -121,7 +121,7 @@ export function expandMessagesForFC(
             : {}),
         })),
       };
-      const toolMsgs: ExpandedMessage[] = m.toolCalls
+      const toolMsgs: ExpandedMessage[] = message.toolCalls
         .filter((tc: ToolCallEntry) => tc.result !== undefined)
         .map((tc: ToolCallEntry) => ({
           role: "tool",
@@ -136,13 +136,13 @@ export function expandMessagesForFC(
     }
 
     // Pass through tool messages with their required fields
-    if (m.role === "tool") {
+    if (message.role === "tool") {
       return [
         {
           role: "tool",
-          tool_call_id: (m as ChatMessage & { tool_call_id?: string }).tool_call_id,
-          name: m.name,
-          content: m.content,
+          tool_call_id: (message as ChatMessage & { tool_call_id?: string }).tool_call_id,
+          name: message.name,
+          content: message.content,
         },
       ];
     }
@@ -152,17 +152,17 @@ export function expandMessagesForFC(
     // can receive them back in multi-turn conversations (required by their API).
     return [
       {
-        role: m.role,
-        ...(m.content?.toString().trim() ? { content: m.content } : { content: " " }),
-        ...(m.images && m.images.length > 0 ? { images: m.images } : {}),
-        ...(m.video && m.video.length > 0 ? { video: m.video } : {}),
-        ...(m.audio && (Array.isArray(m.audio) ? m.audio.length > 0 : m.audio) ? { audio: m.audio } : {}),
-        ...(m.pdf && m.pdf.length > 0 ? { pdf: m.pdf } : {}),
-        ...(m.role === "assistant" && m.thinking
-          ? { thinking: m.thinking }
+        role: message.role,
+        ...(message.content?.toString().trim() ? { content: message.content } : { content: " " }),
+        ...(message.images && message.images.length > 0 ? { images: message.images } : {}),
+        ...(message.video && message.video.length > 0 ? { video: message.video } : {}),
+        ...(message.audio && (Array.isArray(message.audio) ? message.audio.length > 0 : message.audio) ? { audio: message.audio } : {}),
+        ...(message.pdf && message.pdf.length > 0 ? { pdf: message.pdf } : {}),
+        ...(message.role === "assistant" && message.thinking
+          ? { thinking: message.thinking }
           : {}),
-        ...(m.role === "assistant" && (m as ChatMessage & { thinkingSignature?: string }).thinkingSignature
-          ? { thinkingSignature: (m as ChatMessage & { thinkingSignature?: string }).thinkingSignature }
+        ...(message.role === "assistant" && (message as ChatMessage & { thinkingSignature?: string }).thinkingSignature
+          ? { thinkingSignature: (message as ChatMessage & { thinkingSignature?: string }).thinkingSignature }
           : {}),
       },
     ];

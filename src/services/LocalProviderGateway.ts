@@ -235,7 +235,7 @@ const AUDIO_PATTERNS = [
 
 /** Check if a lowercased model name matches any pattern in a list. */
 function matchesAny(nameLower: string, patterns: readonly string[]): boolean {
-  return patterns.some((p) => nameLower.includes(p));
+  return patterns.some((pattern) => nameLower.includes(pattern));
 }
 
 function detectCapabilities(modelKey: string | null | undefined, providerMeta: { capabilities?: Record<string, unknown> } = {}) {

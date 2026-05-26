@@ -1,6 +1,6 @@
 export {
   LABELS,
   DOMAINS,
-  L,
-  D,
+  LABEL_TAGS,
+  DOMAIN_TAGS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";

@@ -59,10 +59,10 @@ const EFFORT_BUDGET_MAP: Record<string, number> = {
 const RETRY_DELAY_MS = 10_000;
 const MAX_RETRIES = 3;
 function isRetryableError(error: unknown): boolean {
-  const err = error as AnthropicSdkError;
-  const errorType = err?.error?.type || err?.type;
+  const errorObject = error as AnthropicSdkError;
+  const errorType = errorObject?.error?.type || errorObject?.type;
   if (errorType === "overloaded_error") return true;
-  if (err.status === 529) return true;
+  if (errorObject.status === 529) return true;
   return false;
 }
 
@@ -137,48 +137,48 @@ async function prepareMessages(messages: ChatMessage[]) {
         (m: ChatMessage) =>
           m.role === "user" || m.role === "assistant" || m.role === "tool",
       )
-      .map(async (m: ChatMessage) => {
+      .map(async (message: ChatMessage) => {
         // Convert tool role messages to tool_result user messages for Anthropic
-        if (m.role === "tool") {
+        if (message.role === "tool") {
           return {
             role: "user",
             content: [
               {
                 type: "tool_result",
-                tool_use_id: m.tool_call_id || m.id || m.name || "unknown",
+                tool_use_id: message.tool_call_id || message.id || message.name || "unknown",
                 content:
-                  typeof m.content === "string"
-                    ? m.content
-                    : JSON.stringify(m.content),
+                  typeof message.content === "string"
+                    ? message.content
+                    : JSON.stringify(message.content),
               },
             ],
           };
         }
 
         // Convert assistant messages with toolCalls to multi-part content
-        if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+        if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
           const contentBlocks: AnthropicBlock[] = [];
           // Preserve thinking blocks for multi-step reasoning continuity.
           // The signature field is REQUIRED by Anthropic's API for multi-turn
           // conversations — without it the API returns a 400.
           // Only include thinking when we have the signature; conversations
           // missing it must omit the block to avoid API 400 errors.
-          if (m.thinking && m.thinkingSignature) {
+          if (message.thinking && message.thinkingSignature) {
             contentBlocks.push({
               type: "thinking",
-              thinking: m.thinking,
-              signature: m.thinkingSignature,
+              thinking: message.thinking,
+              signature: message.thinkingSignature,
             });
           }
-          if (typeof m.content === "string" && m.content.trim()) {
-            contentBlocks.push({ type: "text", text: m.content });
+          if (typeof message.content === "string" && message.content.trim()) {
+            contentBlocks.push({ type: "text", text: message.content });
           }
-          for (const tc of m.toolCalls) {
+          for (const toolCall of message.toolCalls) {
             contentBlocks.push({
               type: "tool_use",
-              id: tc.id || tc.name || `tc-${Date.now()}`,
-              name: tc.name,
-              input: tc.args || {},
+              id: toolCall.id || toolCall.name || `tc-${Date.now()}`,
+              name: toolCall.name,
+              input: toolCall.args || {},
             });
           }
           return {
@@ -188,7 +188,7 @@ async function prepareMessages(messages: ChatMessage[]) {
         }
 
         // Convert messages with media to Anthropic content block format
-        const images = m.images;
+        const images = message.images;
         if (images && images.length > 0) {
           const contentBlocks: AnthropicBlock[] = [];
                     for ( const dataUrl of images) {
@@ -251,13 +251,13 @@ async function prepareMessages(messages: ChatMessage[]) {
             }
             // Other MIME types (audio, video) are not supported by Anthropic — skip
           }
-          const textContent = typeof m.content === "string" ? m.content : "";
+          const textContent = typeof message.content === "string" ? message.content : "";
           if (textContent) {
             contentBlocks.push({ type: "text", text: textContent });
           }
           return {
-            role: m.role,
-            content: contentBlocks.length > 0 ? contentBlocks : m.content,
+            role: message.role,
+            content: contentBlocks.length > 0 ? contentBlocks : message.content,
           };
         }
 
@@ -266,17 +266,17 @@ async function prepareMessages(messages: ChatMessage[]) {
         // not top-level fields — convert them into the proper format.
         // Only include thinking when we have the signature; conversations
         // without it must omit the block to avoid API 400 errors.
-        if (m.role === "assistant" && m.thinking && !m.toolCalls?.length) {
+        if (message.role === "assistant" && message.thinking && !message.toolCalls?.length) {
           const contentBlocks: AnthropicBlock[] = [];
-          if (m.thinkingSignature) {
+          if (message.thinkingSignature) {
             contentBlocks.push({
               type: "thinking",
-              thinking: m.thinking,
-              signature: m.thinkingSignature,
+              thinking: message.thinking,
+              signature: message.thinkingSignature,
             });
           }
-          if (typeof m.content === "string" && m.content.trim()) {
-            contentBlocks.push({ type: "text", text: m.content });
+          if (typeof message.content === "string" && message.content.trim()) {
+            contentBlocks.push({ type: "text", text: message.content });
           } else {
             contentBlocks.push({ type: "text", text: " " });
           }
@@ -285,41 +285,41 @@ async function prepareMessages(messages: ChatMessage[]) {
             content:
               contentBlocks.length > 1
                 ? contentBlocks
-                : (typeof m.content === "string" ? m.content.trim() : "") || " ",
+                : (typeof message.content === "string" ? message.content.trim() : "") || " ",
           };
         }
 
         // Ensure assistant messages never have empty content
-        if (m.role === "assistant" && (!m.content || (typeof m.content === "string" && !m.content.trim()))) {
+        if (message.role === "assistant" && (!message.content || (typeof message.content === "string" && !message.content.trim()))) {
           return { role: "assistant", content: " " };
         }
 
         // Default: user or assistant with plain text — whitelist only role + content
-        return { role: m.role, content: m.content || " " };
+        return { role: message.role, content: message.content || " " };
       }),
   );
 
   // Merge consecutive same-role messages
-  const merged = cleaned.reduce((acc: ChatMessage[], cur: ChatMessage) => {
-    if (acc.length && acc[acc.length - 1].role === cur.role) {
-      const prev = acc[acc.length - 1];
+  const merged = cleaned.reduce((acc: ChatMessage[], current: ChatMessage) => {
+    if (acc.length && acc[acc.length - 1].role === current.role) {
+      const previous = acc[acc.length - 1];
       // Handle merging when content might be string or array
-      if (typeof prev.content === "string" && typeof cur.content === "string") {
-        prev.content += `\n\n${cur.content}`;
+      if (typeof previous.content === "string" && typeof current.content === "string") {
+        previous.content += `\n\n${current.content}`;
       } else {
         // Convert both to arrays and concat
         const prevBlocks =
-          typeof prev.content === "string"
-            ? [{ type: "text", text: prev.content }]
-            : prev.content;
+          typeof previous.content === "string"
+            ? [{ type: "text", text: previous.content }]
+            : previous.content;
         const currentBlocks =
-          typeof cur.content === "string"
-            ? [{ type: "text", text: cur.content }]
-            : cur.content;
-        prev.content = [...prevBlocks, ...currentBlocks];
+          typeof current.content === "string"
+            ? [{ type: "text", text: current.content }]
+            : current.content;
+        previous.content = [...prevBlocks, ...currentBlocks];
       }
     } else {
-      acc.push({ ...cur });
+      acc.push({ ...current });
     }
     return acc;
   }, []);
@@ -412,11 +412,11 @@ function buildTools(options: ProviderOptions) {
   }
   // Custom function calling tools
   if (options.tools && Array.isArray(options.tools)) {
-        for ( const t of options.tools) {
+        for ( const tool of options.tools) {
       tools.push({
-        name: t.name,
-        description: t.description || "",
-        input_schema: t.parameters || { type: "object", properties: {} },
+        name: tool.name,
+        description: tool.description || "",
+        input_schema: tool.parameters || { type: "object", properties: {} },
       });
     }
   }
@@ -531,13 +531,13 @@ const anthropicProvider = {
           .messages.create(payload as unknown as Anthropic.MessageCreateParamsNonStreaming)
           .withResponse();
         const rateLimits = extractAnthropicRateLimits(rawResponse, model);
-        const msg = response as Anthropic.Messages.Message;
+        const message = response as Anthropic.Messages.Message;
 
         const { text, thinking, thinkingSignature, citations, toolCalls } =
-          extractResponseContent(msg.content as AnthropicBlock[]);
+          extractResponseContent(message.content as AnthropicBlock[]);
         const result: AnthropicGenerateResult = {
           text,
-          usage: buildUsage(msg.usage),
+          usage: buildUsage(message.usage),
         };
         if (thinking) result.thinking = thinking;
         if (thinkingSignature) result.thinkingSignature = thinkingSignature;
@@ -545,8 +545,8 @@ const anthropicProvider = {
         if (toolCalls.length > 0) result.toolCalls = toolCalls;
         if (rateLimits) result.rateLimits = rateLimits;
         // Forward structured stop details for observability (SDK 0.82+)
-        if (msg.stop_reason) result.stopReason = msg.stop_reason;
-        if ("stop_details" in msg && msg.stop_details) result.stopDetails = { ...msg.stop_details };
+        if (message.stop_reason) result.stopReason = message.stop_reason;
+        if ("stop_details" in message && message.stop_details) result.stopDetails = { ...message.stop_details };
         return result;
       } catch (error: unknown) {
         lastError = error;

@@ -160,9 +160,9 @@ export default class PolicyEngine {
       if (rule.when) {
         try {
           if (!rule.when(args)) continue;
-        } catch (err) {
+        } catch (errorObject) {
           logger.warn(
-            `[PolicyEngine] Predicate for "${rule.name}" threw: ${(err as Error).message}. Skipping rule.`,
+            `[PolicyEngine] Predicate for "${rule.name}" threw: ${(errorObject as Error).message}. Skipping rule.`,
           );
           continue;
         }
