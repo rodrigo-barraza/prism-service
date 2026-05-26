@@ -150,38 +150,50 @@ router.post(
 router.get(
   "/workers",
   asyncHandler(async (req: Request, res: Response) => {
-    const agentSessionId = req.query.agentSessionId as string | undefined;
-    let workers = CoordinatorService.listWorkers({
-      parentAgentSessionId: agentSessionId,
+    const agentSessionIdentifier = req.query.agentSessionId as string | undefined;
+    const activeWorkersList = CoordinatorService.listWorkers({
+      parentAgentSessionId: agentSessionIdentifier,
     });
 
-    // Fall back to persisted workers from the agent_session document
-    // when in-memory is empty (page refresh, server restart)
-    if (workers.length === 0 && agentSessionId) {
+    let persistedWorkersList: any[] = [];
+    if (agentSessionIdentifier) {
       try {
         const { default: MongoWrapper } =
           await import("../wrappers/MongoWrapper.js");
-                const { MONGO_DB_NAME } = await import("../../config.js");
+        const { MONGO_DB_NAME } = await import("../../config.js");
         const { COLLECTIONS } = await import("../constants.js");
         const collection = MongoWrapper.getCollection(
           MONGO_DB_NAME,
           COLLECTIONS.AGENT_CONVERSATIONS,
         );
-        const session = await collection.findOne(
-          { id: agentSessionId },
+        const agentSessionDocument = await collection.findOne(
+          { id: agentSessionIdentifier },
           { projection: { workers: 1 } },
         );
-        if (session && session.workers && session.workers.length > 0) {
-          workers = session.workers;
+        if (
+          agentSessionDocument &&
+          agentSessionDocument.workers &&
+          agentSessionDocument.workers.length > 0
+        ) {
+          persistedWorkersList = agentSessionDocument.workers;
         }
       } catch (error: unknown) {
         logger.warn(
-                    `[coordinator] Failed to load persisted workers: ${(error as Error).message}`,
+          `[coordinator] Failed to load persisted workers: ${(error as Error).message}`,
         );
       }
     }
 
-    res.json({ workers });
+    const mergedWorkersMap = new Map<string, any>();
+    for (const worker of persistedWorkersList) {
+      mergedWorkersMap.set(worker.agentId, worker);
+    }
+    for (const worker of activeWorkersList) {
+      mergedWorkersMap.set(worker.agentId, worker);
+    }
+    const finalWorkersList = Array.from(mergedWorkersMap.values());
+
+    res.json({ workers: finalWorkersList });
   }),
 );
 

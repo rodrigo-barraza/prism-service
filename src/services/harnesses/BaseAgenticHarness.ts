@@ -628,25 +628,38 @@ export default class BaseAgenticHarness {
       try {
         const { default: CoordinatorService } =
           await import("../CoordinatorService.js");
-        const workers = CoordinatorService.listWorkers({
+        const activeWorkersList = CoordinatorService.listWorkers({
           parentAgentSessionId: agentSessionId,
         });
-        if (workers.length > 0) {
+        if (activeWorkersList.length > 0) {
           const collection = MongoWrapper.getCollection(
             MONGO_DB_NAME,
             COLLECTIONS.AGENT_CONVERSATIONS,
           );
+          const agentSessionDocument = await collection.findOne(
+            { id: agentSessionId, project, username },
+            { projection: { workers: 1 } },
+          );
+          const existingWorkersList = (agentSessionDocument && agentSessionDocument.workers) || [];
+          const mergedWorkersMap = new Map<string, any>();
+          for (const worker of existingWorkersList) {
+            mergedWorkersMap.set(worker.agentId, worker);
+          }
+          for (const worker of activeWorkersList) {
+            mergedWorkersMap.set(worker.agentId, worker);
+          }
+          const finalWorkersList = Array.from(mergedWorkersMap.values());
           await collection.updateOne(
             { id: agentSessionId, project, username },
             {
               $set: {
-                workers,
+                workers: finalWorkersList,
                 workersUpdatedAt: new Date().toISOString(),
               },
             },
           );
           logger.info(
-            `[AgenticLoop] Persisted ${workers.length} worker(s) to session ${agentSessionId}`,
+            `[AgenticLoop] Persisted ${finalWorkersList.length} worker(s) to session ${agentSessionId}`,
           );
         }
       } catch (error: unknown) {
