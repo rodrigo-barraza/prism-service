@@ -442,7 +442,7 @@ const CODING_ENABLED_TOOLS = [L.CODING];
 // We define it explicitly so the registry is the single source of truth.
 PERSONAS.set("CODING", {
   id: "CODING",
-  name: "Coding Agent",
+  name: "Coding",
   type: "coding",
   project: "prism-chat",
   displayOrder: 2,
@@ -763,7 +763,7 @@ const LIGHTS_ENABLED_TOOLS = [
 PERSONAS.set("LIGHTS", {
   id: "LIGHTS",
   name: "Lights",
-  type: "",
+  type: "home",
   project: "prism-chat",
   identity: (_ctx: PersonaContext) => {
     const sections = [
@@ -892,8 +892,8 @@ oog have memory tool (upsert_memory). oog use proactively:
 // ── OOG Agent (Caveman Code Simplifier) ──────────────────────────
 PERSONAS.set("OOG", {
   id: "OOG",
-  name: "Oog Caveman Agent",
-  type: "coding",
+  name: "Oog",
+  type: "universal",
   project: "prism-chat",
   identity: () => {
     const sections = [
@@ -907,7 +907,7 @@ PERSONAS.set("OOG", {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (ctx: PersonaContext) => buildToolPolicy(OOG_TOOL_POLICY_SECTIONS, ctx),
-  enabledTools: [...CODING_ENABLED_TOOLS, "start_bonfire"],
+  enabledTools: ["*"],
   capabilities: "",
   usesDirectoryTree: true,
   usesCodingGuidelines: true,
@@ -1145,11 +1145,11 @@ const META_ENABLED_TOOLS = [
 // ── META Agent (Meta-Agent for Persona Design) ───────────────────
 PERSONAS.set("META", {
   id: "META",
-  name: "Meta Agent",
+  name: "Meta",
   type: "",
   project: "prism-chat",
   displayOrder: 4,
-  description: "A specialized meta-agent designed to help you design, create, view, list, and modify custom AI agent personas.",
+  description: "A specialized meta-agent for designing, creating, viewing, listing, and modifying custom AI agent personas.",
   icon: "Bot",
   color: "#a855f7",
   identity: (_ctx: PersonaContext) => {
@@ -1251,8 +1251,8 @@ You have access to ALL tools in the system — coding, web, health, finance, sma
 // ── OMNI Agent (Universal All-Tools Agent) ───────────────────────
 PERSONAS.set("OMNI", {
   id: "OMNI",
-  name: "Omni Agent",
-  type: "coding",
+  name: "Omni",
+  type: "universal",
   project: "prism-chat",
   displayOrder: 1,
   identity: () => {
@@ -1375,11 +1375,11 @@ const IMAGE_ENABLED_TOOLS = [
 // ── IMAGE Agent (AI Artist) ───────────────────────────────────────
 PERSONAS.set("IMAGE", {
   id: "IMAGE",
-  name: "Image Agent",
+  name: "Image",
   type: "creative",
   project: "prism-chat",
   displayOrder: 3,
-  description: "An inspiring and highly skilled AI artist, designed to help you create visual assets, explore artistic styles, and find creative inspiration.",
+  description: "An inspiring and highly skilled AI artist for creating visual assets, exploring artistic styles, and finding creative inspiration.",
   icon: "Palette",
   color: "#ec4899",
   identity: (_ctx: PersonaContext) => {
