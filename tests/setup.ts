@@ -63,6 +63,17 @@ global.fetch = vi.fn().mockImplementation(async (url, init) => {
             json: async () => ({ status: 'ok' }),
         } as any;
     }
+    if (urlString.includes('example.com') || urlString.endsWith('.jpg') || urlString.endsWith('.png')) {
+        return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers: {
+                get: (headerName: string) => headerName.toLowerCase() === 'content-type' ? 'image/jpeg' : null
+            },
+            arrayBuffer: async () => Buffer.from('fake-image-bytes'),
+        } as any;
+    }
     try {
         if (originalFetch) {
             return await originalFetch(url, init);
