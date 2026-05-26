@@ -9,6 +9,7 @@ import ConversationService, {
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
 import ConversationTimerService from "../services/ConversationTimerService.ts";
+import AgenticLoopService from "../services/AgenticLoopService.ts";
 import {
   GetConversationsQuerySchema,
   PostConversationMessagesBodySchema,
@@ -233,7 +234,14 @@ router.get(
         .findOne({ id: conversationId, project, username });
 
       if (chat) {
-        return res.json({ ...chat, type: "direct" });
+        const pendingApproval = AgenticLoopService.getPendingApproval(conversationId);
+        const pendingQuestion = AgenticLoopService.getPendingQuestion(conversationId);
+        return res.json({
+          ...chat,
+          type: "direct",
+          pendingApproval: pendingApproval.pending ? pendingApproval : undefined,
+          pendingQuestion: pendingQuestion.pending ? pendingQuestion : undefined,
+        });
       }
 
       // Check agent sessions next
@@ -247,10 +255,15 @@ router.get(
           project,
           username,
         );
+        const pendingApproval = AgenticLoopService.getPendingApproval(conversationId);
+        const pendingQuestion = AgenticLoopService.getPendingQuestion(conversationId);
+
         return res.json({
           ...agentChat,
           stats: stats || undefined,
           type: "agent",
+          pendingApproval: pendingApproval.pending ? pendingApproval : undefined,
+          pendingQuestion: pendingQuestion.pending ? pendingQuestion : undefined,
         });
       }
 

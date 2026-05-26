@@ -120,10 +120,16 @@ export default class AgenticLoopService {
     pending: boolean;
     type?: string;
     tools?: string[];
+    toolCalls?: any[];
   } {
     const entry = pendingApprovals.get(agentSessionId);
     if (!entry) return { pending: false };
-    return { pending: true, type: entry.type, tools: entry.tools };
+    return {
+      pending: true,
+      type: entry.type,
+      tools: entry.tools,
+      toolCalls: entry.toolCalls,
+    };
   }
 
   // ── Ask User Question — Resolution API ─────────────────
@@ -157,11 +163,17 @@ export default class AgenticLoopService {
   static getPendingQuestion(agentSessionId: string): {
     pending: boolean;
     question?: string;
+    questions?: any[];
     choices?: string[];
   } {
     const entry = pendingQuestions.get(agentSessionId);
     if (!entry) return { pending: false };
-    return { pending: true, question: entry.question, choices: entry.choices };
+    return {
+      pending: true,
+      question: entry.question,
+      questions: entry.questions,
+      choices: entry.choices,
+    };
   }
 
   // ── Harness Discovery API ──────────────────────────────
