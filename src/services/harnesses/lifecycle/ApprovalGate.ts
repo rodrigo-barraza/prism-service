@@ -68,6 +68,12 @@ export async function checkAndWaitForApproval(
       },
       type: "tool",
       tools: needsApproval.map((toolCall) => toolCall.name),
+      toolCalls: needsApproval.map((toolCall) => ({
+        id: toolCall.id,
+        name: toolCall.name,
+        args: toolCall.args,
+        _approval: toolCall._approval,
+      })),
     });
   });
 
