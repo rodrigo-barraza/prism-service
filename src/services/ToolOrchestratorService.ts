@@ -543,6 +543,8 @@ export default class ToolOrchestratorService {
       "execute_javascript",
       "search_tools",
       "web_search",
+      "read_url",
+      "get_web_content",
       "enter_plan_mode",
       "exit_plan_mode",
       "ask_user_question",
