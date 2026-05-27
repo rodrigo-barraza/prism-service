@@ -245,6 +245,20 @@ function slidingWindowTruncation(messages: ChatMessage[], maxTokens: number): Ch
     if (messages[i].role === "user") break; // Stop after first user message
   }
 
+  // Find the protection boundary based on PROTECTED_RECENT_TURNS
+  let userTurnsSeen = 0;
+  let protectionIndex = 0;
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user") {
+      userTurnsSeen++;
+      if (userTurnsSeen >= PROTECTED_RECENT_TURNS) {
+        protectionIndex = i;
+        break;
+      }
+    }
+  }
+
   // Build tail from the end until we approach budget
   const tail: ChatMessage[] = [];
   let tailTokens = 0;
@@ -252,10 +266,16 @@ function slidingWindowTruncation(messages: ChatMessage[], maxTokens: number): Ch
   const availableForTail = maxTokens - headTokens - 200; // 200 token buffer for marker
 
   for (let i = messages.length - 1; i >= headEnd; i--) {
-    const msgTokens = estimateMessageTokens(messages[i]);
-    if (tailTokens + msgTokens > availableForTail) break;
-    tail.unshift(messages[i]);
-    tailTokens += msgTokens;
+    const messageTokens = estimateMessageTokens(messages[i]);
+    if (i >= protectionIndex) {
+      // Always protect recent turns, accumulate token count without breaking on budget
+      tail.unshift(messages[i]);
+      tailTokens += messageTokens;
+    } else {
+      if (tailTokens + messageTokens > availableForTail) break;
+      tail.unshift(messages[i]);
+      tailTokens += messageTokens;
+    }
   }
 
   const droppedCount = messages.length - head.length - tail.length;
@@ -270,6 +290,7 @@ function slidingWindowTruncation(messages: ChatMessage[], maxTokens: number): Ch
 
   return [...head, ...tail];
 }
+
 
 // ────────────────────────────────────────────────────────────
 // Public API
