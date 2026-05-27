@@ -112,11 +112,11 @@ describe("PostExecutionEmitter", () => {
       pass = { streamedImages: [] };
     });
 
-    it("should emit tool_execution with done status for successful results", () => {
+    it("should emit tool_execution with done status for successful results", async () => {
       const toolCalls = [{ name: "read_file", id: "tc-1", args: { path: "/a" } }];
       const results = [{ name: "read_file", id: "tc-1", result: { content: "hello" } }];
 
-      processToolResultMedia(toolCalls, results, state, pass, mockEmit);
+      await processToolResultMedia(toolCalls, results, state, pass, mockEmit);
 
       expect(mockEmit).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -127,7 +127,7 @@ describe("PostExecutionEmitter", () => {
       );
     });
 
-    it("should emit tool_execution with error status for failed results", () => {
+    it("should emit tool_execution with error status for failed results", async () => {
       const toolCalls = [{ name: "write_file", id: "tc-2", args: {} }];
       const results = [
         {
@@ -137,7 +137,7 @@ describe("PostExecutionEmitter", () => {
         },
       ];
 
-      processToolResultMedia(toolCalls, results, state, pass, mockEmit);
+      await processToolResultMedia(toolCalls, results, state, pass, mockEmit);
 
       expect(mockEmit).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -147,7 +147,7 @@ describe("PostExecutionEmitter", () => {
       );
     });
 
-    it("should track screenshot references in state and pass", () => {
+    it("should track screenshot references in state and pass", async () => {
       const toolCalls = [{ name: "browser_screenshot", id: "tc-3", args: {} }];
       const results = [
         {
@@ -157,13 +157,13 @@ describe("PostExecutionEmitter", () => {
         },
       ];
 
-      processToolResultMedia(toolCalls, results, state, pass, mockEmit);
+      await processToolResultMedia(toolCalls, results, state, pass, mockEmit);
 
       expect(state.streamedImages).toContain("minio://screenshots/abc.png");
       expect(pass.streamedImages).toContain("minio://screenshots/abc.png");
     });
 
-    it("should emit image event and track image data in state", () => {
+    it("should emit image event and track image data in state", async () => {
       const toolCalls = [{ name: "generate_image", id: "tc-4", args: {} }];
       const results = [
         {
@@ -179,7 +179,7 @@ describe("PostExecutionEmitter", () => {
         },
       ];
 
-      processToolResultMedia(toolCalls, results, state, pass, mockEmit);
+      await processToolResultMedia(toolCalls, results, state, pass, mockEmit);
 
       expect(mockEmit).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -190,6 +190,29 @@ describe("PostExecutionEmitter", () => {
         }),
       );
       expect(state.streamedImages).toContain("minio://images/gen.png");
+    });
+
+    it("should upload raw audio results to MinIO and set audioRef in resultObj", async () => {
+      const toolCalls = [{ name: "generate_audio", id: "tc-5", args: {} }];
+      const results = [
+        {
+          name: "generate_audio",
+          id: "tc-5",
+          result: {
+            audio: {
+              data: "base64audiodata",
+              mimeType: "audio/wav",
+            },
+            duration: 10,
+          },
+        },
+      ];
+
+      await processToolResultMedia(toolCalls, results, state, pass, mockEmit);
+
+      const updatedResult = results[0].result as any;
+      expect(updatedResult.audioRef).toBeDefined();
+      expect(updatedResult.audio).toBeUndefined();
     });
   });
 

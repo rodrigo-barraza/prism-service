@@ -312,7 +312,7 @@ export default class ReActHarness extends BaseAgenticHarness {
         }
 
         // ── Post-execution: media, errors, status ─────────────
-        processToolResultMedia(
+        await processToolResultMedia(
           pass.pendingToolCalls,
           results,
           state,

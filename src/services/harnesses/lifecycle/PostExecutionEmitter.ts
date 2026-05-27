@@ -2,6 +2,7 @@ import logger from "../../../utils/logger.ts";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type { ToolCall, ToolResult, PassState, EmitFn } from "../types.ts";
+import FileService from "../../FileService.ts";
 
 /**
  * PostExecutionEmitter — status notifications emitted after tool execution.
@@ -36,19 +37,35 @@ export function emitPostExecutionStatus(
 }
 
 /** Process tool results for image/screenshot side-effects. */
-export function processToolResultMedia(
+export async function processToolResultMedia(
   toolCalls: ToolCall[],
   results: ToolResult[],
   state: AgenticLoopState,
   pass: PassState,
   emit: EmitFn,
-): void {
+): Promise<void> {
   for (const toolCall of toolCalls) {
     const res = results.find(
       (r) => r.id === toolCall.id || (!r.id && r.name === toolCall.name),
     );
     const resultObj = res?.result as Record<string, unknown> | null;
     const hasError = !!resultObj?.error;
+
+    // Check if result has raw audio data, upload it if so
+    const audioResult = resultObj?.audio as Record<string, string> | undefined;
+    if (audioResult?.data) {
+      const mimeType = audioResult.mimeType || "audio/wav";
+      const dataUrl = `data:${mimeType};base64,${audioResult.data}`;
+      try {
+        const uploadResult = await FileService.uploadFile(dataUrl, "generations");
+        if (resultObj) {
+          resultObj.audioRef = uploadResult.ref;
+          delete resultObj.audio;
+        }
+      } catch (uploadError) {
+        logger.error(`[PostExecutionEmitter] Failed to upload audio:`, uploadError);
+      }
+    }
 
     emit({
       type: "tool_execution",

@@ -45,6 +45,7 @@ const COMPACTABLE_TOOLS = new Set([
   "python_interpreter",
   "javascript_interpreter",
   "shell",
+  "generate_audio",
 ]);
 
 export interface MicroCompactionResult {

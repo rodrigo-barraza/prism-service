@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { vi, describe, it, expect } from "vitest";
 
 // Suppress logger output during tests
 vi.mock("../src/utils/logger.ts", () => ({
@@ -349,6 +349,32 @@ describe("ContextWindowManager.enforce — sliding window", () => {
     // The final answer should be in the result
     const lastAssistant = result.messages.filter(m => m.role === "assistant").pop();
     expect(lastAssistant.content).toContain("FINAL_ANSWER_MARKER");
+  });
+
+  it("never drops recent user messages even under severe budget pressure", () => {
+    const messages = [
+      { role: "system", content: "System" },
+      { role: "user", content: "First user query" },
+      { role: "assistant", content: "Long response ".repeat(2000) },
+      { role: "user", content: "Second user query" },
+      { role: "assistant", content: "Another long response ".repeat(2000) },
+      { role: "user", content: "Third user query (recent)" },
+      { role: "assistant", content: "Recent response" },
+    ];
+
+    const result = ContextWindowManager.enforce(messages, {
+      maxInputTokens: 16_000,
+    });
+
+    expect(result.truncated).toBe(true);
+    expect(result.strategy).toBe("sliding_window");
+
+    const userMessages = result.messages.filter(
+      (m) => m.role === "user" && !m.content?.includes("CONTEXT NOTE"),
+    );
+
+    expect(userMessages.length).toBeGreaterThanOrEqual(2);
+    expect(userMessages.some((m) => m.content === "Third user query (recent)")).toBe(true);
   });
 
   it("handles conversation with only 3 messages (no truncation possible)", () => {
