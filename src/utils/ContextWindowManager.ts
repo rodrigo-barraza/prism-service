@@ -1,6 +1,7 @@
 import logger from "./logger.ts";
 import { estimateTokens } from "./CostCalculator.ts";
 import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
+import MicroCompactionService from "../services/compact/MicroCompactionService.ts";
 
 // ────────────────────────────────────────────────────────────
 // ContextWindowManager — Token-Budget Truncation
@@ -323,8 +324,25 @@ export default class ContextWindowManager {
       `[ContextWindowManager] Context overflow: ${currentTokens} tokens > ${budget} budget (${maxInputTokens} window, ${outputReserve} output reserve)`,
     );
 
+    // Strategy 0: Micro-compaction — clear old compactable tool results entirely
+    const microCompactionResult = MicroCompactionService.microcompactMessages(messages);
+    let result = microCompactionResult.messages;
+    currentTokens = estimateTotalTokens(result);
+
+    if (currentTokens <= budget) {
+      logger.info(
+        `[ContextWindowManager] Fixed with micro-compaction: ${currentTokens} tokens (cleared ${microCompactionResult.clearedResultCount} results, freed ~${microCompactionResult.freedTokens} tokens)`,
+      );
+      return {
+        messages: result,
+        truncated: true,
+        strategy: "micro_compaction",
+        estimatedTokens: currentTokens,
+      };
+    }
+
     // Strategy 1: Truncate tool results aggressively
-    let result = truncateToolResults(messages);
+    result = truncateToolResults(result);
     currentTokens = estimateTotalTokens(result);
 
     if (currentTokens <= budget) {

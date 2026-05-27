@@ -19,6 +19,9 @@ import {
 
 import PlanningModeService from "../PlanningModeService.ts";
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
+import AutoCompactionTrigger from "../compact/AutoCompactionTrigger.ts";
+import CompactionService from "../compact/CompactionService.ts";
+import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 
 import type { ConversationMessage, ToolCall, ToolSchema, ToolResult } from "./types.ts";
 
@@ -166,6 +169,54 @@ export default class ReActHarness extends BaseAgenticHarness {
       const allowedToolNames = new Set(
         ((passOptions.tools as ToolSchema[]) || []).map((tool: ToolSchema) => tool.name),
       );
+
+      // ── Auto-compaction trigger ─────────────────────────────
+      // Before mechanical truncation, check if we should run LLM-powered
+      // compaction. This produces an intelligent summary instead of
+      // just dropping messages. Modeled after Claude Code's autoCompact.ts.
+      const contextWindowSize = context.modelDef?.maxInputTokens || 128_000;
+      const maxOutputTokens = options.maxTokens || 8192;
+      const preEnforceTokenEstimate = ContextWindowManager.estimateTokens(
+        currentMessages as Parameters<typeof ContextWindowManager.estimateTokens>[0],
+      );
+
+      const autoCompactEvaluation = AutoCompactionTrigger.evaluate(
+        preEnforceTokenEstimate,
+        contextWindowSize,
+        maxOutputTokens,
+        currentMessages.length,
+      );
+
+      if (autoCompactEvaluation.shouldCompact) {
+        const compactionResult = await CompactionService.compactConversation(
+          currentMessages as Parameters<typeof CompactionService.compactConversation>[0],
+          {
+            project: project || "",
+            username: username || "",
+            agentSessionId,
+            traceId: traceId || null,
+            agent: agent || null,
+            emit,
+            signal: signal || undefined,
+          },
+        );
+
+        if (compactionResult) {
+          currentMessages = compactionResult.compactedMessages as ConversationMessage[];
+          // Recalculate originalMessageCount to match the compacted array
+          // so finalize() only persists new messages from this point on.
+          state.originalMessageCount = currentMessages.length;
+          state.compactionPerformed = true;
+          state.preCompactTokenCount = compactionResult.preCompactTokenCount;
+          state.postCompactTokenCount = compactionResult.postCompactTokenCount;
+
+          logger.info(
+            `[ReActHarness] Auto-compacted: ${compactionResult.preCompactTokenCount} → ` +
+              `${compactionResult.postCompactTokenCount} tokens ` +
+              `(${currentMessages.length} messages remain)`,
+          );
+        }
+      }
 
       // ── Context window enforcement ─────────────────────────
       currentMessages = this.enforceContextWindow(
