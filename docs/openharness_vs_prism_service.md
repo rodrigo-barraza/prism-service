@@ -33,7 +33,7 @@ This document provides a detailed comparison between **OpenHarness** and **Prism
 | **Agent Loops** | Server-side `AgenticLoopService` (up to 100 iterations, parallel execution). | Local loop with streaming tool-calls, exponential backoff API retries. |
 | **Multi-Agent** | `CoordinatorService` (Task decomposition + parallel git worktree workers). | Swarm Coordination (Subagent spawning, background tasks, worker registry). |
 | **Model Context Protocol** | ✅ `MCPClientService` integrated. | ✅ `MCPTool`, resource reading/listing supported. |
-| **Scheduled Tasks** | Currently no native cron tool mentioned. | ✅ Native `CronCreate/List/Delete` tools. |
+| **Scheduled Tasks** | ✅ `ScheduledTaskService` daemon built-in. | ✅ Native `CronCreate/List/Delete` tools. |
 | **Skill Ecosystem** | Agent skill definitions (`/skills` endpoint). | ✅ On-demand `.md` skills compatible with `anthropics/skills`. |
 | **Plugins** | Internal modules. | ✅ Fully compatible with `claude-code` plugins. |
 
@@ -74,10 +74,6 @@ OpenHarness thrives on ecosystem compatibility. `prism-service` could adopt stan
 In long-running backend agent loops (100+ iterations), context limits are easily reached.
 - **Smart Compression:** Implement a feature similar to OpenHarness's auto-compaction, which transparently summarizes older conversation turns or excessive tool outputs into a dense digest, while preserving the active task state and current plan.
 
-### D. Scheduled Agents (Cron Background Tasks)
-OpenHarness treats scheduling as a native tool (`CronCreate`). 
-- **Cron Jobs:** Giving agents in `prism-service` the ability to schedule future executions (e.g., "Run this scraper every 6 hours and update the vector database") natively through a `CronCreate` tool would transform `prism-service` into an autonomous background-job engine.
-
 ### E. Dry-Run / Safe Preview Endpoints
 - **`/agent/dry-run`:** Allowing the client to preview the exact System Prompt, loaded skills, authenticated tools, and MCP servers the agent *would* have access to, without actually initiating the expensive API requests.
 
@@ -88,4 +84,4 @@ OpenHarness treats scheduling as a native tool (`CronCreate`).
 
 `prism-service` is an incredibly powerful **centralized, multi-modal backend gateway**, excelling at bringing text, audio, image, and local models under one API with robust vector memory. **OpenHarness**, on the other hand, excels in **ecosystem compatibility, strict safety boundaries, and CLI developer experience**. 
 
-Merging the **Safety Governance (Permissions/Hooks)**, **Standardized Plugin Ecosystems (.md skills)**, and **Background Task Scheduling** from OpenHarness into `prism-service` would significantly mature its autonomous agent capabilities.
+Merging the **Safety Governance (Permissions/Hooks)** and **Standardized Plugin Ecosystems (.md skills)** from OpenHarness into `prism-service` would significantly mature its autonomous agent capabilities.
