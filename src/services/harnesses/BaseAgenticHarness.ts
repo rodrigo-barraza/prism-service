@@ -9,7 +9,7 @@ import { getPricing, TYPES } from "../../config.ts";
 import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.ts";
 import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
-import RequestLogger, { type LogChatGenerationParams, TokenUsage, MessagePayload, ToolCallPayload } from "../RequestLogger.ts";
+import RequestLogger, { TokenUsage, MessagePayload, ToolCallPayload } from "../RequestLogger.ts";
 import FileService from "../FileService.ts";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
@@ -140,6 +140,7 @@ export default class BaseAgenticHarness {
     toolCount: number,
   ): ConversationMessage[] {
     const { modelDef, options, emit } = this.ctx;
+    const preEnforceCount = messages.length;
     const contextResult = ContextWindowManager.enforce(messages as Parameters<typeof ContextWindowManager.enforce>[0], {
       maxInputTokens: modelDef?.maxInputTokens || 128_000,
       maxOutputTokens: options.maxTokens || 8192,
@@ -152,6 +153,17 @@ export default class BaseAgenticHarness {
         strategy: contextResult.strategy,
         estimatedTokens: contextResult.estimatedTokens,
       });
+      // Recalculate originalMessageCount so finalize() slices correctly
+      // against the post-truncation array, not the pre-truncation one.
+      // Without this, the slice index points to the wrong position and
+      // captures synthetic [CONTEXT NOTE] markers for DB persistence.
+      const droppedCount = preEnforceCount - contextResult.messages.length;
+      if (droppedCount > 0) {
+        this.state.originalMessageCount = Math.max(
+          0,
+          this.state.originalMessageCount - droppedCount,
+        );
+      }
       return contextResult.messages as ConversationMessage[];
     }
     return messages;
@@ -583,6 +595,13 @@ export default class BaseAgenticHarness {
 
     const newTurnMessages = currentMessages.slice(
       Math.max(0, state.originalMessageCount - 1),
+    ).filter(
+      (message) =>
+        !(
+          message.role === "user" &&
+          typeof message.content === "string" &&
+          message.content.startsWith("[CONTEXT NOTE:")
+        ),
     );
 
     logger.info(

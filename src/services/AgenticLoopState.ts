@@ -55,6 +55,12 @@ export default class AgenticLoopState {
   // history; we must not re-append already-persisted messages.
   originalMessageCount: number;
 
+  // ── Compaction tracking ─────────────────────────────────
+  // Set when LLM-powered auto-compaction fires during the loop.
+  compactionPerformed: boolean;
+  preCompactTokenCount: number | null;
+  postCompactTokenCount: number | null;
+
   // ── Error budget tracking ───────────────────────────────
   toolErrorCounts: Map<string, number>;
 
@@ -100,6 +106,10 @@ export default class AgenticLoopState {
     this.planModeText = "";
 
     this.originalMessageCount = originalMessageCount;
+
+    this.compactionPerformed = false;
+    this.preCompactTokenCount = null;
+    this.postCompactTokenCount = null;
 
     this.toolErrorCounts = new Map();
 

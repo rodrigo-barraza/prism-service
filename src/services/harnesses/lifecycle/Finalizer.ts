@@ -464,12 +464,23 @@ function swapMsgContent(message: MessagePayload) {
     if (agent) {
             finalMeta = { ...(finalMeta || {}), agent };
     }
-    // Ensure all user messages to append are properly swapped/sanitized
-    const sanitizedMessagesToAppend = messagesToAppend.map((message) => {
-      const cloned = { ...message };
-      swapMsgContent(cloned);
-      return cloned;
-    });
+    // Ensure all user messages to append are properly swapped/sanitized,
+    // then filter out synthetic compaction artifacts that should never
+    // reach MongoDB (context notes, compaction summaries, cleared stubs).
+    const sanitizedMessagesToAppend = messagesToAppend
+      .map((message) => {
+        const cloned = { ...message };
+        swapMsgContent(cloned);
+        return cloned;
+      })
+      .filter((message) => {
+        if (message.role === "user" && typeof message.content === "string") {
+          if (message.content.startsWith("[CONTEXT NOTE:")) return false;
+          if (message.content.startsWith("[Conversation Summary")) return false;
+          if ((message as Record<string, unknown>).isCompactSummary === true) return false;
+        }
+        return true;
+      });
 
     appendAndFinalize(
       conversationId || "",
