@@ -534,7 +534,7 @@ export default class ToolOrchestratorService {
 
   /** Client-facing schemas (with domain/dataSource/labels, no endpoint) — for Prism Client UI */
   static getClientToolSchemas() {
-    const CORE_SYSTEM_TOOLS = new Set([
+    const CORE_AGENTIC_TOOLS = new Set([
       "upsert_memory",
       "task_create",
       "task_list",
@@ -576,12 +576,12 @@ export default class ToolOrchestratorService {
 
     const internalClient = InternalToolRegistry.getClientSchemas().map((tool) => ({
       ...tool,
-      system: CORE_SYSTEM_TOOLS.has(tool.name) || tool.domain === "Reasoning" || tool.domain === "Coordinator",
+      system: CORE_AGENTIC_TOOLS.has(tool.name) || tool.domain === "Reasoning" || tool.domain === "Coordinator",
     }));
 
     const clientSchemasEnriched = cachedClientSchemas.map((tool) => ({
       ...tool,
-      system: CORE_SYSTEM_TOOLS.has(tool.name) || tool.domain === "Reasoning" || tool.domain === "Coordinator",
+      system: CORE_AGENTIC_TOOLS.has(tool.name) || tool.domain === "Reasoning" || tool.domain === "Coordinator",
     }));
 
     const mcpClient = ToolOrchestratorService.getMCPToolSchemas().map((tool) => ({

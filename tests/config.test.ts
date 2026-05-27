@@ -104,7 +104,7 @@ describe('GET /config', () => {
 });
 
 describe('GET /config/agents', () => {
-  it('returns the list of agents with core system tools included for non-Lupos agents', async () => {
+  it('returns the list of agents with core agentic tools included for non-Lupos agents', async () => {
     const res = await request(app)
       .get('/config/agents')
       .expect(200);
@@ -113,15 +113,15 @@ describe('GET /config/agents', () => {
     
     const codingAgent = res.body.find((a: any) => a.id === 'CODING');
     expect(codingAgent).toBeDefined();
-    // Non-Lupos agent should have core system tools like enter_plan_mode
+    // Non-Lupos agent should have core agentic tools like enter_plan_mode
     expect(codingAgent.enabledToolNames).toContain('enter_plan_mode');
     expect(codingAgent.toolCount).toBeGreaterThan(0);
 
     const luposAgent = res.body.find((a: any) => a.id === 'LUPOS');
     expect(luposAgent).toBeDefined();
-    // Lupos agent should NOT have core system tools like enter_plan_mode
+    // Lupos agent should NOT have core agentic tools like enter_plan_mode
     expect(luposAgent.enabledToolNames).not.toContain('enter_plan_mode');
-    // But Lupos agent SHOULD have explicitly whitelisted system tools like upsert_memory
+    // But Lupos agent SHOULD have explicitly whitelisted agentic tools like upsert_memory
     expect(luposAgent.enabledToolNames).toContain('upsert_memory');
   });
 });
@@ -136,17 +136,17 @@ describe('GET /config/tools', () => {
     expect(res.body.some((t: any) => t.name === 'enter_plan_mode')).toBe(true);
   });
 
-  it('includes core system tools when filtered by a non-Lupos agent like CODING', async () => {
+  it('includes core agentic tools when filtered by a non-Lupos agent like CODING', async () => {
     const res = await request(app)
       .get('/config/tools?agent=CODING')
       .expect(200);
 
     expect(Array.isArray(res.body)).toBe(true);
-    // Should contain system tools
+    // Should contain agentic tools
     expect(res.body.some((t: any) => t.name === 'enter_plan_mode')).toBe(true);
   });
 
-  it('does NOT include non-whitelisted core system tools when filtered by LUPOS, but includes whitelisted ones', async () => {
+  it('does NOT include non-whitelisted core agentic tools when filtered by LUPOS, but includes whitelisted ones', async () => {
     const res = await request(app)
       .get('/config/tools?agent=LUPOS')
       .expect(200);
@@ -158,7 +158,7 @@ describe('GET /config/tools', () => {
     expect(res.body.some((t: any) => t.name === 'upsert_memory')).toBe(true);
   });
 
-  it('preserves system: true for whitelisted core system tools returned for LUPOS agent', async () => {
+  it('preserves system: true for whitelisted core agentic tools returned for LUPOS agent', async () => {
     const res = await request(app)
       .get('/config/tools?agent=LUPOS')
       .expect(200);
