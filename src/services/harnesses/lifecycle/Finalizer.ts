@@ -325,27 +325,11 @@ function swapMsgContent(message: MessagePayload) {
       rateLimits,
     });
   }
-  // ── Emit done event ───────────────────────────────────────────
-    if (!signal?.aborted) {
-        if (emit) {
-          emit({
-            type: "done",
-            provider: providerName,
-            model: resolvedModel,
-            usage: usage || null,
-            estimatedCost,
-            tokensPerSec,
-            ...(audioRef ? { audioRef } : {}),
-            timeToGeneration:
-                      timeToGenerationSec != null ? roundMs(timeToGenerationSec) : null,
-                  generationTime: generationSec != null ? roundMs(generationSec) : null,
-                  totalTime: totalSec != null ? roundMs(totalSec) : null,
-                  ...(traceId && { traceId }),
-                  ...(conversationId && { conversationId }),
-          });
-        }
-  }
   // ── Conversation persistence ──────────────────────────────────
+  // IMPORTANT: Persist BEFORE emitting `done` so the client's post-stream
+  // DB fetch sees the complete conversation. Previously, `done` fired first
+  // and `appendAndFinalize` was fire-and-forget, causing a race condition
+  // where the client fetched stale data from MongoDB.
   if (conversationId) {
     let messagesToAppend: MessagePayload[] = [];
     if (overrideMessagesToAppend) {
@@ -482,7 +466,7 @@ function swapMsgContent(message: MessagePayload) {
         return true;
       });
 
-    appendAndFinalize(
+    await appendAndFinalize(
       conversationId || "",
       project || "",
       username as string,
@@ -490,6 +474,28 @@ function swapMsgContent(message: MessagePayload) {
       finalMeta,
             getCollectionOpts(project),
     );
+  }
+  // ── Emit done event ───────────────────────────────────────────
+  // Emitted AFTER persistence so the client's post-stream DB fetch
+  // is guaranteed to see the complete, up-to-date conversation.
+    if (!signal?.aborted) {
+        if (emit) {
+          emit({
+            type: "done",
+            provider: providerName,
+            model: resolvedModel,
+            usage: usage || null,
+            estimatedCost,
+            tokensPerSec,
+            ...(audioRef ? { audioRef } : {}),
+            timeToGeneration:
+                      timeToGenerationSec != null ? roundMs(timeToGenerationSec) : null,
+                  generationTime: generationSec != null ? roundMs(generationSec) : null,
+                  totalTime: totalSec != null ? roundMs(totalSec) : null,
+                  ...(traceId && { traceId }),
+                  ...(conversationId && { conversationId }),
+          });
+        }
   }
 }
 
