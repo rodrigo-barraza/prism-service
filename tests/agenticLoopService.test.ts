@@ -76,6 +76,7 @@ vi.mock("../src/utils/ContextWindowManager.ts", () => ({
       strategy: "none",
       estimatedTokens: 10,
     })),
+    estimateTokens: vi.fn().mockReturnValue(10),
   },
 }));
 
