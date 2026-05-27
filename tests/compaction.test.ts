@@ -261,6 +261,43 @@ describe("CompactionService", () => {
     );
   });
 
+  it("preserves active turns in recent tail when conversation has fewer than 3 user turns", async () => {
+    const summaryContent = "Conversation summarized elegantly.";
+    MOCK_GENERATE_TEXT.mockResolvedValueOnce({
+      text: `<analysis>Drafting compaction...</analysis>\n<summary>${summaryContent}</summary>`,
+      usage: { inputTokens: 50, outputTokens: 25 },
+    });
+
+    // Conversation has only 2 user turns: "Historical Q" and "Active Q"
+    const messages: ChatMessage[] = [
+      { role: "system", content: "You are an assistant." },
+      { role: "user", content: "Historical Q" },
+      { role: "assistant", content: "Historical A" },
+      { role: "user", content: "Active Q" },
+    ];
+
+    const mockEmit = vi.fn();
+    const result = await CompactionService.compactConversation(messages, {
+      project: "test-proj",
+      username: "rodrigo",
+      agentSessionId: "sess-1",
+      emit: mockEmit,
+    });
+
+    expect(result).not.toBeNull();
+    const compacted = result!.compactedMessages;
+    // With 2 user turns (< 3), all messages (except system) are preserved in the tail.
+    // So "Historical Q", "Historical A", and "Active Q" should all be in the tail!
+    expect(compacted[0].role).toBe("system");
+    expect(compacted[1].role).toBe("user");
+    expect(compacted[1].content).toContain(summaryContent);
+    
+    // The rest of the messages should be our preserved turns
+    expect(compacted[2].content).toBe("Historical Q");
+    expect(compacted[3].content).toBe("Historical A");
+    expect(compacted[4].content).toBe("Active Q");
+  });
+
   it("stops calling provider when circuit breaker is open", async () => {
     // Force 3 consecutive failures
     MOCK_GENERATE_TEXT.mockRejectedValue(new Error("API Rate Limit exceeded"));

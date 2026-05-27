@@ -344,7 +344,10 @@ const RECENT_TAIL_TURN_COUNT = 3;
 function extractRecentTail(messages: ChatMessage[]): ChatMessage[] {
   // Walk backwards counting user turns
   let userTurnsSeen = 0;
-  let tailStartIndex = messages.length;
+  // Default to 0 so that if the conversation has fewer user turns than
+  // RECENT_TAIL_TURN_COUNT, we preserve all messages (except system)
+  // in the tail instead of discarding the entire history.
+  let tailStartIndex = 0;
 
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "user") {
