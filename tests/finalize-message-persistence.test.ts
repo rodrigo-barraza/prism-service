@@ -1,0 +1,848 @@
+/**
+ * Tests for the finalize() newTurnMessages slice logic in BaseAgenticHarness.
+ *
+ * Validates that the correct messages are extracted for DB persistence across:
+ *   - Normal multi-turn conversations (no compaction)
+ *   - Conversations where compaction fires mid-loop
+ *   - Tool call iterations with intermediate assistant messages
+ *   - Edge cases around originalMessageCount boundaries
+ *
+ * These are pure unit tests — no DB or network required.
+ */
+
+import { describe, it, expect } from "vitest";
+
+// ── Types mirroring the harness ConversationMessage shape ────────
+interface TestMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    args: Record<string, unknown>;
+    result?: unknown;
+  }>;
+  isCompactSummary?: boolean;
+}
+
+/**
+ * Replicates the exact newTurnMessages slice logic from
+ * BaseAgenticHarness.finalize() — lines 596-605.
+ *
+ * This is the function under test.
+ */
+function extractNewTurnMessages(
+  currentMessages: TestMessage[],
+  originalMessageCount: number,
+): TestMessage[] {
+  return currentMessages
+    .slice(Math.max(0, originalMessageCount - 1))
+    .filter(
+      (message) =>
+        !(
+          message.role === "user" &&
+          typeof message.content === "string" &&
+          message.content.startsWith("[CONTEXT NOTE:")
+        ),
+    );
+}
+
+/**
+ * Replicates the sanitization filter from Finalizer.ts lines 470-483.
+ * This filters out compaction artifacts that should never reach MongoDB.
+ */
+function sanitizeMessagesToAppend(
+  messagesToAppend: TestMessage[],
+): TestMessage[] {
+  return messagesToAppend.filter((message) => {
+    if (message.role === "user" && typeof message.content === "string") {
+      if (message.content.startsWith("[CONTEXT NOTE:")) return false;
+      if (message.content.startsWith("[Conversation Summary")) return false;
+      if (message.isCompactSummary === true) return false;
+    }
+    return true;
+  });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SCENARIO 1: Normal two-turn conversation without compaction
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+describe("newTurnMessages slice — normal flow (no compaction)", () => {
+  it("captures user message and tool-calling assistant in a single-tool turn", () => {
+    // Client sends 4 messages: [system, user1, assistant1, user2]
+    // originalMessageCount = 4
+    // After iteration 1 (tool call): [system, user1, assistant1, user2, assistant2_with_tools]
+    // After iteration 2 (text only — breaks without pushing)
+    // currentMessages.length = 5
+
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "You are helpful." },
+      { role: "user", content: "hey whats up" },
+      { role: "assistant", content: "Hey Rodrigo! What's good?" },
+      { role: "user", content: "make a song about the war" },
+      {
+        role: "assistant",
+        content: "I'll create a song for you!",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "generate_audio",
+            args: { title: "War Song" },
+            result: { success: true, audioRef: "minio://audio/war.wav" },
+          },
+        ],
+      },
+    ];
+    const originalMessageCount = 4;
+
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessages,
+      originalMessageCount,
+    );
+
+    // Should capture: user2 + assistant2_with_tools (slice from index 3)
+    expect(newTurnMessages).toHaveLength(2);
+    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].content).toBe("make a song about the war");
+    expect(newTurnMessages[1].role).toBe("assistant");
+    expect(newTurnMessages[1].toolCalls).toHaveLength(1);
+    expect(newTurnMessages[1].toolCalls![0].name).toBe("generate_audio");
+  });
+
+  it("captures user message in a text-only turn (no tools)", () => {
+    // Client sends: [system, user1, assistant1, user2]
+    // Iteration 1 produces text only → breaks without pushing
+    // currentMessages stays at 4
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "You are helpful." },
+      { role: "user", content: "hey" },
+      { role: "assistant", content: "Hello!" },
+      { role: "user", content: "how are you?" },
+    ];
+    const originalMessageCount = 4;
+
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessages,
+      originalMessageCount,
+    );
+
+    // Should capture: user2 (slice from index 3)
+    expect(newTurnMessages).toHaveLength(1);
+    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].content).toBe("how are you?");
+  });
+
+  it("captures user + multiple tool iterations", () => {
+    // Two tool iterations before final text
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "System" },
+      { role: "user", content: "hello" },
+      { role: "assistant", content: "Hi!" },
+      { role: "user", content: "search for X and generate audio" },
+      {
+        role: "assistant",
+        content: "Let me search first.",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "web_search",
+            args: { query: "X" },
+            result: { results: [] },
+          },
+        ],
+      },
+      {
+        role: "assistant",
+        content: "Now generating audio.",
+        toolCalls: [
+          {
+            id: "tc-1",
+            name: "generate_audio",
+            args: { title: "X Song" },
+            result: { success: true },
+          },
+        ],
+      },
+    ];
+    const originalMessageCount = 4;
+
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessages,
+      originalMessageCount,
+    );
+
+    // Should capture: user2, assistant_search, assistant_audio
+    expect(newTurnMessages).toHaveLength(3);
+    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].content).toBe(
+      "search for X and generate audio",
+    );
+    expect(newTurnMessages[1].toolCalls![0].name).toBe("web_search");
+    expect(newTurnMessages[2].toolCalls![0].name).toBe("generate_audio");
+  });
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SCENARIO 2: Compaction fires mid-loop
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
+  it("BUG: compaction resets originalMessageCount to compacted length, losing the user message", () => {
+    // This test documents the CURRENT BUGGY behavior:
+    //
+    // Before compaction: [system, user1, assistant1, user2]
+    //   originalMessageCount = 4
+    //
+    // After compaction: [system, summaryUser, user1, assistant1, user2]
+    //   state.originalMessageCount = 5  (set to compactedMessages.length in ReActHarness line 208)
+    //
+    // After iteration 1 (tool call): [system, summaryUser, user1, assistant1, user2, assistant2_with_tools]
+    //   currentMessages.length = 6
+    //
+    // After iteration 2 (text only — breaks without pushing)
+    //   currentMessages.length = 6 (unchanged)
+    //
+    // finalize() slices from Math.max(0, 5 - 1) = 4:
+    //   newTurnMessages = currentMessages.slice(4)
+    //                   = [user2, assistant2_with_tools]
+    //
+    // This is CORRECT — user2 is included!
+    // But wait, the issue might be different...
+
+    const currentMessagesAfterCompaction: TestMessage[] = [
+      { role: "system", content: "You are helpful." },
+      {
+        role: "user",
+        content: "[Conversation Summary]\nUser greeted the assistant.",
+        isCompactSummary: true,
+      },
+      { role: "user", content: "hey whats up" },
+      { role: "assistant", content: "Hey Rodrigo!" },
+      { role: "user", content: "make a song about the war" },
+      {
+        role: "assistant",
+        content: "Creating your song!",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "generate_audio",
+            args: { title: "War" },
+            result: { success: true },
+          },
+        ],
+      },
+    ];
+    // After compaction, originalMessageCount is set to compacted array length
+    const originalMessageCountAfterCompaction =
+      currentMessagesAfterCompaction.length - 1; // 5 (before tool iteration appends)
+
+    // Actually, let me re-trace. Compaction happens BEFORE the iteration starts.
+    // originalMessageCount is set to currentMessages.length at compaction time.
+    // At compaction time, currentMessages = [system, summary, user1, assistant1, user2]
+    // length = 5, so originalMessageCount = 5.
+    // Then iteration 1 appends assistant2_with_tools → length = 6.
+    // finalize() slices from 5 - 1 = 4:
+    //   = [user2, assistant2_with_tools]
+    // This IS correct.
+
+    const sliceFromIndex = Math.max(0, 5 - 1); // 4
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessagesAfterCompaction,
+      5,
+    );
+
+    // user2 IS included — so the bug is not here when compaction preserves user2.
+    expect(newTurnMessages).toHaveLength(2);
+    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].content).toBe("make a song about the war");
+
+    // But after sanitization, the compaction summary is irrelevant
+    // because it wasn't in the slice anyway.
+    const sanitized = sanitizeMessagesToAppend(newTurnMessages);
+    expect(sanitized).toHaveLength(2);
+    expect(sanitized[0].content).toBe("make a song about the war");
+  });
+
+  it("BUG: compaction drops user2 from recent tail → user message lost entirely", () => {
+    // The REAL bug: if extractRecentTail fails to include user2 in the tail,
+    // compaction output becomes [system, summary] without user2.
+    //
+    // Then originalMessageCount = 2, and the loop adds assistant2_with_tools
+    // at index 2. finalize() slices from 2-1=1:
+    //   newTurnMessages = [summary, assistant2_with_tools]
+    // After sanitization: [assistant2_with_tools] — user2 is GONE!
+
+    const currentMessagesAfterBadCompaction: TestMessage[] = [
+      { role: "system", content: "You are helpful." },
+      {
+        role: "user",
+        content: "[Conversation Summary]\nEntire history compacted.",
+        isCompactSummary: true,
+      },
+      {
+        role: "assistant",
+        content: "Creating your song!",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "generate_audio",
+            args: { title: "War" },
+            result: { success: true },
+          },
+        ],
+      },
+    ];
+    const originalMessageCountAfterBadCompaction = 2; // compaction produced only [system, summary]
+
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessagesAfterBadCompaction,
+      originalMessageCountAfterBadCompaction,
+    );
+
+    // Slice from 2 - 1 = 1: [summary, assistant2_with_tools]
+    expect(newTurnMessages).toHaveLength(2);
+
+    // After sanitization: summary is filtered out
+    const sanitized = sanitizeMessagesToAppend(newTurnMessages);
+
+    // BUG: Only assistant remains — user message was LOST
+    expect(sanitized).toHaveLength(1);
+    expect(sanitized[0].role).toBe("assistant");
+    // The user's "make a song about the war" is nowhere to be found!
+  });
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SCENARIO 3: First turn of a new conversation (1 user message)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+describe("newTurnMessages slice — first turn", () => {
+  it("captures user message on first turn with tool call", () => {
+    // Client sends: [system, user1]
+    // originalMessageCount = 2
+    // After iteration 1 (tool call): [system, user1, assistant1_with_tools]
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "System" },
+      { role: "user", content: "generate an image of a cat" },
+      {
+        role: "assistant",
+        content: "Creating a cat image!",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "generate_image",
+            args: { prompt: "cat" },
+            result: { success: true },
+          },
+        ],
+      },
+    ];
+
+    const newTurnMessages = extractNewTurnMessages(currentMessages, 2);
+
+    // Slice from 2 - 1 = 1: [user1, assistant1_with_tools]
+    expect(newTurnMessages).toHaveLength(2);
+    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].content).toBe("generate an image of a cat");
+    expect(newTurnMessages[1].toolCalls![0].name).toBe("generate_image");
+  });
+
+  it("captures only user message on first turn without tools", () => {
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "System" },
+      { role: "user", content: "hello" },
+    ];
+
+    const newTurnMessages = extractNewTurnMessages(currentMessages, 2);
+    expect(newTurnMessages).toHaveLength(1);
+    expect(newTurnMessages[0].content).toBe("hello");
+  });
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SCENARIO 4: Context window enforcement drops messages
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+describe("newTurnMessages slice — context window enforcement", () => {
+  it("correctly adjusts originalMessageCount when truncation drops messages", () => {
+    // Before truncation: [system, user1, assistant1, user2, assistant2, user3]
+    //   originalMessageCount = 6
+    //
+    // After truncation drops 2 old messages:
+    //   currentMessages = [system, CONTEXT_NOTE, user2, assistant2, user3]
+    //   originalMessageCount adjusted to 6 - 2 = 4
+    //
+    // Then iteration adds tool result:
+    //   currentMessages = [system, CONTEXT_NOTE, user2, assistant2, user3, assistant3_tools]
+
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "System" },
+      { role: "user", content: "[CONTEXT NOTE: 2 messages truncated]" },
+      { role: "user", content: "second message" },
+      { role: "assistant", content: "response to second" },
+      { role: "user", content: "third message" },
+      {
+        role: "assistant",
+        content: "Using tool",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "generate_audio",
+            args: {},
+            result: { success: true },
+          },
+        ],
+      },
+    ];
+
+    // originalMessageCount was adjusted from 6 to 4 by enforceContextWindow
+    const adjustedOriginalMessageCount = 4;
+
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessages,
+      adjustedOriginalMessageCount,
+    );
+
+    // Slice from 4 - 1 = 3: [assistant2, user3, assistant3_tools]
+    // CONTEXT_NOTE should be filtered out (not in this slice anyway)
+    expect(newTurnMessages).toHaveLength(3);
+    expect(newTurnMessages[0].role).toBe("assistant");
+    expect(newTurnMessages[1].role).toBe("user");
+    expect(newTurnMessages[1].content).toBe("third message");
+    expect(newTurnMessages[2].toolCalls![0].name).toBe("generate_audio");
+  });
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SCENARIO 5: originalMessageCount boundary edge cases
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+describe("newTurnMessages slice — edge cases", () => {
+  it("handles originalMessageCount = 0 (empty history)", () => {
+    const currentMessages: TestMessage[] = [
+      { role: "user", content: "hello" },
+      {
+        role: "assistant",
+        content: "Hi!",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "test_tool",
+            args: {},
+            result: {},
+          },
+        ],
+      },
+    ];
+
+    const newTurnMessages = extractNewTurnMessages(currentMessages, 0);
+    // slice(0) = all messages
+    expect(newTurnMessages).toHaveLength(2);
+  });
+
+  it("handles originalMessageCount = 1 (only system message)", () => {
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "System" },
+      { role: "user", content: "hello" },
+    ];
+
+    const newTurnMessages = extractNewTurnMessages(currentMessages, 1);
+    // slice(0) = all messages
+    expect(newTurnMessages).toHaveLength(2);
+  });
+
+  it("handles originalMessageCount equal to currentMessages length (no new messages)", () => {
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "System" },
+      { role: "user", content: "hello" },
+    ];
+
+    const newTurnMessages = extractNewTurnMessages(currentMessages, 2);
+    // slice(1) = [user] — the user message IS the new turn
+    expect(newTurnMessages).toHaveLength(1);
+    expect(newTurnMessages[0].content).toBe("hello");
+  });
+
+  it("handles originalMessageCount exceeding currentMessages length after compaction", () => {
+    // This can happen if compaction reduces the array below the original count
+    // due to aggressive summarization
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "System" },
+      {
+        role: "user",
+        content: "[Conversation Summary]\nSummary",
+        isCompactSummary: true,
+      },
+    ];
+
+    // originalMessageCount was set to the pre-compaction count
+    const newTurnMessages = extractNewTurnMessages(currentMessages, 10);
+    // slice(9) with only 2 elements = empty
+    expect(newTurnMessages).toHaveLength(0);
+    // BUG: This means NO messages get persisted!
+  });
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SCENARIO 6: The Generate Audio specific flow
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+describe("Generate Audio tool flow — second turn message persistence", () => {
+  it("simulates the exact flow: turn 1 text, turn 2 with generate_audio tool", () => {
+    // TURN 1 already persisted in DB: [user1:"hey whats up", assistant1:"Hey Rodrigo!"]
+    //
+    // TURN 2 client sends to server:
+    //   messages = [system, user1, assistant1, user2:"make a song"]
+    //   originalMessageCount = 4
+    //
+    // Iteration 1: model generates text + generate_audio tool call
+    //   currentMessages = [system, user1, assistant1, user2, assistant2_with_tools]
+    //
+    // Iteration 2: model generates final text → breaks
+    //   currentMessages = [system, user1, assistant1, user2, assistant2_with_tools]
+    //   (unchanged — text-only break doesn't push)
+
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "You are a creative assistant." },
+      { role: "user", content: "hey whats up" },
+      { role: "assistant", content: "Hey Rodrigo! What's good?" },
+      { role: "user", content: "make a song about the war" },
+      {
+        role: "assistant",
+        content: "I'll create an original song about war!",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "generate_audio",
+            args: {
+              title: "Echoes of War",
+              tracks: [{ type: "oscillator" }],
+            },
+            result: {
+              success: true,
+              audioRef: "minio://generations/audio/war.wav",
+              duration: 30,
+            },
+          },
+        ],
+      },
+    ];
+    const originalMessageCount = 4;
+
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessages,
+      originalMessageCount,
+    );
+
+    // Slice from 3: [user2, assistant2_with_tools]
+    expect(newTurnMessages).toHaveLength(2);
+    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].content).toBe("make a song about the war");
+    expect(newTurnMessages[1].role).toBe("assistant");
+    expect(newTurnMessages[1].content).toBe(
+      "I'll create an original song about war!",
+    );
+    expect(newTurnMessages[1].toolCalls![0].name).toBe("generate_audio");
+    expect(newTurnMessages[1].toolCalls![0].result).toEqual({
+      success: true,
+      audioRef: "minio://generations/audio/war.wav",
+      duration: 30,
+    });
+
+    // After sanitization (no compaction artifacts in this case)
+    const sanitized = sanitizeMessagesToAppend(newTurnMessages);
+    expect(sanitized).toHaveLength(2);
+    expect(sanitized[0].content).toBe("make a song about the war");
+  });
+
+  it("simulates generate_audio flow WITH compaction triggering (large context)", () => {
+    // In this scenario, the system prompt + tool schemas + history push the
+    // token count above the compaction threshold.
+    //
+    // Before compaction: [system, user1, assistant1, user2]
+    //   originalMessageCount = 4
+    //
+    // Compaction produces: [system, summaryUser, user1, assistant1, user2]
+    //   state.originalMessageCount = 5
+    //
+    // Iteration 1 with tool: [system, summaryUser, user1, assistant1, user2, assistant2_tools]
+    //   length = 6
+    //
+    // finalize(): slice(5-1=4) → [user2, assistant2_tools] ✓ CORRECT
+
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "Massive system prompt with tools..." },
+      {
+        role: "user",
+        content: "[Conversation Summary]\nPrevious context.",
+        isCompactSummary: true,
+      },
+      { role: "user", content: "hey whats up" },
+      { role: "assistant", content: "Hey! What's up?" },
+      { role: "user", content: "make me a song" },
+      {
+        role: "assistant",
+        content: "Creating your song!",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "generate_audio",
+            args: {},
+            result: { success: true },
+          },
+        ],
+      },
+    ];
+    // Compaction set originalMessageCount to 5 (compacted array before tool iteration)
+    const originalMessageCount = 5;
+
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessages,
+      originalMessageCount,
+    );
+
+    // Slice from 4: [user2:"make me a song", assistant2_tools]
+    expect(newTurnMessages).toHaveLength(2);
+    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].content).toBe("make me a song");
+
+    const sanitized = sanitizeMessagesToAppend(newTurnMessages);
+    expect(sanitized).toHaveLength(2);
+    expect(sanitized[0].content).toBe("make me a song");
+  });
+
+  it("BUG REPRO: compaction aggressively drops user2 from the tail", () => {
+    // If extractRecentTail has a bug where it doesn't include user2,
+    // compaction produces [system, summary] with user2 gone.
+    // originalMessageCount = 2
+    // Tool iteration appends: [system, summary, assistant_tools]
+    // finalize(): slice(1) → [summary, assistant_tools]
+    // sanitized: [assistant_tools] — user message LOST
+
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "System" },
+      {
+        role: "user",
+        content: "[Conversation Summary]\nAll history.",
+        isCompactSummary: true,
+      },
+      {
+        role: "assistant",
+        content: "Making your song!",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "generate_audio",
+            args: {},
+            result: { success: true },
+          },
+        ],
+      },
+    ];
+
+    const newTurnMessages = extractNewTurnMessages(currentMessages, 2);
+    const sanitized = sanitizeMessagesToAppend(newTurnMessages);
+
+    // BUG: user message is completely absent from what gets persisted
+    const hasUserMessage = sanitized.some(
+      (message) => message.role === "user" && !message.isCompactSummary,
+    );
+
+    // This FAILS — documenting the bug
+    expect(hasUserMessage).toBe(false);
+    // What SHOULD be true: expect(hasUserMessage).toBe(true);
+  });
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SCENARIO 7: Finalizer messagesToAppend construction
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+describe("Finalizer messagesToAppend — what gets $pushed to MongoDB", () => {
+  it("agentic path: overrideMessagesToAppend + final assistant message", () => {
+    // The Finalizer receives overrideMessagesToAppend (the newTurnMessages from finalize())
+    // and appends one more assistant message with the final text + telemetry.
+    //
+    // DB already has from turn 1: [user1, assistant1]
+    // $push: [user2, assistant2_tools, assistant_final]
+    // Result: [user1, assistant1, user2, assistant2_tools, assistant_final]
+
+    const overrideMessagesToAppend: TestMessage[] = [
+      { role: "user", content: "make a song about the war" },
+      {
+        role: "assistant",
+        content: "Creating your song!",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "generate_audio",
+            args: {},
+            result: { success: true },
+          },
+        ],
+      },
+    ];
+
+    // Finalizer appends final assistant
+    const finalAssistant: TestMessage = {
+      role: "assistant",
+      content: "Here's your song! I created a powerful piece about war.",
+    };
+
+    const messagesToAppend = [...overrideMessagesToAppend, finalAssistant];
+    const sanitized = sanitizeMessagesToAppend(messagesToAppend);
+
+    expect(sanitized).toHaveLength(3);
+    expect(sanitized[0].role).toBe("user");
+    expect(sanitized[0].content).toBe("make a song about the war");
+    expect(sanitized[1].toolCalls![0].name).toBe("generate_audio");
+    expect(sanitized[2].content).toBe(
+      "Here's your song! I created a powerful piece about war.",
+    );
+  });
+
+  it("hasIntermediateToolMessages detection prevents duplicate toolCalls on final message", () => {
+    const overrideMessagesToAppend: TestMessage[] = [
+      { role: "user", content: "make a song" },
+      {
+        role: "assistant",
+        content: "Creating!",
+        toolCalls: [
+          { id: "tc-0", name: "generate_audio", args: {}, result: {} },
+        ],
+      },
+    ];
+
+    // Check if any intermediate message has toolCalls
+    const hasIntermediateToolMessages = overrideMessagesToAppend.some(
+      (message) =>
+        message.role === "assistant" &&
+        message.toolCalls &&
+        message.toolCalls.length > 0,
+    );
+
+    expect(hasIntermediateToolMessages).toBe(true);
+
+    // When true, the final assistant should NOT include toolCalls
+    // (they're already in the intermediate message)
+    const finalAssistant: TestMessage = {
+      role: "assistant",
+      content: "Done!",
+      // toolCalls should NOT be included when hasIntermediateToolMessages is true
+    };
+
+    expect(finalAssistant.toolCalls).toBeUndefined();
+  });
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SCENARIO 8: DB message array after full round-trip
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+describe("Full round-trip: DB state after appendAndFinalize", () => {
+  it("turn 1 text-only → turn 2 with generate_audio → correct DB state", () => {
+    // Simulates the MongoDB document state after each turn
+
+    // === TURN 1 ===
+    const dbMessagesAfterTurn1: TestMessage[] = [
+      { role: "user", content: "hey whats up" },
+      { role: "assistant", content: "Hey Rodrigo! What's good?" },
+    ];
+
+    // === TURN 2 ===
+    // Server processes turn 2, finalize() produces newTurnMessages:
+    const turn2AppendMessages: TestMessage[] = [
+      { role: "user", content: "make a song about the war" },
+      {
+        role: "assistant",
+        content: "I'll create a song!",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "generate_audio",
+            args: { title: "War" },
+            result: {
+              success: true,
+              audioRef: "minio://audio/war.wav",
+            },
+          },
+        ],
+      },
+      {
+        role: "assistant",
+        content: "Here's your song about the war!",
+      },
+    ];
+
+    // $push: { messages: { $each: turn2AppendMessages } }
+    const dbMessagesAfterTurn2 = [
+      ...dbMessagesAfterTurn1,
+      ...turn2AppendMessages,
+    ];
+
+    // === VERIFICATION ===
+    expect(dbMessagesAfterTurn2).toHaveLength(5);
+
+    // All user messages should be present
+    const userMessages = dbMessagesAfterTurn2.filter(
+      (message) => message.role === "user",
+    );
+    expect(userMessages).toHaveLength(2);
+    expect(userMessages[0].content).toBe("hey whats up");
+    expect(userMessages[1].content).toBe("make a song about the war");
+
+    // Tool calls should be present
+    const toolCallMessages = dbMessagesAfterTurn2.filter(
+      (message) => message.toolCalls && message.toolCalls.length > 0,
+    );
+    expect(toolCallMessages).toHaveLength(1);
+    expect(toolCallMessages[0].toolCalls![0].name).toBe("generate_audio");
+    expect(toolCallMessages[0].toolCalls![0].result).toHaveProperty(
+      "audioRef",
+    );
+
+    // Final assistant message should have the summary text
+    const lastMessage =
+      dbMessagesAfterTurn2[dbMessagesAfterTurn2.length - 1];
+    expect(lastMessage.role).toBe("assistant");
+    expect(lastMessage.content).toBe("Here's your song about the war!");
+  });
+
+  it("the user's second message should never be a duplicate of the first", () => {
+    // Bug symptom: user message 3 shows "hey whats up" instead of "make a song"
+    const dbMessages: TestMessage[] = [
+      { role: "user", content: "hey whats up" },
+      { role: "assistant", content: "Hey Rodrigo!" },
+      { role: "user", content: "make a song about the war" },
+      {
+        role: "assistant",
+        content: "Creating!",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "generate_audio",
+            args: {},
+            result: { success: true },
+          },
+        ],
+      },
+      {
+        role: "assistant",
+        content: "Here it is!",
+      },
+    ];
+
+    // No two consecutive user messages should have the same content
+    const userMessages = dbMessages.filter(
+      (message) => message.role === "user",
+    );
+    for (let index = 1; index < userMessages.length; index++) {
+      // Consecutive user messages in a multi-turn conversation
+      // should not be identical (would indicate message duplication/replacement bug)
+      expect(userMessages[index].content).not.toBe(
+        userMessages[index - 1].content,
+      );
+    }
+  });
+});

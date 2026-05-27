@@ -39,51 +39,52 @@ export function markGenerating(
  * fails — preventing sessions from being permanently stuck as
  * "generating" when the $push operation encounters errors.
  */
-export function appendAndFinalize(
+export async function appendAndFinalize(
   conversationId: string | null | undefined,
   project: string,
   username: string,
   messagesToAppend: Array<ChatMessage | MessagePayload>,
   meta: Record<string, unknown> | null | undefined,
   opts: { collection?: string } = {},
-): void {
+): Promise<void> {
   if (!conversationId) return;
 
-  ConversationService.appendMessages(
-    conversationId,
-    project,
-    username,
-    messagesToAppend,
-    meta,
-    opts,
-  )
-    .then(() =>
-      ConversationService.setGenerating(
-        conversationId,
-        project,
-        username,
-        false,
-        opts,
-      ),
-    )
-    .catch((error: unknown) => {
-      logger.error(
-        `Failed to append ${messagesToAppend?.length ?? 0} messages to ${conversationId} ` +
-          `(project=${project}, collection=${opts?.collection || COLLECTIONS.MODEL_CONVERSATIONS}): ${(error as Error).message}`,
-      );
+  try {
+    await ConversationService.appendMessages(
+      conversationId,
+      project,
+      username,
+      messagesToAppend,
+      meta,
+      opts,
+    );
+    await ConversationService.setGenerating(
+      conversationId,
+      project,
+      username,
+      false,
+      opts,
+    );
+  } catch (error: unknown) {
+    logger.error(
+      `Failed to append ${messagesToAppend?.length ?? 0} messages to ${conversationId} ` +
+        `(project=${project}, collection=${opts?.collection || COLLECTIONS.MODEL_CONVERSATIONS}): ${(error as Error).message}`,
+    );
 
-      // Always clear isGenerating even on failure — prevents sessions
-      // from being permanently stuck as "generating" on the next page load.
-      ConversationService.setGenerating(
+    // Always clear isGenerating even on failure — prevents sessions
+    // from being permanently stuck as "generating" on the next page load.
+    try {
+      await ConversationService.setGenerating(
         conversationId,
         project,
         username,
         false,
         opts,
-      ).catch((clearErr: unknown) =>
-        logger.error(
-          `Failed to clear isGenerating after append failure: ${(clearErr as Error).message}`,
-        ),
       );
-    });
+    } catch (clearError: unknown) {
+      logger.error(
+        `Failed to clear isGenerating after append failure: ${(clearError as Error).message}`,
+      );
+    }
+  }
 }

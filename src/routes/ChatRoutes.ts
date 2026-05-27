@@ -904,16 +904,9 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
     mimeType: result.mimeType || "image/png",
     minioRef,
   });
-  emit({
-    type: "done",
-    usage: result.usage || null,
-    estimatedCost,
-    totalTime: totalSec,
-    ...(traceId && { traceId }),
-    ...(conversationId && { conversationId }),
-  });
   // Link conversation to session
-  // Auto-append to conversation
+  // Auto-append to conversation — persist BEFORE emitting `done`
+  // so the client's post-stream DB fetch sees the complete conversation.
   if (conversationId) {
     const messagesToAppend: ConversationMessage[] = [];
     // Only append the user message on the first call for this turn
@@ -944,7 +937,7 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
           settings: { provider: providerName, model: resolvedModel },
         }
       : undefined;
-    appendAndFinalize(
+    await appendAndFinalize(
       conversationId,
       project,
       username,
@@ -953,6 +946,14 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
       getCollectionOpts(project),
     );
   }
+  emit({
+    type: "done",
+    usage: result.usage || null,
+    estimatedCost,
+    totalTime: totalSec,
+    ...(traceId && { traceId }),
+    ...(conversationId && { conversationId }),
+  });
 }
 
 type GenerationContext = Awaited<ReturnType<typeof prepareGenerationContext>> & {
