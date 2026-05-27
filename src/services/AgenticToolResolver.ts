@@ -60,8 +60,8 @@ interface ResolveParams {
 /** Coordinator tools bypass the enabledTools filter (always available) */
 const COORDINATOR_TOOL_NAMES = new Set(COORDINATOR_ONLY_TOOLS);
 
-/** Core system tools bypass the enabledTools filter (always available to all agents as part of the core cognitive architecture) */
-const CORE_SYSTEM_TOOLS = new Set([
+/** Core agentic tools bypass the enabledTools filter (always available to all agents as part of the core cognitive architecture) */
+const CORE_AGENTIC_TOOLS = new Set([
   "upsert_memory",
   "task_create",
   "task_list",
@@ -261,7 +261,7 @@ export default class AgenticToolResolver {
           t._isCustom ||
           t.name.startsWith("mcp__") ||
           (agent !== "LUPOS" && (
-            CORE_SYSTEM_TOOLS.has(t.name) ||
+            CORE_AGENTIC_TOOLS.has(t.name) ||
             COORDINATOR_TOOL_NAMES.has(t.name) ||
             PRISM_LOCAL_TOOL_NAMES.has(t.name)
           )),

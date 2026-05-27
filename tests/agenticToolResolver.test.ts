@@ -303,7 +303,7 @@ describe("AgenticToolResolver — custom tool handling", () => {
     expect(finalTools.some((t) => t.name === "read_file")).toBe(true);
   });
 
-  it("automatically enables core system tools for other agents like CODING even if not explicitly whitelisted", async () => {
+  it("automatically enables core agentic tools for other agents like CODING even if not explicitly whitelisted", async () => {
     const { finalTools } = await AgenticToolResolver.resolve({
       options: {},
       agent: "CODING",
@@ -314,11 +314,11 @@ describe("AgenticToolResolver — custom tool handling", () => {
 
     const toolNames = finalTools.map((t) => t.name);
 
-    // precise_calculator is a core system tool and should be bypassed
+    // precise_calculator is a core agentic tool and should be bypassed
     expect(toolNames).toContain("precise_calculator");
   });
 
-  it("does NOT automatically enable core system tools for LUPOS unless they are explicitly whitelisted", async () => {
+  it("does NOT automatically enable core agentic tools for LUPOS unless they are explicitly whitelisted", async () => {
     const { finalTools } = await AgenticToolResolver.resolve({
       options: {},
       agent: "LUPOS",
@@ -329,7 +329,7 @@ describe("AgenticToolResolver — custom tool handling", () => {
 
     const toolNames = finalTools.map((t) => t.name);
 
-    // precise_calculator is a core system tool and should NOT be present for LUPOS because LUPOS is restricted
+    // precise_calculator is a core agentic tool and should NOT be present for LUPOS because LUPOS is restricted
     expect(toolNames).not.toContain("precise_calculator");
     // Only explicitly enabled tool 'read_file' should be present
     expect(toolNames).toContain("read_file");

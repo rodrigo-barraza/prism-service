@@ -200,8 +200,8 @@ export default class SystemPromptAssembler {
       }
     }
 
-    // Define the core system, coordinator, and local tools
-    const CORE_SYSTEM_TOOLS = new Set([
+    // Define the core agentic, coordinator, and local tools
+    const CORE_AGENTIC_TOOLS = new Set([
       "upsert_memory",
       "task_create",
       "task_list",
@@ -218,7 +218,7 @@ export default class SystemPromptAssembler {
       (toolSchema) =>
         enabledSet.has(toolSchema.name as string) ||
         (agentId !== "LUPOS" && (
-          CORE_SYSTEM_TOOLS.has(toolSchema.name as string) ||
+          CORE_AGENTIC_TOOLS.has(toolSchema.name as string) ||
           COORDINATOR_TOOL_NAMES.has(toolSchema.name as string) ||
           PRISM_LOCAL_TOOL_NAMES.has(toolSchema.name as string)
         ))
@@ -533,7 +533,7 @@ export default class SystemPromptAssembler {
             }
           }
 
-          const CORE_SYSTEM_TOOLS = new Set([
+          const CORE_AGENTIC_TOOLS = new Set([
             "upsert_memory",
             "task_create",
             "task_list",
@@ -550,7 +550,7 @@ export default class SystemPromptAssembler {
             (toolSchema) =>
               enabledSet.has(toolSchema.name as string) ||
               (agentId !== "LUPOS" && (
-                CORE_SYSTEM_TOOLS.has(toolSchema.name as string) ||
+                CORE_AGENTIC_TOOLS.has(toolSchema.name as string) ||
                 COORDINATOR_TOOL_NAMES.has(toolSchema.name as string) ||
                 PRISM_LOCAL_TOOL_NAMES.has(toolSchema.name as string)
               ))
