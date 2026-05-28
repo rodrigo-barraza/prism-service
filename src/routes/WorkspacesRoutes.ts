@@ -213,4 +213,71 @@ router.get(
   }),
 );
 
+/**
+ * GET /workspaces/download/agent
+ * Proxies the single-file workspace agent download from tools-service.
+ * Streams the .mjs file directly to the browser as a download attachment.
+ */
+router.get(
+  "/download/agent",
+  asyncHandler(async (_req: Request, res: Response) => {
+    try {
+      const toolsResponse = await fetch(
+        `${TOOLS_SERVICE_URL}/agents/download/agent`,
+        { signal: AbortSignal.timeout(10_000) },
+      );
+
+      if (!toolsResponse.ok) {
+        const errorBody = (await toolsResponse.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        return res.status(toolsResponse.status).json({
+          error:
+            errorBody.error || `tools-service returned ${toolsResponse.status}`,
+        });
+      }
+
+      res.setHeader(
+        "Content-Type",
+        toolsResponse.headers.get("Content-Type") ||
+          "application/javascript; charset=utf-8",
+      );
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="workspace-agent.mjs"',
+      );
+      const contentLength = toolsResponse.headers.get("Content-Length");
+      if (contentLength) {
+        res.setHeader("Content-Length", contentLength);
+      }
+      res.setHeader("Cache-Control", "public, max-age=300");
+
+      // Pipe the ReadableStream from fetch to the Express response
+      const reader = toolsResponse.body?.getReader();
+      if (!reader) {
+        return res
+          .status(502)
+          .json({ error: "Empty response from tools-service" });
+      }
+
+      const pump = async () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(value);
+        }
+        res.end();
+      };
+      await pump();
+    } catch (error: unknown) {
+      logger.error(
+        `GET /workspaces/download/agent error: ${(error as Error).message}`,
+      );
+      res
+        .status(502)
+        .json({ error: "Failed to download workspace agent from tools-service" });
+    }
+  }),
+);
+
 export default router;
