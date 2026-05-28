@@ -100,6 +100,7 @@ export interface ToolCallPayload {
   name: string;
   id?: string | null;
   args?: Record<string, unknown> | string;
+  thoughtSignature?: string;
 }
 
 export interface MessagePayload {
