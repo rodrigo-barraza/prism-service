@@ -1114,6 +1114,7 @@ async function handleStreamingText(context: GenerationContext) {
         id: toolCall.id,
         name: toolCall.name,
         args: toolCall.args,
+        ...(toolCall.thoughtSignature ? { thoughtSignature: toolCall.thoughtSignature } : {}),
       })),
       ...(streamState.thinking ? { thinking: streamState.thinking } : {}),
       ...(streamState.thinkingSignature
@@ -1182,7 +1183,12 @@ async function handleStreamingText(context: GenerationContext) {
     text: streamState.text,
     thinking: streamState.thinking,
     images: streamState.images,
-    toolCalls: streamState.toolCalls.map((toolCall): ToolCallPayload => ({ name: toolCall.name, id: toolCall.id, args: toolCall.args as Record<string, unknown> })),
+    toolCalls: streamState.toolCalls.map((toolCall): ToolCallPayload => ({
+      name: toolCall.name,
+      id: toolCall.id,
+      args: toolCall.args as Record<string, unknown>,
+      ...(toolCall.thoughtSignature ? { thoughtSignature: toolCall.thoughtSignature } : {}),
+    })),
     audioChunks: streamState.audioChunks,
     audioSampleRate: streamState.audioSampleRate,
     usage: streamState.usage as FinalizerTokenUsage | null,
