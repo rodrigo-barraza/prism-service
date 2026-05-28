@@ -27,6 +27,16 @@ interface SettingsData {
   security: {
     allowEnvFiles: boolean;
   };
+  creative?: {
+    imageProvider: string;
+    imageModel: string;
+    visionProvider: string;
+    visionModel: string;
+    textToSpeechProvider?: string;
+    textToSpeechModel?: string;
+    speechToTextProvider?: string;
+    speechToTextModel?: string;
+  };
 }
 
 let _cache: SettingsData | null = null;
@@ -47,6 +57,16 @@ const DEFAULTS: SettingsData = {
   },
   security: {
     allowEnvFiles: false,
+  },
+  creative: {
+    imageProvider: "google",
+    imageModel: "gemini-3-pro-image-preview",
+    visionProvider: "google",
+    visionModel: "gemini-3.5-flash",
+    textToSpeechProvider: "elevenlabs",
+    textToSpeechModel: "",
+    speechToTextProvider: "openai",
+    speechToTextModel: "",
   },
 };
 

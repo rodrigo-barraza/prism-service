@@ -48,6 +48,7 @@ import textRouter from "./routes/TextRoutes.ts";
 import lmStudioRouter from "./routes/LmStudioRoutes.ts";
 import customToolsRouter from "./routes/CustomToolsRoutes.ts";
 import skillsRouter from "./routes/SkillsRoutes.ts";
+import rulesRouter from "./routes/RulesRoutes.ts";
 import agentMemoriesRouter from "./routes/AgentMemoriesRoutes.ts";
 import mcpServersRouter from "./routes/McpServersRoutes.ts";
 import favoritesRouter from "./routes/FavoritesRoutes.ts";
@@ -104,6 +105,7 @@ const ENDPOINTS = {
     "/lm-studio",
     "/custom-tools",
     "/skills",
+    "/rules",
     "/agent-memories",
     "/mcp-servers",
     "/favorites",
@@ -163,6 +165,7 @@ app.use("/text", textRouter);
 app.use("/lm-studio", lmStudioRouter);
 app.use("/custom-tools", customToolsRouter);
 app.use("/skills", skillsRouter);
+app.use("/rules", rulesRouter);
 app.use("/agent-memories", agentMemoriesRouter);
 app.use("/mcp-servers", mcpServersRouter);
 app.use("/favorites", favoritesRouter);
@@ -269,8 +272,9 @@ setupWebSocket(wss);
         db
           .collection("synthesis")
           .createIndex({ project: 1, username: 1, updatedAt: -1 }),
-        // agent_skills
         db.collection("agent_skills").createIndex({ project: 1, username: 1 }),
+        // agent_rules
+        db.collection("agent_rules").createIndex({ project: 1, username: 1, agent: 1 }),
         // mcp_servers
         db.collection("mcp_servers").createIndex({ project: 1, username: 1 }),
         // mcp_servers — compound for enabled filter (5+ query sites)

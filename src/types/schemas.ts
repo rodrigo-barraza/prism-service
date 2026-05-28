@@ -260,6 +260,21 @@ export const PutSkillSchema = z.object({
   enabled: z.boolean().optional(),
 });
 
+export const PostRuleSchema = z.object({
+  name: z.string().min(1, "name is required"),
+  description: z.string().optional().default(""),
+  content: z.string().optional().default(""),
+  agent: z.string().min(1, "agent is required"),
+  enabled: z.boolean().optional().default(true),
+});
+
+export const PutRuleSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+  content: z.string().optional(),
+  enabled: z.boolean().optional(),
+});
+
 export const GetAgentSessionsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   cursor: z.string().nullable().optional(),

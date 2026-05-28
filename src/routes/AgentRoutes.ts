@@ -1,6 +1,7 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import AgenticLoopService from "../services/AgenticLoopService.ts";
+import LiveFrameService from "../services/LiveFrameService.ts";
 import { handleAgent } from "./ChatRoutes.ts";
 import logger from "../utils/logger.ts";
 import { handleSseRequest, handleJsonRequest } from "../utils/SseUtilities.ts";
@@ -96,6 +97,34 @@ router.post(
     );
 
     res.json({ ok: true });
+  }),
+);
+
+// ─── live vision frame streaming ────────────────────────────
+
+/**
+ * POST /agent/session/:agentSessionId/frame
+ *
+ * Body:
+ *   { frameDataUrl: string } // base64 JPEG data URL
+ *
+ * Receives the latest frame for a session and adds it to the rolling buffer.
+ */
+router.post(
+  "/session/:agentSessionId/frame",
+  asyncHandler(async (request: Request, response: Response) => {
+    const { agentSessionId } = request.params;
+    const { frameDataUrl } = request.body;
+
+    if (!agentSessionId) {
+      return response.status(400).json({ error: "Missing agentSessionId" });
+    }
+    if (!frameDataUrl) {
+      return response.status(400).json({ error: "Missing frameDataUrl" });
+    }
+
+    LiveFrameService.pushFrame(agentSessionId as string, frameDataUrl as string);
+    response.json({ ok: true });
   }),
 );
 

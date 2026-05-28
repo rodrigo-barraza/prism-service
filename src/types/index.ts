@@ -48,6 +48,8 @@ export {
   PatchSynthesisBodySchema,
   PostSkillSchema,
   PutSkillSchema,
+  PostRuleSchema,
+  PutRuleSchema,
   GetAgentSessionsQuerySchema,
   GetVramBenchmarksQuerySchema,
 } from "./schemas.ts";

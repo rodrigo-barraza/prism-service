@@ -42,6 +42,7 @@ export const COLLECTIONS = {
   FAVORITES: "favorites",
   CUSTOM_TOOLS: "custom_tools",
   AGENT_SKILLS: "agent_skills",
+  AGENT_RULES: "agent_rules",
   MCP_SERVERS: "mcp_servers",
   MEMORIES: "memories",
   MEMORY_CONSOLIDATION_RUNS: "memory_consolidation_runs",
