@@ -232,4 +232,23 @@ describe("POST /chat (text-to-text)", () => {
 
     expect(res.body).toHaveProperty("error", true);
   });
+
+  it("injects tools into the system prompt when functionCallingEnabled is true", async () => {
+    await request(app)
+      .post("/chat?stream=false")
+      .send({
+        provider: "openai",
+        messages: [{ role: "user", content: "hi" }],
+        functionCallingEnabled: true,
+        enabledTools: ["get_weather"],
+      })
+      .expect(200);
+
+    expect(MOCK_GENERATE_TEXT_STREAM).toHaveBeenCalledTimes(1);
+    const calledMessages = MOCK_GENERATE_TEXT_STREAM.mock.calls[0][0];
+    const systemMessage = calledMessages.find((m: any) => m.role === "system");
+    expect(systemMessage).toBeDefined();
+    expect(systemMessage.content).toMatch(/Available Tools/i);
+    expect(systemMessage.content).toMatch(/get_weather/i);
+  });
 });

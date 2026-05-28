@@ -49,6 +49,59 @@ import { ChatRequestSchema, ChatRequest } from "../types/index.ts";
 import type { ConversationMessage, EmitFn, ToolSchema } from "../services/harnesses/types.ts";
 
 const router = express.Router();
+function injectToolsIntoSystemPrompt(
+  messages: Array<{ role: string; content?: string; [key: string]: unknown }>,
+  tools: any[],
+) {
+  if (!tools || tools.length === 0) {
+    return;
+  }
+
+  const groups = new Map<string, any[]>();
+  for (const tool of tools) {
+    const domain = ((tool.domain as string) || "Other").replace(/^Agentic:\s*/i, "");
+    if (!groups.has(domain)) {
+      groups.set(domain, []);
+    }
+    groups.get(domain)!.push(tool);
+  }
+
+  const sections: string[] = [];
+  for (const [domain, domainTools] of groups) {
+    const entries = domainTools.map((tool) => {
+      const description = (tool.description as string) || "";
+      const parameters = (tool.parameters as Record<string, unknown>)?.properties as Record<string, Record<string, unknown>> || {};
+      const parameterNames = Object.keys(parameters);
+      const required = ((tool.parameters as Record<string, unknown>)?.required || []) as string[];
+      const parameterString = parameterNames
+        .map((parameterName) => {
+          const isRequired = required.includes(parameterName);
+          const parameterDescription = (parameters[parameterName].description as string) || "";
+          return `  - ${parameterName}${isRequired ? " (required)" : ""}: ${parameterDescription}`;
+        })
+        .join("\n");
+
+      return `### ${tool.name}\n${description}\n${parameterString}`;
+    });
+
+    sections.push(`**${domain}**\n${entries.join("\n\n")}`);
+  }
+
+  const toolsSection = `\n\n## Available Tools (${tools.length})\n` + sections.join("\n\n");
+
+  const systemMessage = messages.find((message) => message.role === "system");
+  if (systemMessage) {
+    if (typeof systemMessage.content === "string" && !systemMessage.content.includes("## Available Tools")) {
+      systemMessage.content += toolsSection;
+    }
+  } else {
+    messages.unshift({
+      role: "system",
+      content: `You are a helpful AI assistant with access to a comprehensive suite of real-time data and utility tools. Present data clearly with relevant formatting. For questions that don't require API data, respond naturally without tool calls.` + toolsSection,
+    });
+  }
+}
+
 // ─── converts refs for providers & storage ──────────────────
 /**
  * Resolve image references in messages for both provider use and storage.
@@ -556,61 +609,38 @@ export async function handleConversation(
           400,
         );
       }
+      // Resolve and inject tools for /chat function calling
+      if (options.functionCallingEnabled && !options.agenticLoopEnabled) {
+        const useNativeMcp = LocalProviderGateway.isNativeMCP(providerName);
+        const builtInTools = ToolOrchestratorService.getToolSchemas();
+        let tools = builtInTools;
+        if (options.enabledTools && Array.isArray(options.enabledTools)) {
+          const enabledSet = new Set(options.enabledTools as string[]);
+          tools = tools.filter((t) => enabledSet.has(t.name));
+        } else if (
+          options.disabledBuiltIns &&
+          Array.isArray(options.disabledBuiltIns)
+        ) {
+          const disabledSet = new Set(options.disabledBuiltIns as string[]);
+          tools = tools.filter((t) => !disabledSet.has(t.name));
+        }
+        options.tools = tools;
+
+        // Inject tool descriptions into the system prompt
+        injectToolsIntoSystemPrompt(fullCtx.messages as any[], tools);
+
+        if (useNativeMcp && (modelDef as Record<string, unknown> | null)?.contextLength) {
+          options.contextLength = (modelDef as Record<string, unknown>).contextLength;
+        }
+
+        logger.info(
+          `[chat] FC tools resolved and injected into system prompt: ${tools.length} tools enabled for ${providerName} ${resolvedModel}`,
+        );
+      }
+
       const useStreaming =
         context.provider.generateTextStream && (modelDef as Record<string, unknown> | null)?.streaming !== false;
       if (useStreaming) {
-        // Native MCP tool execution — provider handles tool calling internally
-        const useNativeMcp =
-          LocalProviderGateway.isNativeMCP(providerName) &&
-          !options.agenticLoopEnabled;
-        if (useNativeMcp && options.functionCallingEnabled) {
-          const builtInTools = ToolOrchestratorService.getToolSchemas();
-          let tools = builtInTools;
-          if (options.enabledTools && Array.isArray(options.enabledTools)) {
-            const enabledSet = new Set(options.enabledTools as string[]);
-            tools = tools.filter((t) => enabledSet.has(t.name));
-          } else if (
-            options.disabledBuiltIns &&
-            Array.isArray(options.disabledBuiltIns)
-          ) {
-            const disabledSet = new Set(options.disabledBuiltIns as string[]);
-            tools = tools.filter((t) => !disabledSet.has(t.name));
-          }
-          options.tools = tools;
-          if ((modelDef as Record<string, unknown> | null)?.contextLength) {
-            options.contextLength = (modelDef as Record<string, unknown>).contextLength;
-          }
-          logger.info(
-            `[chat] Native MCP (${providerName}): ${tools.length} tools enabled, enabledTools=${(options.enabledTools as string[] || []).length}, builtIn=${builtInTools.length}, contextLength=${options.contextLength || "unset"}`,
-          );
-        } else if (useNativeMcp) {
-          logger.warn(
-            `[chat] Native MCP SKIPPED (${providerName}): functionCallingEnabled=${options.functionCallingEnabled}, useNativeMcp=${useNativeMcp}`,
-          );
-        }
-        // Non-LM-Studio FC on /chat path
-        if (
-          !useNativeMcp &&
-          !options.agenticLoopEnabled &&
-          options.functionCallingEnabled
-        ) {
-          const builtInTools = ToolOrchestratorService.getToolSchemas();
-          let tools = builtInTools;
-          if (options.enabledTools && Array.isArray(options.enabledTools)) {
-            const enabledSet = new Set(options.enabledTools as string[]);
-            tools = tools.filter((t) => enabledSet.has(t.name));
-          } else if (
-            options.disabledBuiltIns &&
-            Array.isArray(options.disabledBuiltIns)
-          ) {
-            const disabledSet = new Set(options.disabledBuiltIns as string[]);
-            tools = tools.filter((t) => !disabledSet.has(t.name));
-          }
-          options.tools = tools;
-          logger.info(
-            `[chat] FC tools injected: ${tools.length} tools enabled for ${providerName} ${resolvedModel}`,
-          );
-        }
         await handleStreamingText(fullCtx);
       } else {
         await handleNonStreamingText(fullCtx);
