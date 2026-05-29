@@ -9,13 +9,13 @@ interface ToolContext {
   [key: string]: unknown;
 }
 
-// ── Schedule Timer/Cron Tool ────────────────────────────────
-const schedule = {
-  name: "schedule",
+// ── Set Timer Tool ─────────────────────────────────────────
+const setTimer = {
+  name: "set_timer",
   schema: {
-    name: "schedule",
+    name: "set_timer",
     description:
-      "Schedule a one-shot timer or a recurring cron job that fires an instruction or prompt " +
+      "Set a one-shot timer or a recurring cron within this conversation that fires an instruction or prompt " +
       "back into this conversation after a duration. Use this to wait, sleep, yield, defer execution, " +
       "or to schedule periodic background checks on long-running tasks or builds.",
     parameters: {
@@ -41,7 +41,7 @@ const schedule = {
       required: ["prompt"],
     },
   },
-  domain: "Agentic: Automation",
+  domain: "Timers",
   labels: ["timer", "automation", "scheduler"],
 
   async execute(args: Record<string, unknown>, context: ToolContext) {
@@ -69,7 +69,7 @@ const schedule = {
         maxIterations: maxIterations ? Number(maxIterations) : undefined,
       });
 
-      logger.info(`[ReminderTools] schedule created timer ${timer.id} for conversation ${conversationId}`);
+      logger.info(`[ReminderTools] set_timer created timer ${timer.id} for conversation ${conversationId}`);
 
       return {
         success: true,
@@ -81,23 +81,23 @@ const schedule = {
         },
       };
     } catch (error: unknown) {
-      return { error: `Failed to create scheduled timer: ${(error as Error).message}` };
+      return { error: `Failed to create timer: ${(error as Error).message}` };
     }
   },
 };
 
-// ── List Schedules Tool ──────────────────────────────────────
-const listSchedules = {
-  name: "list_schedules",
+// ── List Timers Tool ────────────────────────────────────────
+ const listTimers = {
+  name: "list_timers",
   schema: {
-    name: "list_schedules",
-    description: "List all active timers, schedules, and cron reminders for the current conversation.",
+    name: "list_timers",
+    description: "List all active timers and recurring cron schedules for the current conversation.",
     parameters: {
       type: "object",
       properties: {},
     },
   },
-  domain: "Agentic: Automation",
+  domain: "Timers",
   labels: ["timer", "automation", "scheduler"],
 
   async execute(_args: Record<string, unknown>, context: ToolContext) {
@@ -114,7 +114,7 @@ const listSchedules = {
 
       return {
         success: true,
-        reminders: activeTimers.map((timer) => ({
+        timers: activeTimers.map((timer) => ({
           id: timer.id,
           mode: timer.mode,
           firesAt: timer.firesAt,
@@ -123,17 +123,17 @@ const listSchedules = {
         })),
       };
     } catch (error: unknown) {
-      return { error: `Failed to list schedules: ${(error as Error).message}` };
+      return { error: `Failed to list timers: ${(error as Error).message}` };
     }
   },
 };
 
-// ── Cancel Schedule Tool ─────────────────────────────────────
-const cancelSchedule = {
-  name: "cancel_schedule",
+// ── Cancel Timer Tool ───────────────────────────────────────
+const cancelTimer = {
+  name: "cancel_timer",
   schema: {
-    name: "cancel_schedule",
-    description: "Cancel an active scheduled timer, schedule, or recurring cron in the current conversation.",
+    name: "cancel_timer",
+    description: "Cancel an active timer or recurring cron in the current conversation.",
     parameters: {
       type: "object",
       properties: {
@@ -145,7 +145,7 @@ const cancelSchedule = {
       required: ["timerId"],
     },
   },
-  domain: "Agentic: Automation",
+  domain: "Timers",
   labels: ["timer", "automation", "scheduler"],
 
   async execute(args: Record<string, unknown>, context: ToolContext) {
@@ -163,18 +163,18 @@ const cancelSchedule = {
       if (!wasCancelled) {
         return {
           success: false,
-          message: `No active schedule found with ID ${timerId} in this conversation.`,
+          message: `No active timer found with ID ${timerId} in this conversation.`,
         };
       }
 
       return {
         success: true,
-        message: `Successfully cancelled schedule ${timerId}.`,
+        message: `Successfully cancelled timer ${timerId}.`,
       };
     } catch (error: unknown) {
-      return { error: `Failed to cancel schedule: ${(error as Error).message}` };
+      return { error: `Failed to cancel timer: ${(error as Error).message}` };
     }
   },
 };
 
-export default [schedule, listSchedules, cancelSchedule];
+export default [setTimer, listTimers, cancelTimer];
