@@ -6,7 +6,7 @@ import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { TOOLS_SERVICE_URL, MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
-import { cosineSimilarity } from "../utils/math.ts";
+import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import {
   getCoordinatorPromptAddendum,
   COORDINATOR_ONLY_TOOLS,

@@ -6,7 +6,7 @@ import { MONGO_DB_NAME } from "../../config.ts";
 import EmbeddingService from "./EmbeddingService.ts";
 import RequestLogger from "./RequestLogger.ts";
 import logger from "../utils/logger.ts";
-import { cosineSimilarity } from "../utils/math.ts";
+import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import { parseJsonFromLlmResponse } from "@rodrigo-barraza/utilities-library";
 import { COLLECTIONS } from "../constants.ts";
 import SettingsService from "./SettingsService.ts";
