@@ -639,6 +639,18 @@ describe("Pricing sanity checks against official published rates", () => {
         expect(m.pricing.outputPerMillion).toBe(25.0);
     });
 
+    it("Opus 4.7: $5.00 in / $25.00 out", () => {
+        const m = getModelByName("claude-opus-4-7");
+        expect(m.pricing.inputPerMillion).toBe(5.0);
+        expect(m.pricing.outputPerMillion).toBe(25.0);
+    });
+
+    it("Opus 4.8: $5.00 in / $25.00 out", () => {
+        const m = getModelByName("claude-opus-4-8");
+        expect(m.pricing.inputPerMillion).toBe(5.0);
+        expect(m.pricing.outputPerMillion).toBe(25.0);
+    });
+
     // ── OpenAI — Embeddings ──────────────────────────────────────
 
     it("text-embedding-3-small: $0.02 in", () => {
