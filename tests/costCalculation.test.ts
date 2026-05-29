@@ -442,11 +442,11 @@ describe("Pricing sanity checks against official published rates", () => {
 
     // ── Google Gemini — Text/Conversation ─────────────────────────
 
-    it("Gemini 3.5 Flash: $0.50 in / $3.00 out, $1.00 audioIn", () => {
+    it("Gemini 3.5 Flash: $1.50 in / $9.00 out, $3.00 audioIn", () => {
         const m = getModelByName("gemini-3.5-flash");
-        expect(m.pricing.inputPerMillion).toBe(0.5);
-        expect(m.pricing.audioInputPerMillion).toBe(1.0);
-        expect(m.pricing.outputPerMillion).toBe(3.0);
+        expect(m.pricing.inputPerMillion).toBe(1.5);
+        expect(m.pricing.audioInputPerMillion).toBe(3.0);
+        expect(m.pricing.outputPerMillion).toBe(9.0);
     });
 
     it("Gemini 3 Flash: $0.50 in / $3.00 out, $1.00 audioIn", () => {
