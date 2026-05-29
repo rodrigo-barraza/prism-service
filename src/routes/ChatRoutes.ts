@@ -409,6 +409,14 @@ async function prepareGenerationContext(
     delete options.reasoningEffort;
     delete options.thinkingLevel;
     delete options.thinkingBudget;
+  } else {
+    // Synchronize both fields so OpenAI/Anthropic (reasoningEffort) and Gemini (thinkingLevel) both get the correct option
+    if (options.thinkingLevel && !options.reasoningEffort) {
+      options.reasoningEffort = options.thinkingLevel;
+    }
+    if (options.reasoningEffort && !options.thinkingLevel) {
+      options.thinkingLevel = options.reasoningEffort;
+    }
   }
   // Local models emit thinking tokens (<think> tags) by default. Default
   // thinkingEnabled ON only when the client didn't send a value (undefined).

@@ -117,6 +117,24 @@ describe("POST /chat (text-to-text)", () => {
     expect(calledOptions).toMatchObject({ temperature: 0.5, maxTokens: 100 });
   });
 
+  it("synchronizes thinkingLevel to reasoningEffort and vice-versa", async () => {
+    await request(app)
+      .post("/chat?stream=false")
+      .send({
+        provider: "openai",
+        messages: [{ role: "user", content: "hi" }],
+        thinkingLevel: "medium",
+      })
+      .expect(200);
+
+    expect(MOCK_GENERATE_TEXT_STREAM).toHaveBeenCalledTimes(1);
+    const calledOptions = MOCK_GENERATE_TEXT_STREAM.mock.calls[0][2];
+    expect(calledOptions).toMatchObject({
+      thinkingLevel: "medium",
+      reasoningEffort: "medium",
+    });
+  });
+
   it("defaults options to empty object when omitted", async () => {
     await request(app)
       .post("/chat?stream=false")

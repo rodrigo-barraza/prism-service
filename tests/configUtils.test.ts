@@ -59,6 +59,25 @@ describe("Config route — pattern constant detection", () => {
     }
   });
 
+  it("thinking-capable models expose thinkingLevels array containing low and high", async () => {
+    const res = await request(app).get("/config").expect(200);
+
+    const allModels = Object.values(res.body.textToText.models).flat();
+    const thinkingModels = allModels.filter(
+      (m: any) => m.thinking === true && m.modelType === "conversation"
+    );
+
+    expect(thinkingModels.length).toBeGreaterThan(0);
+
+    for (const model of thinkingModels) {
+      expect(model).toHaveProperty("thinkingLevels");
+      expect(Array.isArray(model.thinkingLevels)).toBe(true);
+      expect(model.thinkingLevels.length).toBeGreaterThanOrEqual(3);
+      expect(model.thinkingLevels).toContain("low");
+      expect(model.thinkingLevels).toContain("high");
+    }
+  });
+
   it("models with Tool Calling have it in their tools array", async () => {
     const res = await request(app).get("/config").expect(200);
 
