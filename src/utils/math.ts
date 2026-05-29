@@ -1,4 +1,4 @@
-export { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
+
 
 /** Cap — anything above this is a measurement artifact */
 const MAX_TOKENS_PER_SEC = 10_000;
