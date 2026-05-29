@@ -11,6 +11,10 @@ export const ARENA_SCORES = {
   // Source: https://arena.ai/leaderboard/text
   text: {
     "gemini-3.5-flash": 1515,
+    "claude-opus-4-8-thinking": 1532,
+    "claude-opus-4-8": 1530,
+    "claude-opus-4-7-thinking": 1522,
+    "claude-opus-4-7": 1520,
     "claude-opus-4-6": 1504,
     "claude-opus-4-6-thinking": 1502,
     "gemini-3.1-pro-preview": 1500,
@@ -339,6 +343,10 @@ export const ARENA_SCORES = {
   // ── Code Arena ──────────────────────────────────────────────
   // Source: https://arena.ai/leaderboard/code
   code: {
+    "claude-opus-4-8-thinking": 1582,
+    "claude-opus-4-8": 1580,
+    "claude-opus-4-7-thinking": 1568,
+    "claude-opus-4-7": 1565,
     "claude-opus-4-6-thinking": 1556,
     "claude-opus-4-6": 1555,
     "claude-sonnet-4-6": 1523,
@@ -400,6 +408,8 @@ export const ARENA_SCORES = {
   // ── Document Arena ──────────────────────────────────────────
   // Source: https://arena.ai/leaderboard/document
   document: {
+    "claude-opus-4-8": 1555,
+    "claude-opus-4-7": 1540,
     "claude-opus-4-6": 1525,
     "gemini-3.5-flash": 1475,
     "claude-opus-4-5-20251101": 1474,
@@ -516,6 +526,8 @@ export const ARENA_SCORES = {
   // ── Search Arena ────────────────────────────────────────────
   // Source: https://arena.ai/leaderboard/search
   search: {
+    "claude-opus-4-8-search": 1290,
+    "claude-opus-4-7-search": 1270,
     "claude-opus-4-6-search": 1255,
     "grok-4.20-beta1": 1225,
     "gpt-5.2-search": 1219,
