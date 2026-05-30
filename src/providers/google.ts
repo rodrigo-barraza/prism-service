@@ -383,6 +383,9 @@ const googleProvider = {
         usage: {
           inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
           outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+          ...(response.usageMetadata?.cachedContentTokenCount ? {
+            cacheReadInputTokens: response.usageMetadata.cachedContentTokenCount,
+          } : {}),
         },
       };
       if (toolCalls.length > 0) result.toolCalls = toolCalls;
@@ -491,6 +494,9 @@ const googleProvider = {
           usage = {
             inputTokens: chunk.usageMetadata.promptTokenCount ?? 0,
             outputTokens: chunk.usageMetadata.candidatesTokenCount ?? 0,
+            ...(chunk.usageMetadata.cachedContentTokenCount ? {
+              cacheReadInputTokens: chunk.usageMetadata.cachedContentTokenCount,
+            } : {}),
           };
         }
       }
@@ -678,6 +684,9 @@ const googleProvider = {
                   usage: {
                     inputTokens: user.promptTokenCount ?? 0,
                     outputTokens: user.responseTokenCount ?? 0,
+                    ...((user as Record<string, unknown>).cachedContentTokenCount ? {
+                      cacheReadInputTokens: (user as Record<string, unknown>).cachedContentTokenCount as number,
+                    } : {}),
                   },
                 });
               }
@@ -858,6 +867,9 @@ const googleProvider = {
       const usage = {
         inputTokens: response.usageMetadata?.promptTokenCount || 0,
         outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
+        ...(response.usageMetadata?.cachedContentTokenCount ? {
+          cacheReadInputTokens: response.usageMetadata.cachedContentTokenCount,
+        } : {}),
       };
       return { text: response.text, usage };
     } catch (error: unknown) {
@@ -1030,6 +1042,9 @@ const googleProvider = {
         usage: {
           inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
           outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+          ...(response.usageMetadata?.cachedContentTokenCount ? {
+            cacheReadInputTokens: response.usageMetadata.cachedContentTokenCount,
+          } : {}),
         },
       };
     } catch (error: unknown) {

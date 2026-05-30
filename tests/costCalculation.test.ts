@@ -6,6 +6,7 @@ import {
     getTotalInputTokens,
 } from "../src/utils/CostCalculator.ts";
 import { normalizeUsage } from "../src/utils/openai-compat.ts";
+import { normalizeResponsesUsage } from "../src/providers/openai.ts";
 import { TYPES, getPricing, getModelByName } from "../src/config.ts";
 
 
@@ -809,6 +810,89 @@ describe("normalizeUsage", () => {
         // output: (200/1M)*5.0 = 0.001
         // total = 0.00128
         expect(cost).toBeCloseTo(0.00128, 8);
+    });
+});
+
+describe("normalizeResponsesUsage", () => {
+    it("extracts basic input_tokens and output_tokens", () => {
+        const usage = normalizeResponsesUsage({ input_tokens: 100, output_tokens: 50 });
+        expect(usage.inputTokens).toBe(100);
+        expect(usage.outputTokens).toBe(50);
+    });
+
+    it("returns zeros when rawUsage is null", () => {
+        const usage = normalizeResponsesUsage(null);
+        expect(usage.inputTokens).toBe(0);
+        expect(usage.outputTokens).toBe(0);
+    });
+
+    it("returns zeros when rawUsage is undefined", () => {
+        const usage = normalizeResponsesUsage(undefined);
+        expect(usage.inputTokens).toBe(0);
+        expect(usage.outputTokens).toBe(0);
+    });
+
+    it("extracts cached_tokens from input_tokens_details", () => {
+        const usage = normalizeResponsesUsage({
+            input_tokens: 1000,
+            output_tokens: 200,
+            input_tokens_details: { cached_tokens: 800 },
+        });
+        expect(usage.cacheReadInputTokens).toBe(800);
+        expect(usage.inputTokens).toBe(200);
+        expect(usage.outputTokens).toBe(200);
+    });
+
+    it("does not set cacheReadInputTokens when cached_tokens is 0", () => {
+        const usage = normalizeResponsesUsage({
+            input_tokens: 500,
+            output_tokens: 100,
+            input_tokens_details: { cached_tokens: 0 },
+        });
+        expect(usage.cacheReadInputTokens).toBeUndefined();
+        expect(usage.inputTokens).toBe(500);
+    });
+
+    it("clamps inputTokens to 0 when cached_tokens >= input_tokens", () => {
+        const usage = normalizeResponsesUsage({
+            input_tokens: 100,
+            output_tokens: 50,
+            input_tokens_details: { cached_tokens: 100 },
+        });
+        expect(usage.cacheReadInputTokens).toBe(100);
+        expect(usage.inputTokens).toBe(0);
+    });
+
+    it("extracts reasoning_tokens from output_tokens_details", () => {
+        const usage = normalizeResponsesUsage({
+            input_tokens: 12,
+            output_tokens: 10,
+            output_tokens_details: { reasoning_tokens: 9 },
+        });
+        expect(usage.reasoningOutputTokens).toBe(9);
+        expect(usage.outputTokens).toBe(10);
+    });
+
+    it("does not set reasoningOutputTokens when reasoning_tokens is 0", () => {
+        const usage = normalizeResponsesUsage({
+            input_tokens: 100,
+            output_tokens: 50,
+            output_tokens_details: { reasoning_tokens: 0 },
+        });
+        expect(usage.reasoningOutputTokens).toBeUndefined();
+    });
+
+    it("extracts both cached_tokens and reasoning_tokens when present", () => {
+        const usage = normalizeResponsesUsage({
+            input_tokens: 1000,
+            output_tokens: 500,
+            input_tokens_details: { cached_tokens: 800 },
+            output_tokens_details: { reasoning_tokens: 350 },
+        });
+        expect(usage.inputTokens).toBe(200);
+        expect(usage.cacheReadInputTokens).toBe(800);
+        expect(usage.outputTokens).toBe(500);
+        expect(usage.reasoningOutputTokens).toBe(350);
     });
 });
 });
