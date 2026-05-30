@@ -54,6 +54,56 @@ export interface OpenAIMsg {
   [key: string]: unknown;
 }
 
+function sanitizeSchemaForOpenAI(schema: unknown): unknown {
+  if (!schema || typeof schema !== "object") return schema;
+
+  if (Array.isArray(schema)) {
+    return schema.map((item: unknown) => sanitizeSchemaForOpenAI(item));
+  }
+
+  const source = schema as Record<string, unknown>;
+  const cleaned: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(source)) {
+    cleaned[key] = sanitizeSchemaForOpenAI(value);
+  }
+
+  if (cleaned.type === "object" || cleaned.properties !== undefined) {
+    cleaned.additionalProperties = false;
+
+    if (cleaned.properties && typeof cleaned.properties === "object") {
+      const propertiesMap = cleaned.properties as Record<string, unknown>;
+      const propertyKeys = Object.keys(propertiesMap);
+      const originalRequired = Array.isArray(cleaned.required) ? cleaned.required : [];
+      const newRequired = [...originalRequired];
+
+      for (const propertyKey of propertyKeys) {
+        if (!newRequired.includes(propertyKey)) {
+          newRequired.push(propertyKey);
+
+          const propertySchema = propertiesMap[propertyKey];
+          if (propertySchema && typeof propertySchema === "object") {
+            const typedPropertySchema = propertySchema as Record<string, unknown>;
+            if (typeof typedPropertySchema.type === "string") {
+              typedPropertySchema.type = [typedPropertySchema.type, "null"];
+            } else if (Array.isArray(typedPropertySchema.type)) {
+              if (!typedPropertySchema.type.includes("null")) {
+                typedPropertySchema.type = [...typedPropertySchema.type, "null"];
+              }
+            }
+          }
+        }
+      }
+
+      if (newRequired.length > 0) {
+        cleaned.required = newRequired;
+      }
+    }
+  }
+
+  return cleaned;
+}
+
 /**
  * Convert generic tool schemas to OpenAI Responses API format.
  * Input:  [{ name, description, parameters }]
@@ -61,11 +111,11 @@ export interface OpenAIMsg {
  */
 function convertToolsToResponsesAPI(tools?: ToolSchema[] | null): OpenAI.Responses.Tool[] | null {
   if (!tools || !Array.isArray(tools) || tools.length === 0) return null;
-  return tools.map((t: ToolSchema): OpenAI.Responses.Tool => ({
+  return tools.map((tool: ToolSchema): OpenAI.Responses.Tool => ({
     type: "function" as const,
-    name: t.name,
-    description: t.description || "",
-    parameters: (t.parameters || {}) as Record<string, unknown>,
+    name: tool.name,
+    description: tool.description || "",
+    parameters: sanitizeSchemaForOpenAI(tool.parameters || {}) as Record<string, unknown>,
     strict: true,
   }));
 }
