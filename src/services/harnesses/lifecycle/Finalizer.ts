@@ -463,6 +463,8 @@ function swapMsgContent(message: MessagePayload) {
           if (message.content.startsWith("[Conversation Summary")) return false;
           if ((message as Record<string, unknown>).isCompactSummary === true) return false;
         }
+        // Strip ephemeral planning injection messages (cache-stable planning mode)
+        if ((message as Record<string, unknown>)._isPlanningInjection === true) return false;
         return true;
       });
 

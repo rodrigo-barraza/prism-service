@@ -1,5 +1,6 @@
 import ReActHarness from "./ReActHarness.ts";
 import VisionLanguageHarness from "./VisionLanguageHarness.ts";
+import TreeOfThoughtHarness from "./TreeOfThoughtHarness.ts";
 import type { ConversationMessage } from "./types.ts";
 
 /**
@@ -28,9 +29,8 @@ function register(HarnessClass: HarnessConstructor) {
 // ── Built-in harnesses ───────────────────────────────────────
 register(ReActHarness as unknown as HarnessConstructor);
 register(VisionLanguageHarness as unknown as HarnessConstructor);
+register(TreeOfThoughtHarness as unknown as HarnessConstructor);
 
-// Future: register(SingleShotHarness);
-// Future: register(PlanExecuteHarness);
 
 const HarnessRegistry = {
   get(id: string) {

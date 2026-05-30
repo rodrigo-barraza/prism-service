@@ -2,13 +2,16 @@ import logger from "../utils/logger.ts";
 import type { ConversationMessage } from "./harnesses/types.ts";
 
 /**
- * Planning instruction injected into the system message when planFirst=true.
+ * Planning instruction injected as a separate message when planFirst=true.
  * Mirrors Claude Code's plan mode: the model explores and designs first,
  * then calls exit_plan_mode to present its plan for approval.
+ *
+ * CACHE-STABILITY NOTE: This is injected as a standalone message AFTER the
+ * system prompt, not appended to it. This preserves the system prompt's
+ * content hash across iterations, enabling prefix caching on Anthropic,
+ * Gemini context caching, and OpenAI cached prompts.
  */
-const PLANNING_INSTRUCTION = `
-
-## ⚠️ PLANNING MODE ACTIVE — TOOL ACCESS RESTRICTED
+const PLANNING_INSTRUCTION = `## ⚠️ PLANNING MODE ACTIVE — TOOL ACCESS RESTRICTED
 
 **IMPORTANT**: Although the system prompt above may describe various tools (team_create, execute_shell, read_file, etc.), you are in PLANNING MODE and **CANNOT use any of them**.
 
@@ -31,44 +34,58 @@ Keep your plan concise. For simple tasks, a brief summary is sufficient.`;
  *
  * When planFirst=true:
  * 1. Loop starts with planModeActive=true (tools stripped)
- * 2. Planning instruction injected into system prompt
+ * 2. Planning instruction injected as a separate message (cache-stable)
  * 3. Model outputs plan text, then calls exit_plan_mode
  * 4. exit_plan_mode triggers plan_proposal + approval gate
  * 5. Approved plan echoed as tool result → model continues with full tools
  */
 export default class PlanningModeService {
   /**
-   * Inject the planning instruction into the system message.
-   * Called once before the agentic loop starts when planFirst=true.
+   * Inject the planning instruction as a separate message after the system prompt.
+   *
+   * Uses a dedicated message with `_isPlanningInjection: true` marker instead
+   * of mutating the system message content. This preserves prefix cache
+   * stability across all major providers (Anthropic, Gemini, OpenAI).
    */
   static injectPlanningInstruction(messages: ConversationMessage[]) {
-    const systemMsg = messages.find((message) => message.role === "system");
-    if (systemMsg) {
-      // Idempotency: don't append twice
-      if (systemMsg.content?.includes("PLANNING MODE ACTIVE")) return;
-      systemMsg.content = (systemMsg.content || "") + PLANNING_INSTRUCTION;
-    } else {
-      messages.unshift({
-        role: "system",
-        content: PLANNING_INSTRUCTION.trim(),
-      });
+    // Idempotency: don't inject twice
+    if (
+      messages.some(
+        (message) =>
+          (message as Record<string, unknown>)._isPlanningInjection === true,
+      )
+    ) {
+      return;
     }
 
+    // Insert AFTER the system message but BEFORE any user messages
+    const systemIndex = messages.findIndex((message) => message.role === "system");
+    const insertionIndex = systemIndex >= 0 ? systemIndex + 1 : 0;
+
+    messages.splice(insertionIndex, 0, {
+      role: "user",
+      content: PLANNING_INSTRUCTION,
+      _isPlanningInjection: true,
+    });
+
     logger.info(
-      "[PlanningMode] Injected planning instruction into system prompt",
+      "[PlanningMode] Injected planning instruction as separate message (cache-stable)",
     );
   }
 
   /**
-   * Strip the planning instruction from the system message.
+   * Strip the planning instruction message from the conversation.
    * Called when exiting plan mode so execution doesn't carry stale constraints.
    */
   static stripPlanningInstruction(messages: ConversationMessage[]) {
-    const systemMsg = messages.find((message) => message.role === "system");
-    if (systemMsg && systemMsg.content?.includes("PLANNING MODE ACTIVE")) {
-      systemMsg.content = systemMsg.content.replace(PLANNING_INSTRUCTION, "");
+    const injectionIndex = messages.findIndex(
+      (message) =>
+        (message as Record<string, unknown>)._isPlanningInjection === true,
+    );
+    if (injectionIndex >= 0) {
+      messages.splice(injectionIndex, 1);
       logger.info(
-        "[PlanningMode] Stripped planning instruction from system prompt",
+        "[PlanningMode] Stripped planning instruction message",
       );
     }
   }
@@ -82,3 +99,4 @@ export default class PlanningModeService {
     return steps;
   }
 }
+
