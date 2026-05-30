@@ -4,8 +4,9 @@ import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
+import type { ChatMessage } from "../types/admin.ts";
 import type { MessagePayload } from "./RequestLogger.ts";
+import { discoverDescendantSessionIds } from "../utils/SessionDiscovery.ts";
 
 const DEFAULT_COLLECTION = COLLECTIONS.MODEL_CONVERSATIONS;
 
@@ -550,22 +551,8 @@ const ConversationService: ConversationServiceInterface = {
     if (!db) return null;
 
     // Recursively discover all descendant session IDs (multi-level workers)
-    const allSessionIds = new Set([sessionId]);
-    let frontier = [sessionId];
-    for (let depth = 0; depth < 10 && frontier.length > 0; depth++) {
-      const childIds = await db
-        .collection(COLLECTIONS.REQUESTS)
-        .distinct("agentSessionId", {
-          parentAgentSessionId: { $in: frontier },
-          agentSessionId: { $nin: [...allSessionIds] },
-          project,
-          username,
-        });
-      if (childIds.length === 0) break;
-      const newIds = childIds.filter(Boolean);
-      for (const id of newIds) allSessionIds.add(id);
-      frontier = newIds;
-    }
+    const allSessionIds = await discoverDescendantSessionIds(db, sessionId, { project, username });
+
 
     const requests = await db
       .collection(COLLECTIONS.REQUESTS)
