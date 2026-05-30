@@ -98,6 +98,8 @@ export const ChatRequestSchema = z
     maxWorkerIterations: z.number().nullable().optional(),
     agentContext: z.unknown().nullable().optional(),
     workspaceRoot: z.string().nullable().optional(),
+    enableCriticGate: z.boolean().nullable().optional(),
+    criticModel: z.string().nullable().optional(),
   })
   .passthrough(); // Support extra provider/custom parameters dynamically
 

@@ -360,6 +360,9 @@ async function prepareGenerationContext(
     agentContext,
     // Multi-workspace: user-selected workspace root path (absolute fs path).
     workspaceRoot,
+    // CriticGate: multi-model review of dangerous tool calls.
+    enableCriticGate,
+    criticModel,
     ...extraParams
   } = validatedParams;
 
@@ -401,6 +404,8 @@ async function prepareGenerationContext(
     ...(maxIterations != null && { maxIterations }),
     ...(maxWorkerIterations != null && { maxWorkerIterations }),
     ...(agentContext != null && { agentContext }),
+    ...(enableCriticGate != null && { enableCriticGate }),
+    ...(criticModel != null && { criticModel }),
     ...((extraParams as Record<string, unknown>).systemPrompt ? { systemPrompt: (extraParams as Record<string, unknown>).systemPrompt } : {}),
   };
   // When thinking is explicitly disabled, strip all thinking sub-params

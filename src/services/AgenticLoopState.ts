@@ -64,6 +64,11 @@ export default class AgenticLoopState {
   // ── Error budget tracking ───────────────────────────────
   toolErrorCounts: Map<string, number>;
 
+  // ── Branch tracking (TreeOfThought) ─────────────────────
+  branchesExplored: number;
+  branchesBacktracked: number;
+  selectedBranchScores: number[];
+
   // ── High-water marks ────────────────────────────────────
   // Token counts emitted to the frontend must be monotonically
   // non-decreasing. These prevent dips at iteration boundaries.
@@ -112,6 +117,10 @@ export default class AgenticLoopState {
     this.postCompactTokenCount = null;
 
     this.toolErrorCounts = new Map();
+
+    this.branchesExplored = 0;
+    this.branchesBacktracked = 0;
+    this.selectedBranchScores = [];
 
     this.hwmOutputTokens = 0;
     this.hwmInputTokens = 0;

@@ -16,6 +16,7 @@ import {
   handleExitPlanMode,
   checkForPlanModeEntry,
 } from "./lifecycle/PlanModeController.ts";
+import { validateAfterToolExecution } from "./lifecycle/ValidationInterceptor.ts";
 
 import PlanningModeService from "../PlanningModeService.ts";
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
@@ -86,6 +87,8 @@ export default class ReActHarness extends BaseAgenticHarness {
       workspaceRoot: workspaceRoot || undefined,
       autoApprove: options.autoApprove === true,
       policies: options.policies,
+      enableCriticGate: options.enableCriticGate === true,
+      criticModel: options.criticModel || undefined,
     });
 
     if (options.planFirst) {
@@ -363,6 +366,58 @@ export default class ReActHarness extends BaseAgenticHarness {
         }
 
         this.logIteration(pass, currentMessages);
+
+        // ── Validation intercept (linter auto-remediation) ──────
+        const validationFeedback = await validateAfterToolExecution(
+          pass.pendingToolCalls,
+          results,
+          context,
+          state,
+        );
+
+        if (validationFeedback.length > 0) {
+          const errorBlock = validationFeedback
+            .map(
+              (feedback) =>
+                `### ${feedback.filePath} (${feedback.validatorType})\n${feedback.rawOutput}`,
+            )
+            .join("\n\n");
+
+          currentMessages.push({
+            role: "assistant",
+            content: pass.streamedText || "",
+            ...(pass.streamedThinking && { thinking: pass.streamedThinking }),
+            ...(pass.thinkingSignature && {
+              thinkingSignature: pass.thinkingSignature,
+            }),
+            toolCalls: pass.pendingToolCalls.map((toolCall: ToolCall) => {
+              const matchingResult = results.find(
+                (result) => result.id === toolCall.id,
+              );
+              return {
+                id: toolCall.id || null,
+                name: toolCall.name,
+                args: toolCall.args,
+                result: matchingResult ? matchingResult.result : null,
+              };
+            }),
+          });
+
+          currentMessages.push({
+            role: "user",
+            content:
+              `[VALIDATION ERROR] Your recent edit(s) introduced ${validationFeedback.length} error(s):\n\n` +
+              `${errorBlock}\n\n` +
+              `Fix these issues before proceeding. Do not move on to other tasks until validation passes.`,
+          });
+
+          emit({
+            type: "status",
+            message: "validation_errors_detected",
+            count: validationFeedback.length,
+          });
+          continue;
+        }
 
         // ── Append to context for next pass ───────────────────
         const assistantMessage: ConversationMessage = {

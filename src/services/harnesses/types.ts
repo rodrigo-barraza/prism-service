@@ -90,7 +90,19 @@ export interface ConversationMessage {
   textFragments?: string[];
   thinkingFragments?: string[];
   generationSettings?: Record<string, unknown>;
+  /** Internal marker — planning injection message, stripped on plan exit and DB persistence. */
+  _isPlanningInjection?: boolean;
   [key: string]: unknown;
+}
+
+// ── Validation Feedback ─────────────────────────────────────
+
+export interface ValidationFeedback {
+  toolName: string;
+  filePath: string;
+  validatorType: string;
+  errors: string[];
+  rawOutput: string;
 }
 
 // ── SSE Emission ────────────────────────────────────────────
@@ -147,6 +159,18 @@ export interface AgenticOptions {
   tools?: ToolSchema[];
   /** Declarative tool call policies (allow/deny/askUser with argument predicates). */
   policies?: PolicyRule[];
+  /** Enable CriticGate multi-model review of dangerous tool calls. */
+  enableCriticGate?: boolean;
+  /** Model to use for CriticGate reviews (default: gemini-2.5-flash). */
+  criticModel?: string;
+  /** Number of parallel branches for TreeOfThought harness (default: 2, max: 5). */
+  branchCount?: number;
+  /** Enable sandbox execution with git-based rollback for destructive tools. */
+  enableSandbox?: boolean;
+  /** Skip CriticGate review for this session. */
+  skipCritic?: boolean;
+  /** Skip sandbox for destructive tools. */
+  skipSandbox?: boolean;
   [key: string]: unknown;
 }
 
