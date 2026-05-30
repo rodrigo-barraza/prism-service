@@ -47,6 +47,7 @@ export interface OpenAIMsg {
     id?: string;
     name: string;
     args: Record<string, unknown>;
+    result?: unknown;
     responsesItemId?: string;
     reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> };
   }>;
@@ -329,6 +330,23 @@ export function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.R
               ? toolCall.args
               : JSON.stringify(toolCall.args || {}),
         } as OpenAI.Responses.ResponseFunctionToolCall as unknown as OpenAI.Responses.ResponseInputItem);
+      }
+      // Generate function_call_output items for compact-format messages where
+      // tool results are embedded inside toolCalls[].result (not pre-expanded
+      // into separate role="tool" messages by expandMessagesForFC). This path
+      // is hit by the non-streaming generateText route which bypasses expansion.
+      for (const toolCall of message.toolCalls) {
+        if (toolCall.result !== undefined) {
+          const outputCallId = toolCall.id || (toolCall.responsesItemId?.startsWith("fc") ? toolCall.responsesItemId : `fc_${toolCall.responsesItemId || ""}`);
+          const resultString = typeof toolCall.result === "string"
+            ? toolCall.result
+            : JSON.stringify(toolCall.result);
+          result.push({
+            type: "function_call_output",
+            call_id: outputCallId,
+            output: resultString,
+          } as unknown as OpenAI.Responses.ResponseInputItem);
+        }
       }
       continue;
     }
