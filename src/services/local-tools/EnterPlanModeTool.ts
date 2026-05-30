@@ -1,5 +1,9 @@
 import logger from "../../utils/logger.ts";
 
+interface EnterPlanModeArgs {
+  reason?: string;
+}
+
 export default {
   name: "enter_plan_mode",
 
@@ -22,10 +26,10 @@ export default {
     },
   },
 
-  domain: "Agentic: Control Flow",
+  domain: "Control Flow",
   labels: ["coding"],
 
-  async execute(args: Record<string, unknown>) {
+  async execute(args: EnterPlanModeArgs) {
     logger.info(`[EnterPlanMode] ${args.reason || "(no reason given)"}`);
     return {
       acknowledged: true,

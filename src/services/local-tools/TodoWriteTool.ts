@@ -1,5 +1,39 @@
 import logger from "../../utils/logger.ts";
 
+interface TodoItemInput {
+  content: string;
+  status?: "pending" | "in_progress" | "completed";
+  priority?: "high" | "medium" | "low";
+}
+
+interface TodoWriteArgs {
+  items: TodoItemInput[];
+}
+
+interface TodoItemNormalized {
+  id: number;
+  content: string;
+  status: string;
+  priority: string;
+}
+
+interface TodoStats {
+  total: number;
+  pending: number;
+  in_progress: number;
+  completed: number;
+}
+
+interface TodoEmitEvent {
+  type: "todo_update";
+  items: TodoItemNormalized[];
+  stats: TodoStats;
+}
+
+interface TodoContext {
+  _emit?: (event: TodoEmitEvent) => void;
+}
+
 export default {
   name: "todo_write",
 
@@ -42,27 +76,28 @@ export default {
     },
   },
 
-  domain: "Agentic: Task Management",
+  domain: "Task Management",
   labels: ["coding"],
 
-  async execute(args: Record<string, unknown>, context: { _emit?: (event: Record<string, unknown>) => void }) {
-    const { items } = args;
+  async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
+    const writeArgs = args as unknown as TodoWriteArgs;
+    const typedContext = context as unknown as TodoContext;
+    const { items } = writeArgs;
     if (!Array.isArray(items)) {
       return { error: "'items' must be an array of todo objects" };
     }
 
-    const normalized = items.map((item: Record<string, unknown>, i: number) => ({
+    const normalized: TodoItemNormalized[] = items.map((item, i) => ({
       id: i + 1,
-      content: (item.content as string) || "",
-      status: (item.status as string) || "pending",
-      priority: (item.priority as string) || "medium",
+      content: item.content || "",
+      status: item.status || "pending",
+      priority: item.priority || "medium",
     }));
 
-    const stats = {
+    const stats: TodoStats = {
       total: normalized.length,
       pending: normalized.filter((i) => i.status === "pending").length,
-      in_progress: normalized.filter((i) => i.status === "in_progress")
-        .length,
+      in_progress: normalized.filter((i) => i.status === "in_progress").length,
       completed: normalized.filter((i) => i.status === "completed").length,
     };
 
@@ -70,8 +105,8 @@ export default {
       `[TodoWrite] ${stats.total} items (${stats.completed} done, ${stats.in_progress} in progress, ${stats.pending} pending)`,
     );
 
-    if (context._emit) {
-      context._emit({ type: "todo_update", items: normalized, stats });
+    if (typedContext._emit) {
+      typedContext._emit({ type: "todo_update", items: normalized, stats });
     }
 
     return { acknowledged: true, items: normalized, stats };

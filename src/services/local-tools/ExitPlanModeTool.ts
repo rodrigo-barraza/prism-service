@@ -1,5 +1,9 @@
 import logger from "../../utils/logger.ts";
 
+interface ExitPlanModeArgs {
+  summary?: string;
+}
+
 export default {
   name: "exit_plan_mode",
 
@@ -20,10 +24,10 @@ export default {
     },
   },
 
-  domain: "Agentic: Control Flow",
+  domain: "Control Flow",
   labels: ["coding"],
 
-  async execute(args: Record<string, unknown>) {
+  async execute(args: ExitPlanModeArgs) {
     logger.info(`[ExitPlanMode] ${args.summary || "(no summary)"}`);
     // Note: AgenticLoopService overrides this result with the approved plan
     // and Claude Code-style approval message after the approval gate.
