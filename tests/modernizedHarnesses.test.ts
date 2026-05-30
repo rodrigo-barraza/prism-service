@@ -238,7 +238,7 @@ describe("CriticGate", () => {
     };
   });
 
-  it("should auto-approve any tool calls that are not in the DANGER tier", async () => {
+  it("should auto-approve any tool calls that are not in the DANGER tier and fallback to context.resolvedModel if criticModel is unconfigured", async () => {
     const criticGate = new CriticGate();
     const toolCall: ToolCall = {
       id: "call-1",
@@ -250,6 +250,7 @@ describe("CriticGate", () => {
     const reviewResult = await criticGate.review(toolCall, mockContext);
     expect(reviewResult.approved).toBe(true);
     expect(reviewResult.reason).toBe("below_danger_tier");
+    expect(reviewResult.criticModel).toBe("test-model"); // default to context.resolvedModel
     expect(mockProvider.generateTextStream).not.toHaveBeenCalled();
   });
 

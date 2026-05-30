@@ -31,10 +31,10 @@ interface CriticReviewResult {
 }
 
 export default class CriticGate {
-  private criticModel: string;
+  private criticModel: string | undefined;
 
   constructor(options: CriticGateOptions = {}) {
-    this.criticModel = options.model || DEFAULT_CRITIC_MODEL;
+    this.criticModel = options.model || undefined;
   }
 
   /**
@@ -47,14 +47,16 @@ export default class CriticGate {
     const approvalInfo = toolCall._approval as { tier: number } | undefined;
     const tier = approvalInfo?.tier ?? APPROVAL_TIERS.WRITE;
 
+    const activeCriticModel = this.criticModel || context.resolvedModel;
+
     // Only review DANGER tier tools
     if (tier !== APPROVAL_TIERS.DANGER) {
-      return { approved: true, reason: "below_danger_tier", criticModel: this.criticModel };
+      return { approved: true, reason: "below_danger_tier", criticModel: activeCriticModel };
     }
 
     // Skip if critic is explicitly disabled for this context
     if ((context.options as Record<string, unknown>).skipCritic === true) {
-      return { approved: true, reason: "critic_skipped", criticModel: this.criticModel };
+      return { approved: true, reason: "critic_skipped", criticModel: activeCriticModel };
     }
 
     try {
@@ -62,15 +64,15 @@ export default class CriticGate {
 
       // Use the same provider from the context to avoid a separate provider dependency.
       // The critic call is intentionally lightweight and fast.
-      const criticResponse = await this.callCriticModel(reviewPrompt, context);
-      return this.parseReviewResponse(criticResponse);
+      const criticResponse = await this.callCriticModel(reviewPrompt, context, activeCriticModel);
+      return this.parseReviewResponse(criticResponse, activeCriticModel);
     } catch (criticError: unknown) {
       // On critic failure, default to allowing (fail-open for usability).
       // A fail-closed approach would block all DANGER tools on critic downtime.
       logger.warn(
         `[CriticGate] Review failed for "${toolCall.name}": ${(criticError as Error).message}. Defaulting to approve.`,
       );
-      return { approved: true, reason: "critic_error_fallback", criticModel: this.criticModel };
+      return { approved: true, reason: "critic_error_fallback", criticModel: activeCriticModel };
     }
   }
 
@@ -103,6 +105,7 @@ export default class CriticGate {
   private async callCriticModel(
     prompt: string,
     context: AgenticContext,
+    activeModel: string,
   ): Promise<string> {
     const { provider } = context;
 
@@ -120,7 +123,7 @@ export default class CriticGate {
 
     const stream = provider.generateTextStream(
       criticMessages,
-      this.criticModel,
+      activeModel,
       criticOptions,
     );
 
@@ -136,22 +139,22 @@ export default class CriticGate {
   /**
    * Parse the critic model's response into a structured result.
    */
-  private parseReviewResponse(response: string): CriticReviewResult {
+  private parseReviewResponse(response: string, activeModel: string): CriticReviewResult {
     const firstLine = response.split("\n")[0].trim().toUpperCase();
 
     if (firstLine.startsWith("APPROVE")) {
-      return { approved: true, reason: "critic_approved", criticModel: this.criticModel };
+      return { approved: true, reason: "critic_approved", criticModel: activeModel };
     }
 
     if (firstLine.startsWith("DENY")) {
       const denialReason = response.split("\n").slice(1).join(" ").trim() || "critic_denied";
       logger.info(`[CriticGate] DENIED: ${denialReason}`);
-      return { approved: false, reason: denialReason, criticModel: this.criticModel };
+      return { approved: false, reason: denialReason, criticModel: activeModel };
     }
 
     // Ambiguous response — default to approve
     logger.warn(`[CriticGate] Ambiguous critic response: "${response.slice(0, 100)}". Defaulting to approve.`);
-    return { approved: true, reason: "critic_parse_fallback", criticModel: this.criticModel };
+    return { approved: true, reason: "critic_parse_fallback", criticModel: activeModel };
   }
 
   /**
