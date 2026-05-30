@@ -390,6 +390,7 @@ export default class BaseAgenticHarness {
         name: toolName,
         args: streamChunk.args || {},
         thoughtSignature: streamChunk.thoughtSignature || undefined,
+        reasoningItem: streamChunk.reasoningItem || undefined,
       };
       pass.pendingToolCalls.push(toolCall);
       state.streamedToolCalls.push({ ...toolCall });

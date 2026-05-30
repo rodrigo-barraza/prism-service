@@ -42,6 +42,8 @@ export interface ToolCall {
   args: Record<string, unknown>;
   responsesItemId?: string;
   thoughtSignature?: string;
+  /** OpenAI Responses API reasoning output item paired with this function call. */
+  reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> };
   /** Populated by AutoApprovalEngine during beforeToolCall hook. */
   _approval?: { tier: string; tierLabel: string };
   result?: unknown;
@@ -231,6 +233,8 @@ export interface StreamChunk {
   // Tool call
   id?: string;
   responsesItemId?: string;
+  /** OpenAI Responses API reasoning output item paired with this tool call. */
+  reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> };
   name?: string;
   args?: Record<string, unknown>;
   thoughtSignature?: string;
