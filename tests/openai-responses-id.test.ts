@@ -375,4 +375,125 @@ describe("OpenAI Responses API input preparation", () => {
     const functionCallItem = inputItems[0] as unknown as { arguments: string };
     expect(functionCallItem.arguments).toBe(JSON.stringify({ prompt: "test", volume: 0.5 }));
   });
+
+  // ── Compact format edge cases (non-streaming path) ─────────
+
+  it("generates function_call_output from compact-format embedded results", () => {
+    const messages: OpenAIMsg[] = [
+      {
+        role: "assistant",
+        content: "I generated the audio.",
+        toolCalls: [
+          {
+            id: "call_compact_test",
+            name: "generate_audio",
+            args: { prompt: "A song" },
+            result: { success: true, audioRef: "minio://audio/song.wav" },
+          },
+        ],
+      },
+      { role: "user", content: "Thanks, now make it louder." },
+    ];
+
+    const inputItems = prepareResponsesInput(messages);
+
+    // Expected order: assistant text, function_call, function_call_output, user
+    const functionCallItem = inputItems.find((item) => item.type === "function_call");
+    const functionCallOutputItem = inputItems.find((item) => item.type === "function_call_output");
+
+    expect(functionCallItem).toBeDefined();
+    expect(functionCallOutputItem).toBeDefined();
+
+    // call_id on both must match for correlation
+    const typedFunctionCall = functionCallItem as unknown as { call_id: string };
+    const typedOutput = functionCallOutputItem as unknown as { call_id: string; output: string };
+    expect(typedFunctionCall.call_id).toBe("call_compact_test");
+    expect(typedOutput.call_id).toBe("call_compact_test");
+    expect(typedOutput.output).toBe(JSON.stringify({ success: true, audioRef: "minio://audio/song.wav" }));
+  });
+
+  it("generates function_call_output for multiple compact-format tool calls", () => {
+    const messages: OpenAIMsg[] = [
+      {
+        role: "assistant",
+        toolCalls: [
+          {
+            id: "call_audio",
+            name: "generate_audio",
+            args: { prompt: "Song" },
+            result: { audioRef: "minio://audio/1.wav" },
+          },
+          {
+            id: "call_image",
+            name: "generate_image",
+            args: { prompt: "Cover art" },
+            result: { imageRef: "minio://images/1.png" },
+          },
+        ],
+      },
+    ];
+
+    const inputItems = prepareResponsesInput(messages);
+
+    const functionCallItems = inputItems.filter((item) => item.type === "function_call");
+    const functionCallOutputItems = inputItems.filter((item) => item.type === "function_call_output");
+
+    expect(functionCallItems).toHaveLength(2);
+    expect(functionCallOutputItems).toHaveLength(2);
+
+    // Each output's call_id must match its corresponding function_call's call_id
+    const firstOutput = functionCallOutputItems[0] as unknown as { call_id: string };
+    const secondOutput = functionCallOutputItems[1] as unknown as { call_id: string };
+    expect(firstOutput.call_id).toBe("call_audio");
+    expect(secondOutput.call_id).toBe("call_image");
+  });
+
+  it("does NOT generate function_call_output for tool calls without results (pending execution)", () => {
+    const messages: OpenAIMsg[] = [
+      {
+        role: "assistant",
+        toolCalls: [
+          {
+            id: "call_pending",
+            name: "generate_audio",
+            args: { prompt: "Song" },
+          },
+        ],
+      },
+    ];
+
+    const inputItems = prepareResponsesInput(messages);
+
+    const functionCallOutputItems = inputItems.filter((item) => item.type === "function_call_output");
+    expect(functionCallOutputItems).toHaveLength(0);
+  });
+
+  it("handles expanded-format (separate tool messages) without duplicating function_call_output", () => {
+    const messages: OpenAIMsg[] = [
+      {
+        role: "assistant",
+        toolCalls: [
+          {
+            id: "call_expanded",
+            name: "generate_audio",
+            args: { prompt: "Song" },
+          },
+        ],
+      },
+      {
+        role: "tool",
+        tool_call_id: "call_expanded",
+        content: JSON.stringify({ success: true }),
+      },
+    ];
+
+    const inputItems = prepareResponsesInput(messages);
+
+    // Should be exactly 1 function_call_output (from the tool message), not 2
+    const functionCallOutputItems = inputItems.filter((item) => item.type === "function_call_output");
+    expect(functionCallOutputItems).toHaveLength(1);
+
+    const typedOutput = functionCallOutputItems[0] as unknown as { call_id: string };
+    expect(typedOutput.call_id).toBe("call_expanded");
+  });
 });
