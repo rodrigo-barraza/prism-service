@@ -447,6 +447,8 @@ const openaiProvider = {
     }
     if (options.reasoningSummary) {
       reasoning.summary = options.reasoningSummary as "auto" | "concise" | "detailed";
+    } else if (reasoning.effort) {
+      reasoning.summary = "auto";
     }
     if (Object.keys(reasoning).length > 0) {
       payload.reasoning = reasoning;
@@ -721,6 +723,8 @@ const openaiProvider = {
     }
     if (options.reasoningSummary) {
       reasoning.summary = options.reasoningSummary as "auto" | "concise" | "detailed";
+    } else if (reasoning.effort) {
+      reasoning.summary = "auto";
     }
     if (Object.keys(reasoning).length > 0) {
       payload.reasoning = reasoning;
