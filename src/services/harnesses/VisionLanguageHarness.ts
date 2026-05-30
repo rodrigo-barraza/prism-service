@@ -356,32 +356,9 @@ Use these images to observe the environment, notice changes, animations, or user
           emit,
         );
 
-        // ── Plan mode toggling ────────────────────────────────
-        checkForPlanModeEntry(
-          pass.pendingToolCalls,
-          currentMessages,
-          state,
-          emit,
-        );
-
-        const exitPlanToolCall = pass.pendingToolCalls.find(
-          (toolCall) => toolCall.name === "exit_plan_mode",
-        );
-        if (exitPlanToolCall) {
-          const { shouldContinueLoop } = await handleExitPlanMode(
-            exitPlanToolCall,
-            pass,
-            results,
-            currentMessages,
-            context,
-            state,
-          );
-          if (!shouldContinueLoop) return { messages: currentMessages };
-        }
-
-        this.logIteration(pass, currentMessages);
-
         // ── Validation intercept (linter auto-remediation) ──────
+        // Must run BEFORE plan mode toggling — no point entering plan
+        // mode if validation will inject error feedback and continue.
         const validationFeedback = await validateAfterToolExecution(
           pass.pendingToolCalls,
           results,
@@ -430,7 +407,31 @@ Use these images to observe the environment, notice changes, animations, or user
             message: "validation_errors_detected",
             count: validationFeedback.length,
           });
+          this.logIteration(pass, currentMessages);
           continue;
+        }
+
+        // ── Plan mode toggling ────────────────────────────────
+        checkForPlanModeEntry(
+          pass.pendingToolCalls,
+          currentMessages,
+          state,
+          emit,
+        );
+
+        const exitPlanToolCall = pass.pendingToolCalls.find(
+          (toolCall) => toolCall.name === "exit_plan_mode",
+        );
+        if (exitPlanToolCall) {
+          const { shouldContinueLoop } = await handleExitPlanMode(
+            exitPlanToolCall,
+            pass,
+            results,
+            currentMessages,
+            context,
+            state,
+          );
+          if (!shouldContinueLoop) return { messages: currentMessages };
         }
 
         // ── Append to context for next pass ───────────────────
@@ -466,6 +467,7 @@ Use these images to observe the environment, notice changes, animations, or user
               (!message.toolCalls || message.toolCalls.length === 0)
             ),
         );
+        this.logIteration(pass, currentMessages);
         continue;
       }
 
