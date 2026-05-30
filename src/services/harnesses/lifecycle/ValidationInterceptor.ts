@@ -1,6 +1,7 @@
 import logger from "../../../utils/logger.ts";
 import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
 import path from "node:path";
+import fs from "node:fs";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type { ToolCall, ToolResult, AgenticContext, ValidationFeedback } from "../types.ts";
@@ -30,10 +31,10 @@ interface ValidatorConfig {
 }
 
 const EXTENSION_VALIDATORS: Record<string, ValidatorConfig> = {
-  ".ts":  { command: "npx tsc --noEmit --pretty 2>&1 | head -60", type: "typescript" },
-  ".tsx": { command: "npx tsc --noEmit --pretty 2>&1 | head -60", type: "typescript" },
-  ".js":  { command: "npx eslint --format compact 2>&1 | head -40", type: "eslint" },
-  ".jsx": { command: "npx eslint --format compact 2>&1 | head -40", type: "eslint" },
+  ".ts":  { command: "npx tsc --noEmit --pretty", type: "typescript" },
+  ".tsx": { command: "npx tsc --noEmit --pretty", type: "typescript" },
+  ".js":  { command: "npx eslint --format compact", type: "eslint" },
+  ".jsx": { command: "npx eslint --format compact", type: "eslint" },
   ".json": { command: null, type: "json-parse" },
 };
 
@@ -47,6 +48,31 @@ function extractFilePath(toolCall: ToolCall): string | null {
   const arguments_ = toolCall.args as Record<string, unknown>;
   const rawPath = arguments_.path || arguments_.filePath || arguments_.file || arguments_.newPath;
   return typeof rawPath === "string" ? rawPath : null;
+}
+
+/**
+ * Find the nearest directory containing a tsconfig.json or package.json starting from a file's directory.
+ * Walks up the tree until it reaches the workspace root.
+ */
+function findNearestConfigDir(filePath: string, workspaceRoot: string): string {
+  const absoluteFilePath = path.isAbsolute(filePath)
+    ? filePath
+    : path.join(workspaceRoot, filePath);
+
+  let currentDirectory = path.dirname(absoluteFilePath);
+
+  while (currentDirectory.startsWith(workspaceRoot) && currentDirectory !== workspaceRoot) {
+    const hasTsConfig = fs.existsSync(path.join(currentDirectory, "tsconfig.json"));
+    const hasPackageJson = fs.existsSync(path.join(currentDirectory, "package.json"));
+    if (hasTsConfig || hasPackageJson) {
+      return currentDirectory;
+    }
+    const parentDirectory = path.dirname(currentDirectory);
+    if (parentDirectory === currentDirectory) break;
+    currentDirectory = parentDirectory;
+  }
+
+  return workspaceRoot;
 }
 
 /**
@@ -75,12 +101,15 @@ async function runShellValidator(
   const workspaceRoot = context.workspaceRoot || ToolOrchestratorService.getWorkspaceRoot();
   if (!workspaceRoot) return null;
 
+  const executionCwd = findNearestConfigDir(filePath, workspaceRoot);
+
   try {
     const shellResult = await ToolOrchestratorService.executeTool(
-      "execute_shell",
+      "run_command",
       {
-        command: `export PATH=$PATH:/usr/local/bin:/usr/bin:/bin && timeout ${Math.floor(VALIDATION_TIMEOUT_MS / 1000)}s ${validatorConfig.command}`,
-        cwd: workspaceRoot,
+        command: validatorConfig.command,
+        cwd: executionCwd,
+        timeout: VALIDATION_TIMEOUT_MS,
       },
       {
         project: context.project,
@@ -109,7 +138,7 @@ async function runShellValidator(
     if (errorLines.length === 0 && combinedOutput.length < 20) return null;
 
     return {
-      toolName: "execute_shell",
+      toolName: "run_command",
       filePath,
       validatorType: validatorConfig.type,
       errors: errorLines.length > 0 ? errorLines : [combinedOutput.slice(0, 500)],

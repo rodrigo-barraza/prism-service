@@ -155,7 +155,7 @@ describe("ValidationInterceptor", () => {
 
     expect(feedbackList).toHaveLength(1);
     expect(feedbackList[0]).toEqual({
-      toolName: "execute_shell",
+      toolName: "run_command",
       filePath: "test.ts",
       validatorType: "typescript",
       errors: ["error TS2322: Type 'string' is not assignable to type 'number'."],
@@ -163,9 +163,11 @@ describe("ValidationInterceptor", () => {
     });
 
     expect(ToolOrchestratorService.executeTool).toHaveBeenCalledWith(
-      "execute_shell",
+      "run_command",
       expect.objectContaining({
-        command: expect.stringContaining("npx tsc --noEmit"),
+        command: "npx tsc --noEmit --pretty",
+        cwd: "/home/rodrigo/development",
+        timeout: 15000,
       }),
       expect.any(Object),
     );
@@ -188,9 +190,11 @@ describe("ValidationInterceptor", () => {
     const feedbackList = await validateAfterToolExecution(toolCalls, results, mockContext, mockState);
     expect(feedbackList).toEqual([]);
     expect(ToolOrchestratorService.executeTool).toHaveBeenCalledWith(
-      "execute_shell",
+      "run_command",
       expect.objectContaining({
-        command: expect.stringContaining("npx tsc --noEmit"),
+        command: "npx tsc --noEmit --pretty",
+        cwd: "/home/rodrigo/development",
+        timeout: 15000,
       }),
       expect.any(Object),
     );
