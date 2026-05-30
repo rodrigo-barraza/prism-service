@@ -222,11 +222,11 @@ async function* parseNativeSSEStream(reader: ReadableStreamDefaultReader<Uint8Ar
     // reader released
   }
 }
-function safeParseJSON(str: unknown) {
+function safeParseJSON(serializedString: unknown) {
   try {
-    return JSON.parse(String(str));
+    return JSON.parse(String(serializedString));
   } catch {
-    return str;
+    return serializedString;
   }
 }
 // Build the native /api/v1/chat input from OpenAI-style messages.
@@ -243,8 +243,8 @@ function buildNativeInput(messages: PreparedMessage[]) {
     .find((message) => message.role === "user");
   if (!lastUser) return "";
   // Find the index of the last user message to separate history from current turn
-  const lastUserIdx = nonSystemMessages.lastIndexOf(lastUser);
-  const historyMessages = nonSystemMessages.slice(0, lastUserIdx);
+  const lastUserIndex = nonSystemMessages.lastIndexOf(lastUser);
+  const historyMessages = nonSystemMessages.slice(0, lastUserIndex);
   // Build conversation history prefix (prior turns only)
   let historyPrefix = "";
   if (historyMessages.length > 0) {
