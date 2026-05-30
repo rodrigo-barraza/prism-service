@@ -1,23 +1,49 @@
-Starting stream with model: gemini-3.5-flash...
-CHUNK PARTS: [
-  {
-    "text": "**Defining the Parameters**\n\nI've got the request parsed: \"Why is the sky blue?\" My task is to produce a single, concise sentence. I've pinpointed Rayleigh scattering as the key scientific concept to include. Now, it's about crafting the sentence so it's both accurate and short.\n\n\n",
-    "thought": true
-  }
-]
-CHUNK PARTS: [
-  {
-    "text": "The sky is blue because Earth's atmosphere scatters blue light from the sun in all directions"
-  }
-]
-CHUNK PARTS: [
-  {
-    "text": " more than other colors."
-  }
-]
-CHUNK PARTS: [
-  {
-    "text": "",
-    "thoughtSignature": "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"
-  }
-]
+Starting OpenAI thinking test with minimal...
+[17:45:16] INFO  [prism] [OpenAI] generateTextStream model=gpt-5.5
+[17:45:16] INFO  [prism] [OpenAI/Responses] Sending stream payload: {"model":"gpt-5.5","input":[{"role":"user","content":"A box contains 5 red balls, 7 blue balls, and 8 green balls. If we select 3 balls at random without replacement, what is the probability that all 3 are of different colors? Think step by step and explain carefully."}],"stream":true,"reasoning":{"effort":"minimal","summary":"auto"}}
+(node:1440164) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Test failed with error: ProviderError: 400 Unsupported value: 'minimal' is not supported with the 'gpt-5.5' model. Supported values are: 'none', 'low', 'medium', 'high', and 'xhigh'.
+    at toProviderError (/home/rodrigo/development/prism-service/src/providers/openai.ts:135:9)
+    at Object.generateTextStream (/home/rodrigo/development/prism-service/src/providers/openai.ts:709:7)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async test (/home/rodrigo/development/prism-service/scratch/test_openai_thinking.ts:21:22) {
+  provider: 'openai',
+  statusCode: 400,
+  originalError: BadRequestError: 400 Unsupported value: 'minimal' is not supported with the 'gpt-5.5' model. Supported values are: 'none', 'low', 'medium', 'high', and 'xhigh'.
+      at APIError.generate (/home/rodrigo/development/prism-service/node_modules/openai/src/core/error.ts:73:14)
+      at OpenAI.makeStatusError (/home/rodrigo/development/prism-service/node_modules/openai/src/client.ts:591:28)
+      at OpenAI.makeRequest (/home/rodrigo/development/prism-service/node_modules/openai/src/client.ts:872:24)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    status: 400,
+    headers: Headers {
+      date: 'Sat, 30 May 2026 00:45:16 GMT',
+      'content-type': 'application/json',
+      'content-length': '280',
+      'cf-ray': 'a039b712be77d8fc-YVR',
+      'cf-cache-status': 'DYNAMIC',
+      server: 'cloudflare',
+      'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',
+      'x-content-type-options': 'nosniff',
+      'access-control-expose-headers': 'X-Request-ID, CF-Ray, CF-Ray',
+      'openai-organization': 'digest-technologies-inc',
+      'openai-processing-ms': '34',
+      'openai-project': 'proj_SSroF47GyiKX8JaNSGjJR2Sl',
+      'openai-version': '2020-10-01',
+      'x-request-id': 'req_07b741e3b9044d1db4815c6423c9252e',
+      'set-cookie': '__cf_bm=oUgUCc1DcrqVEVTIh1X28UmyHPkwl4jPjA7wYAGSjxA-1780101916.5920115-1.0.1.1-hlNVvHRobNGX2HmXBnRyQMD9Kj7ZloXH8WILJGgbBt.234LMgvZ1yHVTGLdpe9YRPNf4CAuaa0Ni7kEBNfs1IhVmEwtxYgcCcuw.2MVey2YYVgKcqUAi_AJUnyg1BQ1P; HttpOnly; SameSite=None; Secure; Path=/; Domain=api.openai.com; Expires=Sat, 30 May 2026 01:15:16 GMT',
+      'alt-svc': 'h3=":443"; ma=86400'
+    },
+    requestID: 'req_07b741e3b9044d1db4815c6423c9252e',
+    error: {
+      message: "Unsupported value: 'minimal' is not supported with the 'gpt-5.5' model. Supported values are: 'none', 'low', 'medium', 'high', and 'xhigh'.",
+      type: 'invalid_request_error',
+      param: 'reasoning.effort',
+      code: 'unsupported_value'
+    },
+    code: 'unsupported_value',
+    param: 'reasoning.effort',
+    type: 'invalid_request_error'
+  },
+  errorType: 'invalid_request_error'
+}

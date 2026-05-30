@@ -513,6 +513,8 @@ const openaiProvider = {
       payload.tools = [...((payload.tools as OpenAI.Responses.Tool[]) || []), ...customTools];
     }
 
+    logger.info(`[OpenAI/Responses] Sending non-stream payload: ${JSON.stringify(payload)}`);
+
     const { data: response, response: rawResponse } = await getClient()
       .responses.create(payload)
       .withResponse();
@@ -788,6 +790,8 @@ const openaiProvider = {
     if (customTools) {
       payload.tools = [...((payload.tools as OpenAI.Responses.Tool[]) || []), ...customTools];
     }
+
+    logger.info(`[OpenAI/Responses] Sending stream payload: ${JSON.stringify(payload)}`);
 
     const { data: streamData, response: rawStreamResponse } = await getClient()
       .responses.create(payload, {
