@@ -106,12 +106,12 @@ class MutationQueue {
    */
   async withLock<T>(
     filePath: string,
-    fn: () => Promise<T> | T,
+    actionFunction: () => Promise<T> | T,
     workerId: string = "any",
   ): Promise<T> {
     const handle = await this.acquire(filePath, workerId);
     try {
-      return await fn();
+      return await actionFunction();
     } finally {
       handle.release();
     }
