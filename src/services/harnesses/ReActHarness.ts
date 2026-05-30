@@ -414,24 +414,33 @@ export default class ReActHarness extends BaseAgenticHarness {
           continue;
         }
 
-        // Handle Codex/planning models that separate planning and action in iteration 1
+        // Handle Codex/planning models that separate planning and action in multi-turn agentic flows
         const isCodexModel = context.resolvedModel?.toLowerCase().includes("codex");
         const hasToolsAvailable = this.tools.finalTools && this.tools.finalTools.length > 0;
-        if (isCodexModel && hasToolsAvailable && state.iterations === 1) {
-          logger.info(
-            `[ReActHarness] Codex model planning phase detected in iteration 1. Continuing to action phase.`,
-          );
-          currentMessages.push({
-            role: "assistant",
-            content: pass.streamedText,
-            ...(pass.streamedThinking && { thinking: pass.streamedThinking }),
-          });
-          currentMessages.push({
-            role: "user",
-            content: "[System Context: Please proceed with the next step using the appropriate tools to implement your plan.]",
-          });
-          this.logIteration(pass, currentMessages);
-          continue;
+        if (isCodexModel && hasToolsAvailable) {
+          const lastMessage = currentMessages[currentMessages.length - 1];
+          const isAlreadyPrompted =
+            lastMessage &&
+            lastMessage.role === "user" &&
+            typeof lastMessage.content === "string" &&
+            lastMessage.content.includes("If you have fully completed");
+
+          if (!isAlreadyPrompted) {
+            logger.info(
+              `[ReActHarness] Codex model planning/update detected in iteration ${state.iterations}. Continuing to action phase.`,
+            );
+            currentMessages.push({
+              role: "assistant",
+              content: pass.streamedText,
+              ...(pass.streamedThinking && { thinking: pass.streamedThinking }),
+            });
+            currentMessages.push({
+              role: "user",
+              content: "[System Context: Please proceed with the next step using the appropriate tools to implement your plan. If you have fully completed the user's request, please output a final message stating that you are done without calling any tools.]",
+            });
+            this.logIteration(pass, currentMessages);
+            continue;
+          }
         }
 
         this.logIteration(pass, currentMessages);
