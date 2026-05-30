@@ -29,6 +29,7 @@ router.get(
         endpoint,
         operation,
         success,
+        agent,
         from,
         to,
         sort = "timestamp",
@@ -39,11 +40,26 @@ router.get(
       const filter: Record<string, unknown> = {};
       if (project) filter.project = project;
       if (username) filter.username = username;
-      if (provider) filter.provider = provider;
       if (model) filter.model = model;
-      if (endpoint) filter.endpoint = endpoint;
-      if (operation) filter.operation = operation;
-      if (success !== undefined) filter.success = success === "true";
+
+      const applyCommaSeparatedFilter = (key: string, value: unknown) => {
+        if (!value) return;
+        const values = String(value).split(",").filter(Boolean);
+        if (values.length === 1) filter[key] = values[0];
+        else if (values.length > 1) filter[key] = { $in: values };
+      };
+
+      applyCommaSeparatedFilter("provider", provider);
+      applyCommaSeparatedFilter("endpoint", endpoint);
+      applyCommaSeparatedFilter("operation", operation);
+      applyCommaSeparatedFilter("agent", agent);
+
+      if (success !== undefined) {
+        const successValues = String(success).split(",").filter(Boolean);
+        if (successValues.length === 1) filter.success = successValues[0] === "true";
+        else if (successValues.length > 1) filter.success = { $in: successValues.map((value: string) => value === "true") };
+      }
+
       applyDateRangeFilter(filter, from as string, to as string);
 
       const [docs, total] = await Promise.all([

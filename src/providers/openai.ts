@@ -12,7 +12,8 @@ import {
   getDefaultModels,
   getModelByName,
 } from "../config.ts";
-import { convertToolsToOpenAI } from "../utils/openai-compat.ts";
+import { convertToolsToOpenAI, normalizeUsage } from "../utils/openai-compat.ts";
+import type { TokenUsage } from "../types/admin.ts";
 import {
   getDataUrlMimeType,
   getUrlType,
@@ -146,6 +147,32 @@ interface ErrorRecord {
 /** Narrow any catch to a typed error record for retry logic. */
 function asErrorRecord(error: unknown): ErrorRecord {
   return error as ErrorRecord;
+}
+export function normalizeResponsesUsage(
+  rawUsage: {
+    input_tokens?: number;
+    output_tokens?: number;
+    input_tokens_details?: { cached_tokens?: number };
+    output_tokens_details?: { reasoning_tokens?: number };
+  } | null | undefined
+): TokenUsage {
+  const usage: TokenUsage = {
+    inputTokens: rawUsage?.input_tokens ?? 0,
+    outputTokens: rawUsage?.output_tokens ?? 0,
+  };
+
+  const cachedTokens = rawUsage?.input_tokens_details?.cached_tokens;
+  if (cachedTokens && cachedTokens > 0) {
+    usage.cacheReadInputTokens = cachedTokens;
+    usage.inputTokens = Math.max(0, (usage.inputTokens ?? 0) - cachedTokens);
+  }
+
+  const reasoningTokens = rawUsage?.output_tokens_details?.reasoning_tokens;
+  if (reasoningTokens && reasoningTokens > 0) {
+    usage.reasoningOutputTokens = reasoningTokens;
+  }
+
+  return usage;
 }
 function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletionMessageParam[] {
   return messages.map((message: OpenAIMsg): OpenAI.Chat.ChatCompletionMessageParam => {
@@ -601,10 +628,7 @@ const openaiProvider = {
     const result: Record<string, unknown> = {
       text: response.output_text || "",
       images,
-      usage: {
-        inputTokens: response.usage?.input_tokens ?? 0,
-        outputTokens: response.usage?.output_tokens ?? 0,
-      },
+      usage: normalizeResponsesUsage(response.usage),
     };
     if (toolCalls.length > 0) result.toolCalls = toolCalls;
     if (rateLimits) result.rateLimits = rateLimits;
@@ -670,10 +694,7 @@ const openaiProvider = {
       const message = response.choices[0].message;
       const result: Record<string, unknown> = {
         text: message.content || "",
-        usage: {
-          inputTokens: response.usage?.prompt_tokens ?? 0,
-          outputTokens: response.usage?.completion_tokens ?? 0,
-        },
+        usage: normalizeUsage(response.usage),
       };
       if (message.tool_calls && message.tool_calls.length > 0) {
         result.toolCalls = message.tool_calls.map((toolCall) => {
@@ -730,10 +751,7 @@ const openaiProvider = {
           const response = await getClient().chat.completions.create(payload);
           return {
             text: response.choices[0].message.content,
-            usage: {
-              inputTokens: response.usage?.prompt_tokens ?? 0,
-              outputTokens: response.usage?.completion_tokens ?? 0,
-            },
+            usage: normalizeUsage(response.usage),
           };
         }
       }
@@ -961,10 +979,7 @@ const openaiProvider = {
       if (event.type === "response.completed") {
         const typedEvent = event as OpenAI.Responses.ResponseCompletedEvent;
         if (typedEvent.response?.usage) {
-          usage = {
-            inputTokens: typedEvent.response.usage.input_tokens ?? 0,
-            outputTokens: typedEvent.response.usage.output_tokens ?? 0,
-          };
+          usage = normalizeResponsesUsage(typedEvent.response.usage);
         }
       }
     }
@@ -1091,10 +1106,7 @@ const openaiProvider = {
     for await (const chunk of stream) {
       if (options.signal?.aborted) break;
       if (chunk.usage) {
-        usage = {
-          inputTokens: chunk.usage.prompt_tokens ?? 0,
-          outputTokens: chunk.usage.completion_tokens ?? 0,
-        };
+        usage = normalizeUsage(chunk.usage);
       }
       const delta = chunk.choices?.[0]?.delta;
       const content = delta?.content || "";
@@ -1267,10 +1279,7 @@ const openaiProvider = {
         messages,
         max_completion_tokens: 1000,
       });
-      const usage = {
-        inputTokens: response.usage?.prompt_tokens || 0,
-        outputTokens: response.usage?.completion_tokens || 0,
-      };
+      const usage = normalizeUsage(response.usage);
       return { text: response.choices[0].message.content, usage };
     } catch (error: unknown) {
       toProviderError(error);
