@@ -44,7 +44,7 @@ const enterWorktree = {
       required: [],
     },
   },
-  domain: "Agentic: Git Isolation",
+  domain: "Agentic: Workspace",
   labels: ["coding", "git"],
 
   async execute(args: Record<string, unknown>, context: ToolContext) {
@@ -147,7 +147,7 @@ const exitWorktree = {
       required: ["action"],
     },
   },
-  domain: "Agentic: Git Isolation",
+  domain: "Agentic: Workspace",
   labels: ["coding", "git"],
 
   async execute(args: Record<string, unknown>, context: ToolContext) {

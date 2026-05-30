@@ -75,7 +75,7 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
     getClientToolSchemas: vi.fn(() =>
       MOCK_TOOLS_API_SCHEMAS.map((t) => ({
         ...t,
-        domain: "Agentic: File Operations",
+        domain: "Agentic: Workspace",
         labels: ["coding"],
       })),
     ),

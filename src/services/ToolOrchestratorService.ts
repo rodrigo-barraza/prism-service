@@ -62,6 +62,7 @@ interface ToolExecutionContext {
   _emit?: ((event: { type: string; [key: string]: unknown }) => void) | null;
   _maxWorkerIterations?: number;
   _minContextLength?: number;
+  enabledTools?: string[];
   [key: string]: unknown;
 }
 
@@ -326,6 +327,9 @@ function buildContextHeaders(context: ToolExecutionContext = {}): Record<string,
   // Multi-workspace: when the user has selected a non-default workspace root,
   // send it to tools-api so file/git/shell tools resolve within it.
   if (context.workspaceRoot) headers["X-Workspace-Root"] = context.workspaceRoot;
+  if (context.enabledTools && Array.isArray(context.enabledTools)) {
+    headers["X-Enabled-Tools"] = context.enabledTools.join(",");
+  }
   return headers;
 }
 

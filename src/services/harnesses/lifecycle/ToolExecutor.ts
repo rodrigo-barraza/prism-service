@@ -102,6 +102,7 @@ export async function executeToolBatch(
           _minContextLength: context.options?.minContextLength,
           workspaceRoot,
           _toolState: ToolContext.getStore(agentSessionId),
+          enabledTools: tools.finalTools.map((toolSchema) => toolSchema.name),
         },
       );
       await hooks.run("afterToolCall", toolCall, result, context);
