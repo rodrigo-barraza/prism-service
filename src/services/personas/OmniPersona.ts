@@ -1,3 +1,4 @@
+import { TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -35,33 +36,33 @@ You have access to ALL tools in the system — coding, web, health, finance, sma
 - Use git tools to track changes
 - Use run_command for shell operations
 - Use LSP tools for code intelligence`,
-    requires: ["read_file", "str_replace_file", "write_file", "grep_search", "run_command"],
+    requires: [TOOL_NAMES.READ_FILE, TOOL_NAMES.STR_REPLACE_FILE, TOOL_NAMES.WRITE_FILE, TOOL_NAMES.GREP_SEARCH, TOOL_NAMES.RUN_COMMAND],
   },
   {
     content: `## Research & Knowledge Tools
-- Use web_search for current information
+- Use search_web for current information
 - Use Wikipedia, arXiv, and knowledge tools for research
 - Use trend tools for social and market trends`,
-    requires: ["web_search", "get_wikipedia_summary", "get_trends"],
+    requires: [TOOL_NAMES.SEARCH_WEB, TOOL_NAMES.GET_WIKIPEDIA_SUMMARY, TOOL_NAMES.GET_TRENDS],
   },
   {
     content: `## Data & Compute Tools
 - Use calculate_precise for math
 - Use execute_javascript or execute_python for complex computation
 - Use chart tools for data visualization`,
-    requires: ["calculate_precise", "execute_javascript"],
+    requires: [TOOL_NAMES.CALCULATE_PRECISE, TOOL_NAMES.EXECUTE_JAVASCRIPT],
   },
   {
     content: `## Creative Tools
 - Use generate_image for image creation and editing
 - Use TTS tools for speech synthesis`,
-    requires: ["generate_image"],
+    requires: [TOOL_NAMES.GENERATE_IMAGE],
   },
   {
     content: `## Health & Lifestyle Tools
 - Use nutrition tools for dietary analysis
 - Use exercise tools for fitness planning`,
-    requires: ["search_usda_nutrition", "search_gym_exercises", "rank_foods_by_category"],
+    requires: [TOOL_NAMES.SEARCH_USDA_NUTRITION, TOOL_NAMES.SEARCH_GYM_EXERCISES, TOOL_NAMES.RANK_FOODS_BY_CATEGORY],
   },
   {
     content: `## Smart Home Tools
@@ -72,7 +73,7 @@ You have access to ALL tools in the system — coding, web, health, finance, sma
     content: `## Task & Memory Tools
 - Use task tools to track multi-step work
 - Use memory tools to persist important information across sessions`,
-    requires: ["task_create", "task_list", "task_update", "upsert_memory"],
+    requires: [TOOL_NAMES.CREATE_TASK, TOOL_NAMES.LIST_TASKS, TOOL_NAMES.UPDATE_TASK, TOOL_NAMES.UPSERT_MEMORY],
   },
 ];
 
@@ -102,17 +103,17 @@ export const OmniPersona: Persona = {
       ...OMNI_TOOL_POLICY_SECTIONS,
       {
         content: `## Task Management
-You have persistent task tools (task_create, task_list, task_update) that survive across conversations.
+You have persistent task tools (create_task, list_tasks, update_task) that survive across conversations.
 Use them proactively:
-- At the START of a session, call task_list to check for in-progress or pending tasks from prior sessions
-- When starting complex multi-step work (3+ files, multi-phase refactors, migrations), create a task with task_create to track progress
+- At the START of a session, call list_tasks to check for in-progress or pending tasks from prior sessions
+- When starting complex multi-step work (3+ files, multi-phase refactors, migrations), create a task with create_task to track progress
 - ONLY mark a task as completed when you have FULLY accomplished it — if blocked or encountering errors, keep it as in_progress
 - Always set activeForm when creating or updating to "in_progress" — a present-continuous phrase shown as a spinner (e.g. "Running tests", "Refactoring auth module")
-- After completing a task, call task_list to find your next task
-- To delete a task that is no longer relevant or was created in error, set its status to "deleted" via task_update
+- After completing a task, call list_tasks to find your next task
+- To delete a task that is no longer relevant or was created in error, set its status to "deleted" via update_task
 - Break large tasks into subtasks — use metadata to link related tasks
 - Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`,
-        requires: ["task_create", "task_list", "task_update"],
+        requires: [TOOL_NAMES.CREATE_TASK, TOOL_NAMES.LIST_TASKS, TOOL_NAMES.UPDATE_TASK],
       },
       {
         content: `## Proactive Memory
@@ -124,7 +125,7 @@ Use it **proactively** — do NOT wait for the user to say "remember":
 - When you learn a project convention or workflow pattern worth preserving
 - **When in doubt, save it** — over-remembering is better than forgetting
 - Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`,
-        requires: ["upsert_memory"],
+        requires: [TOOL_NAMES.UPSERT_MEMORY],
       },
     ];
     return buildToolPolicy(omniSections, context);

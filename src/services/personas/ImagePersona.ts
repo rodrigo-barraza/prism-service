@@ -1,4 +1,4 @@
-import { LABEL_TAGS } from "../ToolTaxonomyConstants.ts";
+import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -39,28 +39,28 @@ const IMAGE_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 - When editing/redrawing (reference images attached):
   - Do NOT rewrite or re-describe the whole image from scratch.
   - Write a SHORT instruction (under 2 sentences) focusing ONLY on the changes (e.g., "Change the background to a sunset", "Make the character smile").`,
-    requires: ["generate_image"],
+    requires: [TOOL_NAMES.GENERATE_IMAGE],
   },
   {
-    content: `- Use \`web_search\` to lookup details on specific artists, art movements, or design patterns if needed.`,
-    requires: ["web_search"],
+    content: `- Use \`search_web\` to lookup details on specific artists, art movements, or design patterns if needed.`,
+    requires: [TOOL_NAMES.SEARCH_WEB],
   },
   {
     content: `- Use \`convert_image_to_ascii\` when the user or agent wants to represent an image as stylized ASCII text art. You can customize character width, contrast, or density inversion. You MUST output the resulting raw ASCII string directly in your text response inside a fenced code block (\`\`\`) so it is rendered in a monospace block.`,
-    requires: ["convert_image_to_ascii"],
+    requires: [TOOL_NAMES.CONVERT_IMAGE_TO_ASCII],
   },
   {
     content: `- Use \`upsert_memory\` to save user brand colors, favorite aesthetics, or recurring characters for future sessions.`,
-    requires: ["upsert_memory"],
+    requires: [TOOL_NAMES.UPSERT_MEMORY],
   },
 ];
 
 const IMAGE_ENABLED_TOOLS = [
-  "generate_image",
+  TOOL_NAMES.GENERATE_IMAGE,
   LABEL_TAGS.CREATIVE,
   LABEL_TAGS.WEB,
   LABEL_TAGS.MEDIA,
-  "upsert_memory",
+  TOOL_NAMES.UPSERT_MEMORY,
 ];
 
 export const ImagePersona: Persona = {

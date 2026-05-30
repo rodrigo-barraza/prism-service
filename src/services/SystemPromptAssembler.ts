@@ -7,6 +7,7 @@ import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { TOOLS_SERVICE_URL, MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
+import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   getCoordinatorPromptAddendum,
   COORDINATOR_ONLY_TOOLS,
@@ -201,16 +202,7 @@ export default class SystemPromptAssembler {
     }
 
     // Define the core agentic, coordinator, and local tools
-    const CORE_AGENTIC_TOOLS = new Set([
-      "upsert_memory",
-      "task_create",
-      "task_list",
-      "task_update",
-      "calculate_precise",
-      "execute_javascript",
-      "search_tools",
-      "web_search",
-    ]);
+    const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
     const COORDINATOR_TOOL_NAMES = new Set(COORDINATOR_ONLY_TOOLS);
     const PRISM_LOCAL_TOOL_NAMES = InternalToolRegistry.getNames();
 
@@ -533,16 +525,7 @@ export default class SystemPromptAssembler {
             }
           }
 
-          const CORE_AGENTIC_TOOLS = new Set([
-            "upsert_memory",
-            "task_create",
-            "task_list",
-            "task_update",
-            "calculate_precise",
-            "execute_javascript",
-            "search_tools",
-            "web_search",
-          ]);
+          const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
           const COORDINATOR_TOOL_NAMES = new Set(COORDINATOR_ONLY_TOOLS);
           const PRISM_LOCAL_TOOL_NAMES = InternalToolRegistry.getNames();
 

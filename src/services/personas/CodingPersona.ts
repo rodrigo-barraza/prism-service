@@ -1,4 +1,4 @@
-import { LABEL_TAGS } from "../ToolTaxonomyConstants.ts";
+import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -6,33 +6,33 @@ const CODING_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
     content: `## Tool Tips
 - Use multi_file_read when you need to inspect several files at once`,
-    requires: ["multi_file_read"],
+    requires: [TOOL_NAMES.MULTI_FILE_READ],
   },
   {
     content: `- Use project_summary to understand unfamiliar codebases before diving in`,
-    requires: ["project_summary"],
+    requires: [TOOL_NAMES.PROJECT_SUMMARY],
   },
   {
     content: `- Check git status before and after edits to track your changes`,
-    requires: ["git"],
+    requires: [TOOL_NAMES.GIT],
   },
   {
     content: `- When searching, use includes filters to narrow results (e.g. [".js", ".ts"])`,
-    requires: ["grep_search"],
+    requires: [TOOL_NAMES.GREP_SEARCH],
   },
   {
     content: `## Task Management
-You have persistent task tools (task_create, task_list, task_update) that survive across conversations.
+You have persistent task tools (create_task, list_tasks, update_task) that survive across conversations.
 Use them proactively:
-- At the START of a session, call task_list to check for in-progress or pending tasks from prior sessions
-- When starting complex multi-step work (3+ files, multi-phase refactors, migrations), create a task with task_create to track progress
+- At the START of a session, call list_tasks to check for in-progress or pending tasks from prior sessions
+- When starting complex multi-step work (3+ files, multi-phase refactors, migrations), create a task with create_task to track progress
 - ONLY mark a task as completed when you have FULLY accomplished it — if blocked or encountering errors, keep it as in_progress
 - Always set activeForm when creating or updating to "in_progress" — a present-continuous phrase shown as a spinner (e.g. "Running tests", "Refactoring auth module")
-- After completing a task, call task_list to find your next task
-- To delete a task that is no longer relevant or was created in error, set its status to "deleted" via task_update
+- After completing a task, call list_tasks to find your next task
+- To delete a task that is no longer relevant or was created in error, set its status to "deleted" via update_task
 - Break large tasks into subtasks — use metadata to link related tasks
 - Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`,
-    requires: ["task_create", "task_list", "task_update"],
+    requires: [TOOL_NAMES.CREATE_TASK, TOOL_NAMES.LIST_TASKS, TOOL_NAMES.UPDATE_TASK],
   },
   {
     content: `## Proactive Memory
@@ -44,7 +44,7 @@ Use it **proactively** — do NOT wait for the user to say "remember":
 - When you learn a project convention or workflow pattern worth preserving
 - **When in doubt, save it** — over-remembering is better than forgetting
 - Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`,
-    requires: ["upsert_memory"],
+    requires: [TOOL_NAMES.UPSERT_MEMORY],
   },
 ];
 

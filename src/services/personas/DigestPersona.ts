@@ -1,4 +1,4 @@
-import { LABEL_TAGS } from "../ToolTaxonomyConstants.ts";
+import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -54,43 +54,43 @@ const DIGEST_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
   {
     content: `- Always use calculate_caloric_needs BEFORE build_meal_plan — the meal plan needs a caloric target.`,
-    requires: ["calculate_caloric_needs", "build_meal_plan"],
+    requires: [TOOL_NAMES.CALCULATE_CALORIC_NEEDS, TOOL_NAMES.BUILD_MEAL_PLAN],
   },
   {
     content: `- When the user asks about a specific food, use search_usda_nutrition for detailed data.`,
-    requires: ["search_usda_nutrition"],
+    requires: [TOOL_NAMES.SEARCH_USDA_NUTRITION],
   },
   {
     content: `- When comparing foods, use compare_food_nutrition for side-by-side analysis.`,
-    requires: ["compare_food_nutrition"],
+    requires: [TOOL_NAMES.COMPARE_FOOD_NUTRITION],
   },
   {
     content: `- For "what's high in X?" questions, use rank_foods_by_category or rank_foods_by_nutrient.`,
-    requires: ["rank_foods_by_category", "rank_foods_by_nutrient"],
+    requires: [TOOL_NAMES.RANK_FOODS_BY_CATEGORY, TOOL_NAMES.RANK_FOODS_BY_NUTRIENT],
   },
   {
     content: `- For dietary analysis, chain: user provides food log → analyze_nutrient_gaps → identify deficiencies → search_food_substitutes or rank_foods_by_category to fill gaps.`,
-    requires: ["analyze_nutrient_gaps"],
+    requires: [TOOL_NAMES.ANALYZE_NUTRIENT_GAPS],
   },
   {
     content: `- When the user mentions medications, proactively check drug-nutrient interactions.`,
-    requires: ["search_drug_nutrient_interactions", "search_fda_drugs"],
+    requires: [TOOL_NAMES.SEARCH_DRUG_NUTRIENT_INTERACTIONS, TOOL_NAMES.SEARCH_FDA_DRUGS],
   },
   {
-    content: `- Use web_search for current research, studies, or information not in the static databases.`,
-    requires: ["web_search"],
+    content: `- Use search_web for current research, studies, or information not in the static databases.`,
+    requires: [TOOL_NAMES.SEARCH_WEB],
   },
   {
     content: `- Use upsert_memory to save user stats, allergies, preferences, and goals for cross-session continuity.`,
-    requires: ["upsert_memory"],
+    requires: [TOOL_NAMES.UPSERT_MEMORY],
   },
   {
     content: `- When the user asks about exercises, use search_gym_exercises with appropriate filters.`,
-    requires: ["search_gym_exercises"],
+    requires: [TOOL_NAMES.SEARCH_GYM_EXERCISES],
   },
   {
     content: `- For hydration questions, use calculate_hydration_needs with as many parameters as known.`,
-    requires: ["calculate_hydration_needs"],
+    requires: [TOOL_NAMES.CALCULATE_HYDRATION_NEEDS],
   },
   {
     content: `# Agent Tool Guidelines
@@ -104,10 +104,10 @@ const DIGEST_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 const DIGEST_ENABLED_TOOLS = [
   LABEL_TAGS.HEALTH,
   LABEL_TAGS.WEB,
-  "calculate_precise",
-  "execute_javascript",
-  "get_weather",
-  "upsert_memory",
+  TOOL_NAMES.CALCULATE_PRECISE,
+  TOOL_NAMES.EXECUTE_JAVASCRIPT,
+  TOOL_NAMES.GET_WEATHER,
+  TOOL_NAMES.UPSERT_MEMORY,
 ];
 
 export const DigestPersona: Persona = {

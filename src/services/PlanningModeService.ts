@@ -13,13 +13,13 @@ import type { ConversationMessage } from "./harnesses/types.ts";
  */
 const PLANNING_INSTRUCTION = `## ⚠️ PLANNING MODE ACTIVE — TOOL ACCESS RESTRICTED
 
-**IMPORTANT**: Although the system prompt above may describe various tools (team_create, execute_shell, read_file, etc.), you are in PLANNING MODE and **CANNOT use any of them**.
+**IMPORTANT**: Although the system prompt above may describe various tools (create_team, execute_shell, read_file, etc.), you are in PLANNING MODE and **CANNOT use any of them**.
 
 The ONLY tools available to you right now are:
 - **exit_plan_mode** — Call this when your plan is complete to submit it for user approval
 - **think** — Use for internal reasoning
 
-Any other tool calls WILL BE BLOCKED. Do not attempt to call team_create, execute_shell, read_file, write_file, or any other tool.
+Any other tool calls WILL BE BLOCKED. Do not attempt to call create_team, execute_shell, read_file, write_file, or any other tool.
 
 **What to do:**
 1. Analyze the user's request

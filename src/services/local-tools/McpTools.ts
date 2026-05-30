@@ -34,7 +34,7 @@ const listMcpResources = {
       required: [],
     },
   },
-  domain: "Meta",
+  domain: "Model Context Protocol",
   labels: ["coding", "meta"],
   async execute(args: Record<string, unknown>) {
     const listArgs = args as unknown as ListMcpResourcesArgs;
@@ -87,7 +87,7 @@ const readMcpResource = {
       required: ["server_name", "uri"],
     },
   },
-  domain: "Meta",
+  domain: "Model Context Protocol",
   labels: ["coding", "meta"],
   async execute(args: Record<string, unknown>) {
     const readArgs = args as unknown as ReadMcpResourceArgs;
@@ -129,7 +129,7 @@ const mcpAuthenticate = {
       required: ["server_name"],
     },
   },
-  domain: "Meta",
+  domain: "Model Context Protocol",
   labels: ["coding", "meta"],
   async execute(args: Record<string, unknown>) {
     const authArgs = args as unknown as McpAuthenticateArgs;

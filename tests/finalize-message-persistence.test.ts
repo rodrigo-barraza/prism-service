@@ -146,7 +146,7 @@ describe("newTurnMessages slice — normal flow (no compaction)", () => {
         toolCalls: [
           {
             id: "tc-0",
-            name: "web_search",
+            name: "search_web",
             args: { query: "X" },
             result: { results: [] },
           },
@@ -178,7 +178,7 @@ describe("newTurnMessages slice — normal flow (no compaction)", () => {
     expect(newTurnMessages[0].content).toBe(
       "search for X and generate audio",
     );
-    expect(newTurnMessages[1].toolCalls![0].name).toBe("web_search");
+    expect(newTurnMessages[1].toolCalls![0].name).toBe("search_web");
     expect(newTurnMessages[2].toolCalls![0].name).toBe("generate_audio");
   });
 });

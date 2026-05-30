@@ -595,13 +595,13 @@ describe.each([
 
     const result = await streamAndCollect(
       provider, model,
-      "I need you to research 4 topics IN PARALLEL using your team_create tool. " +
+      "I need you to research 4 topics IN PARALLEL using your create_team tool. " +
       "Create a team with 4 workers:\n" +
-      "1. Worker 1: Use web_search to find what 'Solar Eclipse' is and summarize in 2 sentences\n" +
-      "2. Worker 2: Use web_search to find what 'Northern Lights' is and summarize in 2 sentences\n" +
-      "3. Worker 3: Use web_search to find what 'Tidal Waves' are and summarize in 2 sentences\n" +
-      "4. Worker 4: Use web_search to find what 'Meteor Showers' are and summarize in 2 sentences\n\n" +
-      "Use team_create with exactly 4 members. Each worker should use web_search.",
+      "1. Worker 1: Use search_web to find what 'Solar Eclipse' is and summarize in 2 sentences\n" +
+      "2. Worker 2: Use search_web to find what 'Northern Lights' is and summarize in 2 sentences\n" +
+      "3. Worker 3: Use search_web to find what 'Tidal Waves' are and summarize in 2 sentences\n" +
+      "4. Worker 4: Use search_web to find what 'Meteor Showers' are and summarize in 2 sentences\n\n" +
+      "Use create_team with exactly 4 members. Each worker should use search_web.",
       { maxTokens: 1500, timeout: 180_000, maxIterations: 15 },
     );
 
@@ -617,9 +617,9 @@ describe.each([
     console.log(`     Final outputTokens: ${last.outputTokens}`);
     console.log(`     Final inputTokens:  ${last.inputTokens}`);
 
-    // ─── team_create detection ────────────────────────────────
+    // ─── create_team detection ────────────────────────────────
     const teamCreateCalls = result.toolCalls.filter(
-      (t) => (t.tool?.name || t.name) === "team_create",
+      (t) => (t.tool?.name || t.name) === "create_team",
     );
     console.log(`     team_create calls: ${teamCreateCalls.length}`);
 

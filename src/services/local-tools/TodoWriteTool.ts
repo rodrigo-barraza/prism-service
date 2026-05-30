@@ -35,10 +35,10 @@ interface TodoContext {
 }
 
 export default {
-  name: "todo_write",
+  name: "write_todo",
 
   schema: {
-    name: "todo_write",
+    name: "write_todo",
     description:
       "Write or update a persistent TODO checklist for the current project. " +
       "Maintains a structured list of items with completion status. " +

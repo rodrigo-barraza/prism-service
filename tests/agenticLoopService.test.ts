@@ -18,13 +18,13 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
   default: {
     ensureSchemas: vi.fn().mockResolvedValue(),
     getToolSchemas: vi.fn().mockReturnValue([
-      { name: "web_search", description: "Search the web" },
+      { name: "search_web", description: "Search the web" },
       { name: "read_file", description: "Read a file" },
       { name: "generate_image", description: "Generate image" },
       { name: "describe_image", description: "Describe image" },
     ]),
     getClientToolSchemas: vi.fn().mockReturnValue([
-      { name: "web_search", domain: "knowledge", labels: ["safe"] },
+      { name: "search_web", domain: "knowledge", labels: ["safe"] },
       { name: "read_file", domain: "system", labels: ["safe"] },
     ]),
     getMCPToolSchemas: vi.fn().mockReturnValue([]),
@@ -183,16 +183,16 @@ describe("AgenticLoopService", () => {
     expect(chunks[1].content).toBe(" World");
   });
 
-  it("should filter out native web_search tool if options.webSearch is true", async () => {
+  it("should filter out native search_web tool if options.webSearch is true", async () => {
     mockCtx.options.webSearch = true;
-    mockCtx.options.enabledTools = ["web_search", "read_file"];
+    mockCtx.options.enabledTools = ["search_web", "read_file"];
 
     await AgenticLoopService.runAgenticLoop(mockCtx);
 
     const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
     const passTools = callArgs.tools;
     
-    expect(passTools.find(t => t.name === "web_search")).toBeUndefined();
+    expect(passTools.find(t => t.name === "search_web")).toBeUndefined();
     expect(passTools.find(t => t.name === "read_file")).toBeDefined();
   });
 
@@ -230,9 +230,9 @@ describe("AgenticLoopService", () => {
     const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
     const passTools = callArgs.tools;
     
-    // getClientToolSchemas returns web_search as domain:knowledge
+    // getClientToolSchemas returns search_web as domain:knowledge
     expect(passTools.length).toBeGreaterThan(0);
-    expect(passTools.find(t => t.name === "web_search")).toBeDefined();
+    expect(passTools.find(t => t.name === "search_web")).toBeDefined();
   });
 
   it("should handle context truncation", async () => {
@@ -427,8 +427,8 @@ describe("AgenticLoopService", () => {
     const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
     const passTools = callArgs.tools;
     
-    // Should contain web_search (as it's in the schemas), but NOT generate_image
-    expect(passTools.find(t => t.name === "web_search")).toBeDefined();
+    // Should contain search_web (as it's in the schemas), but NOT generate_image
+    expect(passTools.find(t => t.name === "search_web")).toBeDefined();
     expect(passTools.find(t => t.name === "generate_image")).toBeUndefined();
   });
 

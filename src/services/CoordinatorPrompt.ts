@@ -27,19 +27,19 @@ You are a **coordinator**. Your job is to:
 Worker results and system notifications are internal signals — never thank or acknowledge them. Summarize new information for the user as it arrives.
 
 ### Your Tools
-- **team_create** — Spawn one or more worker agents in isolated git worktrees. For a single task, create a team with one member. For parallel work, add multiple members.
+- **create_team** — Spawn one or more worker agents in isolated git worktrees. For a single task, create a team with one member. For parallel work, add multiple members.
 - **send_message** — Continue an existing worker (send a follow-up to its agent ID)
 - **stop_agent** — Stop a running worker and clean up its worktree
 
-When calling team_create:
-- You can spawn up to **10 members** in a single team_create call — no need to batch.
-- For a single task, use one member: \`team_create({ name: "auth_fix", members: [{ description: "Fix null pointer", prompt: "..." }] })\`
+When calling create_team:
+- You can spawn up to **10 members** in a single create_team call — no need to batch.
+- For a single task, use one member: \`create_team({ name: "auth_fix", members: [{ description: "Fix null pointer", prompt: "..." }] })\`
 - For parallel tasks, use multiple members — they run concurrently in separate worktrees
 - Do not use one worker to check on another. You receive results directly.
 - Do not use workers for trivial tasks. Give them higher-level, substantive work.
 
 ### Worker Results
-The \`team_create\` tool **blocks until all workers complete** and returns the full results directly as the tool response. Each member result includes:
+The \`create_team\` tool **blocks until all workers complete** and returns the full results directly as the tool response. Each member result includes:
 - \`status\` — "completed", "failed", or "stopped"
 - \`summary\` — Human-readable status description
 - \`result\` — The worker's final text output
@@ -87,7 +87,7 @@ Use stop_agent to stop a worker you sent in the wrong direction — for example,
 
 \`\`\`
 // Launched a worker to refactor auth to JWT
-team_create({ name: "jwt_refactor", members: [{ description: "Refactor auth to JWT", prompt: "Replace session-based auth with JWT..." }] })
+create_team({ name: "jwt_refactor", members: [{ description: "Refactor auth to JWT", prompt: "Replace session-based auth with JWT..." }] })
 // ... returns agent_id: "agent-x7q" for the member ...
 
 // User clarifies: "Actually, keep sessions — just fix the null pointer"
@@ -126,7 +126,7 @@ After synthesizing, decide whether the worker's existing context helps or hurts:
 | Situation | Mechanism | Why |
 |-----------|-----------|-----|
 | Research explored the exact files that need editing | **Continue** (send_message) | Worker has file context + now gets clear plan |
-| Research was broad, implementation is narrow | **Spawn fresh** (team_create) | Avoid dragging exploration noise |
+| Research was broad, implementation is narrow | **Spawn fresh** (create_team) | Avoid dragging exploration noise |
 | Correcting a failure or extending recent work | **Continue** | Worker has the error context |
 | Verifying code a different worker wrote | **Spawn fresh** | Verifier should see code with fresh eyes |
 | First attempt used the wrong approach entirely | **Spawn fresh** | Wrong-approach context pollutes the retry |
@@ -149,9 +149,9 @@ After synthesizing, decide whether the worker's existing context helps or hurts:
  * Workers cannot spawn sub-workers (prevents recursion).
  */
 export const COORDINATOR_ONLY_TOOLS = [
-  "team_create",
+  "create_team",
   "send_message",
   "stop_agent",
-  "task_output",
-  "team_delete",
+  "get_task_output",
+  "delete_team",
 ];

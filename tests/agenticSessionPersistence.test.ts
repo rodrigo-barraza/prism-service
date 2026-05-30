@@ -288,7 +288,7 @@ describe("finalizeTextGeneration — segment deduplication", () => {
     ];
 
     const nativeToolCalls = [
-      { id: "ntc-1", name: "web_search", args: { query: "test" }, result: { results: [] } },
+      { id: "ntc-1", name: "search_web", args: { query: "test" }, result: { results: [] } },
     ];
 
     const ctx = makeCtx();

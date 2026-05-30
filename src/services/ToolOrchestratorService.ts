@@ -3,6 +3,7 @@ import MCPClientService from "./MCPClientService.ts";
 import logger from "../utils/logger.ts";
 import { COORDINATOR_ONLY_TOOLS } from "./CoordinatorPrompt.ts";
 import { createAbortController } from "../utils/AbortController.ts";
+import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   TOOL_SCHEMA_FETCH_TIMEOUT_MS,
   TOOL_CONFIG_FETCH_TIMEOUT_MS,
@@ -401,7 +402,7 @@ async function fetchJsonPost(
 
 const COORDINATOR_TOOL_SCHEMAS = [
   {
-    name: "team_create",
+    name: "create_team",
     description:
       "Spawn one or more worker agents that execute in parallel, each in an isolated git worktree. " +
       "Workers have access to the full tool suite (read, write, search, shell). " +
@@ -458,7 +459,7 @@ const COORDINATOR_TOOL_SCHEMAS = [
     parameters: {
       type: "object",
       properties: {
-        to: { type: "string", description: "Agent ID returned by team_create" },
+        to: { type: "string", description: "Agent ID returned by create_team" },
         message: {
           type: "string",
           description: "Follow-up instructions for the worker",
@@ -480,7 +481,7 @@ const COORDINATOR_TOOL_SCHEMAS = [
     },
   },
   {
-    name: "task_output",
+    name: "get_task_output",
     description:
       "Read the output from a previously spawned worker agent by its agent ID. " +
       "Use this to check on a worker's result after it has completed, or to read " +
@@ -491,14 +492,14 @@ const COORDINATOR_TOOL_SCHEMAS = [
       properties: {
         agent_id: {
           type: "string",
-          description: "The agent ID returned by team_create.",
+          description: "The agent ID returned by create_team.",
         },
       },
       required: ["agent_id"],
     },
   },
   {
-    name: "team_delete",
+    name: "delete_team",
     description:
       "Stop and remove all workers in a named team. Cleans up worktrees for all members.",
     parameters: {
@@ -506,7 +507,7 @@ const COORDINATOR_TOOL_SCHEMAS = [
       properties: {
         teamName: {
           type: "string",
-          description: "The team name to delete (as provided to team_create).",
+          description: "The team name to delete (as provided to create_team).",
         },
       },
       required: ["teamName"],
@@ -538,37 +539,7 @@ export default class ToolOrchestratorService {
 
   /** Client-facing schemas (with domain/dataSource/labels, no endpoint) — for Prism Client UI */
   static getClientToolSchemas() {
-    const CORE_AGENTIC_TOOLS = new Set([
-      "upsert_memory",
-      "task_create",
-      "task_list",
-      "task_update",
-      "calculate_precise",
-      "execute_javascript",
-      "search_tools",
-      "web_search",
-      "read_url",
-      "get_web_content",
-      "enter_plan_mode",
-      "exit_plan_mode",
-      "ask_user_question",
-      "todo_write",
-      "brief",
-      "enter_worktree",
-      "exit_worktree",
-      "skill_create",
-      "skill_execute",
-      "skill_list",
-      "skill_delete",
-      "list_mcp_resources",
-      "read_mcp_resource",
-      "mcp_authenticate",
-      "team_create",
-      "send_message",
-      "stop_agent",
-      "task_output",
-      "team_delete",
-    ]);
+    const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 
     // Coordinator tools are Prism-local — add domain metadata for UI grouping
     const coordinatorClient = COORDINATOR_TOOL_SCHEMAS.map((tool) => ({
@@ -758,7 +729,7 @@ export default class ToolOrchestratorService {
     // access to Prism's conversation messages.
     // IMPORTANT: Only extract from the LAST user message to avoid collecting
     // stale images from conversation history.
-    if (name === "generate_image" && context.messages) {
+    if (name === TOOL_NAMES.GENERATE_IMAGE && context.messages) {
       const referenceImages: string[] = [];
       // Find the last user message with images
       for (let i = context.messages.length - 1; i >= 0; i--) {
@@ -813,7 +784,7 @@ export default class ToolOrchestratorService {
     // Models cannot reliably reproduce base64 data in tool arguments — they truncate it,
     // producing corrupt image buffers. Extract the real image from the last user message
     // and set it as the `input` arg so the tools-service receives valid data.
-    const IMAGE_INPUT_TOOLS = ["convert_image_to_ascii", "manipulate_image"];
+    const IMAGE_INPUT_TOOLS = [TOOL_NAMES.CONVERT_IMAGE_TO_ASCII, TOOL_NAMES.MANIPULATE_IMAGE];
     if (IMAGE_INPUT_TOOLS.includes(name) && context.messages) {
       for (let i = context.messages.length - 1; i >= 0; i--) {
         const message = context.messages[i];
@@ -838,7 +809,7 @@ export default class ToolOrchestratorService {
     const result = await executeToolGeneric(name, args, context);
 
     // Post-process: upload generated images to MinIO
-    if (name === "generate_image" && (result as Record<string, unknown>).image && !(result as Record<string, unknown>).error) {
+    if (name === TOOL_NAMES.GENERATE_IMAGE && (result as Record<string, unknown>).image && !(result as Record<string, unknown>).error) {
       try {
         const FileService = (await import("./FileService.js")).default;
         const image = (result as Record<string, unknown>).image as Record<string, unknown>;
@@ -858,7 +829,7 @@ export default class ToolOrchestratorService {
     }
 
     // Post-process: upload browser screenshots to MinIO
-    if (name === "browser_action" && (result as Record<string, unknown>).screenshot && !(result as Record<string, unknown>).error) {
+    if (name === TOOL_NAMES.BROWSER_ACTION && (result as Record<string, unknown>).screenshot && !(result as Record<string, unknown>).error) {
       try {
         const FileService = (await import("./FileService.js")).default;
         const resultObj = result as Record<string, unknown>;
@@ -883,7 +854,7 @@ export default class ToolOrchestratorService {
   }
 
   /**
-   * Execute a coordinator tool (team_create, send_message, stop_agent).
+   * Execute a coordinator tool (create_team, send_message, stop_agent).
    * These are Prism-local — they dispatch to CoordinatorService in-process.
    */
   static async executeCoordinatorTool(name: string, args: Record<string, unknown> = {}, context: ToolExecutionContext = {}) {
@@ -911,7 +882,7 @@ export default class ToolOrchestratorService {
     };
 
     switch (name) {
-      case "team_create":
+      case "create_team":
         return CoordinatorService.createTeam(args as { name: string; members: TeamMember[] }, coordinatorCtx as CoordinatorContext);
 
       case "send_message":
@@ -924,10 +895,10 @@ export default class ToolOrchestratorService {
       case "stop_agent":
         return CoordinatorService.stopAgent(args.agent_id as string);
 
-      case "task_output":
+      case "get_task_output":
         return CoordinatorService.getTaskOutput(args.agent_id as string);
 
-      case "team_delete":
+      case "delete_team":
         return CoordinatorService.deleteTeam(args.teamName as string);
 
       default:
@@ -955,10 +926,10 @@ export default class ToolOrchestratorService {
    * Only process-based tools that spawn subprocesses benefit from streaming.
    */
   static STREAMABLE_TOOLS: Record<string, string> = {
-    execute_shell: "/compute/shell/stream",
-    execute_python: "/utility/python/stream",
-    execute_javascript: "/compute/js/stream",
-    run_command: "/agentic/command/stream",
+    [TOOL_NAMES.EXECUTE_SHELL]: "/compute/shell/stream",
+    [TOOL_NAMES.EXECUTE_PYTHON]: "/utility/python/stream",
+    [TOOL_NAMES.EXECUTE_JAVASCRIPT]: "/compute/js/stream",
+    [TOOL_NAMES.RUN_COMMAND]: "/agentic/command/stream",
   };
 
   static isStreamable(toolName: string) {

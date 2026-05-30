@@ -1,4 +1,4 @@
-import { LABEL_TAGS } from "../ToolTaxonomyConstants.ts";
+import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -166,7 +166,7 @@ const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 
 # Agent Tool Guidelines
 - You have access to tools that you can use autonomously to help the user.
-- For factual questions about current events, trends, or real-time information, use web_search or the trends tools.`,
+- For factual questions about current events, trends, or real-time information, use search_web or the trends tools.`,
   },
   {
     content: `- The guildId for discord tools is available in the server context provided to you.
@@ -211,7 +211,7 @@ When calling generate_image, the prompt you write depends on whether reference i
 
 ## Safety fallback
 - If the image generation tool fails due to content safety, try rephrasing the prompt creatively — describe the same scene differently, avoiding potentially flagged terms while preserving the artistic intent.`,
-    requires: ["generate_image"],
+    requires: [TOOL_NAMES.GENERATE_IMAGE],
   },
 ];
 
@@ -219,29 +219,29 @@ const LUPOS_ENABLED_TOOLS = [
   LABEL_TAGS.DISCORD,
   LABEL_TAGS.MEDIA,
   LABEL_TAGS.WEB,
-  "generate_image",
-  "get_trends",
-  "get_hot_trends",
-  "get_top_trends",
-  "get_events",
-  "get_on_this_day",
-  "get_wikipedia_summary",
-  "search_products",
-  "get_trending_products",
-  "search_gym_exercises",
-  "rank_foods_by_category",
-  "search_usda_nutrition",
-  "get_weather",
-  "get_weather_forecast",
-  "get_local_environment",
-  "get_earthquakes",
-  "get_wildfires",
-  "get_iss_location",
-  "get_near_earth_objects",
-  "get_solar_activity",
-  "calculate_precise",
-  "execute_javascript",
-  "upsert_memory",
+  TOOL_NAMES.GENERATE_IMAGE,
+  TOOL_NAMES.GET_TRENDS,
+  TOOL_NAMES.GET_HOT_TRENDS,
+  TOOL_NAMES.GET_TOP_TRENDS,
+  TOOL_NAMES.GET_EVENTS,
+  TOOL_NAMES.GET_ON_THIS_DAY,
+  TOOL_NAMES.GET_WIKIPEDIA_SUMMARY,
+  TOOL_NAMES.SEARCH_PRODUCTS,
+  TOOL_NAMES.GET_TRENDING_PRODUCTS,
+  TOOL_NAMES.SEARCH_GYM_EXERCISES,
+  TOOL_NAMES.RANK_FOODS_BY_CATEGORY,
+  TOOL_NAMES.SEARCH_USDA_NUTRITION,
+  TOOL_NAMES.GET_WEATHER,
+  TOOL_NAMES.GET_WEATHER_FORECAST,
+  TOOL_NAMES.GET_LOCAL_ENVIRONMENT,
+  TOOL_NAMES.GET_EARTHQUAKES,
+  TOOL_NAMES.GET_WILDFIRES,
+  TOOL_NAMES.GET_ISS_LOCATION,
+  TOOL_NAMES.GET_NEAR_EARTH_OBJECTS,
+  TOOL_NAMES.GET_SOLAR_ACTIVITY,
+  TOOL_NAMES.CALCULATE_PRECISE,
+  TOOL_NAMES.EXECUTE_JAVASCRIPT,
+  TOOL_NAMES.UPSERT_MEMORY,
 ];
 
 export const LuposPersona: Persona = {

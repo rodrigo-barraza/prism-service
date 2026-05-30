@@ -123,7 +123,7 @@ vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
 
 // Mock CoordinatorPrompt
 vi.mock("../src/services/CoordinatorPrompt.ts", () => ({
-  COORDINATOR_ONLY_TOOLS: ["team_create", "send_message", "stop_agent"],
+  COORDINATOR_ONLY_TOOLS: ["create_team", "send_message", "stop_agent"],
 }));
 
 // Mock InternalToolRegistry

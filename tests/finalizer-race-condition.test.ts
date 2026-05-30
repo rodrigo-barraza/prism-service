@@ -162,7 +162,7 @@ describe("Finalizer message assembly", () => {
           toolCalls: [
             {
               id: "tc-0",
-              name: "web_search",
+              name: "search_web",
               args: {},
               result: { results: [] },
             },
@@ -186,7 +186,7 @@ describe("Finalizer message assembly", () => {
       images: [],
       audioRef: null,
       toolCalls: [
-        { id: "tc-0", name: "web_search", args: {}, result: { results: [] } },
+        { id: "tc-0", name: "search_web", args: {}, result: { results: [] } },
         { id: "tc-1", name: "generate_audio", args: {}, result: { success: true } },
       ],
       resolvedModel: "claude-haiku-4-5-20250514",
