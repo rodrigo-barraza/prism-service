@@ -53,11 +53,13 @@ interface StreamChunk {
   outcome?: string;
   results?: unknown;
   id?: string | null;
+  responsesItemId?: string;
   name?: string;
   args?: Record<string, unknown>;
   result?: unknown;
   status?: string;
   thoughtSignature?: string;
+  reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> };
   message?: string;
   phase?: string;
   progress?: number;
@@ -275,16 +277,19 @@ export async function dispatchChunk(
       } else {
         state.toolCalls.push({
           id: chunk.id || null,
+          responsesItemId: chunk.responsesItemId || undefined,
           name: chunk.name || "",
           args: chunk.args || {},
           result: chunk.result || undefined,
           status: chunk.status || undefined,
           thoughtSignature: chunk.thoughtSignature || undefined,
+          reasoningItem: chunk.reasoningItem || undefined,
         });
       }
       emit({
         type: "toolCall",
         id: chunk.id || null,
+        responsesItemId: chunk.responsesItemId || undefined,
         name: chunk.name,
         args: chunk.args || {},
         result: chunk.result || undefined,

@@ -1122,7 +1122,9 @@ async function handleStreamingText(context: GenerationContext) {
         id: toolCall.id,
         name: toolCall.name,
         args: toolCall.args,
+        ...(toolCall.responsesItemId ? { responsesItemId: toolCall.responsesItemId } : {}),
         ...(toolCall.thoughtSignature ? { thoughtSignature: toolCall.thoughtSignature } : {}),
+        ...(toolCall.reasoningItem ? { reasoningItem: toolCall.reasoningItem } : {}),
       })),
       ...(streamState.thinking ? { thinking: streamState.thinking } : {}),
       ...(streamState.thinkingSignature

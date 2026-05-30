@@ -285,7 +285,7 @@ function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletio
  * Convert messages to Responses API input format.
  * System messages become developer messages; images use input_image, PDFs use input_file.
  */
-function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.ResponseInputItem[] {
+export function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.ResponseInputItem[] {
   const result: OpenAI.Responses.ResponseInputItem[] = [];
   for (const message of messages) {
     // Assistant message with tool calls → expand into function_call items
@@ -308,7 +308,17 @@ function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.Response
             summary: toolCall.reasoningItem.summary,
           } as unknown as OpenAI.Responses.ResponseInputItem);
         }
-        const functionCallId = toolCall.responsesItemId || toolCall.id || `fc_${Date.now()}`;
+        let functionCallId = toolCall.responsesItemId;
+        if (!functionCallId || !functionCallId.startsWith("fc")) {
+          if (toolCall.id && toolCall.id.startsWith("fc")) {
+            functionCallId = toolCall.id;
+          } else if (toolCall.id && toolCall.id.startsWith("call_")) {
+            functionCallId = toolCall.id.replace(/^call_/, "fc_");
+          } else {
+            const secureRandomString = Math.random().toString(36).substring(2, 10);
+            functionCallId = `fc_${toolCall.id || secureRandomString}`;
+          }
+        }
         result.push({
           type: "function_call",
           id: functionCallId,
@@ -532,8 +542,10 @@ const openaiProvider = {
 
     // Collect tool calls and images from output items
     const images: Array<{ type: string; data: string; mimeType: string }> = [];
-    const toolCalls: Array<{ id: string; name: string; args: Record<string, unknown> }> = [];
+    const toolCalls: Array<{ id: string; responsesItemId?: string; name: string; args: Record<string, unknown>; reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> } }> = [];
     if (response.output) {
+      // Track pending reasoning items to pair with subsequent function calls
+      const pendingReasoningItems: Array<{ id: string; summary: Array<{ type: string; text: string }> }> = [];
       for (const item of response.output) {
         if (item.type === "image_generation_call" && item.result) {
           images.push({
@@ -541,6 +553,14 @@ const openaiProvider = {
             data: item.result,
             mimeType: "image/png",
           });
+        } else if (item.type === "reasoning") {
+          const reasoningOutputItem = item as unknown as { id: string; summary?: Array<{ type: string; text: string }> };
+          if (reasoningOutputItem.id) {
+            pendingReasoningItems.push({
+              id: reasoningOutputItem.id,
+              summary: reasoningOutputItem.summary || [],
+            });
+          }
         } else if (item.type === "function_call") {
           let args: Record<string, unknown> = {};
           try {
@@ -548,10 +568,13 @@ const openaiProvider = {
           } catch {
             /* ignore */
           }
+          const pairedReasoningItem = pendingReasoningItems.shift();
           toolCalls.push({
             id: item.call_id,
+            responsesItemId: item.id,
             name: item.name,
             args,
+            ...(pairedReasoningItem ? { reasoningItem: pairedReasoningItem } : {}),
           });
         }
       }
