@@ -79,7 +79,7 @@ async function runShellValidator(
     const shellResult = await ToolOrchestratorService.executeTool(
       "execute_shell",
       {
-        command: `timeout ${Math.floor(VALIDATION_TIMEOUT_MS / 1000)}s ${validatorConfig.command}`,
+        command: `export PATH=$PATH:/usr/local/bin:/usr/bin:/bin && timeout ${Math.floor(VALIDATION_TIMEOUT_MS / 1000)}s ${validatorConfig.command}`,
         cwd: workspaceRoot,
       },
       {
