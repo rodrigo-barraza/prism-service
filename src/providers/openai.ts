@@ -48,6 +48,7 @@ export interface OpenAIMsg {
     name: string;
     args: Record<string, unknown>;
     responsesItemId?: string;
+    reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> };
   }>;
   tool_call_id?: string;
   id?: string;
@@ -296,10 +297,17 @@ function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.Response
           content: message.content,
         } as OpenAI.Responses.ResponseInputItem);
       }
-      // Each tool call becomes a function_call output item
+      // Each tool call becomes a function_call output item, preceded by its
+      // paired reasoning item when present (required by the Responses API for
+      // reasoning models — omitting it triggers a 400 referential integrity error).
       for (const toolCall of message.toolCalls) {
-        // Responses API requires the function_call id to start with "fc_"
-        // responsesItemId is the fc_ prefixed ID from the streaming handler
+        if (toolCall.reasoningItem) {
+          result.push({
+            type: "reasoning",
+            id: toolCall.reasoningItem.id,
+            summary: toolCall.reasoningItem.summary,
+          } as unknown as OpenAI.Responses.ResponseInputItem);
+        }
         const functionCallId = toolCall.responsesItemId || toolCall.id || `fc_${Date.now()}`;
         result.push({
           type: "function_call",
@@ -803,6 +811,10 @@ const openaiProvider = {
     // Track function names from output_item.added events; the arguments.done
     // event may not include the name property (known OpenAI SDK issue).
     const pendingFunctions: Record<string, { name: string; callId: string; args: string }> = {};
+    // Track reasoning output items so we can pair them with subsequent function calls.
+    // The Responses API emits reasoning items before their paired function_call items.
+    const pendingReasoningItems: Array<{ id: string; summary: Array<{ type: string; text: string }> }> = [];
+    const reasoningSummaryAccumulator: Record<string, string> = {};
     for await (const event of streamData) {
       if (options.signal?.aborted) break;
       // Text delta from output_text
@@ -810,9 +822,13 @@ const openaiProvider = {
         const typedEvent = event as OpenAI.Responses.ResponseTextDeltaEvent;
         yield typedEvent.delta || "";
       }
-      // Reasoning / thinking summary delta
+      // Reasoning / thinking summary delta — also accumulate for reasoning item reconstruction
       if (event.type === "response.reasoning_summary_text.delta") {
         const typedEvent = event as OpenAI.Responses.ResponseReasoningSummaryTextDeltaEvent;
+        const itemId = (typedEvent as unknown as { item_id?: string }).item_id;
+        if (itemId) {
+          reasoningSummaryAccumulator[itemId] = (reasoningSummaryAccumulator[itemId] || "") + (typedEvent.delta || "");
+        }
         yield { type: "thinking", content: typedEvent.delta || "" };
       }
       // Image generation completed
@@ -826,10 +842,18 @@ const openaiProvider = {
           };
         }
       }
-      // Track function call metadata from output_item.added
+      // Track reasoning and function call metadata from output_item.added
       if (event.type === "response.output_item.added") {
         const typedEvent = event as OpenAI.Responses.ResponseOutputItemAddedEvent;
-        if (typedEvent.item?.type === "function_call") {
+        if (typedEvent.item?.type === "reasoning") {
+          const reasoningItem = typedEvent.item as unknown as { id: string; summary?: Array<{ type: string; text: string }> };
+          if (reasoningItem.id) {
+            pendingReasoningItems.push({
+              id: reasoningItem.id,
+              summary: reasoningItem.summary || [],
+            });
+          }
+        } else if (typedEvent.item?.type === "function_call") {
           const item = typedEvent.item as OpenAI.Responses.ResponseFunctionToolCall;
           if (item.id) {
             pendingFunctions[item.id] = {
@@ -866,6 +890,20 @@ const openaiProvider = {
         } catch {
           /* ignore */
         }
+        // Pop the most recent pending reasoning item and finalize its summary
+        // text from the accumulated deltas. This pairs the reasoning item with
+        // this function call for referential integrity on subsequent turns.
+        let pairedReasoningItem: { id: string; summary: Array<{ type: string; text: string }> } | undefined;
+        if (pendingReasoningItems.length > 0) {
+          pairedReasoningItem = pendingReasoningItems.shift();
+          if (pairedReasoningItem) {
+            const accumulatedText = reasoningSummaryAccumulator[pairedReasoningItem.id];
+            if (accumulatedText) {
+              pairedReasoningItem.summary = [{ type: "summary_text", text: accumulatedText }];
+              delete reasoningSummaryAccumulator[pairedReasoningItem.id];
+            }
+          }
+        }
         yield {
           type: "toolCall",
           id: callId,
@@ -873,6 +911,7 @@ const openaiProvider = {
           responsesItemId: typedEvent.item_id,
           name,
           args,
+          ...(pairedReasoningItem ? { reasoningItem: pairedReasoningItem } : {}),
         };
         // Clean up
         delete pendingFunctions[typedEvent.item_id];

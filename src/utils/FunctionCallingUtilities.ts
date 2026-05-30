@@ -63,6 +63,7 @@ interface ExpandedToolCall {
   args?: unknown;
   responsesItemId?: string;
   thoughtSignature?: string;
+  reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> };
 }
 
 interface ExpandedMessage {
@@ -118,6 +119,9 @@ export function expandMessagesForFC(
             : {}),
           ...(tc.thoughtSignature
             ? { thoughtSignature: tc.thoughtSignature }
+            : {}),
+          ...(tc.reasoningItem
+            ? { reasoningItem: tc.reasoningItem }
             : {}),
         })),
       };

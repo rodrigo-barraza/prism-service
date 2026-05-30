@@ -246,6 +246,8 @@ export interface ToolCallEntry {
   status?: string;
   responsesItemId?: string;
   thoughtSignature?: string;
+  /** OpenAI Responses API reasoning output item paired with this function call. */
+  reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> };
 }
 
 export interface ChatMessage {
