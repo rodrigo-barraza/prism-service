@@ -489,7 +489,7 @@ describe("prepareDisplayMessages", () => {
         role: "assistant",
         content: "Searching...",
         toolCalls: [
-          { id: "tc-0", name: "web_search", args: { query: "test" } },
+          { id: "tc-0", name: "search_web", args: { query: "test" } },
         ],
       },
       {

@@ -5,6 +5,7 @@ import logger from "../utils/logger.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import { COORDINATOR_ONLY_TOOLS } from "./CoordinatorPrompt.ts";
 import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
+import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TYPES } from "../config.ts";
 
 // ── Types ────────────────────────────────────────────────────
@@ -61,16 +62,7 @@ interface ResolveParams {
 const COORDINATOR_TOOL_NAMES = new Set(COORDINATOR_ONLY_TOOLS);
 
 /** Core agentic tools bypass the enabledTools filter (always available to all agents as part of the core cognitive architecture) */
-const CORE_AGENTIC_TOOLS = new Set([
-  "upsert_memory",
-  "task_create",
-  "task_list",
-  "task_update",
-  "calculate_precise",
-  "execute_javascript",
-  "search_tools",
-  "web_search",
-]);
+const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 
 /** Prism-local tools bypass the enabledTools filter (always available to all agents) — derived from registry */
 let _prismLocalCache: Set<string> | null = null;
@@ -278,15 +270,15 @@ export default class AgenticToolResolver {
 
     // ── Native tool collision prevention ────────────────────────
     if (options.webSearch) {
-      finalTools = finalTools.filter((tool) => tool.name !== "web_search");
+      finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.SEARCH_WEB);
     }
 
     if (modelDef?.outputTypes?.includes(TYPES.IMAGE)) {
-      finalTools = finalTools.filter((tool) => tool.name !== "generate_image");
+      finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.GENERATE_IMAGE);
     }
 
     if (modelDef?.inputTypes?.includes(TYPES.IMAGE)) {
-      finalTools = finalTools.filter((tool) => tool.name !== "describe_image");
+      finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.DESCRIBE_IMAGE);
     }
 
     const finalCustomCount = finalTools.filter((tool) => tool._isCustom).length;

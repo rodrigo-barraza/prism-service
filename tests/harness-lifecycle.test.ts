@@ -23,7 +23,7 @@ describe("PostExecutionEmitter", () => {
 
     it("should emit tasks_updated when a task tool was called", () => {
       const executedToolCalls = [
-        { name: "task_create", id: "1", args: {} },
+        { name: "create_task", id: "1", args: {} },
         { name: "read_file", id: "2", args: {} },
       ];
 
@@ -35,8 +35,8 @@ describe("PostExecutionEmitter", () => {
       });
     });
 
-    it("should emit workers_updated when team_create was called", () => {
-      const executedToolCalls = [{ name: "team_create", id: "1", args: {} }];
+    it("should emit workers_updated when create_team was called", () => {
+      const executedToolCalls = [{ name: "create_team", id: "1", args: {} }];
 
       emitPostExecutionStatus(executedToolCalls, mockEmit);
 
@@ -83,7 +83,7 @@ describe("PostExecutionEmitter", () => {
 
     it("should emit multiple statuses when multiple matching tools are called", () => {
       const executedToolCalls = [
-        { name: "task_update", id: "1", args: {} },
+        { name: "update_task", id: "1", args: {} },
         { name: "upsert_memory", id: "2", args: {} },
       ];
 

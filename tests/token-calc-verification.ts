@@ -338,10 +338,10 @@ async function testSingleAgentFlow() {
 async function testCoordinatorFlow() {
   logSection("PART B: COORDINATOR + WORKER AGENTIC FLOW");
 
-  const prompt = `You MUST delegate this work by calling team_create with exactly 2 workers:
+  const prompt = `You MUST delegate this work by calling create_team with exactly 2 workers:
 - Worker 1: "List files in /tmp and report what you find"
 - Worker 2: "Run 'echo hello world' and report the output"
-Do NOT do the work yourself. Use team_create immediately.`;
+Do NOT do the work yourself. Use create_team immediately.`;
 
   log("📤", `Prompt: delegate to 2 workers`);
   log("⏳", "Streaming coordinator + worker SSE response...\n");
@@ -350,7 +350,7 @@ Do NOT do the work yourself. Use team_create immediately.`;
     maxIterations: 10,
     maxWorkerIterations: 3,
     title: "Coordinator Token Test",
-    enabledTools: ["read_file", "write_file", "list_dir", "run_command", "team_create", "send_message", "stop_agent"],
+    enabledTools: ["read_file", "write_file", "list_dir", "run_command", "create_team", "send_message", "stop_agent"],
   });
 
   const { chunkCount, thinkingChunkCount, doneEvent, usageUpdateEvents, workerCompleteEvents, workerProgressEvents: _workerProgressEvents, workerStatusEvents, maxOutputTokensFromChunks } = result;

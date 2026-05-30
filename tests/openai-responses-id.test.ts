@@ -274,7 +274,7 @@ describe("OpenAI Responses API input preparation", () => {
         toolCalls: [
           {
             id: "call_no_text",
-            name: "web_search",
+            name: "search_web",
             args: { query: "test" },
           },
         ],

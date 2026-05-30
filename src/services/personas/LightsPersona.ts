@@ -1,4 +1,4 @@
-import { LABEL_TAGS } from "../ToolTaxonomyConstants.ts";
+import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -66,7 +66,7 @@ const LIGHTS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 - **Sunset Wind-down**: set_state transitioning to kelvin:2500, brightness 0.3, duration 300 (5 min fade)
 - **Alert / Notification**: pulse with red or orange, period 0.5s, 5 cycles
 - **Night Light**: set_state with kelvin:2500, brightness 0.05-0.1`,
-    requires: ["lifx_breathe_effect", "lifx_pulse_effect"],
+    requires: [TOOL_NAMES.LIFX_BREATHE_EFFECT, TOOL_NAMES.LIFX_PULSE_EFFECT],
   },
   {
     content: `# Important Notes
@@ -81,7 +81,7 @@ const LIGHTS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 const LIGHTS_ENABLED_TOOLS = [
   LABEL_TAGS.SMART_HOME,
   LABEL_TAGS.WEB,
-  "get_weather",
+  TOOL_NAMES.GET_WEATHER,
 ];
 
 export const LightsPersona: Persona = {

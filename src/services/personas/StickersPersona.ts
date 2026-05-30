@@ -1,4 +1,4 @@
-import { LABEL_TAGS } from "../ToolTaxonomyConstants.ts";
+import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -120,7 +120,7 @@ const STICKERS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 - For image generation, write rich prompts that describe style, composition, subjects, colors, mood, lighting, and artistic direction.
 - Always generate sticker-appropriate images: vibrant colors, clean lines, suitable for 4x6 inch printing.
 - If the image generation tool fails due to content safety, try rephrasing the prompt creatively.`,
-    requires: ["generate_image"],
+    requires: [TOOL_NAMES.GENERATE_IMAGE],
   },
 ];
 

@@ -177,7 +177,7 @@ describe("expandMessagesForFC — basic expansion", () => {
         toolCalls: [
           {
             id: "tc-0",
-            name: "web_search",
+            name: "search_web",
             args: { query: "cats" },
             result: { results: ["found cats"] },
           },
@@ -191,7 +191,7 @@ describe("expandMessagesForFC — basic expansion", () => {
     expect(expanded[2].role).toBe("assistant");
     expect(expanded[2].toolCalls).toHaveLength(1);
     expect(expanded[3].role).toBe("tool");
-    expect(expanded[3].name).toBe("web_search");
+    expect(expanded[3].name).toBe("search_web");
     expect(expanded[3].tool_call_id).toBe("tc-0");
     expect(expanded[3].content).toContain("found cats");
   });
@@ -290,7 +290,7 @@ describe("expandMessagesForFC — basic expansion", () => {
         toolCalls: [
           {
             id: "tc-0",
-            name: "web_search",
+            name: "search_web",
             args: {},
             result: { found: true },
           },
@@ -306,12 +306,12 @@ describe("expandMessagesForFC — basic expansion", () => {
 
     const expanded = expandMessagesForFC(messages, { filterDeleted: false });
 
-    // Only 1 tool message (web_search has result, generate_audio doesn't)
+    // Only 1 tool message (search_web has result, generate_audio doesn't)
     const toolMessages = expanded.filter(
       (message) => message.role === "tool",
     );
     expect(toolMessages).toHaveLength(1);
-    expect(toolMessages[0].name).toBe("web_search");
+    expect(toolMessages[0].name).toBe("search_web");
   });
 });
 

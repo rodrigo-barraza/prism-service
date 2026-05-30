@@ -47,7 +47,7 @@ describe("getTier — default assignments", () => {
     "list_directory",
     "grep_search",
     "glob_files",
-    "web_search",
+    "search_web",
     "read_web_page",
     "multi_file_read",
     "file_info",

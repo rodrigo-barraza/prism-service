@@ -35,10 +35,10 @@ interface SkillDeleteArgs {
 // CRUD operations for reusable workflow skills.
 // Delegates to SkillService for MongoDB persistence.
 
-const skillCreate = {
-  name: "skill_create",
+const createSkill = {
+  name: "create_skill",
   schema: {
-    name: "skill_create",
+    name: "create_skill",
     description:
       "Create a reusable workflow skill. Skills are stored prompt templates with variable " +
       "interpolation ({{variable}}) that can be invoked by name. Use this to capture " +
@@ -95,14 +95,14 @@ const skillCreate = {
   },
 };
 
-const skillExecute = {
-  name: "skill_execute",
+const executeSkill = {
+  name: "execute_skill",
   schema: {
-    name: "skill_execute",
+    name: "execute_skill",
     description:
       "Execute a previously created skill by its ID. The skill's prompt template is " +
       "interpolated with the provided variables and executed as an inline agentic task. " +
-      "Use skill_list to see available skills.",
+      "Use list_skills to see available skills.",
     parameters: {
       type: "object",
       properties: {
@@ -130,14 +130,14 @@ const skillExecute = {
     );
     if (prepared.error) return prepared;
 
-    // Execute via coordinator's team_create mechanism
+    // Execute via coordinator's create_team mechanism
     logger.info(
       `[SkillExecute] Executing skill "${prepared.name}" (${prepared.skillId})`
     );
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
     return ToolOrchestratorService.executeCoordinatorTool(
-      "team_create",
+      "create_team",
       {
         name: `skill_${prepared.skillId}`,
         members: [
@@ -153,12 +153,12 @@ const skillExecute = {
   },
 };
 
-const skillList = {
-  name: "skill_list",
+const listSkills = {
+  name: "list_skills",
   schema: {
-    name: "skill_list",
+    name: "list_skills",
     description:
-      "List all available skills. Skills are reusable workflow templates created with skill_create.",
+      "List all available skills. Skills are reusable workflow templates created with create_skill.",
     parameters: {
       type: "object",
       properties: {
@@ -179,10 +179,10 @@ const skillList = {
   },
 };
 
-const skillDelete = {
-  name: "skill_delete",
+const deleteSkill = {
+  name: "delete_skill",
   schema: {
-    name: "skill_delete",
+    name: "delete_skill",
     description: "Delete a skill by its ID.",
     parameters: {
       type: "object",
@@ -201,4 +201,4 @@ const skillDelete = {
   },
 };
 
-export default [skillCreate, skillExecute, skillList, skillDelete];
+export default [createSkill, executeSkill, listSkills, deleteSkill];

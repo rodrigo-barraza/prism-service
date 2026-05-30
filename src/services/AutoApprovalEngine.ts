@@ -25,7 +25,7 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   list_directory: APPROVAL_TIERS.AUTO,
   grep_search: APPROVAL_TIERS.AUTO,
   glob_files: APPROVAL_TIERS.AUTO,
-  web_search: APPROVAL_TIERS.AUTO,
+  search_web: APPROVAL_TIERS.AUTO,
   read_web_page: APPROVAL_TIERS.AUTO,
   multi_file_read: APPROVAL_TIERS.AUTO,
   file_info: APPROVAL_TIERS.AUTO,
@@ -36,13 +36,15 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   project_summary: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — task management (agent's own scratchpad, not user files)
-  task_create: APPROVAL_TIERS.AUTO,
-  task_get: APPROVAL_TIERS.AUTO,
-  task_list: APPROVAL_TIERS.AUTO,
-  task_update: APPROVAL_TIERS.AUTO,
+  create_task: APPROVAL_TIERS.AUTO,
+  get_task: APPROVAL_TIERS.AUTO,
+  list_tasks: APPROVAL_TIERS.AUTO,
+  update_task: APPROVAL_TIERS.AUTO,
+  get_task_output: APPROVAL_TIERS.AUTO,
+  write_todo: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — coordinator orchestration
-  team_create: APPROVAL_TIERS.AUTO,
+  create_team: APPROVAL_TIERS.AUTO,
   send_message: APPROVAL_TIERS.AUTO,
   stop_agent: APPROVAL_TIERS.AUTO,
 
@@ -56,23 +58,27 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   search_tools: APPROVAL_TIERS.AUTO,
 
   // Tier 2 — scheduling / notebook (creates persistent state)
-  cron_create: APPROVAL_TIERS.WRITE,
+  create_cron: APPROVAL_TIERS.WRITE,
   remote_trigger: APPROVAL_TIERS.WRITE,
+  create_cron_job: APPROVAL_TIERS.WRITE,
+  list_cron_jobs: APPROVAL_TIERS.WRITE,
+  delete_cron_job: APPROVAL_TIERS.WRITE,
+  trigger_cron_job: APPROVAL_TIERS.WRITE,
   notebook_edit: APPROVAL_TIERS.WRITE,
 
   // Tier 1 — skill management (read-only discovery)
-  skill_list: APPROVAL_TIERS.AUTO,
+  list_skills: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — structured output (data formatting only)
   synthetic_output: APPROVAL_TIERS.AUTO,
 
   // Tier 2 — skill mutations + execution
-  skill_create: APPROVAL_TIERS.WRITE,
-  skill_execute: APPROVAL_TIERS.WRITE,
-  skill_delete: APPROVAL_TIERS.WRITE,
+  create_skill: APPROVAL_TIERS.WRITE,
+  execute_skill: APPROVAL_TIERS.WRITE,
+  delete_skill: APPROVAL_TIERS.WRITE,
 
   // Tier 2 — team deletion (stops workers)
-  team_delete: APPROVAL_TIERS.WRITE,
+  delete_team: APPROVAL_TIERS.WRITE,
 
   // Tier 2 — worktree isolation (creates/merges git branches)
   enter_worktree: APPROVAL_TIERS.WRITE,

@@ -19,13 +19,21 @@ export function emitPostExecutionStatus(
   toolCalls: ToolCall[],
   emit: EmitFn,
 ): void {
-  if (toolCalls.some((toolCall) => toolCall.name.startsWith("task_"))) {
+  if (
+    toolCalls.some(
+      (toolCall) =>
+        toolCall.name.includes("_task") || toolCall.name.startsWith("task_"),
+    )
+  ) {
     emit({ type: "status", message: "tasks_updated" });
   }
 
   if (
     toolCalls.some(
-      (toolCall) => toolCall.name === "team_create" || toolCall.name === "stop_agent",
+      (toolCall) =>
+        toolCall.name === "create_team" ||
+        toolCall.name === "team_create" ||
+        toolCall.name === "stop_agent",
     )
   ) {
     emit({ type: "status", message: "workers_updated" });

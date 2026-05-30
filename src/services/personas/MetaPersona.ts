@@ -1,4 +1,4 @@
-import { LABEL_TAGS } from "../ToolTaxonomyConstants.ts";
+import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -61,11 +61,11 @@ const META_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 - Use create_custom_agent only AFTER presenting the proposed configuration to the user and receiving their approval (or if they've given you a complete spec upfront).
 - Use update_custom_agent to modify an existing custom agent after verifying its current state.
 - NEVER create or update an agent without at least a name and identity — these are required fields.`,
-    requires: ["create_custom_agent", "list_custom_agents", "update_custom_agent"],
+    requires: [TOOL_NAMES.CREATE_CUSTOM_AGENT, TOOL_NAMES.LIST_CUSTOM_AGENTS, TOOL_NAMES.UPDATE_CUSTOM_AGENT],
   },
   {
-    content: `- Use web_search if you need to look up Lucide icon names, color palette ideas, or domain-specific terminology for writing the identity prompt.`,
-    requires: ["web_search"],
+    content: `- Use search_web if you need to look up Lucide icon names, color palette ideas, or domain-specific terminology for writing the identity prompt.`,
+    requires: [TOOL_NAMES.SEARCH_WEB],
   },
   {
     content: `# Agent Design Best Practices
@@ -74,15 +74,15 @@ const META_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 - Tool policies should explain WHEN to use each tool category, not just list them.
 - Prefer label-based tool groups over individual tool names when an entire category applies.
 - Always include a relevant project scope — 'coding' for dev tools, or a custom scope for domain-specific agents.`,
-    requires: ["create_custom_agent", "update_custom_agent"],
+    requires: [TOOL_NAMES.CREATE_CUSTOM_AGENT, TOOL_NAMES.UPDATE_CUSTOM_AGENT],
   },
 ];
 
 const META_ENABLED_TOOLS = [
-  "create_custom_agent",
-  "list_custom_agents",
-  "update_custom_agent",
-  "search_tools",
+  TOOL_NAMES.CREATE_CUSTOM_AGENT,
+  TOOL_NAMES.LIST_CUSTOM_AGENTS,
+  TOOL_NAMES.UPDATE_CUSTOM_AGENT,
+  TOOL_NAMES.SEARCH_TOOLS,
   LABEL_TAGS.WEB,
 ];
 
