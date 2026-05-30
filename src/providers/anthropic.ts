@@ -53,6 +53,8 @@ const EFFORT_BUDGET_MAP: Record<string, number> = {
   low: 1024,
   medium: 4096,
   high: 50000,
+  xhigh: 100000,
+  max: 128000,
 };
 
 // Retry config for transient Anthropic errors (overloaded, rate limit)
