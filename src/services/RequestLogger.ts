@@ -7,7 +7,7 @@ import {
   estimateTokens,
   calculateTextCost,
 } from "../utils/CostCalculator.ts";
-import { computeModalities } from "./ConversationService.ts";
+import { computeModalities } from "./conversation/index.ts";
 import { COLLECTIONS } from "../constants.ts";
 import { TYPES, getPricing } from "../config.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";
@@ -96,25 +96,8 @@ export interface LlmOptions {
   [key: string]: unknown;
 }
 
-export interface ToolCallPayload {
-  name: string;
-  id?: string | null;
-  args?: Record<string, unknown> | string;
-  thoughtSignature?: string;
-}
-
-export interface MessagePayload {
-  role: string;
-  content?: string | unknown[] | null;
-  rawContent?: string;
-  images?: string[] | unknown[];
-  audio?: string | unknown[];
-  video?: string | unknown[];
-  pdf?: string | unknown[];
-  toolCalls?: ToolCallPayload[];
-  thinking?: string;
-  [key: string]: unknown;
-}
+import type { ToolCallPayload, MessagePayload } from "./conversation/index.ts";
+export type { ToolCallPayload, MessagePayload };
 
 export interface LogChatGenerationParams extends LogParams {
   usage?: TokenUsage;
