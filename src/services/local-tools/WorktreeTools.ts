@@ -7,7 +7,8 @@ import logger from "../../utils/logger.ts";
 
 interface ToolContext {
   agentSessionId?: string;
-  _emit?: (event: Record<string, unknown>) => void;
+  project?: string;
+  _emit?: (event: { type: string; [key: string]: unknown }) => void;
   [key: string]: unknown;
 }
 
@@ -19,7 +20,15 @@ interface WorktreeCreateResult {
 interface WorktreeMergeResult {
   error?: string;
   diff?: unknown;
-  [key: string]: unknown;
+}
+
+interface EnterWorktreeArgs {
+  reason?: string;
+}
+
+interface ExitWorktreeArgs {
+  action: "merge" | "discard";
+  commitMessage?: string;
 }
 
 const enterWorktree = {
@@ -44,16 +53,19 @@ const enterWorktree = {
       required: [],
     },
   },
-  domain: "Agentic: Workspace",
+  domain: "Workspace",
   labels: ["coding", "git"],
 
-  async execute(args: Record<string, unknown>, context: ToolContext) {
+  async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
+    const enterArgs = args as unknown as EnterWorktreeArgs;
+    const typedContext = context as unknown as ToolContext;
+
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
     const { resolve } = await import("node:path");
     const { existsSync } = await import("node:fs");
 
-    const sessionId = context.agentSessionId;
+    const sessionId = typedContext.agentSessionId;
     if (!sessionId) {
       return {
         error:
@@ -83,7 +95,7 @@ const enterWorktree = {
     const createResult = await ToolOrchestratorService._proxyPost(
       "/agentic/git/worktree/create",
       { path: repoPath, branch: branchName },
-      context,
+      typedContext,
     ) as WorktreeCreateResult;
 
     if (createResult.error) {
@@ -102,8 +114,8 @@ const enterWorktree = {
       `[Worktree] enter: ${branchName} → ${createResult.worktreePath}`,
     );
 
-    if (context._emit) {
-      context._emit({
+    if (typedContext._emit) {
+      typedContext._emit({
         type: "status",
         message: "worktree_entered",
         branch: branchName,
@@ -115,7 +127,7 @@ const enterWorktree = {
       acknowledged: true,
       branch: branchName,
       worktreePath: createResult.worktreePath,
-      reason: args.reason || null,
+      reason: enterArgs.reason || null,
       message: `Now working in isolated worktree. All file operations are redirected to ${createResult.worktreePath}. Call exit_worktree with action 'merge' or 'discard' when done.`,
     };
   },
@@ -147,14 +159,17 @@ const exitWorktree = {
       required: ["action"],
     },
   },
-  domain: "Agentic: Workspace",
+  domain: "Workspace",
   labels: ["coding", "git"],
 
-  async execute(args: Record<string, unknown>, context: ToolContext) {
+  async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
+    const exitArgs = args as unknown as ExitWorktreeArgs;
+    const typedContext = context as unknown as ToolContext;
+
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
 
-    const sessionId = context.agentSessionId;
+    const sessionId = typedContext.agentSessionId;
     const worktreeState = ToolOrchestratorService.getWorktreeState(sessionId);
     if (!sessionId || !worktreeState) {
       return {
@@ -162,15 +177,15 @@ const exitWorktree = {
       };
     }
 
-    const { action, commitMessage } = args;
+    const { action, commitMessage } = exitArgs;
     let mergeResult: WorktreeMergeResult | null = null;
 
     if (action === "merge") {
       const diffResult = await ToolOrchestratorService._proxyPost(
         "/agentic/git/worktree/diff",
         { path: worktreeState.repoPath, branch: worktreeState.branchName },
-        context,
-      ) as Record<string, unknown>;
+        typedContext,
+      ) as { error?: string };
 
       mergeResult = await ToolOrchestratorService._proxyPost(
         "/agentic/git/worktree/merge",
@@ -179,7 +194,7 @@ const exitWorktree = {
           branch: worktreeState.branchName,
           message: commitMessage || `Merge worktree: ${worktreeState.branchName}`,
         },
-        context,
+        typedContext,
       ) as WorktreeMergeResult;
 
       if (mergeResult.error) {
@@ -195,19 +210,19 @@ const exitWorktree = {
     await ToolOrchestratorService._proxyPost(
       "/agentic/git/worktree/remove",
       { path: worktreeState.repoPath, worktreePath: worktreeState.worktreePath, deleteBranch: true },
-      context,
+      typedContext,
     );
 
     ToolOrchestratorService._clearWorktree(sessionId);
 
     logger.info(`[Worktree] exit: ${action} — ${worktreeState.branchName}`);
 
-    if (context._emit) {
-      context._emit({
+    if (typedContext._emit) {
+      typedContext._emit({
         type: "status",
         message: "worktree_exited",
         action,
-        branch: worktreeState.branchName,
+        branch: worktreeState.branchName as string,
       });
     }
 

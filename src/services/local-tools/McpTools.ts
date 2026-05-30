@@ -1,6 +1,23 @@
 import logger from "../../utils/logger.ts";
 import MCPClientService from "../MCPClientService.ts";
 
+interface ListMcpResourcesArgs {
+  server_name?: string;
+}
+
+interface ReadMcpResourceArgs {
+  server_name: string;
+  uri: string;
+}
+
+interface McpAuthenticateArgs {
+  server_name: string;
+  token?: string;
+  api_key?: string;
+  api_key_header?: string;
+  env?: Record<string, string>;
+}
+
 const listMcpResources = {
   name: "list_mcp_resources",
   schema: {
@@ -17,12 +34,13 @@ const listMcpResources = {
       required: [],
     },
   },
-  domain: "Agentic: Meta",
+  domain: "Meta",
   labels: ["coding", "meta"],
   async execute(args: Record<string, unknown>) {
-    const { server_name } = args;
+    const listArgs = args as unknown as ListMcpResourcesArgs;
+    const { server_name } = listArgs;
     if (server_name) {
-      const result = await MCPClientService.listResources(server_name as string);
+      const result = await MCPClientService.listResources(server_name);
       logger.info(
         `[MCP] list_resources: ${server_name} → ${result.count ?? 0} resources`,
       );
@@ -33,10 +51,10 @@ const listMcpResources = {
       return { resources: [], count: 0, message: "No MCP servers connected." };
     }
     const allResources: Record<string, unknown>[] = [];
-        for ( const server of servers) {
+    for (const server of servers) {
       const result = await MCPClientService.listResources(server.name);
       if (result.resources) {
-                for ( const r of result.resources)
+        for (const r of result.resources)
           allResources.push({ ...r, server: server.name });
       }
     }
@@ -46,7 +64,7 @@ const listMcpResources = {
     return {
       resources: allResources,
       count: allResources.length,
-      servers: servers.map((s: Record<string, unknown>) => s.name),
+      servers: servers.map((s) => s.name),
     };
   },
 };
@@ -69,14 +87,15 @@ const readMcpResource = {
       required: ["server_name", "uri"],
     },
   },
-  domain: "Agentic: Meta",
+  domain: "Meta",
   labels: ["coding", "meta"],
   async execute(args: Record<string, unknown>) {
-    const { server_name, uri } = args;
+    const readArgs = args as unknown as ReadMcpResourceArgs;
+    const { server_name, uri } = readArgs;
     if (!server_name || !uri)
       return { error: "'server_name' and 'uri' are required" };
     logger.info(`[MCP] read_resource: ${server_name} → ${uri}`);
-    return MCPClientService.readResource(server_name as string, uri as string);
+    return MCPClientService.readResource(server_name, uri);
   },
 };
 
@@ -110,21 +129,22 @@ const mcpAuthenticate = {
       required: ["server_name"],
     },
   },
-  domain: "Agentic: Meta",
+  domain: "Meta",
   labels: ["coding", "meta"],
   async execute(args: Record<string, unknown>) {
-    const { server_name, token, api_key, api_key_header, env: authEnv } = args;
+    const authArgs = args as unknown as McpAuthenticateArgs;
+    const { server_name, token, api_key, api_key_header, env: authEnv } = authArgs;
     if (!server_name) return { error: "'server_name' is required" };
     if (!token && !api_key && !authEnv)
       return {
         error: "At least one of 'token', 'api_key', or 'env' must be provided",
       };
     logger.info(`[MCP] authenticate: ${server_name}`);
-    return MCPClientService.authenticate(server_name as string, {
-      token: token as string | undefined,
-      apiKey: api_key as string | undefined,
-      apiKeyHeader: api_key_header as string | undefined,
-      env: authEnv as Record<string, string> | undefined,
+    return MCPClientService.authenticate(server_name, {
+      token: token,
+      apiKey: api_key,
+      apiKeyHeader: api_key_header,
+      env: authEnv,
     });
   },
 };

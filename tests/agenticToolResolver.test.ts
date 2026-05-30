@@ -73,9 +73,9 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
     getToolSchemas: vi.fn(() => MOCK_TOOLS_API_SCHEMAS),
     getMCPToolSchemas: vi.fn(() => []),
     getClientToolSchemas: vi.fn(() =>
-      MOCK_TOOLS_API_SCHEMAS.map((t) => ({
-        ...t,
-        domain: "Agentic: Workspace",
+      MOCK_TOOLS_API_SCHEMAS.map((tool) => ({
+        ...tool,
+        domain: "Workspace",
         labels: ["coding"],
       })),
     ),
@@ -165,7 +165,7 @@ describe("AgenticToolResolver — custom tool handling", () => {
     });
 
     // Custom tools should be in finalTools
-    const customNames = finalTools.filter((t) => t._isCustom).map((t) => t.name);
+    const customNames = finalTools.filter((tool) => tool._isCustom).map((tool) => tool.name);
     expect(customNames).toContain("get_week_of_year");
     expect(customNames).toContain("celsius_to_fahrenheit");
 
@@ -184,12 +184,12 @@ describe("AgenticToolResolver — custom tool handling", () => {
       modelDef: undefined,
     });
 
-    const customTool = finalTools.find((t) => t.name === "get_week_of_year");
+    const customTool = finalTools.find((tool) => tool.name === "get_week_of_year");
     expect(customTool).toBeTruthy();
     expect(customTool?._isCustom).toBe(true);
 
     // Built-in tools should NOT have _isCustom
-    const builtIn = finalTools.find((t) => t.name === "read_file");
+    const builtIn = finalTools.find((tool) => tool.name === "read_file");
     expect(builtIn).toBeTruthy();
     expect(builtIn?._isCustom).toBeUndefined();
   });
@@ -203,24 +203,24 @@ describe("AgenticToolResolver — custom tool handling", () => {
       modelDef: undefined,
     });
 
-    const weekTool = finalTools.find((t) => t.name === "get_week_of_year");
+    const weekTool = finalTools.find((tool) => tool.name === "get_week_of_year");
     expect(weekTool).toBeTruthy();
-    expect(weekTool?.parameters?.type).toBe("object");
-    expect((weekTool?.parameters?.properties as any)?.date).toEqual({
+    expect(weekTool?.parameters?.["type"]).toBe("object");
+    expect((weekTool?.parameters?.["properties"] as Record<string, unknown> | undefined)?.["date"]).toEqual({
       type: "string",
       description: "ISO date",
     });
     // date is not required
-    expect(weekTool?.parameters?.required).toEqual([]);
+    expect(weekTool?.parameters?.["required"]).toEqual([]);
 
-    const tempTool = finalTools.find((t) => t.name === "celsius_to_fahrenheit");
+    const tempTool = finalTools.find((tool) => tool.name === "celsius_to_fahrenheit");
     expect(tempTool).toBeTruthy();
-    expect((tempTool?.parameters?.properties as any)?.celsius).toEqual({
+    expect((tempTool?.parameters?.["properties"] as Record<string, unknown> | undefined)?.["celsius"]).toEqual({
       type: "number",
       description: "Temp in C",
     });
     // celsius IS required
-    expect(tempTool?.parameters?.required).toEqual(["celsius"]);
+    expect(tempTool?.parameters?.["required"]).toEqual(["celsius"]);
   });
 
   it("custom tools bypass persona enabledTools whitelist filter", async () => {
@@ -234,7 +234,7 @@ describe("AgenticToolResolver — custom tool handling", () => {
       modelDef: undefined,
     });
 
-    const toolNames = finalTools.map((t) => t.name);
+    const toolNames = finalTools.map((tool) => tool.name);
 
     // Built-in tools in persona's enabledTools: should be present
     expect(toolNames).toContain("read_file");
@@ -260,7 +260,7 @@ describe("AgenticToolResolver — custom tool handling", () => {
       modelDef: undefined,
     });
 
-    const toolNames = finalTools.map((t) => t.name);
+    const toolNames = finalTools.map((tool) => tool.name);
 
     // Disabled built-in should be gone
     expect(toolNames).not.toContain("get_weather");
@@ -282,9 +282,9 @@ describe("AgenticToolResolver — custom tool handling", () => {
     });
 
     expect(customToolMap.size).toBe(0);
-    expect(finalTools.every((t) => !t._isCustom)).toBe(true);
+    expect(finalTools.every((tool) => !tool._isCustom)).toBe(true);
     // Built-in tools should still be present
-    expect(finalTools.some((t) => t.name === "read_file")).toBe(true);
+    expect(finalTools.some((tool) => tool.name === "read_file")).toBe(true);
   });
 
   it("handles MongoDB failure gracefully", async () => {
@@ -300,7 +300,7 @@ describe("AgenticToolResolver — custom tool handling", () => {
 
     // Should still return built-in tools even if custom tools fail
     expect(customToolMap.size).toBe(0);
-    expect(finalTools.some((t) => t.name === "read_file")).toBe(true);
+    expect(finalTools.some((tool) => tool.name === "read_file")).toBe(true);
   });
 
   it("automatically enables core agentic tools for other agents like CODING even if not explicitly whitelisted", async () => {
@@ -312,7 +312,7 @@ describe("AgenticToolResolver — custom tool handling", () => {
       modelDef: undefined,
     });
 
-    const toolNames = finalTools.map((t) => t.name);
+    const toolNames = finalTools.map((tool) => tool.name);
 
     // calculate_precise is a core agentic tool and should be bypassed
     expect(toolNames).toContain("calculate_precise");
@@ -327,7 +327,7 @@ describe("AgenticToolResolver — custom tool handling", () => {
       modelDef: undefined,
     });
 
-    const toolNames = finalTools.map((t) => t.name);
+    const toolNames = finalTools.map((tool) => tool.name);
 
     // calculate_precise is a core agentic tool and should NOT be present for LUPOS because LUPOS is restricted
     expect(toolNames).not.toContain("calculate_precise");

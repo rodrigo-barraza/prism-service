@@ -13,19 +13,43 @@ interface NormalizedQuestion {
   [key: string]: unknown;
 }
 
+interface UserQuestionEmitEvent {
+  type: "user_question";
+  questions: NormalizedQuestion[];
+  question: string;
+  choices: string[];
+  context: string | null;
+}
+
 interface ToolContext {
   agentSessionId?: string;
-  _emit?: (event: Record<string, unknown>) => void;
+  _emit?: (event: UserQuestionEmitEvent) => void;
 }
 
 interface QuestionAnswer {
   answer?: string | string[];
-  [key: string]: unknown;
 }
 
 interface QuestionResult {
   answers: QuestionAnswer[] | null;
   timedOut?: boolean;
+}
+
+interface QuestionInput {
+  question: string;
+  header?: string;
+  options?: {
+    label: string;
+    preview?: string | null;
+  }[];
+  multiSelect?: boolean;
+}
+
+interface AskUserQuestionArgs {
+  question?: string;
+  choices?: string[];
+  context?: string;
+  questions?: QuestionInput[];
 }
 
 export default {
@@ -111,10 +135,10 @@ export default {
       // At least one of question or questions is required — validated in execute()
     },
   },
-  domain: "Agentic: Control Flow",
+  domain: "Control Flow",
   labels: ["coding"],
 
-  async execute(args: Record<string, unknown>, context: ToolContext) {
+  async execute(args: AskUserQuestionArgs, context: ToolContext) {
     const { question, choices, context: questionContext, questions } = args;
 
     // ── Normalize into questions array ─────────────────
@@ -122,7 +146,7 @@ export default {
     if (questions && Array.isArray(questions) && questions.length > 0) {
       // Multi-question mode — validate uniqueness
       const seen = new Set<string>();
-      for (const query of questions as Record<string, unknown>[]) {
+      for (const query of questions) {
         if (!query.question || typeof query.question !== "string") {
           return {
             error:
@@ -131,33 +155,33 @@ export default {
         }
         if (seen.has(query.question)) {
           return {
-            error: `Duplicate question text: "${(query.question as string).slice(0, 60)}"`,
+            error: `Duplicate question text: "${query.question.slice(0, 60)}"`,
           };
         }
         seen.add(query.question);
         // Validate option label uniqueness within each question
-        const qOptions = query.options as Record<string, unknown>[] | undefined;
+        const qOptions = query.options;
         if (qOptions && qOptions.length > 0) {
           const labelsSeen = new Set<string>();
           for (const opt of qOptions) {
-            if (labelsSeen.has(opt.label as string)) {
+            if (labelsSeen.has(opt.label)) {
               return {
-                error: `Duplicate option label "${opt.label}" in question "${(query.question as string).slice(0, 40)}"`,
+                error: `Duplicate option label "${opt.label}" in question "${query.question.slice(0, 40)}"`,
               };
             }
-            labelsSeen.add(opt.label as string);
+            labelsSeen.add(opt.label);
           }
         }
       }
       if (questions.length > 4) {
         return { error: "Maximum 4 questions per call" };
       }
-      normalizedQuestions = (questions as Record<string, unknown>[]).map((query) => ({
-        question: query.question as string,
-        header: ((query.header as string) || "").slice(0, 16) || null,
-        options: ((query.options || []) as Record<string, unknown>[]).slice(0, 6).map((item) => ({
-          label: item.label as string,
-          preview: (item.preview as string) || null,
+      normalizedQuestions = questions.map((query) => ({
+        question: query.question,
+        header: (query.header || "").slice(0, 16) || null,
+        options: (query.options || []).slice(0, 6).map((item) => ({
+          label: item.label,
+          preview: item.preview || null,
         })),
         multiSelect: !!query.multiSelect,
       }));
@@ -167,7 +191,7 @@ export default {
         {
           question,
           header: null,
-          options: ((choices || []) as string[]).map((item) => ({
+          options: (choices || []).map((item) => ({
             label: item,
             preview: null,
           })),

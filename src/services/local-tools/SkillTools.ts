@@ -3,8 +3,32 @@ import logger from "../../utils/logger.ts";
 interface ToolContext {
   agentSessionId?: string;
   project?: string;
-  _emit?: (event: Record<string, unknown>) => void;
+  _emit?: (event: { type: string; [key: string]: unknown }) => void;
   [key: string]: unknown;
+}
+
+interface SkillCreateArgs {
+  name: string;
+  description?: string;
+  prompt: string;
+  steps?: string[];
+  tools?: string[];
+  maxIterations?: number;
+  model?: string;
+  [key: string]: unknown;
+}
+
+interface SkillExecuteArgs {
+  skillId: string;
+  variables?: Record<string, unknown>;
+}
+
+interface SkillListArgs {
+  project?: string;
+}
+
+interface SkillDeleteArgs {
+  skillId: string;
 }
 
 // ── Skill Tools ────────────────────────────────────────────
@@ -62,11 +86,12 @@ const skillCreate = {
       required: ["name", "prompt"],
     },
   },
-  domain: "Agentic: Skills",
+  domain: "Skills",
   labels: ["coding", "automation"],
   async execute(args: Record<string, unknown>) {
+    const createArgs = args as unknown as SkillCreateArgs;
     const { default: SkillService } = await import("../SkillService.js");
-    return SkillService.create(args);
+    return SkillService.create(createArgs);
   },
 };
 
@@ -94,19 +119,20 @@ const skillExecute = {
       required: ["skillId"],
     },
   },
-  domain: "Agentic: Skills",
+  domain: "Skills",
   labels: ["coding", "automation"],
   async execute(args: Record<string, unknown>, context: ToolContext) {
+    const execArgs = args as unknown as SkillExecuteArgs;
     const { default: SkillService } = await import("../SkillService.js");
     const prepared = await SkillService.prepare(
-      args.skillId as string,
-      (args.variables || {}) as Record<string, unknown>,
+      execArgs.skillId,
+      execArgs.variables || {},
     );
     if (prepared.error) return prepared;
 
     // Execute via coordinator's team_create mechanism
     logger.info(
-      `[SkillExecute] Executing skill "${prepared.name}" (${prepared.skillId})`,
+      `[SkillExecute] Executing skill "${prepared.name}" (${prepared.skillId})`
     );
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
@@ -118,7 +144,7 @@ const skillExecute = {
           {
             description: `Skill: ${prepared.name}`,
             prompt: prepared.prompt,
-            model: (prepared.config as Record<string, unknown>)?.model as string || undefined,
+            model: (prepared.config as { model?: string })?.model || undefined,
           },
         ],
       },
@@ -144,11 +170,12 @@ const skillList = {
       required: [],
     },
   },
-  domain: "Agentic: Skills",
+  domain: "Skills",
   labels: ["coding", "automation"],
   async execute(args: Record<string, unknown>, context: ToolContext) {
+    const listArgs = args as unknown as SkillListArgs;
     const { default: SkillService } = await import("../SkillService.js");
-    return SkillService.list({ project: (args.project as string) || context.project });
+    return SkillService.list({ project: listArgs.project || context.project });
   },
 };
 
@@ -165,11 +192,12 @@ const skillDelete = {
       required: ["skillId"],
     },
   },
-  domain: "Agentic: Skills",
+  domain: "Skills",
   labels: ["coding", "automation"],
   async execute(args: Record<string, unknown>) {
+    const deleteArgs = args as unknown as SkillDeleteArgs;
     const { default: SkillService } = await import("../SkillService.js");
-    return SkillService.delete(args.skillId as string);
+    return SkillService.delete(deleteArgs.skillId);
   },
 };
 
