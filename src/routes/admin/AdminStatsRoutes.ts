@@ -1,0 +1,897 @@
+import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
+import express from "express";
+import type { Request, Response, NextFunction } from "express";
+import {
+  COLLECTIONS,
+  COST_SUM_EXPR,
+  TOTAL_TOKENS_EXPR,
+  AVG_TOKENS_PER_SEC_EXPR,
+} from "../../constants.ts";
+import AgentPersonaRegistry from "../../services/AgentPersonaRegistry.ts";
+import ToolOrchestratorService from "../../services/ToolOrchestratorService.ts";
+import logger from "../../utils/logger.ts";
+import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import { applyDateRangeFilter, parsePaginationParams } from "../../utils/QueryBuilders.ts";
+import requireDb from "../../middleware/RequireDbMiddleware.ts";
+import {
+  hours as hoursToMs,
+} from "@rodrigo-barraza/utilities-library";
+
+const router = express.Router();
+const {
+  REQUESTS: REQUESTS_COL,
+  MODEL_CONVERSATIONS: CONVERSATIONS_COL,
+  WORKFLOWS: WORKFLOWS_COL,
+} = COLLECTIONS;
+
+router.use(requireDb);
+
+// ─── GET /stats — aggregate stats ─────────────────────
+router.get(
+  "/",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { from, to, project } = req.query;
+      const match: Record<string, unknown> = {};
+      if (project) match.project = project;
+      applyDateRangeFilter(match, from as string, to as string);
+
+      const pipeline: Record<string, unknown>[] = [
+        ...(Object.keys(match).length ? [{ $match: match }] : []),
+        {
+          $group: {
+            _id: null,
+            totalRequests: { $sum: 1 },
+            totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
+            totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
+            totalCost: COST_SUM_EXPR,
+            avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
+            avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
+            totalDuration: { $sum: { $ifNull: ["$totalTime", 0] } },
+            successCount: {
+              $sum: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
+            },
+            errorCount: {
+              $sum: { $cond: [{ $eq: ["$success", false] }, 1, 0] },
+            },
+          },
+        },
+      ];
+
+      const toolCallPipeline: Record<string, unknown>[] = [
+        ...(Object.keys(match).length ? [{ $match: match }] : []),
+        { $match: { toolApiNames: { $exists: true, $ne: [] } } },
+        { $unwind: "$toolApiNames" },
+        { $count: "total" },
+      ];
+
+      const convMatch: Record<string, unknown> = {};
+      if (project) convMatch.project = project;
+      applyDateRangeFilter(convMatch, from as string, to as string, "createdAt");
+
+      const traceMatch: Record<string, unknown> = { traceId: { $ne: null } };
+      if (project) traceMatch.project = project;
+      applyDateRangeFilter(traceMatch, from as string, to as string);
+
+      const traceCountPipeline: Record<string, unknown>[] = [
+        { $match: traceMatch },
+        { $group: { _id: "$traceId" } },
+        { $count: "total" },
+      ];
+
+      const agentCount = AgentPersonaRegistry.list().length;
+      const workspaceCount = ToolOrchestratorService.getWorkspaceRoots().length;
+
+      const [resultDocs, toolCallResult, traceResult, conversationCount] =
+        await Promise.all([
+          req.db.collection(REQUESTS_COL).aggregate(pipeline).toArray(),
+          req.db.collection(REQUESTS_COL).aggregate(toolCallPipeline).toArray(),
+          req.db.collection(REQUESTS_COL).aggregate(traceCountPipeline).toArray(),
+          req.db.collection(CONVERSATIONS_COL).countDocuments(convMatch),
+        ]);
+      const result = (resultDocs[0] || {}) as Record<string, unknown>;
+      const traceCount = traceResult[0]?.total || 0;
+      const totalToolCalls = toolCallResult[0]?.total || 0;
+
+      res.json({
+        totalRequests: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalCost: 0,
+        avgLatency: 0,
+        avgTokensPerSec: 0,
+        totalDuration: 0,
+        successCount: 0,
+        errorCount: 0,
+        ...result,
+        traceCount,
+        conversationCount,
+        totalToolCalls,
+        agentCount,
+        workspaceCount,
+      });
+    } catch (error: unknown) {
+      logger.error(`Admin /stats error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+// ─── GET /stats/projects — per-project breakdown ──────
+router.get(
+  "/projects",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { from, to, project } = req.query;
+      const match: Record<string, unknown> = {};
+      if (project) match.project = project;
+      applyDateRangeFilter(match, from as string, to as string);
+
+      const pipeline: Record<string, unknown>[] = [
+        ...(Object.keys(match).length ? [{ $match: match }] : []),
+        {
+          $group: {
+            _id: "$project",
+            totalRequests: { $sum: 1 },
+            totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
+            totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
+            totalTokens: TOTAL_TOKENS_EXPR,
+            totalCost: COST_SUM_EXPR,
+            avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
+            avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
+            lastRequest: { $max: "$timestamp" },
+            _models: { $addToSet: "$model" },
+            _providers: { $addToSet: "$provider" },
+          },
+        },
+        {
+          $addFields: {
+            modelCount: { $size: "$_models" },
+            providerCount: { $size: "$_providers" },
+          },
+        },
+        { $sort: { totalRequests: -1 } },
+      ];
+
+      const workflowPipeline: Record<string, unknown>[] = [
+        { $match: { conversationIds: { $exists: true, $ne: [] } } },
+        {
+          $lookup: {
+            from: CONVERSATIONS_COL,
+            localField: "conversationIds",
+            foreignField: "id",
+            as: "_convs",
+            pipeline: [{ $project: { project: 1 } }],
+          },
+        },
+        { $unwind: "$_convs" },
+        {
+          $group: {
+            _id: "$_convs.project",
+            workflowIds: { $addToSet: "$_id" },
+          },
+        },
+        { $project: { _id: 1, workflowCount: { $size: "$workflowIds" } } },
+      ];
+
+      const convPipeline: Record<string, unknown>[] = [
+        { $group: { _id: "$project", conversationCount: { $sum: 1 } } },
+      ];
+
+      const tracePipeline: Record<string, unknown>[] = [
+        { $match: { traceId: { $ne: null } } },
+        { $group: { _id: { project: "$project", traceId: "$traceId" } } },
+        { $group: { _id: "$_id.project", traceCount: { $sum: 1 } } },
+      ];
+
+      const [results, workflowCounts, convCounts, traceCounts] =
+        await Promise.all([
+          req.db.collection(REQUESTS_COL).aggregate(pipeline).toArray(),
+          req.db.collection(WORKFLOWS_COL).aggregate(workflowPipeline).toArray(),
+          req.db.collection(CONVERSATIONS_COL).aggregate(convPipeline).toArray(),
+          req.db.collection(REQUESTS_COL).aggregate(tracePipeline).toArray(),
+        ]);
+
+      const wfMap: Record<string, number> = {};
+      for (const wc of workflowCounts) {
+        wfMap[wc._id || "any"] = wc.workflowCount;
+      }
+
+      const convMap: Record<string, number> = {};
+      for (const cc of convCounts) {
+        convMap[cc._id || "any"] = cc.conversationCount;
+      }
+
+      const traceMap: Record<string, number> = {};
+      for (const toolCall of traceCounts) {
+        traceMap[toolCall._id || "any"] = toolCall.traceCount;
+      }
+
+      res.json(
+        results.map((r: Record<string, unknown>) => ({
+          project: r._id || "any",
+          totalRequests: r.totalRequests,
+          totalInputTokens: r.totalInputTokens,
+          totalOutputTokens: r.totalOutputTokens,
+          totalTokens: r.totalTokens,
+          totalCost: r.totalCost,
+          avgLatency: r.avgLatency,
+          avgTokensPerSec: r.avgTokensPerSec,
+          lastRequest: r.lastRequest,
+          modelCount: r.modelCount,
+          providerCount: r.providerCount,
+          models: ((r._models || []) as string[]).filter(Boolean),
+          providers: ((r._providers || []) as string[]).filter(Boolean),
+          workflowCount: wfMap[(r._id as string) || "any"] || 0,
+          conversationCount: convMap[(r._id as string) || "any"] || 0,
+          traceCount: traceMap[(r._id as string) || "any"] || 0,
+        })),
+      );
+    } catch (error: unknown) {
+      logger.error(`Admin /stats/projects error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+// ─── GET /stats/users — per-user breakdown ────────────
+router.get(
+  "/users",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const pipeline: Record<string, unknown>[] = [
+        {
+          $group: {
+            _id: "$username",
+            totalRequests: { $sum: 1 },
+            totalTokens: TOTAL_TOKENS_EXPR,
+            totalCost: COST_SUM_EXPR,
+            avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
+            lastRequest: { $max: "$timestamp" },
+          },
+        },
+        { $sort: { totalRequests: -1 } },
+      ];
+
+      const results = await req.db
+        .collection(REQUESTS_COL)
+        .aggregate(pipeline)
+        .toArray();
+
+      res.json(
+        results.map((r: Record<string, unknown>) => ({
+          username: r._id || "any",
+          totalRequests: r.totalRequests,
+          totalTokens: r.totalTokens,
+          totalCost: r.totalCost,
+          avgLatency: r.avgLatency,
+          lastRequest: r.lastRequest,
+        })),
+      );
+    } catch (error: unknown) {
+      logger.error(`Admin /stats/users error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+// ─── GET /stats/models — per-model breakdown ──────────
+router.get(
+  "/models",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { from, to, project } = req.query;
+      const match: Record<string, unknown> = {};
+      if (project) match.project = project;
+      applyDateRangeFilter(match, from as string, to as string);
+
+      const pipeline: Record<string, unknown>[] = [
+        ...(Object.keys(match).length ? [{ $match: match }] : []),
+        {
+          $group: {
+            _id: { model: "$model", provider: "$provider" },
+            totalRequests: { $sum: 1 },
+            totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
+            totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
+            totalTokens: TOTAL_TOKENS_EXPR,
+            totalCost: COST_SUM_EXPR,
+            avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
+            avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
+            _convIds: { $addToSet: "$conversationId" },
+            toolsUsed: {
+              $max: { $cond: [{ $eq: ["$toolsUsed", true] }, true, false] },
+            },
+          },
+        },
+        { $sort: { totalRequests: -1 } },
+      ];
+
+      const results = await req.db
+        .collection(REQUESTS_COL)
+        .aggregate(pipeline)
+        .toArray();
+
+      const allConvIds = new Set();
+      for (const r of results) {
+        for (const conversationId of r._convIds || []) {
+          if (conversationId) allConvIds.add(conversationId);
+        }
+      }
+
+      const wfByConv: Record<string, number> = {};
+      if (allConvIds.size > 0) {
+        const wfResults = await req.db
+          .collection(WORKFLOWS_COL)
+          .aggregate([
+            {
+              $match: {
+                conversationIds: { $elemMatch: { $in: [...allConvIds] } },
+              },
+            },
+            { $unwind: "$conversationIds" },
+            { $match: { conversationIds: { $in: [...allConvIds] } } },
+            {
+              $group: { _id: "$conversationIds", wfIds: { $addToSet: "$_id" } },
+            },
+            { $project: { _id: 1, workflowCount: { $size: "$wfIds" } } },
+          ])
+          .toArray();
+        for (const workflow of wfResults) {
+          wfByConv[workflow._id] = workflow.workflowCount;
+        }
+      }
+
+      const traceByConv: Record<string, string> = {};
+      if (allConvIds.size > 0) {
+        const convDocs = await req.db
+          .collection(CONVERSATIONS_COL)
+          .find({
+            id: { $in: [...allConvIds] },
+            traceId: { $exists: true, $ne: null },
+          })
+          .project({ id: 1, traceId: 1 })
+          .toArray();
+        for (const item of convDocs) {
+          traceByConv[item.id] = item.traceId;
+        }
+      }
+
+      res.json(
+        results.map((r: Record<string, unknown>) => {
+          const convIds = ((r._convIds || []) as string[]).filter(Boolean);
+          const conversationCount = convIds.length;
+          let workflowCount = 0;
+          const traceSet = new Set();
+          for (const conversationId of convIds) {
+            workflowCount += wfByConv[conversationId] || 0;
+            if (traceByConv[conversationId]) traceSet.add(traceByConv[conversationId]);
+          }
+          return {
+            model: (r._id as { model: string }).model,
+            provider: (r._id as { provider: string }).provider,
+            totalRequests: r.totalRequests,
+            totalInputTokens: r.totalInputTokens,
+            totalOutputTokens: r.totalOutputTokens,
+            totalTokens: r.totalTokens,
+            totalCost: r.totalCost,
+            avgLatency: r.avgLatency,
+            avgTokensPerSec: r.avgTokensPerSec,
+            toolsUsed: r.toolsUsed || false,
+            conversationCount,
+            workflowCount,
+            traceCount: traceSet.size,
+          };
+        }),
+      );
+    } catch (error: unknown) {
+      logger.error(`Admin /stats/models error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+// ─── GET /stats/tools — per-tool lifetime usage breakdown ─
+router.get(
+  "/tools",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { from, to, project, tool } = req.query;
+      const match: Record<string, unknown> = { toolApiNames: { $exists: true, $ne: [] } };
+      if (project) match.project = project;
+      applyDateRangeFilter(match, from as string, to as string);
+
+      const pipeline: Record<string, unknown>[] = [
+        { $match: match },
+        { $unwind: "$toolApiNames" },
+        ...(tool ? [{ $match: { toolApiNames: tool } }] : []),
+        {
+          $group: {
+            _id: "$toolApiNames",
+            totalCalls: { $sum: 1 },
+            totalRequests: { $addToSet: "$requestId" },
+            totalCost: COST_SUM_EXPR,
+            totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
+            totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
+            avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
+            firstUsed: { $min: "$timestamp" },
+            lastUsed: { $max: "$timestamp" },
+            _models: { $push: "$model" },
+            _agents: { $push: "$agent" },
+            _providers: { $addToSet: "$provider" },
+            successCount: {
+              $sum: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
+            },
+            failureCount: {
+              $sum: { $cond: [{ $eq: ["$success", false] }, 1, 0] },
+            },
+          },
+        },
+        {
+          $addFields: {
+            totalRequests: { $size: "$totalRequests" },
+          },
+        },
+        { $sort: { totalCalls: -1 } },
+      ];
+
+      const results = await req.db
+        .collection(REQUESTS_COL)
+        .aggregate(pipeline)
+        .toArray();
+
+      res.json(
+        results.map((r: Record<string, unknown>) => {
+          const modelCounts: Record<string, number> = {};
+          for (const model of (r._models as string[]) || []) {
+            if (model) modelCounts[model] = (modelCounts[model] || 0) + 1;
+          }
+          const topModels = Object.entries(modelCounts)
+            .sort((firstItem, b) => b[1] - firstItem[1])
+            .slice(0, 5)
+            .map(([model, count]) => ({ model, count }));
+
+          const agentCounts: Record<string, number> = {};
+          for (const agent of (r._agents as string[]) || []) {
+            if (agent) agentCounts[agent] = (agentCounts[agent] || 0) + 1;
+          }
+          const topAgents = Object.entries(agentCounts)
+            .sort((firstItem, b) => b[1] - firstItem[1])
+            .slice(0, 5)
+            .map(([agent, count]) => ({ agent, count }));
+
+          return {
+            tool: r._id,
+            totalCalls: r.totalCalls,
+            totalRequests: r.totalRequests,
+            totalCost: r.totalCost,
+            totalInputTokens: r.totalInputTokens,
+            totalOutputTokens: r.totalOutputTokens,
+            avgLatency: r.avgLatency,
+            firstUsed: r.firstUsed,
+            lastUsed: r.lastUsed,
+            providers: (r._providers as string[])?.filter(Boolean) || [],
+            topModels,
+            topAgents,
+            successCount: r.successCount,
+            failureCount: r.failureCount,
+          };
+        }),
+      );
+    } catch (error: unknown) {
+      logger.error(`Admin /stats/tools error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+// ─── GET /stats/endpoints — per-endpoint breakdown ────
+router.get(
+  "/endpoints",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { from, to } = req.query;
+      const match: Record<string, unknown> = {};
+      applyDateRangeFilter(match, from as string, to as string);
+
+      const pipeline: Record<string, unknown>[] = [
+        ...(Object.keys(match).length ? [{ $match: match }] : []),
+        {
+          $group: {
+            _id: "$endpoint",
+            totalRequests: { $sum: 1 },
+            totalTokens: TOTAL_TOKENS_EXPR,
+            totalCost: COST_SUM_EXPR,
+            avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
+            successRate: {
+              $avg: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
+            },
+          },
+        },
+        { $sort: { totalRequests: -1 } },
+      ];
+
+      const results = await req.db
+        .collection(REQUESTS_COL)
+        .aggregate(pipeline)
+        .toArray();
+
+      res.json(
+        results.map((r: Record<string, unknown>) => ({
+          endpoint: r._id || "any",
+          totalRequests: r.totalRequests,
+          totalTokens: r.totalTokens,
+          totalCost: r.totalCost,
+          avgLatency: r.avgLatency,
+          successRate: r.successRate,
+        })),
+      );
+    } catch (error: unknown) {
+      logger.error(`Admin /stats/endpoints error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+// ─── GET /stats/costs — comprehensive cost breakdown ──
+router.get(
+  "/costs",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { from, to } = req.query;
+      const match: Record<string, unknown> = {};
+      applyDateRangeFilter(match, from as string, to as string);
+      const matchStage = Object.keys(match).length ? [{ $match: match }] : [];
+
+      const groupFields = {
+        totalCost: COST_SUM_EXPR,
+        totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
+        totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
+        totalRequests: { $sum: 1 },
+        avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
+      };
+
+      const [result] = await req.db
+        .collection(REQUESTS_COL)
+        .aggregate([
+          ...matchStage,
+          {
+            $facet: {
+              totals: [{ $group: { _id: null, ...groupFields } }],
+              byProject: [
+                { $group: { _id: "$project", ...groupFields } },
+                { $sort: { totalCost: -1 } },
+              ],
+              byProvider: [
+                { $group: { _id: "$provider", ...groupFields } },
+                { $sort: { totalCost: -1 } },
+              ],
+              byModel: [
+                {
+                  $group: {
+                    _id: { model: "$model", provider: "$provider" },
+                    ...groupFields,
+                  },
+                },
+                { $sort: { totalCost: -1 } },
+              ],
+              byEndpoint: [
+                { $group: { _id: "$endpoint", ...groupFields } },
+                { $sort: { totalCost: -1 } },
+              ],
+              byProjectProvider: [
+                {
+                  $group: {
+                    _id: { project: "$project", provider: "$provider" },
+                    ...groupFields,
+                  },
+                },
+                { $sort: { totalCost: -1 } },
+              ],
+              byProjectEndpoint: [
+                {
+                  $group: {
+                    _id: { project: "$project", endpoint: "$endpoint" },
+                    ...groupFields,
+                  },
+                },
+                { $sort: { totalCost: -1 } },
+              ],
+              byProjectModel: [
+                {
+                  $group: {
+                    _id: {
+                      project: "$project",
+                      model: "$model",
+                      provider: "$provider",
+                    },
+                    ...groupFields,
+                  },
+                },
+                { $sort: { totalCost: -1 } },
+              ],
+            },
+          },
+        ])
+        .toArray();
+
+      const {
+        totals,
+        byProject,
+        byProvider,
+        byModel,
+        byEndpoint,
+        byProjectProvider,
+        byProjectEndpoint,
+        byProjectModel,
+      } = result;
+
+      const providersByProject: Record<string, Record<string, unknown>[]> = {};
+      for (const row of byProjectProvider) {
+        const proj = row._id.project || "any";
+        if (!providersByProject[proj]) providersByProject[proj] = [];
+        (providersByProject)[proj].push({
+          provider: row._id.provider || "any",
+          totalCost: row.totalCost,
+          totalInputTokens: row.totalInputTokens,
+          totalOutputTokens: row.totalOutputTokens,
+          totalRequests: row.totalRequests,
+          avgTokensPerSec: row.avgTokensPerSec,
+        });
+      }
+
+      const endpointsByProject: Record<string, Record<string, unknown>[]> = {};
+      for (const row of byProjectEndpoint) {
+        const proj = row._id.project || "any";
+        if (!endpointsByProject[proj]) endpointsByProject[proj] = [];
+        (endpointsByProject)[proj].push({
+          endpoint: row._id.endpoint || "any",
+          totalCost: row.totalCost,
+          totalInputTokens: row.totalInputTokens,
+          totalOutputTokens: row.totalOutputTokens,
+          totalRequests: row.totalRequests,
+          avgTokensPerSec: row.avgTokensPerSec,
+        });
+      }
+
+      const modelsByProject: Record<string, Record<string, unknown>[]> = {};
+      for (const row of byProjectModel) {
+        const proj = row._id.project || "any";
+        if (!modelsByProject[proj]) modelsByProject[proj] = [];
+        (modelsByProject)[proj].push({
+          model: row._id.model || "any",
+          provider: row._id.provider || "any",
+          totalCost: row.totalCost,
+          totalInputTokens: row.totalInputTokens,
+          totalOutputTokens: row.totalOutputTokens,
+          totalRequests: row.totalRequests,
+          avgTokensPerSec: row.avgTokensPerSec,
+        });
+      }
+
+      const tool = totals[0] || {
+        totalCost: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalRequests: 0,
+      };
+
+      res.json({
+        totals: {
+          totalCost: tool.totalCost,
+          totalInputTokens: tool.totalInputTokens,
+          totalOutputTokens: tool.totalOutputTokens,
+          totalRequests: tool.totalRequests,
+          avgTokensPerSec: tool.avgTokensPerSec,
+        },
+        byProject: byProject.map((r: Record<string, unknown>) => ({
+          project: r._id || "any",
+          totalCost: r.totalCost,
+          totalInputTokens: r.totalInputTokens,
+          totalOutputTokens: r.totalOutputTokens,
+          totalRequests: r.totalRequests,
+          avgTokensPerSec: r.avgTokensPerSec,
+          byProvider: providersByProject[(r._id as string) || "any"] || [],
+          byEndpoint: endpointsByProject[(r._id as string) || "any"] || [],
+          byModel: modelsByProject[(r._id as string) || "any"] || [],
+        })),
+        byProvider: byProvider.map((r: Record<string, unknown>) => ({
+          provider: r._id || "any",
+          totalCost: r.totalCost,
+          totalInputTokens: r.totalInputTokens,
+          totalOutputTokens: r.totalOutputTokens,
+          totalRequests: r.totalRequests,
+        })),
+        byModel: byModel.map((r: Record<string, unknown>) => ({
+          model: (r._id as Record<string, string>)?.model || "any",
+          provider: (r._id as Record<string, string>)?.provider || "any",
+          totalCost: r.totalCost,
+          totalInputTokens: r.totalInputTokens,
+          totalOutputTokens: r.totalOutputTokens,
+          totalRequests: r.totalRequests,
+          avgTokensPerSec: r.avgTokensPerSec,
+        })),
+        byEndpoint: byEndpoint.map((r: Record<string, unknown>) => ({
+          endpoint: r._id || "any",
+          totalCost: r.totalCost,
+          totalInputTokens: r.totalInputTokens,
+          totalOutputTokens: r.totalOutputTokens,
+          totalRequests: r.totalRequests,
+          avgTokensPerSec: r.avgTokensPerSec,
+        })),
+      });
+    } catch (error: unknown) {
+      logger.error(`Admin /stats/costs error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+// ─── GET /stats/timeline — requests grouped by adaptive granularity ─
+router.get(
+  "/timeline",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { hours = 24, from, to, project } = req.query;
+
+      let sinceDate: Date;
+      let untilDate: Date | undefined;
+      if (typeof from === "string") {
+        sinceDate = new Date(from);
+      } else {
+        sinceDate = new Date(Date.now() - hoursToMs(parseInt(hours as string, 10)));
+      }
+      if (typeof to === "string") {
+        untilDate = new Date(to);
+      }
+
+      const spanMs = (untilDate ? untilDate.getTime() : Date.now()) - sinceDate.getTime();
+      const spanMinutes = spanMs / (1000 * 60);
+      const spanHours = spanMinutes / 60;
+      const spanDays = spanHours / 24;
+
+      let granularity: string, groupId: Record<string, unknown>;
+
+      // Helper to build a "floor seconds to interval N" aggregation expression
+      const floorSecondsExpr = (interval: number) => ({
+        $concat: [
+          {
+            $dateToString: {
+              format: "%Y-%m-%dT%H:%M:",
+              date: { $toDate: "$timestamp" },
+              timezone: "UTC",
+            },
+          },
+          {
+            $cond: [
+              {
+                $lt: [
+                  { $multiply: [{ $floor: { $divide: [{ $second: { $toDate: "$timestamp" } }, interval] } }, interval] },
+                  10,
+                ],
+              },
+              { $concat: ["0", { $toString: { $multiply: [{ $floor: { $divide: [{ $second: { $toDate: "$timestamp" } }, interval] } }, interval] } }] },
+              { $toString: { $multiply: [{ $floor: { $divide: [{ $second: { $toDate: "$timestamp" } }, interval] } }, interval] } },
+            ],
+          },
+        ],
+      });
+
+      // Helper to build a "floor hours to interval N" aggregation expression
+      const floorHoursExpr = (interval: number) => ({
+        $concat: [
+          {
+            $dateToString: {
+              format: "%Y-%m-%dT",
+              date: { $toDate: "$timestamp" },
+              timezone: "UTC",
+            },
+          },
+          {
+            $cond: [
+              {
+                $lt: [
+                  { $multiply: [{ $floor: { $divide: [{ $hour: { $toDate: "$timestamp" } }, interval] } }, interval] },
+                  10,
+                ],
+              },
+              { $concat: ["0", { $toString: { $multiply: [{ $floor: { $divide: [{ $hour: { $toDate: "$timestamp" } }, interval] } }, interval] } }] },
+              { $toString: { $multiply: [{ $floor: { $divide: [{ $hour: { $toDate: "$timestamp" } }, interval] } }, interval] } },
+            ],
+          },
+        ],
+      });
+
+      if (spanMinutes <= 2) {
+        granularity = "1s";
+        groupId = {
+          $dateToString: { format: "%Y-%m-%dT%H:%M:%S", date: { $toDate: "$timestamp" }, timezone: "UTC" },
+        };
+      } else if (spanMinutes <= 10) {
+        granularity = "5s";
+        groupId = floorSecondsExpr(5);
+      } else if (spanHours <= 1) {
+        granularity = "15s";
+        groupId = floorSecondsExpr(15);
+      } else if (spanHours <= 4) {
+        granularity = "1min";
+        groupId = {
+          $dateToString: { format: "%Y-%m-%dT%H:%M", date: { $toDate: "$timestamp" }, timezone: "UTC" },
+        };
+      } else if (spanDays <= 1) {
+        granularity = "5min";
+        groupId = {
+          $concat: [
+            { $substr: ["$timestamp", 0, 14] },
+            {
+              $toString: {
+                $multiply: [{ $floor: { $divide: [{ $toInt: { $substr: ["$timestamp", 14, 2] } }, 5] } }, 5],
+              },
+            },
+          ],
+        };
+      } else if (spanDays <= 7) {
+        granularity = "hour";
+        groupId = { $substr: ["$timestamp", 0, 13] };
+      } else if (spanDays <= 60) {
+        granularity = "6h";
+        groupId = floorHoursExpr(6);
+      } else {
+        granularity = "day";
+        groupId = { $substr: ["$timestamp", 0, 10] };
+      }
+
+      const timeMatch: Record<string, string> = { $gte: sinceDate.toISOString() };
+      if (untilDate) timeMatch.$lte = untilDate!.toISOString();
+
+      const matchFilter: Record<string, unknown> = { timestamp: timeMatch };
+      if (project) matchFilter.project = project;
+
+      const pipeline: Record<string, unknown>[] = [
+        { $match: matchFilter },
+        {
+          $group: {
+            _id: groupId,
+            requests: { $sum: 1 },
+            tokens: {
+              $sum: {
+                $add: [
+                  { $ifNull: ["$inputTokens", 0] },
+                  { $ifNull: ["$outputTokens", 0] },
+                ],
+              },
+            },
+            cost: COST_SUM_EXPR,
+            avgLatency: { $avg: { $ifNull: ["$totalTime", null] } },
+            successes: {
+              $sum: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
+            },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ];
+
+      const results = await req.db
+        .collection(REQUESTS_COL)
+        .aggregate(pipeline)
+        .toArray();
+
+      res.json({
+        granularity,
+        data: results.map((r: Record<string, unknown>) => ({
+          hour: r._id,
+          requests: r.requests,
+          tokens: r.tokens,
+          cost: r.cost,
+          avgLatency: r.avgLatency ? Math.round(r.avgLatency as number) : 0,
+          successRate:
+            (r.requests as number) > 0 ? Math.round(((r.successes as number) / (r.requests as number)) * 100) : 100,
+        })),
+      });
+    } catch (error: unknown) {
+      logger.error(`Admin /stats/timeline error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+export default router;

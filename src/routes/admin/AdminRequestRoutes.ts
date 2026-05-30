@@ -1,0 +1,175 @@
+import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
+import express from "express";
+import type { Request, Response, NextFunction } from "express";
+import { COLLECTIONS, COST_SUM_EXPR } from "../../constants.ts";
+import logger from "../../utils/logger.ts";
+import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import { applyDateRangeFilter, parsePaginationParams } from "../../utils/QueryBuilders.ts";
+import requireDb from "../../middleware/RequireDbMiddleware.ts";
+
+const router = express.Router();
+const {
+  REQUESTS: REQUESTS_COL,
+  MODEL_CONVERSATIONS: CONVERSATIONS_COL,
+  WORKFLOWS: WORKFLOWS_COL,
+} = COLLECTIONS;
+
+router.use(requireDb);
+
+// ─── GET /requests — paginated, filtered request logs ─
+router.get(
+  "/",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const {
+        project,
+        username,
+        provider,
+        model,
+        endpoint,
+        operation,
+        success,
+        from,
+        to,
+        sort = "timestamp",
+      } = req.query;
+
+      const { skip, limit, page, sortDirection } = parsePaginationParams(req.query);
+
+      const filter: Record<string, unknown> = {};
+      if (project) filter.project = project;
+      if (username) filter.username = username;
+      if (provider) filter.provider = provider;
+      if (model) filter.model = model;
+      if (endpoint) filter.endpoint = endpoint;
+      if (operation) filter.operation = operation;
+      if (success !== undefined) filter.success = success === "true";
+      applyDateRangeFilter(filter, from as string, to as string);
+
+      const [docs, total] = await Promise.all([
+        req.db
+          .collection(REQUESTS_COL)
+          .find(filter, {
+            projection: { requestPayload: 0, responsePayload: 0 },
+          })
+          .sort({ [sort as string]: sortDirection })
+          .skip(skip)
+          .limit(limit)
+          .toArray(),
+        req.db.collection(REQUESTS_COL).countDocuments(filter),
+      ]);
+
+      res.json({ data: docs, total, page, limit });
+    } catch (error: unknown) {
+      logger.error(`Admin /requests error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+// ─── GET /requests/:id — single request detail ────────
+router.get(
+  "/:id",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const document = await req.db
+        .collection(REQUESTS_COL)
+        .findOne({ requestId: req.params.id });
+      if (!document) return res.status(404).json({ error: "Request not found" });
+
+      res.json(document);
+    } catch (error: unknown) {
+      logger.error(`Admin /requests/:id error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+// ─── GET /requests/:id/associations — conversations, workflows & traces ─
+router.get(
+  "/:id/associations",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const request = await req.db
+        .collection(REQUESTS_COL)
+        .findOne({ requestId: req.params.id });
+      if (!request) return res.status(404).json({ error: "Request not found" });
+
+      let conversations: Record<string, unknown>[] = [];
+      let workflows: Record<string, unknown>[] = [];
+      let traces: Record<string, unknown>[] = [];
+
+      if (request.conversationId) {
+        conversations = await req.db
+          .collection(CONVERSATIONS_COL)
+          .find({ id: request.conversationId })
+          .project({
+            id: 1,
+            title: 1,
+            project: 1,
+            traceId: 1,
+            model: 1,
+            totalCost: 1,
+            modalities: 1,
+            providers: 1,
+            updatedAt: 1,
+            createdAt: 1,
+            username: 1,
+          })
+          .toArray();
+
+        workflows = await req.db
+          .collection(WORKFLOWS_COL)
+          .find({ conversationIds: request.conversationId })
+          .project({ _id: 1, name: 1, nodeCount: 1, edgeCount: 1, source: 1 })
+          .toArray();
+
+        workflows = workflows.map((w: Record<string, unknown>) => ({
+          id: (w._id as { toString: () => string }).toString(),
+          name: w.name || "Untitled Workflow",
+          nodeCount: w.nodeCount || 0,
+          edgeCount: w.edgeCount || 0,
+          source: w.source || "prism-client",
+        }));
+
+        const traceIds = new Set();
+        for (const conversation of conversations) {
+          if (conversation.traceId) traceIds.add(conversation.traceId);
+        }
+        if (traceIds.size > 0) {
+          const traceAgg = await req.db
+            .collection(REQUESTS_COL)
+            .aggregate([
+              { $match: { traceId: { $in: [...traceIds] } } },
+              {
+                $group: {
+                  _id: "$traceId",
+                  requestCount: { $sum: 1 },
+                  project: { $first: "$project" },
+                  username: { $first: "$username" },
+                  createdAt: { $min: "$timestamp" },
+                  updatedAt: { $max: "$timestamp" },
+                },
+              },
+            ])
+            .toArray();
+          traces = traceAgg.map((s: Record<string, unknown>) => ({
+            id: s._id,
+            project: s.project,
+            username: s.username,
+            requestCount: s.requestCount,
+            createdAt: s.createdAt,
+            updatedAt: s.updatedAt,
+          }));
+        }
+      }
+
+      res.json({ conversations, workflows, traces });
+    } catch (error: unknown) {
+      logger.error(`Admin /requests/:id/associations error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+export default router;
