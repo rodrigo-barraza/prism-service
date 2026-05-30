@@ -357,7 +357,7 @@ async function runSingleModel(
         }),
         ...(model.toolsEnabled && {
           functionCallingEnabled: true,
-          enabledTools: ["precise_calculator"],
+          enabledTools: ["calculate_precise"],
         }),
       },
       (event: SseEvent) => {

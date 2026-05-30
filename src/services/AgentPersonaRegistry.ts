@@ -347,7 +347,7 @@ const LUPOS_ENABLED_TOOLS = [
   "get_trending_products",
   // Health & fitness
   "search_gym_exercises",
-  "rank_foods",
+  "rank_foods_by_category",
   "search_usda_nutrition",
   // Weather & environment
   "get_weather",
@@ -359,7 +359,7 @@ const LUPOS_ENABLED_TOOLS = [
   "get_near_earth_objects",
   "get_solar_activity",
   // Compute
-  "precise_calculator",
+  "calculate_precise",
   "execute_javascript",
   "upsert_memory",
 ];
@@ -978,11 +978,11 @@ const DIGEST_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
     requires: ["compare_food_nutrition"],
   },
   {
-    content: `- For "what's high in X?" questions, use rank_foods or rank_foods_by_nutrient.`,
-    requires: ["rank_foods", "rank_foods_by_nutrient"],
+    content: `- For "what's high in X?" questions, use rank_foods_by_category or rank_foods_by_nutrient.`,
+    requires: ["rank_foods_by_category", "rank_foods_by_nutrient"],
   },
   {
-    content: `- For dietary analysis, chain: user provides food log → analyze_nutrient_gaps → identify deficiencies → find_food_substitutes or rank_foods to fill gaps.`,
+    content: `- For dietary analysis, chain: user provides food log → analyze_nutrient_gaps → identify deficiencies → search_food_substitutes or rank_foods_by_category to fill gaps.`,
     requires: ["analyze_nutrient_gaps"],
   },
   {
@@ -1020,7 +1020,7 @@ const DIGEST_ENABLED_TOOLS = [
   // Web & research
   LABEL_TAGS.WEB,
   // Compute
-  "precise_calculator",
+  "calculate_precise",
   "execute_javascript",
   // Weather (for hydration context)
   "get_weather",
@@ -1067,7 +1067,7 @@ const META_CAPABILITIES = `# Capabilities
 - You can create fully-configured custom agent personas using the create_custom_agent tool.
 - You can list existing custom agent personas using the list_custom_agents tool.
 - You can update and modify existing custom agent personas using the update_custom_agent tool.
-- You can search available tools using tool_search to discover what capabilities exist for the agent being designed.
+- You can search available tools using search_tools to discover what capabilities exist for the agent being designed.
 - You understand the complete agent configuration schema:
   - **name**: Display name (must be unique, generates CUSTOM_<UPPERCASED_NAME> ID)
   - **description**: Short picker description (1-2 sentences)
@@ -1090,7 +1090,7 @@ const META_RESPONSE_GUIDELINES = `# Response Guidelines
 - When you have enough information, present a summary of the proposed agent configuration before calling create_custom_agent or update_custom_agent.
 - Explain your design choices — why you picked a certain icon, color, or tool set.
 - After creation or modification, confirm success and explain how to select or test the new agent.
-- For tool selection, use tool_search to discover available tools matching the agent's domain before finalizing enabledTools.
+- For tool selection, use search_tools to discover available tools matching the agent's domain before finalizing enabledTools.
 - Write identity prompts that are vivid, specific, and establish clear behavioral boundaries.
 - Write guidelines that are actionable — use bullet points, markdown headers, and concrete examples.
 - Write tool policies that prevent misuse and encourage efficient tool chains.`;
@@ -1099,7 +1099,7 @@ const META_INTERACTION_RULES = `# Interaction Rules
 - If the user gives a vague request like "make me a cooking agent", ask follow-up questions about personality, tone, specific tool needs, and visual preferences.
 - If the user wants to edit or inspect existing agents, use list_custom_agents to view their current configurations and IDs.
 - If the user gives a detailed spec, proceed directly to creating or modifying the agent.
-- Always use tool_search to verify that requested tools exist before including them in enabledTools.
+- Always use search_tools to verify that requested tools exist before including them in enabledTools.
 - Suggest appropriate label-based tool groups (e.g. 'label:health' for health agents, 'label:web' for web-aware agents) to avoid listing individual tools when a label covers the category.
 - When designing the identity field, write it in second person ("You are...") and include personality traits, domain expertise, behavioral rules, and response style.
 - Pick icons and colors that match the agent's theme — don't use generic defaults.
@@ -1110,7 +1110,7 @@ const META_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
     content: `# Tool Use Policy
 - Use list_custom_agents FIRST to view existing agents and obtain their configurations and database IDs.
-- Use tool_search when the user mentions a domain or capability — discover what tools are available before designing the enabledTools array.
+- Use search_tools when the user mentions a domain or capability — discover what tools are available before designing the enabledTools array.
 - Use create_custom_agent only AFTER presenting the proposed configuration to the user and receiving their approval (or if they've given you a complete spec upfront).
 - Use update_custom_agent to modify an existing custom agent after verifying its current state.
 - NEVER create or update an agent without at least a name and identity — these are required fields.`,
@@ -1137,7 +1137,7 @@ const META_ENABLED_TOOLS = [
   "list_custom_agents",
   "update_custom_agent",
   // Discovery — finding available tools for the agent being designed
-  "tool_search",
+  "search_tools",
   // Web — researching icons, colors, domain knowledge
   LABEL_TAGS.WEB,
 ];
@@ -1218,10 +1218,10 @@ You have access to ALL tools in the system — coding, web, health, finance, sma
   },
   {
     content: `## Data & Compute Tools
-- Use precise_calculator for math
+- Use calculate_precise for math
 - Use execute_javascript or execute_python for complex computation
 - Use chart tools for data visualization`,
-    requires: ["precise_calculator", "execute_javascript"],
+    requires: ["calculate_precise", "execute_javascript"],
   },
   {
     content: `## Creative Tools
@@ -1233,7 +1233,7 @@ You have access to ALL tools in the system — coding, web, health, finance, sma
     content: `## Health & Lifestyle Tools
 - Use nutrition tools for dietary analysis
 - Use exercise tools for fitness planning`,
-    requires: ["search_usda_nutrition", "search_gym_exercises", "rank_foods"],
+    requires: ["search_usda_nutrition", "search_gym_exercises", "rank_foods_by_category"],
   },
   {
     content: `## Smart Home Tools

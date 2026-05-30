@@ -66,7 +66,7 @@ const CORE_AGENTIC_TOOLS = new Set([
   "task_create",
   "task_list",
   "task_update",
-  "precise_calculator",
+  "calculate_precise",
   "execute_javascript",
   "search_tools",
   "web_search",
