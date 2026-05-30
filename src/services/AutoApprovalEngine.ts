@@ -26,7 +26,7 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   grep_search: APPROVAL_TIERS.AUTO,
   glob_files: APPROVAL_TIERS.AUTO,
   web_search: APPROVAL_TIERS.AUTO,
-  fetch_url: APPROVAL_TIERS.AUTO,
+  read_web_page: APPROVAL_TIERS.AUTO,
   multi_file_read: APPROVAL_TIERS.AUTO,
   file_info: APPROVAL_TIERS.AUTO,
   file_diff: APPROVAL_TIERS.AUTO,
@@ -53,7 +53,7 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   sleep: APPROVAL_TIERS.AUTO,
   enter_plan_mode: APPROVAL_TIERS.AUTO,
   exit_plan_mode: APPROVAL_TIERS.AUTO,
-  tool_search: APPROVAL_TIERS.AUTO,
+  search_tools: APPROVAL_TIERS.AUTO,
 
   // Tier 2 — scheduling / notebook (creates persistent state)
   cron_create: APPROVAL_TIERS.WRITE,
