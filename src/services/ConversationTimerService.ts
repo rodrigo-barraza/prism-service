@@ -31,6 +31,7 @@ export interface ConversationTimer {
 }
 
 let tickerInterval: ReturnType<typeof setInterval> | null = null;
+let isTickInProgress = false;
 
 const ConversationTimerService = {
   /**
@@ -44,9 +45,15 @@ const ConversationTimerService = {
     logger.info("[ConversationTimers] Starting background timer daemon (1s interval)...");
 
     tickerInterval = setInterval(() => {
-      this.tick().catch((error: unknown) => {
-        logger.error(`[ConversationTimers] Daemon tick error: ${(error as Error).message}`);
-      });
+      if (isTickInProgress) return;
+      isTickInProgress = true;
+      this.tick()
+        .catch((error: unknown) => {
+          logger.error(`[ConversationTimers] Daemon tick error: ${(error as Error).message}`);
+        })
+        .finally(() => {
+          isTickInProgress = false;
+        });
     }, 1000);
 
     logger.success("[ConversationTimers] Background timer daemon active.");
@@ -238,7 +245,8 @@ const ConversationTimerService = {
           }
         }
 
-        // 1. Mark timer as executed/updated in database
+        // 1. Atomically claim this timer to prevent duplicate fires from overlapping ticks.
+        // findOneAndUpdate ensures only one tick can transition the timer's state.
         const newIterationCount = timer.iterationCount + 1;
         const isRecurringExpired =
           timer.mode === "recurring" &&
@@ -262,10 +270,21 @@ const ConversationTimerService = {
           updates.lastFiredMinuteKey = currentMinuteKey;
         }
 
-        await database.collection(COLLECTIONS.CONVERSATION_TIMERS).updateOne(
-          { id: timer.id },
+        // Atomic claim: only proceed if the timer is still in the expected state.
+        // This prevents a second tick (or cluster node) from firing the same timer.
+        const claimedTimer = await database.collection(COLLECTIONS.CONVERSATION_TIMERS).findOneAndUpdate(
+          {
+            id: timer.id,
+            status: "active",
+            iterationCount: timer.iterationCount,
+          },
           { $set: updates }
         );
+
+        if (!claimedTimer) {
+          logger.debug(`[ConversationTimers] Timer ${timer.id} was already claimed by another tick. Skipping.`);
+          continue;
+        }
 
         // Redundant wake-up prevention (Antigravity-aligned):
         // When any timer fires, cancel all OTHER active one-shot timers for
