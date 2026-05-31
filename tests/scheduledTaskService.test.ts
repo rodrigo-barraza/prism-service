@@ -153,4 +153,31 @@ describe("ScheduledTaskService — Tool Configuration & Propagation Tests", () =
       disabledTools: ["execute_shell"],
     });
   });
+
+  it("should spawn background agent with only enabledTools when the parent agent (e.g. Omni) has wildcard availableTools but has a subset as enabledTools", async () => {
+    mockFindOne.mockResolvedValueOnce(null); // workspace lookup
+    mockRunAgenticLoop.mockResolvedValueOnce(undefined);
+
+    const taskWithOmniWildcard = {
+      ...TASK_FIXTURE,
+      toolConfig: {
+        availableTools: ["*"],
+        disabledTools: ["search_web", "generate_image"],
+        enabledTools: ["read_file", "write_file", "calculate_precise"],
+      },
+    };
+
+    await ScheduledTaskService.executeTask(
+      taskWithOmniWildcard as any,
+      undefined,
+      { username: "rodrigo" }
+    );
+
+    expect(mockRunAgenticLoop).toHaveBeenCalledTimes(1);
+    const loopArguments = mockRunAgenticLoop.mock.calls[0][0];
+
+    // Verify that the options inside loop execution contain exact toolConfig parameters
+    expect(loopArguments.options.enabledTools).toEqual(["read_file", "write_file", "calculate_precise"]);
+    expect(loopArguments.options.disabledTools).toEqual(["search_web", "generate_image"]);
+  });
 });
