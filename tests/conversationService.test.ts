@@ -401,8 +401,12 @@ describe("ConversationService.appendMessages", () => {
     });
   });
 
-  // ── Auto-cancellation of active one-shot timers ─────────────
-  describe("active one-shot timer auto-cancellation", () => {
+  // ── Timer isolation (appendMessages must not touch timers) ───
+  // Timer lifecycle is managed by ConversationTimerService (fire/expire)
+  // and the cancel_timer tool (explicit cancel). The conversation persistence
+  // layer must never mutate timer state — this aligns with Antigravity's
+  // architecture where auto-cancel lives in the messaging dispatch layer.
+  describe("timer isolation from message persistence", () => {
     let mockTimersCollection;
 
     beforeEach(() => {
@@ -417,10 +421,7 @@ describe("ConversationService.appendMessages", () => {
       });
     });
 
-    it("should silently cancel active one-shot timers when a normal user message is appended", async () => {
-      const sessionId = "session-timer-abc";
-      await createStub(sessionId);
-
+    async function createActiveTimer(sessionId) {
       const filter = {
         conversationId: sessionId,
         project: "coding",
@@ -429,7 +430,6 @@ describe("ConversationService.appendMessages", () => {
         mode: "one_shot",
       };
 
-      // Create an active one-shot timer using exact same filter appendMessages will query
       await mockTimersCollection.updateOne(
         filter,
         {
@@ -439,7 +439,14 @@ describe("ConversationService.appendMessages", () => {
         { upsert: true }
       );
 
-      // Append a normal user message
+      return filter;
+    }
+
+    it("should not cancel timers when a user message is appended", async () => {
+      const sessionId = "session-timer-abc";
+      await createStub(sessionId);
+      const filter = await createActiveTimer(sessionId);
+
       await ConversationService.appendMessages(
         sessionId,
         "coding",
@@ -449,81 +456,65 @@ describe("ConversationService.appendMessages", () => {
         { collection: "agent_sessions" }
       );
 
-      // Verify the timer was cancelled
-      const timer = await mockTimersCollection.findOne(filter);
-      expect(timer.status).toBe("cancelled");
-    });
-
-    it("should NOT cancel active one-shot timers when a reminder firing notification message is appended", async () => {
-      const sessionId = "session-timer-abc";
-      await createStub(sessionId);
-
-      const filter = {
-        conversationId: sessionId,
-        project: "coding",
-        username: "testuser",
-        status: "active",
-        mode: "one_shot",
-      };
-
-      // Create an active one-shot timer
-      await mockTimersCollection.updateOne(
-        filter,
-        {
-          $set: { id: "timer-1", updatedAt: new Date().toISOString() },
-          $setOnInsert: { createdAt: new Date().toISOString() },
-        },
-        { upsert: true }
-      );
-
-      // Append a reminder firing message (starts with ⏰ Reminder fired: )
-      await ConversationService.appendMessages(
-        sessionId,
-        "coding",
-        "testuser",
-        [{ role: "user", content: "⏰ Reminder fired: check build" }],
-        null,
-        { collection: "agent_sessions" }
-      );
-
-      // Verify the timer is STILL active
       const timer = await mockTimersCollection.findOne(filter);
       expect(timer.status).toBe("active");
     });
 
-    it("should NOT cancel active one-shot timers when a new 🔔 Notification message is appended", async () => {
+    it("should not cancel timers when an assistant message is appended", async () => {
       const sessionId = "session-timer-abc";
       await createStub(sessionId);
+      const filter = await createActiveTimer(sessionId);
 
-      const filter = {
-        conversationId: sessionId,
-        project: "coding",
-        username: "testuser",
-        status: "active",
-        mode: "one_shot",
-      };
-
-      // Create an active one-shot timer
-      await mockTimersCollection.updateOne(
-        filter,
-        {
-          $set: { id: "timer-1", updatedAt: new Date().toISOString() },
-          $setOnInsert: { createdAt: new Date().toISOString() },
-        },
-        { upsert: true }
-      );
-
-      // Append a reminder firing message (starts with 🔔 Notification: )
       await ConversationService.appendMessages(
         sessionId,
         "coding",
         "testuser",
-        [{ role: "user", content: "🔔 Notification: check build" }],
+        [{ role: "assistant", content: "I've set a timer for 1 minute. Stay hydrated! 💧", model: "gemini-3.5-flash", provider: "google" }],
         null,
         { collection: "agent_sessions" }
       );
 
-      // Verify the timer is STILL active
+      const timer = await mockTimersCollection.findOne(filter);
+      expect(timer.status).toBe("active");
+    });
+
+    it("should not cancel timers when a notification message is appended", async () => {
+      const sessionId = "session-timer-abc";
+      await createStub(sessionId);
+      const filter = await createActiveTimer(sessionId);
+
+      await ConversationService.appendMessages(
+        sessionId,
+        "coding",
+        "testuser",
+        [{ role: "user", content: "🔔 Notification: check build status" }],
+        null,
+        { collection: "agent_sessions" }
+      );
+
+      const timer = await mockTimersCollection.findOne(filter);
+      expect(timer.status).toBe("active");
+    });
+
+    it("should not cancel timers when a mixed batch of messages is appended", async () => {
+      const sessionId = "session-timer-abc";
+      await createStub(sessionId);
+      const filter = await createActiveTimer(sessionId);
+
+      await ConversationService.appendMessages(
+        sessionId,
+        "coding",
+        "testuser",
+        [
+          { role: "user", content: "What's the status?" },
+          { role: "assistant", content: "Let me check.", model: "gemini-3.5-flash", provider: "google" },
+          { role: "tool", content: JSON.stringify({ result: "success" }) },
+          { role: "assistant", content: "All good!", model: "gemini-3.5-flash", provider: "google" },
+        ],
+        null,
+        { collection: "agent_sessions" }
+      );
+
       const timer = await mockTimersCollection.findOne(filter);
       expect(timer.status).toBe("active");
     });
