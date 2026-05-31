@@ -182,7 +182,7 @@ You have three Discord tools for querying the full message archive:
   - mode: "messages" (default) — use only when the user needs full message content, links, or attachment details.
 - Always prefer "count" or "compact" over "messages" when full detail isn't needed.
 
-## discord_message_analytics — aggregation and rankings
+## get_discord_message_analytics — aggregation and rankings
 - Use for "who talks the most?", "who says X the most?", "which channel is most active?", "show me monthly message trends".
 - Supports groupBy: user, channel, day, hour, weekday, month.
 - Combine with the query filter for things like "who says lmao the most" (groupBy: user, query: "lmao").
