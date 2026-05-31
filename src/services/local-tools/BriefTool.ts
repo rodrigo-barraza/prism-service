@@ -37,7 +37,7 @@ export default {
     },
   },
 
-  domain: "Reasoning",
+  domain: "Core Tools",
   labels: ["coding"],
 
   async execute(args: Record<string, unknown>, context: { _emit?: (event: Record<string, unknown>) => void }) {

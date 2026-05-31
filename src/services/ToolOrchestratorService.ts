@@ -3,7 +3,7 @@ import MCPClientService from "./MCPClientService.ts";
 import logger from "../utils/logger.ts";
 import { COORDINATOR_ONLY_TOOLS } from "./CoordinatorPrompt.ts";
 import { createAbortController } from "../utils/AbortController.ts";
-import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   TOOL_SCHEMA_FETCH_TIMEOUT_MS,
   TOOL_CONFIG_FETCH_TIMEOUT_MS,
@@ -539,24 +539,22 @@ export default class ToolOrchestratorService {
 
   /** Client-facing schemas (with domain/dataSource/labels, no endpoint) — for Prism Client UI */
   static getClientToolSchemas() {
-    const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
-
     // Coordinator tools are Prism-local — add domain metadata for UI grouping
     const coordinatorClient = COORDINATOR_TOOL_SCHEMAS.map((tool) => ({
       ...tool,
-      domain: "Coordinator",
+      domain: "Core Tools",
       labels: ["coding", "orchestration"],
       system: true,
     }));
 
     const internalClient = InternalToolRegistry.getClientSchemas().map((tool) => ({
       ...tool,
-      system: CORE_AGENTIC_TOOLS.has(tool.name) || tool.domain === "Reasoning" || tool.domain === "Coordinator",
+      system: tool.domain === "Core Tools",
     }));
 
     const clientSchemasEnriched = cachedClientSchemas.map((tool) => ({
       ...tool,
-      system: CORE_AGENTIC_TOOLS.has(tool.name) || tool.domain === "Reasoning" || tool.domain === "Coordinator",
+      system: tool.domain === "Core Tools",
     }));
 
     const mcpClient = ToolOrchestratorService.getMCPToolSchemas().map((tool) => ({

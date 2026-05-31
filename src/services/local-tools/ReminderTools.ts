@@ -41,7 +41,7 @@ const setTimer = {
       required: ["prompt"],
     },
   },
-  domain: "Timers",
+  domain: "Core Tools",
   labels: ["timer", "automation", "scheduler"],
 
   async execute(args: Record<string, unknown>, context: ToolContext) {
@@ -97,7 +97,7 @@ const setTimer = {
       properties: {},
     },
   },
-  domain: "Timers",
+  domain: "Core Tools",
   labels: ["timer", "automation", "scheduler"],
 
   async execute(_args: Record<string, unknown>, context: ToolContext) {
@@ -145,7 +145,7 @@ const cancelTimer = {
       required: ["timerId"],
     },
   },
-  domain: "Timers",
+  domain: "Core Tools",
   labels: ["timer", "automation", "scheduler"],
 
   async execute(args: Record<string, unknown>, context: ToolContext) {

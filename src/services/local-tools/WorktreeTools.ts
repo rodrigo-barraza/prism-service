@@ -54,7 +54,7 @@ const enterWorktree = {
       required: [],
     },
   },
-  domain: "Workspace",
+  domain: "Core Tools",
   labels: ["coding", "git"],
 
   async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
@@ -160,7 +160,7 @@ const exitWorktree = {
       required: ["action"],
     },
   },
-  domain: "Workspace",
+  domain: "Core Tools",
   labels: ["coding", "git"],
 
   async execute(args: Record<string, unknown>, context: Record<string, unknown>) {

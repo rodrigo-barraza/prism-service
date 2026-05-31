@@ -135,7 +135,7 @@ export default {
       // At least one of question or questions is required — validated in execute()
     },
   },
-  domain: "Control Flow",
+  domain: "Core Tools",
   labels: ["coding"],
 
   async execute(args: AskUserQuestionArgs, context: ToolContext) {
