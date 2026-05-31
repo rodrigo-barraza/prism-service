@@ -1,4 +1,5 @@
 import logger from "../../../utils/logger.ts";
+import { TOOL_NAMES } from "../../ToolTaxonomyConstants.ts";
 import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
 import { executeToolBatch } from "./ToolExecutor.ts";
 import { validateAfterToolExecution } from "./ValidationInterceptor.ts";
@@ -29,15 +30,15 @@ import type {
  */
 
 const DESTRUCTIVE_TOOLS = new Set([
-  "write_file",
-  "str_replace_file",
-  "patch_file",
-  "move_file",
-  "delete_file",
-  "execute_shell",
-  "execute_python",
-  "execute_javascript",
-  "run_command",
+  TOOL_NAMES.WRITE_FILE,
+  TOOL_NAMES.STR_REPLACE_FILE,
+  TOOL_NAMES.PATCH_FILE,
+  TOOL_NAMES.MOVE_FILE,
+  TOOL_NAMES.DELETE_FILE,
+  TOOL_NAMES.EXECUTE_SHELL,
+  TOOL_NAMES.EXECUTE_PYTHON,
+  TOOL_NAMES.EXECUTE_JAVASCRIPT,
+  TOOL_NAMES.RUN_COMMAND,
 ]);
 
 const SANDBOX_SHELL_TIMEOUT_MS = 10_000;

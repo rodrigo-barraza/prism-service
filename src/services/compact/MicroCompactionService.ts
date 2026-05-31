@@ -1,5 +1,6 @@
 import logger from "../../utils/logger.ts";
 import { estimateTokens } from "../../utils/CostCalculator.ts";
+import { TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import type { ChatMessage, ToolCallEntry } from "../../types/admin.ts";
 
 // ────────────────────────────────────────────────────────────
@@ -35,17 +36,17 @@ const PROTECTED_RECENT_TURNS = 4;
  * Matches Claude Code's COMPACTABLE_TOOLS set from microCompact.ts.
  */
 const COMPACTABLE_TOOLS = new Set([
-  "read_file",
-  "execute_code",
-  "web_content",
-  "web_search",
-  "search_files",
-  "list_directory",
-  "read_image",
-  "python_interpreter",
-  "javascript_interpreter",
-  "shell",
-  "generate_audio",
+  TOOL_NAMES.READ_FILE,
+  TOOL_NAMES.EXECUTE_CODE,
+  TOOL_NAMES.WEB_CONTENT,
+  TOOL_NAMES.WEB_SEARCH,
+  TOOL_NAMES.SEARCH_FILES,
+  TOOL_NAMES.LIST_DIRECTORY,
+  TOOL_NAMES.READ_IMAGE,
+  TOOL_NAMES.PYTHON_INTERPRETER,
+  TOOL_NAMES.JAVASCRIPT_INTERPRETER,
+  TOOL_NAMES.SHELL,
+  TOOL_NAMES.GENERATE_AUDIO,
 ]);
 
 export interface MicroCompactionResult {
