@@ -186,6 +186,7 @@ const LOCAL_PROVIDERS = localInstances.map((inst) => {
 router.get(
   "/",
   asyncHandler(async (_req: Request, res: Response) => {
+    await ToolOrchestratorService.ensureSchemas();
     // Get static model options (cloud-only — no network calls)
     let textToTextModels = getModelOptions(TYPES.TEXT, TYPES.TEXT);
     let textToImageModels = getModelOptions(TYPES.TEXT, TYPES.IMAGE);
@@ -314,92 +315,100 @@ export { localConfigRouter };
  * GET /config/agents
  * Returns the list of registered agent personas with metadata for the frontend picker.
  */
-router.get("/agents", (_req: Request, res: Response) => {
-  const agents = AgentPersonaRegistry.list().map((first) => {
-    const persona = AgentPersonaRegistry.get(first.id);
-    const resolvedTools = resolveEnabledToolsToSet(persona?.enabledTools);
-    // null sentinel means "*" wildcard → all tools
-    const isWildcard = resolvedTools === null;
+router.get(
+  "/agents",
+  asyncHandler(async (_req: Request, res: Response) => {
+    await ToolOrchestratorService.ensureSchemas();
+    const agents = AgentPersonaRegistry.list().map((first) => {
+      const persona = AgentPersonaRegistry.get(first.id);
+      const resolvedTools = resolveEnabledToolsToSet(persona?.enabledTools);
+      // null sentinel means "*" wildcard → all tools
+      const isWildcard = resolvedTools === null;
 
-    let finalToolsCount = isWildcard ? -1 : resolvedTools.size;
-    let finalToolNames = isWildcard ? ["*"] : [...(resolvedTools || [])];
+      let finalToolsCount = isWildcard ? -1 : resolvedTools.size;
+      let finalToolNames = isWildcard ? ["*"] : [...(resolvedTools || [])];
 
-    if (!isWildcard) {
-      const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
+      if (!isWildcard) {
+        const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
 
-      // System tools auto-included unless core tools are unlocked
-      const isCoreToolsLocked = persona?.coreToolsLocked ?? true;
-      let systemToolNames: string[] = isCoreToolsLocked
-        ? clientSchemas.filter((tool) => tool.system === true).map((tool) => tool.name)
-        : [];
+        // System tools auto-included unless core tools are unlocked
+        const isCoreToolsLocked = persona?.coreToolsLocked ?? true;
+        let systemToolNames: string[] = isCoreToolsLocked
+          ? clientSchemas.filter((tool) => tool.system === true).map((tool) => tool.name)
+          : [];
 
-      // Apply persona disabledTools denylist to system tools (enabledSet protects)
-      if (persona?.disabledTools?.length) {
-        const disabledSet = resolveToolEntriesToSet(persona.disabledTools, clientSchemas);
-        systemToolNames = systemToolNames.filter(
-          (toolName) => !disabledSet.has(toolName) || resolvedTools.has(toolName),
-        );
+        // Apply persona disabledTools denylist to system tools (enabledSet protects)
+        if (persona?.disabledTools?.length) {
+          const disabledSet = resolveToolEntriesToSet(persona.disabledTools, clientSchemas);
+          systemToolNames = systemToolNames.filter(
+            (toolName) => !disabledSet.has(toolName) || resolvedTools.has(toolName),
+          );
+        }
+
+        const unionSet = new Set([...finalToolNames, ...systemToolNames]);
+        finalToolsCount = unionSet.size;
+        finalToolNames = [...unionSet];
       }
 
-      const unionSet = new Set([...finalToolNames, ...systemToolNames]);
-      finalToolsCount = unionSet.size;
-      finalToolNames = [...unionSet];
-    }
-
-    return {
-      id: first.id,
-      name: first.name,
-      description: persona?.description || "",
-      custom: first.custom || false,
-      icon: persona?.icon || "",
-      color: persona?.color || "",
-      backgroundImage: persona?.backgroundImage || "",
-      project: persona?.project,
-      toolCount: finalToolsCount,
-      enabledToolNames: finalToolNames,
-      coreToolsLocked: persona?.coreToolsLocked ?? true,
-      canSpawnWorkers: COORDINATOR_ONLY_TOOLS.includes("create_team"),
-      usesDirectoryTree: persona?.usesDirectoryTree || false,
-      usesCodingGuidelines: persona?.usesCodingGuidelines || false,
-    };
-  });
-  res.json(agents);
-});
+      return {
+        id: first.id,
+        name: first.name,
+        description: persona?.description || "",
+        custom: first.custom || false,
+        icon: persona?.icon || "",
+        color: persona?.color || "",
+        backgroundImage: persona?.backgroundImage || "",
+        project: persona?.project,
+        toolCount: finalToolsCount,
+        enabledToolNames: finalToolNames,
+        coreToolsLocked: persona?.coreToolsLocked ?? true,
+        canSpawnWorkers: COORDINATOR_ONLY_TOOLS.includes("create_team"),
+        usesDirectoryTree: persona?.usesDirectoryTree || false,
+        usesCodingGuidelines: persona?.usesCodingGuidelines || false,
+      };
+    });
+    res.json(agents);
+  }),
+);
 
 /**
  * GET /config/tools
  * Returns tool schemas. Optionally filter by agent persona via ?agent=CODING.
  */
-router.get("/tools", (_req: Request, res: Response) => {
-  const schemas = ToolOrchestratorService.getClientToolSchemas() || [];
-  const agentId = _req.query.agent as string | undefined;
+router.get(
+  "/tools",
+  asyncHandler(async (_req: Request, res: Response) => {
+    await ToolOrchestratorService.ensureSchemas();
+    const schemas = ToolOrchestratorService.getClientToolSchemas() || [];
+    const agentId = _req.query.agent as string | undefined;
 
-  if (agentId) {
-    const persona = AgentPersonaRegistry.get(agentId);
-    if (persona?.enabledTools) {
-      const enabledSet = resolveEnabledToolsToSet(persona.enabledTools);
-      const isCoreToolsLocked = persona.coreToolsLocked ?? true;
-      // null = wildcard ("*") → return all schemas unfiltered
-      if (enabledSet !== null) {
-        let filteredSchemas = schemas.filter(
-          (tool) => enabledSet.has(tool.name) || (isCoreToolsLocked && tool.system === true),
-        );
-
-        // Apply persona disabledTools denylist (enabledSet protects)
-        if (persona.disabledTools?.length) {
-          const disabledSet = resolveToolEntriesToSet(persona.disabledTools, schemas);
-          filteredSchemas = filteredSchemas.filter(
-            (tool) => !disabledSet.has(tool.name) || enabledSet.has(tool.name),
+    if (agentId) {
+      const persona = AgentPersonaRegistry.get(agentId);
+      if (persona?.enabledTools) {
+        const enabledSet = resolveEnabledToolsToSet(persona.enabledTools);
+        const isCoreToolsLocked = persona.coreToolsLocked ?? true;
+        // null = wildcard ("*") → return all schemas unfiltered
+        if (enabledSet !== null) {
+          let filteredSchemas = schemas.filter(
+            (tool) => enabledSet.has(tool.name) || (isCoreToolsLocked && tool.system === true),
           );
-        }
 
-        return res.json(filteredSchemas);
+          // Apply persona disabledTools denylist (enabledSet protects)
+          if (persona.disabledTools?.length) {
+            const disabledSet = resolveToolEntriesToSet(persona.disabledTools, schemas);
+            filteredSchemas = filteredSchemas.filter(
+              (tool) => !disabledSet.has(tool.name) || enabledSet.has(tool.name),
+            );
+          }
+
+          return res.json(filteredSchemas);
+        }
       }
     }
-  }
 
-  res.json(schemas);
-});
+    res.json(schemas);
+  }),
+);
 
 /**
  * POST /config/tools/refresh
