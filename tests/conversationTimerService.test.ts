@@ -75,6 +75,7 @@ vi.mock("../src/providers/index.ts", () => ({
 // ── Mock MongoWrapper ──────────────────────────────────────────
 const mockFindOne = vi.fn();
 const mockUpdateOne = vi.fn().mockResolvedValue({ modifiedCount: 1 });
+const mockUpdateMany = vi.fn().mockResolvedValue({ modifiedCount: 0 });
 const mockFindDocuments = vi.fn().mockReturnValue({
   sort: vi.fn().mockReturnValue({
     toArray: vi.fn().mockResolvedValue([]),
@@ -87,6 +88,7 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
       collection: vi.fn().mockReturnValue({
         findOne: (...args: unknown[]) => mockFindOne(...args),
         updateOne: (...args: unknown[]) => mockUpdateOne(...args),
+        updateMany: (...args: unknown[]) => mockUpdateMany(...args),
         find: (...args: unknown[]) => mockFindDocuments(...args),
         insertOne: vi.fn().mockResolvedValue({ insertedId: "test" }),
       }),
@@ -382,5 +384,86 @@ describe("ConversationTimerService.tick — isGenerating lifecycle", () => {
     // Should NOT have run agentic loop or appended messages
     expect(mockRunAgenticLoop).not.toHaveBeenCalled();
     expect(mockAppendMessages).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+describe("ConversationTimerService.tick — redundant wake-up prevention", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should cancel other active one-shot timers for the same conversation when a timer fires", async () => {
+    mockFindDocuments.mockReturnValueOnce({
+      sort: vi.fn().mockReturnThis(),
+      toArray: vi.fn().mockResolvedValue([TIMER_FIXTURE]),
+    });
+
+    mockFindOne.mockResolvedValueOnce({
+      ...CONVERSATION_FIXTURE,
+      isGenerating: false,
+    });
+
+    mockUpdateOne.mockResolvedValue({ modifiedCount: 1 });
+    mockRunAgenticLoop.mockResolvedValueOnce(undefined);
+
+    await ConversationTimerService.tick();
+
+    // Verify updateMany was called with the redundant wake-up prevention filter
+    expect(mockUpdateMany).toHaveBeenCalledWith(
+      {
+        conversationId: "session-abc-123",
+        project: "coding",
+        username: "testuser",
+        status: "active",
+        mode: "one_shot",
+        id: { $ne: "timer-test-001" },
+      },
+      {
+        $set: expect.objectContaining({
+          status: "cancelled",
+        }),
+      }
+    );
+  });
+
+  it("should not cancel recurring timers when a one-shot timer fires", async () => {
+    mockFindDocuments.mockReturnValueOnce({
+      sort: vi.fn().mockReturnThis(),
+      toArray: vi.fn().mockResolvedValue([TIMER_FIXTURE]),
+    });
+
+    mockFindOne.mockResolvedValueOnce({
+      ...CONVERSATION_FIXTURE,
+      isGenerating: false,
+    });
+
+    mockUpdateOne.mockResolvedValue({ modifiedCount: 1 });
+    mockRunAgenticLoop.mockResolvedValueOnce(undefined);
+
+    await ConversationTimerService.tick();
+
+    // The updateMany filter explicitly targets mode: "one_shot" only,
+    // so recurring crons are never touched by the auto-cancel.
+    const updateManyFilter = mockUpdateMany.mock.calls[0][0];
+    expect(updateManyFilter.mode).toBe("one_shot");
+  });
+
+  it("should not cancel timers when the conversation is currently generating (deferred)", async () => {
+    mockFindDocuments.mockReturnValueOnce({
+      sort: vi.fn().mockReturnThis(),
+      toArray: vi.fn().mockResolvedValue([TIMER_FIXTURE]),
+    });
+
+    mockFindOne.mockResolvedValueOnce({
+      ...CONVERSATION_FIXTURE,
+      isGenerating: true,
+    });
+
+    await ConversationTimerService.tick();
+
+    // Deferred — nothing should fire, no auto-cancel should occur
+    expect(mockUpdateMany).not.toHaveBeenCalled();
+    expect(mockRunAgenticLoop).not.toHaveBeenCalled();
   });
 });

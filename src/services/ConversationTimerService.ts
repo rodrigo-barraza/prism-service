@@ -267,6 +267,22 @@ const ConversationTimerService = {
           { $set: updates }
         );
 
+        // Redundant wake-up prevention (Antigravity-aligned):
+        // When any timer fires, cancel all OTHER active one-shot timers for
+        // the same conversation — they're now redundant since this conversation
+        // is being woken up. Recurring crons are never auto-cancelled.
+        await database.collection(COLLECTIONS.CONVERSATION_TIMERS).updateMany(
+          {
+            conversationId: timer.conversationId,
+            project: timer.project,
+            username: timer.username,
+            status: "active",
+            mode: "one_shot",
+            id: { $ne: timer.id },
+          },
+          { $set: { status: "cancelled", updatedAt: nowTimestamp } }
+        );
+
         // 2. Append timer fired message to the conversation
         const reminderMessage = {
           role: "user",
