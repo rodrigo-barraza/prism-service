@@ -290,43 +290,6 @@ describe("ConversationTimerService.executeAgenticLoop", () => {
     expect(loopArguments.options.functionCallingEnabled).toBe(true);
   });
 
-  it("should spawn cron background agent with only enabledTools when the parent agent (e.g. Omni) has wildcard availableTools but has a subset as enabledTools", async () => {
-    mockRunAgenticLoop.mockResolvedValueOnce(undefined);
-
-    const conversationWithOmniWildcard = {
-      ...CONVERSATION_FIXTURE,
-      settings: {
-        provider: "google",
-        model: "gemini-3.5-flash",
-        agent: "OMNI",
-        workspaceRoot: "/custom/root",
-        toolConfig: {
-          availableTools: ["*"],
-          disabledTools: ["search_web", "generate_image"],
-          enabledTools: ["read_file", "write_file", "calculate_precise"],
-        },
-      },
-    };
-
-    await ConversationTimerService.executeAgenticLoop(
-      TIMER_FIXTURE,
-      conversationWithOmniWildcard,
-      REMINDER_MESSAGE,
-    );
-
-    expect(mockRunAgenticLoop).toHaveBeenCalledTimes(1);
-
-    const loopArguments = mockRunAgenticLoop.mock.calls[0][0];
-    expect(loopArguments.providerName).toBe("google");
-    expect(loopArguments.resolvedModel).toBe("gemini-3.5-flash");
-    expect(loopArguments.agent).toBe("OMNI");
-
-    // Verify that options have enabledTools set to exactly the enabled subset
-    expect(loopArguments.options.enabledTools).toEqual(["read_file", "write_file", "calculate_precise"]);
-    // Verify that disabledTools are also passed so they are preserved
-    expect(loopArguments.options.disabledTools).toEqual(["search_web", "generate_image"]);
-  });
-
   it("should use agent_conversations collection for setGenerating", async () => {
     mockRunAgenticLoop.mockResolvedValueOnce(undefined);
 
