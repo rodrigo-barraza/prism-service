@@ -17,7 +17,6 @@ import { COORDINATOR_ONLY_TOOLS } from "./CoordinatorPrompt.ts";
 import SettingsService from "./SettingsService.ts";
 import { createAbortController } from "../utils/AbortController.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
-import SessionGenerationTracker from "./SessionGenerationTracker.ts";
 import { resolveModelForInstances } from "../utils/ModelResolution.ts";
 
 // Extracted Domain Helpers
@@ -25,14 +24,14 @@ import { InstanceLoadBalancer } from "./coordinator/InstanceLoadBalancer.ts";
 import { GitWorktreeHelper } from "./coordinator/GitWorktreeHelper.ts";
 import {
   getLastAssistantText,
-  estimateTokens,
   buildWorkerResult,
 } from "./coordinator/WorkerResultBuilder.ts";
+import { WorkerTelemetryEmitter } from "./coordinator/WorkerTelemetryEmitter.ts";
+import { evictIdleSecondaryModel } from "./coordinator/VramEvictionPolicy.ts";
 
 import type {
   WorkerState,
   WorktreeDiff,
-  WorkerResult,
   CoordinatorSpawnParams,
   CoordinatorContext,
   SubTask,
@@ -688,286 +687,14 @@ export default class CoordinatorService {
     // without polling — events arrive as `worker_tool_execution`, `worker_tool_output`,
     // and `worker_status` with the worker's agentId for disambiguation.
     const parentEmit = coordinatorCtx.emit;
-    let workerOutput = "";
-    const workerToolCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
-    let lastWorkerPhase: string | null = null;
-
-    let workerFirstChunkTime: number | null = null;
-    let workerLastChunkTime: number | null = null;
-    let cumulativeOutputChars = 0; // total output characters across all bursts
-    let burstOutputChars = 0; // output characters in current generation burst
-    let burstFirstChunkTime: number | null = null; // start of current burst
-    const WORKER_PROGRESS_INTERVAL = 1; // emit on every chunk — LM Studio batches SSE deltas heavily under continuous batching
-    let burstChunkCount = 0; // raw chunk count for interval gating only
-
-    /** Build the generation_progress payload for the frontend. */
-    const buildProgress = () => {
-      // Compute per-worker tok/s from burst-scoped character accumulation.
-      // This is the ONLY source of per-worker throughput — the
-      // SessionGenerationTracker aggregates across all workers
-      // and must NOT be used for individual worker display.
-      const burstTokens = estimateTokens(burstOutputChars);
-      let workerTokPerSec = null;
-      if (burstTokens > 1 && burstFirstChunkTime && workerLastChunkTime) {
-        const elapsedSec = (workerLastChunkTime - burstFirstChunkTime) / 1000;
-        if (elapsedSec > 0.1) workerTokPerSec = burstTokens / elapsedSec;
-      }
-      return {
-        type: "worker_status",
-        workerId: worker.agentId,
-        message: "generation_progress",
-        // Burst-scoped values — used for tok/s computation
-        outputTokens: burstTokens,
-        firstChunkTime: burstFirstChunkTime,
-        lastChunkTime: workerLastChunkTime,
-        // Per-worker tok/s computed from burst counters
-        tokPerSec: workerTokPerSec,
-        // Cumulative total — used for token badge count
-        totalOutputTokens: estimateTokens(cumulativeOutputChars),
-      };
-    };
-
-    // ── Aggregate progress HWMs ────────────────────────────
-    // When workers stream, emit aggregate session-level progress
-    // so the main token badges update in real-time. HWMs prevent
-    // non-monotonic values across workers and iteration boundaries.
-    const parentSessionId = coordinatorCtx.agentSessionId;
-    let hwmOutputTokens = 0;
-    let hwmInputTokens = 0;
-    let hwmTotalTokens = 0;
-
-    /** Emit aggregate session-level generation_progress from the tracker. */
-    const emitAggregateProgress = () => {
-      if (!parentEmit || !parentSessionId) return;
-      const stats = SessionGenerationTracker.getSessionStats(parentSessionId);
-      if (stats.totalOutputTokens > 0 || stats.activeRequests > 0) {
-        hwmOutputTokens = Math.max(hwmOutputTokens, stats.totalOutputTokens);
-        hwmInputTokens = Math.max(hwmInputTokens, stats.totalInputTokens);
-        hwmTotalTokens = Math.max(hwmTotalTokens, stats.totalTokens);
-        parentEmit({
-          type: SSE_EVENT_TYPES.STATUS,
-          message: STATUS_MESSAGES.GENERATION_PROGRESS,
-          tokPerSec: stats.tokPerSec,
-          activeRequests: stats.activeRequests,
-          outputTokens: hwmOutputTokens,
-          inputTokens: hwmInputTokens,
-          totalTokens: hwmTotalTokens,
-          avgTtft: stats.avgTtft,
-        });
-      }
-    };
-
-    const workerEmit: EmitFn = (event) => {
-      if (event.type === "chunk") {
-        workerOutput += (event.content as string) || "";
-        const chunkChars = ((event.content as string) || "").length;
-
-        // Reset burst counters on phase transition (thinking → generating)
-        // so each phase's tok/s is computed independently.
-        if (lastWorkerPhase === "thinking" && burstOutputChars > 0) {
-          if (parentEmit) {
-            parentEmit(buildProgress());
-            emitAggregateProgress();
-          }
-          burstOutputChars = 0;
-          burstChunkCount = 0;
-          burstFirstChunkTime = null;
-        }
-
-        cumulativeOutputChars += chunkChars;
-        burstOutputChars += chunkChars;
-        burstChunkCount++;
-        // Use Date.now() (not performance.now()) since these timestamps
-        // cross process boundaries — the frontend needs wall-clock time
-        // to compute staleness and elapsed generation time correctly.
-        if (!workerFirstChunkTime) workerFirstChunkTime = Date.now();
-        if (!burstFirstChunkTime) burstFirstChunkTime = Date.now();
-        workerLastChunkTime = Date.now();
-        // Notify the frontend that the worker is actively generating text
-        if (parentEmit && lastWorkerPhase !== "generating") {
-          lastWorkerPhase = "generating";
-          parentEmit({
-            type: "worker_status",
-            workerId: worker.agentId,
-            message: "phase",
-            phase: "generating",
-          });
-        }
-        // Emit generation progress — first chunk immediately (so tok/s badge
-        // appears right away), then at regular intervals for smooth updates
-        const shouldEmit =
-          burstChunkCount === 1 ||
-          burstChunkCount % WORKER_PROGRESS_INTERVAL === 0;
-
-        if (parentEmit && shouldEmit) {
-          parentEmit(buildProgress());
-          // Also emit aggregate progress for the main token badges
-          emitAggregateProgress();
-        }
-      } else if (event.type === "thinking") {
-        // Thinking IS active generation — the model is producing output
-        // tokens during reasoning. Track thinking characters in the same
-        // burst counters so per-worker tok/s is reported during thinking.
-        const thinkChars = ((event.content as string) || "").length;
-
-        // Reset burst counters on phase transition (generating → thinking)
-        // so each phase's tok/s is computed independently.
-        if (lastWorkerPhase === "generating" && burstOutputChars > 0) {
-          if (parentEmit) {
-            parentEmit(buildProgress());
-            emitAggregateProgress();
-          }
-          burstOutputChars = 0;
-          burstChunkCount = 0;
-          burstFirstChunkTime = null;
-        }
-
-        cumulativeOutputChars += thinkChars;
-        burstOutputChars += thinkChars;
-        burstChunkCount++;
-        if (!workerFirstChunkTime) workerFirstChunkTime = Date.now();
-        if (!burstFirstChunkTime) burstFirstChunkTime = Date.now();
-        workerLastChunkTime = Date.now();
-        // Notify the frontend that the worker is in the thinking phase
-        if (parentEmit && lastWorkerPhase !== "thinking") {
-          lastWorkerPhase = "thinking";
-          parentEmit({
-            type: "worker_status",
-            workerId: worker.agentId,
-            message: "phase",
-            phase: "thinking",
-          });
-        }
-        // Emit generation progress at regular intervals
-        const shouldEmitThinking =
-          burstChunkCount === 1 ||
-          burstChunkCount % WORKER_PROGRESS_INTERVAL === 0;
-
-        if (parentEmit && shouldEmitThinking) {
-          parentEmit(buildProgress());
-          emitAggregateProgress();
-        }
-      } else if (event.type === "tool_execution") {
-        if (event.status === "calling") {
-          workerToolCalls.push({
-            name: (event.tool as Record<string, unknown>)?.name as string,
-            args: (event.tool as Record<string, unknown>)?.args as Record<string, unknown>,
-          });
-        }
-        // Emit final generation_progress before tool execution pauses generation
-        if (
-          parentEmit &&
-          lastWorkerPhase === "generating" &&
-          burstOutputChars > 0
-        ) {
-          parentEmit(buildProgress());
-          emitAggregateProgress();
-        }
-        // Reset burst counters for next generation burst
-        burstOutputChars = 0;
-        burstChunkCount = 0;
-        burstFirstChunkTime = null;
-        lastWorkerPhase = null;
-        // Forward to parent SSE stream — namespaced so the frontend can
-        // distinguish worker tool calls from the coordinator's own
-        if (parentEmit) {
-          parentEmit({
-            type: "worker_tool_execution",
-            workerId: worker.agentId,
-            workerDescription: worker.description,
-            tool: event.tool,
-            status: event.status,
-          });
-        }
-      } else if (event.type === "tool_output") {
-        // Forward streaming tool output (shell, python, etc.)
-        if (parentEmit) {
-          parentEmit({
-            type: "worker_tool_output",
-            workerId: worker.agentId,
-            toolCallId: event.toolCallId,
-            name: event.name,
-            event: event.event,
-            data: event.data,
-          });
-        }
-      } else if (event.type === "status") {
-        // Forward iteration progress and notable status updates
-        if (
-          parentEmit &&
-          (event.message === "iteration_progress" ||
-            event.message === "workers_updated")
-        ) {
-          if (event.iteration) worker.iterations = event.iteration as number;
-          parentEmit({
-            type: "worker_status",
-            workerId: worker.agentId,
-            message: event.message as string,
-            iteration: event.iteration,
-            maxIterations: event.maxIterations,
-          });
-        }
-        // Forward server-computed TTFT so the frontend can track per-worker and per-iteration TTFT
-        if (parentEmit && event.message === "generation_started") {
-          parentEmit({
-            type: "worker_status",
-            workerId: worker.agentId,
-            message: "generation_started",
-            timeToFirstToken: event.timeToFirstToken,
-          });
-        }
-        // Forward LM Studio lifecycle phases (loading, processing, generating)
-        // Include the label text so worker StatusBars can show progress %
-        if (parentEmit && event.phase) {
-          lastWorkerPhase = event.phase as string;
-          parentEmit({
-            type: "worker_status",
-            workerId: worker.agentId,
-            message: "phase",
-            phase: event.phase,
-            label: event.message || undefined,
-            ...(event.progress != null && { progress: event.progress }),
-          });
-        }
-      } else if (event.type === "done") {
-        // Capture cost and usage from finalizeTextGeneration
-        worker.totalCost = (event.estimatedCost as number) || null;
-        worker.usage = (event.usage as Record<string, number>) || null;
-        // Emit final generation_progress so the frontend gets a definitive
-        // tok/s reading. Under continuous batching, LM Studio coalesces
-        // SSE deltas so heavily that workerEmit may receive ZERO individual
-        // chunk/thinking events despite the model producing hundreds of tokens.
-        // The provider-reported usage is the only reliable source.
-        if (parentEmit && event.usage) {
-          // tokensPerSec lives at the done event's top level (computed by
-          // finalizeTextGeneration), not inside the usage sub-object.
-          const finalTokPerSec = event.tokensPerSec || null;
-          // Use provider-reported output tokens (authoritative) when available,
-          // fall back to chars/4 estimation from accumulated characters.
-          const estimatedOutput = estimateTokens(cumulativeOutputChars);
-          const finalOutputTokens = (event.usage as Record<string, number>).outputTokens || estimatedOutput;
-          const burstTokens = estimateTokens(burstOutputChars);
-          parentEmit({
-            type: "worker_status",
-            workerId: worker.agentId,
-            message: "generation_progress",
-            outputTokens: burstTokens || finalOutputTokens,
-            firstChunkTime: burstFirstChunkTime || workerFirstChunkTime,
-            lastChunkTime: workerLastChunkTime || Date.now(),
-            tokPerSec: finalTokPerSec,
-            totalOutputTokens: finalOutputTokens,
-          });
-          emitAggregateProgress();
-        }
-      } else if (event.type === "usage_update") {
-        // Forward background usage events (memory extraction, embeddings)
-        // directly to the parent SSE stream so the frontend can accumulate
-        // them into the session token badge in real-time.
-        if (parentEmit) {
-          parentEmit(event);
-        }
-      }
-    };
+    // ── Worker Telemetry ────────────────────────────────────
+    const telemetry = new WorkerTelemetryEmitter({
+      workerId: worker.agentId,
+      workerDescription: worker.description,
+      parentEmit,
+      parentSessionId: coordinatorCtx.agentSessionId,
+    });
+    const workerEmit = telemetry.createEmitFunction();
 
     // Build enabled tools list for the worker.
     // If the parent agent has a persona with scoped tools (e.g. Lupos),
@@ -1043,8 +770,8 @@ export default class CoordinatorService {
     const finalMessages = loopResult?.messages || workerMessages;
 
     // Always populate — including on abort/error paths
-    worker.output = getLastAssistantText(finalMessages as ConversationMessage[]) || workerOutput;
-    worker.toolCalls = workerToolCalls as ToolCall[];
+    worker.output = getLastAssistantText(finalMessages as ConversationMessage[]) || telemetry.output;
+    worker.toolCalls = telemetry.toolCalls as ToolCall[];
     worker.messages = finalMessages as ConversationMessage[];
     worker.durationMs = Date.now() - worker.startedAt;
 
@@ -1083,70 +810,32 @@ export default class CoordinatorService {
       );
     }
 
+    // Transfer cost/usage/iterations captured by telemetry from streamed events
+    worker.totalCost = telemetry.totalCost;
+    worker.usage = telemetry.usage;
+    if (telemetry.iterations != null) worker.iterations = telemetry.iterations;
+
     // Notify frontend immediately so the per-worker StatusBar updates
-    // from "Generating..." to a completed state. Each worker finishes
-    // independently — can't wait for the parent's `workers_updated` event.
-    if (parentEmit) {
-      parentEmit({
-        type: "worker_status",
-        workerId: worker.agentId,
-        message: "complete",
-        durationMs: worker.durationMs,
-        toolCount: workerToolCalls.length,
-        // Include usage telemetry so the frontend can update token badges
-        // in real-time as each worker finishes, without waiting for the
-        // full backendSessionStats fetch at coordinator completion.
-        usage: worker.usage || null,
-        estimatedCost: worker.totalCost || null,
-      });
-    }
+    // from "Generating..." to a completed state.
+    telemetry.emitCompletion(
+      worker.durationMs,
+      worker.usage || null,
+      worker.totalCost || null,
+    );
 
     // Release the per-instance reservation (synchronous counter)
     InstanceLoadBalancer.releaseReservation(worker.providerName);
 
     logger.info(
-      `[Coordinator] Agent ${worker.agentId} completed in ${worker.durationMs}ms (${workerToolCalls.length} tool calls)`,
+      `[Coordinator] Agent ${worker.agentId} completed in ${worker.durationMs}ms (${telemetry.toolCalls.length} tool calls)`,
     );
 
     // ── VRAM eviction for secondary instances ──────────────────
-    // When a worker finishes on a secondary LM Studio instance (not the
-    // coordinator's own), check if any other workers are still active on
-    // that instance. If none, unload the model to free GPU VRAM.
-    // This prevents idle secondary GPUs from holding 14+ GB of model weights.
-    // The primary instance is NEVER unloaded (orchestrator needs it).
-    const workerInstanceId = worker.providerName;
-    const coordinatorInstanceId = coordinatorCtx.providerName;
-    if (workerInstanceId !== coordinatorInstanceId) {
-      const othersOnSameInstance = [...activeWorkers.values()].filter(
-        (workerObj) =>
-          workerObj.providerName === workerInstanceId &&
-          workerObj.agentId !== worker.agentId &&
-          workerObj.status === "running",
-      );
-      if (othersOnSameInstance.length === 0) {
-        try {
-          const workerProviderObj = getProvider(workerInstanceId);
-          if (workerProviderObj?.unloadModelByKey) {
-            logger.info(
-              `[Coordinator] VRAM eviction: unloading "${worker.resolvedModel}" from secondary instance ${workerInstanceId} (no active workers remain)`,
-            );
-            await workerProviderObj
-              .unloadModelByKey(worker.resolvedModel)
-              .catch((error: unknown) =>
-                logger.warn(
-                  `[Coordinator] VRAM eviction failed on ${workerInstanceId}: ${(error as Error).message}`,
-                ),
-              );
-          }
-        } catch (error: unknown) {
-          logger.warn(`[Coordinator] VRAM eviction error: ${(error as Error).message}`);
-        }
-      } else {
-        logger.info(
-          `[Coordinator] VRAM eviction deferred: ${othersOnSameInstance.length} worker(s) still active on ${workerInstanceId}`,
-        );
-      }
-    }
+    await evictIdleSecondaryModel(
+      worker,
+      coordinatorCtx.providerName,
+      activeWorkers,
+    );
   }
 
   // ══════════════════════════════════════════════════════════

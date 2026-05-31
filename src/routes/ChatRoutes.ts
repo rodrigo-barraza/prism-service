@@ -29,10 +29,7 @@ import {
   createStreamState,
   dispatchChunk,
 } from "../utils/StreamChunkDispatcher.ts";
-import {
-  compressImageForSizeLimit,
-  constrainImageDimensions,
-} from "../utils/media.ts";
+import { resolveMessageMediaReferences } from "../services/MediaResolutionService.ts";
 
 import SessionGenerationTracker from "../services/SessionGenerationTracker.ts";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
@@ -46,8 +43,8 @@ import {
 } from "../utils/ConversationUtilities.ts";
 import { handleSseRequest, handleJsonRequest } from "../utils/SseUtilities.ts";
 import { SseEvent } from "../types/SseTypes.ts";
-import { ChatRequestSchema, ChatRequest } from "../types/index.ts";
-import type { ConversationMessage, EmitFn, ToolSchema } from "../services/harnesses/types.ts";
+import { ChatRequestSchema } from "../types/index.ts";
+import type { ConversationMessage, EmitFn } from "../services/harnesses/types.ts";
 
 const router = express.Router();
 function injectToolsIntoSystemPrompt(
@@ -101,173 +98,6 @@ function injectToolsIntoSystemPrompt(
       content: `You are a helpful AI assistant with access to a comprehensive suite of real-time data and utility tools. Present data clearly with relevant formatting. For questions that don't require API data, respond naturally without tool calls.` + toolsSection,
     });
   }
-}
-
-// ─── converts refs for providers & storage ──────────────────
-/**
- * Resolve image references in messages for both provider use and storage.
- *
- * Returns a deep copy of messages where all images are base64 data URLs
- * (ready for providers). The ORIGINAL messages array is mutated in-place
- * so that images are stored as minio:// refs (for conversation storage).
- *
- * Handles:
- *  - data:... base64  → upload to MinIO (original gets minio ref), provider gets data URL
- *  - minio://...       → download from MinIO (original unchanged), provider gets data URL
- *  - http(s)://...     → fetch (original unchanged), provider gets data URL
- */
-async function resolveImageRefs(messages: ConversationMessage[], project: string, username: string) {
-  // Deep copy for the provider — images will be data URLs
-  const providerMessages = messages.map((message) => ({ ...message }));
-  for (let i = 0; i < messages.length; i++) {
-    const message = messages[i];
-    // ── Resolve media array fields: images, audio, video, pdf ──
-    for (const field of ["images", "audio", "video", "pdf"] as const) {
-      const array = (message as Record<string, unknown>)[field];
-      if (array && Array.isArray(array) && array.length > 0) {
-        const providerArr: string[] = [];
-        const storageArr: string[] = [];
-        await Promise.all(
-          array.map(async (ref: string, j: number) => {
-            const resolved = await resolveMediaRef(ref, project, username);
-            providerArr[j] = resolved.providerRef;
-            storageArr[j] = resolved.storageRef;
-          }),
-        );
-        (providerMessages[i] as Record<string, unknown>)[field] = providerArr;
-        (message as Record<string, unknown>)[field] = storageArr;
-      }
-    }
-  }
-  return providerMessages;
-}
-/**
- * Compress an oversized image data URL in-place.
- * Parses the data URL, checks decoded size, runs through compressImageForSizeLimit,
- * and reconstructs if compression changed the data.
-
- */
-async function compressDataUrlIfOversized(dataUrl: string): Promise<string> {
-  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-  if (!match) return dataUrl;
-  let mimeType = match[1];
-  if (!mimeType.startsWith("image/")) return dataUrl;
-  let base64Data = match[2];
-  // Step 1: enforce pixel dimension limits (Anthropic rejects >8000px)
-  try {
-    const dimResult = await constrainImageDimensions(base64Data, mimeType);
-    if (dimResult.data !== base64Data) {
-      base64Data = dimResult.data;
-      mimeType = dimResult.mediaType;
-      logger.info(
-        `[chat] Dimension-constrained image: now ${(base64Data.length / 1024 / 1024).toFixed(2)} MB b64 (${mimeType})`,
-      );
-    }
-  } catch (error: unknown) {
-        logger.warn(`[chat] Dimension constraint failed: ${(error as Error).message}`);
-  }
-  // Step 2: enforce byte-size limit
-  const b64Len = base64Data.length; // Anthropic checks base64 STRING length
-  const MAX = 5 * 1024 * 1024;
-  if (b64Len <= MAX) {
-    // Dimensions may have changed even if size is fine — rebuild URL
-    return `data:${mimeType};base64,${base64Data}`;
-  }
-  logger.info(
-    `[chat] Oversized image detected: ${(b64Len / 1024 / 1024).toFixed(2)} MB b64 (${mimeType}). Compressing...`,
-  );
-  try {
-    const result = await compressImageForSizeLimit(base64Data, mimeType);
-    const newUrl = `data:${result.mediaType};base64,${result.data}`;
-    const newLen = result.data.length;
-    logger.info(
-      `[chat] Compressed: ${(b64Len / 1024 / 1024).toFixed(2)} MB → ${(newLen / 1024 / 1024).toFixed(2)} MB b64 (${result.mediaType})`,
-    );
-    return newUrl;
-  } catch (error: unknown) {
-    logger.error(
-            `[chat] Image compression failed: ${(error as Error).message}. Sending original.`,
-    );
-    return `data:${mimeType};base64,${base64Data}`;
-  }
-}
-async function resolveMediaRef(ref: string, project: string, username: string) {
-  // Already a base64 data URL — compress if oversized, upload to MinIO for storage
-  if (ref.startsWith("data:")) {
-    let providerRef = ref;
-    // Compress oversized images before they reach any provider
-        providerRef = await compressDataUrlIfOversized(providerRef);
-    let storageRef = providerRef;
-    try {
-      const { ref: minioRef } = await FileService.uploadFile(
-        ref, // Upload original to MinIO
-        "uploads",
-        project,
-        username,
-      );
-      storageRef = minioRef;
-    } catch (error: unknown) {
-            logger.error(`[chat] Failed to upload media to MinIO: ${(error as Error).message}`);
-    }
-    return { providerRef, storageRef };
-  }
-  // MinIO reference — download for provider, keep ref for storage
-  if (FileService.isMinioRef(ref)) {
-    try {
-      const key = FileService.extractKey(ref);
-      const file = await FileService.getFile(key);
-      if (!file) {
-        logger.warn(`[chat] Could not resolve MinIO ref: ${ref}`);
-        return { providerRef: ref, storageRef: ref };
-      }
-      const chunks: Buffer[] = [];
-      for await (const chunk of file.stream) {
-        chunks.push(chunk);
-      }
-      const buffer = Buffer.concat(chunks);
-      const base64 = buffer.toString("base64");
-      let providerRef = `data:${file.contentType};base64,${base64}`;
-      // Constrain dimensions + compress oversized images before they reach any provider
-      providerRef = await compressDataUrlIfOversized(providerRef);
-      return {
-        providerRef,
-        storageRef: ref,
-      };
-    } catch (error: unknown) {
-      logger.error(
-                `[chat] Failed to resolve MinIO ref ${ref}: ${(error as Error).message}`,
-      );
-      return { providerRef: ref, storageRef: ref };
-    }
-  }
-  // HTTP(S) URL — fetch for provider, keep URL for storage
-  if ((ref as string).startsWith("http://") || (ref as string).startsWith("https://")) {
-    try {
-      const response = await fetch(ref);
-      if (!response.ok) {
-        logger.warn(
-          `[chat] Failed to fetch media URL (${response.status}): ${ref}`,
-        );
-        return { providerRef: ref, storageRef: ref };
-      }
-      const contentType =
-        response.headers.get("content-type") || "application/octet-stream";
-      const arrayBuffer = await response.arrayBuffer();
-      const base64 = Buffer.from(arrayBuffer).toString("base64");
-      let providerRef = `data:${contentType};base64,${base64}`;
-      // Compress oversized images before they reach any provider
-      providerRef = await compressDataUrlIfOversized(providerRef);
-      return {
-        providerRef,
-        storageRef: ref,
-      };
-    } catch (error: unknown) {
-            logger.error(`[chat] Failed to fetch media URL ${ref}: ${(error as Error).message}`);
-      return { providerRef: ref, storageRef: ref };
-    }
-  }
-  // Unknown — pass through
-  return { providerRef: ref, storageRef: ref };
 }
 // ─── parameter parsing, validation, model resolution ────────
 /**
@@ -435,7 +265,7 @@ async function prepareGenerationContext(
   // ── Strip soft-deleted messages ──────────────────────────────
   const activeMessages = messages.filter((m) => !m.deleted);
   // ── Resolve image refs ─────────────────────────────────────
-  const providerMessages = await resolveImageRefs(
+  const providerMessages = await resolveMessageMediaReferences(
     activeMessages as ConversationMessage[],
     project,
     username,
@@ -870,7 +700,7 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
       allImages.push(...message.images);
     }
   }
-  const result = await (provider as Record<string, Function>).generateImage(
+  const result = await provider.generateImage(
     prompt,
     allImages,
     resolvedModel,
@@ -1031,12 +861,12 @@ async function handleStreamingText(context: GenerationContext) {
     getCollectionOpts(project),
   );
   const stream =
-    (modelDef as Record<string, unknown> | null)?.liveAPI && (provider as Record<string, Function>).generateTextStreamLive
-      ? (provider as Record<string, Function>).generateTextStreamLive(messages, resolvedModel, {
+    (modelDef as Record<string, unknown> | null)?.liveAPI && provider.generateTextStreamLive
+      ? provider.generateTextStreamLive(messages, resolvedModel, {
           ...options,
           signal,
         })
-      : (provider as Record<string, Function>).generateTextStream(messages, resolvedModel, {
+      : provider.generateTextStream(messages, resolvedModel, {
           ...options,
           signal,
         });
@@ -1153,7 +983,7 @@ async function handleStreamingText(context: GenerationContext) {
     streamState.thinking = "";
     streamState.thinkingSignature = "";
     streamState.toolCalls.length = 0;
-    const followUpStream = (provider as Record<string, Function>).generateTextStream(
+    const followUpStream = provider.generateTextStream(
       updatedMessages,
       resolvedModel,
       {
@@ -1255,7 +1085,7 @@ async function handleNonStreamingText(context: GenerationContext) {
     });
   }
   const generationStart = performance.now();
-  const genResult = await (provider as Record<string, Function>).generateText(
+  const genResult = await provider.generateText(
     messages,
     resolvedModel,
     options,
