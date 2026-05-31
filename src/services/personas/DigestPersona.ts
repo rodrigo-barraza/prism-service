@@ -128,7 +128,7 @@ export const DigestPersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(DIGEST_TOOL_POLICY_SECTIONS, context),
-  enabledTools: DIGEST_ENABLED_TOOLS,
+  availableTools: DIGEST_ENABLED_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
   usesCodingGuidelines: false,

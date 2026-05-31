@@ -9,6 +9,8 @@ import { TYPES, getPricing } from "../../../config.ts";
 import RequestLogger from "../../RequestLogger.ts";
 import FileService from "../../FileService.ts";
 import AgentPersonaRegistry from "../../AgentPersonaRegistry.ts";
+import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
+import { resolveToolEntriesToSet } from "../../../utils/resolveToolEntriesToSet.ts";
 import {
   appendAndFinalize,
 } from "../../../utils/ConversationUtilities.ts";
@@ -56,6 +58,7 @@ export interface FinalizerPayload {
   contentSegments?: unknown[];
   textFragments?: unknown[];
   thinkingFragments?: unknown[];
+  resolvedEnabledTools?: string[] | null;
 }
 
 /**
@@ -102,6 +105,7 @@ export async function finalizeTextGeneration(
     contentSegments,
     textFragments,
     thinkingFragments,
+    resolvedEnabledTools,
   }: FinalizerPayload,
     overrideMessagesToAppend: MessagePayload[] | null = null,
 ) {
@@ -432,13 +436,35 @@ function swapMsgContent(message: MessagePayload) {
         },
       });
     }
+    let toolConfig: Record<string, unknown> | undefined = undefined;
+    if (resolvedEnabledTools) {
+      const disabledTools = (options.disabledTools as string[]) || [];
+      let availableTools: string[] = [];
+      if (agent) {
+        const persona = AgentPersonaRegistry.get(agent);
+        if (persona) {
+          const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
+          const resolvedAvailable = resolveToolEntriesToSet(persona.availableTools, clientSchemas);
+          availableTools = [...resolvedAvailable];
+        }
+      } else {
+        const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
+        availableTools = clientSchemas.map((t) => t.name);
+      }
+      toolConfig = {
+        availableTools,
+        disabledTools,
+        enabledTools: resolvedEnabledTools,
+      };
+    }
+
     const mergedSettings = {
       ...(conversationMeta?.settings || {}),
       provider: providerName,
       model: resolvedModel,
       agent: agent || undefined,
       workspaceRoot: workspaceRoot || undefined,
-      options: options || undefined,
+      toolConfig: toolConfig || undefined,
     };
 
     const finalMeta: Record<string, unknown> = {

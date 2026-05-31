@@ -418,9 +418,9 @@ describe("AgenticLoopService", () => {
     expect(passTools.find(t => t.name === "custom_db_tool").description).toBe("A tool from the database");
   });
 
-  it("should resolve disabledBuiltIns mode correctly", async () => {
+  it("should resolve disabledTools mode correctly", async () => {
     mockCtx.options.enabledTools = null;
-    mockCtx.options.disabledBuiltIns = ["generate_image"];
+    mockCtx.options.disabledTools = ["generate_image"];
     
     await AgenticLoopService.runAgenticLoop(mockCtx);
 

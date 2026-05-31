@@ -149,7 +149,7 @@ export const StickersPersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(STICKERS_TOOL_POLICY_SECTIONS, context),
-  enabledTools: STICKERS_ENABLED_TOOLS,
+  availableTools: STICKERS_ENABLED_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
   usesCodingGuidelines: false,

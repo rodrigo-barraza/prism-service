@@ -130,7 +130,7 @@ Use it **proactively** — do NOT wait for the user to say "remember":
     ];
     return buildToolPolicy(omniSections, context);
   },
-  enabledTools: ["*"],
+  availableTools: ["*"],
   capabilities: "",
   usesDirectoryTree: true,
   usesCodingGuidelines: true,

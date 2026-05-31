@@ -55,22 +55,22 @@ const AVAILABLE_PROVIDERS = new Set<string>([
 ]);
 
 /**
- * Resolve enabledTools entries (may contain "label:X" / "domain:X" prefixes)
+ * Resolve availableTools entries (may contain "label:X" / "domain:X" prefixes)
  * into a flat Set of concrete tool names using client schemas.
  */
-function resolveEnabledToolsToSet(enabledTools: string[] | undefined) {
-  if (!enabledTools || !Array.isArray(enabledTools)) return new Set<string>();
+function resolveAvailableToolsToSet(availableTools: string[] | undefined) {
+  if (!availableTools || !Array.isArray(availableTools)) return new Set<string>();
 
   // "*" wildcard means all tools — return null sentinel
-  if (enabledTools.includes("*")) return null;
+  if (availableTools.includes("*")) return null;
 
-  const hasPrefixed = enabledTools.some(
+  const hasPrefixed = availableTools.some(
     (e) => e.startsWith("label:") || e.startsWith("domain:") || e.startsWith("domainKey:"),
   );
-  if (!hasPrefixed) return new Set<string>(enabledTools);
+  if (!hasPrefixed) return new Set<string>(availableTools);
 
   const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
-  return resolveToolEntriesToSet(enabledTools, clientSchemas);
+  return resolveToolEntriesToSet(availableTools, clientSchemas);
 }
 
 function filterByAvailableProviders(modelsMap: Record<string, ModelOptionEntry[]>) {
@@ -321,7 +321,7 @@ router.get(
     await ToolOrchestratorService.ensureSchemas();
     const agents = AgentPersonaRegistry.list().map((first) => {
       const persona = AgentPersonaRegistry.get(first.id);
-      const resolvedTools = resolveEnabledToolsToSet(persona?.enabledTools);
+      const resolvedTools = resolveAvailableToolsToSet(persona?.availableTools);
       // null sentinel means "*" wildcard → all tools
       const isWildcard = resolvedTools === null;
 
@@ -337,9 +337,9 @@ router.get(
           ? clientSchemas.filter((tool) => tool.system === true).map((tool) => tool.name)
           : [];
 
-        // Apply persona disabledTools denylist to system tools (enabledSet protects)
-        if (persona?.disabledTools?.length) {
-          const disabledSet = resolveToolEntriesToSet(persona.disabledTools, clientSchemas);
+        // Apply persona blockedTools denylist to system tools (enabledSet protects)
+        if (persona?.blockedTools?.length) {
+          const disabledSet = resolveToolEntriesToSet(persona.blockedTools, clientSchemas);
           systemToolNames = systemToolNames.filter(
             (toolName) => !disabledSet.has(toolName) || resolvedTools.has(toolName),
           );
@@ -384,8 +384,8 @@ router.get(
 
     if (agentId) {
       const persona = AgentPersonaRegistry.get(agentId);
-      if (persona?.enabledTools) {
-        const enabledSet = resolveEnabledToolsToSet(persona.enabledTools);
+      if (persona?.availableTools) {
+        const enabledSet = resolveAvailableToolsToSet(persona.availableTools);
         const isCoreToolsLocked = persona.coreToolsLocked ?? true;
         // null = wildcard ("*") → return all schemas unfiltered
         if (enabledSet !== null) {
@@ -393,9 +393,9 @@ router.get(
             (tool) => enabledSet.has(tool.name) || (isCoreToolsLocked && tool.system === true),
           );
 
-          // Apply persona disabledTools denylist (enabledSet protects)
-          if (persona.disabledTools?.length) {
-            const disabledSet = resolveToolEntriesToSet(persona.disabledTools, schemas);
+          // Apply persona blockedTools denylist (enabledSet protects)
+          if (persona.blockedTools?.length) {
+            const disabledSet = resolveToolEntriesToSet(persona.blockedTools, schemas);
             filteredSchemas = filteredSchemas.filter(
               (tool) => !disabledSet.has(tool.name) || enabledSet.has(tool.name),
             );

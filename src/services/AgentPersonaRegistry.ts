@@ -110,7 +110,7 @@ const AgentPersonaRegistry = {
 
         return buildToolPolicy(sections, ctx);
       },
-      enabledTools: Array.isArray(doc.enabledTools) ? (doc.enabledTools as string[]) : [],
+      availableTools: Array.isArray(doc.availableTools) ? (doc.availableTools as string[]) : Array.isArray(doc.enabledTools) ? (doc.enabledTools as string[]) : [],
       policies: policies.length > 0 ? policies : undefined,
       capabilities: "",
       usesDirectoryTree: (doc.usesDirectoryTree as boolean) || false,
@@ -119,7 +119,7 @@ const AgentPersonaRegistry = {
 
     PERSONAS.set(doc.agentId as string, persona);
     logger.info(
-      `[AgentPersonaRegistry] Registered custom agent: "${doc.name}" (${doc.agentId}) with ${persona.enabledTools.length} tools, ${policies.length} policies`,
+      `[AgentPersonaRegistry] Registered custom agent: "${doc.name}" (${doc.agentId}) with ${persona.availableTools.length} tools, ${policies.length} policies`,
     );
   },
 

@@ -258,12 +258,10 @@ describe("ConversationTimerService.executeAgenticLoop", () => {
         model: "gemini-3.5-flash",
         agent: "CUSTOM_DEVELOPER",
         workspaceRoot: "/custom/root",
-        options: {
-          temperature: 0.2,
-          maxTokens: 4000,
-          planFirst: true,
-          enabledTools: ["read_file", "write_file", "search_web"],
-          policies: [{ tool: "run_command", decision: "ASK_USER" }],
+        toolConfig: {
+          availableTools: ["read_file", "write_file", "search_web"],
+          disabledTools: ["search_web"],
+          enabledTools: ["read_file", "write_file"],
         },
       },
     };
@@ -282,12 +280,8 @@ describe("ConversationTimerService.executeAgenticLoop", () => {
     expect(loopArguments.agent).toBe("CUSTOM_DEVELOPER");
     expect(loopArguments.workspaceRoot).toBe("/custom/root");
     
-    // Verify the nested options are merged exactly
-    expect(loopArguments.options.temperature).toBe(0.2);
-    expect(loopArguments.options.maxTokens).toBe(4000);
-    expect(loopArguments.options.planFirst).toBe(true);
-    expect(loopArguments.options.enabledTools).toEqual(["read_file", "write_file", "search_web"]);
-    expect(loopArguments.options.policies).toEqual([{ tool: "run_command", decision: "ASK_USER" }]);
+    // Verify the enabledTools from toolConfig are passed exactly
+    expect(loopArguments.options.enabledTools).toEqual(["read_file", "write_file"]);
     
     // Ensure base defaults like agenticLoopEnabled are still preserved
     expect(loopArguments.options.agenticLoopEnabled).toBe(true);

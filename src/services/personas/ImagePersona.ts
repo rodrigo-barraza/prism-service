@@ -83,7 +83,7 @@ export const ImagePersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(IMAGE_TOOL_POLICY_SECTIONS, context),
-  enabledTools: IMAGE_ENABLED_TOOLS,
+  availableTools: IMAGE_ENABLED_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
   usesCodingGuidelines: false,

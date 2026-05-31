@@ -85,7 +85,7 @@ export const ChatRequestSchema = z
     functionCallingEnabled: z.boolean().nullable().optional(),
     agenticLoopEnabled: z.boolean().nullable().optional(),
     enabledTools: z.array(z.string()).nullable().optional(),
-    disabledBuiltIns: z.array(z.string()).nullable().optional(),
+    disabledTools: z.array(z.string()).nullable().optional(),
     minContextLength: z.number().nullable().optional(),
     forceImageGeneration: z.boolean().nullable().optional(),
     responseFormat: z.unknown().nullable().optional(),

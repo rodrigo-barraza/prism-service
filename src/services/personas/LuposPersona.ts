@@ -291,8 +291,8 @@ export const LuposPersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(LUPOS_TOOL_POLICY_SECTIONS, context),
-  enabledTools: LUPOS_ENABLED_TOOLS,
-  disabledTools: [
+  availableTools: LUPOS_ENABLED_TOOLS,
+  blockedTools: [
     DOMAIN_KEY_TAGS.COORDINATOR,
     DOMAIN_KEY_TAGS.WORKSPACE,
     DOMAIN_KEY_TAGS.SKILLS,

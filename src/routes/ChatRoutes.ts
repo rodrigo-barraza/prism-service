@@ -177,7 +177,7 @@ async function prepareGenerationContext(
     functionCallingEnabled,
     agenticLoopEnabled,
     enabledTools,
-    disabledBuiltIns,
+    disabledTools,
     minContextLength,
     forceImageGeneration,
     responseFormat,
@@ -224,7 +224,7 @@ async function prepareGenerationContext(
     ...(functionCallingEnabled != null && { functionCallingEnabled }),
     ...(agenticLoopEnabled != null && { agenticLoopEnabled }),
     ...(enabledTools && { enabledTools }),
-    ...(disabledBuiltIns && { disabledBuiltIns }),
+    ...(disabledTools && { disabledTools }),
     ...(minContextLength && { minContextLength }),
     ...(forceImageGeneration != null && { forceImageGeneration }),
     ...(responseFormat != null && { responseFormat }),
@@ -462,10 +462,10 @@ export async function handleConversation(
           const enabledSet = new Set(options.enabledTools as string[]);
           tools = tools.filter((t) => enabledSet.has(t.name));
         } else if (
-          options.disabledBuiltIns &&
-          Array.isArray(options.disabledBuiltIns)
+          options.disabledTools &&
+          Array.isArray(options.disabledTools)
         ) {
-          const disabledSet = new Set(options.disabledBuiltIns as string[]);
+          const disabledSet = new Set(options.disabledTools as string[]);
           tools = tools.filter((t) => !disabledSet.has(t.name));
         }
         options.tools = tools;
@@ -1038,6 +1038,7 @@ async function handleStreamingText(context: GenerationContext) {
     audioChunks: streamState.audioChunks,
     audioSampleRate: streamState.audioSampleRate,
     usage: streamState.usage as FinalizerTokenUsage | null,
+    resolvedEnabledTools: (options.tools as any[])?.map((t) => t.name) || null,
     outputCharacters: streamState.outputCharacters,
     timeToGenerationSec: streamState.firstTokenTime
       ? (streamState.firstTokenTime - requestStart) / 1000
@@ -1167,6 +1168,7 @@ async function handleNonStreamingText(context: GenerationContext) {
     audioChunks: [],
     audioSampleRate: 24000,
     usage: genResult.usage || { inputTokens: 0, outputTokens: 0 },
+    resolvedEnabledTools: (options.tools as any[])?.map((t) => t.name) || null,
     outputCharacters: genResult.text ? genResult.text.length : 0,
     timeToGenerationSec: (generationStart - requestStart) / 1000,
     generationSec: (now - generationStart) / 1000,

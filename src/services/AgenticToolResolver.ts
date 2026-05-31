@@ -46,7 +46,7 @@ interface ModelDef {
 
 interface ResolveOptions {
   enabledTools?: string[];
-  disabledBuiltIns?: string[];
+  disabledTools?: string[];
   webSearch?: boolean;
   [key: string]: unknown;
 }
@@ -150,15 +150,15 @@ export default class AgenticToolResolver {
     // ── Tool filtering ────────────────────────────────────────────
     let resolvedEnabledTools: string[] | null = options.enabledTools || null;
 
-    // Mode 2: disabledBuiltIns — resolve server-side
+    // Mode 2: disabledTools — resolve server-side
     if (
       !resolvedEnabledTools &&
-      options.disabledBuiltIns &&
-      Array.isArray(options.disabledBuiltIns)
+      options.disabledTools &&
+      Array.isArray(options.disabledTools)
     ) {
-      const disabledSet = new Set(options.disabledBuiltIns);
+      const disabledSet = new Set(options.disabledTools);
       const persona = agent ? AgentPersonaRegistry.get(agent) : null;
-      const rawBaseTools = persona?.enabledTools || null;
+      const rawBaseTools = persona?.availableTools || null;
       // "*" wildcard = all tools — treat same as no persona base tools
       const baseTools = rawBaseTools?.includes("*") ? null : rawBaseTools;
 
@@ -183,31 +183,31 @@ export default class AgenticToolResolver {
         for (const name of disabledSet) expandedSet.delete(name);
         resolvedEnabledTools = [...expandedSet];
         logger.info(
-          `[AgenticLoop] disabledBuiltIns mode: ${disabledSet.size} disabled → ${resolvedEnabledTools.length} enabled tools`,
+          `[AgenticLoop] disabledTools mode: ${disabledSet.size} disabled → ${resolvedEnabledTools.length} enabled tools`,
         );
       } else {
         resolvedEnabledTools = dynamicTools
           .map((tool) => tool.name)
           .filter((name) => !disabledSet.has(name));
         logger.info(
-          `[AgenticLoop] disabledBuiltIns mode (no persona): ${disabledSet.size} disabled → ${resolvedEnabledTools.length} enabled tools`,
+          `[AgenticLoop] disabledTools mode (no persona): ${disabledSet.size} disabled → ${resolvedEnabledTools.length} enabled tools`,
         );
       }
     }
 
-    // Mode 3: fallback to persona's enabledTools
+    // Mode 3: fallback to persona's availableTools
     if (!resolvedEnabledTools && agent) {
       const persona = AgentPersonaRegistry.get(agent);
-      if (persona?.enabledTools) {
+      if (persona?.availableTools) {
         // "*" wildcard means "all tools" — skip filtering entirely
-        if (persona.enabledTools.includes("*")) {
+        if (persona.availableTools.includes("*")) {
           logger.info(
-            `[AgenticLoop] Persona "${agent}" uses wildcard enabledTools — all tools enabled`,
+            `[AgenticLoop] Persona "${agent}" uses wildcard availableTools — all tools enabled`,
           );
         } else {
-          resolvedEnabledTools = persona.enabledTools;
+          resolvedEnabledTools = persona.availableTools;
           logger.info(
-            `[AgenticLoop] Using persona "${agent}" enabledTools: [${resolvedEnabledTools!.join(", ")}]`,
+            `[AgenticLoop] Using persona "${agent}" availableTools: [${resolvedEnabledTools!.join(", ")}]`,
           );
         }
       }
@@ -246,15 +246,15 @@ export default class AgenticToolResolver {
           PRISM_LOCAL_TOOL_NAMES.has(tool.name),
       );
 
-      // Apply disabledTools post-filter denylist from persona
-      if (resolvedPersona?.disabledTools?.length) {
+      // Apply blockedTools post-filter denylist from persona
+      if (resolvedPersona?.blockedTools?.length) {
         const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
-        const disabledSet = resolveToolEntriesToSet(resolvedPersona.disabledTools, clientSchemas);
+        const disabledSet = resolveToolEntriesToSet(resolvedPersona.blockedTools, clientSchemas);
         finalTools = finalTools.filter(
           (tool) => !disabledSet.has(tool.name) || enabledSet.has(tool.name),
         );
         logger.info(
-          `[AgenticLoop] Applied disabledTools denylist (${disabledSet.size} tools blocked, enabledSet protects ${enabledSet.size})`,
+          `[AgenticLoop] Applied blockedTools denylist (${disabledSet.size} tools blocked, enabledSet protects ${enabledSet.size})`,
         );
       }
 
