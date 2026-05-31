@@ -189,11 +189,11 @@ export default class SystemPromptAssembler {
         (toolSchema as Record<string, unknown>).domain === "Core Tools"
     );
 
-    // Apply disabledTools post-filter denylist — enabledSet entries are protected
+    // Apply blockedTools post-filter denylist — enabledSet entries are protected
     if (agentId) {
       const persona = AgentPersonaRegistry.get(agentId);
-      if (persona?.disabledTools?.length) {
-        const disabledSet = resolveToolEntriesToSet(persona.disabledTools, schemas);
+      if (persona?.blockedTools?.length) {
+        const disabledSet = resolveToolEntriesToSet(persona.blockedTools, schemas);
         filteredSchemas = filteredSchemas.filter(
           (toolSchema) => !disabledSet.has(toolSchema.name as string) || enabledSet.has(toolSchema.name as string),
         );
@@ -496,11 +496,11 @@ export default class SystemPromptAssembler {
               (toolSchema as Record<string, unknown>).domain === "Core Tools"
           );
 
-          // Apply disabledTools post-filter denylist — enabledSet entries are protected
+          // Apply blockedTools post-filter denylist — enabledSet entries are protected
           if (agentId) {
             const assemblerPersona = AgentPersonaRegistry.get(agentId);
-            if (assemblerPersona?.disabledTools?.length) {
-              const disabledSet = resolveToolEntriesToSet(assemblerPersona.disabledTools, schemas);
+            if (assemblerPersona?.blockedTools?.length) {
+              const disabledSet = resolveToolEntriesToSet(assemblerPersona.blockedTools, schemas);
               filteredSchemas = filteredSchemas.filter(
                 (toolSchema) => !disabledSet.has(toolSchema.name as string) || enabledSet.has(toolSchema.name as string),
               );

@@ -145,7 +145,7 @@ export interface AgenticOptions {
   autoApprove?: boolean;
   maxIterations?: number;
   enabledTools?: string[];
-  disabledBuiltIns?: string[];
+  disabledTools?: string[];
   agenticLoopEnabled?: boolean;
   temperature?: number;
   maxTokens?: number;

@@ -101,7 +101,7 @@ export const LightsPersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(LIGHTS_TOOL_POLICY_SECTIONS, context),
-  enabledTools: LIGHTS_ENABLED_TOOLS,
+  availableTools: LIGHTS_ENABLED_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
   usesCodingGuidelines: false,

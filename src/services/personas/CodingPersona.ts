@@ -66,7 +66,7 @@ export const CodingPersona: Persona = {
 - Keep your explanations concise and technical`,
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(CODING_TOOL_POLICY_SECTIONS, context),
-  enabledTools: CODING_ENABLED_TOOLS,
+  availableTools: CODING_ENABLED_TOOLS,
   capabilities: "",
   usesDirectoryTree: true,
   usesCodingGuidelines: true,

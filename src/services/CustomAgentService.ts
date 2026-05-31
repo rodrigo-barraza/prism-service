@@ -71,7 +71,7 @@ const CustomAgentService = {
       identity: data.identity || "",
       guidelines: data.guidelines || "",
       toolPolicy: data.toolPolicy || "",
-      enabledTools: Array.isArray(data.enabledTools) ? data.enabledTools : [],
+      availableTools: Array.isArray(data.availableTools) ? data.availableTools : Array.isArray(data.enabledTools) ? data.enabledTools : [],
       policies: Array.isArray(data.policies) ? data.policies : [],
       usesDirectoryTree: data.usesDirectoryTree || false,
       usesCodingGuidelines: data.usesCodingGuidelines || false,

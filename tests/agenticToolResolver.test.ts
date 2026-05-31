@@ -4,7 +4,7 @@
 // Validates that custom tools:
 //   1. Are tagged with _isCustom for filter bypass
 //   2. Bypass the persona enabledTools whitelist
-//   3. Survive disabledBuiltIns filtering
+//   3. Survive disabledTools filtering
 //   4. Appear in both finalTools and customToolMap
 // ────────────────────────────────────────────────────────────
 
@@ -106,10 +106,10 @@ vi.mock("../config.ts", () => ({
 
 // Mock AgentPersonaRegistry
 const mockPersona = {
-  enabledTools: ["read_file", "write_file", "create_custom_tool"],
+  availableTools: ["read_file", "write_file", "create_custom_tool"],
 };
 const mockLuposPersona = {
-  enabledTools: ["read_file"],
+  availableTools: ["read_file"],
   coreToolsLocked: false,
 };
 vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
@@ -249,11 +249,11 @@ describe("AgenticToolResolver — custom tool handling", () => {
     expect(toolNames).toContain("celsius_to_fahrenheit");
   });
 
-  it("custom tools survive disabledBuiltIns filtering", async () => {
-    // disabledBuiltIns mode: client sends a list of tools to disable
+  it("custom tools survive disabledTools filtering", async () => {
+    // disabledTools mode: client sends a list of tools to disable
     const { finalTools } = await AgenticToolResolver.resolve({
       options: {
-        disabledBuiltIns: ["get_weather"],
+        disabledTools: ["get_weather"],
       },
       agent: "CODING",
       project: "coding",

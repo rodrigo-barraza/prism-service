@@ -706,9 +706,9 @@ export default class CoordinatorService {
       const { default: AgentPersonaRegistry } =
         await import("./AgentPersonaRegistry.js");
       const persona = AgentPersonaRegistry.get(worker.agent as string);
-      if (persona?.enabledTools) {
+      if (persona?.availableTools) {
         // Inherit the parent's persona-scoped tools
-        workerEnabledTools = persona.enabledTools;
+        workerEnabledTools = persona.availableTools;
       }
     }
 

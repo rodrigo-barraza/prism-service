@@ -123,7 +123,7 @@ export const OogPersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(OOG_TOOL_POLICY_SECTIONS, context),
-  enabledTools: ["*"],
+  availableTools: ["*"],
   capabilities: "",
   usesDirectoryTree: true,
   usesCodingGuidelines: true,

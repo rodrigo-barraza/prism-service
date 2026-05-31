@@ -646,6 +646,7 @@ export default class BaseAgenticHarness {
         contentSegments: cleanSegments,
         textFragments: cleanTextFragments,
         thinkingFragments: cleanThinkingFragments,
+        resolvedEnabledTools: this.tools.resolvedEnabledTools,
       },
       newTurnMessages as Parameters<typeof finalizeTextGeneration>[2],
     );

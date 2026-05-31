@@ -48,7 +48,7 @@ export const MeepoPersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: "",
-  enabledTools: [],
+  availableTools: [],
   capabilities: "",
   usesDirectoryTree: false,
   usesCodingGuidelines: false,

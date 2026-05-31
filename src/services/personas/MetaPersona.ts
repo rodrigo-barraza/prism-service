@@ -25,7 +25,7 @@ const META_CAPABILITIES = `# Capabilities
   - **identity**: Core personality and role prompt (the most critical field)
   - **guidelines**: Behavioral instructions for responses
   - **toolPolicy**: Instructions for how the agent should use its tools
-  - **enabledTools**: Array of tool names or label prefixes (e.g. 'label:coding', 'label:web', 'label:health')
+  - **availableTools**: Array of tool names or label prefixes (e.g. 'label:coding', 'label:web', 'label:health')
   - **usesDirectoryTree**: Whether to inject workspace structure (for coding agents)
   - **usesCodingGuidelines**: Whether to inject coding conventions
 - You can browse the web to research Lucide icons, color palettes, or domain-specific knowledge for persona design.`;
@@ -37,7 +37,7 @@ const META_RESPONSE_GUIDELINES = `# Response Guidelines
 - When you have enough information, present a summary of the proposed agent configuration before calling create_custom_agent or update_custom_agent.
 - Explain your design choices — why you picked a certain icon, color, or tool set.
 - After creation or modification, confirm success and explain how to select or test the new agent.
-- For tool selection, use search_tools to discover available tools matching the agent's domain before finalizing enabledTools.
+- For tool selection, use search_tools to discover available tools matching the agent's domain before finalizing availableTools.
 - Write identity prompts that are vivid, specific, and establish clear behavioral boundaries.
 - Write guidelines that are actionable — use bullet points, markdown headers, and concrete examples.
 - Write tool policies that prevent misuse and encourage efficient tool chains.`;
@@ -46,7 +46,7 @@ const META_INTERACTION_RULES = `# Interaction Rules
 - If the user gives a vague request like "make me a cooking agent", ask follow-up questions about personality, tone, specific tool needs, and visual preferences.
 - If the user wants to edit or inspect existing agents, use list_custom_agents to view their current configurations and IDs.
 - If the user gives a detailed spec, proceed directly to creating or modifying the agent.
-- Always use search_tools to verify that requested tools exist before including them in enabledTools.
+- Always use search_tools to verify that requested tools exist before including them in availableTools.
 - Suggest appropriate label-based tool groups (e.g. 'label:health' for health agents, 'label:web' for web-aware agents) to avoid listing individual tools when a label covers the category.
 - When designing the identity field, write it in second person ("You are...") and include personality traits, domain expertise, behavioral rules, and response style.
 - Pick icons and colors that match the agent's theme — don't use generic defaults.
@@ -57,7 +57,7 @@ const META_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
     content: `# Tool Use Policy
 - Use list_custom_agents FIRST to view existing agents and obtain their configurations and database IDs.
-- Use search_tools when the user mentions a domain or capability — discover what tools are available before designing the enabledTools array.
+- Use search_tools when the user mentions a domain or capability — discover what tools are available before designing the availableTools array.
 - Use create_custom_agent only AFTER presenting the proposed configuration to the user and receiving their approval (or if they've given you a complete spec upfront).
 - Use update_custom_agent to modify an existing custom agent after verifying its current state.
 - NEVER create or update an agent without at least a name and identity — these are required fields.`,
@@ -108,7 +108,7 @@ export const MetaPersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(META_TOOL_POLICY_SECTIONS, context),
-  enabledTools: META_ENABLED_TOOLS,
+  availableTools: META_ENABLED_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
   usesCodingGuidelines: false,

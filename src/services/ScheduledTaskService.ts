@@ -247,6 +247,15 @@ const ScheduledTaskService = {
     };
 
     // 1. Create agent session stub document
+    const settings = {
+      provider: task.provider,
+      model: task.model,
+      agent: task.agent,
+      workspaceRoot: workspacePath,
+      toolConfig: (task as any).toolConfig,
+    };
+
+    // 1. Create agent session stub document
     // Top-level `agent` is required for per-agent filtering in GET /conversations
     // (the user sidebar queries with ?agent=OMNI etc.). Without it, the
     // conversation only appears in the admin view which doesn't filter by agent.
@@ -258,12 +267,7 @@ const ScheduledTaskService = {
       agent: task.agent,
       messages: [userTriggerMessage],
       systemPrompt: "",
-      settings: {
-        provider: task.provider,
-        model: task.model,
-        agent: task.agent,
-        workspaceRoot: workspacePath,
-      },
+      settings,
       modalities: { textIn: true, textOut: false },
       providers: [task.provider.toLowerCase()],
       totalCost: 0,
@@ -297,6 +301,7 @@ const ScheduledTaskService = {
           agenticLoopEnabled: true,
           functionCallingEnabled: true,
           planFirst: false,
+          ...((task as any).toolConfig?.enabledTools && { enabledTools: (task as any).toolConfig.enabledTools }),
         },
         agentSessionId: resolvedSessionId,
         userMessage: userTriggerMessage as ConversationMessage,
@@ -304,6 +309,7 @@ const ScheduledTaskService = {
           title: task.name,
           agent: task.agent,
           workspaceRoot: workspacePath,
+          settings,
         },
         traceId,
         project: task.project,
