@@ -466,6 +466,9 @@ function swapMsgContent(message: MessagePayload) {
         }
         // Strip ephemeral planning injection messages (cache-stable planning mode)
         if ((message as Record<string, unknown>)._isPlanningInjection === true) return false;
+        // Strip eagerly-persisted messages (timer reminders, scheduled task triggers)
+        // that were already appended to MongoDB before the agentic loop ran
+        if ((message as Record<string, unknown>)._alreadyPersisted === true) return false;
         return true;
       });
 
