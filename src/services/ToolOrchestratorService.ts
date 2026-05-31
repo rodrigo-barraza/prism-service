@@ -3,7 +3,7 @@ import MCPClientService from "./MCPClientService.ts";
 import logger from "../utils/logger.ts";
 import { COORDINATOR_ONLY_TOOLS } from "./CoordinatorPrompt.ts";
 import { createAbortController } from "../utils/AbortController.ts";
-import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { DOMAINS, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   TOOL_SCHEMA_FETCH_TIMEOUT_MS,
   TOOL_CONFIG_FETCH_TIMEOUT_MS,
@@ -537,23 +537,35 @@ export default class ToolOrchestratorService {
     ];
   }
 
-  /** Client-facing schemas (with domain/dataSource/labels, no endpoint) — for Prism Client UI */
+  /** Client-facing schemas (with domain/domainKey/dataSource/labels, no endpoint) — for Prism Client UI */
   static getClientToolSchemas() {
+    // Reverse map: display name → domainKey (e.g. "Core Tools" → "core")
+    const domainDisplayNameToKey = new Map<string, string>();
+    for (const entry of Object.values(DOMAINS)) {
+      if (!domainDisplayNameToKey.has(entry.displayName)) {
+        domainDisplayNameToKey.set(entry.displayName, entry.key);
+      }
+    }
+    const resolveDomainKey = (domain: string) => domainDisplayNameToKey.get(domain) || domain.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
     // Coordinator tools are Prism-local — add domain metadata for UI grouping
     const coordinatorClient = COORDINATOR_TOOL_SCHEMAS.map((tool) => ({
       ...tool,
       domain: "Core Tools",
+      domainKey: "core",
       labels: ["coding", "orchestration"],
       system: true,
     }));
 
     const internalClient = InternalToolRegistry.getClientSchemas().map((tool) => ({
       ...tool,
+      domainKey: resolveDomainKey(tool.domain || "Core Tools"),
       system: tool.domain === "Core Tools",
     }));
 
     const clientSchemasEnriched = cachedClientSchemas.map((tool) => ({
       ...tool,
+      domainKey: (tool.domainKey as string) || resolveDomainKey(tool.domain || "Other"),
       system: tool.domain === "Core Tools",
     }));
 
@@ -562,6 +574,7 @@ export default class ToolOrchestratorService {
       description: tool.description,
       parameters: tool.parameters,
       domain: tool.domain || `Model Context Protocol: ${tool._mcpServer}`,
+      domainKey: "mcp",
       labels: tool.labels || ["mcp", tool._mcpServer],
       system: false,
     }));
