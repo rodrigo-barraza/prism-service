@@ -327,10 +327,11 @@ router.get("/agents", (_req: Request, res: Response) => {
     if (!isWildcard) {
       const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
 
-      // System tools auto-included unless persona disables them
-      let systemToolNames: string[] = clientSchemas
-        .filter((tool) => tool.system === true)
-        .map((tool) => tool.name);
+      // System tools auto-included unless core tools are unlocked
+      const isCoreToolsLocked = persona?.coreToolsLocked ?? true;
+      let systemToolNames: string[] = isCoreToolsLocked
+        ? clientSchemas.filter((tool) => tool.system === true).map((tool) => tool.name)
+        : [];
 
       // Apply persona disabledTools denylist to system tools (enabledSet protects)
       if (persona?.disabledTools?.length) {
@@ -377,10 +378,11 @@ router.get("/tools", (_req: Request, res: Response) => {
     const persona = AgentPersonaRegistry.get(agentId);
     if (persona?.enabledTools) {
       const enabledSet = resolveEnabledToolsToSet(persona.enabledTools);
+      const isCoreToolsLocked = persona.coreToolsLocked ?? true;
       // null = wildcard ("*") → return all schemas unfiltered
       if (enabledSet !== null) {
         let filteredSchemas = schemas.filter(
-          (tool) => enabledSet.has(tool.name) || tool.system === true,
+          (tool) => enabledSet.has(tool.name) || (isCoreToolsLocked && tool.system === true),
         );
 
         // Apply persona disabledTools denylist (enabledSet protects)

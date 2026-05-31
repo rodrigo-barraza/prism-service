@@ -230,21 +230,23 @@ export default class AgenticToolResolver {
         enabledSet = new Set(resolvedEnabledTools);
       }
 
+      const resolvedPersona = agent ? AgentPersonaRegistry.get(agent) : null;
+      const isCoreToolsLocked = resolvedPersona?.coreToolsLocked ?? true;
+
       const preFilterCustom = finalTools
         .filter((tool) => tool._isCustom)
         .map((tool) => tool.name);
       finalTools = finalTools.filter(
-        (t) =>
-          enabledSet.has(t.name) ||
-          t._isCustom ||
-          t.name.startsWith("mcp__") ||
-          CORE_AGENTIC_TOOLS.has(t.name) ||
-          COORDINATOR_TOOL_NAMES.has(t.name) ||
-          PRISM_LOCAL_TOOL_NAMES.has(t.name),
+        (tool) =>
+          enabledSet.has(tool.name) ||
+          tool._isCustom ||
+          tool.name.startsWith("mcp__") ||
+          (isCoreToolsLocked && CORE_AGENTIC_TOOLS.has(tool.name)) ||
+          COORDINATOR_TOOL_NAMES.has(tool.name) ||
+          PRISM_LOCAL_TOOL_NAMES.has(tool.name),
       );
 
       // Apply disabledTools post-filter denylist from persona
-      const resolvedPersona = agent ? AgentPersonaRegistry.get(agent) : null;
       if (resolvedPersona?.disabledTools?.length) {
         const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
         const disabledSet = resolveToolEntriesToSet(resolvedPersona.disabledTools, clientSchemas);

@@ -110,6 +110,7 @@ const mockPersona = {
 };
 const mockLuposPersona = {
   enabledTools: ["read_file"],
+  coreToolsLocked: false,
 };
 vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
   default: {
