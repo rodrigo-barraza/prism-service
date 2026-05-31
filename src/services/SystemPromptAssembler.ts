@@ -13,6 +13,7 @@ import {
   COORDINATOR_ONLY_TOOLS,
 } from "./CoordinatorPrompt.ts";
 import { createAbortController } from "../utils/AbortController.ts";
+import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
 import { DIRECTORY_CACHE_TTL_MS, DIRECTORY_FETCH_TIMEOUT_MS } from "../constants.ts";
 
 const SKILL_RELEVANCE_THRESHOLD = 0.3;
@@ -175,37 +176,29 @@ export default class SystemPromptAssembler {
     }
 
     const hasPrefixed = enabledTools.some(
-      (enabledTool) => enabledTool.startsWith("label:") || enabledTool.startsWith("domain:"),
+      (enabledTool) => enabledTool.startsWith("label:") || enabledTool.startsWith("domain:") || enabledTool.startsWith("domainKey:"),
     );
 
-    const enabledSet = new Set<string>();
-    if (hasPrefixed) {
-      for (const entry of enabledTools) {
-        if (entry.startsWith("label:")) {
-          const label = entry.slice(6);
-          for (const toolSchema of schemas) {
-            if (toolSchema.labels?.includes(label)) enabledSet.add(toolSchema.name);
-          }
-        } else if (entry.startsWith("domain:")) {
-          const domain = entry.slice(7);
-          for (const toolSchema of schemas) {
-            if (toolSchema.domain === domain) enabledSet.add(toolSchema.name);
-          }
-        } else {
-          enabledSet.add(entry);
-        }
-      }
-    } else {
-      for (const entry of enabledTools) {
-        enabledSet.add(entry);
-      }
-    }
+    const enabledSet = hasPrefixed
+      ? resolveToolEntriesToSet(enabledTools, schemas)
+      : new Set(enabledTools);
 
-    const filteredSchemas = schemas.filter(
+    let filteredSchemas = schemas.filter(
       (toolSchema) =>
         enabledSet.has(toolSchema.name as string) ||
         (toolSchema as Record<string, unknown>).domain === "Core Tools"
     );
+
+    // Apply disabledTools post-filter denylist — enabledSet entries are protected
+    if (agentId) {
+      const persona = AgentPersonaRegistry.get(agentId);
+      if (persona?.disabledTools?.length) {
+        const disabledSet = resolveToolEntriesToSet(persona.disabledTools, schemas);
+        filteredSchemas = filteredSchemas.filter(
+          (toolSchema) => !disabledSet.has(toolSchema.name as string) || enabledSet.has(toolSchema.name as string),
+        );
+      }
+    }
 
     return this._formatToolDescriptions(filteredSchemas);
   }
@@ -491,36 +484,30 @@ export default class SystemPromptAssembler {
         let count = schemas.length;
         if (context.enabledTools) {
           const hasPrefixed = context.enabledTools.some(
-            (enabledTool) => enabledTool.startsWith("label:") || enabledTool.startsWith("domain:"),
+            (enabledTool) => enabledTool.startsWith("label:") || enabledTool.startsWith("domain:") || enabledTool.startsWith("domainKey:"),
           );
-          const enabledSet = new Set<string>();
-          if (hasPrefixed) {
-            for (const entry of context.enabledTools) {
-              if (entry.startsWith("label:")) {
-                const label = entry.slice(6);
-                for (const toolSchema of schemas) {
-                  if (toolSchema.labels?.includes(label)) enabledSet.add(toolSchema.name);
-                }
-              } else if (entry.startsWith("domain:")) {
-                const domain = entry.slice(7);
-                for (const toolSchema of schemas) {
-                  if (toolSchema.domain === domain) enabledSet.add(toolSchema.name);
-                }
-              } else {
-                enabledSet.add(entry);
-              }
-            }
-          } else {
-            for (const entry of context.enabledTools) {
-              enabledSet.add(entry);
-            }
-          }
+          const enabledSet = hasPrefixed
+            ? resolveToolEntriesToSet(context.enabledTools, schemas)
+            : new Set(context.enabledTools);
 
-          count = schemas.filter(
+          let filteredSchemas = schemas.filter(
             (toolSchema) =>
               enabledSet.has(toolSchema.name as string) ||
               (toolSchema as Record<string, unknown>).domain === "Core Tools"
-          ).length;
+          );
+
+          // Apply disabledTools post-filter denylist — enabledSet entries are protected
+          if (agentId) {
+            const assemblerPersona = AgentPersonaRegistry.get(agentId);
+            if (assemblerPersona?.disabledTools?.length) {
+              const disabledSet = resolveToolEntriesToSet(assemblerPersona.disabledTools, schemas);
+              filteredSchemas = filteredSchemas.filter(
+                (toolSchema) => !disabledSet.has(toolSchema.name as string) || enabledSet.has(toolSchema.name as string),
+              );
+            }
+          }
+
+          count = filteredSchemas.length;
         }
         sections.push(`## Available Tools (${count})\n` + toolDescriptions);
       }

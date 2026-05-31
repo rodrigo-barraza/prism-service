@@ -18,6 +18,7 @@ import rateLimitStore from "../services/RateLimitStore.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import LocalProviderGateway from "../services/LocalProviderGateway.ts";
 import { COORDINATOR_ONLY_TOOLS } from "../services/CoordinatorPrompt.ts";
+import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
 import {
   OPENAI_API_KEY,
   ANTHROPIC_API_KEY,
@@ -64,28 +65,12 @@ function resolveEnabledToolsToSet(enabledTools: string[] | undefined) {
   if (enabledTools.includes("*")) return null;
 
   const hasPrefixed = enabledTools.some(
-    (e) => e.startsWith("label:") || e.startsWith("domain:"),
+    (e) => e.startsWith("label:") || e.startsWith("domain:") || e.startsWith("domainKey:"),
   );
   if (!hasPrefixed) return new Set<string>(enabledTools);
 
   const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
-  const resolved = new Set<string>();
-  for (const entry of enabledTools) {
-    if (entry.startsWith("label:")) {
-      const label = entry.slice(6);
-      for (const tool of clientSchemas) {
-        if (tool.labels?.includes(label)) resolved.add(tool.name);
-      }
-    } else if (entry.startsWith("domain:")) {
-      const domain = entry.slice(7);
-      for (const tool of clientSchemas) {
-        if (tool.domain === domain) resolved.add(tool.name);
-      }
-    } else {
-      resolved.add(entry);
-    }
-  }
-  return resolved;
+  return resolveToolEntriesToSet(enabledTools, clientSchemas);
 }
 
 function filterByAvailableProviders(modelsMap: Record<string, ModelOptionEntry[]>) {
@@ -341,10 +326,19 @@ router.get("/agents", (_req: Request, res: Response) => {
 
     if (!isWildcard) {
       const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
-      const isLupos = first.id === "LUPOS";
-      const systemToolNames = isLupos
-        ? []
-        : clientSchemas.filter((tool) => tool.system === true).map((t) => t.name);
+
+      // System tools auto-included unless persona disables them
+      let systemToolNames: string[] = clientSchemas
+        .filter((tool) => tool.system === true)
+        .map((tool) => tool.name);
+
+      // Apply persona disabledTools denylist to system tools (enabledSet protects)
+      if (persona?.disabledTools?.length) {
+        const disabledSet = resolveToolEntriesToSet(persona.disabledTools, clientSchemas);
+        systemToolNames = systemToolNames.filter(
+          (toolName) => !disabledSet.has(toolName) || resolvedTools.has(toolName),
+        );
+      }
 
       const unionSet = new Set([...finalToolNames, ...systemToolNames]);
       finalToolsCount = unionSet.size;
@@ -362,7 +356,7 @@ router.get("/agents", (_req: Request, res: Response) => {
       project: persona?.project,
       toolCount: finalToolsCount,
       enabledToolNames: finalToolNames,
-      coreToolsLocked: first.id !== "LUPOS",
+      coreToolsLocked: persona?.coreToolsLocked ?? true,
       canSpawnWorkers: COORDINATOR_ONLY_TOOLS.includes("create_team"),
       usesDirectoryTree: persona?.usesDirectoryTree || false,
       usesCodingGuidelines: persona?.usesCodingGuidelines || false,
@@ -385,10 +379,19 @@ router.get("/tools", (_req: Request, res: Response) => {
       const enabledSet = resolveEnabledToolsToSet(persona.enabledTools);
       // null = wildcard ("*") → return all schemas unfiltered
       if (enabledSet !== null) {
-        const isLupos = agentId === "LUPOS";
-        return res.json(
-          schemas.filter((tool) => enabledSet.has(tool.name) || (!isLupos && tool.system === true)),
+        let filteredSchemas = schemas.filter(
+          (tool) => enabledSet.has(tool.name) || tool.system === true,
         );
+
+        // Apply persona disabledTools denylist (enabledSet protects)
+        if (persona.disabledTools?.length) {
+          const disabledSet = resolveToolEntriesToSet(persona.disabledTools, schemas);
+          filteredSchemas = filteredSchemas.filter(
+            (tool) => !disabledSet.has(tool.name) || enabledSet.has(tool.name),
+          );
+        }
+
+        return res.json(filteredSchemas);
       }
     }
   }

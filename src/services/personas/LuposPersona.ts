@@ -1,4 +1,4 @@
-import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
+import { DOMAIN_KEY_TAGS, LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -292,6 +292,21 @@ export const LuposPersona: Persona = {
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(LUPOS_TOOL_POLICY_SECTIONS, context),
   enabledTools: LUPOS_ENABLED_TOOLS,
+  disabledTools: [
+    DOMAIN_KEY_TAGS.COORDINATOR,
+    DOMAIN_KEY_TAGS.WORKSPACE,
+    DOMAIN_KEY_TAGS.SKILLS,
+    DOMAIN_KEY_TAGS.CONTROL,
+    DOMAIN_KEY_TAGS.TASKS,
+    DOMAIN_KEY_TAGS.AGENTS,
+    DOMAIN_KEY_TAGS.TOOLS,
+    DOMAIN_KEY_TAGS.STRUCTURED,
+    DOMAIN_KEY_TAGS.MCP,
+    DOMAIN_KEY_TAGS.BROWSER,
+    DOMAIN_KEY_TAGS.TORRENT,
+    DOMAIN_KEY_TAGS.META,
+  ],
+  coreToolsLocked: false,
   capabilities: "",
   usesDirectoryTree: false,
   usesCodingGuidelines: false,

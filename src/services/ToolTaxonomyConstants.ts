@@ -3,6 +3,7 @@ export {
   DOMAINS,
   LABEL_TAGS,
   DOMAIN_TAGS,
+  DOMAIN_KEY_TAGS,
   TOOL_NAMES,
   SSE_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -14,4 +15,9 @@ export type {
   SseEventType,
   StatusMessage,
   AgentId,
+  DomainConstantKey,
+  DomainEntry,
+  DomainKey,
+  DomainDisplayName,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+

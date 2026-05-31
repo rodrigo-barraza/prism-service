@@ -54,6 +54,10 @@ export interface Persona {
   interactionRules: string;
   toolPolicy: string | ((context: PersonaContext) => string);
   enabledTools: string[];
+  /** Post-filter denylist — strips tools after all resolution (supports domainKey:, domain:, label:, exact names). Tools explicitly in enabledTools are protected. */
+  disabledTools?: string[];
+  /** Controls whether core tools are locked (always-on, non-toggleable) in the client UI. Default: true. */
+  coreToolsLocked?: boolean;
   /** Declarative tool call policies (serialized for custom agents). */
   policies?: PolicyRule[];
   capabilities: string;

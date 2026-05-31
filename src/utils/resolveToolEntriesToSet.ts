@@ -1,0 +1,52 @@
+// ────────────────────────────────────────────────────────────
+// resolveToolEntriesToSet — Shared DSL Expansion Utility
+// ────────────────────────────────────────────────────────────
+// Resolves an array of tool entry strings into a Set of concrete
+// tool names by expanding prefix-based entries:
+//
+//   - "label:discord"           → all tools with labels containing "discord"
+//   - "domainKey:workspace"     → all tools with domainKey === "workspace"
+//   - "domain:Core Tools"       → all tools with domain === "Core Tools"
+//   - "calculate_precise"       → exact tool name passthrough
+//
+// Used by AgenticToolResolver, SystemPromptAssembler, and ConfigRoutes
+// to avoid duplicating prefix expansion logic.
+// ────────────────────────────────────────────────────────────
+
+interface ToolSchemaForResolution {
+  name: string;
+  domain?: string;
+  domainKey?: string;
+  labels?: string[];
+  [key: string]: unknown;
+}
+
+export function resolveToolEntriesToSet(
+  entries: string[],
+  schemas: ToolSchemaForResolution[],
+): Set<string> {
+  const resolvedSet = new Set<string>();
+
+  for (const entry of entries) {
+    if (entry.startsWith("label:")) {
+      const label = entry.slice(6);
+      for (const toolSchema of schemas) {
+        if (toolSchema.labels?.includes(label)) resolvedSet.add(toolSchema.name);
+      }
+    } else if (entry.startsWith("domainKey:")) {
+      const domainKey = entry.slice(10);
+      for (const toolSchema of schemas) {
+        if (toolSchema.domainKey === domainKey) resolvedSet.add(toolSchema.name);
+      }
+    } else if (entry.startsWith("domain:")) {
+      const domain = entry.slice(7);
+      for (const toolSchema of schemas) {
+        if (toolSchema.domain === domain) resolvedSet.add(toolSchema.name);
+      }
+    } else {
+      resolvedSet.add(entry);
+    }
+  }
+
+  return resolvedSet;
+}

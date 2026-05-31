@@ -7,6 +7,7 @@ import { COORDINATOR_ONLY_TOOLS } from "./CoordinatorPrompt.ts";
 import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
 import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TYPES } from "../config.ts";
+import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -215,28 +216,13 @@ export default class AgenticToolResolver {
     let finalTools = dynamicTools;
     if (resolvedEnabledTools && Array.isArray(resolvedEnabledTools)) {
       const hasPrefixed = resolvedEnabledTools.some(
-        (e) => e.startsWith("label:") || e.startsWith("domain:"),
+        (e) => e.startsWith("label:") || e.startsWith("domain:") || e.startsWith("domainKey:"),
       );
 
       let enabledSet: Set<string>;
       if (hasPrefixed) {
         const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
-        enabledSet = new Set();
-        for (const entry of resolvedEnabledTools) {
-          if (entry.startsWith("label:")) {
-            const label = entry.slice(6);
-            for (const tool of clientSchemas) {
-              if (tool.labels?.includes(label)) enabledSet.add(tool.name);
-            }
-          } else if (entry.startsWith("domain:")) {
-            const domain = entry.slice(7);
-            for (const tool of clientSchemas) {
-              if (tool.domain === domain) enabledSet.add(tool.name);
-            }
-          } else {
-            enabledSet.add(entry);
-          }
-        }
+        enabledSet = resolveToolEntriesToSet(resolvedEnabledTools, clientSchemas);
         logger.info(
           `[AgenticLoop] Expanded ${resolvedEnabledTools.length} enabledTools entries → ${enabledSet.size} unique tools`,
         );
@@ -247,17 +233,29 @@ export default class AgenticToolResolver {
       const preFilterCustom = finalTools
         .filter((tool) => tool._isCustom)
         .map((tool) => tool.name);
-      const isLupos = agent === "LUPOS";
       finalTools = finalTools.filter(
         (t) =>
           enabledSet.has(t.name) ||
           t._isCustom ||
-          (!isLupos &&
-            (t.name.startsWith("mcp__") ||
-              CORE_AGENTIC_TOOLS.has(t.name) ||
-              COORDINATOR_TOOL_NAMES.has(t.name) ||
-              PRISM_LOCAL_TOOL_NAMES.has(t.name))),
+          t.name.startsWith("mcp__") ||
+          CORE_AGENTIC_TOOLS.has(t.name) ||
+          COORDINATOR_TOOL_NAMES.has(t.name) ||
+          PRISM_LOCAL_TOOL_NAMES.has(t.name),
       );
+
+      // Apply disabledTools post-filter denylist from persona
+      const resolvedPersona = agent ? AgentPersonaRegistry.get(agent) : null;
+      if (resolvedPersona?.disabledTools?.length) {
+        const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
+        const disabledSet = resolveToolEntriesToSet(resolvedPersona.disabledTools, clientSchemas);
+        finalTools = finalTools.filter(
+          (tool) => !disabledSet.has(tool.name) || enabledSet.has(tool.name),
+        );
+        logger.info(
+          `[AgenticLoop] Applied disabledTools denylist (${disabledSet.size} tools blocked, enabledSet protects ${enabledSet.size})`,
+        );
+      }
+
       const postFilterCustom = finalTools
         .filter((tool) => tool._isCustom)
         .map((tool) => tool.name);
