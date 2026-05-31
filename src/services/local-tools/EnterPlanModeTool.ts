@@ -26,7 +26,7 @@ export default {
     },
   },
 
-  domain: "Control Flow",
+  domain: "Core Tools",
   labels: ["coding"],
 
   async execute(args: EnterPlanModeArgs) {

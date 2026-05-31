@@ -86,7 +86,7 @@ const createSkill = {
       required: ["name", "prompt"],
     },
   },
-  domain: "Skills",
+  domain: "Core Tools",
   labels: ["coding", "automation"],
   async execute(args: Record<string, unknown>) {
     const createArgs = args as unknown as SkillCreateArgs;
@@ -119,7 +119,7 @@ const executeSkill = {
       required: ["skillId"],
     },
   },
-  domain: "Skills",
+  domain: "Core Tools",
   labels: ["coding", "automation"],
   async execute(args: Record<string, unknown>, context: ToolContext) {
     const execArgs = args as unknown as SkillExecuteArgs;
@@ -170,7 +170,7 @@ const listSkills = {
       required: [],
     },
   },
-  domain: "Skills",
+  domain: "Core Tools",
   labels: ["coding", "automation"],
   async execute(args: Record<string, unknown>, context: ToolContext) {
     const listArgs = args as unknown as SkillListArgs;
@@ -192,7 +192,7 @@ const deleteSkill = {
       required: ["skillId"],
     },
   },
-  domain: "Skills",
+  domain: "Core Tools",
   labels: ["coding", "automation"],
   async execute(args: Record<string, unknown>) {
     const deleteArgs = args as unknown as SkillDeleteArgs;

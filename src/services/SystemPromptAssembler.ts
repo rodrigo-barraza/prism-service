@@ -2,12 +2,12 @@ import ToolOrchestratorService from "./ToolOrchestratorService.ts";
 import MemoryService from "./MemoryService.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import EmbeddingService from "./EmbeddingService.ts";
-import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
+
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { TOOLS_SERVICE_URL, MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
-import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
+
 import {
   getCoordinatorPromptAddendum,
   COORDINATOR_ONLY_TOOLS,
@@ -201,19 +201,10 @@ export default class SystemPromptAssembler {
       }
     }
 
-    // Define the core agentic, coordinator, and local tools
-    const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
-    const COORDINATOR_TOOL_NAMES = new Set(COORDINATOR_ONLY_TOOLS);
-    const PRISM_LOCAL_TOOL_NAMES = InternalToolRegistry.getNames();
-
     const filteredSchemas = schemas.filter(
       (toolSchema) =>
         enabledSet.has(toolSchema.name as string) ||
-        (agentId !== "LUPOS" && (
-          CORE_AGENTIC_TOOLS.has(toolSchema.name as string) ||
-          COORDINATOR_TOOL_NAMES.has(toolSchema.name as string) ||
-          PRISM_LOCAL_TOOL_NAMES.has(toolSchema.name as string)
-        ))
+        (agentId !== "LUPOS" && (toolSchema as Record<string, unknown>).domain === "Core Tools")
     );
 
     return this._formatToolDescriptions(filteredSchemas);
@@ -525,18 +516,10 @@ export default class SystemPromptAssembler {
             }
           }
 
-          const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
-          const COORDINATOR_TOOL_NAMES = new Set(COORDINATOR_ONLY_TOOLS);
-          const PRISM_LOCAL_TOOL_NAMES = InternalToolRegistry.getNames();
-
           count = schemas.filter(
             (toolSchema) =>
               enabledSet.has(toolSchema.name as string) ||
-              (agentId !== "LUPOS" && (
-                CORE_AGENTIC_TOOLS.has(toolSchema.name as string) ||
-                COORDINATOR_TOOL_NAMES.has(toolSchema.name as string) ||
-                PRISM_LOCAL_TOOL_NAMES.has(toolSchema.name as string)
-              ))
+              (agentId !== "LUPOS" && (toolSchema as Record<string, unknown>).domain === "Core Tools")
           ).length;
         }
         sections.push(`## Available Tools (${count})\n` + toolDescriptions);
