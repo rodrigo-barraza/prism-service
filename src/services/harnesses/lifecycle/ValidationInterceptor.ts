@@ -19,7 +19,7 @@ import type { ToolCall, ToolResult, AgenticContext, ValidationFeedback } from ".
  * (Cursor, Windsurf, Claude Code) to dramatically reduce cascading errors.
  */
 
-const FILE_MUTATING_TOOLS = new Set([
+const FILE_MUTATING_TOOLS: Set<string> = new Set([
   TOOL_NAMES.WRITE_FILE,
   TOOL_NAMES.STR_REPLACE_FILE,
   TOOL_NAMES.PATCH_FILE,
@@ -106,7 +106,7 @@ async function runShellValidator(
 
   try {
     const shellResult = await ToolOrchestratorService.executeTool(
-      "run_command",
+      TOOL_NAMES.RUN_COMMAND,
       {
         command: validatorConfig.command,
         cwd: executionCwd,

@@ -1,5 +1,6 @@
 import BaseAgenticHarness from "./BaseAgenticHarness.ts";
 import logger from "../../utils/logger.ts";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
 import { executeToolBatch } from "./lifecycle/ToolExecutor.ts";
@@ -92,7 +93,7 @@ export default class ReActHarness extends BaseAgenticHarness {
     });
 
     if (options.planFirst) {
-      emit({ type: "status", message: "plan_mode_entered" });
+      emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.PLAN_MODE_ENTERED });
     }
 
     // ── Main loop ────────────────────────────────────────────
@@ -100,8 +101,8 @@ export default class ReActHarness extends BaseAgenticHarness {
       state.iterations++;
 
       emit({
-        type: "status",
-        message: "iteration_progress",
+        type: SSE_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.ITERATION_PROGRESS,
         iteration: state.iterations,
         maxIterations: resolvedMaxIterations,
       });
@@ -140,8 +141,8 @@ export default class ReActHarness extends BaseAgenticHarness {
           hookContext._injectedSkills.length > 0
         ) {
           emit({
-            type: "status",
-            message: "skills_injected",
+            type: SSE_EVENT_TYPES.STATUS,
+            message: STATUS_MESSAGES.SKILLS_INJECTED,
             skills: hookContext._injectedSkills,
           });
         }
@@ -257,7 +258,7 @@ export default class ReActHarness extends BaseAgenticHarness {
       if (signal?.aborted) break;
 
       emit({
-        type: "usage_update",
+        type: SSE_EVENT_TYPES.USAGE_UPDATE,
         usage: { ...state.overallUsage, requests: state.iterations },
       });
 
@@ -389,8 +390,8 @@ export default class ReActHarness extends BaseAgenticHarness {
           });
 
           emit({
-            type: "status",
-            message: "validation_errors_detected",
+            type: SSE_EVENT_TYPES.STATUS,
+            message: STATUS_MESSAGES.VALIDATION_ERRORS_DETECTED,
             count: validationFeedback.length,
           });
           this.logIteration(pass, currentMessages);

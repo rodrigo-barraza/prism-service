@@ -1,5 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { formatCostTag, roundMs } from "@rodrigo-barraza/utilities-library";
+import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response, NextFunction } from "express";
 import {
   finalizeTextGeneration,
@@ -569,7 +570,7 @@ export async function handleConversation(
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
-        emit({ type: "error", message: (error as Error).message });
+        emit({ type: SSE_EVENT_TYPES.ERROR, message: (error as Error).message });
     return;
   }
   const {
@@ -691,7 +692,7 @@ export async function handleConversation(
       messages: context.rawMessages || [],
       options: {},
     });
-        emit({ type: "error", message: (error as Error).message });
+        emit({ type: SSE_EVENT_TYPES.ERROR, message: (error as Error).message });
   }
 }
 // ─── Agent session path (agentSessionId, no conversationId) ─
@@ -706,7 +707,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
-        emit({ type: "error", message: (error as Error).message });
+        emit({ type: SSE_EVENT_TYPES.ERROR, message: (error as Error).message });
     return;
   }
   const {
@@ -829,7 +830,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
       messages: context.rawMessages || [],
       options: {},
     });
-        emit({ type: "error", message: (error as Error).message });
+        emit({ type: SSE_EVENT_TYPES.ERROR, message: (error as Error).message });
   }
 }
 // ─── Dispatch: Image API models (e.g. GPT Image 1.5, OpenAI images) ─
@@ -939,10 +940,10 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
   });
   // Emit events
   if (result.text) {
-    emit({ type: "chunk", content: result.text });
+    emit({ type: SSE_EVENT_TYPES.CHUNK, content: result.text });
   }
   emit({
-    type: "image",
+    type: SSE_EVENT_TYPES.IMAGE,
     data: result.imageData,
     mimeType: result.mimeType || "image/png",
     minioRef,
@@ -990,7 +991,7 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
     );
   }
   emit({
-    type: "done",
+    type: SSE_EVENT_TYPES.DONE,
     usage: result.usage || null,
     estimatedCost,
     totalTime: totalSec,
@@ -1084,7 +1085,7 @@ async function handleStreamingText(context: GenerationContext) {
     // Execute all pending tool calls
     for (const toolCall of pendingCalls) {
       emit({
-        type: "toolCall",
+        type: SSE_EVENT_TYPES.TOOL_CALL,
         id: toolCall.id,
         name: toolCall.name,
         args: toolCall.args,
@@ -1099,7 +1100,7 @@ async function handleStreamingText(context: GenerationContext) {
         toolCall.result = result;
         toolCall.status = (result && typeof result === "object" && "error" in result && result.error) ? "error" : "done";
         emit({
-          type: "toolCall",
+          type: SSE_EVENT_TYPES.TOOL_CALL,
           id: toolCall.id,
           name: toolCall.name,
           args: toolCall.args,
@@ -1110,7 +1111,7 @@ async function handleStreamingText(context: GenerationContext) {
         toolCall.result = { error: (error as Error).message };
         toolCall.status = "error";
         emit({
-          type: "toolCall",
+          type: SSE_EVENT_TYPES.TOOL_CALL,
           id: toolCall.id,
           name: toolCall.name,
           args: toolCall.args,
@@ -1185,7 +1186,7 @@ async function handleStreamingText(context: GenerationContext) {
     // per-iteration token counts instead of relying on chunk heuristics
     if (streamState.usage) {
       emit({
-        type: "usage_update",
+        type: SSE_EVENT_TYPES.USAGE_UPDATE,
         usage: { ...(streamState.usage as Record<string, unknown>), requests: fcIteration + 1 },
       });
     }
@@ -1272,15 +1273,15 @@ async function handleNonStreamingText(context: GenerationContext) {
   }
   // Emit chunk/thinking/toolCall events before finalization
   if (genResult.text) {
-    emit({ type: "chunk", content: genResult.text });
+    emit({ type: SSE_EVENT_TYPES.CHUNK, content: genResult.text });
   }
   if (genResult.thinking) {
-    emit({ type: "thinking", content: genResult.thinking });
+    emit({ type: SSE_EVENT_TYPES.THINKING, content: genResult.thinking });
   }
   if (genResult.toolCalls && genResult.toolCalls.length > 0) {
     for (const toolCall of genResult.toolCalls) {
       emit({
-        type: "toolCall",
+        type: SSE_EVENT_TYPES.TOOL_CALL,
         id: toolCall.id || null,
         name: toolCall.name,
         args: toolCall.args || {},
@@ -1314,7 +1315,7 @@ async function handleNonStreamingText(context: GenerationContext) {
         );
       }
       emit({
-        type: "image",
+        type: SSE_EVENT_TYPES.IMAGE,
         data: image.data,
         mimeType: image.mimeType,
         minioRef,

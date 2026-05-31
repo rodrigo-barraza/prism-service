@@ -1,4 +1,5 @@
 import { daysSinceIso } from "@rodrigo-barraza/utilities-library";
+import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
 import MemoryService from "./MemoryService.ts";
@@ -800,7 +801,7 @@ async function processBatch(
           )
         : null;
       broadcast({
-        type: "usage_update",
+        type: SSE_EVENT_TYPES.USAGE_UPDATE,
         operation: "memory:consolidate",
         usage: {
           requests: 1,

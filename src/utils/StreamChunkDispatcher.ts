@@ -7,6 +7,7 @@
 
 import FileService from "../services/FileService.ts";
 import logger from "./logger.ts";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { TokenUsage, ToolCallEntry } from "../types/admin.ts";
 
 // ── Types ────────────────────────────────────────────────────
@@ -137,8 +138,8 @@ function emitFirstToken(state: StreamState, emit: StreamContext["emit"]): void {
     state.firstTokenTime = performance.now();
     if (state.requestStart) {
       emit({
-        type: "status",
-        message: "generation_started",
+        type: SSE_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.GENERATION_STARTED,
         timeToFirstToken: (state.firstTokenTime - state.requestStart) / 1000,
       });
     }
@@ -172,7 +173,7 @@ export async function dispatchChunk(
     state.outputCharacters = cleanText.length;
     if (chunkStr)
       emit({
-        type: "chunk",
+        type: SSE_EVENT_TYPES.CHUNK,
         content: chunkStr,
         outputCharacters: state.outputCharacters,
       });
@@ -197,7 +198,7 @@ export async function dispatchChunk(
       state.thinking += chunk.content || "";
       state.outputCharacters += (chunk.content || "").length;
       emit({
-        type: "thinking",
+        type: SSE_EVENT_TYPES.THINKING,
         content: chunk.content,
         outputCharacters: state.outputCharacters,
       });
@@ -220,7 +221,7 @@ export async function dispatchChunk(
         );
       }
       emit({
-        type: "image",
+        type: SSE_EVENT_TYPES.IMAGE,
         data: chunk.data,
         mimeType: chunk.mimeType,
         minioRef,
@@ -230,7 +231,7 @@ export async function dispatchChunk(
 
     case "executableCode":
       emit({
-        type: "executableCode",
+        type: SSE_EVENT_TYPES.EXECUTABLE_CODE,
         code: chunk.code,
         language: chunk.language,
       });
@@ -238,18 +239,18 @@ export async function dispatchChunk(
 
     case "codeExecutionResult":
       emit({
-        type: "codeExecutionResult",
+        type: SSE_EVENT_TYPES.CODE_EXECUTION_RESULT,
         output: chunk.output,
         outcome: chunk.outcome,
       });
       return true;
 
     case "webSearchResult":
-      emit({ type: "webSearchResult", results: chunk.results });
+      emit({ type: SSE_EVENT_TYPES.WEB_SEARCH_RESULT, results: chunk.results });
       return true;
 
     case "audio":
-      emit({ type: "audio", data: chunk.data, mimeType: chunk.mimeType });
+      emit({ type: SSE_EVENT_TYPES.AUDIO, data: chunk.data, mimeType: chunk.mimeType });
       if (chunk.data) state.audioChunks.push(chunk.data);
       if (chunk.mimeType) {
         const rateMatch = chunk.mimeType.match(/rate=(\d+)/);
@@ -287,7 +288,7 @@ export async function dispatchChunk(
         });
       }
       emit({
-        type: "toolCall",
+        type: SSE_EVENT_TYPES.TOOL_CALL,
         id: chunk.id || null,
         responsesItemId: chunk.responsesItemId || undefined,
         name: chunk.name,
@@ -307,7 +308,7 @@ export async function dispatchChunk(
 
     case "status":
       emit({
-        type: "status",
+        type: SSE_EVENT_TYPES.STATUS,
         message: chunk.message,
         phase: chunk.phase,
         ...(chunk.progress != null && { progress: chunk.progress }),
@@ -325,7 +326,7 @@ export async function dispatchChunk(
       state.outputCharacters = cleanText.length;
       if (chunkStr)
         emit({
-          type: "chunk",
+          type: SSE_EVENT_TYPES.CHUNK,
           content: chunkStr,
           outputCharacters: state.outputCharacters,
         });

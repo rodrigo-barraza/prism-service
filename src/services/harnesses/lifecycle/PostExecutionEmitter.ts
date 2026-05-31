@@ -1,4 +1,6 @@
 import logger from "../../../utils/logger.ts";
+import { TOOL_NAMES } from "../../ToolTaxonomyConstants.ts";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type { ToolCall, ToolResult, PassState, EmitFn } from "../types.ts";
@@ -22,24 +24,26 @@ export function emitPostExecutionStatus(
   if (
     toolCalls.some(
       (toolCall) =>
+        // TODO(cleanup): Remove "task_" startsWith once historical sessions have aged out
         toolCall.name.includes("_task") || toolCall.name.startsWith("task_"),
     )
   ) {
-    emit({ type: "status", message: "tasks_updated" });
+    emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.TASKS_UPDATED });
   }
 
   if (
     toolCalls.some(
       (toolCall) =>
         toolCall.name === "create_team" ||
+        // TODO(cleanup): Remove "team_create" once historical sessions have aged out
         toolCall.name === "team_create" ||
         toolCall.name === "stop_agent",
     )
   ) {
-    emit({ type: "status", message: "workers_updated" });
+    emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.WORKERS_UPDATED });
   }
 
-  if (toolCalls.some((toolCall) => toolCall.name === "upsert_memory")) {
+  if (toolCalls.some((toolCall) => toolCall.name === TOOL_NAMES.UPSERT_MEMORY)) {
     emit({ type: "status", message: "memories_updated" });
   }
 }
@@ -76,7 +80,7 @@ export async function processToolResultMedia(
     }
 
     emit({
-      type: "tool_execution",
+      type: SSE_EVENT_TYPES.TOOL_EXECUTION,
       tool: {
         name: toolCall.name,
         args: toolCall.args || {},
@@ -99,7 +103,7 @@ export async function processToolResultMedia(
       state.streamedImages.push(toolImgRef);
       pass.streamedImages.push(toolImgRef);
       emit({
-        type: "image",
+        type: SSE_EVENT_TYPES.IMAGE,
         data: imageResult.data,
         mimeType: imageResult.mimeType,
         minioRef: imageResult.minioRef,
@@ -131,7 +135,7 @@ export function trackToolErrors(
           `[AgenticLoop] Tool "${toolCall.name}" hit error limit (${count}), skipping in future iterations`,
         );
         emit({
-          type: "status",
+          type: SSE_EVENT_TYPES.STATUS,
           message: `Tool "${toolCall.name}" failed ${count} times consecutively — skipping`,
         });
       }

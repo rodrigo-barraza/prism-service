@@ -17,7 +17,7 @@ import { COLLECTIONS } from "../constants.ts";
  *   - Read-through: getStore() loads from MongoDB on first access
  *
  * Use cases:
- *   - Pagination cursors (web_search, list_directory)
+ *   - Pagination cursors (search_web, list_directory)
  *   - Browser tab/session state (browser_action)
  *   - Cumulative diff tracking (str_replace_file rollback)
  *   - MCP connection state across invocations

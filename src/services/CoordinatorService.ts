@@ -13,6 +13,7 @@ import {
 } from "../providers/instance-registry.ts";
 import RequestLogger from "./RequestLogger.ts";
 import { parseJsonFromLlmResponse } from "@rodrigo-barraza/utilities-library";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import localModelQueue from "./LocalModelQueue.ts";
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
 import { COORDINATOR_ONLY_TOOLS } from "./CoordinatorPrompt.ts";
@@ -687,7 +688,7 @@ export default class CoordinatorService {
       // Notify frontend immediately so the StatusBar stops showing "Generating..."
       if (coordinatorCtx.emit) {
         coordinatorCtx.emit({
-          type: "worker_status",
+          type: SSE_EVENT_TYPES.WORKER_STATUS,
           workerId: agentId,
           message: "failed",
           error: (error as Error).message,
@@ -697,7 +698,7 @@ export default class CoordinatorService {
 
     // Notify UI that worker state changed
     if (coordinatorCtx.emit) {
-      coordinatorCtx.emit({ type: "status", message: "workers_updated" });
+      coordinatorCtx.emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.WORKERS_UPDATED });
     }
 
     const workerResult = buildWorkerResult(workerState);
@@ -1251,8 +1252,8 @@ export default class CoordinatorService {
         hwmInputTokens = Math.max(hwmInputTokens, stats.totalInputTokens);
         hwmTotalTokens = Math.max(hwmTotalTokens, stats.totalTokens);
         parentEmit!({
-          type: "status",
-          message: "generation_progress",
+          type: SSE_EVENT_TYPES.STATUS,
+          message: STATUS_MESSAGES.GENERATION_PROGRESS,
           tokPerSec: stats.tokPerSec,
           activeRequests: stats.activeRequests,
           outputTokens: hwmOutputTokens,

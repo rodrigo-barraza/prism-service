@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 interface TodoItemInput {
   content: string;
@@ -25,7 +26,7 @@ interface TodoStats {
 }
 
 interface TodoEmitEvent {
-  type: "todo_update";
+  type: typeof SSE_EVENT_TYPES.TODO_UPDATE;
   items: TodoItemNormalized[];
   stats: TodoStats;
 }
@@ -106,7 +107,7 @@ export default {
     );
 
     if (typedContext._emit) {
-      typedContext._emit({ type: "todo_update", items: normalized, stats });
+      typedContext._emit({ type: SSE_EVENT_TYPES.TODO_UPDATE, items: normalized, stats });
     }
 
     return { acknowledged: true, items: normalized, stats };

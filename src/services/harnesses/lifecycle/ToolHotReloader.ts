@@ -1,6 +1,7 @@
 import MongoWrapper from "../../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../../config.ts";
 import logger from "../../../utils/logger.ts";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type { ToolCall, ResolvedTools, EmitFn } from "../types.ts";
 
@@ -87,7 +88,7 @@ export async function reloadIfCustomToolsMutated(
       `[ToolHotReloader] Reloaded ${freshCustomTools.length} custom tool(s) into live session`,
     );
 
-    emit({ type: "status", message: "custom_tools_updated" });
+    emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.CUSTOM_TOOLS_UPDATED });
     return true;
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? (error as Error).message : String(error);

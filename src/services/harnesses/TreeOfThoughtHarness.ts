@@ -1,5 +1,6 @@
 import BaseAgenticHarness from "./BaseAgenticHarness.ts";
 import logger from "../../utils/logger.ts";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
 import { executeToolBatch } from "./lifecycle/ToolExecutor.ts";
@@ -135,8 +136,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       hookContext._injectedSkills.length > 0
     ) {
       emit({
-        type: "status",
-        message: "skills_injected",
+        type: SSE_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.SKILLS_INJECTED,
         skills: hookContext._injectedSkills,
       });
     }
@@ -146,8 +147,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       state.iterations++;
 
       emit({
-        type: "status",
-        message: "iteration_progress",
+        type: SSE_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.ITERATION_PROGRESS,
         iteration: state.iterations,
         maxIterations: resolvedMaxIterations,
         harness: "tree_of_thought",
@@ -209,8 +210,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
       emit({
-        type: "status",
-        message: "branching_started",
+        type: SSE_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.BRANCHING_STARTED,
         branchCount,
         iteration: state.iterations,
       });
@@ -257,8 +258,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       state.selectedBranchScores.push(selectedBranch.score);
 
       emit({
-        type: "status",
-        message: "branch_selected",
+        type: SSE_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.BRANCH_SELECTED,
         branchIndex: selectedBranch.branchIndex,
         score: selectedBranch.score,
         branchCount,
@@ -298,7 +299,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       }
 
       emit({
-        type: "usage_update",
+        type: SSE_EVENT_TYPES.USAGE_UPDATE,
         usage: { ...state.overallUsage, requests: state.iterations },
       });
 
@@ -375,8 +376,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
         if (validationFeedback.length > 0 && scoredBranches.length > 1) {
           state.branchesBacktracked++;
           emit({
-            type: "status",
-            message: "branch_backtracked",
+            type: SSE_EVENT_TYPES.STATUS,
+            message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
             branchIndex: selectedBranch.branchIndex,
             validationErrors: validationFeedback.length,
           });

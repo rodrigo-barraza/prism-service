@@ -6,6 +6,7 @@ import RequestLogger from "./RequestLogger.ts";
 import SettingsService from "./SettingsService.ts";
 import logger from "../utils/logger.ts";
 import { parseJsonFromLlmResponse } from "@rodrigo-barraza/utilities-library";
+import { TOOL_NAMES, SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   estimateTokens,
   calculateTextCost,
@@ -173,7 +174,7 @@ export default class MemoryExtractor {
     // skip extraction — the agent's explicit memory writes take precedence.
     // This prevents duplicate or conflicting memories from the extraction
     // pipeline when the agent has already decided what to remember.
-    if (toolCalls?.some((toolCall) => toolCall.name === "upsert_memory")) {
+    if (toolCalls?.some((toolCall) => toolCall.name === TOOL_NAMES.UPSERT_MEMORY)) {
       logger.info(
         `[MemoryExtractor] Skipping — main agent used upsert_memory this turn (mutual exclusion)`,
       );
@@ -295,7 +296,7 @@ export default class MemoryExtractor {
                 )
               : null;
             emit({
-              type: "usage_update",
+              type: SSE_EVENT_TYPES.USAGE_UPDATE,
               operation: "memory:extract",
               usage: {
                 requests: 1,
@@ -421,8 +422,8 @@ export default class MemoryExtractor {
         .then((stored) => {
           if (stored?.length > 0 && context.emit) {
             context.emit({
-              type: "status",
-              message: "memories_updated",
+              type: SSE_EVENT_TYPES.STATUS,
+              message: STATUS_MESSAGES.MEMORIES_UPDATED,
               count: stored.length,
             });
           }
