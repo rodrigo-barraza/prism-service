@@ -187,7 +187,9 @@ function buildGenerateConfig(options: ProviderOptions, modelDef: ModelDef | null
   if (options.presencePenalty !== undefined) config.presencePenalty = options.presencePenalty;
   if (options.frequencyPenalty !== undefined) config.frequencyPenalty = options.frequencyPenalty;
   if (options.stopSequences !== undefined) config.stopSequences = options.stopSequences;
-  if (options.maxTokens !== undefined) config.maxOutputTokens = options.maxTokens;
+  if (options.maxTokens !== undefined && options.maxTokens !== null && options.maxTokens > 0) {
+    config.maxOutputTokens = options.maxTokens;
+  }
   if (options.seed !== undefined) config.seed = parseInt(String(options.seed));
   if (options.responseFormat === "json_object") config.responseMimeType = "application/json";
 
@@ -545,7 +547,9 @@ const googleProvider = {
       if (options.temperature !== undefined) liveConfig.temperature = options.temperature;
       if (options.topP !== undefined) liveConfig.topP = options.topP;
       if (options.topK !== undefined) liveConfig.topK = options.topK;
-      if (options.maxTokens !== undefined) liveConfig.maxOutputTokens = options.maxTokens;
+      if (options.maxTokens !== undefined && options.maxTokens !== null && options.maxTokens > 0) {
+        liveConfig.maxOutputTokens = options.maxTokens;
+      }
 
       const supportsThinking = modelDef?.thinking === true;
       if (
