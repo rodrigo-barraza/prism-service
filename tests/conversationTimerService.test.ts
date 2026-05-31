@@ -76,6 +76,7 @@ vi.mock("../src/providers/index.ts", () => ({
 const mockFindOne = vi.fn();
 const mockUpdateOne = vi.fn().mockResolvedValue({ modifiedCount: 1 });
 const mockUpdateMany = vi.fn().mockResolvedValue({ modifiedCount: 0 });
+const mockFindOneAndUpdate = vi.fn().mockResolvedValue({ id: "timer-test-001" });
 const mockFindDocuments = vi.fn().mockReturnValue({
   sort: vi.fn().mockReturnValue({
     toArray: vi.fn().mockResolvedValue([]),
@@ -89,6 +90,7 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
         findOne: (...args: unknown[]) => mockFindOne(...args),
         updateOne: (...args: unknown[]) => mockUpdateOne(...args),
         updateMany: (...args: unknown[]) => mockUpdateMany(...args),
+        findOneAndUpdate: (...args: unknown[]) => mockFindOneAndUpdate(...args),
         find: (...args: unknown[]) => mockFindDocuments(...args),
         insertOne: vi.fn().mockResolvedValue({ insertedId: "test" }),
       }),
@@ -312,7 +314,7 @@ describe("ConversationTimerService.tick — isGenerating lifecycle", () => {
     await ConversationTimerService.tick();
 
     // Timer status should have been updated to "fired"
-    expect(mockUpdateOne).toHaveBeenCalled();
+    expect(mockFindOneAndUpdate).toHaveBeenCalled();
     // Reminder message should have been appended
     expect(mockAppendMessages).toHaveBeenCalled();
   });
@@ -341,7 +343,7 @@ describe("ConversationTimerService.tick — isGenerating lifecycle", () => {
     await ConversationTimerService.tick();
 
     // Timer status should have been updated to "fired"
-    expect(mockUpdateOne).toHaveBeenCalled();
+    expect(mockFindOneAndUpdate).toHaveBeenCalled();
     
     // Reminder message should have been appended with collection set to model_conversations
     expect(mockAppendMessages).toHaveBeenCalledWith(
