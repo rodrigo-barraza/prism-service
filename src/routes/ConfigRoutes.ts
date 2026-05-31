@@ -359,6 +359,7 @@ router.get("/agents", (_req: Request, res: Response) => {
       project: persona?.project,
       toolCount: finalToolsCount,
       enabledToolNames: finalToolNames,
+      coreToolsLocked: first.id !== "LUPOS",
       canSpawnWorkers: COORDINATOR_ONLY_TOOLS.includes("create_team"),
       usesDirectoryTree: persona?.usesDirectoryTree || false,
       usesCodingGuidelines: persona?.usesCodingGuidelines || false,
