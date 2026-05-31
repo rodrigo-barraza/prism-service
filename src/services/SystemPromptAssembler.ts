@@ -204,7 +204,7 @@ export default class SystemPromptAssembler {
     const filteredSchemas = schemas.filter(
       (toolSchema) =>
         enabledSet.has(toolSchema.name as string) ||
-        (agentId !== "LUPOS" && (toolSchema as Record<string, unknown>).domain === "Core Tools")
+        (toolSchema as Record<string, unknown>).domain === "Core Tools"
     );
 
     return this._formatToolDescriptions(filteredSchemas);
@@ -519,7 +519,7 @@ export default class SystemPromptAssembler {
           count = schemas.filter(
             (toolSchema) =>
               enabledSet.has(toolSchema.name as string) ||
-              (agentId !== "LUPOS" && (toolSchema as Record<string, unknown>).domain === "Core Tools")
+              (toolSchema as Record<string, unknown>).domain === "Core Tools"
           ).length;
         }
         sections.push(`## Available Tools (${count})\n` + toolDescriptions);
