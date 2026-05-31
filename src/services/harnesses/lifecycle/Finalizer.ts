@@ -432,22 +432,28 @@ function swapMsgContent(message: MessagePayload) {
         },
       });
     }
-    const meta = conversationMeta
-      ? {
-          ...conversationMeta,
-          settings: { provider: providerName, model: resolvedModel },
-        }
-      : undefined;
-    // Merge parentAgentSessionId, workspaceRoot, and agent into meta for persistence
-    let finalMeta: Record<string, unknown> | undefined = meta as Record<string, unknown> | undefined;
+    const mergedSettings = {
+      ...(conversationMeta?.settings || {}),
+      provider: providerName,
+      model: resolvedModel,
+      agent: agent || undefined,
+      workspaceRoot: workspaceRoot || undefined,
+      options: options || undefined,
+    };
+
+    const finalMeta: Record<string, unknown> = {
+      ...(conversationMeta || {}),
+      settings: mergedSettings,
+    };
+
     if (parentAgentSessionId) {
-            finalMeta = { ...(finalMeta || {}), parentAgentSessionId };
+      finalMeta.parentAgentSessionId = parentAgentSessionId;
     }
     if (workspaceRoot) {
-            finalMeta = { ...(finalMeta || {}), workspaceRoot };
+      finalMeta.workspaceRoot = workspaceRoot;
     }
     if (agent) {
-            finalMeta = { ...(finalMeta || {}), agent };
+      finalMeta.agent = agent;
     }
     // Ensure all user messages to append are properly swapped/sanitized,
     // then filter out synthetic compaction artifacts that should never

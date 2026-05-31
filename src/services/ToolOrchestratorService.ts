@@ -331,6 +331,8 @@ function buildContextHeaders(context: ToolExecutionContext = {}): Record<string,
   if (context.enabledTools && Array.isArray(context.enabledTools)) {
     headers["X-Enabled-Tools"] = context.enabledTools.join(",");
   }
+  if (context._providerName) headers["X-Provider"] = context._providerName;
+  if (context._resolvedModel) headers["X-Model"] = context._resolvedModel;
   return headers;
 }
 
