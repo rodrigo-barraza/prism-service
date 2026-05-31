@@ -51,7 +51,8 @@ function extractNewTurnMessages(
           message.role === "user" &&
           typeof message.content === "string" &&
           message.content.startsWith("[CONTEXT NOTE:")
-        ),
+        ) &&
+        !(message as any)._alreadyPersisted,
     );
 }
 
@@ -68,6 +69,7 @@ function sanitizeMessagesToAppend(
       if (message.content.startsWith("[Conversation Summary")) return false;
       if (message.isCompactSummary === true) return false;
     }
+    if ((message as any)._alreadyPersisted === true) return false;
     return true;
   });
 }
@@ -926,5 +928,70 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
     expect(newTurnMessages[0].role).toBe("assistant");
     expect(newTurnMessages[0].content).toBe("Starting database check...");
     expect(newTurnMessages[0].toolCalls![0].name).toBe("run_integrity_check");
+  });
+
+  it("defense-in-depth: filters _alreadyPersisted even when originalMessageCount drifts from compaction", () => {
+    // Simulates the production bug: auto-compaction or context truncation
+    // adjusts originalMessageCount incorrectly, causing the slice to include
+    // the already-persisted reminder. The _alreadyPersisted filter catches it.
+    //
+    // Pre-compaction: [system, user1, assistant1, user2, assistant2, reminder(_ap)]
+    // originalMessageCount = 6
+    // After compaction: [system, summary, reminder(_ap)]
+    // Correct adjusted originalMessageCount = 3 → sliceIndex = 3 (correct)
+    // But if compaction math drifts by -1 → originalMessageCount = 2
+    // Then sliceIndex = 1 (wrong) and reminder leaks into newTurnMessages
+
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "You are a creative assistant." },
+      { role: "assistant", content: "[Conversation summary]" },
+      {
+        role: "user",
+        content: "🔔 Notification: Drink water!",
+        _alreadyPersisted: true,
+      },
+      {
+        role: "assistant",
+        content: "Here's your water reminder! 💧",
+      },
+    ];
+    // Simulate the drift: originalMessageCount is wrong (should be 3, but is 2)
+    // lastOriginalMessage = currentMessages[2-1] = assistant summary (no _alreadyPersisted)
+    // sliceIndex = Math.max(0, 2-1) = 1
+    // currentMessages.slice(1) = [summary, reminder(_ap), assistant]
+    // Without _alreadyPersisted filter: reminder leaks through → DUPLICATE!
+    // With _alreadyPersisted filter: reminder stripped → only [summary, assistant]
+    const driftedOriginalMessageCount = 2;
+
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessages,
+      driftedOriginalMessageCount,
+    );
+
+    // The summary is a non-user message so it passes through, plus the assistant
+    // But critically, the _alreadyPersisted reminder is STRIPPED
+    const hasReminder = newTurnMessages.some(
+      (message) => message.content === "🔔 Notification: Drink water!",
+    );
+    expect(hasReminder).toBe(false);
+
+    // Verify the assistant response IS included
+    const hasAssistantResponse = newTurnMessages.some(
+      (message) => message.content === "Here's your water reminder! 💧",
+    );
+    expect(hasAssistantResponse).toBe(true);
+
+    // Also verify sanitizeMessagesToAppend catches it as a second defense layer
+    const messagesWithPersisted: TestMessage[] = [
+      {
+        role: "user",
+        content: "🔔 Notification: Drink water!",
+        _alreadyPersisted: true,
+      },
+      { role: "assistant", content: "Reminder delivered!" },
+    ];
+    const sanitized = sanitizeMessagesToAppend(messagesWithPersisted);
+    expect(sanitized).toHaveLength(1);
+    expect(sanitized[0].role).toBe("assistant");
   });
 });

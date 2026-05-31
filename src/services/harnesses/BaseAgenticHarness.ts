@@ -611,7 +611,8 @@ export default class BaseAgenticHarness {
           message.role === "user" &&
           typeof message.content === "string" &&
           message.content.startsWith("[CONTEXT NOTE:")
-        ),
+        ) &&
+        !(message as any)._alreadyPersisted,
     );
 
     logger.info(
