@@ -247,14 +247,16 @@ export default class AgenticToolResolver {
       const preFilterCustom = finalTools
         .filter((tool) => tool._isCustom)
         .map((tool) => tool.name);
+      const isLupos = agent === "LUPOS";
       finalTools = finalTools.filter(
         (t) =>
           enabledSet.has(t.name) ||
           t._isCustom ||
-          t.name.startsWith("mcp__") ||
-          CORE_AGENTIC_TOOLS.has(t.name) ||
-          COORDINATOR_TOOL_NAMES.has(t.name) ||
-          PRISM_LOCAL_TOOL_NAMES.has(t.name),
+          (!isLupos &&
+            (t.name.startsWith("mcp__") ||
+              CORE_AGENTIC_TOOLS.has(t.name) ||
+              COORDINATOR_TOOL_NAMES.has(t.name) ||
+              PRISM_LOCAL_TOOL_NAMES.has(t.name))),
       );
       const postFilterCustom = finalTools
         .filter((tool) => tool._isCustom)

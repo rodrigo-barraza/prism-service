@@ -341,7 +341,10 @@ router.get("/agents", (_req: Request, res: Response) => {
 
     if (!isWildcard) {
       const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
-      const systemToolNames = clientSchemas.filter((tool) => tool.system === true).map((t) => t.name);
+      const isLupos = first.id === "LUPOS";
+      const systemToolNames = isLupos
+        ? []
+        : clientSchemas.filter((tool) => tool.system === true).map((t) => t.name);
 
       const unionSet = new Set([...finalToolNames, ...systemToolNames]);
       finalToolsCount = unionSet.size;
@@ -359,7 +362,7 @@ router.get("/agents", (_req: Request, res: Response) => {
       project: persona?.project,
       toolCount: finalToolsCount,
       enabledToolNames: finalToolNames,
-      coreToolsLocked: true,
+      coreToolsLocked: first.id !== "LUPOS",
       canSpawnWorkers: COORDINATOR_ONLY_TOOLS.includes("create_team"),
       usesDirectoryTree: persona?.usesDirectoryTree || false,
       usesCodingGuidelines: persona?.usesCodingGuidelines || false,
@@ -382,7 +385,10 @@ router.get("/tools", (_req: Request, res: Response) => {
       const enabledSet = resolveEnabledToolsToSet(persona.enabledTools);
       // null = wildcard ("*") → return all schemas unfiltered
       if (enabledSet !== null) {
-        return res.json(schemas.filter((tool) => enabledSet.has(tool.name) || tool.system === true));
+        const isLupos = agentId === "LUPOS";
+        return res.json(
+          schemas.filter((tool) => enabledSet.has(tool.name) || (!isLupos && tool.system === true)),
+        );
       }
     }
   }
