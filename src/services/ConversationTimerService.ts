@@ -285,9 +285,10 @@ const ConversationTimerService = {
 
         // 2. Append timer fired message to the conversation
         const reminderMessage = {
-          role: "user",
+          role: "user" as const,
           content: `🔔 Notification: ${timer.prompt}`,
           timestamp: nowTimestamp,
+          _alreadyPersisted: true,
         };
 
         await ConversationService.appendMessages(

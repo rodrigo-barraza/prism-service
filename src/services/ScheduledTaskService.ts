@@ -231,19 +231,20 @@ const ScheduledTaskService = {
       finalPrompt += `\n\nTrigger payload: ${JSON.stringify(payload)}`;
     }
 
+    const userTriggerMessage = {
+      role: "user" as const,
+      content: finalPrompt,
+      timestamp: nowISO,
+      _alreadyPersisted: true,
+    };
+
     // 1. Create agent session stub document
     await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).insertOne({
       id: agentSessionId,
       project: task.project,
       username: "system",
       title: task.name,
-      messages: [
-        {
-          role: "user",
-          content: finalPrompt,
-          timestamp: nowISO,
-        },
-      ],
+      messages: [userTriggerMessage],
       systemPrompt: "",
       settings: {
         provider: task.provider,
@@ -278,31 +279,15 @@ const ScheduledTaskService = {
         providerName: task.provider,
         resolvedModel: task.model,
         modelDef,
-        messages: [
-          {
-            role: "user",
-            content: finalPrompt,
-            timestamp: nowISO,
-          } as ConversationMessage,
-        ],
-        originalMessages: [
-          {
-            role: "user",
-            content: finalPrompt,
-            timestamp: nowISO,
-          } as ConversationMessage,
-        ],
+        messages: [userTriggerMessage as ConversationMessage],
+        originalMessages: [userTriggerMessage as ConversationMessage],
         options: {
           agenticLoopEnabled: true,
           functionCallingEnabled: true,
           planFirst: false,
         },
         agentSessionId,
-        userMessage: {
-          role: "user",
-          content: finalPrompt,
-          timestamp: nowISO,
-        } as ConversationMessage,
+        userMessage: userTriggerMessage as ConversationMessage,
         conversationMeta: {
           title: task.name,
           agent: task.agent || null,

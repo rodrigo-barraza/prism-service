@@ -595,9 +595,17 @@ export default class BaseAgenticHarness {
     const { cleanSegments, cleanTextFragments, cleanThinkingFragments } =
       state.getCleanDisplayData();
 
-    const newTurnMessages = currentMessages.slice(
-      Math.max(0, state.originalMessageCount - 1),
-    ).filter(
+    // If the last message of the original context was already persisted (e.g. background timer reminder or scheduled task),
+    // we slice from originalMessageCount so we don't append it again. Otherwise, we slice from
+    // originalMessageCount - 1 to capture the user's triggering message for this turn.
+    const lastOriginalMessage = context.messages[state.originalMessageCount - 1];
+    const isLastAlreadyPersisted = lastOriginalMessage && (lastOriginalMessage as any)._alreadyPersisted;
+
+    const sliceIndex = isLastAlreadyPersisted
+      ? state.originalMessageCount
+      : Math.max(0, state.originalMessageCount - 1);
+
+    const newTurnMessages = currentMessages.slice(sliceIndex).filter(
       (message) =>
         !(
           message.role === "user" &&

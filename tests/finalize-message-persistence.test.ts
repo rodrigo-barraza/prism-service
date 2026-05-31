@@ -23,6 +23,7 @@ interface TestMessage {
     result?: unknown;
   }>;
   isCompactSummary?: boolean;
+  _alreadyPersisted?: boolean;
 }
 
 /**
@@ -35,8 +36,15 @@ function extractNewTurnMessages(
   currentMessages: TestMessage[],
   originalMessageCount: number,
 ): TestMessage[] {
+  const lastOriginalMessage = currentMessages[originalMessageCount - 1];
+  const isLastAlreadyPersisted = lastOriginalMessage && (lastOriginalMessage as any)._alreadyPersisted;
+
+  const sliceIndex = isLastAlreadyPersisted
+    ? originalMessageCount
+    : Math.max(0, originalMessageCount - 1);
+
   return currentMessages
-    .slice(Math.max(0, originalMessageCount - 1))
+    .slice(sliceIndex)
     .filter(
       (message) =>
         !(
@@ -844,5 +852,79 @@ describe("Full round-trip: DB state after appendAndFinalize", () => {
         userMessages[index - 1].content,
       );
     }
+  });
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SCENARIO 9: Background Timers & Scheduled Tasks (Eager Append)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+describe("newTurnMessages slice — background timer / scheduled task", () => {
+  it("skips eagerly persisted triggering message when _alreadyPersisted is true", () => {
+    // Timer fires: DB eagerly appends "🔔 Notification"
+    // contextMessages = [system, user1, assistant1, reminderMessage(_alreadyPersisted: true)]
+    // originalMessageCount = 4
+    // Model responds with "Here's your reminder"
+    // currentMessages = [system, user1, assistant1, reminderMessage, assistant2]
+
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "You are a creative assistant." },
+      { role: "user", content: "hey whats up" },
+      { role: "assistant", content: "Hey Rodrigo! What's good?" },
+      {
+        role: "user",
+        content: "🔔 Notification: Rodrigo, your 1-minute timer is up!",
+        _alreadyPersisted: true,
+      },
+    ];
+    const originalMessageCount = 4;
+
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessages,
+      originalMessageCount,
+    );
+
+    // Should slice from 4 (skipping the reminderMessage) → newTurnMessages is empty!
+    expect(newTurnMessages).toHaveLength(0);
+  });
+
+  it("handles background execution with intermediate tool calls correctly", () => {
+    // Scheduled task runs: DB eagerly appends scheduled task triggering user message
+    // originalMessageCount = 1
+    // Loop run 1 (tool call): [userTrigger(_alreadyPersisted: true), assistant_tool]
+    // Loop run 2 (breaks): [userTrigger, assistant_tool]
+    // currentMessages = [userTrigger, assistant_tool]
+
+    const currentMessages: TestMessage[] = [
+      {
+        role: "user",
+        content: "Run database integrity check",
+        _alreadyPersisted: true,
+      },
+      {
+        role: "assistant",
+        content: "Starting database check...",
+        toolCalls: [
+          {
+            id: "tc-0",
+            name: "run_integrity_check",
+            args: {},
+            result: { success: true },
+          },
+        ],
+      },
+    ];
+    const originalMessageCount = 1;
+
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessages,
+      originalMessageCount,
+    );
+
+    // Should slice from 1 (skipping userTrigger) → newTurnMessages contains assistant_tool
+    expect(newTurnMessages).toHaveLength(1);
+    expect(newTurnMessages[0].role).toBe("assistant");
+    expect(newTurnMessages[0].content).toBe("Starting database check...");
+    expect(newTurnMessages[0].toolCalls![0].name).toBe("run_integrity_check");
   });
 });
