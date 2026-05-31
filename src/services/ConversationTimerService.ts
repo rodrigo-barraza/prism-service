@@ -10,7 +10,6 @@ import { getModelByName } from "../config.ts";
 import { matchCron } from "./ScheduledTaskService.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
 
-import type { ConversationMessage } from "./harnesses/types.ts";
 import type { SseEvent } from "../types/SseTypes.ts";
 
 export interface ConversationTimer {
@@ -183,15 +182,26 @@ const ConversationTimerService = {
 
     for (const timer of dueTimers) {
       try {
-        // Fetch target conversation to check its current status
-        const conversation = await database.collection(COLLECTIONS.AGENT_CONVERSATIONS).findOne({
+        // Fetch target conversation to check its current status.
+        // Check agent_conversations first, then fallback to model_conversations.
+        let collection = COLLECTIONS.AGENT_CONVERSATIONS;
+        let conversation = await database.collection(collection).findOne({
           id: timer.conversationId,
           project: timer.project,
           username: timer.username,
         });
 
         if (!conversation) {
-          logger.warn(`[ConversationTimers] Conversation ${timer.conversationId} not found. Expiring timer.`);
+          collection = COLLECTIONS.MODEL_CONVERSATIONS;
+          conversation = await database.collection(collection).findOne({
+            id: timer.conversationId,
+            project: timer.project,
+            username: timer.username,
+          });
+        }
+
+        if (!conversation) {
+          logger.warn(`[ConversationTimers] Conversation ${timer.conversationId} not found in agent or model collections. Expiring timer.`);
           await database.collection(COLLECTIONS.CONVERSATION_TIMERS).updateOne(
             { id: timer.id },
             { $set: { status: "expired", updatedAt: nowTimestamp } }
@@ -206,7 +216,7 @@ const ConversationTimerService = {
           continue;
         }
 
-        logger.info(`[ConversationTimers] Firing due timer ${timer.id} for conversation ${timer.conversationId}.`);
+        logger.info(`[ConversationTimers] Firing due timer ${timer.id} for conversation ${timer.conversationId} in collection ${collection}.`);
 
         // Compute current minute key (to avoid cron double-fires in the same minute)
         const currentMinuteKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}T${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -270,11 +280,11 @@ const ConversationTimerService = {
           timer.username,
           [reminderMessage],
           null,
-          { collection: COLLECTIONS.AGENT_CONVERSATIONS }
+          { collection }
         );
 
         // 3. Trigger AgenticLoopService in the background
-        this.executeAgenticLoop(timer, conversation, reminderMessage).catch((error: unknown) => {
+        this.executeAgenticLoop(timer, conversation, reminderMessage, collection).catch((error: unknown) => {
           logger.error(`[ConversationTimers] Background loop failed for timer ${timer.id}: ${(error as Error).message}`);
         });
 
@@ -290,7 +300,8 @@ const ConversationTimerService = {
   async executeAgenticLoop(
     timer: ConversationTimer,
     conversation: Record<string, any>,
-    reminderMessage: any
+    reminderMessage: any,
+    collection: string = COLLECTIONS.AGENT_CONVERSATIONS
   ): Promise<void> {
     const database = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!database) return;
@@ -316,7 +327,6 @@ const ConversationTimerService = {
 
     const traceId = conversation.traceId || crypto.randomUUID();
     const requestId = crypto.randomUUID();
-    const nowISO = new Date().toISOString();
 
     // Reconstruct the message list for the agentic harness
     const contextMessages = [
@@ -335,7 +345,7 @@ const ConversationTimerService = {
       timer.project,
       timer.username,
       true,
-      { collection: COLLECTIONS.AGENT_CONVERSATIONS, agent }
+      { collection, agent }
     );
 
     try {
@@ -379,7 +389,7 @@ const ConversationTimerService = {
         timer.project,
         timer.username,
         false,
-        { collection: COLLECTIONS.AGENT_CONVERSATIONS }
+        { collection }
       ).catch(() => {});
     }
   },
