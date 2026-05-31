@@ -314,4 +314,73 @@ describe("ConversationTimerService.tick — isGenerating lifecycle", () => {
     // Reminder message should have been appended
     expect(mockAppendMessages).toHaveBeenCalled();
   });
+
+  it("should fallback to model_conversations when conversation is not in agent_conversations", async () => {
+    // Mock: find one due timer
+    mockFindDocuments.mockReturnValueOnce({
+      sort: vi.fn().mockReturnThis(),
+      toArray: vi.fn().mockResolvedValue([TIMER_FIXTURE]),
+    });
+
+    // Mock: agent_conversations findOne returns null, but model_conversations findOne succeeds
+    mockFindOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        ...CONVERSATION_FIXTURE,
+        isGenerating: false,
+      });
+
+    // Mock: timer update succeeds
+    mockUpdateOne.mockResolvedValue({ modifiedCount: 1 });
+
+    // Mock: agentic loop succeeds
+    mockRunAgenticLoop.mockResolvedValueOnce(undefined);
+
+    await ConversationTimerService.tick();
+
+    // Timer status should have been updated to "fired"
+    expect(mockUpdateOne).toHaveBeenCalled();
+    
+    // Reminder message should have been appended with collection set to model_conversations
+    expect(mockAppendMessages).toHaveBeenCalledWith(
+      "session-abc-123",
+      "coding",
+      "testuser",
+      expect.any(Array),
+      null,
+      { collection: "model_conversations" }
+    );
+  });
+
+  it("should expire timer if conversation is not found in either collection", async () => {
+    // Mock: find one due timer
+    mockFindDocuments.mockReturnValueOnce({
+      sort: vi.fn().mockReturnThis(),
+      toArray: vi.fn().mockResolvedValue([TIMER_FIXTURE]),
+    });
+
+    // Mock: both agent_conversations and model_conversations lookups return null
+    mockFindOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+
+    // Mock: timer update succeeds
+    mockUpdateOne.mockResolvedValue({ modifiedCount: 1 });
+
+    await ConversationTimerService.tick();
+
+    // Should have updated timer status to "expired"
+    expect(mockUpdateOne).toHaveBeenCalledWith(
+      { id: "timer-test-001" },
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          status: "expired"
+        })
+      })
+    );
+
+    // Should NOT have run agentic loop or appended messages
+    expect(mockRunAgenticLoop).not.toHaveBeenCalled();
+    expect(mockAppendMessages).not.toHaveBeenCalled();
+  });
 });
