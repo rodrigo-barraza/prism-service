@@ -35,7 +35,7 @@ const PROTECTED_RECENT_TURNS = 4;
  *
  * Matches Claude Code's COMPACTABLE_TOOLS set from microCompact.ts.
  */
-const COMPACTABLE_TOOLS = new Set([
+const COMPACTABLE_TOOLS: Set<string> = new Set([
   TOOL_NAMES.READ_FILE,
   TOOL_NAMES.EXECUTE_CODE,
   TOOL_NAMES.WEB_CONTENT,

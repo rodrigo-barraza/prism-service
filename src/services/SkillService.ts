@@ -90,7 +90,7 @@ const SkillService = {
 
     return {
       skill: sanitize(document),
-      message: `Skill "${name}" created. Execute with skill_execute({ skillId: "${skillId}" }).`,
+      message: `Skill "${name}" created. Execute with execute_skill({ skillId: "${skillId}" }).`,
     };
   },
 
@@ -162,7 +162,7 @@ const SkillService = {
     const document = await collection.findOne({ skillId });
     if (!document) {
       return {
-        error: `Skill "${skillId}" not found. Use skill_list to see available skills.`,
+        error: `Skill "${skillId}" not found. Use list_skills to see available skills.`,
       };
     }
 

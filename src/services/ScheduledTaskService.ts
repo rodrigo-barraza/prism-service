@@ -8,6 +8,7 @@ import { getModelByName } from "../config.ts";
 import logger from "../utils/logger.ts";
 import { SseEvent } from "../types/SseTypes.ts";
 import { ConversationMessage } from "./harnesses/types.ts";
+import { RecurrenceRule, matchRecurrenceRule } from "../utils/RecurrenceMatcher.ts";
 
 export interface ScheduledTask {
   id: string;
@@ -17,11 +18,12 @@ export interface ScheduledTask {
   agent: string | null;
   provider: string;
   model: string;
-  scheduleType: "hourly" | "daily" | "weekly" | "cron" | "trigger" | "once";
+  scheduleType: "hourly" | "daily" | "weekly" | "cron" | "trigger" | "once" | "custom";
   scheduleTime?: string; // "HH:MM" e.g. "09:00"
   scheduleDay?: number; // 0-6 (Sunday to Saturday)
   scheduleDate?: string; // "YYYY-MM-DD" e.g. "2026-05-25"
   cronExpression?: string; // e.g. "0 9 * * *"
+  recurrenceRule?: RecurrenceRule;
   enabled: boolean;
   lastRunMinute?: string; // "YYYY-MM-DDTHH:mm"
   createdAt: string;
@@ -157,6 +159,15 @@ const ScheduledTaskService = {
                   now.getDate() === dy &&
                   currentHour === sh &&
                   currentMin === sm;
+        } else if (task.scheduleType === "custom" && task.recurrenceRule && task.scheduleTime) {
+          const [sh, sm] = task.scheduleTime.split(":").map(Number);
+          const isTimeMatch = currentHour === sh && currentMin === sm;
+          if (isTimeMatch) {
+            const startDate = task.recurrenceRule.startDate
+              ? new Date(task.recurrenceRule.startDate)
+              : new Date(task.createdAt);
+            isDue = matchRecurrenceRule(task.recurrenceRule, startDate, now);
+          }
         }
 
         if (isDue) {

@@ -402,6 +402,11 @@ router.get(
 
       const pipeline: Record<string, unknown>[] = [
         { $match: match },
+        {
+          $addFields: {
+            toolCount: { $size: { $ifNull: ["$toolApiNames", []] } },
+          },
+        },
         { $unwind: "$toolApiNames" },
         ...(tool ? [{ $match: { toolApiNames: tool } }] : []),
         {
@@ -409,9 +414,33 @@ router.get(
             _id: "$toolApiNames",
             totalCalls: { $sum: 1 },
             totalRequests: { $addToSet: "$requestId" },
-            totalCost: COST_SUM_EXPR,
-            totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
-            totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
+            totalCost: {
+              $sum: {
+                $cond: [
+                  { $gt: ["$toolCount", 0] },
+                  { $divide: [{ $ifNull: ["$estimatedCost", 0] }, "$toolCount"] },
+                  0,
+                ],
+              },
+            },
+            totalInputTokens: {
+              $sum: {
+                $cond: [
+                  { $gt: ["$toolCount", 0] },
+                  { $divide: [{ $ifNull: ["$inputTokens", 0] }, "$toolCount"] },
+                  0,
+                ],
+              },
+            },
+            totalOutputTokens: {
+              $sum: {
+                $cond: [
+                  { $gt: ["$toolCount", 0] },
+                  { $divide: [{ $ifNull: ["$outputTokens", 0] }, "$toolCount"] },
+                  0,
+                ],
+              },
+            },
             avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
             firstUsed: { $min: "$timestamp" },
             lastUsed: { $max: "$timestamp" },

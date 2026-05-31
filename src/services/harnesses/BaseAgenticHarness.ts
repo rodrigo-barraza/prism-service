@@ -17,6 +17,7 @@ import { COLLECTIONS } from "../../constants.ts";
 import { finalizeTextGeneration, type FinalizerContext } from "./lifecycle/Finalizer.ts";
 import logger from "../../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type AgenticLoopState from "../AgenticLoopState.ts";
 import type AgentHooks from "../AgentHooks.ts";
@@ -104,8 +105,8 @@ export default class BaseAgenticHarness {
         state.overallOutputCharacters,
       );
       emit({
-        type: "status",
-        message: "generation_progress",
+        type: SSE_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.GENERATION_PROGRESS,
         tokPerSec: stats.tokPerSec,
         activeRequests: stats.activeRequests,
         outputTokens: state.hwmOutputTokens,
@@ -148,8 +149,8 @@ export default class BaseAgenticHarness {
     });
     if (contextResult.truncated) {
       emit({
-        type: "status",
-        message: "context_truncated",
+        type: SSE_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.CONTEXT_TRUNCATED,
         strategy: contextResult.strategy,
         estimatedTokens: contextResult.estimatedTokens,
       });
@@ -282,7 +283,7 @@ export default class BaseAgenticHarness {
       // Display segment tracking
       if (state.lastDisplaySegType !== "thinking") {
         state.displaySegments.push({
-          type: "thinking",
+          type: SSE_EVENT_TYPES.THINKING,
           fragmentIndex: state.displayThinkingFragments.length,
         });
         state.displayThinkingFragments.push("");
@@ -299,7 +300,7 @@ export default class BaseAgenticHarness {
         );
       }
       emit({
-        type: "thinking",
+        type: SSE_EVENT_TYPES.THINKING,
         content: streamChunk.content || "",
         outputCharacters: state.overallOutputCharacters,
       });
@@ -364,7 +365,7 @@ export default class BaseAgenticHarness {
           }
         }
         emit({
-          type: "toolCall",
+          type: SSE_EVENT_TYPES.TOOL_CALL,
           id: streamChunk.id || null,
           name: streamChunk.name,
           args: streamChunk.args || {},
@@ -396,7 +397,7 @@ export default class BaseAgenticHarness {
       state.streamedToolCalls.push({ ...toolCall });
       this._trackToolDisplaySegment(stdTcId);
       emit({
-        type: "tool_execution",
+        type: SSE_EVENT_TYPES.TOOL_EXECUTION,
         tool: { name: toolName, args: streamChunk.args || {}, id: stdTcId },
         status: "calling",
       });
@@ -430,7 +431,7 @@ export default class BaseAgenticHarness {
       return { action: "continue" };
     }
     if (streamChunk?.type === "audio") {
-      emit({ type: "audio", data: streamChunk.data, mimeType: streamChunk.mimeType });
+      emit({ type: SSE_EVENT_TYPES.AUDIO, data: streamChunk.data, mimeType: streamChunk.mimeType });
       if (streamChunk.data) state.streamedAudioChunks.push(streamChunk.data);
       if (streamChunk.mimeType) {
         const rateMatch = streamChunk.mimeType.match(/rate=(\d+)/);
@@ -440,7 +441,7 @@ export default class BaseAgenticHarness {
     }
     if (streamChunk?.type === "status") {
       const { type: _t, ...statusRest } = streamChunk;
-      emit({ type: "status", ...statusRest });
+      emit({ type: SSE_EVENT_TYPES.STATUS, ...statusRest });
       return { action: "continue" };
     }
 
@@ -460,7 +461,7 @@ export default class BaseAgenticHarness {
     // Display segment tracking
     if (state.lastDisplaySegType !== "text") {
       state.displaySegments.push({
-        type: "text",
+        type: SSE_EVENT_TYPES.TEXT,
         fragmentIndex: state.displayTextFragments.length,
       });
       state.displayTextFragments.push("");
@@ -476,7 +477,7 @@ export default class BaseAgenticHarness {
     }
     if (chunkStr)
       emit({
-        type: "chunk",
+        type: SSE_EVENT_TYPES.CHUNK,
         content: chunkStr,
         outputCharacters: state.overallOutputCharacters,
       });
@@ -642,7 +643,8 @@ export default class BaseAgenticHarness {
 
     // Persist worker snapshots for coordinator sessions
     if (
-      state.streamedToolCalls.some((toolCall) => toolCall.name === "team_create") &&
+      // TODO(cleanup): Remove "team_create" once historical sessions have aged out
+      state.streamedToolCalls.some((toolCall) => toolCall.name === "create_team" || toolCall.name === "team_create") &&
       agentSessionId
     ) {
       try {
@@ -713,8 +715,8 @@ export default class BaseAgenticHarness {
       const ttftSec = (pass.firstTokenTime - pass.start) / 1000;
       if (pass.requestId) SessionGenerationTracker.update(pass.requestId, { ttft: ttftSec });
       this.ctx.emit({
-        type: "status",
-        message: "generation_started",
+        type: SSE_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.GENERATION_STARTED,
         timeToFirstToken: ttftSec,
       });
     }
@@ -764,7 +766,7 @@ export default class BaseAgenticHarness {
       pass.streamedImages.push(imgRef);
     }
     emit({
-      type: "image",
+      type: SSE_EVENT_TYPES.IMAGE,
       ...(minioRef ? {} : { data: chunk.data }),
       mimeType: chunk.mimeType,
       minioRef,

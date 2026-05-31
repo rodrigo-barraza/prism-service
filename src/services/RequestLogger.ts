@@ -12,6 +12,8 @@ import { COLLECTIONS } from "../constants.ts";
 import { TYPES, getPricing } from "../config.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";
 const COLLECTION = COLLECTIONS.REQUESTS;
+// Maps provider-native API tool/feature names to human-readable display names.
+// These are NOT our custom tool names — they are keys from Anthropic/OpenAI/Google APIs.
 const API_TO_CANONICAL = {
   googleSearch: "Google Search",
   googleSearchRetrieval: "Google Search",

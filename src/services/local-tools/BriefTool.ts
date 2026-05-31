@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 export default {
   name: "brief",
@@ -60,7 +61,7 @@ export default {
     );
 
     if (context._emit) {
-      context._emit({ type: "brief_update", brief });
+      context._emit({ type: SSE_EVENT_TYPES.BRIEF_UPDATE, brief });
     }
 
     return { acknowledged: true, brief };

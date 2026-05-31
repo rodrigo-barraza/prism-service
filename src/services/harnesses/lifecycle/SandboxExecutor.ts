@@ -29,7 +29,7 @@ import type {
  * used by Cursor, Devin, and Factory for high-confidence tool execution.
  */
 
-const DESTRUCTIVE_TOOLS = new Set([
+const DESTRUCTIVE_TOOLS: Set<string> = new Set([
   TOOL_NAMES.WRITE_FILE,
   TOOL_NAMES.STR_REPLACE_FILE,
   TOOL_NAMES.PATCH_FILE,
@@ -56,7 +56,7 @@ async function createCheckpoint(
   try {
     // Stage all changes first so stash create captures untracked files
     await ToolOrchestratorService.executeTool(
-      "execute_shell",
+      TOOL_NAMES.EXECUTE_SHELL,
       {
         command: `timeout ${Math.floor(SANDBOX_SHELL_TIMEOUT_MS / 1000)}s git add -A`,
         cwd: workspaceRoot,
@@ -70,7 +70,7 @@ async function createCheckpoint(
     );
 
     const stashResult = await ToolOrchestratorService.executeTool(
-      "execute_shell",
+      TOOL_NAMES.EXECUTE_SHELL,
       {
         command: `timeout ${Math.floor(SANDBOX_SHELL_TIMEOUT_MS / 1000)}s git stash create`,
         cwd: workspaceRoot,
@@ -111,7 +111,7 @@ async function rollbackToCheckpoint(
 ): Promise<boolean> {
   try {
     await ToolOrchestratorService.executeTool(
-      "execute_shell",
+      TOOL_NAMES.EXECUTE_SHELL,
       {
         command: `timeout ${Math.floor(SANDBOX_SHELL_TIMEOUT_MS / 1000)}s git stash apply ${checkpointSha} 2>&1 || git checkout -- .`,
         cwd: workspaceRoot,

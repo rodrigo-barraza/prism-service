@@ -4,6 +4,7 @@ import SettingsService from "../SettingsService.ts";
 import RequestLogger from "../RequestLogger.ts";
 import logger from "../../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   estimateTokens,
   calculateTextCost,
@@ -186,7 +187,7 @@ export default class CompactionService {
     ];
 
     // ── Call the LLM ──────────────────────────────────────────
-    options.emit?.({ type: "status", message: "compaction_started" });
+    options.emit?.({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.COMPACTION_STARTED });
 
     const requestId = crypto.randomUUID();
     const requestStart = performance.now();
@@ -207,7 +208,7 @@ export default class CompactionService {
       logger.error(
         `[CompactionService] LLM call failed (failure ${this.consecutiveFailures}/${MAX_CONSECUTIVE_COMPACT_FAILURES}): ${compactionError}`,
       );
-      options.emit?.({ type: "status", message: "compaction_failed" });
+      options.emit?.({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.COMPACTION_FAILED });
       return null;
     } finally {
       // Log the compaction LLM call for cost tracking
@@ -244,7 +245,7 @@ export default class CompactionService {
       logger.warn(
         `[CompactionService] LLM returned no extractable summary. Failure ${this.consecutiveFailures}/${MAX_CONSECUTIVE_COMPACT_FAILURES}`,
       );
-      options.emit?.({ type: "status", message: "compaction_failed" });
+      options.emit?.({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.COMPACTION_FAILED });
       return null;
     }
 
@@ -280,8 +281,8 @@ export default class CompactionService {
     );
 
     options.emit?.({
-      type: "status",
-      message: "compaction_complete",
+      type: SSE_EVENT_TYPES.STATUS,
+      message: STATUS_MESSAGES.COMPACTION_COMPLETE,
       preCompactTokens: preCompactTokenCount,
       postCompactTokens: postCompactTokenCount,
     });
@@ -300,7 +301,7 @@ export default class CompactionService {
             )
           : null;
         options.emit({
-          type: "usage_update",
+          type: SSE_EVENT_TYPES.USAGE_UPDATE,
           operation: "compact:summarize",
           usage: {
             requests: 1,

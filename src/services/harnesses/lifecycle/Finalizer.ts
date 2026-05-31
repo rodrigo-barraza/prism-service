@@ -1,4 +1,5 @@
 import { formatCostTag, roundMs } from "@rodrigo-barraza/utilities-library";
+import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   calculateTextCost,
   getTotalInputTokens,
@@ -483,7 +484,7 @@ function swapMsgContent(message: MessagePayload) {
     if (!signal?.aborted) {
         if (emit) {
           emit({
-            type: "done",
+            type: SSE_EVENT_TYPES.DONE,
             provider: providerName,
             model: resolvedModel,
             usage: usage || null,

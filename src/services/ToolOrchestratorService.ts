@@ -784,7 +784,7 @@ export default class ToolOrchestratorService {
     // Models cannot reliably reproduce base64 data in tool arguments — they truncate it,
     // producing corrupt image buffers. Extract the real image from the last user message
     // and set it as the `input` arg so the tools-service receives valid data.
-    const IMAGE_INPUT_TOOLS = [TOOL_NAMES.CONVERT_IMAGE_TO_ASCII, TOOL_NAMES.MANIPULATE_IMAGE];
+    const IMAGE_INPUT_TOOLS: string[] = [TOOL_NAMES.CONVERT_IMAGE_TO_ASCII, TOOL_NAMES.MANIPULATE_IMAGE];
     if (IMAGE_INPUT_TOOLS.includes(name) && context.messages) {
       for (let i = context.messages.length - 1; i >= 0; i--) {
         const message = context.messages[i];

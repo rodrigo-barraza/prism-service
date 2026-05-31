@@ -1,4 +1,5 @@
 import { pendingApprovals } from "../../ApprovalRegistry.ts";
+import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { ToolCall, AgenticContext } from "../types.ts";
 import type AutoApprovalEngine from "../../AutoApprovalEngine.ts";
 
@@ -79,7 +80,7 @@ export async function checkAndWaitForApproval(
 
   if (!approvalResult?.approved) {
     emit({
-      type: "status",
+      type: SSE_EVENT_TYPES.STATUS,
       message: `Tool execution rejected: ${needsApproval.map((toolCall) => toolCall.name).join(", ")}`,
     });
     return { approved: false, approveAll: false };

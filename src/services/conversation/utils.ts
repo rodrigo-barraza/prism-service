@@ -98,8 +98,8 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
   };
 
   // TODO(cleanup): Remove "web_search" and "web_search_preview" once historical sessions have aged out
-  const WEB_SEARCH_NAMES = new Set([TOOL_NAMES.WEB_SEARCH, TOOL_NAMES.SEARCH_WEB, TOOL_NAMES.WEB_SEARCH_PREVIEW, TOOL_NAMES.SEARCH_WEB_PREVIEW]);
-  const CODE_EXEC_NAMES = new Set([TOOL_NAMES.CODE_EXECUTION]);
+  const WEB_SEARCH_NAMES: Set<string> = new Set([TOOL_NAMES.WEB_SEARCH, TOOL_NAMES.SEARCH_WEB, TOOL_NAMES.WEB_SEARCH_PREVIEW, TOOL_NAMES.SEARCH_WEB_PREVIEW]);
+  const CODE_EXEC_NAMES: Set<string> = new Set([TOOL_NAMES.CODE_EXECUTION]);
 
   for (const m of messages || []) {
     if (m.deleted) continue;
@@ -165,7 +165,7 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
     }
 
     // Tool result messages — mark as function calling
-    // (web_search and code_execution results are inlined, not stored as role:"tool")
+    // (provider-native web_search and code_execution results are inlined, not stored as role:"tool")
     if (m.role === "tool") {
       modalities.functionCalling = true;
     }

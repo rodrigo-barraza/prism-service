@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 // ── Worktree Isolation Tools ────────────────────────────────
 // Allows the agent to self-isolate into a git worktree for
@@ -116,8 +117,8 @@ const enterWorktree = {
 
     if (typedContext._emit) {
       typedContext._emit({
-        type: "status",
-        message: "worktree_entered",
+        type: SSE_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.WORKTREE_ENTERED,
         branch: branchName,
         path: createResult.worktreePath,
       });
@@ -219,8 +220,8 @@ const exitWorktree = {
 
     if (typedContext._emit) {
       typedContext._emit({
-        type: "status",
-        message: "worktree_exited",
+        type: SSE_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.WORKTREE_EXITED,
         action,
         branch: worktreeState.branchName as string,
       });

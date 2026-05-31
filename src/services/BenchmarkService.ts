@@ -1,4 +1,5 @@
 import { sleep, roundMs } from "@rodrigo-barraza/utilities-library";
+import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 // ─── Custom LLM Accuracy Benchmarking ───────────────────────
 import crypto from "crypto";
 import { handleConversation, handleAgent } from "../routes/ChatRoutes.ts";
@@ -357,7 +358,7 @@ async function runSingleModel(
         }),
         ...(model.toolsEnabled && {
           functionCallingEnabled: true,
-          enabledTools: ["calculate_precise"],
+          enabledTools: [TOOL_NAMES.CALCULATE_PRECISE],
         }),
       },
       (event: SseEvent) => {
