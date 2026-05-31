@@ -14,6 +14,7 @@ export interface ScheduledTask {
   id: string;
   name: string;
   project: string;
+  username?: string;
   prompt: string;
   agent: string | null;
   provider: string;
@@ -188,7 +189,7 @@ const ScheduledTaskService = {
           );
 
           // Trigger execution in the background asynchronously
-          this.executeTask(task).catch((err: unknown) =>
+          this.executeTask(task, undefined, { username: task.username || "system" }).catch((err: unknown) =>
             logger.error(`[ScheduledTasks] Execution failed for task "${task.name}": ${(err as Error).message}`),
           );
         }
@@ -202,15 +203,19 @@ const ScheduledTaskService = {
    * Programmatically executes a scheduled task in the background.
    * Decoupled completely from live WebSockets/browser clients.
    */
-  async executeTask(task: ScheduledTask, payload?: Record<string, unknown>): Promise<void> {
+  async executeTask(
+    task: ScheduledTask,
+    payload?: Record<string, unknown>,
+    { username = "system", agentSessionId }: { username?: string; agentSessionId?: string } = {},
+  ): Promise<{ agentSessionId: string }> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
-    const agentSessionId = crypto.randomUUID();
+    const resolvedSessionId = agentSessionId || crypto.randomUUID();
     const traceId = crypto.randomUUID();
     const nowISO = new Date().toISOString();
 
-    logger.info(`[ScheduledTasks] Executing task "${task.name}" under Session ID: ${agentSessionId}`);
+    logger.info(`[ScheduledTasks] Executing task "${task.name}" under Session ID: ${resolvedSessionId} (user: ${username})`);
 
     // Determine default workspace root path if available
     let workspacePath: string | null = null;
@@ -240,9 +245,9 @@ const ScheduledTaskService = {
 
     // 1. Create agent session stub document
     await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).insertOne({
-      id: agentSessionId,
+      id: resolvedSessionId,
       project: task.project,
-      username: "system",
+      username,
       title: task.name,
       messages: [userTriggerMessage],
       systemPrompt: "",
@@ -286,7 +291,7 @@ const ScheduledTaskService = {
           functionCallingEnabled: true,
           planFirst: false,
         },
-        agentSessionId,
+        agentSessionId: resolvedSessionId,
         userMessage: userTriggerMessage as ConversationMessage,
         conversationMeta: {
           title: task.name,
@@ -295,7 +300,7 @@ const ScheduledTaskService = {
         },
         traceId,
         project: task.project,
-        username: "system",
+        username,
         clientIp: "127.0.0.1",
         agent: task.agent || null,
         workspaceRoot: workspacePath,
@@ -310,12 +315,14 @@ const ScheduledTaskService = {
       
       // Ensure the generated session is not stuck as "generating"
       await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).updateOne(
-        { id: agentSessionId },
+        { id: resolvedSessionId },
         { $set: { isGenerating: false, updatedAt: new Date().toISOString() } },
       ).catch(() => {});
 
       throw err;
     }
+
+    return { agentSessionId: resolvedSessionId };
   },
 
   // ─── CRUD REST Helpers ─────────────────────────────────────────────────────────
@@ -468,9 +475,13 @@ const ScheduledTaskService = {
     }
 
     const agentSessionId = crypto.randomUUID();
-    
-    // Fire-and-forget background execution
-    this.executeTask({ ...task, id: task.id }, payload).catch((err: unknown) => {
+
+    // Fire-and-forget background execution with the pre-generated session ID
+    this.executeTask(
+      { ...task, id: task.id },
+      payload,
+      { username, agentSessionId },
+    ).catch((err: unknown) => {
       logger.error(`[ScheduledTasks] Manual trigger failed for task "${task.name}": ${(err as Error).message}`);
     });
 
