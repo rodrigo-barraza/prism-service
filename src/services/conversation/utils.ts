@@ -1,6 +1,7 @@
 import FileService from "../FileService.ts";
 import logger from "../../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
+import { TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import type { ChatMessage } from "../../types/admin.ts";
 import type { MessagePayload, ConversationSettings, ConversationPatchInput, ConversationPatchFields } from "./types.ts";
 
@@ -97,8 +98,8 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
   };
 
   // TODO(cleanup): Remove "web_search" and "web_search_preview" once historical sessions have aged out
-  const WEB_SEARCH_NAMES = new Set(["web_search", "search_web", "web_search_preview", "search_web_preview"]);
-  const CODE_EXEC_NAMES = new Set(["code_execution"]);
+  const WEB_SEARCH_NAMES = new Set([TOOL_NAMES.WEB_SEARCH, TOOL_NAMES.SEARCH_WEB, TOOL_NAMES.WEB_SEARCH_PREVIEW, TOOL_NAMES.SEARCH_WEB_PREVIEW]);
+  const CODE_EXEC_NAMES = new Set([TOOL_NAMES.CODE_EXECUTION]);
 
   for (const m of messages || []) {
     if (m.deleted) continue;

@@ -1,4 +1,5 @@
 import logger from "../../../utils/logger.ts";
+import { TOOL_NAMES } from "../../ToolTaxonomyConstants.ts";
 import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
 import path from "node:path";
 import fs from "node:fs";
@@ -19,10 +20,10 @@ import type { ToolCall, ToolResult, AgenticContext, ValidationFeedback } from ".
  */
 
 const FILE_MUTATING_TOOLS = new Set([
-  "write_file",
-  "str_replace_file",
-  "patch_file",
-  "move_file",
+  TOOL_NAMES.WRITE_FILE,
+  TOOL_NAMES.STR_REPLACE_FILE,
+  TOOL_NAMES.PATCH_FILE,
+  TOOL_NAMES.MOVE_FILE,
 ]);
 
 interface ValidatorConfig {
@@ -138,7 +139,7 @@ async function runShellValidator(
     if (errorLines.length === 0 && combinedOutput.length < 20) return null;
 
     return {
-      toolName: "run_command",
+      toolName: TOOL_NAMES.RUN_COMMAND,
       filePath,
       validatorType: validatorConfig.type,
       errors: errorLines.length > 0 ? errorLines : [combinedOutput.slice(0, 500)],
