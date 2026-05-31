@@ -25,6 +25,10 @@ export interface ScheduledTask {
   scheduleDate?: string; // "YYYY-MM-DD" e.g. "2026-05-25"
   cronExpression?: string; // e.g. "0 9 * * *"
   recurrenceRule?: RecurrenceRule;
+  toolConfig?: {
+    enabledTools?: string[];
+    disabledTools?: string[];
+  };
   enabled: boolean;
   lastRunMinute?: string; // "YYYY-MM-DDTHH:mm"
   createdAt: string;
