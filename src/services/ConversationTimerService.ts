@@ -398,6 +398,7 @@ const ConversationTimerService = {
           planFirst: false,
           minContextLength: 65_000,
           ...(settings.toolConfig?.enabledTools && { enabledTools: settings.toolConfig.enabledTools }),
+          ...(settings.toolConfig?.disabledTools && { disabledTools: settings.toolConfig.disabledTools }),
         },
         agentSessionId: timer.conversationId,
         userMessage: reminderMessage,
