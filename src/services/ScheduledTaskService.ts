@@ -212,6 +212,9 @@ const ScheduledTaskService = {
     if (!db) throw new Error("Database not connected");
 
     const resolvedSessionId = agentSessionId || crypto.randomUUID();
+    if (!task.agent) {
+      throw new Error(`Scheduled task "${task.name}" is missing a required agent identifier`);
+    }
     const traceId = crypto.randomUUID();
     const nowISO = new Date().toISOString();
 
@@ -244,17 +247,21 @@ const ScheduledTaskService = {
     };
 
     // 1. Create agent session stub document
+    // Top-level `agent` is required for per-agent filtering in GET /conversations
+    // (the user sidebar queries with ?agent=OMNI etc.). Without it, the
+    // conversation only appears in the admin view which doesn't filter by agent.
     await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).insertOne({
       id: resolvedSessionId,
       project: task.project,
       username,
       title: task.name,
+      agent: task.agent,
       messages: [userTriggerMessage],
       systemPrompt: "",
       settings: {
         provider: task.provider,
         model: task.model,
-        agent: task.agent || null,
+        agent: task.agent,
         workspaceRoot: workspacePath,
       },
       modalities: { textIn: true, textOut: false },
@@ -295,14 +302,14 @@ const ScheduledTaskService = {
         userMessage: userTriggerMessage as ConversationMessage,
         conversationMeta: {
           title: task.name,
-          agent: task.agent || null,
+          agent: task.agent,
           workspaceRoot: workspacePath,
         },
         traceId,
         project: task.project,
         username,
         clientIp: "127.0.0.1",
-        agent: task.agent || null,
+        agent: task.agent,
         workspaceRoot: workspacePath,
         requestId: crypto.randomUUID(),
         requestStart: performance.now(),
