@@ -302,6 +302,7 @@ const ScheduledTaskService = {
           functionCallingEnabled: true,
           planFirst: false,
           ...((task as any).toolConfig?.enabledTools && { enabledTools: (task as any).toolConfig.enabledTools }),
+          ...((task as any).toolConfig?.disabledTools && { disabledTools: (task as any).toolConfig.disabledTools }),
         },
         agentSessionId: resolvedSessionId,
         userMessage: userTriggerMessage as ConversationMessage,

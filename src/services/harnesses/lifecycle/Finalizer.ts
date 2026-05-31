@@ -438,7 +438,10 @@ function swapMsgContent(message: MessagePayload) {
     }
     let toolConfig: Record<string, unknown> | undefined = undefined;
     if (resolvedEnabledTools) {
-      const disabledTools = (options.disabledTools as string[]) || [];
+      const disabledTools =
+        (options.disabledTools as string[]) ||
+        ((conversationMeta as any)?.settings?.toolConfig as any)?.disabledTools ||
+        [];
       let availableTools: string[] = [];
       if (agent) {
         const persona = AgentPersonaRegistry.get(agent);
@@ -449,7 +452,7 @@ function swapMsgContent(message: MessagePayload) {
         }
       } else {
         const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
-        availableTools = clientSchemas.map((t) => t.name);
+        availableTools = clientSchemas.map((toolSchema) => toolSchema.name);
       }
       toolConfig = {
         availableTools,
