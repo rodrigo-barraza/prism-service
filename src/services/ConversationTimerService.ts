@@ -397,6 +397,7 @@ const ConversationTimerService = {
           functionCallingEnabled: true,
           planFirst: false,
           minContextLength: 65_000,
+          ...(settings.options || {}),
         },
         agentSessionId: timer.conversationId,
         userMessage: reminderMessage,
