@@ -994,4 +994,231 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
     expect(sanitized).toHaveLength(1);
     expect(sanitized[0].role).toBe("assistant");
   });
+
+  it("filters multiple _alreadyPersisted messages from recurring cron timers", () => {
+    // Recurring cron fires multiple times. Each fires eagerly-appends a notification
+    // before the agentic loop. If the context carries history from prior fires,
+    // multiple _alreadyPersisted messages may exist in currentMessages.
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "You are a creative assistant." },
+      {
+        role: "user",
+        content: "🔔 Notification: Check build status (iteration 1)",
+        _alreadyPersisted: true,
+      },
+      { role: "assistant", content: "Build still running..." },
+      {
+        role: "user",
+        content: "🔔 Notification: Check build status (iteration 2)",
+        _alreadyPersisted: true,
+      },
+      { role: "assistant", content: "Build complete! All tests passed." },
+    ];
+    // originalMessageCount = 5 (all messages were loaded as context)
+    const originalMessageCount = 5;
+
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessages,
+      originalMessageCount,
+    );
+
+    // originalMessageCount = 5, last original is assistant (no _alreadyPersisted)
+    // sliceIndex = 4, slice(4) = [last assistant] → 1 message
+    expect(newTurnMessages).toHaveLength(1);
+    expect(newTurnMessages[0].content).toBe("Build complete! All tests passed.");
+
+    // But if originalMessageCount drifts to 3 (wrong):
+    const driftedResult = extractNewTurnMessages(currentMessages, 3);
+    // slice(2) → [notification1(filtered), assistant1, notification2(filtered), assistant2]
+    // _alreadyPersisted filter strips both notifications
+    const hasAnyNotification = driftedResult.some(
+      (message) => (message as any)._alreadyPersisted,
+    );
+    expect(hasAnyNotification).toBe(false);
+    // Only assistant messages survive
+    expect(driftedResult.every((message) => message.role === "assistant")).toBe(true);
+  });
+
+  it("preserves normal user messages while filtering _alreadyPersisted ones", () => {
+    // A conversation where the user sent a real message, THEN a timer fired.
+    // The real user message must NOT be filtered.
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "You are a creative assistant." },
+      { role: "user", content: "Set a timer for 1 minute" },
+      {
+        role: "assistant",
+        content: "Timer set!",
+        toolCalls: [
+          { id: "tc-0", name: "set_timer", args: { durationSeconds: 60 }, result: { success: true } },
+        ],
+      },
+      {
+        role: "user",
+        content: "🔔 Notification: Your 1-minute timer is up!",
+        _alreadyPersisted: true,
+      },
+      { role: "assistant", content: "Time's up! Here's your reminder." },
+    ];
+
+    // Normal case: originalMessageCount = 4 (everything before the model's response)
+    const normalResult = extractNewTurnMessages(currentMessages, 4);
+    // sliceIndex = 4 (because last original is _alreadyPersisted)
+    // slice(4) → [assistant response]
+    expect(normalResult).toHaveLength(1);
+    expect(normalResult[0].content).toBe("Time's up! Here's your reminder.");
+
+    // Drifted case: originalMessageCount = 2 (way off)
+    const driftedResult = extractNewTurnMessages(currentMessages, 2);
+    // slice(1) → [user msg, assistant+tool, notification(_ap filtered), assistant]
+    // The REAL user message ("Set a timer...") should NOT be filtered
+    const hasRealUserMessage = driftedResult.some(
+      (message) => message.content === "Set a timer for 1 minute",
+    );
+    expect(hasRealUserMessage).toBe(true);
+
+    // The _alreadyPersisted notification MUST be filtered
+    const hasNotification = driftedResult.some(
+      (message) => message.content === "🔔 Notification: Your 1-minute timer is up!",
+    );
+    expect(hasNotification).toBe(false);
+  });
+
+  it("handles timer fire with multi-iteration agentic tool loop", () => {
+    // Timer fires → model makes tool calls across multiple iterations.
+    // Only the _alreadyPersisted triggering message should be stripped;
+    // all intermediate tool-calling assistant messages must survive.
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "You are an assistant." },
+      {
+        role: "user",
+        content: "🔔 Notification: Run daily backup",
+        _alreadyPersisted: true,
+      },
+      {
+        role: "assistant",
+        content: "Starting backup...",
+        toolCalls: [
+          { id: "tc-0", name: "create_backup", args: {}, result: { success: true } },
+        ],
+      },
+      {
+        role: "assistant",
+        content: "Verifying backup integrity...",
+        toolCalls: [
+          { id: "tc-1", name: "verify_backup", args: {}, result: { verified: true } },
+        ],
+      },
+      { role: "assistant", content: "Backup complete and verified! ✅" },
+    ];
+    // originalMessageCount = 2 (system + notification)
+    const originalMessageCount = 2;
+
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessages,
+      originalMessageCount,
+    );
+
+    // Notification is stripped, all 3 assistant messages survive
+    expect(newTurnMessages).toHaveLength(3);
+    expect(newTurnMessages.every((message) => message.role === "assistant")).toBe(true);
+    expect(newTurnMessages[0].content).toBe("Starting backup...");
+    expect(newTurnMessages[0].toolCalls![0].name).toBe("create_backup");
+    expect(newTurnMessages[1].content).toBe("Verifying backup integrity...");
+    expect(newTurnMessages[2].content).toBe("Backup complete and verified! ✅");
+  });
+
+  it("sanitizeMessagesToAppend strips _alreadyPersisted regardless of message content", () => {
+    // The sanitizer is the last line of defense. Even if the message doesn't
+    // match any content-based filter, _alreadyPersisted alone should cause removal.
+    const messagesToAppend: TestMessage[] = [
+      {
+        role: "user",
+        content: "Totally normal looking message",
+        _alreadyPersisted: true,
+      },
+      {
+        role: "assistant",
+        content: "Some tool output",
+        _alreadyPersisted: true,
+      },
+      { role: "assistant", content: "Final response" },
+      { role: "user", content: "Follow-up question" },
+    ];
+
+    const sanitized = sanitizeMessagesToAppend(messagesToAppend);
+    expect(sanitized).toHaveLength(2);
+    expect(sanitized[0].content).toBe("Final response");
+    expect(sanitized[1].content).toBe("Follow-up question");
+  });
+
+  it("does NOT filter messages that lack _alreadyPersisted (no false positives)", () => {
+    // Guard test: messages with notification-like content but WITHOUT
+    // _alreadyPersisted must NOT be filtered.
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "You are a creative assistant." },
+      {
+        role: "user",
+        content: "🔔 Notification: This is a manual user message, not from a timer",
+      },
+      { role: "assistant", content: "Got it!" },
+    ];
+    const originalMessageCount = 1;
+
+    const newTurnMessages = extractNewTurnMessages(
+      currentMessages,
+      originalMessageCount,
+    );
+
+    // The notification-like message does NOT have _alreadyPersisted, so it stays
+    const hasNotification = newTurnMessages.some(
+      (message) => message.content?.includes("🔔 Notification:"),
+    );
+    expect(hasNotification).toBe(true);
+    // sliceIndex = 0 (system has no _alreadyPersisted), slice(0) = all 3 messages
+    expect(newTurnMessages).toHaveLength(3);
+
+    // Same for sanitizer — no false positives
+    const sanitized = sanitizeMessagesToAppend(currentMessages.slice(1));
+    expect(sanitized).toHaveLength(2);
+  });
+
+  it("handles context truncation drift where reminder lands exactly at slice boundary", () => {
+    // Edge case: truncation drops messages and the reminder ends up at the
+    // exact position where sliceIndex points. Without the filter, it would
+    // be the first element in newTurnMessages.
+    const currentMessages: TestMessage[] = [
+      { role: "system", content: "You are an assistant." },
+      {
+        role: "user",
+        content: "🔔 Notification: Check deployment status",
+        _alreadyPersisted: true,
+      },
+      { role: "assistant", content: "Deployment is healthy! ✅" },
+    ];
+    // truncation adjusted originalMessageCount to 2, but last original
+    // is the reminder. Index check works here (happy path).
+    const correctCount = 2;
+    const correctResult = extractNewTurnMessages(currentMessages, correctCount);
+    expect(correctResult).toHaveLength(1);
+    expect(correctResult[0].content).toBe("Deployment is healthy! ✅");
+
+    // But if originalMessageCount over-corrected to 1:
+    // sliceIndex = 0, slice(0) = all messages
+    // System msg passes, notification gets filtered, assistant passes
+    const overCorrectedResult = extractNewTurnMessages(currentMessages, 1);
+    const hasNotification = overCorrectedResult.some(
+      (message) => (message as any)._alreadyPersisted,
+    );
+    expect(hasNotification).toBe(false);
+    expect(
+      overCorrectedResult.some((message) => message.content === "Deployment is healthy! ✅"),
+    ).toBe(true);
+
+    // And if originalMessageCount under-corrected to 3:
+    // lastOriginal = currentMessages[2] = assistant (no _alreadyPersisted)
+    // sliceIndex = 2, slice(2) = [assistant] → 1 message
+    const underCorrectedResult = extractNewTurnMessages(currentMessages, 3);
+    expect(underCorrectedResult).toHaveLength(1);
+    expect(underCorrectedResult[0].content).toBe("Deployment is healthy! ✅");
+  });
 });
