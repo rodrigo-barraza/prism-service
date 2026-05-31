@@ -252,11 +252,9 @@ export default class AgenticToolResolver {
           enabledSet.has(t.name) ||
           t._isCustom ||
           t.name.startsWith("mcp__") ||
-          (agent !== "LUPOS" && (
-            CORE_AGENTIC_TOOLS.has(t.name) ||
-            COORDINATOR_TOOL_NAMES.has(t.name) ||
-            PRISM_LOCAL_TOOL_NAMES.has(t.name)
-          )),
+          CORE_AGENTIC_TOOLS.has(t.name) ||
+          COORDINATOR_TOOL_NAMES.has(t.name) ||
+          PRISM_LOCAL_TOOL_NAMES.has(t.name),
       );
       const postFilterCustom = finalTools
         .filter((tool) => tool._isCustom)

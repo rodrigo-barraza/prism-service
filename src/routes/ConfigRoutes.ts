@@ -339,7 +339,7 @@ router.get("/agents", (_req: Request, res: Response) => {
     let finalToolsCount = isWildcard ? -1 : resolvedTools.size;
     let finalToolNames = isWildcard ? ["*"] : [...(resolvedTools || [])];
 
-    if (!isWildcard && first.id !== "LUPOS") {
+    if (!isWildcard) {
       const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
       const systemToolNames = clientSchemas.filter((tool) => tool.system === true).map((t) => t.name);
 
@@ -359,7 +359,7 @@ router.get("/agents", (_req: Request, res: Response) => {
       project: persona?.project,
       toolCount: finalToolsCount,
       enabledToolNames: finalToolNames,
-      coreToolsLocked: first.id !== "LUPOS",
+      coreToolsLocked: true,
       canSpawnWorkers: COORDINATOR_ONLY_TOOLS.includes("create_team"),
       usesDirectoryTree: persona?.usesDirectoryTree || false,
       usesCodingGuidelines: persona?.usesCodingGuidelines || false,
@@ -382,13 +382,7 @@ router.get("/tools", (_req: Request, res: Response) => {
       const enabledSet = resolveEnabledToolsToSet(persona.enabledTools);
       // null = wildcard ("*") → return all schemas unfiltered
       if (enabledSet !== null) {
-        if (agentId !== "LUPOS") {
-          return res.json(schemas.filter((tool) => enabledSet.has(tool.name) || tool.system === true));
-        } else {
-          // Lupos is restricted. Preserve original system flags of whitelisted tools so its whitelisted system tools appear locked-on in the UI
-          const filtered = schemas.filter((tool) => enabledSet.has(tool.name));
-          return res.json(filtered);
-        }
+        return res.json(schemas.filter((tool) => enabledSet.has(tool.name) || tool.system === true));
       }
     }
   }
