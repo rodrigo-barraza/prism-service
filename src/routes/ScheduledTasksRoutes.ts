@@ -34,7 +34,7 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const project: string = typeof req.project === "string" ? req.project : "direct";
     const username: string = typeof req.username === "string" ? req.username : "system";
-    let { name, prompt, agent, provider, model, scheduleType, scheduleTime, scheduleDay, scheduleDate, cronExpression } = req.body;
+    let { name, prompt, agent, provider, model, scheduleType, scheduleTime, scheduleDay, scheduleDate, cronExpression, recurrenceRule } = req.body;
 
     provider = provider || "anthropic";
     model = model || "claude-sonnet-4-5-20250929";
@@ -55,6 +55,7 @@ router.post(
         scheduleDay,
         scheduleDate,
         cronExpression,
+        recurrenceRule,
         enabled: true,
         project: project as string,
         username: username as string,
