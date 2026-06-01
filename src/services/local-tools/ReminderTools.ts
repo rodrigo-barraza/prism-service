@@ -1,5 +1,6 @@
 import logger from "../../utils/logger.ts";
 import ConversationTimerService from "../ConversationTimerService.ts";
+import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
 interface ToolContext {
   agentSessionId?: string;
@@ -81,7 +82,7 @@ const setTimer = {
         },
       };
     } catch (error: unknown) {
-      return { error: `Failed to create timer: ${(error as Error).message}` };
+      return { error: `Failed to create timer: ${getErrorMessage(error)}` };
     }
   },
 };
@@ -123,7 +124,7 @@ const setTimer = {
         })),
       };
     } catch (error: unknown) {
-      return { error: `Failed to list timers: ${(error as Error).message}` };
+      return { error: `Failed to list timers: ${getErrorMessage(error)}` };
     }
   },
 };
@@ -172,7 +173,7 @@ const cancelTimer = {
         message: `Successfully cancelled timer ${timerId}.`,
       };
     } catch (error: unknown) {
-      return { error: `Failed to cancel timer: ${(error as Error).message}` };
+      return { error: `Failed to cancel timer: ${getErrorMessage(error)}` };
     }
   },
 };

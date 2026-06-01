@@ -6,6 +6,7 @@ import EmbeddingService from "../services/EmbeddingService.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
 import { PostSkillSchema, PutSkillSchema } from "../types/index.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
 router.use(requireDb);
@@ -95,7 +96,7 @@ router.post(
       try {
         document.embedding = await generateSkillEmbedding(document);
       } catch (error: unknown) {
-        logger.warn(`[Skills] Embedding generation failed: ${(error as Error).message}`);
+        logger.warn(`[Skills] Embedding generation failed: ${getErrorMessage(error)}`);
         document.embedding = null;
       }
 
@@ -152,7 +153,7 @@ router.put(
           }
         } catch (error: unknown) {
           logger.warn(
-            `[Skills] Embedding re-generation failed: ${(error as Error).message}`,
+            `[Skills] Embedding re-generation failed: ${getErrorMessage(error)}`,
           );
         }
       }

@@ -4,6 +4,7 @@ import logger from "../utils/logger.ts";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import { COLLECTIONS } from "../constants.ts";
 import { MongoFilter, GetVramBenchmarksQuerySchema } from "../types/index.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = Router();
 router.use(requireDb);
@@ -157,7 +158,7 @@ router.get(
 
       res.json({ count: docs.length, data: docs });
     } catch (error: unknown) {
-      logger.error(`GET /vram-benchmarks error: ${(error as Error).message}`);
+      logger.error(`GET /vram-benchmarks error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -218,7 +219,7 @@ router.get(
         })),
       );
     } catch (error: unknown) {
-      logger.error(`GET /vram-benchmarks/machines error: ${(error as Error).message}`);
+      logger.error(`GET /vram-benchmarks/machines error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -247,7 +248,7 @@ router.get(
 
       res.json(labels);
     } catch (error: unknown) {
-      logger.error(`GET /vram-benchmarks/settings error: ${(error as Error).message}`);
+      logger.error(`GET /vram-benchmarks/settings error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -276,7 +277,7 @@ router.get(
 
       res.json(contexts);
     } catch (error: unknown) {
-      logger.error(`GET /vram-benchmarks/contexts error: ${(error as Error).message}`);
+      logger.error(`GET /vram-benchmarks/contexts error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),

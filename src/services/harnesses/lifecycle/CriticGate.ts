@@ -2,6 +2,7 @@ import logger from "../../../utils/logger.ts";
 import { APPROVAL_TIERS } from "../../AutoApprovalEngine.ts";
 
 import type { ToolCall, AgenticContext } from "../types.ts";
+import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 /**
  * CriticGate — lightweight multi-model review of high-risk tool calls.
@@ -70,7 +71,7 @@ export default class CriticGate {
       // On critic failure, default to allowing (fail-open for usability).
       // A fail-closed approach would block all DANGER tools on critic downtime.
       logger.warn(
-        `[CriticGate] Review failed for "${toolCall.name}": ${(criticError as Error).message}. Defaulting to approve.`,
+        `[CriticGate] Review failed for "${toolCall.name}": ${getErrorMessage(criticError)}. Defaulting to approve.`,
       );
       return { approved: true, reason: "critic_error_fallback", criticModel: activeCriticModel };
     }

@@ -2,6 +2,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import FileService from "../services/FileService.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ router.post(
       const result = await FileService.uploadFile(data);
       res.json(result);
     } catch (error: unknown) {
-            logger.error(`File upload error: ${(error as Error).message}`);
+            logger.error(`File upload error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -54,7 +55,7 @@ router.get(
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       result.stream.pipe(res);
     } catch (error: unknown) {
-            logger.error(`File retrieval error: ${(error as Error).message}`);
+            logger.error(`File retrieval error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),

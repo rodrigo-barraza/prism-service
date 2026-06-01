@@ -4,6 +4,7 @@ import logger from "../../../utils/logger.ts";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type { ToolCall, ResolvedTools, EmitFn } from "../types.ts";
+import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 /**
  * ToolHotReloader — refreshes custom tools mid-session without restart.
@@ -91,7 +92,7 @@ export async function reloadIfCustomToolsMutated(
     emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.CUSTOM_TOOLS_UPDATED });
     return true;
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? (error as Error).message : String(error);
+    const errorMessage = error instanceof Error ? getErrorMessage(error) : String(error);
     logger.warn(`[ToolHotReloader] Failed to reload custom tools: ${errorMessage}`);
     return false;
   }

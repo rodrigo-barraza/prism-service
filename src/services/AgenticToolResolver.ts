@@ -8,6 +8,7 @@ import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
 import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TYPES } from "../config.ts";
 import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -102,7 +103,7 @@ export default class AgenticToolResolver {
         );
       }
     } catch (error: unknown) {
-      logger.warn(`Failed to fetch custom tools for loop: ${(error as Error).message}`);
+      logger.warn(`Failed to fetch custom tools for loop: ${getErrorMessage(error)}`);
     }
 
     // Build the dynamic tool map

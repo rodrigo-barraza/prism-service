@@ -10,6 +10,7 @@ import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import { parseJsonFromLlmResponse } from "@rodrigo-barraza/utilities-library";
 import { COLLECTIONS } from "../constants.ts";
 import SettingsService from "./SettingsService.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 // ─── Constants ────────────────────────────────────────────────────────────────
 /** Single unified collection for all agent memories. */
 const COLLECTION = COLLECTIONS.MEMORIES;
@@ -199,7 +200,7 @@ ${participantList}`;
     });
   } catch (error: unknown) {
     success = false;
-        errorMessage = (error as Error).message;
+        errorMessage = getErrorMessage(error);
     throw error;
   } finally {
     RequestLogger.logBackgroundLlmCall({
@@ -388,7 +389,7 @@ const MemoryService = {
           );
         }
       } catch (error: unknown) {
-                logger.error(`[MemoryService] Failed to store fact: ${(error as Error).message}`);
+                logger.error(`[MemoryService] Failed to store fact: ${getErrorMessage(error)}`);
       }
     }
     return storedMemories;

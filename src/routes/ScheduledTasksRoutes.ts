@@ -2,6 +2,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response } from "express";
 import ScheduledTaskService from "../services/ScheduledTaskService.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
 
@@ -19,7 +20,7 @@ router.get(
       const tasks = await ScheduledTaskService.listTasks(project as string, username as string);
       res.json(tasks);
     } catch (error: unknown) {
-      logger.error(`[ScheduledTasks][GET] Error listing tasks: ${(error as Error).message}`);
+      logger.error(`[ScheduledTasks][GET] Error listing tasks: ${getErrorMessage(error)}`);
       res.status(500).json({ error: "Failed to list scheduled tasks" });
     }
   }),
@@ -64,7 +65,7 @@ router.post(
 
       res.status(201).json(task);
     } catch (error: unknown) {
-      logger.error(`[ScheduledTasks][POST] Error creating task: ${(error as Error).message}`);
+      logger.error(`[ScheduledTasks][POST] Error creating task: ${getErrorMessage(error)}`);
       res.status(500).json({ error: "Failed to create scheduled task" });
     }
   }),
@@ -86,8 +87,8 @@ router.patch(
       const updatedTask = await ScheduledTaskService.updateTask(id as string, project as string, username as string, updates as any);
       res.json(updatedTask);
     } catch (error: unknown) {
-      logger.error(`[ScheduledTasks][PATCH] Error updating task ${id}: ${(error as Error).message}`);
-      res.status(500).json({ error: (error as Error).message || "Failed to update scheduled task" });
+      logger.error(`[ScheduledTasks][PATCH] Error updating task ${id}: ${getErrorMessage(error)}`);
+      res.status(500).json({ error: getErrorMessage(error) || "Failed to update scheduled task" });
     }
   }),
 );
@@ -107,7 +108,7 @@ router.delete(
       const success = await ScheduledTaskService.deleteTask(id as string, project as string, username as string);
       res.json({ success });
     } catch (error: unknown) {
-      logger.error(`[ScheduledTasks][DELETE] Error deleting task ${id}: ${(error as Error).message}`);
+      logger.error(`[ScheduledTasks][DELETE] Error deleting task ${id}: ${getErrorMessage(error)}`);
       res.status(500).json({ error: "Failed to delete scheduled task" });
     }
   }),
@@ -129,8 +130,8 @@ router.post(
       const result = await ScheduledTaskService.triggerTask(id as string, project as string, username as string, payload);
       res.json(result);
     } catch (error: unknown) {
-      logger.error(`[ScheduledTasks][TRIGGER] Error triggering task ${id}: ${(error as Error).message}`);
-      res.status(500).json({ error: (error as Error).message || "Failed to trigger scheduled task" });
+      logger.error(`[ScheduledTasks][TRIGGER] Error triggering task ${id}: ${getErrorMessage(error)}`);
+      res.status(500).json({ error: getErrorMessage(error) || "Failed to trigger scheduled task" });
     }
   }),
 );

@@ -5,6 +5,7 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import logger from "../utils/logger.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
 import type { Db } from "mongodb";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -207,7 +208,7 @@ const MCPClientService = {
       await client.connect(transport);
     } catch (error: unknown) {
       logger.error(
-        `[MCP] Failed to connect to "${serverName}": ${(error as Error).message}`,
+        `[MCP] Failed to connect to "${serverName}": ${getErrorMessage(error)}`,
       );
       throw error;
     }
@@ -219,7 +220,7 @@ const MCPClientService = {
       mcpTools = (result.tools || []) as MCPRawTool[];
     } catch (error: unknown) {
       logger.warn(
-        `[MCP] Failed to list tools for "${serverName}": ${(error as Error).message}`,
+        `[MCP] Failed to list tools for "${serverName}": ${getErrorMessage(error)}`,
       );
     }
 
@@ -254,7 +255,7 @@ const MCPClientService = {
     try {
       await conn.client.close();
     } catch (error: unknown) {
-      logger.warn(`[MCP] Error closing "${serverName}": ${(error as Error).message}`);
+      logger.warn(`[MCP] Error closing "${serverName}": ${getErrorMessage(error)}`);
     }
 
     // For stdio, ensure child process is killed
@@ -325,8 +326,8 @@ const MCPClientService = {
     } catch (error: unknown) {
       // Attempt reconnect once on connection errors
       if (
-        (error as Error).message?.includes("closed") ||
-        (error as Error).message?.includes("transport")
+        getErrorMessage(error)?.includes("closed") ||
+        getErrorMessage(error)?.includes("transport")
       ) {
         logger.warn(
           `[MCP] Connection lost to "${serverName}", attempting reconnect...`,
@@ -336,11 +337,11 @@ const MCPClientService = {
           return this.callTool(serverName, toolName, args);
         } catch (reconnectErr: unknown) {
           return {
-            error: `MCP server "${serverName}" connection lost and reconnect failed: ${(reconnectErr as Error).message}`,
+            error: `MCP server "${serverName}" connection lost and reconnect failed: ${getErrorMessage(reconnectErr)}`,
           };
         }
       }
-      return { error: `MCP tool call failed: ${(error as Error).message}` };
+      return { error: `MCP tool call failed: ${getErrorMessage(error)}` };
     }
   },
 
@@ -486,7 +487,7 @@ const MCPClientService = {
       return { contents, serverName };
     } catch (error: unknown) {
       return {
-        error: `Failed to read resource "${uri}" from "${serverName}": ${(error as Error).message}`,
+        error: `Failed to read resource "${uri}" from "${serverName}": ${getErrorMessage(error)}`,
       };
     }
   },
@@ -555,7 +556,7 @@ const MCPClientService = {
       };
     } catch (error: unknown) {
       return {
-        error: `Authentication failed for "${serverName}": ${(error as Error).message}`,
+        error: `Authentication failed for "${serverName}": ${getErrorMessage(error)}`,
       };
     }
   },
@@ -593,7 +594,7 @@ const MCPClientService = {
         }
       }
     } catch (error: unknown) {
-      logger.warn(`[MCP] Auto-connect DB query failed: ${(error as Error).message}`);
+      logger.warn(`[MCP] Auto-connect DB query failed: ${getErrorMessage(error)}`);
     }
   },
 

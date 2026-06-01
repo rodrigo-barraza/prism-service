@@ -2,6 +2,7 @@ import logger from "../utils/logger.ts";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import { COLLECTIONS } from "../constants.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 /**
  * ToolContext — per-session key-value state store for stateful tool chains.
@@ -61,7 +62,7 @@ async function persistToMongo(sessionId: string, store: Map<string, unknown>): P
     );
   } catch (error) {
     logger.warn(
-      `[ToolContext] MongoDB persist failed for session ${sessionId}: ${(error as Error).message}`,
+      `[ToolContext] MongoDB persist failed for session ${sessionId}: ${getErrorMessage(error)}`,
     );
   }
 }
@@ -78,7 +79,7 @@ async function loadFromMongo(sessionId: string): Promise<Map<string, unknown>> {
     }
   } catch (error) {
     logger.warn(
-      `[ToolContext] MongoDB load failed for session ${sessionId}: ${(error as Error).message}`,
+      `[ToolContext] MongoDB load failed for session ${sessionId}: ${getErrorMessage(error)}`,
     );
   }
   return new Map();
@@ -170,7 +171,7 @@ export default class ToolContext {
       if (collection) {
         collection.deleteOne({ sessionId }).catch((error: unknown) => {
           logger.warn(
-            `[ToolContext] MongoDB cleanup failed for session ${sessionId}: ${(error as Error).message}`,
+            `[ToolContext] MongoDB cleanup failed for session ${sessionId}: ${getErrorMessage(error)}`,
           );
         });
       }

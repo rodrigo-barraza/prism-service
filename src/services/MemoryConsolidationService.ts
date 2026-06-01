@@ -41,6 +41,7 @@ import {
   findStaleConversationalMemories,
 } from "./memory/ConversationalMemoryPartitioner.ts";
 
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import type {
   MemoryDoc,
   ConsolidationAction,
@@ -154,7 +155,7 @@ async function applyActions(
     } catch (error: unknown) {
       results.errors++;
       logger.error(
-        `[MemoryConsolidation] Failed to apply action: ${(error as Error).message}`,
+        `[MemoryConsolidation] Failed to apply action: ${getErrorMessage(error)}`,
       );
     }
   }
@@ -223,9 +224,9 @@ async function processBatch(
     });
   } catch (error: unknown) {
     llmSuccess = false;
-    llmError = (error as Error).message;
+    llmError = getErrorMessage(error);
     logger.error(
-      `[MemoryConsolidation] ${batchLabel} LLM call failed: ${(error as Error).message}`,
+      `[MemoryConsolidation] ${batchLabel} LLM call failed: ${getErrorMessage(error)}`,
     );
   }
 
@@ -608,7 +609,7 @@ const MemoryConsolidationService = {
           ...consolidationResult,
         });
       } catch (error: unknown) {
-        logger.warn(`[MemoryConsolidation] Broadcast failed: ${(error as Error).message}`);
+        logger.warn(`[MemoryConsolidation] Broadcast failed: ${getErrorMessage(error)}`);
       }
     }
     return consolidationResult;
@@ -645,13 +646,13 @@ const MemoryConsolidationService = {
           agentSessionId: agentSessionId || null,
         }).catch((error: unknown) =>
           logger.error(
-            `[MemoryConsolidation] Background consolidation failed: ${(error as Error).message}`,
+            `[MemoryConsolidation] Background consolidation failed: ${getErrorMessage(error)}`,
           ),
         );
       }
     } catch (error: unknown) {
       logger.error(
-        `[MemoryConsolidation] checkAndRun failed: ${(error as Error).message}`,
+        `[MemoryConsolidation] checkAndRun failed: ${getErrorMessage(error)}`,
       );
     }
   },

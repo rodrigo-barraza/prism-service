@@ -11,6 +11,7 @@ import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
 import type { SseEvent } from "../types/SseTypes.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const BENCHMARKS_COL = COLLECTIONS.BENCHMARKS;
 const RUNS_COL = COLLECTIONS.BENCHMARK_RUNS;
@@ -518,7 +519,7 @@ async function runSingleModel(
     };
   } catch (error: unknown) {
     const latency = (performance.now() - start) / 1000;
-    logger.error(`[benchmark]   💥 ${model.model} threw: ${(error as Error).message}`);
+    logger.error(`[benchmark]   💥 ${model.model} threw: ${getErrorMessage(error)}`);
     return {
       provider: model.provider,
       model: model.model,
@@ -531,7 +532,7 @@ async function runSingleModel(
       latency: roundMs(latency),
       usage: null,
       estimatedCost: null,
-      error: (error as Error).message,
+      error: getErrorMessage(error),
       completedAt: new Date().toISOString(),
     };
   }

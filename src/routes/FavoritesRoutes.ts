@@ -3,6 +3,7 @@ import express, { Request, Response, NextFunction } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import {
   GetFavoritesQuerySchema,
   PostFavoritesBodySchema,
@@ -55,7 +56,7 @@ router.get(
 
       res.json(favorites);
     } catch (error: unknown) {
-      logger.error(`Error fetching favorites: ${(error as Error).message}`);
+      logger.error(`Error fetching favorites: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -105,7 +106,7 @@ router.post(
 
       res.json({ success: true, favorite: document });
     } catch (error: unknown) {
-      logger.error(`Error adding favorite: ${(error as Error).message}`);
+      logger.error(`Error adding favorite: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -138,7 +139,7 @@ router.delete(
 
       res.json({ success: true, deleted: result.deletedCount });
     } catch (error: unknown) {
-      logger.error(`Error removing favorite: ${(error as Error).message}`);
+      logger.error(`Error removing favorite: ${getErrorMessage(error)}`);
       next(error);
     }
   }),

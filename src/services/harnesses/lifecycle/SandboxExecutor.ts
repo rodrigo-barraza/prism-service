@@ -6,6 +6,7 @@ import { validateAfterToolExecution } from "./ValidationInterceptor.ts";
 
 import type AgentHooks from "../../AgentHooks.ts";
 import type AgenticLoopState from "../../AgenticLoopState.ts";
+import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 import type {
   ToolCall,
   ToolResult,
@@ -94,7 +95,7 @@ async function createCheckpoint(
     return stashSha;
   } catch (checkpointError: unknown) {
     logger.warn(
-      `[SandboxExecutor] Failed to create checkpoint: ${(checkpointError as Error).message}`,
+      `[SandboxExecutor] Failed to create checkpoint: ${getErrorMessage(checkpointError)}`,
     );
     return null;
   }
@@ -128,7 +129,7 @@ async function rollbackToCheckpoint(
     return true;
   } catch (rollbackError: unknown) {
     logger.error(
-      `[SandboxExecutor] Rollback failed: ${(rollbackError as Error).message}`,
+      `[SandboxExecutor] Rollback failed: ${getErrorMessage(rollbackError)}`,
     );
     return false;
   }

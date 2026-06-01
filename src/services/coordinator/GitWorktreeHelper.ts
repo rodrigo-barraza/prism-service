@@ -8,6 +8,7 @@ import type {
   WorktreeDiff,
 } from "../../types/coordinator.ts";
 import logger from "../../utils/logger.ts";
+import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
 export class GitWorktreeHelper {
   static getDefaultWorkspaceRoot(overrideRoot?: string): string {
@@ -61,7 +62,7 @@ export class GitWorktreeHelper {
       }
       return (await response.json()) as ToolsApiResponse;
     } catch (error: unknown) {
-      return { error: `Failed to reach tools-api: ${(error as Error).message}` };
+      return { error: `Failed to reach tools-api: ${getErrorMessage(error)}` };
     }
   }
 

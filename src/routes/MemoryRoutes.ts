@@ -2,6 +2,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import MemoryService from "../services/MemoryService.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
 
@@ -42,7 +43,7 @@ router.post(
 
       res.json({ memories, count: memories.length });
     } catch (error: unknown) {
-            logger.error(`[memory/extract] ${(error as Error).message}`);
+            logger.error(`[memory/extract] ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -78,7 +79,7 @@ router.post(
 
       res.json({ memories, count: memories.length });
     } catch (error: unknown) {
-            logger.error(`[memory/search] ${(error as Error).message}`);
+            logger.error(`[memory/search] ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -105,7 +106,7 @@ router.get(
       });
       res.json(result);
     } catch (error: unknown) {
-            logger.error(`[memory/list] ${(error as Error).message}`);
+            logger.error(`[memory/list] ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -122,7 +123,7 @@ router.delete(
       const deleted = await MemoryService.delete(String(req.params.id));
       res.json({ deleted });
     } catch (error: unknown) {
-            logger.error(`[memory/delete] ${(error as Error).message}`);
+            logger.error(`[memory/delete] ${getErrorMessage(error)}`);
       next(error);
     }
   }),

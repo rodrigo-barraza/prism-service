@@ -1,6 +1,7 @@
 import { TOOLS_SERVICE_URL } from "../../config.ts";
 import MCPClientService from "./MCPClientService.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { COORDINATOR_ONLY_TOOLS } from "./CoordinatorPrompt.ts";
 import { createAbortController } from "../utils/AbortController.ts";
 import { DOMAINS, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
@@ -141,15 +142,15 @@ async function fetchSchemas() {
     cachedSchemas = schemas;
 
     // Client-facing schemas: keep domain/dataSource/labels for UI grouping, strip only endpoint
-    cachedClientSchemas = schemas.map(({ endpoint: _e, ...rest }) => rest);
+    cachedClientSchemas = schemas.map(({ endpoint: _endpoint, ...rest }) => rest);
 
     // Strip endpoint, dataSource, domain, and labels metadata for LLM consumption
     cachedAISchemas = schemas.map(
       ({
-        endpoint: _e,
-        dataSource: _ds,
-        domain: _d,
-        labels: _l,
+        endpoint: _endpoint,
+        dataSource: _dataSource,
+        domain: _domain,
+        labels: _labels,
         ...rest
       }) => rest,
     );
@@ -185,12 +186,12 @@ async function fetchSchemas() {
       }
     } catch (cfgErr: unknown) {
       logger.warn(
-                `[ToolOrchestrator] Could not fetch workspace config: ${(cfgErr as Error).message}`,
+                `[ToolOrchestrator] Could not fetch workspace config: ${getErrorMessage(cfgErr)}`,
       );
     }
   } catch (error: unknown) {
     logger.warn(
-            `[ToolOrchestrator] Could not reach tools-api for schemas: ${(error as Error).message}`,
+            `[ToolOrchestrator] Could not reach tools-api for schemas: ${getErrorMessage(error)}`,
     );
   }
 }
@@ -354,10 +355,10 @@ async function fetchJson(url: string, extraHeaders: Record<string, string> = {},
     }
     return await response.json();
   } catch (error: unknown) {
-    if ((error as Error).name === "AbortError") {
+    if (error instanceof Error && error.name === "AbortError") {
       return { error: "Tool execution aborted" };
     }
-    return { error: `Failed to reach API: ${(error as Error).message}` };
+    return { error: `Failed to reach API: ${getErrorMessage(error)}` };
   }
 }
 
@@ -387,10 +388,10 @@ async function fetchJsonPost(
     }
     return await response.json();
   } catch (error: unknown) {
-    if ((error as Error).name === "AbortError") {
+    if (error instanceof Error && error.name === "AbortError") {
       return { error: "Tool execution aborted" };
     }
-    return { error: `Failed to reach API: ${(error as Error).message}` };
+    return { error: `Failed to reach API: ${getErrorMessage(error)}` };
   }
 }
 
@@ -621,7 +622,7 @@ export default class ToolOrchestratorService {
       }
     } catch (error: unknown) {
       logger.warn(
-                `[ToolOrchestrator] refreshWorkspaceRoots failed: ${(error as Error).message}`,
+                `[ToolOrchestrator] refreshWorkspaceRoots failed: ${getErrorMessage(error)}`,
       );
     }
   }
@@ -836,7 +837,7 @@ export default class ToolOrchestratorService {
         image.minioRef = ref;
       } catch (error: unknown) {
         logger.warn(
-                    `[ToolOrchestrator] Image MinIO upload failed: ${(error as Error).message}`,
+                    `[ToolOrchestrator] Image MinIO upload failed: ${getErrorMessage(error)}`,
         );
       }
     }
@@ -857,7 +858,7 @@ export default class ToolOrchestratorService {
         delete resultObj.screenshot; // Don't send base64 downstream
       } catch (error: unknown) {
         logger.warn(
-                    `[ToolOrchestrator] Screenshot MinIO upload failed: ${(error as Error).message}`,
+                    `[ToolOrchestrator] Screenshot MinIO upload failed: ${getErrorMessage(error)}`,
         );
         // Keep base64 as fallback if MinIO fails
       }
@@ -1082,7 +1083,7 @@ export default class ToolOrchestratorService {
       }
       return finalResult || { error: "Stream ended without exit event" };
     } catch (error: unknown) {
-            return { error: `Streaming failed: ${(error as Error).message}` };
+      return { error: `Streaming failed: ${getErrorMessage(error)}` };
     }
   }
 
@@ -1127,10 +1128,10 @@ export default class ToolOrchestratorService {
         }
         return await response.json();
       } catch (error: unknown) {
-                if ((error as Error).name === "AbortError" || (error as Error).name === "TimeoutError") {
+        if (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError")) {
           return { error: "Custom tool execution timed out (35s)" };
         }
-                return { error: `Custom tool execution failed: ${(error as Error).message}` };
+        return { error: `Custom tool execution failed: ${getErrorMessage(error)}` };
       }
     }
 
@@ -1170,7 +1171,7 @@ export default class ToolOrchestratorService {
       }
       return await response.json();
     } catch (error: unknown) {
-            return { error: `Failed to reach API: ${(error as Error).message}` };
+      return { error: `Failed to reach API: ${getErrorMessage(error)}` };
     }
   }
 

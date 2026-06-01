@@ -17,6 +17,7 @@ import {
 import { COLLECTIONS } from "../../../constants.ts";
 import logger from "../../../utils/logger.ts";
 import { TokenUsage, MessagePayload, ToolCallPayload, LlmOptions } from "../../RequestLogger.ts";
+import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 export interface FinalizerContext {
   providerName: string;
@@ -288,7 +289,7 @@ function swapMsgContent(message: MessagePayload) {
       audioRef = ref;
     } catch (error: unknown) {
       logger.error(
-                `[chat] Failed to build/upload Live API audio WAV: ${(error as Error).message}`,
+                `[chat] Failed to build/upload Live API audio WAV: ${getErrorMessage(error)}`,
       );
     }
   }

@@ -3,6 +3,7 @@ import express, { Request, Response, NextFunction } from "express";
 import CustomAgentService from "../services/CustomAgentService.ts";
 import AgentPersonaRegistry from "../services/AgentPersonaRegistry.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ router.get(
       const agents = await CustomAgentService.list();
       res.json(agents);
     } catch (error: unknown) {
-            logger.error(`GET /custom-agents error: ${(error as Error).message}`);
+            logger.error(`GET /custom-agents error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -43,10 +44,10 @@ router.post(
 
       res.status(201).json(created);
     } catch (error: unknown) {
-            if ((error as Error).message?.includes("already exists")) {
-                return res.status(409).json({ error: (error as Error).message });
+            if (getErrorMessage(error)?.includes("already exists")) {
+                return res.status(409).json({ error: getErrorMessage(error) });
       }
-            logger.error(`POST /custom-agents error: ${(error as Error).message}`);
+            logger.error(`POST /custom-agents error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -84,7 +85,7 @@ router.put(
 
       res.json(updated);
     } catch (error: unknown) {
-            logger.error(`PUT /custom-agents/:id error: ${(error as Error).message}`);
+            logger.error(`PUT /custom-agents/:id error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -111,7 +112,7 @@ router.delete(
 
       res.json({ success: true });
     } catch (error: unknown) {
-            logger.error(`DELETE /custom-agents/:id error: ${(error as Error).message}`);
+            logger.error(`DELETE /custom-agents/:id error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),

@@ -4,6 +4,7 @@ import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 import { ELEVENLABS_API_KEY } from "../../config.ts";
 import { TYPES, DEFAULT_VOICES, getDefaultModels } from "../config.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 function getApiKey() {
   if (!ELEVENLABS_API_KEY) {
@@ -55,7 +56,7 @@ const elevenlabsProvider = ({
       return { stream: response.body, contentType: "audio/mpeg" };
     } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
-            throw new ProviderError("elevenlabs", (error as Error).message, 500, error);
+            throw new ProviderError("elevenlabs", getErrorMessage(error), 500, error);
     }
   },
   async *generateSpeechStream(
@@ -169,7 +170,7 @@ const elevenlabsProvider = ({
           }
         } else {
           if (error)
-            throw new ProviderError("elevenlabs", (error as Error).message, 500, error);
+            throw new ProviderError("elevenlabs", getErrorMessage(error), 500, error);
           if (ended) break;
           await new Promise<void>((r) => { resolveMessage = r; });
         }

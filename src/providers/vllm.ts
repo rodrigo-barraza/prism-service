@@ -4,6 +4,7 @@ import logger from "../utils/logger.ts";
 import type { TokenUsage } from "../types/admin.ts";
 
 import { TYPES, getDefaultModels } from "../config.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import {
   convertToolsToOpenAI,
   buildPayloadParams,
@@ -96,7 +97,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         return result;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("vllm", (error as Error).message, 500, error);
+                throw new ProviderError("vllm", getErrorMessage(error), 500, error);
       }
     },
 
@@ -158,9 +159,9 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
                     thinkingEnabled: options.thinkingEnabled,
         });
       } catch (error: unknown) {
-                if ((error as Error).name === "AbortError") return; // Client disconnected
+                if ((error instanceof Error && error.name === "AbortError")) return; // Client disconnected
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("vllm", (error as Error).message, 500, error);
+                throw new ProviderError("vllm", getErrorMessage(error), 500, error);
       }
     },
 
@@ -206,7 +207,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         return { text, usage };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("vllm", (error as Error).message, 500, error);
+        throw new ProviderError("vllm", getErrorMessage(error), 500, error);
       }
     },
 
@@ -247,7 +248,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("vllm", (error as Error).message, 500, error);
+        throw new ProviderError("vllm", getErrorMessage(error), 500, error);
       }
     },
 
@@ -280,7 +281,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         return { models };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("vllm", (error as Error).message, 500, error);
+        throw new ProviderError("vllm", getErrorMessage(error), 500, error);
       }
     },
   };

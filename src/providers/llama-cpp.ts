@@ -44,6 +44,7 @@ import {
   type OpenAICompletionResponse,
 } from "../utils/openai-compat.ts";
 import type { TokenUsage } from "../types/admin.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -145,7 +146,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
         return result;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("llama-cpp", (error as Error).message, 500, error);
+        throw new ProviderError("llama-cpp", getErrorMessage(error), 500, error);
       }
     },
 
@@ -212,9 +213,9 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
           },
         });
       } catch (error: unknown) {
-        if ((error as Error).name === "AbortError") return; // Client disconnected
+        if ((error instanceof Error && error.name === "AbortError")) return; // Client disconnected
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("llama-cpp", (error as Error).message, 500, error);
+        throw new ProviderError("llama-cpp", getErrorMessage(error), 500, error);
       }
     },
 
@@ -264,7 +265,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
         return { text, usage };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("llama-cpp", (error as Error).message, 500, error);
+        throw new ProviderError("llama-cpp", getErrorMessage(error), 500, error);
       }
     },
 
@@ -294,7 +295,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
         return { models };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("llama-cpp", (error as Error).message, 500, error);
+        throw new ProviderError("llama-cpp", getErrorMessage(error), 500, error);
       }
     },
 
@@ -319,7 +320,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
           slotsProcessing: data.slots_processing ?? null,
         };
       } catch (error: unknown) {
-        return { ok: false, status: "unreachable", error: (error as Error).message };
+        return { ok: false, status: "unreachable", error: getErrorMessage(error) };
       }
     },
   };

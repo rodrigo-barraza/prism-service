@@ -8,6 +8,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import sharp from "sharp";
 import logger from "./logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 // ── ffmpeg availability (cached per process) ────────────────
 let _ffmpegAvailable: boolean | null = null;
@@ -141,7 +142,7 @@ export async function constrainImageDimensions(
     return { data: resizedB64, mediaType: outputMime };
   } catch (error: unknown) {
     logger.warn(
-      `[media] Dimension check failed (${error instanceof Error ? (error as Error).message : String(error)}), passing through`,
+      `[media] Dimension check failed (${error instanceof Error ? getErrorMessage(error) : String(error)}), passing through`,
     );
     return { data: base64Data, mediaType };
   }
