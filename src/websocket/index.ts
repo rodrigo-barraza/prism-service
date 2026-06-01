@@ -13,6 +13,7 @@ import logger from "../utils/logger.ts";
 import RequestLogger from "../services/RequestLogger.ts";
 import ConversationService from "../services/ConversationService.ts";
 import { calculateLiveCost } from "../utils/CostCalculator.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { getModelByName } from "../config.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";
 import type { WebSocket } from "ws";
@@ -302,7 +303,7 @@ function handleWsLive(
       );
       return ref;
     } catch (error: unknown) {
-      logger.error(`[Live API] Failed to build/upload WAV: ${(error as Error).message}`);
+      logger.error(`[Live API] Failed to build/upload WAV: ${getErrorMessage(error)}`);
       return null;
     }
   }
@@ -399,7 +400,7 @@ function handleWsLive(
             tools.push(...googleFormats);
           }
         } catch (error: unknown) {
-          logger.error(`[Live API] Error loading tools: ${(error as Error).message}`);
+          logger.error(`[Live API] Error loading tools: ${getErrorMessage(error)}`);
         }
       }
 
@@ -540,10 +541,10 @@ function handleWsLive(
               // Top-level tool calls
               if (serverMessage.toolCall?.functionCalls) {
                 const functionCalls: FunctionCallRef[] = serverMessage.toolCall.functionCalls.map(
-                  (fc: any) => ({
-                    id: fc.id || `live-tc-${crypto.randomUUID()}`,
-                    name: fc.name,
-                    args: fc.args || {},
+                  (fc: Record<string, unknown>) => ({
+                    id: (fc.id as string) || `live-tc-${crypto.randomUUID()}`,
+                    name: fc.name as string,
+                    args: (fc.args as Record<string, unknown>) || {},
                   }),
                 );
                 turnToolCalls.push(...functionCalls);
@@ -585,7 +586,7 @@ function handleWsLive(
                       }
                     } catch (error: unknown) {
                       logger.warn(
-                        `Failed to fetch custom tools for Live API loop: ${(error as Error).message}`,
+                        `Failed to fetch custom tools for Live API loop: ${getErrorMessage(error)}`,
                       );
                     }
 
@@ -630,7 +631,7 @@ function handleWsLive(
                     liveSession!.sendToolResponse({ functionResponses });
                   } catch (error: unknown) {
                     logger.error(
-                      `[Live API] Error executing tools: ${(error as Error).message}`,
+                      `[Live API] Error executing tools: ${getErrorMessage(error)}`,
                     );
                   }
                 })();
@@ -836,8 +837,8 @@ function handleWsLive(
           },
         });
       } catch (error: unknown) {
-        logger.error(`[Live API] Failed to connect: ${(error as Error).message}`);
-        emit({ type: "error", message: `Failed to connect: ${(error as Error).message}` });
+        logger.error(`[Live API] Failed to connect: ${getErrorMessage(error)}`);
+        emit({ type: "error", message: `Failed to connect: ${getErrorMessage(error)}` });
       }
       return;
     }
@@ -884,10 +885,10 @@ function handleWsLive(
         liveSession.sendRealtimeInput({ text: data.text as string });
         liveSession.sendRealtimeInput({ activityEnd: {} });
       } catch (error: unknown) {
-        logger.error(`[Live API] Failed to send text: ${(error as Error).message}`);
+        logger.error(`[Live API] Failed to send text: ${getErrorMessage(error)}`);
         emit({
           type: "error",
-          message: `Failed to send text: ${(error as Error).message}`,
+          message: `Failed to send text: ${getErrorMessage(error)}`,
         });
       }
       return;

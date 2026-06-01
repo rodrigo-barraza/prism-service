@@ -9,6 +9,7 @@ import logger from "../utils/logger.ts";
 import { SseEvent } from "../types/SseTypes.ts";
 import { ConversationMessage } from "./harnesses/types.ts";
 import { RecurrenceRule, matchRecurrenceRule } from "../utils/RecurrenceMatcher.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 export interface ScheduledTask {
   id: string;
@@ -95,12 +96,12 @@ const ScheduledTaskService = {
     const secondsToNextMinute = 60 - new Date().getSeconds();
     setTimeout(() => {
       this.tick().catch((err: unknown) =>
-        logger.error(`[ScheduledTasks] Initial tick error: ${(err as Error).message}`),
+        logger.error(`[ScheduledTasks] Initial tick error: ${getErrorMessage(err)}`),
       );
-
+ 
       tickingInterval = setInterval(() => {
         this.tick().catch((err: unknown) =>
-          logger.error(`[ScheduledTasks] Tick error: ${(err as Error).message}`),
+          logger.error(`[ScheduledTasks] Tick error: ${getErrorMessage(err)}`),
         );
       }, 60000);
     }, secondsToNextMinute * 1000);
@@ -178,27 +179,27 @@ const ScheduledTaskService = {
         if (isDue) {
           logger.info(`[ScheduledTasks] Task "${task.name}" (${task.id}) is due to run.`);
           
-          const updateFields: Record<string, any> = {
+          const updateFields: Record<string, unknown> = {
             lastRunMinute: minuteKey,
             updatedAt: new Date().toISOString()
           };
           if (task.scheduleType === "once") {
             updateFields.enabled = false;
           }
-
+ 
           // Mark as run for this minute key to prevent double execution in cluster setups
           await db.collection(COLLECTIONS.SCHEDULED_TASKS).updateOne(
             { id: task.id },
             { $set: updateFields }
           );
-
+ 
           // Trigger execution in the background asynchronously
           this.executeTask(task, undefined, { username: task.username || "system" }).catch((err: unknown) =>
-            logger.error(`[ScheduledTasks] Execution failed for task "${task.name}": ${(err as Error).message}`),
+            logger.error(`[ScheduledTasks] Execution failed for task "${task.name}": ${getErrorMessage(err)}`),
           );
         }
       } catch (err: unknown) {
-        logger.error(`[ScheduledTasks] Failed to parse/check task "${task.name}": ${(err as Error).message}`);
+        logger.error(`[ScheduledTasks] Failed to parse/check task "${task.name}": ${getErrorMessage(err)}`);
       }
     }
   },
@@ -256,7 +257,7 @@ const ScheduledTaskService = {
       model: task.model,
       agent: task.agent,
       workspaceRoot: workspacePath,
-      toolConfig: (task as any).toolConfig,
+      toolConfig: task.toolConfig,
     };
 
     // 1. Create agent session stub document
@@ -295,7 +296,7 @@ const ScheduledTaskService = {
     // 3. Trigger AgenticLoopService
     try {
       await AgenticLoopService.runAgenticLoop({
-        provider: provider as any as import("./harnesses/types.ts").LLMProvider,
+        provider: provider as unknown as import("./harnesses/types.ts").LLMProvider,
         providerName: task.provider,
         resolvedModel: task.model,
         modelDef,
@@ -306,8 +307,8 @@ const ScheduledTaskService = {
           functionCallingEnabled: true,
           planFirst: false,
           autoApprove: true,
-          ...((task as any).toolConfig?.enabledTools && { enabledTools: (task as any).toolConfig.enabledTools }),
-          ...((task as any).toolConfig?.disabledTools && { disabledTools: (task as any).toolConfig.disabledTools }),
+          ...(task.toolConfig?.enabledTools && { enabledTools: task.toolConfig.enabledTools }),
+          ...(task.toolConfig?.disabledTools && { disabledTools: task.toolConfig.disabledTools }),
         },
         agentSessionId: resolvedSessionId,
         userMessage: userTriggerMessage as ConversationMessage,
@@ -330,7 +331,7 @@ const ScheduledTaskService = {
 
       logger.success(`[ScheduledTasks] Task "${task.name}" completed execution successfully.`);
     } catch (err: unknown) {
-      logger.error(`[ScheduledTasks] Agent loop error for task "${task.name}": ${(err as Error).message}`);
+      logger.error(`[ScheduledTasks] Agent loop error for task "${task.name}": ${getErrorMessage(err)}`);
       
       // Ensure the generated session is not stuck as "generating"
       await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).updateOne(
@@ -347,7 +348,7 @@ const ScheduledTaskService = {
   // ─── CRUD REST Helpers ─────────────────────────────────────────────────────────
 
   // Helper to determine if a project is a client UI project and build an appropriate query filter
-  async _getQueryFilter(id: string, project: string, username: string): Promise<Record<string, any>> {
+  async _getQueryFilter(id: string, project: string, username: string): Promise<Record<string, unknown>> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     let isClientProject = true;
 
@@ -370,7 +371,7 @@ const ScheduledTaskService = {
       }
     }
 
-    const filter: Record<string, any> = { id };
+    const filter: Record<string, unknown> = { id };
     if (!isClientProject) {
       filter.project = project;
     }
@@ -404,7 +405,7 @@ const ScheduledTaskService = {
       }
     }
 
-    const query: Record<string, any> = {};
+    const query: Record<string, unknown> = {};
     if (!isClientProject) {
       query.project = project;
     }
@@ -440,12 +441,12 @@ const ScheduledTaskService = {
     if (!db) throw new Error("Database not connected");
 
     const nowISO = new Date().toISOString();
-    const cleanUpdates = {
+    const cleanUpdates: Record<string, unknown> = {
       ...updates,
       updatedAt: nowISO,
     };
-    delete (cleanUpdates as any).id;
-    delete (cleanUpdates as any).createdAt;
+    delete cleanUpdates.id;
+    delete cleanUpdates.createdAt;
 
     const filter = await this._getQueryFilter(id, project, username);
     const result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOneAndUpdate(
@@ -470,7 +471,7 @@ const ScheduledTaskService = {
     if ((result.deletedCount ?? 0) === 0) {
       const nameFilter = { ...filter };
       delete nameFilter.id;
-      (nameFilter as any).name = id;
+      nameFilter.name = id;
       result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).deleteOne(nameFilter);
     }
     return (result.deletedCount ?? 0) > 0;
@@ -486,7 +487,7 @@ const ScheduledTaskService = {
       // Fallback: look up by name
       const nameFilter = { ...filter };
       delete nameFilter.id;
-      (nameFilter as any).name = id;
+      nameFilter.name = id;
       task = (await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOne(nameFilter)) as unknown as ScheduledTask;
     }
     if (!task) {
@@ -501,7 +502,7 @@ const ScheduledTaskService = {
       payload,
       { username, agentSessionId },
     ).catch((err: unknown) => {
-      logger.error(`[ScheduledTasks] Manual trigger failed for task "${task.name}": ${(err as Error).message}`);
+      logger.error(`[ScheduledTasks] Manual trigger failed for task "${task.name}": ${getErrorMessage(err)}`);
     });
 
     return { success: true, agentSessionId };
