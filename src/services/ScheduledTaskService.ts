@@ -305,6 +305,7 @@ const ScheduledTaskService = {
           agenticLoopEnabled: true,
           functionCallingEnabled: true,
           planFirst: false,
+          autoApprove: true,
           ...((task as any).toolConfig?.enabledTools && { enabledTools: (task as any).toolConfig.enabledTools }),
           ...((task as any).toolConfig?.disabledTools && { disabledTools: (task as any).toolConfig.disabledTools }),
         },
