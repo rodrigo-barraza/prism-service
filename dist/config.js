@@ -55,7 +55,6 @@ export const MINIO_BUCKET_NAME = process.env.PRISM_SERVICE_MINIO_BUCKET_NAME || 
 export const TOOLS_SERVICE_URL = process.env.TOOLS_SERVICE_URL;
 // ── Default Model Names ───────────────────────────────────────
 // Vault-backed model identifiers — swap models without code deploys.
-export const COORDINATOR_DECOMPOSITION_MODEL = process.env.COORDINATOR_DECOMPOSITION_MODEL;
 export const LIVE_AUDIO_MODEL = process.env.LIVE_AUDIO_MODEL;
 export const OPENAI_TRANSCRIPTION_MODEL = process.env.OPENAI_TRANSCRIPTION_MODEL;
 export const GOOGLE_TTS_MODEL = process.env.GOOGLE_TTS_MODEL;
