@@ -7,6 +7,7 @@ import { createAbortController } from "../utils/AbortController.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
 import type { WithId, Document } from "mongodb";
 import type { TextAssertion } from "../types/benchmark.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
 
@@ -146,7 +147,7 @@ router.get(
 
       res.json({ benchmarks: enriched, count: enriched.length });
     } catch (error: unknown) {
-      logger.error(`GET /benchmark error: ${(error as Error).message}`);
+      logger.error(`GET /benchmark error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -316,7 +317,7 @@ router.get(
         totalBenchmarks: benchmarks.length,
       });
     } catch (error: unknown) {
-      logger.error(`GET /benchmark/stats error: ${(error as Error).message}`);
+      logger.error(`GET /benchmark/stats error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -436,7 +437,7 @@ router.post(
 
       res.status(201).json(benchmark);
     } catch (error: unknown) {
-      logger.error(`POST /benchmark error: ${(error as Error).message}`);
+      logger.error(`POST /benchmark error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -463,7 +464,7 @@ router.get(
 
       res.json({ ...benchmark, latestRun: latestRun || null });
     } catch (error: unknown) {
-      logger.error(`GET /benchmark/:id error: ${(error as Error).message}`);
+      logger.error(`GET /benchmark/:id error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -486,7 +487,7 @@ router.delete(
       await BenchmarkService.remove(String(req.params.id), req.project || null);
       res.json({ deleted: true, id: req.params.id });
     } catch (error: unknown) {
-      logger.error(`DELETE /benchmark/:id error: ${(error as Error).message}`);
+      logger.error(`DELETE /benchmark/:id error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -651,11 +652,11 @@ router.post(
       if (!clientClosed) res.end();
       cleanup();
     } catch (error: unknown) {
-      logger.error(`POST /benchmark/:id/run error: ${(error as Error).message}`);
+      logger.error(`POST /benchmark/:id/run error: ${getErrorMessage(error)}`);
       if (res.headersSent) {
         try {
           res.write(
-            `data: ${JSON.stringify({ type: "error", message: (error as Error).message })}\n\n`,
+            `data: ${JSON.stringify({ type: "error", message: getErrorMessage(error) })}\n\n`,
           );
           res.end();
         } catch {
@@ -790,7 +791,7 @@ router.get(
       const runs = await BenchmarkService.getRuns(benchmark.id as string, req.project || null);
       res.json({ runs, count: runs.length });
     } catch (error: unknown) {
-      logger.error(`GET /benchmark/:id/runs error: ${(error as Error).message}`);
+      logger.error(`GET /benchmark/:id/runs error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -834,7 +835,7 @@ router.post(
       res.json(run);
     } catch (error: unknown) {
       logger.error(
-        `POST /benchmark/:id/runs/:runId/rerun error: ${(error as Error).message}`,
+        `POST /benchmark/:id/runs/:runId/rerun error: ${getErrorMessage(error)}`,
       );
       next(error);
     }

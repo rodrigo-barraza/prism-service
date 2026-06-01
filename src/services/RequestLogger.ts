@@ -99,6 +99,7 @@ export interface LlmOptions {
 }
 
 import type { ToolCallPayload, MessagePayload } from "./conversation/index.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 export type { ToolCallPayload, MessagePayload };
 
 export interface LogChatGenerationParams extends LogParams {
@@ -235,7 +236,7 @@ const RequestLogger = {
       };
       await db.collection(COLLECTION).insertOne(document);
     } catch (error: unknown) {
-            logger.error("RequestLogger: failed to save request", (error as Error).message);
+            logger.error("RequestLogger: failed to save request", getErrorMessage(error));
     }
   },
   /**

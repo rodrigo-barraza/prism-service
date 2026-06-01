@@ -17,6 +17,7 @@ import {
 import { TYPES } from "../config.ts";
 import { resolveArchParams, estimateMemory } from "../utils/gguf-arch.ts";
 import { InstanceEntry } from "../types/ProviderTypes.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 export interface ModelEntry {
   name: string;
@@ -793,7 +794,7 @@ class LocalProviderGateway {
       return normalized;
     } catch (error: unknown) {
       logger.warn(
-        `[LocalProviderGateway] Failed to discover models for ${instance.id}: ${(error as Error).message}`,
+        `[LocalProviderGateway] Failed to discover models for ${instance.id}: ${getErrorMessage(error)}`,
       );
       return [];
     }
@@ -1042,7 +1043,7 @@ class LocalProviderGateway {
               type: instance.type,
               ok: false,
               status: "unreachable",
-              error: (error as Error).message,
+              error: getErrorMessage(error),
             };
           }
         }

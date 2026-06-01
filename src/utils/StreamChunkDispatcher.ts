@@ -9,6 +9,7 @@ import FileService from "../services/FileService.ts";
 import logger from "./logger.ts";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { TokenUsage, ToolCallEntry } from "../types/admin.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ export async function uploadImageChunk(
     );
     return ref;
   } catch (error: unknown) {
-    logger.error(`[${logPrefix}] MinIO upload failed: ${(error as Error).message}`);
+    logger.error(`[${logPrefix}] MinIO upload failed: ${getErrorMessage(error)}`);
     return null;
   }
 }

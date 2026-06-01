@@ -1,5 +1,6 @@
 import logger from "../utils/logger.ts";
 import type { PolicyRule, PolicyDecision } from "./PolicyEngine.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import {
   BUILT_IN_PERSONAS,
   Persona,
@@ -156,7 +157,7 @@ const AgentPersonaRegistry = {
       );
     } catch (error: unknown) {
       logger.warn(
-        `[AgentPersonaRegistry] Failed to load custom agents: ${(error as Error).message}`,
+        `[AgentPersonaRegistry] Failed to load custom agents: ${getErrorMessage(error)}`,
       );
     }
   },

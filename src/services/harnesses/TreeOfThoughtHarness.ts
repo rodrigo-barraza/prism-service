@@ -19,6 +19,7 @@ import AutoCompactionTrigger from "../compact/AutoCompactionTrigger.ts";
 import CompactionService from "../compact/CompactionService.ts";
 import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 
+import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import type {
   ConversationMessage,
   ToolCall,
@@ -623,7 +624,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     } catch (scoringError: unknown) {
       // On scoring failure, assign equal scores (first branch wins via stable sort)
       logger.warn(
-        `[TreeOfThought] Scoring failed: ${(scoringError as Error).message}. Using equal scores.`,
+        `[TreeOfThought] Scoring failed: ${getErrorMessage(scoringError)}. Using equal scores.`,
       );
       for (const branch of branches) {
         branch.score = 5;

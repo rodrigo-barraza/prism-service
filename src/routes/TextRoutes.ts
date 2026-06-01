@@ -4,6 +4,7 @@ import requireDb from "../middleware/RequireDbMiddleware.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
 import { GetTextQuerySchema } from "../types/index.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
 router.use(requireDb);
@@ -147,7 +148,7 @@ router.get(
         ].sort(),
       });
     } catch (error: unknown) {
-      logger.error(`GET /text error: ${(error as Error).message}`);
+      logger.error(`GET /text error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),

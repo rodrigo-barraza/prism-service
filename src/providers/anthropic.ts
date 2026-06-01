@@ -10,6 +10,7 @@ import { sleep } from "@rodrigo-barraza/utilities-library";
 
 import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
 import type { TokenUsage } from "../types/admin.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 export interface AnthropicBlock {
   type: string;
@@ -644,7 +645,7 @@ const anthropicProvider = {
     } catch (error: unknown) {
       throw new ProviderError(
         "anthropic",
-        (error as Error).message,
+        getErrorMessage(error),
         (error as AnthropicSdkError)?.status || 500,
         error,
       );
@@ -922,7 +923,7 @@ const anthropicProvider = {
         yield { type: "rateLimits", rateLimits };
       }
     } catch (error: unknown) {
-      if ((error as Error).name === "AbortError") return;
+      if ((error instanceof Error && error.name === "AbortError")) return;
       // For streaming, retry overloaded errors with the same delay/attempts policy
       if (isRetryableError(error)) {
         // Recursive retry with attempt tracking via options._retryAttempt
@@ -941,7 +942,7 @@ const anthropicProvider = {
       }
       throw new ProviderError(
         "anthropic",
-        (error as Error).message,
+        getErrorMessage(error),
         (error as AnthropicSdkError)?.status || 500,
         error,
       );

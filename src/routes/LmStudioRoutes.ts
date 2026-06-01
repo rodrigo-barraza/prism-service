@@ -6,6 +6,7 @@ import { isInstance } from "../providers/instance-registry.ts";
 import logger from "../utils/logger.ts";
 import LocalProviderGateway from "../services/LocalProviderGateway.ts";
 import { initSseResponse } from "../utils/SseUtilities.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 const router = express.Router();
 /** Resolve instance ID from request — supports ?instance=lm-studio-2 */
 function resolveInstanceId(req: Request) {
@@ -27,7 +28,7 @@ router.get(
       const data = await provider.listModels();
       res.json(data);
     } catch (error: unknown) {
-            logger.error(`GET /lm-studio/models error: ${(error as Error).message}`);
+            logger.error(`GET /lm-studio/models error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -77,7 +78,7 @@ router.post(
       }
       res.json({ model, alreadyLoaded: false });
     } catch (error: unknown) {
-            logger.error(`POST /lm-studio/load error: ${(error as Error).message}`);
+            logger.error(`POST /lm-studio/load error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -160,7 +161,7 @@ router.post(
         }
       } catch (listErr: unknown) {
         logger.warn(
-                    `[load-stream] Could not check models before loading: ${(listErr as Error).message}`,
+                    `[load-stream] Could not check models before loading: ${getErrorMessage(listErr)}`,
         );
       }
       if (!needsLoad || aborted) {
@@ -195,16 +196,16 @@ router.post(
       await loadPromise;
       if (aborted) return res.end();
       if (loadError) {
-        logger.error(`[load-stream] loadModel failed: ${(loadError as Error).message}`);
-        send({ type: "error", message: (loadError as Error).message });
+        logger.error(`[load-stream] loadModel failed: ${getErrorMessage(loadError)}`);
+        send({ type: "error", message: getErrorMessage(loadError) });
       } else {
         send({ type: "progress", progress: 1 });
         send({ type: "complete" });
         logger.info(`[load-stream] Model ${model} loaded successfully`);
       }
     } catch (error: unknown) {
-            logger.error(`POST /lm-studio/load-stream error: ${(error as Error).message}`);
-            send({ type: "error", message: (error as Error).message });
+            logger.error(`POST /lm-studio/load-stream error: ${getErrorMessage(error)}`);
+            send({ type: "error", message: getErrorMessage(error) });
     } finally {
       if (!res.writableEnded) res.end();
     }
@@ -230,7 +231,7 @@ router.post(
       const data = await provider.unloadModel(instance_id);
       res.json(data);
     } catch (error: unknown) {
-            logger.error(`POST /lm-studio/unload error: ${(error as Error).message}`);
+            logger.error(`POST /lm-studio/unload error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -282,7 +283,7 @@ router.post(
       }
       res.json(estimate);
     } catch (error: unknown) {
-            logger.error(`POST /lm-studio/estimate error: ${(error as Error).message}`);
+            logger.error(`POST /lm-studio/estimate error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),

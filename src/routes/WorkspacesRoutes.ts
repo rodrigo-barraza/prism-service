@@ -5,6 +5,7 @@ import { TOOLS_SERVICE_URL } from "../../config.ts";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
 import logger from "../utils/logger.ts";
 import { PutWorkspacesSchema, ValidateWorkspaceSchema } from "../types/index.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
 
@@ -51,7 +52,7 @@ router.get(
 
       res.json(workspaces);
     } catch (error: unknown) {
-      logger.error(`GET /workspaces error: ${(error as Error).message}`);
+      logger.error(`GET /workspaces error: ${getErrorMessage(error)}`);
       res.status(500).json({ error: "Failed to retrieve workspace roots" });
     }
   }),
@@ -82,7 +83,7 @@ router.get(
         }
       } catch (agentErr: unknown) {
         logger.warn(
-          `GET /workspaces/full agent fetch failed: ${(agentErr as Error).message}`,
+          `GET /workspaces/full agent fetch failed: ${getErrorMessage(agentErr)}`,
         );
       }
 
@@ -104,7 +105,7 @@ router.get(
 
       res.json({ workspaces, agents, staticRoots });
     } catch (error: unknown) {
-      logger.error(`GET /workspaces/full error: ${(error as Error).message}`);
+      logger.error(`GET /workspaces/full error: ${getErrorMessage(error)}`);
       res
         .status(500)
         .json({ error: "Failed to retrieve full workspace config" });
@@ -134,7 +135,7 @@ router.put(
       );
       res.json(result);
     } catch (error: unknown) {
-      logger.error(`PUT /workspaces error: ${(error as Error).message}`);
+      logger.error(`PUT /workspaces error: ${getErrorMessage(error)}`);
       res.status(500).json({ error: "Failed to update workspace roots" });
     }
   }),
@@ -161,7 +162,7 @@ router.post(
       );
       res.json(result);
     } catch (error: unknown) {
-      logger.error(`POST /workspaces/validate error: ${(error as Error).message}`);
+      logger.error(`POST /workspaces/validate error: ${getErrorMessage(error)}`);
       res.status(500).json({ error: "Failed to validate workspace path" });
     }
   }),
@@ -207,7 +208,7 @@ router.get(
       const result = await toolsRes.json();
       res.json(result);
     } catch (error: unknown) {
-      logger.error(`GET /workspaces/tree error: ${(error as Error).message}`);
+      logger.error(`GET /workspaces/tree error: ${getErrorMessage(error)}`);
       res.status(500).json({ error: "Failed to fetch workspace tree" });
     }
   }),
@@ -271,7 +272,7 @@ router.get(
       await pump();
     } catch (error: unknown) {
       logger.error(
-        `GET /workspaces/download/agent error: ${(error as Error).message}`,
+        `GET /workspaces/download/agent error: ${getErrorMessage(error)}`,
       );
       res
         .status(502)

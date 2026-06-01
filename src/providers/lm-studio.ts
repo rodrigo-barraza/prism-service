@@ -31,6 +31,7 @@ import {
   type OpenAICompletionResponse,
 } from "../utils/openai-compat.ts";
 import { COORDINATOR_ONLY_TOOLS } from "../services/CoordinatorPrompt.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 // ── Native /api/v1/chat SSE stream parser ────────────────────
 // The native endpoint emits named SSE events: reasoning.start/delta/end,
 // message.start/delta/end, content.start/delta/end, chat.end.
@@ -347,7 +348,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         return result;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
+                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
       }
     },
     // ── Streaming Text Generation (SSE) ──────────────────────
@@ -552,7 +553,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                     })
                     .catch((error: unknown) => {
                       loadDone = true;
-                      if ((error as Error).name !== "AbortError") loadError = error;
+                      if ((error instanceof Error ? error.name : "") !== "AbortError") loadError = error;
                     });
                   const startTime = Date.now();
                   const EXPECTED_LOAD_MS = 15_000;
@@ -565,7 +566,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                       );
                       this.unloadModelByKey(model).catch((e: unknown) =>
                         logger.warn(
-                        `[LM-Studio] Failed to unload ${model} after abort: ${(e as Error).message}`,
+                        `[LM-Studio] Failed to unload ${model} after abort: ${getErrorMessage(e)}`,
                         ),
                       );
                       return;
@@ -594,7 +595,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                     );
                       this.unloadModelByKey(model).catch((e: unknown) =>
                       logger.warn(
-                        `[LM-Studio] Failed to unload ${model} after abort: ${(e as Error).message}`,
+                        `[LM-Studio] Failed to unload ${model} after abort: ${getErrorMessage(e)}`,
                       ),
                     );
                     return;
@@ -658,15 +659,22 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           // If model load explicitly failed, re-throw so the generator exits
           // cleanly. runSingleModel will catch it and record an error result,
           // allowing the benchmark to continue to the next model.
+          const isModelLoadFailed =
+            loadCheckErr instanceof Error &&
+            loadCheckErr.cause &&
+            typeof loadCheckErr.cause === "object" &&
+            "type" in loadCheckErr.cause &&
+            (loadCheckErr.cause as { type?: unknown }).type === "model_load_failed";
+
           if (
-            ((loadCheckErr as Error)?.cause as Record<string, unknown>)?.type === "model_load_failed" ||
-                        (loadCheckErr as Error).message?.includes("Failed to load") ||
-                        (loadCheckErr as Error).message?.includes("API error")
+            isModelLoadFailed ||
+            getErrorMessage(loadCheckErr)?.includes("Failed to load") ||
+            getErrorMessage(loadCheckErr)?.includes("API error")
           ) {
             throw loadCheckErr;
           }
           logger.warn(
-                        `Could not check/load model before streaming: ${(loadCheckErr as Error).message}`,
+                        `Could not check/load model before streaming: ${getErrorMessage(loadCheckErr)}`,
           );
         }
                 if (options.signal?.aborted) return;
@@ -830,9 +838,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         const nativeReader = nativeResponse.body.getReader();
         yield* parseNativeSSEStream(nativeReader, { signal: options.signal });
       } catch (error: unknown) {
-                if ((error as Error).name === "AbortError") return; // Client disconnected
+                if ((error instanceof Error && error.name === "AbortError")) return; // Client disconnected
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
+                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
       }
     },
     /**
@@ -957,7 +965,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         return { embedding: firstEmbedding, dimensions: firstEmbedding.length };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
+                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
       }
     },
     async captionImage(
@@ -1005,7 +1013,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         return { text: textContent, usage };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
+                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
       }
     },
     // ── Model Management ─────────────────────────────────────
@@ -1097,7 +1105,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         return data as Record<string, unknown>;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
+                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
       }
     },
     async loadModel(model: string, options: ProviderOptions = {}, signal?: AbortSignal) {
@@ -1125,9 +1133,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         }
         return response.json();
       } catch (error: unknown) {
-                if ((error as Error).name === "AbortError") throw error; // Let AbortError propagate
+                if ((error instanceof Error && error.name === "AbortError")) throw error; // Let AbortError propagate
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
+                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
       }
     },
     /**
@@ -1148,7 +1156,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         }
       } catch (error: unknown) {
         logger.warn(
-                    `[LM-Studio] unloadModelByKey(${modelKey}) failed: ${(error as Error).message}`,
+                    `[LM-Studio] unloadModelByKey(${modelKey}) failed: ${getErrorMessage(error)}`,
         );
       }
     },
@@ -1168,7 +1176,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         return response.json();
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", (error as Error).message, 500, error);
+                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
       }
     },
   };

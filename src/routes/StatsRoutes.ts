@@ -2,6 +2,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response, NextFunction } from "express";
 import logger from "../utils/logger.ts";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import {
   COLLECTIONS,
   COST_SUM_EXPR,
@@ -94,7 +95,7 @@ router.get(
         })),
       );
     } catch (error: unknown) {
-      logger.error(`GET /stats/models error: ${(error as Error).message}`);
+      logger.error(`GET /stats/models error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),

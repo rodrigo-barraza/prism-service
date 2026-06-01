@@ -45,6 +45,7 @@ import { handleSseRequest, handleJsonRequest } from "../utils/SseUtilities.ts";
 import { SseEvent } from "../types/SseTypes.ts";
 import { ChatRequestSchema } from "../types/index.ts";
 import type { ConversationMessage, EmitFn } from "../services/harnesses/types.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
 function injectToolsIntoSystemPrompt(
@@ -400,7 +401,7 @@ export async function handleConversation(
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
-        emit({ type: SSE_EVENT_TYPES.ERROR, message: (error as Error).message });
+        emit({ type: SSE_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
     return;
   }
   const {
@@ -517,12 +518,12 @@ export async function handleConversation(
       conversationId: conversationId || null,
       traceId: traceId || null,
       success: false,
-            errorMessage: (error as Error).message,
+            errorMessage: getErrorMessage(error),
       totalSec,
       messages: context.rawMessages || [],
       options: {},
     });
-        emit({ type: SSE_EVENT_TYPES.ERROR, message: (error as Error).message });
+        emit({ type: SSE_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
   }
 }
 // ─── Agent session path (agentSessionId, no conversationId) ─
@@ -537,7 +538,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
-        emit({ type: SSE_EVENT_TYPES.ERROR, message: (error as Error).message });
+        emit({ type: SSE_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
     return;
   }
   const {
@@ -630,7 +631,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
             await import("../services/CoordinatorService.js");
           await CoordinatorService.abortWorkersBySession(agentSessionId);
         } catch (cleanupErr: unknown) {
-                    logger.warn(`[agent] Worker cleanup failed: ${(cleanupErr as Error).message}`);
+                    logger.warn(`[agent] Worker cleanup failed: ${getErrorMessage(cleanupErr)}`);
         }
       }
     }
@@ -655,12 +656,12 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
       agentSessionId,
       traceId: traceId || null,
       success: false,
-            errorMessage: (error as Error).message,
+            errorMessage: getErrorMessage(error),
       totalSec,
       messages: context.rawMessages || [],
       options: {},
     });
-        emit({ type: SSE_EVENT_TYPES.ERROR, message: (error as Error).message });
+        emit({ type: SSE_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
   }
 }
 // ─── Dispatch: Image API models (e.g. GPT Image 1.5, OpenAI images) ─
@@ -741,7 +742,7 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
       minioRef = ref;
     } catch (uploadErr: unknown) {
       logger.error(
-                `[chat/image-api] MinIO upload failed: ${(uploadErr as Error).message}`,
+                `[chat/image-api] MinIO upload failed: ${getErrorMessage(uploadErr)}`,
       );
     }
   }
@@ -938,7 +939,7 @@ async function handleStreamingText(context: GenerationContext) {
           status: toolCall.status,
         });
       } catch (error: unknown) {
-        toolCall.result = { error: (error as Error).message };
+        toolCall.result = { error: getErrorMessage(error) };
         toolCall.status = "error";
         emit({
           type: SSE_EVENT_TYPES.TOOL_CALL,
@@ -1138,7 +1139,7 @@ async function handleNonStreamingText(context: GenerationContext) {
           minioRef = ref;
         } catch (uploadErr: unknown) {
           logger.error(
-            `[chat/non-stream] MinIO upload failed: ${(uploadErr as Error).message}`,
+            `[chat/non-stream] MinIO upload failed: ${getErrorMessage(uploadErr)}`,
           );
         }
         images.push(

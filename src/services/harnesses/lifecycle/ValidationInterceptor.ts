@@ -6,6 +6,7 @@ import fs from "node:fs";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type { ToolCall, ToolResult, AgenticContext, ValidationFeedback } from "../types.ts";
+import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 /**
  * ValidationInterceptor — automatic linter/AST feedback loop.
@@ -147,7 +148,7 @@ async function runShellValidator(
     };
   } catch (validationError: unknown) {
     logger.warn(
-      `[ValidationInterceptor] Validator failed for ${filePath}: ${(validationError as Error).message}`,
+      `[ValidationInterceptor] Validator failed for ${filePath}: ${getErrorMessage(validationError)}`,
     );
     return null;
   }

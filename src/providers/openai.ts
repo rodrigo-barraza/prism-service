@@ -772,7 +772,7 @@ const openaiProvider = {
         yield* this._streamChatCompletions(messages, model, options);
       }
     } catch (error: unknown) {
-      if (error && typeof error === "object" && "name" in error && (error as Error).name === "AbortError") return;
+      if (error && typeof error === "object" && "name" in error && (error instanceof Error && error.name === "AbortError")) return;
       toProviderError(error);
     }
   },

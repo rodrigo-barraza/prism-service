@@ -6,6 +6,7 @@
 import { getProvider } from "../../providers/index.ts";
 import logger from "../../utils/logger.ts";
 import type { WorkerState } from "../../types/coordinator.ts";
+import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
 /**
  * Evict the model from a secondary GPU instance when no other workers
@@ -43,12 +44,12 @@ export async function evictIdleSecondaryModel(
           .unloadModelByKey(completedWorker.resolvedModel)
           .catch((error: unknown) =>
             logger.warn(
-              `[Coordinator] VRAM eviction failed on ${workerInstanceId}: ${(error as Error).message}`,
+              `[Coordinator] VRAM eviction failed on ${workerInstanceId}: ${getErrorMessage(error)}`,
             ),
           );
       }
     } catch (error: unknown) {
-      logger.warn(`[Coordinator] VRAM eviction error: ${(error as Error).message}`);
+      logger.warn(`[Coordinator] VRAM eviction error: ${getErrorMessage(error)}`);
     }
   } else {
     logger.info(

@@ -2,6 +2,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response } from "express";
 import CoordinatorService from "../services/CoordinatorService.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = Router();
 
@@ -49,7 +50,7 @@ router.get(
         }
       } catch (error: unknown) {
         logger.warn(
-          `[coordinator] Failed to load persisted workers: ${(error as Error).message}`,
+          `[coordinator] Failed to load persisted workers: ${getErrorMessage(error)}`,
         );
       }
     }

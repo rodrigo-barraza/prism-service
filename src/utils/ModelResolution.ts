@@ -7,6 +7,7 @@
 import logger from "./logger.ts";
 import { getProvider } from "../providers/index.ts";
 import type { InstanceEntry } from "../types/ProviderTypes.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -179,7 +180,7 @@ export async function resolveModelForInstances(
     return { usable, modelOverrides };
   } catch (error: unknown) {
     logger.warn(
-      `[ModelResolution] Model availability check failed: ${(error as Error).message}`,
+      `[ModelResolution] Model availability check failed: ${getErrorMessage(error)}`,
     );
     return { usable: siblings, modelOverrides };
   }

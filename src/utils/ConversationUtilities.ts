@@ -3,6 +3,7 @@ import logger from "./logger.ts";
 import type { ChatMessage } from "../types/admin.ts";
 import type { MessagePayload } from "../services/RequestLogger.ts";
 import { COLLECTIONS } from "../constants.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 // ─── Conversation persistence helpers ───────────────────────
 
@@ -26,7 +27,7 @@ export function markGenerating(
     opts,
   ).catch((error: unknown) =>
     logger.error(
-      `Failed to ${generating ? "set" : "clear"} isGenerating: ${(error as Error).message}`,
+      `Failed to ${generating ? "set" : "clear"} isGenerating: ${getErrorMessage(error)}`,
     ),
   );
 }
@@ -68,7 +69,7 @@ export async function appendAndFinalize(
   } catch (error: unknown) {
     logger.error(
       `Failed to append ${messagesToAppend?.length ?? 0} messages to ${conversationId} ` +
-        `(project=${project}, collection=${opts?.collection || COLLECTIONS.MODEL_CONVERSATIONS}): ${(error as Error).message}`,
+        `(project=${project}, collection=${opts?.collection || COLLECTIONS.MODEL_CONVERSATIONS}): ${getErrorMessage(error)}`,
     );
 
     // Always clear isGenerating even on failure — prevents sessions
@@ -83,7 +84,7 @@ export async function appendAndFinalize(
       );
     } catch (clearError: unknown) {
       logger.error(
-        `Failed to clear isGenerating after append failure: ${(clearError as Error).message}`,
+        `Failed to clear isGenerating after append failure: ${getErrorMessage(clearError)}`,
       );
     }
   }

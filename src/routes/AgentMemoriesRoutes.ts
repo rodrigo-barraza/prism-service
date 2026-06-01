@@ -3,6 +3,7 @@ import express, { Request, Response, NextFunction } from "express";
 import MemoryService from "../services/MemoryService.ts";
 import MemoryConsolidationService from "../services/MemoryConsolidationService.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
 
@@ -44,7 +45,7 @@ router.post(
       const { embedding: _emb, ...safe } = result;
       res.json(safe);
     } catch (error: unknown) {
-            logger.error(`[agent-memories] POST ${(error as Error).message}`);
+            logger.error(`[agent-memories] POST ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -74,7 +75,7 @@ router.get(
       });
       res.json(result);
     } catch (error: unknown) {
-            logger.error(`[agent-memories] ${(error as Error).message}`);
+            logger.error(`[agent-memories] ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -94,7 +95,7 @@ router.delete(
       }
       res.json({ success: true });
     } catch (error: unknown) {
-            logger.error(`[agent-memories] DELETE ${(error as Error).message}`);
+            logger.error(`[agent-memories] DELETE ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -112,7 +113,7 @@ router.get(
       const combos = await MemoryService.discoverCombos();
       res.json({ combos });
     } catch (error: unknown) {
-            logger.error(`[agent-memories] DISCOVER ${(error as Error).message}`);
+            logger.error(`[agent-memories] DISCOVER ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -135,7 +136,7 @@ router.get(
       );
       res.json({ history });
     } catch (error: unknown) {
-            logger.error(`[agent-memories] HISTORY ${(error as Error).message}`);
+            logger.error(`[agent-memories] HISTORY ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -162,7 +163,7 @@ router.post(
       });
       res.json(result);
     } catch (error: unknown) {
-            logger.error(`[agent-memories] CONSOLIDATE ${(error as Error).message}`);
+            logger.error(`[agent-memories] CONSOLIDATE ${getErrorMessage(error)}`);
       next(error);
     }
   }),

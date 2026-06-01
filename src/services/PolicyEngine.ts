@@ -1,4 +1,5 @@
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 /**
  * PolicyEngine — declarative tool call policy system.
@@ -162,7 +163,7 @@ export default class PolicyEngine {
           if (!rule.when(args)) continue;
         } catch (errorObject) {
           logger.warn(
-            `[PolicyEngine] Predicate for "${rule.name}" threw: ${(errorObject as Error).message}. Skipping rule.`,
+            `[PolicyEngine] Predicate for "${rule.name}" threw: ${getErrorMessage(errorObject)}. Skipping rule.`,
           );
           continue;
         }

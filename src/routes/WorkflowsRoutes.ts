@@ -7,6 +7,7 @@ import FileService from "../services/FileService.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import { assembleGraph } from "../services/WorkflowAssembler.ts";
 import { COLLECTIONS } from "../constants.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 
 interface CustomRequest extends Request {
@@ -43,7 +44,7 @@ async function uploadIfDataUrl(
       );
       return ref;
     } catch (error: unknown) {
-      logger.error(`Workflow file upload failed: ${(error as Error).message}`);
+      logger.error(`Workflow file upload failed: ${getErrorMessage(error)}`);
       return value;
     }
   }
@@ -327,7 +328,7 @@ router.get(
 
       res.json(workflows);
     } catch (error: unknown) {
-            logger.error(`GET /workflows error: ${(error as Error).message}`);
+            logger.error(`GET /workflows error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -359,7 +360,7 @@ router.get(
 
       res.json(workflow);
     } catch (error: unknown) {
-            logger.error(`GET /workflows/:id error: ${(error as Error).message}`);
+            logger.error(`GET /workflows/:id error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -446,7 +447,7 @@ router.post(
       const result = await db.collection(WORKFLOWS_COL).insertOne(workflow);
       res.json({ success: true, id: result.insertedId.toString() });
     } catch (error: unknown) {
-            logger.error(`POST /workflows error: ${(error as Error).message}`);
+            logger.error(`POST /workflows error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -503,7 +504,7 @@ router.put(
 
       res.json({ success: true });
     } catch (error: unknown) {
-            logger.error(`PUT /workflows/:id error: ${(error as Error).message}`);
+            logger.error(`PUT /workflows/:id error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -565,7 +566,7 @@ router.patch(
       res.json({ success: true });
     } catch (error: unknown) {
       logger.error(
-                `PATCH /workflows/:id/conversations error: ${(error as Error).message}`,
+                `PATCH /workflows/:id/conversations error: ${getErrorMessage(error)}`,
       );
       next(error);
     }
@@ -592,7 +593,7 @@ router.delete(
       await db.collection(WORKFLOWS_COL).deleteOne(filter);
       res.json({ success: true });
     } catch (error: unknown) {
-            logger.error(`DELETE /workflows/:id error: ${(error as Error).message}`);
+            logger.error(`DELETE /workflows/:id error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),

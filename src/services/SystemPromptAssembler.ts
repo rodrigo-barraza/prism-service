@@ -15,6 +15,7 @@ import {
 import { createAbortController } from "../utils/AbortController.ts";
 import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
 import { DIRECTORY_CACHE_TTL_MS, DIRECTORY_FETCH_TIMEOUT_MS } from "../constants.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const SKILL_RELEVANCE_THRESHOLD = 0.3;
 
@@ -133,7 +134,7 @@ export default class SystemPromptAssembler {
       return tree;
     } catch (error: unknown) {
       logger.warn(
-        `[SystemPromptAssembler] Directory fetch error: ${(error as Error).message}`,
+        `[SystemPromptAssembler] Directory fetch error: ${getErrorMessage(error)}`,
       );
       return this._directoryCache || "";
     }
@@ -273,7 +274,7 @@ export default class SystemPromptAssembler {
       return MemoryService.formatForPrompt(memories);
     } catch (error: unknown) {
       logger.warn(
-        `[SystemPromptAssembler] Memory fetch error: ${(error as Error).message}`,
+        `[SystemPromptAssembler] Memory fetch error: ${getErrorMessage(error)}`,
       );
       return "";
     }
@@ -323,7 +324,7 @@ export default class SystemPromptAssembler {
         });
       } catch (error: unknown) {
         logger.warn(
-          `[SystemPromptAssembler] Query embedding failed: ${(error as Error).message} — returning all skills`,
+          `[SystemPromptAssembler] Query embedding failed: ${getErrorMessage(error)} — returning all skills`,
         );
         return skills.map((s) => ({
           name: s.name as string,
@@ -353,7 +354,7 @@ export default class SystemPromptAssembler {
       return scored;
     } catch (error: unknown) {
       logger.warn(
-        `[SystemPromptAssembler] Skills fetch error: ${(error as Error).message}`,
+        `[SystemPromptAssembler] Skills fetch error: ${getErrorMessage(error)}`,
       );
       return [];
     }
@@ -719,7 +720,7 @@ export default class SystemPromptAssembler {
         );
       } catch (error: unknown) {
         logger.error(
-          `[SystemPromptAssembler] Assembly failed: ${(error as Error).message}`,
+          `[SystemPromptAssembler] Assembly failed: ${getErrorMessage(error)}`,
         );
       }
     };

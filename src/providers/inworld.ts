@@ -4,6 +4,7 @@ import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 import { INWORLD_BASIC } from "../../config.ts";
 import { DEFAULT_VOICES, getDefaultModels, TYPES } from "../config.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice:stream";
 
@@ -41,7 +42,7 @@ async function* parseNdjsonStream(body: ReadableStream<Uint8Array>) {
             yield chunk.result;
           }
         } catch (error: unknown) {
-                    logger.warn(`[Inworld] NDJSON parse error: ${(error as Error).message}`);
+                    logger.warn(`[Inworld] NDJSON parse error: ${getErrorMessage(error)}`);
         }
       }
     }
@@ -107,7 +108,7 @@ const inworldProvider = ({
       return { stream, contentType: "audio/mpeg" };
     } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
-            throw new ProviderError("inworld", (error as Error).message, 500, error);
+            throw new ProviderError("inworld", getErrorMessage(error), 500, error);
     }
   },
 
@@ -178,9 +179,9 @@ const inworldProvider = ({
         }
       }
     } catch (error: unknown) {
-            if ((error as Error).name === "AbortError") return;
+            if ((error instanceof Error && error.name === "AbortError")) return;
       if (error instanceof ProviderError) throw error;
-            throw new ProviderError("inworld", (error as Error).message, 500, error);
+            throw new ProviderError("inworld", getErrorMessage(error), 500, error);
     } finally {
       controller.abort();
     }

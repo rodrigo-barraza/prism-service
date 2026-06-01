@@ -11,6 +11,7 @@ import {
 } from "../utils/media.ts";
 
 import type { ConversationMessage } from "./harnesses/types.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 // ─── Compress oversized data URLs ───────────────────────────
 /**
@@ -35,7 +36,7 @@ export async function compressDataUrlIfOversized(dataUrl: string): Promise<strin
       );
     }
   } catch (error: unknown) {
-    logger.warn(`[MediaResolution] Dimension constraint failed: ${(error as Error).message}`);
+    logger.warn(`[MediaResolution] Dimension constraint failed: ${getErrorMessage(error)}`);
   }
   // Step 2: enforce byte-size limit
   const base64Length = base64Data.length; // Anthropic checks base64 STRING length
@@ -57,7 +58,7 @@ export async function compressDataUrlIfOversized(dataUrl: string): Promise<strin
     return newUrl;
   } catch (error: unknown) {
     logger.error(
-      `[MediaResolution] Image compression failed: ${(error as Error).message}. Sending original.`,
+      `[MediaResolution] Image compression failed: ${getErrorMessage(error)}. Sending original.`,
     );
     return `data:${mimeType};base64,${base64Data}`;
   }
@@ -96,7 +97,7 @@ export async function resolveMediaReference(
       );
       storageRef = minioRef;
     } catch (error: unknown) {
-      logger.error(`[MediaResolution] Failed to upload media to MinIO: ${(error as Error).message}`);
+      logger.error(`[MediaResolution] Failed to upload media to MinIO: ${getErrorMessage(error)}`);
     }
     return { providerRef, storageRef };
   }
@@ -125,7 +126,7 @@ export async function resolveMediaReference(
       };
     } catch (error: unknown) {
       logger.error(
-        `[MediaResolution] Failed to resolve MinIO ref ${reference}: ${(error as Error).message}`,
+        `[MediaResolution] Failed to resolve MinIO ref ${reference}: ${getErrorMessage(error)}`,
       );
       return { providerRef: reference, storageRef: reference };
     }
@@ -152,7 +153,7 @@ export async function resolveMediaReference(
         storageRef: reference,
       };
     } catch (error: unknown) {
-      logger.error(`[MediaResolution] Failed to fetch media URL ${reference}: ${(error as Error).message}`);
+      logger.error(`[MediaResolution] Failed to fetch media URL ${reference}: ${getErrorMessage(error)}`);
       return { providerRef: reference, storageRef: reference };
     }
   }

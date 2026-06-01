@@ -2,6 +2,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import SettingsService from "../services/SettingsService.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
 
@@ -16,7 +17,7 @@ router.get(
       const settings = await SettingsService.get();
       res.json(settings);
     } catch (error: unknown) {
-            logger.error(`GET /settings error: ${(error as Error).message}`);
+            logger.error(`GET /settings error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -40,7 +41,7 @@ router.put(
       const updated = await SettingsService.update(data);
       res.json(updated);
     } catch (error: unknown) {
-            logger.error(`PUT /settings error: ${(error as Error).message}`);
+            logger.error(`PUT /settings error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),

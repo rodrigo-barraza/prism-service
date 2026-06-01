@@ -8,6 +8,7 @@ import RequestLogger from "./RequestLogger.ts";
 import logger from "../utils/logger.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";
 import SettingsService from "./SettingsService.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 /** Resolve the current embedding provider + model from settings. */
 async function getEmbeddingConfig() {
   return SettingsService.getMemoryModelConfig("embedding");
@@ -75,7 +76,7 @@ const EmbeddingService = {
       );
     } catch (error: unknown) {
       success = false;
-      errorMessage = (error as Error).message;
+      errorMessage = getErrorMessage(error);
       throw error;
     } finally {
       const totalSec = (performance.now() - requestStart) / 1000;

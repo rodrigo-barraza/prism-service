@@ -36,6 +36,7 @@ import type {
 
 import type { ConversationMessage, EmitFn, ToolCall } from "./harnesses/types.ts";
 import type { InstanceEntry } from "../types/ProviderTypes.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 // ────────────────────────────────────────────────────────────
 // CoordinatorService — Multi-Agent Orchestration
@@ -341,10 +342,10 @@ export default class CoordinatorService {
       );
     } catch (error: unknown) {
       logger.error(
-        `[Coordinator] Worker ${agentId} loop error: ${(error as Error).message}`,
+        `[Coordinator] Worker ${agentId} loop error: ${getErrorMessage(error)}`,
       );
       workerState.status = "failed";
-      workerState.error = (error as Error).message;
+      workerState.error = getErrorMessage(error);
       workerState.durationMs = Date.now() - workerState.startedAt;
 
       // Clean up worktree on failure to prevent orphaned branches
@@ -354,7 +355,7 @@ export default class CoordinatorService {
           workerState.worktreePath,
         ).catch((cleanupErr: unknown) =>
           logger.warn(
-            `[Coordinator] Worktree cleanup failed for ${agentId}: ${(cleanupErr as Error).message}`,
+            `[Coordinator] Worktree cleanup failed for ${agentId}: ${getErrorMessage(cleanupErr)}`,
           ),
         );
       }
@@ -365,7 +366,7 @@ export default class CoordinatorService {
           type: SSE_EVENT_TYPES.WORKER_STATUS,
           workerId: agentId,
           message: "failed",
-          error: (error as Error).message,
+          error: getErrorMessage(error),
         });
       }
     }
@@ -414,10 +415,10 @@ export default class CoordinatorService {
     CoordinatorService._runWorkerLoop(worker, message, coordinatorCtx).catch(
       (error: unknown) => {
         logger.error(
-          `[Coordinator] Worker ${agentId} continuation error: ${(error as Error).message}`,
+          `[Coordinator] Worker ${agentId} continuation error: ${getErrorMessage(error)}`,
         );
         worker.status = "failed";
-        worker.error = (error as Error).message;
+        worker.error = getErrorMessage(error);
       },
     );
 
@@ -746,7 +747,7 @@ export default class CoordinatorService {
       });
     } catch (error: unknown) {
       if (
-        (error as Error).name === "AbortError" ||
+        (error instanceof Error && error.name === "AbortError") ||
         worker.abortController?.signal.aborted
       ) {
         worker.status = "stopped";
@@ -796,7 +797,7 @@ export default class CoordinatorService {
       await GitWorktreeHelper.removeWorktree(worker.repoPath, worker.worktreePath).catch(
         (error: unknown) =>
           logger.warn(
-            `[Coordinator] Post-completion worktree cleanup failed for ${worker.agentId}: ${(error as Error).message}`,
+            `[Coordinator] Post-completion worktree cleanup failed for ${worker.agentId}: ${getErrorMessage(error)}`,
           ),
       );
     }

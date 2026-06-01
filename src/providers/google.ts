@@ -11,6 +11,7 @@ import {
   GOOGLE_EMBEDDING_MODEL,
 } from "../../config.ts";
 import { TYPES, MODELS, DEFAULT_VOICES, getDefaultModels } from "../config.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 /** Shape of a model definition from the MODELS catalog. */
 interface ModelDef {
@@ -66,7 +67,7 @@ function getClient(): GoogleGenAI {
  * rather than propagated as 500 server errors.
  */
 function isSafetyBlockError(error: unknown): boolean {
-  const message = ((error as Error)?.message || "").toLowerCase();
+  const message = getErrorMessage(error).toLowerCase();
   return (
     message.includes("prohibited_content") ||
     message.includes("image_safety") ||
@@ -283,7 +284,7 @@ async function convertMessages(messages: ConversationMsg[]): Promise<Content[]> 
                 }
               } catch (fetchErr: unknown) {
                 logger.warn(
-                  `[Google] Failed to fetch media URL for inline data: ${(fetchErr as Error).message}`,
+                  `[Google] Failed to fetch media URL for inline data: ${getErrorMessage(fetchErr)}`,
                 );
               }
             }
@@ -398,14 +399,14 @@ const googleProvider = {
       // should return an empty result, not a 500. This lets consumers
       // handle "no image generated" gracefully and preserves the conversation.
       if (isSafetyBlockError(error)) {
-        logger.error(`[Google] Content safety block: ${(error as Error).message}`);
+        logger.error(`[Google] Content safety block: ${getErrorMessage(error)}`);
         return {
           text: "",
           usage: { inputTokens: 0, outputTokens: 0 },
           safetyBlock: true,
         };
       }
-      throw new ProviderError("google", (error as Error).message, 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error);
     }
   },
 
@@ -508,10 +509,10 @@ const googleProvider = {
         yield { type: "usage", usage: { inputTokens: 0, outputTokens: 0 } };
       }
     } catch (error: unknown) {
-      if ((error as Error).name === "AbortError") return;
+      if ((error instanceof Error && error.name === "AbortError")) return;
       if (isSafetyBlockError(error)) {
         logger.error(
-          `[Google] Content safety block (stream): ${(error as Error).message}`,
+          `[Google] Content safety block (stream): ${getErrorMessage(error)}`,
         );
         yield {
           type: "usage",
@@ -520,7 +521,7 @@ const googleProvider = {
         };
         return;
       }
-      throw new ProviderError("google", (error as Error).message, 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error);
     }
   },
 
@@ -804,9 +805,9 @@ const googleProvider = {
         }
       }
     } catch (error: unknown) {
-      if ((error as Error).name === "AbortError") return;
+      if ((error instanceof Error && error.name === "AbortError")) return;
       if (error instanceof ProviderError) throw error;
-      throw new ProviderError("google", (error as Error).message, 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error);
     } finally {
       if (session) {
         try {
@@ -877,7 +878,7 @@ const googleProvider = {
       };
       return { text: response.text, usage };
     } catch (error: unknown) {
-      throw new ProviderError("google", (error as Error).message, 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error);
     }
   },
 
@@ -947,7 +948,7 @@ const googleProvider = {
       throw new Error("No image data received from Google AI");
     } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
-      throw new ProviderError("google", (error as Error).message, 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error);
     }
   },
 
@@ -1003,7 +1004,7 @@ const googleProvider = {
       }
     } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
-      throw new ProviderError("google", (error as Error).message, 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error);
     }
   },
 
@@ -1052,7 +1053,7 @@ const googleProvider = {
         },
       };
     } catch (error: unknown) {
-      throw new ProviderError("google", (error as Error).message, 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error);
     }
   },
 
@@ -1114,7 +1115,7 @@ const googleProvider = {
     } catch (error: unknown) {
       throw new ProviderError(
         "google",
-        (error as Error).message,
+        getErrorMessage(error),
         ((error as Record<string, unknown>).status as number) || 500,
         error,
       );

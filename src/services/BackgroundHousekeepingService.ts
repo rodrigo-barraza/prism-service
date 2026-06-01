@@ -21,6 +21,7 @@ import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -88,7 +89,7 @@ async function pruneOrphanedWorktrees(): Promise<HousekeepingWorktreeResult> {
         pruned.push(entry);
       }
     } catch (error: unknown) {
-      errors.push(`${entry}: ${(error as Error).message}`);
+      errors.push(`${entry}: ${getErrorMessage(error)}`);
     }
   }
 
@@ -221,7 +222,7 @@ async function pruneMinioOrphans(): Promise<number> {
       }
     }
   } catch (error: unknown) {
-    logger.warn(`[Housekeeping] MinIO orphan scan failed: ${(error as Error).message}`);
+    logger.warn(`[Housekeeping] MinIO orphan scan failed: ${getErrorMessage(error)}`);
   }
 
   return removed;
@@ -255,8 +256,8 @@ const BackgroundHousekeepingService = {
         );
       }
     } catch (error: unknown) {
-      results.worktrees = { error: (error as Error).message };
-      logger.error(`[Housekeeping] Worktree pruning failed: ${(error as Error).message}`);
+      results.worktrees = { error: getErrorMessage(error) };
+      logger.error(`[Housekeeping] Worktree pruning failed: ${getErrorMessage(error)}`);
     }
 
     // 2. Clear stale sessions
@@ -271,8 +272,8 @@ const BackgroundHousekeepingService = {
         );
       }
     } catch (error: unknown) {
-      results.staleSessions = { error: (error as Error).message };
-      logger.error(`[Housekeeping] Session cleanup failed: ${(error as Error).message}`);
+      results.staleSessions = { error: getErrorMessage(error) };
+      logger.error(`[Housekeeping] Session cleanup failed: ${getErrorMessage(error)}`);
     }
 
     // 3. Prune old request logs
@@ -285,9 +286,9 @@ const BackgroundHousekeepingService = {
         );
       }
     } catch (error: unknown) {
-      results.requestLogs = { error: (error as Error).message };
+      results.requestLogs = { error: getErrorMessage(error) };
       logger.error(
-        `[Housekeeping] Request log pruning failed: ${(error as Error).message}`
+        `[Housekeeping] Request log pruning failed: ${getErrorMessage(error)}`
       );
     }
 
@@ -301,9 +302,9 @@ const BackgroundHousekeepingService = {
         );
       }
     } catch (error: unknown) {
-      results.minioOrphans = { error: (error as Error).message };
+      results.minioOrphans = { error: getErrorMessage(error) };
       logger.error(
-        `[Housekeeping] MinIO orphan cleanup failed: ${(error as Error).message}`
+        `[Housekeeping] MinIO orphan cleanup failed: ${getErrorMessage(error)}`
       );
     }
 
