@@ -1,15 +1,12 @@
-import {
-  COORDINATOR_DECOMPOSITION_MODEL,
-} from "../../config.ts";
 import logger from "../utils/logger.ts";
-import mutationQueue from "./MutationQueue.ts";
+
 import { getProvider } from "../providers/index.ts";
 import {
   getInstancesByType,
   getInstanceType,
 } from "../providers/instance-registry.ts";
-import RequestLogger from "./RequestLogger.ts";
-import { parseJsonFromLlmResponse } from "@rodrigo-barraza/utilities-library";
+
+
 import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import localModelQueue from "./LocalModelQueue.ts";
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
@@ -34,26 +31,22 @@ import type {
   WorktreeDiff,
   CoordinatorSpawnParams,
   CoordinatorContext,
-  SubTask,
-  PanelWorker,
-  PanelTaskState,
   TeamMember,
 } from "../types/coordinator.ts";
+
 import type { ConversationMessage, EmitFn, ToolCall } from "./harnesses/types.ts";
 import type { InstanceEntry } from "../types/ProviderTypes.ts";
 
 // ────────────────────────────────────────────────────────────
 // CoordinatorService — Multi-Agent Orchestration
 // ────────────────────────────────────────────────────────────
-// Decomposes complex refactoring tasks into sub-tasks, spawns
-// parallel AgenticLoopService workers in isolated git worktrees,
-// and merges results back into the main branch.
+// Spawns parallel AgenticLoopService workers in isolated git
+// worktrees and collects diffs when complete.
 //
-// Two entry points:
-//   1. Manual Panel: decompose() → execute() → approveMerge()
-//   2. Chat Tools:   spawnFromTool() / sendMessage() / stopAgent()
-//      Called when the LLM invokes team_create / send_message / stop_agent
+// Entry point: Chat tools — spawnFromTool() / sendMessage() / stopAgent()
+// Called when the LLM invokes create_team / send_message / stop_agent
 // ────────────────────────────────────────────────────────────
+
 
 /** Max parallel workers */
 const MAX_WORKERS = 10;
@@ -61,8 +54,7 @@ const MAX_WORKERS = 10;
 /** Max iterations per worker agent loop */
 const MAX_WORKER_ITERATIONS = 15;
 
-/** Model used for task decomposition */
-const DECOMPOSITION_PROVIDER = "anthropic";
+
 
 /**
  * Resolve the user-configured subagent provider/model from settings.
@@ -81,8 +73,7 @@ async function getWorkerFallback(): Promise<{ provider: string; model: string } 
   }
 }
 
-/** Active coordinator tasks keyed by taskId (manual panel flow) */
-const activeTasks = new Map<string, PanelTaskState>();
+
 
 /** Active agents spawned via chat tools, keyed by agentId */
 const activeWorkers = new Map<string, WorkerState>();
@@ -837,488 +828,5 @@ export default class CoordinatorService {
       activeWorkers,
     );
   }
-
-  // ══════════════════════════════════════════════════════════
-  // Manual Panel Flow (decompose → execute → approve)
-  // ══════════════════════════════════════════════════════════
-  static async decompose({
-    task,
-    files,
-    repoPath,
-    endpoint,
-    agentSessionId,
-  }: {
-    task: string;
-    files: string[];
-    repoPath?: string;
-    endpoint?: string;
-    agentSessionId?: string;
-  }) {
-    const provider = getProvider(DECOMPOSITION_PROVIDER);
-
-    const userMessage = `Task: ${task}\n\nTarget files:\n${files.map((file) => `- ${file}`).join("\n")}`;
-
-    const DECOMPOSITION_PROMPT = `You are a task decomposition engine for a multi-agent coding system.
-
-Given a refactoring task description and a list of target files, decompose the task into independent sub-tasks that can be executed in parallel by separate coding agents.
-
-Rules:
-1. Each sub-task should target 1-3 files maximum
-2. Sub-tasks must be independent — no sub-task should depend on the output of another
-3. If files have tight coupling and MUST be edited together, group them in one sub-task
-4. Each sub-task instruction should be self-contained and specific
-5. Include the exact file paths in each sub-task
-
-Respond with a JSON object (no markdown fences):
-{
-  "subTasks": [
-    {
-      "id": "task-1",
-      "files": ["/absolute/path/to/file1.js"],
-      "instruction": "Detailed instruction for what the worker agent should do to these files",
-      "complexity": "low|medium|high"
-    }
-  ],
-  "summary": "Brief overall plan summary"
-}`;
-
-    const messages = [
-      { role: "system", content: DECOMPOSITION_PROMPT },
-      { role: "user", content: userMessage },
-    ];
-
-    const requestId = crypto.randomUUID();
-    const requestStart = performance.now();
-    let llmSuccess = true;
-    let llmError = null;
-
-    const result = await provider
-      .generateText(messages, COORDINATOR_DECOMPOSITION_MODEL, {
-        maxTokens: 2000,
-        temperature: 0.2,
-      })
-      .catch((error: Error) => {
-        llmSuccess = false;
-        llmError = error.message;
-        throw error;
-      });
-
-    // Log the decomposition LLM call
-    RequestLogger.logBackgroundLlmCall({
-      requestId,
-      endpoint: endpoint || "/coordinator/plan",
-      operation: "coordinator:decompose",
-      project: null,
-      username: "system",
-      provider: DECOMPOSITION_PROVIDER,
-      model: COORDINATOR_DECOMPOSITION_MODEL,
-      agentSessionId: agentSessionId || null,
-      aiMessages: messages,
-      resultText: result?.text || "",
-      usage: result?.usage || null,
-      success: llmSuccess,
-      errorMessage: llmError,
-      requestStartMs: requestStart,
-      extraRequestPayload: {
-        task: task.slice(0, 200),
-        fileCount: files.length,
-      },
-    });
-
-    const parsed = parseJsonFromLlmResponse(result.text) as {
-      subTasks?: SubTask[];
-      summary?: string;
-    } | null;
-    if (!parsed) {
-      return {
-        error: "Failed to parse decomposition result",
-        raw: result.text,
-      };
-    }
-
-    // Validate and cap sub-tasks
-    const subTasks = (parsed.subTasks || []).slice(0, MAX_WORKERS);
-    for (const subTask of subTasks) {
-      if (!subTask.id) subTask.id = `task-${crypto.randomUUID().slice(0, 8)}`;
-      subTask.branchName = `coordinator/${subTask.id}`;
-    }
-
-    return {
-      taskId: crypto.randomUUID(),
-      task,
-      repoPath: repoPath || GitWorktreeHelper.getDefaultWorkspaceRoot(),
-      subTasks,
-      summary: parsed.summary || `Decomposed into ${subTasks.length} sub-tasks`,
-      status: "planned",
-    };
-  }
-
-  static async execute(plan: { taskId: string; subTasks: SubTask[]; repoPath?: string }, options: {
-    provider?: string;
-    model?: string;
-    project?: string;
-    username?: string;
-    onProgress?: (taskId: string, workers: PanelWorker[]) => void;
-  } = {}) {
-    const { taskId, subTasks, repoPath } = plan;
-
-    if (activeTasks.has(taskId)) {
-      return { error: "Task is already executing" };
-    }
-
-    const taskState: PanelTaskState = {
-      taskId,
-      status: "executing" as const,
-      repoPath: repoPath || GitWorktreeHelper.getDefaultWorkspaceRoot(),
-      workers: subTasks.map((subTask) => ({
-        id: subTask.id,
-        files: subTask.files,
-        instruction: subTask.instruction,
-        branchName: subTask.branchName || `coordinator/${subTask.id}`,
-        worktreePath: null,
-        status: "pending" as const,
-        error: null,
-        diff: null,
-      })),
-      startedAt: new Date().toISOString(),
-    };
-
-    activeTasks.set(taskId, taskState);
-
-    try {
-      // Phase 1: Create all worktrees
-      logger.info(
-        `[Coordinator] Creating ${subTasks.length} worktrees for task ${taskId}`,
-      );
-
-      for (const worker of taskState.workers) {
-        const result = await GitWorktreeHelper.createWorktree(taskState.repoPath, worker.branchName);
-        if (result.error) {
-          worker.status = "error";
-          worker.error = `Worktree creation failed: ${result.error}`;
-          logger.error(
-            `[Coordinator] Worker ${worker.id} worktree failed: ${result.error}`,
-          );
-          continue;
-        }
-        worker.worktreePath = result.worktreePath || null;
-        worker.status = "ready";
-      }
-
-      // Phase 2: Execute workers in parallel
-      const readyWorkers = taskState.workers.filter(
-        (worker) => worker.status === "ready",
-      );
-      logger.info(
-        `[Coordinator] Running ${readyWorkers.length} workers in parallel`,
-      );
-
-      const workerPromises = readyWorkers.map((worker) =>
-        CoordinatorService._runPanelWorker(worker, {
-          repoPath: taskState.repoPath,
-          provider: options.provider,
-          model: options.model,
-          project: options.project,
-          username: options.username,
-          onProgress: (update: Partial<PanelWorker>) => {
-            Object.assign(worker, update);
-            options.onProgress?.(taskId, taskState.workers);
-          },
-        }),
-      );
-
-      await Promise.allSettled(workerPromises);
-
-      // Phase 3: Collect diffs from completed workers
-      const completedWorkers = taskState.workers.filter(
-        (worker) => worker.status === "complete",
-      );
-      logger.info(
-        `[Coordinator] ${completedWorkers.length}/${taskState.workers.length} workers completed`,
-      );
-
-      for (const worker of completedWorkers) {
-        const diffResult = await GitWorktreeHelper.getWorktreeDiff(taskState.repoPath, worker.branchName);
-        if (diffResult.error) {
-          worker.diff = null;
-          worker.error = `Diff retrieval failed: ${diffResult.error}`;
-        } else {
-          worker.diff = diffResult as WorktreeDiff;
-        }
-      }
-
-      taskState.status = "review";
-      options.onProgress?.(taskId, taskState.workers);
-
-      return {
-        taskId,
-        status: "review",
-        workers: taskState.workers,
-        completedCount: completedWorkers.length,
-        totalCount: taskState.workers.length,
-      };
-    } catch (error: unknown) {
-      taskState.status = "error";
-      logger.error(`[Coordinator] Task ${taskId} failed: ${(error as Error).message}`);
-      return { error: (error as Error).message, taskId };
-    }
-  }
-
-  /**
-   * Run a single worker agent in a worktree (manual panel flow).
-   * @private
-   */
-  static async _runPanelWorker(
-    worker: PanelWorker,
-    {
-      repoPath: _repoPath,
-      provider: providerName,
-      model,
-      project,
-      username,
-      onProgress,
-    }: {
-      repoPath: string;
-      provider?: string;
-      model?: string;
-      project?: string;
-      username?: string;
-      onProgress?: (update: Partial<PanelWorker>) => void;
-    },
-  ) {
-    worker.status = "running";
-    onProgress?.({ status: "running" } as Partial<PanelWorker>);
-
-    try {
-      const { default: AgenticLoopService } =
-        await import("./AgenticLoopService.js");
-
-      const workerMessages: ConversationMessage[] = [
-        {
-          role: "user",
-          content:
-            `You are a worker agent in a multi-agent refactoring task.\n\n` +
-            `Your workspace is: ${worker.worktreePath}\n` +
-            `You are working on files: ${worker.files.join(", ")}\n\n` +
-            `Task:\n${worker.instruction}\n\n` +
-            `Important:\n` +
-            `- Only modify files within your workspace\n` +
-            `- Commit your changes when done and report what you accomplished\n` +
-            `- Focus on the specific task described above`,
-        },
-      ];
-
-      let workerOutput = "";
-      const workerToolCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
-      const workerEmit: EmitFn = (event) => {
-        if (event.type === "chunk") {
-          workerOutput += (event.content as string) || "";
-        } else if (
-          event.type === "tool_execution" &&
-          event.status === "calling"
-        ) {
-          workerToolCalls.push({
-            name: (event.tool as Record<string, unknown>)?.name as string,
-            args: (event.tool as Record<string, unknown>)?.args as Record<string, unknown>,
-          });
-        }
-        onProgress?.({ toolCalls: workerToolCalls } as Partial<PanelWorker>);
-      };
-
-      // Build enabled tools — exclude coordinator tools
-      const allSchemas = ToolOrchestratorService.getToolSchemas();
-      const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
-      const workerEnabledTools = allSchemas
-        .map((t: Record<string, unknown>) => t.name as string)
-        .filter((name: string) => !coordinatorSet.has(name));
-
-      let resolvedProviderName = providerName || DECOMPOSITION_PROVIDER;
-      let resolvedModel = model || COORDINATOR_DECOMPOSITION_MODEL;
-
-      // Local model guard with instance pooling
-      if (localModelQueue.isLocal(resolvedProviderName)) {
-        const providerType =
-          getInstanceType(resolvedProviderName) || resolvedProviderName;
-        const siblings = getInstancesByType(providerType);
-        const totalSlots = siblings.reduce(
-          (sum: number, siblingInst) => sum + siblingInst.concurrency,
-          0,
-        );
-
-        if (totalSlots <= 1) {
-          const panelFallback = await getWorkerFallback();
-          if (panelFallback) {
-            logger.info(
-              `[Coordinator] Panel worker ${worker.id}: single-slot concurrency → falling back to ${panelFallback.model}`,
-            );
-            resolvedProviderName = panelFallback.provider;
-            resolvedModel = panelFallback.model;
-          } else {
-            logger.info(
-              `[Coordinator] Panel worker ${worker.id}: single-slot concurrency, no subagent model configured — queuing on local provider`,
-            );
-          }
-        } else {
-          let bestInstance: InstanceEntry | null = null;
-          for (const inst of siblings) {
-            const active = localModelQueue._getQueue(inst.id).activeCount;
-            const available = inst.concurrency - active;
-            if (available > 0) {
-              bestInstance = inst;
-              break;
-            }
-          }
-          if (bestInstance) {
-            resolvedProviderName = bestInstance.id;
-            logger.info(
-              `[Coordinator] Panel worker ${worker.id}: assigned to ${bestInstance.id} (${siblings.length} instance${siblings.length > 1 ? "s" : ""} pooled, ${totalSlots} total slots) — model "${resolvedModel}"`,
-            );
-          }
-        }
-      }
-
-      const workerProvider = getProvider(resolvedProviderName);
-      const { getModelByName } = await import("../config.js");
-      const workerModelDef = getModelByName(resolvedModel!);
-
-      const abortController = createAbortController();
-      worker.abortController = abortController;
-
-      await AgenticLoopService.runAgenticLoop({
-        provider: workerProvider as import("./harnesses/types.ts").LLMProvider,
-        providerName: resolvedProviderName,
-        resolvedModel: resolvedModel!,
-        modelDef: workerModelDef,
-        messages: workerMessages,
-        options: {
-          autoApprove: true,
-          agenticLoopEnabled: true,
-          enabledTools: workerEnabledTools,
-          maxIterations: MAX_WORKER_ITERATIONS,
-          maxTokens: 8192,
-        },
-        agentSessionId: `panel-worker-${worker.id}`,
-        project: project || "",
-        username: username || "system",
-        requestStart: performance.now(),
-        emit: workerEmit,
-        signal: abortController.signal,
-      });
-
-      // Stage and commit changes
-      await GitWorktreeHelper.toolsApiPost("/agentic/command/run", {
-        command: "git add -A",
-        cwd: worker.worktreePath,
-      });
-      await GitWorktreeHelper.toolsApiPost("/agentic/command/run", {
-        command: `git commit -m "coordinator: ${worker.id}" --allow-empty`,
-        cwd: worker.worktreePath,
-      });
-
-      worker.status = "complete";
-      worker.toolCalls = workerToolCalls;
-      worker.output = workerOutput;
-      onProgress?.({ status: "complete" } as Partial<PanelWorker>);
-
-      logger.info(
-        `[Coordinator] Panel worker ${worker.id} complete (${workerToolCalls.length} tool calls)`,
-      );
-    } catch (error: unknown) {
-      worker.status = "error";
-      worker.error = (error as Error).message;
-      onProgress?.({ status: "error", error: (error as Error).message } as Partial<PanelWorker>);
-      logger.error(
-        `[Coordinator] Panel worker ${worker.id} failed: ${(error as Error).message}`,
-      );
-    }
-  }
-
-  static async approveMerge(taskId: string) {
-    const task = activeTasks.get(taskId);
-    if (!task) return { error: "Task not found" };
-    if (task.status !== "review")
-      return { error: `Task is in '${task.status}' state, not 'review'` };
-
-    const completedWorkers = task.workers.filter(
-      (worker) => worker.status === "complete" && worker.diff?.hasChanges,
-    );
-    const results: Array<{ workerId: string; merged: boolean; error: string | null }> = [];
-
-    for (const worker of completedWorkers) {
-      const mergeResult = await GitWorktreeHelper.mergeWorktree(
-        task.repoPath || GitWorktreeHelper.getDefaultWorkspaceRoot(),
-        worker.branchName,
-        `[coordinator] ${worker.id}: ${worker.instruction.slice(0, 80)}`,
-      );
-
-      results.push({
-        workerId: worker.id,
-        merged: !mergeResult.error,
-        error: mergeResult.error || null,
-      });
-    }
-
-    // Cleanup all worktrees
-    await CoordinatorService.cleanup(taskId);
-
-    task.status = "merged";
-    return { taskId, merged: results };
-  }
-
-  static async abort(taskId: string) {
-    const task = activeTasks.get(taskId);
-    if (!task) return { error: "Task not found" };
-
-    // Abort running workers
-    for (const worker of task.workers) {
-      if (worker.abortController) {
-        worker.abortController.abort();
-      }
-    }
-
-    // Release any held mutation locks
-    mutationQueue.releaseAll();
-
-    // Cleanup worktrees
-    await CoordinatorService.cleanup(taskId);
-
-    task.status = "aborted";
-    activeTasks.delete(taskId);
-
-    return { taskId, status: "aborted" };
-  }
-
-  /**
-   * Clean up worktrees for a task.
-   * @private
-   */
-  static async cleanup(taskId: string) {
-    const task = activeTasks.get(taskId);
-    if (!task) return;
-
-    const repoPath = task.repoPath || GitWorktreeHelper.getDefaultWorkspaceRoot();
-
-    for (const worker of task.workers) {
-      if (worker.worktreePath) {
-        await GitWorktreeHelper.removeWorktree(repoPath, worker.worktreePath);
-        worker.worktreePath = null;
-      }
-    }
-
-    // Prune stale worktree references
-    await GitWorktreeHelper.cleanupWorktrees(repoPath);
-  }
-
-  static getStatus(taskId: string) {
-    return activeTasks.get(taskId) || null;
-  }
-
-  static listTasks() {
-    return Array.from(activeTasks.values()).map((task) => ({
-      taskId: task.taskId,
-      status: task.status,
-      workerCount: task.workers.length,
-      startedAt: task.startedAt,
-    }));
-  }
 }
+

@@ -124,45 +124,8 @@ export interface WorktreeCreateResponse extends ToolsApiResponse {
   worktreePath?: string;
 }
 
-// ── Decomposition ───────────────────────────────────────────
 
-export interface SubTask {
-  id: string;
-  files: string[];
-  instruction: string;
-  complexity: "low" | "medium" | "high";
-  /** Attached at runtime by CoordinatorService after decomposition. */
-  branchName?: string;
-}
 
-export interface DecompositionResult {
-  subTasks: SubTask[];
-  summary: string;
-}
-
-// ── Panel Flow State ────────────────────────────────────────
-
-export interface PanelWorker {
-  id: string;
-  files: string[];
-  instruction: string;
-  branchName: string;
-  worktreePath: string | null;
-  status: "pending" | "ready" | "running" | "complete" | "error";
-  error: string | null;
-  diff: WorktreeDiff | null;
-  toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
-  output?: string;
-  abortController?: AbortController;
-}
-
-export interface PanelTaskState {
-  taskId: string;
-  status: "executing" | "review" | "error" | "merged" | "aborted";
-  repoPath: string;
-  workers: PanelWorker[];
-  startedAt: string;
-}
 
 // ── Team Management ─────────────────────────────────────────
 
