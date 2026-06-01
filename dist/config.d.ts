@@ -20,7 +20,6 @@ export declare const MINIO_ACCESS_KEY: string | undefined;
 export declare const MINIO_SECRET_KEY: string | undefined;
 export declare const MINIO_BUCKET_NAME: string | undefined;
 export declare const TOOLS_SERVICE_URL: string | undefined;
-export declare const COORDINATOR_DECOMPOSITION_MODEL: string | undefined;
 export declare const LIVE_AUDIO_MODEL: string | undefined;
 export declare const OPENAI_TRANSCRIPTION_MODEL: string | undefined;
 export declare const GOOGLE_TTS_MODEL: string | undefined;
