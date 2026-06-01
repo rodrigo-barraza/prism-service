@@ -142,6 +142,11 @@ function sanitizeMsg(m: MessagePayload) {
         ...(m.audio?.length ? { audio: sanitizeMedia(m.audio) } : {}),
         ...(m.video?.length ? { video: sanitizeMedia(m.video) } : {}),
         ...(m.pdf?.length ? { pdf: sanitizeMedia(m.pdf) } : {}),
+        ...(m.toolCalls ? { toolCalls: m.toolCalls } : {}),
+        ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
+        ...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
+        ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}),
+        ...(m.name ? { name: m.name } : {}),
   };
 }
 const RequestLogger = {
