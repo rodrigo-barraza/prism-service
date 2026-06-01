@@ -537,9 +537,19 @@ export default class SystemPromptAssembler {
 
     // ── 5b. Coordinator Mode Addendum (when coordinator tools available) ──
     if (!isDirectMode && (codingFallback || persona?.usesCodingGuidelines)) {
-      const enabledSet = context.enabledTools ? new Set(context.enabledTools) : null;
-      const coordinatorAvailable = enabledSet
-        ? COORDINATOR_ONLY_TOOLS.some((t: string) => enabledSet.has(t))
+      const resolvedEnabledSet = (() => {
+        if (!context.enabledTools) return null;
+        const hasPrefixed = context.enabledTools.some(
+          (entry) => entry.startsWith("label:") || entry.startsWith("domain:") || entry.startsWith("domainKey:"),
+        );
+        if (hasPrefixed) {
+          const schemas = ToolOrchestratorService.getClientToolSchemas();
+          return resolveToolEntriesToSet(context.enabledTools, schemas);
+        }
+        return new Set(context.enabledTools);
+      })();
+      const coordinatorAvailable = resolvedEnabledSet
+        ? COORDINATOR_ONLY_TOOLS.some((t: string) => resolvedEnabledSet.has(t))
         : true; // No filter = all tools available including coordinator
 
       if (coordinatorAvailable) {

@@ -9,6 +9,8 @@ import { getProvider } from "../providers/index.ts";
 import { getModelByName } from "../config.ts";
 import { matchCron } from "./ScheduledTaskService.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import type { ConversationMessage } from "./harnesses/types.ts";
 
 import type { SseEvent } from "../types/SseTypes.ts";
 
@@ -49,7 +51,7 @@ const ConversationTimerService = {
       isTickInProgress = true;
       this.tick()
         .catch((error: unknown) => {
-          logger.error(`[ConversationTimers] Daemon tick error: ${(error as Error).message}`);
+          logger.error(`[ConversationTimers] Daemon tick error: ${getErrorMessage(error)}`);
         })
         .finally(() => {
           isTickInProgress = false;
@@ -127,7 +129,7 @@ const ConversationTimerService = {
       updatedAt: timestamp,
     };
 
-    await database.collection(COLLECTIONS.CONVERSATION_TIMERS).insertOne(timer as any);
+    await database.collection(COLLECTIONS.CONVERSATION_TIMERS).insertOne(timer as unknown as import("mongodb").OptionalUnlessRequiredId<ConversationTimer>);
     logger.info(`[ConversationTimers] Scheduled ${mode} timer ${timer.id} for conversation ${timer.conversationId}`);
 
     return timer;
@@ -253,7 +255,7 @@ const ConversationTimerService = {
           timer.maxIterations !== undefined &&
           newIterationCount >= timer.maxIterations;
 
-        const updates: Record<string, any> = {
+        const updates: Record<string, unknown> = {
           iterationCount: newIterationCount,
           updatedAt: nowTimestamp,
         };
@@ -320,12 +322,12 @@ const ConversationTimerService = {
         );
 
         // 3. Trigger AgenticLoopService in the background
-        this.executeAgenticLoop(timer, conversation, reminderMessage, collection).catch((error: unknown) => {
-          logger.error(`[ConversationTimers] Background loop failed for timer ${timer.id}: ${(error as Error).message}`);
+        this.executeAgenticLoop(timer, conversation as unknown as Record<string, unknown>, reminderMessage, collection).catch((error: unknown) => {
+          logger.error(`[ConversationTimers] Background loop failed for timer ${timer.id}: ${getErrorMessage(error)}`);
         });
-
+ 
       } catch (error: unknown) {
-        logger.error(`[ConversationTimers] Error processing due timer ${timer.id}: ${(error as Error).message}`);
+        logger.error(`[ConversationTimers] Error processing due timer ${timer.id}: ${getErrorMessage(error)}`);
       }
     }
   },
@@ -335,8 +337,8 @@ const ConversationTimerService = {
    */
   async executeAgenticLoop(
     timer: ConversationTimer,
-    conversation: Record<string, any>,
-    reminderMessage: any,
+    conversation: Record<string, unknown>,
+    reminderMessage: ConversationMessage,
     collection: string = COLLECTIONS.AGENT_CONVERSATIONS
   ): Promise<void> {
     const database = MongoWrapper.getDb(MONGO_DB_NAME);
@@ -344,11 +346,11 @@ const ConversationTimerService = {
 
     logger.info(`[ConversationTimers] Spawning background agent loop for session: ${timer.conversationId}`);
 
-    const settings = conversation.settings || {};
+    const settings = (conversation.settings || {}) as Record<string, any>;
     const providerName = settings.provider;
     const resolvedModel = settings.model;
-    const agent = settings.agent || null;
-    const workspaceRoot = settings.workspaceRoot || null;
+    const agent = (settings.agent as string | null) || null;
+    const workspaceRoot = (settings.workspaceRoot as string | null) || null;
 
     if (!providerName || !resolvedModel) {
       throw new Error(`Invalid model/provider settings on conversation: ${timer.conversationId}`);
@@ -361,14 +363,14 @@ const ConversationTimerService = {
       throw new Error(`LLM provider ${providerName} is unavailable`);
     }
 
-    const traceId = conversation.traceId || crypto.randomUUID();
+    const traceId = (conversation.traceId as string | undefined) || crypto.randomUUID();
     const requestId = crypto.randomUUID();
 
     // Reconstruct the message list for the agentic harness
     const contextMessages = [
-      ...(conversation.messages || []),
+      ...((conversation.messages as ConversationMessage[]) || []),
       reminderMessage,
-    ] as any[];
+    ];
 
     // Standard logging emitter for background execution
     const mockEmit = (event: SseEvent) => {
@@ -381,12 +383,12 @@ const ConversationTimerService = {
       timer.project,
       timer.username,
       true,
-      { collection, agent }
+      { collection, agent: agent || undefined }
     );
 
     try {
       await AgenticLoopService.runAgenticLoop({
-        provider: provider as any as import("./harnesses/types.ts").LLMProvider,
+        provider: provider as unknown as import("./harnesses/types.ts").LLMProvider,
         providerName,
         resolvedModel,
         modelDef,
@@ -403,7 +405,7 @@ const ConversationTimerService = {
         },
         agentSessionId: timer.conversationId,
         userMessage: reminderMessage,
-        conversationMeta: { title: conversation.title || "Background Agent", settings },
+        conversationMeta: { title: (conversation.title as string) || "Background Agent", settings },
         traceId,
         project: timer.project,
         username: timer.username,
@@ -417,7 +419,7 @@ const ConversationTimerService = {
 
       logger.success(`[ConversationTimers] Background loop completed successfully for conversation ${timer.conversationId}`);
     } catch (error: unknown) {
-      logger.error(`[ConversationTimers] Background loop error on conversation ${timer.conversationId}: ${(error as Error).message}`);
+      logger.error(`[ConversationTimers] Background loop error on conversation ${timer.conversationId}: ${getErrorMessage(error)}`);
       throw error;
     } finally {
       // Always clear isGenerating — both success and error paths.
