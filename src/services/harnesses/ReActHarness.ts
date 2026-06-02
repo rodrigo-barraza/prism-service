@@ -526,7 +526,7 @@ export default class ReActHarness extends BaseAgenticHarness {
         });
         context.emit({
           type: SSE_EVENT_TYPES.STATUS,
-          message: STATUS_MESSAGES.MAX_TOKENS_TRUNCATED || "max_tokens_truncated",
+          message: (STATUS_MESSAGES as any).MAX_TOKENS_TRUNCATED || "max_tokens_truncated",
           phase: "truncated",
         });
       } else {
