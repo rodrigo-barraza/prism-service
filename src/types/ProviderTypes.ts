@@ -75,6 +75,11 @@ export interface ProviderOptions {
   parallelToolCalls?: boolean;
   candidateCount?: number;
   responseMimeType?: string;
+  store?: boolean;
+  mediaResolution?: string;
+  topLogprobs?: number;
+  responseLogprobs?: boolean;
+  logprobs?: number;
   model?: string;
   format?: string;
   instructions?: string;

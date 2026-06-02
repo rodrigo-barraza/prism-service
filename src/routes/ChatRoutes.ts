@@ -200,6 +200,11 @@ async function prepareGenerationContext(
     parallelToolCalls,
     candidateCount,
     responseMimeType,
+    store,
+    mediaResolution,
+    topLogprobs,
+    responseLogprobs,
+    logprobs,
     ...extraParams
   } = validatedParams;
 
@@ -247,6 +252,11 @@ async function prepareGenerationContext(
     ...(parallelToolCalls != null && { parallelToolCalls }),
     ...(candidateCount != null && { candidateCount }),
     ...(responseMimeType != null && responseMimeType !== "" && { responseMimeType }),
+    ...(store != null && { store }),
+    ...(mediaResolution != null && mediaResolution !== "" && { mediaResolution }),
+    ...(topLogprobs != null && topLogprobs > 0 && { topLogprobs }),
+    ...(responseLogprobs != null && { responseLogprobs }),
+    ...(logprobs != null && logprobs > 0 && { logprobs }),
     ...((extraParams as Record<string, unknown>).systemPrompt ? { systemPrompt: (extraParams as Record<string, unknown>).systemPrompt } : {}),
   };
   // When thinking is explicitly disabled, strip all thinking sub-params

@@ -501,7 +501,10 @@ const anthropicProvider = {
         options.stopSequences !== undefined
           ? options.stopSequences
           : undefined,
-      ...(options.serviceTier && { service_tier: options.serviceTier }),
+      ...(options.serviceTier && { service_tier: options.serviceTier === "standard" ? "standard_only" : options.serviceTier }),
+      ...(options.responseFormat === "json_object" && {
+        output_config: { format: { type: "json_schema" as const, schema: { type: "object" } } },
+      }),
     };
 
     // Opus 4.7+ lock sampling parameters — API rejects non-default values
@@ -689,7 +692,10 @@ const anthropicProvider = {
           options.stopSequences !== undefined
             ? options.stopSequences
             : undefined,
-        ...(options.serviceTier && { service_tier: options.serviceTier }),
+        ...(options.serviceTier && { service_tier: options.serviceTier === "standard" ? "standard_only" : options.serviceTier }),
+        ...(options.responseFormat === "json_object" && {
+          output_config: { format: { type: "json_schema" as const, schema: { type: "object" } } },
+        }),
       };
 
       // Opus 4.7+ lock sampling parameters — API rejects non-default values

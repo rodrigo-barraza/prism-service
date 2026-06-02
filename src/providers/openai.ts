@@ -581,6 +581,16 @@ const openaiProvider = {
       payload.parallel_tool_calls = false;
     }
 
+    // Response persistence — defaults to true; set false for privacy
+    if (options.store === false) {
+      payload.store = false;
+    }
+
+    // Log probabilities — top N candidate tokens per step
+    if (options.topLogprobs && options.topLogprobs > 0) {
+      payload.top_logprobs = options.topLogprobs;
+    }
+
     logger.info(`[OpenAI/Responses] Sending non-stream payload: ${JSON.stringify(payload)}`);
 
     const { data: response, response: rawResponse } = await getClient()
@@ -866,6 +876,16 @@ const openaiProvider = {
     // Parallel tool calls — defaults to true; set false for sequential FC
     if (options.parallelToolCalls === false) {
       payload.parallel_tool_calls = false;
+    }
+
+    // Response persistence — defaults to true; set false for privacy
+    if (options.store === false) {
+      payload.store = false;
+    }
+
+    // Log probabilities — top N candidate tokens per step
+    if (options.topLogprobs && options.topLogprobs > 0) {
+      payload.top_logprobs = options.topLogprobs;
     }
 
     logger.info(`[OpenAI/Responses] Sending stream payload: ${JSON.stringify(payload)}`);
