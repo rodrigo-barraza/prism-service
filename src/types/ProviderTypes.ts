@@ -72,6 +72,9 @@ export interface ProviderOptions {
   frequencyPenalty?: number;
   presencePenalty?: number;
   repeatPenalty?: number;
+  parallelToolCalls?: boolean;
+  candidateCount?: number;
+  responseMimeType?: string;
   model?: string;
   format?: string;
   instructions?: string;

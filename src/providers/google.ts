@@ -192,7 +192,9 @@ function buildGenerateConfig(options: ProviderOptions, modelDef: ModelDef | null
     config.maxOutputTokens = options.maxTokens;
   }
   if (options.seed !== undefined) config.seed = parseInt(String(options.seed));
-  if (options.responseFormat === "json_object") config.responseMimeType = "application/json";
+  if (options.responseMimeType) config.responseMimeType = options.responseMimeType;
+  else if (options.responseFormat === "json_object") config.responseMimeType = "application/json";
+  if (options.candidateCount !== undefined && options.candidateCount > 1) config.candidateCount = options.candidateCount;
 
   // Thinking config
   const supportsThinking = modelDef?.thinking === true;

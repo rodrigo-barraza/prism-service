@@ -2,6 +2,13 @@ import { PROVIDERS } from "../constants.ts";
 
 // ─── Parameter Descriptor Interface ─────────────────────────
 
+export interface ParameterProviderOverride {
+  max?: number;
+  min?: number;
+  locked?: boolean;
+  lockedReason?: string;
+}
+
 export interface ParameterDescriptor {
   key: string;
   label: string;
@@ -20,6 +27,7 @@ export interface ParameterDescriptor {
   requiresThinking?: boolean;
   requiresResponsesAPI?: boolean;
   hideWhenReasoning?: boolean;
+  providerOverrides?: Record<string, ParameterProviderOverride>;
 }
 
 // ─── All Providers ──────────────────────────────────────────
@@ -73,6 +81,9 @@ const PARAMETER_DESCRIPTORS: ParameterDescriptor[] = [
     group: "sampling",
     providers: ALL_TEXT_PROVIDERS,
     hideWhenReasoning: true,
+    providerOverrides: {
+      [PROVIDERS.ANTHROPIC]: { max: 1 },
+    },
   },
   {
     key: "topP",
@@ -166,6 +177,7 @@ const PARAMETER_DESCRIPTORS: ParameterDescriptor[] = [
       { value: "medium", label: "Medium" },
       { value: "high", label: "High" },
       { value: "xhigh", label: "Extra High" },
+      { value: "max", label: "Max" },
     ],
     defaultValue: "high",
     agentDefault: "high",
@@ -231,8 +243,8 @@ const PARAMETER_DESCRIPTORS: ParameterDescriptor[] = [
     defaultValue: "",
     agentDefault: "",
     group: "reasoning",
-    providers: [PROVIDERS.GOOGLE],
-    requiresThinking: true,
+    providers: [PROVIDERS.OPENAI],
+    requiresResponsesAPI: true,
   },
 
   // ── Penalties ─────────────────────────────────────────────
@@ -303,11 +315,53 @@ const PARAMETER_DESCRIPTORS: ParameterDescriptor[] = [
     options: [
       { value: "", label: "Default" },
       { value: "auto", label: "Auto" },
+      { value: "priority", label: "Priority" },
+      { value: "flex", label: "Flex" },
     ],
     defaultValue: "",
     agentDefault: "auto",
     group: "advanced",
     providers: [PROVIDERS.OPENAI, PROVIDERS.ANTHROPIC],
+  },
+  {
+    key: "parallelToolCalls",
+    label: "Parallel Tool Calls",
+    controlType: "toggle",
+    dataType: "boolean",
+    defaultValue: true,
+    agentDefault: true,
+    group: "advanced",
+    providers: [PROVIDERS.OPENAI],
+    requiresResponsesAPI: true,
+  },
+  {
+    key: "candidateCount",
+    label: "Candidate Count",
+    controlType: "slider",
+    dataType: "number",
+    min: 1,
+    max: 8,
+    step: 1,
+    defaultValue: 1,
+    agentDefault: 1,
+    group: "advanced",
+    providers: [PROVIDERS.GOOGLE],
+  },
+  {
+    key: "responseMimeType",
+    label: "Response MIME Type",
+    controlType: "select",
+    dataType: "string",
+    options: [
+      { value: "", label: "Default (Text)" },
+      { value: "application/json", label: "JSON" },
+      { value: "text/x.enum", label: "Enum" },
+    ],
+    defaultValue: "",
+    agentDefault: "",
+    group: "advanced",
+    providers: [PROVIDERS.GOOGLE],
+    hideWhenReasoning: true,
   },
 ];
 

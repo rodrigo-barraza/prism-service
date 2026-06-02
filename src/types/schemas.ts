@@ -101,6 +101,9 @@ export const ChatRequestSchema = z
     workspaceRoot: z.string().nullable().optional(),
     enableCriticGate: z.boolean().nullable().optional(),
     criticModel: z.string().nullable().optional(),
+    parallelToolCalls: z.boolean().nullable().optional(),
+    candidateCount: z.number().nullable().optional(),
+    responseMimeType: z.string().nullable().optional(),
   })
   .passthrough(); // Support extra provider/custom parameters dynamically
 
