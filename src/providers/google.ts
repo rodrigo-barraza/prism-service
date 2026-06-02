@@ -209,11 +209,10 @@ function buildGenerateConfig(options: ProviderOptions, modelDef: ModelDef | null
     options.thinkingEnabled !== false
   ) {
     config.thinkingConfig = { includeThoughts: true };
-    if (options.thinkingLevel && modelDef?.thinkingLevels) {
-      config.thinkingConfig.thinkingLevel = options.thinkingLevel as ThinkingLevel;
-    }
     if (options.thinkingBudget !== undefined && options.thinkingBudget !== "") {
       config.thinkingConfig.thinkingBudget = parseInt(String(options.thinkingBudget));
+    } else if (options.thinkingLevel && modelDef?.thinkingLevels) {
+      config.thinkingConfig.thinkingLevel = options.thinkingLevel as ThinkingLevel;
     }
   }
 
@@ -574,11 +573,10 @@ const googleProvider = {
         options.thinkingEnabled !== false
       ) {
         const thinkCfg: Record<string, unknown> = { includeThoughts: true };
-        if (options.thinkingLevel && modelDef?.thinkingLevels) {
-          thinkCfg.thinkingLevel = options.thinkingLevel;
-        }
         if (options.thinkingBudget !== undefined && options.thinkingBudget !== "") {
           thinkCfg.thinkingBudget = parseInt(String(options.thinkingBudget));
+        } else if (options.thinkingLevel && modelDef?.thinkingLevels) {
+          thinkCfg.thinkingLevel = options.thinkingLevel;
         }
         liveConfig.thinkingConfig = thinkCfg;
       }

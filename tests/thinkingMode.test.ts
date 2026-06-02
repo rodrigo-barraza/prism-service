@@ -97,7 +97,27 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
   // ── Section 1: Google Provider Config Building for Thinking ──────────
 
   describe("Google Provider Config Builder", () => {
-    it("configures thinkingConfig when model supports thinking and thinkingEnabled is true", async () => {
+    it("configures thinkingConfig with thinkingLevel when thinkingEnabled is true and no thinkingBudget is set", async () => {
+      mockGenerateContent.mockResolvedValueOnce({
+        candidates: [{ content: { parts: [{ text: "Done" }] } }],
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
+      });
+
+      const messages = [{ role: "user", content: "hello" }];
+      await googleProvider.generateText(messages, MODELS.GEMINI_35_FLASH.name, {
+        thinkingEnabled: true,
+        thinkingLevel: "medium",
+      });
+
+      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+      const args = mockGenerateContent.mock.calls[0][0];
+      expect(args.config.thinkingConfig).toBeDefined();
+      expect(args.config.thinkingConfig.includeThoughts).toBe(true);
+      expect(args.config.thinkingConfig.thinkingLevel).toBe("medium");
+      expect(args.config.thinkingConfig.thinkingBudget).toBeUndefined();
+    });
+
+    it("configures thinkingConfig with thinkingBudget and omits thinkingLevel when both are provided", async () => {
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: "Done" }] } }],
         usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
@@ -114,7 +134,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       const args = mockGenerateContent.mock.calls[0][0];
       expect(args.config.thinkingConfig).toBeDefined();
       expect(args.config.thinkingConfig.includeThoughts).toBe(true);
-      expect(args.config.thinkingConfig.thinkingLevel).toBe("medium");
+      expect(args.config.thinkingConfig.thinkingLevel).toBeUndefined();
       expect(args.config.thinkingConfig.thinkingBudget).toBe(1024);
     });
 
