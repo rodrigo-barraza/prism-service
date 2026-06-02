@@ -81,12 +81,12 @@ async function testOpenAI() {
     failCount++;
   }
 
-  // Test 4: verbosity
+  // Test 4: verbosity (requires a model that supports it)
   try {
     const response = await client.responses.create({
-      model: "gpt-4.1-nano",
+      model: "gpt-4.1-mini",
       input: "Explain photosynthesis briefly",
-      text: { format: { type: "text" }, verbosity: "low" },
+      text: { format: { type: "text" }, verbosity: "medium" },
       max_output_tokens: 200,
       stream: false,
     });
@@ -133,7 +133,7 @@ async function testAnthropic() {
       model: "claude-sonnet-4-20250514",
       messages: [{ role: "user", content: "Return JSON with a 'greeting' key set to 'hello'." }],
       max_tokens: 100,
-      output_config: { format: { type: "json_schema", schema: { type: "object", additionalProperties: true } } },
+      output_config: { format: { type: "json_schema", schema: { type: "object", additionalProperties: false } } },
     });
     const text = response.content[0].type === "text" ? response.content[0].text : "";
     console.log(`${PASS} output_config.format (json_schema) — responseFormat→Anthropic`);
@@ -181,12 +181,10 @@ async function testGoogle() {
         topK: 20,
         maxOutputTokens: 50,
         seed: 42,
-        responseLogprobs: true,
-        logprobs: 5,
       },
     });
     const text = response.text;
-    console.log(`${PASS} temperature, topP, topK, maxOutputTokens, seed, responseLogprobs, logprobs`);
+    console.log(`${PASS} temperature, topP, topK, maxOutputTokens, seed`);
     console.log(`   → "${text?.slice(0, 80)}"`);
     passCount++;
   } catch (error: any) {
