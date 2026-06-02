@@ -1,0 +1,355 @@
+import ToolOrchestratorService from "../ToolOrchestratorService.ts";
+import AgentPersonaRegistry from "../AgentPersonaRegistry.ts";
+import logger from "../../utils/logger.ts";
+import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import {
+  getCoordinatorPromptAddendum,
+  COORDINATOR_ONLY_TOOLS,
+} from "../CoordinatorPrompt.ts";
+import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
+
+import { DirectoryTreeFormatter } from "./DirectoryTreeFormatter.ts";
+import { ToolDocFormatter } from "./ToolDocFormatter.ts";
+import { SkillMemoryScorer } from "./SkillMemoryScorer.ts";
+import { AssemblerContext } from "./types.ts";
+
+export default class SystemPromptAssembler {
+  workspaceRoot: string;
+  private directoryFormatter: DirectoryTreeFormatter;
+  private docFormatter: ToolDocFormatter;
+  private scorer: SkillMemoryScorer;
+
+  constructor(options: { workspaceRoot?: string } = {}) {
+    this.workspaceRoot =
+      options.workspaceRoot ||
+      ToolOrchestratorService.getWorkspaceRoot() ||
+      process.env.HOME ||
+      "/home";
+    this.directoryFormatter = new DirectoryTreeFormatter(this.workspaceRoot);
+    this.docFormatter = new ToolDocFormatter();
+    this.scorer = new SkillMemoryScorer();
+  }
+
+  async fetchDirectoryTree(): Promise<string> {
+    return this.directoryFormatter.fetchDirectoryTree();
+  }
+
+  buildToolDescriptions(enabledTools?: string[], agentId?: string | null): string {
+    return this.docFormatter.buildToolDescriptions(enabledTools, agentId);
+  }
+
+  async assemble(context: AssemblerContext) {
+    const sections: string[] = [];
+    const isDirectMode = !context.agent;
+    const agentId = context.agent || "CODING";
+    const persona = isDirectMode ? null : AgentPersonaRegistry.get(agentId);
+
+    const codingFallback =
+      !isDirectMode && (!persona || persona.id === "CODING");
+
+    // ── 1. Agent Identity ────────────────────────────────────────
+    if (isDirectMode) {
+      sections.push(
+        `You are a helpful AI assistant with access to a comprehensive suite of real-time data and utility tools. Present data clearly with relevant formatting. For questions that don't require API data, respond naturally without tool calls.`,
+      );
+    } else if (persona) {
+      const identityText =
+        typeof persona.identity === "function"
+          ? persona.identity(context)
+          : persona.identity;
+      sections.push(identityText);
+    } else {
+      sections.push(
+        `You are a highly capable coding agent with access to file system, git, command execution, and web tools.`,
+      );
+    }
+
+    // ── 2. Agent Context (runtime data from caller) ──────────────
+    if (context.agentContext) {
+      const agentCtx = context.agentContext;
+
+      if (agentCtx.discordContext) {
+        sections.push(agentCtx.discordContext as string);
+      }
+      if (agentCtx.serverContext) {
+        sections.push(agentCtx.serverContext as string);
+      }
+      if (agentCtx.imageContext) {
+        sections.push(agentCtx.imageContext as string);
+      }
+      if (agentCtx.clockCrewContext) {
+        sections.push(agentCtx.clockCrewContext as string);
+      }
+
+      if (agentCtx.stickersContext) {
+        sections.push(agentCtx.stickersContext as string);
+      }
+      if (agentCtx.emotionContext) {
+        sections.push(agentCtx.emotionContext as string);
+      }
+      if (agentCtx.visualContext) {
+        sections.push(agentCtx.visualContext as string);
+      }
+
+      if (agentCtx.guildId) {
+        let idsBlock = `# Discord IDs\n- Guild ID: ${agentCtx.guildId}`;
+        if (agentCtx.channelId) idsBlock += `\n- Channel ID: ${agentCtx.channelId}`;
+        sections.push(idsBlock);
+      }
+
+      if (agentCtx.lightsContext) {
+        sections.push(agentCtx.lightsContext as string);
+      }
+
+      if (agentCtx.somaticState) {
+        const somatic = agentCtx.somaticState as Record<string, { level: number; label?: string; name?: string }>;
+        const entries = Object.entries(somatic);
+        if (entries.length > 0) {
+          let block = `# Your Current Physical & Emotional State`;
+          for (const [key, state] of entries) {
+            const display = state.label || state.name || `Level ${state.level}`;
+            block += `\n- ${key.charAt(0).toUpperCase() + key.slice(1)}: ${display} (${state.level}/100)`;
+          }
+          sections.push(block);
+        }
+      }
+    }
+
+    // ── 3. Tool Policy (persona-specific) ────────────────────────
+    if (persona?.toolPolicy) {
+      const policyText =
+        typeof persona.toolPolicy === "function"
+          ? persona.toolPolicy(context)
+          : persona.toolPolicy;
+      if (policyText) sections.push(policyText);
+    }
+
+    // ── 4. Available Tools (domain-grouped) ──────────────────────
+    {
+      const toolDescriptions = this.buildToolDescriptions(context.enabledTools, agentId);
+      if (toolDescriptions) {
+        const schemas = ToolOrchestratorService.getClientToolSchemas();
+        let count = schemas.length;
+        if (context.enabledTools) {
+          const hasPrefixed = context.enabledTools.some(
+            (enabledTool) => enabledTool.startsWith("label:") || enabledTool.startsWith("domain:") || enabledTool.startsWith("domainKey:"),
+          );
+          const enabledSet = hasPrefixed
+            ? resolveToolEntriesToSet(context.enabledTools, schemas)
+            : new Set(context.enabledTools);
+
+          let filteredSchemas = schemas.filter(
+            (toolSchema) =>
+              enabledSet.has(toolSchema.name as string) ||
+              (toolSchema as Record<string, unknown>).domain === "Core Tools"
+          );
+
+          if (agentId) {
+            const assemblerPersona = AgentPersonaRegistry.get(agentId);
+            if (assemblerPersona?.blockedTools?.length) {
+              const disabledSet = resolveToolEntriesToSet(assemblerPersona.blockedTools, schemas);
+              filteredSchemas = filteredSchemas.filter(
+                (toolSchema) => !disabledSet.has(toolSchema.name as string) || enabledSet.has(toolSchema.name as string),
+              );
+            }
+          }
+
+          count = filteredSchemas.length;
+        }
+        sections.push(`## Available Tools (${count})\n` + toolDescriptions);
+      }
+    }
+
+    // ── 5. Guidelines ─────────────────────────────────────────────
+    if (!isDirectMode) {
+      if (persona?.guidelines) {
+        sections.push(persona.guidelines);
+      } else if (codingFallback || persona?.usesCodingGuidelines) {
+        sections.push(
+          `## Coding Guidelines\n` +
+            `- Always read relevant files before making edits to understand context\n` +
+            `- After making changes, verify them by reading the modified section\n` +
+            `- Keep your explanations concise and technical\n` +
+            `\n## Command Execution\n` +
+            `- For dev servers and long-running processes (npm run dev, next dev, vite, nodemon, etc.), ALWAYS set run_in_background: true. These commands never terminate on their own.\n` +
+            `- You will receive the first ~2.5 seconds of output to confirm the server started correctly.\n` +
+            `- Do NOT use run_in_background for one-shot commands (npm install, npm test, git status, eslint, prettier, tsc, etc.) — let them complete normally.`,
+        );
+      }
+    }
+
+    // ── 5b. Coordinator Mode Addendum (when coordinator tools available) ──
+    if (!isDirectMode && (codingFallback || persona?.usesCodingGuidelines)) {
+      const resolvedEnabledSet = (() => {
+        if (!context.enabledTools) return null;
+        const hasPrefixed = context.enabledTools.some(
+          (entry) => entry.startsWith("label:") || entry.startsWith("domain:") || entry.startsWith("domainKey:"),
+        );
+        if (hasPrefixed) {
+          const schemas = ToolOrchestratorService.getClientToolSchemas();
+          return resolveToolEntriesToSet(context.enabledTools, schemas);
+        }
+        return new Set(context.enabledTools);
+      })();
+      const coordinatorAvailable = resolvedEnabledSet
+        ? COORDINATOR_ONLY_TOOLS.some((t: string) => resolvedEnabledSet.has(t))
+        : true;
+
+      if (coordinatorAvailable) {
+        const allSchemas = ToolOrchestratorService.getToolSchemas();
+        const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
+        const workerTools = allSchemas
+          .map((tool) => tool.name as string)
+          .filter((name: string) => !coordinatorSet.has(name));
+        sections.push(getCoordinatorPromptAddendum({ workerTools }));
+      }
+    }
+
+    // ── 6. Environment ───────────────────────────────────────────
+    sections.push(
+      `## Environment\n` +
+        `- OS: Linux (WSL2)\n` +
+        `- Workspace: ${this.workspaceRoot}`,
+    );
+
+    // ── 7. Project Structure (cached) ────────────────────────────
+    if (codingFallback || persona?.usesDirectoryTree) {
+      const dirTree = await this.fetchDirectoryTree();
+      if (dirTree) {
+        sections.push(`## Project Structure\n` + dirTree);
+      }
+    }
+
+    // ── 8. Project Skills (relevance-filtered) ────────────────────
+    const lastUserMsg = [...(context.messages || [])]
+      .reverse()
+      .find((message) => message.role === "user");
+    const queryText = (lastUserMsg?.content as string) || "";
+
+    const skills = await this.scorer.fetchSkills(
+      context.project || null,
+      context.username || "",
+      queryText,
+      {
+        traceId: context.traceId,
+        agentSessionId: context.agentSessionId,
+        endpoint: "/agent",
+        agent: agentId,
+      },
+    );
+    const skillNames: string[] = [];
+    let skillsText = "";
+    if (skills.length > 0) {
+      const skillBlocks = skills.map((s) => {
+        skillNames.push(s.name);
+        return `### ${s.name}\n${s.content}`;
+      });
+      skillsText = `[Project Skills]\n` + skillBlocks.join("\n\n");
+    }
+
+    // ── 9. Session Memory (embedding search) ────────────────────
+    const memoryQuery = queryText || context.project || "";
+    let memoriesText = "";
+
+    if (memoryQuery) {
+      const agentCtxForMemory = context.agentContext || {};
+      const memoryGuildId = agentCtxForMemory.guildId as string | undefined;
+      const memoryUserIds = agentCtxForMemory.participantUserIds as string[] | undefined;
+
+      const memories = await this.scorer.fetchMemories(
+        agentId,
+        context.project || null,
+        memoryQuery,
+        {
+          traceId: context.traceId,
+          agentSessionId: context.agentSessionId,
+          endpoint: "/agent",
+          _username: context.username,
+          guildId: memoryGuildId,
+          userIds: memoryUserIds,
+        },
+      );
+      if (memories) {
+        memoriesText = `[Agent Memory]\n` + memories;
+      }
+    }
+
+    return {
+      prompt: sections.join("\n\n"),
+      skillNames,
+      skillsText,
+      memoriesText,
+    };
+  }
+
+  createHook() {
+    return async (context: AssemblerContext) => {
+      try {
+        const {
+          prompt: systemPrompt,
+          skillNames,
+          skillsText,
+          memoriesText,
+        } = await this.assemble(context);
+        if (!systemPrompt) return;
+
+        context._injectedSkills = skillNames;
+
+        const systemIdx = context.messages?.findIndex(
+          (m) => m.role === "system",
+        );
+        if (systemIdx !== undefined && systemIdx >= 0) {
+          context.messages![systemIdx].content = systemPrompt;
+        } else {
+          context.messages?.unshift({ role: "system", content: systemPrompt });
+        }
+
+        if (context.messages) {
+          const userMessages = context.messages.filter((message) => message.role === "user");
+          const lastUserMsg = userMessages[userMessages.length - 1];
+          if (lastUserMsg && typeof lastUserMsg.content === "string") {
+            const contextLines: string[] = [];
+
+            contextLines.push(
+              `- Local Time: ${new Date().toLocaleString("en-US", {
+                dateStyle: "full",
+                timeStyle: "long",
+              })}`,
+            );
+
+            let systemContextBlock = `[System Context]\n${contextLines.join("\n")}\n\n`;
+
+            if (skillsText) {
+              systemContextBlock += `${skillsText}\n\n`;
+            }
+
+            if (memoriesText) {
+              systemContextBlock += `${memoriesText}\n\n`;
+            }
+
+            if (!lastUserMsg.content.startsWith("[System Context]")) {
+              const msgIdx = context.messages.indexOf(lastUserMsg);
+              if (msgIdx !== -1) {
+                const originalContent = lastUserMsg.content;
+                context.messages[msgIdx] = {
+                  ...lastUserMsg,
+                  rawContent: originalContent,
+                  content: systemContextBlock + `[User Message]\n${originalContent}`,
+                };
+              }
+            }
+          }
+        }
+
+        logger.info(
+          `[SystemPromptAssembler] Assembled ${systemPrompt.length} char static system prompt for agent="${context.agent || "DIRECT"}" (${skillNames.length} skills injected into user context)`,
+        );
+      } catch (error: unknown) {
+        logger.error(
+          `[SystemPromptAssembler] Assembly failed: ${getErrorMessage(error)}`,
+        );
+      }
+    };
+  }
+}
+export { SystemPromptAssembler };
