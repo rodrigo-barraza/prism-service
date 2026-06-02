@@ -6,6 +6,8 @@ import { COLLECTIONS, SSE_KEEPALIVE_INTERVAL_MS } from "../../constants.ts";
 import ChangeStreamService from "../../services/ChangeStreamService.ts";
 import BenchmarkService from "../../services/BenchmarkService.ts";
 import ActiveGenerationTracker from "../../services/ActiveGenerationTracker.ts";
+import AgentPersonaRegistry from "../../services/AgentPersonaRegistry.ts";
+import ToolOrchestratorService from "../../services/ToolOrchestratorService.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import { applyDateRangeFilter, parsePaginationParams } from "../../utils/QueryBuilders.ts";
@@ -259,22 +261,33 @@ router.get(
   }),
 );
 
-// ─── GET /conversations/filters — distinct project & username values ─
+// ─── GET /conversations/filters — distinct filter values for admin dropdowns ─
 router.get(
   "/filters",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const [convProjects, reqProjects, usernames] = await Promise.all([
+      const [convProjects, reqProjects, usernames, models, providers] = await Promise.all([
         req.db.collection(CONVERSATIONS_COL).distinct("project"),
         req.db.collection(REQUESTS_COL).distinct("project"),
         req.db.collection(CONVERSATIONS_COL).distinct("username"),
+        req.db.collection(REQUESTS_COL).distinct("model"),
+        req.db.collection(REQUESTS_COL).distinct("provider"),
       ]);
 
       const projects = [...new Set([...convProjects, ...reqProjects])];
+      const workspaceRoots = ToolOrchestratorService.getWorkspaceRoots() as string[];
+      const agentPersonas = AgentPersonaRegistry.list().map((persona) => ({
+        id: persona.id,
+        name: persona.name,
+      }));
 
       res.json({
         projects: projects.filter(Boolean).sort(),
         usernames: usernames.filter(Boolean).sort(),
+        models: models.filter(Boolean).sort(),
+        providers: providers.filter(Boolean).sort(),
+        workspaces: workspaceRoots.filter(Boolean).sort(),
+        agents: agentPersonas,
       });
     } catch (error: unknown) {
       logger.error(`Admin /conversations/filters error: ${getErrorMessage(error)}`);

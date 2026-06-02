@@ -756,11 +756,14 @@ router.get(
 );
 
 // ─── GET /stats/timeline — requests grouped by adaptive granularity ─
+// Supports an optional `granularity` query param for user-selected resolution.
+// Returns `validGranularities` and `defaultGranularity` so the frontend can
+// render a resolution picker constrained to sane bounds per time span.
 router.get(
   "/timeline",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { hours = 24, from, to, project } = req.query;
+      const { hours = 24, from, to, project, agent, granularity: requestedGranularity } = req.query;
 
       let sinceDate: Date;
       let untilDate: Date | undefined;
@@ -774,13 +777,51 @@ router.get(
       }
 
       const spanMs = (untilDate ? untilDate.getTime() : Date.now()) - sinceDate.getTime();
-      const spanMinutes = spanMs / (1000 * 60);
-      const spanHours = spanMinutes / 60;
-      const spanDays = spanHours / 24;
 
-      let granularity: string, groupId: Record<string, unknown>;
+      // ── Granularity tier definitions (ordered finest → coarsest) ──
+      const TIER_KEYS = ["1s", "5s", "15s", "30s", "1min", "5min", "15min", "1hr", "4hr", "1day", "1week"];
+      const TIER_INDEX: Record<string, number> = {};
+      TIER_KEYS.forEach((key, index) => { TIER_INDEX[key] = index; });
 
-      // Helper to build a "floor seconds to interval N" aggregation expression
+      const MINUTES_MS = 60_000;
+      const HOURS_MS = 3_600_000;
+      const DAYS_MS = 86_400_000;
+
+      const SPAN_RULES = [
+        { maxSpanMs: 2 * MINUTES_MS, defaultGranularity: "1s", minGranularity: "1s", maxGranularity: "15s" },
+        { maxSpanMs: 10 * MINUTES_MS, defaultGranularity: "5s", minGranularity: "1s", maxGranularity: "1min" },
+        { maxSpanMs: 30 * MINUTES_MS, defaultGranularity: "15s", minGranularity: "5s", maxGranularity: "5min" },
+        { maxSpanMs: 1 * HOURS_MS, defaultGranularity: "30s", minGranularity: "15s", maxGranularity: "5min" },
+        { maxSpanMs: 6 * HOURS_MS, defaultGranularity: "1min", minGranularity: "15s", maxGranularity: "15min" },
+        { maxSpanMs: 1 * DAYS_MS, defaultGranularity: "5min", minGranularity: "1min", maxGranularity: "1hr" },
+        { maxSpanMs: 3 * DAYS_MS, defaultGranularity: "15min", minGranularity: "5min", maxGranularity: "1day" },
+        { maxSpanMs: 7 * DAYS_MS, defaultGranularity: "1day", minGranularity: "1hr", maxGranularity: "1day" },
+        { maxSpanMs: 14 * DAYS_MS, defaultGranularity: "1day", minGranularity: "4hr", maxGranularity: "1day" },
+        { maxSpanMs: 30 * DAYS_MS, defaultGranularity: "1day", minGranularity: "4hr", maxGranularity: "1week" },
+        { maxSpanMs: 90 * DAYS_MS, defaultGranularity: "1day", minGranularity: "1day", maxGranularity: "1week" },
+        { maxSpanMs: Infinity, defaultGranularity: "1week", minGranularity: "1day", maxGranularity: "1week" },
+      ];
+
+      const matchingRule = SPAN_RULES.find((rule) => spanMs <= rule.maxSpanMs) || SPAN_RULES[SPAN_RULES.length - 1];
+      const minimumIndex = TIER_INDEX[matchingRule.minGranularity] ?? 0;
+      const maximumIndex = TIER_INDEX[matchingRule.maxGranularity] ?? TIER_KEYS.length - 1;
+      const validGranularities = TIER_KEYS.slice(minimumIndex, maximumIndex + 1);
+      const defaultGranularity = matchingRule.defaultGranularity;
+
+      let granularity: string;
+      if (typeof requestedGranularity === "string" && validGranularities.includes(requestedGranularity)) {
+        granularity = requestedGranularity;
+      } else if (typeof requestedGranularity === "string" && !validGranularities.includes(requestedGranularity)) {
+        res.status(400).json({
+          error: `Invalid granularity "${requestedGranularity}" for this time span. Valid options: ${validGranularities.join(", ")}`,
+        });
+        return;
+      } else {
+        granularity = defaultGranularity;
+      }
+
+      // ── MongoDB $group _id expressions per granularity ──
+
       const floorSecondsExpr = (interval: number) => ({
         $concat: [
           {
@@ -805,7 +846,30 @@ router.get(
         ],
       });
 
-      // Helper to build a "floor hours to interval N" aggregation expression
+      const floorMinutesExpr = (interval: number) => ({
+        $concat: [
+          {
+            $dateToString: {
+              format: "%Y-%m-%dT%H:",
+              date: { $toDate: "$timestamp" },
+              timezone: "UTC",
+            },
+          },
+          {
+            $cond: [
+              {
+                $lt: [
+                  { $multiply: [{ $floor: { $divide: [{ $minute: { $toDate: "$timestamp" } }, interval] } }, interval] },
+                  10,
+                ],
+              },
+              { $concat: ["0", { $toString: { $multiply: [{ $floor: { $divide: [{ $minute: { $toDate: "$timestamp" } }, interval] } }, interval] } }] },
+              { $toString: { $multiply: [{ $floor: { $divide: [{ $minute: { $toDate: "$timestamp" } }, interval] } }, interval] } },
+            ],
+          },
+        ],
+      });
+
       const floorHoursExpr = (interval: number) => ({
         $concat: [
           {
@@ -830,43 +894,63 @@ router.get(
         ],
       });
 
-      if (spanMinutes <= 2) {
-        granularity = "1s";
-        groupId = {
-          $dateToString: { format: "%Y-%m-%dT%H:%M:%S", date: { $toDate: "$timestamp" }, timezone: "UTC" },
-        };
-      } else if (spanMinutes <= 10) {
-        granularity = "5s";
-        groupId = floorSecondsExpr(5);
-      } else if (spanHours <= 1) {
-        granularity = "15s";
-        groupId = floorSecondsExpr(15);
-      } else if (spanHours <= 4) {
-        granularity = "1min";
-        groupId = {
-          $dateToString: { format: "%Y-%m-%dT%H:%M", date: { $toDate: "$timestamp" }, timezone: "UTC" },
-        };
-      } else if (spanDays <= 1) {
-        granularity = "5min";
-        groupId = {
-          $concat: [
-            { $substr: ["$timestamp", 0, 14] },
-            {
-              $toString: {
-                $multiply: [{ $floor: { $divide: [{ $toInt: { $substr: ["$timestamp", 14, 2] } }, 5] } }, 5],
+      // ISO week start (Monday) expression
+      const weekStartExpr = {
+        $dateToString: {
+          format: "%Y-%m-%d",
+          date: {
+            $dateSubtract: {
+              startDate: { $toDate: "$timestamp" },
+              unit: "day",
+              amount: {
+                $mod: [
+                  { $add: [{ $subtract: [{ $dayOfWeek: { $toDate: "$timestamp" } }, 2] }, 7] },
+                  7,
+                ],
               },
             },
-          ],
-        };
-      } else if (spanDays <= 7) {
-        granularity = "hour";
-        groupId = { $substr: ["$timestamp", 0, 13] };
-      } else if (spanDays <= 60) {
-        granularity = "6h";
-        groupId = floorHoursExpr(6);
-      } else {
-        granularity = "day";
-        groupId = { $substr: ["$timestamp", 0, 10] };
+          },
+          timezone: "UTC",
+        },
+      };
+
+      let groupId: Record<string, unknown>;
+      switch (granularity) {
+        case "1s":
+          groupId = { $dateToString: { format: "%Y-%m-%dT%H:%M:%S", date: { $toDate: "$timestamp" }, timezone: "UTC" } };
+          break;
+        case "5s":
+          groupId = floorSecondsExpr(5);
+          break;
+        case "15s":
+          groupId = floorSecondsExpr(15);
+          break;
+        case "30s":
+          groupId = floorSecondsExpr(30);
+          break;
+        case "1min":
+          groupId = { $dateToString: { format: "%Y-%m-%dT%H:%M", date: { $toDate: "$timestamp" }, timezone: "UTC" } };
+          break;
+        case "5min":
+          groupId = floorMinutesExpr(5);
+          break;
+        case "15min":
+          groupId = floorMinutesExpr(15);
+          break;
+        case "1hr":
+          groupId = { $substr: ["$timestamp", 0, 13] };
+          break;
+        case "4hr":
+          groupId = floorHoursExpr(4);
+          break;
+        case "1day":
+          groupId = { $substr: ["$timestamp", 0, 10] };
+          break;
+        case "1week":
+          groupId = weekStartExpr;
+          break;
+        default:
+          groupId = { $substr: ["$timestamp", 0, 10] };
       }
 
       const timeMatch: Record<string, string> = { $gte: sinceDate.toISOString() };
@@ -874,6 +958,7 @@ router.get(
 
       const matchFilter: Record<string, unknown> = { timestamp: timeMatch };
       if (project) matchFilter.project = project;
+      if (agent) matchFilter.agent = agent;
 
       const pipeline: Record<string, unknown>[] = [
         { $match: matchFilter },
@@ -906,6 +991,8 @@ router.get(
 
       res.json({
         granularity,
+        defaultGranularity,
+        validGranularities,
         data: results.map((r: Record<string, unknown>) => ({
           hour: r._id,
           requests: r.requests,
