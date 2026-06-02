@@ -576,6 +576,11 @@ const openaiProvider = {
       payload.tools = [...((payload.tools as OpenAI.Responses.Tool[]) || []), ...customTools];
     }
 
+    // Parallel tool calls — defaults to true; set false for sequential FC
+    if (options.parallelToolCalls === false) {
+      payload.parallel_tool_calls = false;
+    }
+
     logger.info(`[OpenAI/Responses] Sending non-stream payload: ${JSON.stringify(payload)}`);
 
     const { data: response, response: rawResponse } = await getClient()
@@ -856,6 +861,11 @@ const openaiProvider = {
     const customTools = convertToolsToResponsesAPI(options.tools as ToolSchema[] | null | undefined);
     if (customTools) {
       payload.tools = [...((payload.tools as OpenAI.Responses.Tool[]) || []), ...customTools];
+    }
+
+    // Parallel tool calls — defaults to true; set false for sequential FC
+    if (options.parallelToolCalls === false) {
+      payload.parallel_tool_calls = false;
     }
 
     logger.info(`[OpenAI/Responses] Sending stream payload: ${JSON.stringify(payload)}`);

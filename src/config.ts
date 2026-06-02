@@ -595,6 +595,7 @@ const MODELS = {
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
+    lockedSampling: true,
     arena: { text: 1520, code: 1565, document: 1540, search: 1270 },
     pricing: {
       inputPerMillion: 5.0,
@@ -632,6 +633,7 @@ const MODELS = {
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
+    lockedSampling: true,
     arena: { text: 1530, code: 1580, document: 1555, search: 1290 },
     pricing: {
       inputPerMillion: 5.0,

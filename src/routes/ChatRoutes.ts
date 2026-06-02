@@ -197,6 +197,9 @@ async function prepareGenerationContext(
     // CriticGate: multi-model review of dangerous tool calls.
     enableCriticGate,
     criticModel,
+    parallelToolCalls,
+    candidateCount,
+    responseMimeType,
     ...extraParams
   } = validatedParams;
 
@@ -241,6 +244,9 @@ async function prepareGenerationContext(
     ...(enableCriticGate != null && { enableCriticGate }),
     ...(criticModel != null && { criticModel }),
     ...(harness != null && { harness }),
+    ...(parallelToolCalls != null && { parallelToolCalls }),
+    ...(candidateCount != null && { candidateCount }),
+    ...(responseMimeType != null && responseMimeType !== "" && { responseMimeType }),
     ...((extraParams as Record<string, unknown>).systemPrompt ? { systemPrompt: (extraParams as Record<string, unknown>).systemPrompt } : {}),
   };
   // When thinking is explicitly disabled, strip all thinking sub-params

@@ -5,7 +5,7 @@ import { extractAnthropicRateLimits } from "../utils/rateLimits.ts";
 import { compressImageForSizeLimit } from "../utils/media.ts";
 import { EMPTY_USAGE } from "../utils/openai-compat.ts";
 import { ANTHROPIC_API_KEY } from "../../config.ts";
-import { TYPES, getDefaultModels } from "../config.ts";
+import { TYPES, getDefaultModels, getModelByName } from "../config.ts";
 import { sleep } from "@rodrigo-barraza/utilities-library";
 
 import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
@@ -504,6 +504,15 @@ const anthropicProvider = {
       ...(options.serviceTier && { service_tier: options.serviceTier }),
     };
 
+    // Opus 4.7+ lock sampling parameters — API rejects non-default values
+    const modelDefinition = getModelByName(model);
+    const hasLockedSampling = (modelDefinition as Record<string, unknown> | null)?.lockedSampling === true;
+    if (hasLockedSampling) {
+      delete payload.temperature;
+      delete payload.top_p;
+      delete payload.top_k;
+    }
+
     // Server tools
     const tools = buildTools(options);
     if (tools) payload.tools = tools;
@@ -682,6 +691,15 @@ const anthropicProvider = {
             : undefined,
         ...(options.serviceTier && { service_tier: options.serviceTier }),
       };
+
+      // Opus 4.7+ lock sampling parameters — API rejects non-default values
+      const modelDefinition = getModelByName(model);
+      const hasLockedSampling = (modelDefinition as Record<string, unknown> | null)?.lockedSampling === true;
+      if (hasLockedSampling) {
+        delete streamPayload.temperature;
+        delete streamPayload.top_p;
+        delete streamPayload.top_k;
+      }
 
       // Server tools
       const tools = buildTools(options);
