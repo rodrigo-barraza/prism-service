@@ -1055,17 +1055,18 @@ class LocalProviderGateway {
 const gateway = new LocalProviderGateway();
 export default gateway;
 // Named exports for capability detection patterns (shared with config.js)
-export { 
-// Provider type sets
-LOCAL_PROVIDER_TYPES, NATIVE_MCP_TYPES, DEFAULT_THINKING_TYPES, MODEL_MANAGEMENT_TYPES, 
-// Capability detection patterns
-THINKING_PATTERNS, FC_PATTERNS, VISION_PATTERNS, VIDEO_PATTERNS, AUDIO_PATTERNS, 
-// Functions
-matchesAny, detectCapabilities, 
-// Formatting helpers
-formatBytes, formatParams, parseParamsFromName, parseQuantFromName, parsePublisherFromName, 
-// HuggingFace enrichment
-fetchHuggingFaceMetadata, enrichWithHuggingFace, 
-// Model normalizers (for direct use by config.js during migration)
-normalizeLmStudioModel, normalizeOllamaModel, normalizeOpenAICompatModel, normalizeVllmModel, NORMALIZER_BY_TYPE, HF_ENRICHED_TYPES, };
+export {
+    // Provider type sets
+    LOCAL_PROVIDER_TYPES, NATIVE_MCP_TYPES, DEFAULT_THINKING_TYPES, MODEL_MANAGEMENT_TYPES,
+    // Capability detection patterns
+    THINKING_PATTERNS, FC_PATTERNS, VISION_PATTERNS, VIDEO_PATTERNS, AUDIO_PATTERNS,
+    // Functions
+    matchesAny, detectCapabilities,
+    // Formatting helpers
+    formatBytes, formatParams, parseParamsFromName, parseQuantFromName, parsePublisherFromName,
+    // HuggingFace enrichment
+    fetchHuggingFaceMetadata, enrichWithHuggingFace,
+    // Model normalizers (for direct use by config.js during migration)
+    normalizeLmStudioModel, normalizeOllamaModel, normalizeOpenAICompatModel, normalizeVllmModel, NORMALIZER_BY_TYPE, HF_ENRICHED_TYPES,
+};
 //# sourceMappingURL=LocalProviderGateway.js.map
