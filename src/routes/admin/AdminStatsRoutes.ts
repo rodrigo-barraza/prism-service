@@ -923,4 +923,84 @@ router.get(
   }),
 );
 
+// ─── GET /stats/agents — per-agent breakdown ──────────
+router.get(
+  "/agents",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { from, to, project } = req.query;
+      const match: Record<string, unknown> = { agent: { $exists: true, $ne: null } };
+      if (project) match.project = project;
+      applyDateRangeFilter(match, from as string, to as string);
+
+      const pipeline: Record<string, unknown>[] = [
+        { $match: match },
+        {
+          $group: {
+            _id: "$agent",
+            totalRequests: { $sum: 1 },
+            totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
+            totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
+            totalTokens: TOTAL_TOKENS_EXPR,
+            totalCost: COST_SUM_EXPR,
+            avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
+            avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
+            _models: { $addToSet: "$model" },
+            _providers: { $addToSet: "$provider" },
+            _convIds: { $addToSet: "$conversationId" },
+            lastRequest: { $max: "$timestamp" },
+            successCount: {
+              $sum: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
+            },
+            errorCount: {
+              $sum: { $cond: [{ $eq: ["$success", false] }, 1, 0] },
+            },
+          },
+        },
+        { $sort: { totalRequests: -1 } },
+      ];
+
+      const results = await req.db
+        .collection(REQUESTS_COL)
+        .aggregate(pipeline)
+        .toArray();
+
+      res.json(
+        results.map((r: Record<string, unknown>) => {
+          const agentId = (r._id as string) || "";
+          const persona = AgentPersonaRegistry.get(agentId);
+          const models = ((r._models || []) as string[]).filter(Boolean);
+          const providers = ((r._providers || []) as string[]).filter(Boolean);
+          const conversationIds = ((r._convIds || []) as string[]).filter(Boolean);
+
+          return {
+            agent: agentId,
+            name: persona?.name || agentId,
+            type: persona?.type || "",
+            custom: persona?.custom || false,
+            totalRequests: r.totalRequests,
+            totalInputTokens: r.totalInputTokens,
+            totalOutputTokens: r.totalOutputTokens,
+            totalTokens: r.totalTokens,
+            totalCost: r.totalCost,
+            avgLatency: r.avgLatency,
+            avgTokensPerSec: r.avgTokensPerSec,
+            modelCount: models.length,
+            models,
+            providerCount: providers.length,
+            providers,
+            conversationCount: conversationIds.length,
+            lastRequest: r.lastRequest,
+            successCount: r.successCount,
+            errorCount: r.errorCount,
+          };
+        }),
+      );
+    } catch (error: unknown) {
+      logger.error(`Admin /stats/agents error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
 export default router;
