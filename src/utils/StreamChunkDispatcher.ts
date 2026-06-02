@@ -27,6 +27,8 @@ export interface StreamState {
   audioChunks: string[];
   audioSampleRate: number;
   rateLimits: unknown;
+  /** Provider stop reason — "length"/"max_tokens" when output was truncated by token budget. */
+  stopReason?: string;
 }
 
 export interface StreamContext {
@@ -194,6 +196,10 @@ export async function dispatchChunk(
       state.rateLimits = chunk.rateLimits;
       return true;
 
+    case "stopReason":
+      state.stopReason = (chunk as unknown as { stopReason?: string }).stopReason || undefined;
+      return true;
+
     case "thinking":
       emitFirstToken(state, emit);
       state.thinking += chunk.content || "";
@@ -351,5 +357,6 @@ export function createStreamState(): StreamState {
     audioChunks: [],
     audioSampleRate: 24000,
     rateLimits: null,
+    stopReason: undefined,
   };
 }

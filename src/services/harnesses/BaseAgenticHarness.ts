@@ -274,6 +274,12 @@ export default class BaseAgenticHarness {
       return { action: "continue" };
     }
 
+    // ── Stop reason (truncation detection) ───────────────
+    if (streamChunk?.type === "stopReason") {
+      pass.stopReason = streamChunk.stopReason as string || undefined;
+      return { action: "continue" };
+    }
+
     // ── Thinking ─────────────────────────────────────────
     if (streamChunk?.type === "thinking") {
       this._recordFirstToken(pass);

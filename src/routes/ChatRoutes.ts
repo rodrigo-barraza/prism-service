@@ -1,6 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { formatCostTag, roundMs } from "@rodrigo-barraza/utilities-library";
-import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response, NextFunction } from "express";
 import {
   finalizeTextGeneration,
@@ -1055,6 +1055,25 @@ async function handleStreamingText(context: GenerationContext) {
     }
     // Update messages ref for potential next iteration
     (messages as Record<string, unknown>[]).push(assistantToolMsg, ...toolResultMsgs);
+  }
+  // Surface max_tokens truncation if the model produced no useful output
+  const isChatTruncated =
+    (streamState.stopReason === "length" || streamState.stopReason === "max_tokens") &&
+    !streamState.text.trim();
+  if (isChatTruncated) {
+    const truncationWarning =
+      `⚠️ The model's response was cut short because the **max_tokens** limit was reached ` +
+      `before it could finish generating. Try increasing the **Max Tokens** setting.`;
+    emit({
+      type: SSE_EVENT_TYPES.CHUNK,
+      content: truncationWarning,
+    });
+    emit({
+      type: SSE_EVENT_TYPES.STATUS,
+      message: STATUS_MESSAGES.MAX_TOKENS_TRUNCATED,
+      phase: "truncated",
+    });
+    streamState.text = truncationWarning;
   }
   // Build normalized result for shared finalization
   const now = performance.now();

@@ -220,6 +220,8 @@ export interface PassState {
   usage: UsageAccumulator;
   options: Record<string, unknown>;
   requestId: string | null;
+  /** Provider stop reason — "length"/"max_tokens" when output was truncated by token budget. */
+  stopReason?: string;
 }
 
 // ── Stream Chunk Routing ────────────────────────────────────

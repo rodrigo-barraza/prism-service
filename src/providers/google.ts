@@ -460,8 +460,12 @@ const googleProvider = {
       let usage: { inputTokens: number; outputTokens: number } | null = null;
       const maxImages = options.imageCount || 1;
       let imageCount = 0;
+      let lastFinishReason: string | null = null;
       for await (const chunk of responseStream) {
         if (options.signal?.aborted) break;
+        // Track finishReason for truncation detection
+        const candidateFinishReason = chunk.candidates?.[0]?.finishReason;
+        if (candidateFinishReason) lastFinishReason = candidateFinishReason;
         // Process all parts in the chunk
         if (chunk.candidates?.[0]?.content?.parts) {
           for (const part of chunk.candidates[0].content.parts) {
@@ -510,6 +514,10 @@ const googleProvider = {
             } : {}),
           };
         }
+      }
+      // Surface max_tokens truncation so harnesses can detect and warn the user
+      if (lastFinishReason === "MAX_TOKENS") {
+        yield { type: "stopReason", stopReason: "max_tokens" };
       }
       if (usage) {
         yield { type: "usage", usage };

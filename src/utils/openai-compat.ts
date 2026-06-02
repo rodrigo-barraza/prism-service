@@ -133,6 +133,7 @@ export type SSEStreamChunk =
     }
   | { type: "toolCallDelta"; characters: number }
   | { type: "usage"; usage: TokenUsage }
+  | { type: "stopReason"; stopReason: string }
   | { type: "status"; message: string; phase?: string; progress?: number };
 
 // ── Tool Conversion ─────────────────────────────────────────
@@ -529,6 +530,7 @@ export async function* parseSSEStream(
   // Skip ThinkTagParser entirely when thinking is disabled — no overhead
   const thinkParser = suppressThinking ? null : new ThinkTagParser();
   const pendingToolCalls: Record<number, PendingToolCall> = {};
+  let lastFinishReason: string | null = null;
 
   try {
     while (true) {
@@ -624,6 +626,7 @@ export async function* parseSSEStream(
 
           // If finish_reason indicates tool calls, yield accumulated tool calls
           const finishReason = json.choices?.[0]?.finish_reason;
+          if (finishReason) lastFinishReason = finishReason;
           if (finishReason === "tool_calls" || finishReason === "tool") {
             for (const toolCall of Object.values(pendingToolCalls)) {
               let args: Record<string, unknown> = {};
@@ -656,6 +659,11 @@ export async function* parseSSEStream(
           yield part.content;
         }
       }
+    }
+
+    // Surface max_tokens truncation so harnesses can detect and warn the user
+    if (lastFinishReason === "length") {
+      yield { type: "stopReason", stopReason: "length" };
     }
 
     // Yield final usage
