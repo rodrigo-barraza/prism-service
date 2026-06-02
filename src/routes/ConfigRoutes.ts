@@ -8,6 +8,7 @@ import {
   DEFAULT_VOICES,
   getModelOptions,
   getDefaultModels,
+  getParameterDescriptors,
 } from "../config.ts";
 import type { ModelOptionEntry } from "../config.ts";
 import { listInstances } from "../providers/instance-registry.ts";
@@ -277,6 +278,7 @@ Guidelines:
         ),
         defaults: filterDefaults(getDefaultModels(TYPES.AUDIO, TYPES.TEXT)),
       },
+      parameterDescriptors: getParameterDescriptors(),
     });
   }),
 );

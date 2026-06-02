@@ -14,6 +14,7 @@ import {
   getDefaultModels,
   getPricing,
   getModelByName,
+  getAgentDefaults,
 } from "../config.ts";
 import {
   estimateTokens,
@@ -257,6 +258,19 @@ async function prepareGenerationContext(
       options.thinkingLevel = options.reasoningEffort;
     }
   }
+
+  // Apply agent-optimized defaults for parameters not explicitly set by client.
+  // Agent sessions benefit from deterministic, high-output defaults
+  // (e.g., temperature=0, maxTokens=16384, reasoningEffort="high").
+  if (agent) {
+    const agentDefaultValues = getAgentDefaults();
+    for (const [parameterKey, defaultValue] of Object.entries(agentDefaultValues)) {
+      if (options[parameterKey] === undefined || options[parameterKey] === null) {
+        options[parameterKey] = defaultValue;
+      }
+    }
+  }
+
   // Local models emit thinking tokens (<think> tags) by default. Default
   // thinkingEnabled ON only when the client didn't send a value (undefined).
   // When the client explicitly sends false (thinking toggle off), respect it

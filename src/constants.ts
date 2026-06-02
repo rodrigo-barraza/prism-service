@@ -94,3 +94,35 @@ export const AVG_TOKENS_PER_SEC_EXPR = {
     ],
   },
 };
+
+// ─── Provider & Modality Constants ──────────────────────────
+
+export const PROVIDERS = {
+  OPENAI: "openai",
+  ANTHROPIC: "anthropic",
+  GOOGLE: "google",
+  ELEVENLABS: "elevenlabs",
+  INWORLD: "inworld",
+  LM_STUDIO: "lm-studio",
+  VLLM: "vllm",
+  OLLAMA: "ollama",
+  LLAMA_CPP: "llama-cpp",
+};
+
+export const PROVIDER_LIST = Object.values(PROVIDERS);
+
+export const TYPES = {
+  TEXT: "text",
+  IMAGE: "image",
+  AUDIO: "audio",
+  VIDEO: "video",
+  PDF: "pdf",
+  EMBEDDING: "embedding",
+};
+
+export const MODEL_TYPES = {
+  CONVERSATION: "conversation",
+  AUDIO: "audio",
+  EMBED: "embed",
+};
+
