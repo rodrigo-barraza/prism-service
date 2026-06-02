@@ -1,38 +1,6 @@
 // ─── Configuration & Reference Catalog ──────────────────────
 
-// PROVIDERS
-const PROVIDERS = {
-  OPENAI: "openai",
-  ANTHROPIC: "anthropic",
-  GOOGLE: "google",
-  ELEVENLABS: "elevenlabs",
-  INWORLD: "inworld",
-  LM_STUDIO: "lm-studio",
-  VLLM: "vllm",
-  OLLAMA: "ollama",
-  LLAMA_CPP: "llama-cpp",
-};
-
-const PROVIDER_LIST = Object.values(PROVIDERS);
-
-// ─── Input / Output modality constants ──────────────────────
-
-const TYPES = {
-  TEXT: "text",
-  IMAGE: "image",
-  AUDIO: "audio",
-  VIDEO: "video",
-  PDF: "pdf",
-  EMBEDDING: "embedding",
-};
-
-// ─── Endpoint-based model category ──────────────────────────
-
-const MODEL_TYPES = {
-  CONVERSATION: "conversation",
-  AUDIO: "audio",
-  EMBED: "embed",
-};
+import { PROVIDERS, PROVIDER_LIST, TYPES, MODEL_TYPES } from "./constants.ts";
 
 // ─── UNIFIED MODEL CATALOG ──────────────────────────────────
 // Every model lives here with all its metadata.
@@ -1615,6 +1583,11 @@ const DEFAULT_VOICES = {
   [PROVIDERS.INWORLD]: "Dennis",
 };
 
+// ─── Parameter Registry ─────────────────────────────────────
+
+import { getParameterDescriptors, getAgentDefaults } from "./services/ParameterRegistry.ts";
+import type { ParameterDescriptor } from "./services/ParameterRegistry.ts";
+
 // ─── EXPORTS ────────────────────────────────────────────────
 
 export {
@@ -1639,4 +1612,10 @@ export {
   // Voices
   VOICES,
   DEFAULT_VOICES,
+
+  // Parameter Registry
+  getParameterDescriptors,
+  getAgentDefaults,
 };
+
+export type { ParameterDescriptor };

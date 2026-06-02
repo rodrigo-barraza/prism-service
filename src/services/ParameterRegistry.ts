@@ -1,0 +1,334 @@
+import { PROVIDERS } from "../constants.ts";
+
+// ─── Parameter Descriptor Interface ─────────────────────────
+
+export interface ParameterDescriptor {
+  key: string;
+  label: string;
+  controlType: "slider" | "select" | "input" | "toggle";
+  dataType: "number" | "string" | "boolean";
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: Array<{ value: string; label: string }>;
+  defaultValue: number | string | boolean;
+  agentDefault: number | string | boolean;
+  locked?: boolean;
+  lockedReason?: string;
+  group: "sampling" | "reasoning" | "output" | "penalties" | "advanced";
+  providers: string[];
+  requiresThinking?: boolean;
+  requiresResponsesAPI?: boolean;
+  hideWhenReasoning?: boolean;
+}
+
+// ─── All Providers ──────────────────────────────────────────
+
+const ALL_CLOUD_PROVIDERS = [
+  PROVIDERS.OPENAI,
+  PROVIDERS.ANTHROPIC,
+  PROVIDERS.GOOGLE,
+];
+
+const ALL_LOCAL_PROVIDERS = [
+  PROVIDERS.LM_STUDIO,
+  PROVIDERS.VLLM,
+  PROVIDERS.LLAMA_CPP,
+];
+
+const ALL_TEXT_PROVIDERS = [...ALL_CLOUD_PROVIDERS, ...ALL_LOCAL_PROVIDERS];
+
+const LOCAL_PLUS_GOOGLE_ANTHROPIC = [
+  PROVIDERS.ANTHROPIC,
+  PROVIDERS.GOOGLE,
+  ...ALL_LOCAL_PROVIDERS,
+];
+
+const PROVIDERS_WITH_PENALTIES = [
+  PROVIDERS.OPENAI,
+  PROVIDERS.GOOGLE,
+  ...ALL_LOCAL_PROVIDERS,
+];
+
+const PROVIDERS_WITH_SEED = [
+  PROVIDERS.OPENAI,
+  PROVIDERS.GOOGLE,
+  ...ALL_LOCAL_PROVIDERS,
+];
+
+// ─── Parameter Descriptors ──────────────────────────────────
+
+const PARAMETER_DESCRIPTORS: ParameterDescriptor[] = [
+  // ── Sampling ──────────────────────────────────────────────
+  {
+    key: "temperature",
+    label: "Temperature",
+    controlType: "slider",
+    dataType: "number",
+    min: 0,
+    max: 2,
+    step: 0.1,
+    defaultValue: 1.0,
+    agentDefault: 0,
+    group: "sampling",
+    providers: ALL_TEXT_PROVIDERS,
+    hideWhenReasoning: true,
+  },
+  {
+    key: "topP",
+    label: "Top P",
+    controlType: "slider",
+    dataType: "number",
+    min: 0,
+    max: 1,
+    step: 0.05,
+    defaultValue: 1.0,
+    agentDefault: 1.0,
+    group: "sampling",
+    providers: ALL_TEXT_PROVIDERS,
+    hideWhenReasoning: true,
+  },
+  {
+    key: "topK",
+    label: "Top K",
+    controlType: "slider",
+    dataType: "number",
+    min: 0,
+    max: 100,
+    step: 1,
+    defaultValue: 40,
+    agentDefault: 40,
+    group: "sampling",
+    providers: LOCAL_PLUS_GOOGLE_ANTHROPIC,
+    hideWhenReasoning: true,
+  },
+  {
+    key: "minP",
+    label: "Min P",
+    controlType: "slider",
+    dataType: "number",
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: 0,
+    agentDefault: 0.05,
+    group: "sampling",
+    providers: ALL_LOCAL_PROVIDERS,
+    hideWhenReasoning: true,
+  },
+
+  // ── Output ────────────────────────────────────────────────
+  {
+    key: "maxTokens",
+    label: "Max Tokens",
+    controlType: "slider",
+    dataType: "number",
+    min: 256,
+    max: 128000,
+    step: 1024,
+    defaultValue: 2048,
+    agentDefault: 16384,
+    group: "output",
+    providers: ALL_TEXT_PROVIDERS,
+  },
+  {
+    key: "stopSequences",
+    label: "Stop Sequences",
+    controlType: "input",
+    dataType: "string",
+    defaultValue: "",
+    agentDefault: "",
+    group: "output",
+    providers: ALL_TEXT_PROVIDERS,
+    hideWhenReasoning: true,
+  },
+  {
+    key: "seed",
+    label: "Seed",
+    controlType: "input",
+    dataType: "number",
+    defaultValue: "",
+    agentDefault: "",
+    group: "output",
+    providers: PROVIDERS_WITH_SEED,
+    hideWhenReasoning: true,
+  },
+
+  // ── Reasoning ─────────────────────────────────────────────
+  {
+    key: "reasoningEffort",
+    label: "Reasoning Effort",
+    controlType: "select",
+    dataType: "string",
+    options: [
+      { value: "none", label: "None" },
+      { value: "low", label: "Low" },
+      { value: "medium", label: "Medium" },
+      { value: "high", label: "High" },
+      { value: "xhigh", label: "Extra High" },
+    ],
+    defaultValue: "high",
+    agentDefault: "high",
+    group: "reasoning",
+    providers: [PROVIDERS.OPENAI, ...ALL_LOCAL_PROVIDERS, PROVIDERS.ANTHROPIC],
+    requiresThinking: true,
+  },
+  {
+    key: "thinkingLevel",
+    label: "Thinking Level",
+    controlType: "select",
+    dataType: "string",
+    options: [
+      { value: "minimal", label: "Minimal" },
+      { value: "low", label: "Low" },
+      { value: "medium", label: "Medium" },
+      { value: "high", label: "High" },
+    ],
+    defaultValue: "high",
+    agentDefault: "high",
+    group: "reasoning",
+    providers: [PROVIDERS.GOOGLE],
+    requiresThinking: true,
+  },
+  {
+    key: "thinkingBudget",
+    label: "Thinking Budget (Tokens)",
+    controlType: "input",
+    dataType: "number",
+    defaultValue: "",
+    agentDefault: "",
+    group: "reasoning",
+    providers: [PROVIDERS.ANTHROPIC, PROVIDERS.GOOGLE],
+    requiresThinking: true,
+  },
+  {
+    key: "reasoningSummary",
+    label: "Reasoning Summary",
+    controlType: "select",
+    dataType: "string",
+    options: [
+      { value: "auto", label: "Auto" },
+      { value: "concise", label: "Concise" },
+      { value: "detailed", label: "Detailed" },
+    ],
+    defaultValue: "auto",
+    agentDefault: "auto",
+    group: "reasoning",
+    providers: [PROVIDERS.OPENAI],
+    requiresResponsesAPI: true,
+  },
+  {
+    key: "verbosity",
+    label: "Verbosity",
+    controlType: "select",
+    dataType: "string",
+    options: [
+      { value: "", label: "Default" },
+      { value: "low", label: "Low" },
+      { value: "medium", label: "Medium" },
+      { value: "high", label: "High" },
+    ],
+    defaultValue: "",
+    agentDefault: "",
+    group: "reasoning",
+    providers: [PROVIDERS.GOOGLE],
+    requiresThinking: true,
+  },
+
+  // ── Penalties ─────────────────────────────────────────────
+  {
+    key: "frequencyPenalty",
+    label: "Frequency Penalty",
+    controlType: "slider",
+    dataType: "number",
+    min: -2,
+    max: 2,
+    step: 0.1,
+    defaultValue: 0,
+    agentDefault: 0,
+    group: "penalties",
+    providers: PROVIDERS_WITH_PENALTIES,
+    hideWhenReasoning: true,
+  },
+  {
+    key: "presencePenalty",
+    label: "Presence Penalty",
+    controlType: "slider",
+    dataType: "number",
+    min: -2,
+    max: 2,
+    step: 0.1,
+    defaultValue: 0,
+    agentDefault: 0,
+    group: "penalties",
+    providers: PROVIDERS_WITH_PENALTIES,
+    hideWhenReasoning: true,
+  },
+  {
+    key: "repeatPenalty",
+    label: "Repeat Penalty",
+    controlType: "slider",
+    dataType: "number",
+    min: 1,
+    max: 2,
+    step: 0.05,
+    defaultValue: 1.0,
+    agentDefault: 1.0,
+    group: "penalties",
+    providers: ALL_LOCAL_PROVIDERS,
+    hideWhenReasoning: true,
+  },
+
+  // ── Advanced ──────────────────────────────────────────────
+  {
+    key: "responseFormat",
+    label: "Response Format",
+    controlType: "select",
+    dataType: "string",
+    options: [
+      { value: "", label: "Default (Text)" },
+      { value: "json_object", label: "JSON Object" },
+    ],
+    defaultValue: "",
+    agentDefault: "",
+    group: "advanced",
+    providers: [PROVIDERS.OPENAI, PROVIDERS.GOOGLE],
+    hideWhenReasoning: true,
+  },
+  {
+    key: "serviceTier",
+    label: "Service Tier",
+    controlType: "select",
+    dataType: "string",
+    options: [
+      { value: "", label: "Default" },
+      { value: "auto", label: "Auto" },
+    ],
+    defaultValue: "",
+    agentDefault: "auto",
+    group: "advanced",
+    providers: [PROVIDERS.OPENAI, PROVIDERS.ANTHROPIC],
+  },
+];
+
+// ─── Public API ─────────────────────────────────────────────
+
+function getParameterDescriptors(): ParameterDescriptor[] {
+  return PARAMETER_DESCRIPTORS;
+}
+
+/**
+ * Build a map of agent-optimized default values keyed by parameter key.
+ * Used by ChatRoutes to backfill unset parameters for agent sessions.
+ */
+function getAgentDefaults(): Record<string, number | string | boolean> {
+  const defaults: Record<string, number | string | boolean> = {};
+  for (const descriptor of PARAMETER_DESCRIPTORS) {
+    if (descriptor.agentDefault !== "" && descriptor.agentDefault !== undefined) {
+      defaults[descriptor.key] = descriptor.agentDefault;
+    }
+  }
+  return defaults;
+}
+
+export { getParameterDescriptors, getAgentDefaults };
