@@ -948,6 +948,7 @@ router.get(
             _models: { $addToSet: "$model" },
             _providers: { $addToSet: "$provider" },
             _convIds: { $addToSet: "$conversationId" },
+            _traceIds: { $addToSet: "$traceId" },
             lastRequest: { $max: "$timestamp" },
             successCount: {
               $sum: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
@@ -972,6 +973,7 @@ router.get(
           const models = ((r._models || []) as string[]).filter(Boolean);
           const providers = ((r._providers || []) as string[]).filter(Boolean);
           const conversationIds = ((r._convIds || []) as string[]).filter(Boolean);
+          const traceIds = ((r._traceIds || []) as string[]).filter(Boolean);
 
           return {
             agent: agentId,
@@ -990,6 +992,7 @@ router.get(
             providerCount: providers.length,
             providers,
             conversationCount: conversationIds.length,
+            sessionCount: traceIds.length,
             lastRequest: r.lastRequest,
             successCount: r.successCount,
             errorCount: r.errorCount,
