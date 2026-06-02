@@ -196,6 +196,40 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       const args = mockGenerateContent.mock.calls[0][0];
       expect(args.config.serviceTier).toBe("standard");
     });
+
+    it("configures all standard parameters correctly", async () => {
+      mockGenerateContent.mockResolvedValueOnce({
+        candidates: [{ content: { parts: [{ text: "Done" }] } }],
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
+      });
+
+      const messages = [{ role: "user", content: "hello" }];
+      await googleProvider.generateText(messages, MODELS.GEMINI_35_FLASH.name, {
+        temperature: 0.4,
+        topP: 0.85,
+        topK: 15,
+        maxTokens: 1000,
+        seed: 12345,
+        responseMimeType: "application/json",
+        candidateCount: 2,
+        mediaResolution: "MEDIA_RESOLUTION_LOW",
+        responseLogprobs: true,
+        logprobs: 3,
+      });
+
+      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+      const args = mockGenerateContent.mock.calls[0][0];
+      expect(args.config.temperature).toBe(0.4);
+      expect(args.config.topP).toBe(0.85);
+      expect(args.config.topK).toBe(15);
+      expect(args.config.maxOutputTokens).toBe(1000);
+      expect(args.config.seed).toBe(12345);
+      expect(args.config.responseMimeType).toBe("application/json");
+      expect(args.config.candidateCount).toBe(2);
+      expect(args.config.mediaResolution).toBe("MEDIA_RESOLUTION_LOW");
+      expect(args.config.responseLogprobs).toBe(true);
+      expect(args.config.logprobs).toBe(3);
+    });
   });
 
   // ── Section 2: Thinking Chunk Parsing in Streams ─────────────────────
@@ -520,6 +554,32 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       });
       const args2 = mockMessagesCreate.mock.calls[1][0];
       expect(args2.top_p).toBe(0.8);
+    });
+
+    it("configures all standard parameters correctly", async () => {
+      mockMessagesCreate.mockReturnValueOnce({
+        content: [{ type: "text", text: "Finished" }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      });
+
+      const messages = [{ role: "user", content: "hello" }];
+      await anthropicProvider.generateText(messages, MODELS.SONNET_46.name, {
+        temperature: 0.6,
+        topP: 0.95,
+        topK: 25,
+        maxTokens: 500,
+        stopSequences: ["STOP1", "STOP2"],
+        serviceTier: "standard",
+      });
+
+      expect(mockMessagesCreate).toHaveBeenCalledTimes(1);
+      const args = mockMessagesCreate.mock.calls[0][0];
+      expect(args.temperature).toBe(0.6);
+      expect(args.top_p).toBeUndefined(); // Omitted when temperature is passed
+      expect(args.top_k).toBe(25);
+      expect(args.max_tokens).toBe(500);
+      expect(args.stop_sequences).toEqual(["STOP1", "STOP2"]);
+      expect(args.service_tier).toBe("standard_only");
     });
   });
 
