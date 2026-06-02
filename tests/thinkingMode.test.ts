@@ -164,6 +164,38 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       const args = mockGenerateContent.mock.calls[0][0];
       expect(args.config.thinkingConfig).toBeUndefined();
     });
+
+    it("filters out serviceTier: 'auto' from config", async () => {
+      mockGenerateContent.mockResolvedValueOnce({
+        candidates: [{ content: { parts: [{ text: "Done" }] } }],
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
+      });
+
+      const messages = [{ role: "user", content: "hello" }];
+      await googleProvider.generateText(messages, MODELS.GEMINI_35_FLASH.name, {
+        serviceTier: "auto",
+      });
+
+      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+      const args = mockGenerateContent.mock.calls[0][0];
+      expect(args.config.serviceTier).toBeUndefined();
+    });
+
+    it("passes valid serviceTier to config", async () => {
+      mockGenerateContent.mockResolvedValueOnce({
+        candidates: [{ content: { parts: [{ text: "Done" }] } }],
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
+      });
+
+      const messages = [{ role: "user", content: "hello" }];
+      await googleProvider.generateText(messages, MODELS.GEMINI_35_FLASH.name, {
+        serviceTier: "standard",
+      });
+
+      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+      const args = mockGenerateContent.mock.calls[0][0];
+      expect(args.config.serviceTier).toBe("standard");
+    });
   });
 
   // ── Section 2: Thinking Chunk Parsing in Streams ─────────────────────

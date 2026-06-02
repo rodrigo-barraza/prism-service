@@ -503,7 +503,7 @@ const anthropicProvider = {
           : undefined,
       ...(options.serviceTier && { service_tier: options.serviceTier === "standard" ? "standard_only" : options.serviceTier }),
       ...(options.responseFormat === "json_object" && {
-        output_config: { format: { type: "json_schema" as const, schema: { type: "object" } } },
+        output_config: { format: { type: "json_schema" as const, schema: { type: "object", additionalProperties: false } } },
       }),
     };
 
@@ -694,7 +694,7 @@ const anthropicProvider = {
             : undefined,
         ...(options.serviceTier && { service_tier: options.serviceTier === "standard" ? "standard_only" : options.serviceTier }),
         ...(options.responseFormat === "json_object" && {
-          output_config: { format: { type: "json_schema" as const, schema: { type: "object" } } },
+          output_config: { format: { type: "json_schema" as const, schema: { type: "object", additionalProperties: false } } },
         }),
       };
 

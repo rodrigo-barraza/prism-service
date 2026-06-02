@@ -198,7 +198,9 @@ function buildGenerateConfig(options: ProviderOptions, modelDef: ModelDef | null
   if (options.mediaResolution) config.mediaResolution = options.mediaResolution as MediaResolution;
   if (options.responseLogprobs === true) config.responseLogprobs = true;
   if (options.logprobs && options.logprobs > 0) config.logprobs = options.logprobs;
-  if (options.serviceTier) config.serviceTier = options.serviceTier as ServiceTier;
+  if (options.serviceTier && options.serviceTier !== "auto") {
+    config.serviceTier = options.serviceTier as ServiceTier;
+  }
 
   // Thinking config
   const supportsThinking = modelDef?.thinking === true;
