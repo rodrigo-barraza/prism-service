@@ -62,6 +62,7 @@ export default class AgenticLoopService {
         harnessId = "standard";
       }
     }
+    options.harness = harnessId;
     const HarnessClass = HarnessRegistry.get(harnessId)!;
     logger.info(
       `[AgenticLoop] Using harness: "${HarnessClass.id}" (${HarnessClass.label})`,

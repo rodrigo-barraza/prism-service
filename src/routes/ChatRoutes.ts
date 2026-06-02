@@ -153,6 +153,7 @@ async function prepareGenerationContext(
     username,
     clientIp,
     agent,
+    harness,
     // Generation options — flat at top-level (OpenAI-style)
     tools,
     temperature,
@@ -238,6 +239,7 @@ async function prepareGenerationContext(
     ...(agentContext != null && { agentContext }),
     ...(enableCriticGate != null && { enableCriticGate }),
     ...(criticModel != null && { criticModel }),
+    ...(harness != null && { harness }),
     ...((extraParams as Record<string, unknown>).systemPrompt ? { systemPrompt: (extraParams as Record<string, unknown>).systemPrompt } : {}),
   };
   // When thinking is explicitly disabled, strip all thinking sub-params

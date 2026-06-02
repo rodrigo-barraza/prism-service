@@ -39,6 +39,7 @@ export interface RequestLogEntry {
   username: string;
   clientIp: string | null;
   agent: string | null;
+  harness?: string | null;
   provider: string;
   model: string;
   conversationId: string | null;
@@ -162,6 +163,7 @@ export interface LogChatGenerationParams {
   username: string;
   clientIp?: string | null;
   agent?: string | null;
+  harness?: string | null;
   provider: string;
   model: string;
   conversationId?: string | null;
@@ -195,6 +197,7 @@ export interface LogBackgroundLlmCallParams {
   project: string | null;
   username?: string;
   agent?: string | null;
+  harness?: string | null;
   provider: string;
   model: string;
   traceId?: string | null;

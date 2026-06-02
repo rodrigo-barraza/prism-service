@@ -40,6 +40,7 @@ export interface LogParams {
   username?: string | null;
   clientIp?: string | null;
   agent?: string | null;
+  harness?: string | null;
   provider?: string | null;
   model?: string | null;
   conversationId?: string | null;
@@ -158,6 +159,7 @@ const RequestLogger = {
     username,
     clientIp = null,
     agent = null,
+    harness = null,
     provider,
     model,
     conversationId = null,
@@ -206,6 +208,7 @@ const RequestLogger = {
         username,
         clientIp,
         agent: agent || null,
+        harness: harness || null,
         provider,
         model,
         conversationId,
@@ -256,6 +259,7 @@ const RequestLogger = {
     username,
     clientIp = null,
     agent = null,
+    harness = null,
     provider,
     model,
     conversationId = null,
@@ -311,6 +315,7 @@ const RequestLogger = {
       username,
       clientIp,
       agent,
+      harness: (harness as string) || (options?.harness as string) || null,
       provider,
       model,
       conversationId,
