@@ -1005,11 +1005,18 @@ const openaiProvider = {
         // Clean up
         delete pendingFunctions[typedEvent.item_id];
       }
-      // Completed response — extract usage
+      // Completed response — extract usage and detect truncation
       if (event.type === "response.completed") {
         const typedEvent = event as OpenAI.Responses.ResponseCompletedEvent;
         if (typedEvent.response?.usage) {
           usage = normalizeResponsesUsage(typedEvent.response.usage);
+        }
+        // Detect max_tokens truncation (Responses API uses "incomplete" status)
+        const responseRecord = typedEvent.response as unknown as Record<string, unknown>;
+        const responseStatus = responseRecord?.status;
+        const incompleteReason = responseRecord?.incomplete_details;
+        if (responseStatus === "incomplete" || (incompleteReason && typeof incompleteReason === "object" && (incompleteReason as Record<string, unknown>).reason === "max_output_tokens")) {
+          yield { type: "stopReason", stopReason: "length" };
         }
       }
     }
@@ -1130,6 +1137,7 @@ const openaiProvider = {
     }
 
     let usage = null;
+    let lastFinishReason: string | null = null;
     // Accumulate tool calls across chunks
     const pendingToolCalls: Record<number, { id: string; name: string; args: string }> = {};
 
@@ -1143,6 +1151,10 @@ const openaiProvider = {
       if (content) {
         yield content;
       }
+
+      // Track the last finish_reason for truncation detection
+      const finishReason = chunk.choices?.[0]?.finish_reason;
+      if (finishReason) lastFinishReason = finishReason;
 
       // Accumulate tool call deltas
       if (delta?.tool_calls) {
@@ -1171,7 +1183,7 @@ const openaiProvider = {
       }
 
       // If finish_reason is "tool_calls", yield accumulated tool calls
-      if (chunk.choices[0]?.finish_reason === "tool_calls") {
+      if (finishReason === "tool_calls") {
         for (const toolCall of Object.values(pendingToolCalls)) {
           let args: Record<string, unknown> = {};
           try {
@@ -1187,6 +1199,10 @@ const openaiProvider = {
           };
         }
       }
+    }
+    // Surface max_tokens truncation so harnesses can detect and warn the user
+    if (lastFinishReason === "length") {
+      yield { type: "stopReason", stopReason: "length" };
     }
     if (usage) {
       yield { type: "usage", usage };

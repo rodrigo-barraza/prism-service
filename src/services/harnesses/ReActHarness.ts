@@ -507,11 +507,35 @@ export default class ReActHarness extends BaseAgenticHarness {
       }
 
       // ── Empty output — break ────────────────────────────────
-      logger.warn(
-        `[AgenticLoop] Empty model output on iteration ${state.iterations} — ` +
-          `text=${pass.streamedText.length}, thinking=${pass.streamedThinking.length}, ` +
-          `toolCalls=${pass.pendingToolCalls.length}. Breaking.`,
-      );
+      const isTruncated = pass.stopReason === "length" || pass.stopReason === "max_tokens";
+      if (isTruncated) {
+        const configuredMaxTokens = context.options.maxTokens || "default";
+        logger.warn(
+          `[AgenticLoop] Max tokens truncation detected on iteration ${state.iterations} — ` +
+            `stopReason=${pass.stopReason}, maxTokens=${configuredMaxTokens}. ` +
+            `The model could not complete its response within the token budget.`,
+        );
+        const truncationWarning =
+          `⚠️ The model's response was cut short because the **max_tokens** limit ` +
+          `(${configuredMaxTokens}) was reached before it could finish generating. ` +
+          `This is especially likely during tool calls, which require more output tokens. ` +
+          `Try increasing the **Max Tokens** setting in your model configuration.`;
+        context.emit({
+          type: SSE_EVENT_TYPES.CHUNK,
+          content: truncationWarning,
+        });
+        context.emit({
+          type: SSE_EVENT_TYPES.STATUS,
+          message: STATUS_MESSAGES.MAX_TOKENS_TRUNCATED || "max_tokens_truncated",
+          phase: "truncated",
+        });
+      } else {
+        logger.warn(
+          `[AgenticLoop] Empty model output on iteration ${state.iterations} — ` +
+            `text=${pass.streamedText.length}, thinking=${pass.streamedThinking.length}, ` +
+            `toolCalls=${pass.pendingToolCalls.length}. Breaking.`,
+        );
+      }
       this.logIteration(pass, currentMessages);
       break;
     }
