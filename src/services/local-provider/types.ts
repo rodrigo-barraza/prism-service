@@ -23,6 +23,7 @@ export interface ModelEntry {
   loaded?: boolean;
   instanceNumber?: number;
   providerType?: string;
+  maxOutputTokens?: number;
   _raw?: unknown;
 }
 

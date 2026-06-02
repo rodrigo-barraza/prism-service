@@ -149,6 +149,9 @@ export function normalizeVllmModel(raw: OpenAICompatRawModel): ModelEntry {
     entry.tools.push("Tool Calling");
   }
 
+  // Set maximum output token capacity for vLLM models to 50,000
+  entry.maxOutputTokens = 50000;
+
   return entry;
 }
 
