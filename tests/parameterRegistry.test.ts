@@ -84,6 +84,58 @@ describe('Chat Pipeline - Agent defaults resolution', () => {
     expect(optionsPassed.reasoningEffort).toBe('high');
   });
 
+  it('should apply agent default parameters when not explicitly sent in agent mode for anthropic', async () => {
+    const { MOCK_GENERATE_TEXT_STREAM } = await import('./setup.ts');
+    MOCK_GENERATE_TEXT_STREAM.mockClear();
+
+    await request(app)
+      .post('/chat')
+      .set('Authorization', 'Bearer test-secret')
+      .send({
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-5-20250929',
+        agent: 'CODING',
+        messages: [{ role: 'user', content: 'hello' }],
+      })
+      .expect(200);
+
+    expect(MOCK_GENERATE_TEXT_STREAM).toHaveBeenCalled();
+    const calls = MOCK_GENERATE_TEXT_STREAM.mock.calls;
+    const lastCall = calls[calls.length - 1];
+    
+    const optionsPassed = lastCall[2];
+    expect(optionsPassed).toBeDefined();
+    expect(optionsPassed.temperature).toBe(0);
+    expect(optionsPassed.maxTokens).toBe(16384);
+    expect(optionsPassed.reasoningEffort).toBe('high');
+  });
+
+  it('should apply agent default parameters when not explicitly sent in agent mode for google', async () => {
+    const { MOCK_GENERATE_TEXT_STREAM } = await import('./setup.ts');
+    MOCK_GENERATE_TEXT_STREAM.mockClear();
+
+    await request(app)
+      .post('/chat')
+      .set('Authorization', 'Bearer test-secret')
+      .send({
+        provider: 'google',
+        model: 'gemini-3.5-flash',
+        agent: 'CODING',
+        messages: [{ role: 'user', content: 'hello' }],
+      })
+      .expect(200);
+
+    expect(MOCK_GENERATE_TEXT_STREAM).toHaveBeenCalled();
+    const calls = MOCK_GENERATE_TEXT_STREAM.mock.calls;
+    const lastCall = calls[calls.length - 1];
+    
+    const optionsPassed = lastCall[2];
+    expect(optionsPassed).toBeDefined();
+    expect(optionsPassed.temperature).toBe(0);
+    expect(optionsPassed.maxTokens).toBe(16384);
+    expect(optionsPassed.thinkingLevel).toBe('high');
+  });
+
   it('should respect explicitly sent parameters in agent mode and not override them', async () => {
     const { MOCK_GENERATE_TEXT_STREAM } = await import('./setup.ts');
     MOCK_GENERATE_TEXT_STREAM.mockClear();
