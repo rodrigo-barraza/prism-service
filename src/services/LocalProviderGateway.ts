@@ -47,6 +47,5 @@ export {
   HF_ENRICHED_TYPES,
 } from "./local-provider/normalizers.ts";
 
-export { formatBytes } from "@rodrigo-barraza/utilities-library";
 export { LocalProviderGateway } from "./local-provider/index.ts";
 export type { ModelEntry } from "./local-provider/types.ts";

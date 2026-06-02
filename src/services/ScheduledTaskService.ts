@@ -420,6 +420,17 @@ const ScheduledTaskService = {
       .toArray()) as unknown as ScheduledTask[];
   },
 
+  async listAllTasks(): Promise<ScheduledTask[]> {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!db) return [];
+
+    return (await db
+      .collection(COLLECTIONS.SCHEDULED_TASKS)
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray()) as unknown as ScheduledTask[];
+  },
+
   async createTask(data: Omit<ScheduledTask, "id" | "createdAt" | "updatedAt"> & { username: string }): Promise<ScheduledTask> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");

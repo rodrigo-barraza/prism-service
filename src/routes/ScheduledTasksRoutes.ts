@@ -27,6 +27,24 @@ router.get(
 );
 
 /**
+ * GET /scheduled-tasks/all
+ * Returns ALL scheduled tasks across every project and user (admin use).
+ */
+router.get(
+  "/all",
+  asyncHandler(async (_req: Request, res: Response) => {
+    try {
+      const tasks = await ScheduledTaskService.listAllTasks();
+      res.json(tasks);
+    } catch (error: unknown) {
+      logger.error(`[ScheduledTasks][GET /all] Error listing all tasks: ${getErrorMessage(error)}`);
+      res.status(500).json({ error: "Failed to list all scheduled tasks" });
+    }
+  }),
+);
+
+
+/**
  * POST /scheduled-tasks
  * Creates a new scheduled task.
  */
