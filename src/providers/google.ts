@@ -1,6 +1,6 @@
 import { ProviderOptions } from "../types/ProviderTypes.ts";
 import type { GenerateTextResult } from "../types/provider.ts";
-import { GoogleGenAI, Modality, type Content, type Part, type GenerateContentConfig, type ThinkingLevel, type LiveServerMessage } from "@google/genai";
+import { GoogleGenAI, Modality, type Content, type Part, type GenerateContentConfig, type ThinkingLevel, type LiveServerMessage, MediaResolution, ServiceTier } from "@google/genai";
 import crypto from "crypto";
 import { Readable } from "stream";
 import { ProviderError } from "../utils/errors.ts";
@@ -195,6 +195,10 @@ function buildGenerateConfig(options: ProviderOptions, modelDef: ModelDef | null
   if (options.responseMimeType) config.responseMimeType = options.responseMimeType;
   else if (options.responseFormat === "json_object") config.responseMimeType = "application/json";
   if (options.candidateCount !== undefined && options.candidateCount > 1) config.candidateCount = options.candidateCount;
+  if (options.mediaResolution) config.mediaResolution = options.mediaResolution as MediaResolution;
+  if (options.responseLogprobs === true) config.responseLogprobs = true;
+  if (options.logprobs && options.logprobs > 0) config.logprobs = options.logprobs;
+  if (options.serviceTier) config.serviceTier = options.serviceTier as ServiceTier;
 
   // Thinking config
   const supportsThinking = modelDef?.thinking === true;

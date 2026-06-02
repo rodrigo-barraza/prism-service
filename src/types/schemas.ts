@@ -104,6 +104,11 @@ export const ChatRequestSchema = z
     parallelToolCalls: z.boolean().nullable().optional(),
     candidateCount: z.number().nullable().optional(),
     responseMimeType: z.string().nullable().optional(),
+    store: z.boolean().nullable().optional(),
+    mediaResolution: z.string().nullable().optional(),
+    topLogprobs: z.number().nullable().optional(),
+    responseLogprobs: z.boolean().nullable().optional(),
+    logprobs: z.number().nullable().optional(),
   })
   .passthrough(); // Support extra provider/custom parameters dynamically
 

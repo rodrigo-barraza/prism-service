@@ -1275,6 +1275,7 @@ export interface ModelOptionEntry {
   mediaLimits?: Record<string, unknown>;
   year?: number;
   supportsSystemPrompt?: boolean;
+  lockedSampling?: boolean;
 }
 
 // ─── derive defaults, options, pricing from MODELS ──────────
@@ -1336,6 +1337,7 @@ function getModelOptions(inputType: string, outputType: string): Record<string, 
       if (modelRecord.thinkingLevels) entry.thinkingLevels = modelRecord.thinkingLevels as string[];
       if (modelRecord.mediaLimits) entry.mediaLimits = modelRecord.mediaLimits as Record<string, unknown>;
       if (modelRecord.year) entry.year = modelRecord.year as number;
+      if (modelRecord.lockedSampling) entry.lockedSampling = true;
       // System prompt support: true for chat models, false for image-only/TTS/embedding APIs
       entry.supportsSystemPrompt =
         modelRecord.supportsSystemPrompt !== undefined
