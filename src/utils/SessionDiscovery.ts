@@ -15,8 +15,16 @@ export async function discoverDescendantSessionIds(
   rootSessionId: string,
   additionalFilter: Record<string, unknown> = {},
 ): Promise<Set<string>> {
-  const allSessionIds = new Set([rootSessionId]);
-  let frontier = [rootSessionId];
+  // Find all active agentSessionIds that are directly tagged with this conversationId
+  const conversationSessionIds = await database
+    .collection(COLLECTIONS.REQUESTS)
+    .distinct("agentSessionId", {
+      conversationId: rootSessionId,
+      ...additionalFilter,
+    });
+
+  const allSessionIds = new Set([rootSessionId, ...conversationSessionIds.filter(Boolean)]);
+  let frontier = [...allSessionIds];
 
   for (let depth = 0; depth < MAX_SESSION_DEPTH && frontier.length > 0; depth++) {
     const childIds = await database

@@ -97,7 +97,7 @@ export async function handleExitPlanMode(
   context: AgenticContext,
   state: AgenticLoopState,
 ): Promise<{ shouldContinueLoop: boolean }> {
-  const { options, emit, signal, agentSessionId } = context;
+  const { options, emit, signal, conversationId } = context;
 
   const planText = state.planModeText.trim() || pass.streamedText.trim();
   const planSteps = PlanningModeService.extractSteps(planText);
@@ -120,14 +120,14 @@ export async function handleExitPlanMode(
   } else {
     planApproved = await new Promise<boolean>((resolve) => {
       const timeoutId = setTimeout(() => {
-        pendingApprovals.delete(agentSessionId);
+        pendingApprovals.delete(conversationId);
         resolve(false);
       }, PLAN_APPROVAL_TIMEOUT_MS);
 
-      pendingApprovals.set(agentSessionId, {
+      pendingApprovals.set(conversationId, {
         resolve: (value: boolean) => {
           clearTimeout(timeoutId);
-          pendingApprovals.delete(agentSessionId);
+          pendingApprovals.delete(conversationId);
           resolve(value);
         },
         type: "plan",

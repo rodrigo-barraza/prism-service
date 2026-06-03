@@ -310,7 +310,7 @@ const ScheduledTaskService = {
           ...(task.toolConfig?.enabledTools && { enabledTools: task.toolConfig.enabledTools }),
           ...(task.toolConfig?.disabledTools && { disabledTools: task.toolConfig.disabledTools }),
         },
-        agentSessionId: resolvedSessionId,
+        agentSessionId: crypto.randomUUID(),
         conversationId: resolvedSessionId,
         userMessage: userTriggerMessage as ConversationMessage,
         conversationMeta: {

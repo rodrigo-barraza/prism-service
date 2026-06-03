@@ -403,7 +403,7 @@ const ConversationTimerService = {
           ...(settings.toolConfig?.enabledTools && { enabledTools: settings.toolConfig.enabledTools }),
           ...(settings.toolConfig?.disabledTools && { disabledTools: settings.toolConfig.disabledTools }),
         },
-        agentSessionId: timer.conversationId,
+        agentSessionId: crypto.randomUUID(),
         conversationId: timer.conversationId,
         userMessage: reminderMessage,
         conversationMeta: { title: (conversation.title as string) || "Background Agent", settings },

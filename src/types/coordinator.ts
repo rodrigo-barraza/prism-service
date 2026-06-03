@@ -40,6 +40,7 @@ export interface WorkerState {
   traceId: string | null;
   maxIterations: number;
   minContextLength: number | null;
+  parentConversationId: string;
   pendingMessages?: string[];
 }
 
@@ -106,6 +107,7 @@ export interface CoordinatorContext {
   resolvedModel: string;
   traceId: string | null;
   agentSessionId: string;
+  conversationId: string;
   maxWorkerIterations?: number;
   minContextLength?: number;
   workspaceRoot?: string | null;

@@ -3,7 +3,7 @@ import ConversationTimerService from "../ConversationTimerService.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
 interface ToolContext {
-  agentSessionId?: string;
+  conversationId?: string;
   project?: string;
   username?: string;
   _emit?: (event: Record<string, unknown>) => void;
@@ -47,7 +47,7 @@ const setTimer = {
 
   async execute(args: Record<string, unknown>, context: ToolContext) {
     const { prompt, durationSeconds, cronExpression, maxIterations } = args;
-    const conversationId = context.agentSessionId;
+    const conversationId = context.conversationId;
     const project = context.project || "default";
     const username = context.username || "anonymous";
 
@@ -102,7 +102,7 @@ const setTimer = {
   labels: ["timer", "automation", "scheduler"],
 
   async execute(_args: Record<string, unknown>, context: ToolContext) {
-    const conversationId = context.agentSessionId;
+    const conversationId = context.conversationId;
     const project = context.project || "default";
     const username = context.username || "anonymous";
 

@@ -14,7 +14,7 @@ const router = express.Router();
  * POST /agent/approve
  *
  * Body:
- *   { agentSessionId: string, approved: boolean }
+ *   { conversationId: string, approved: boolean }
  *
  * Resolves the pending approval promise in AgenticLoopService
  * so the agentic loop can continue (or abort).
@@ -22,27 +22,27 @@ const router = express.Router();
 router.post(
   "/approve",
   asyncHandler(async (req: Request, res: Response) => {
-    const { agentSessionId, approved, approveAll } = req.body;
+    const { conversationId, approved, approveAll } = req.body;
 
-    if (!agentSessionId) {
-      return res.status(400).json({ error: "Missing agentSessionId" });
+    if (!conversationId) {
+      return res.status(400).json({ error: "Missing conversationId" });
     }
 
     const resolved = AgenticLoopService.resolveApproval(
-      agentSessionId,
+      conversationId,
       approved !== false,
       { approveAll: approveAll === true },
     );
 
     if (!resolved) {
       return res.status(404).json({
-        error: "No pending approval for this agent session",
-        agentSessionId,
+        error: "No pending approval for this conversation",
+        conversationId,
       });
     }
 
     logger.info(
-      `[agent/approve] ${approved !== false ? "Approved" : "Rejected"}${approveAll ? " (all future)" : ""} for session ${agentSessionId}`,
+      `[agent/approve] ${approved !== false ? "Approved" : "Rejected"}${approveAll ? " (all future)" : ""} for conversation ${conversationId}`,
     );
 
     res.json({ ok: true, approved: approved !== false });
@@ -55,8 +55,8 @@ router.post(
  * POST /agent/answer
  *
  * Body:
- *   { agentSessionId: string, answer: string }          ← simple (backward-compat)
- *   { agentSessionId: string, answers: Array<{ answer: string|string[], annotations?: string }> }  ← structured multi-question
+ *   { conversationId: string, answer: string }          ← simple (backward-compat)
+ *   { conversationId: string, answers: Array<{ answer: string|string[], annotations?: string }> }  ← structured multi-question
  *
  * Resolves the pending question promise in AgenticLoopService
  * so the agentic loop can continue with the user's answer(s).
@@ -64,10 +64,10 @@ router.post(
 router.post(
   "/answer",
   asyncHandler(async (req: Request, res: Response) => {
-    const { agentSessionId, answer, answers } = req.body;
+    const { conversationId, answer, answers } = req.body;
 
-    if (!agentSessionId) {
-      return res.status(400).json({ error: "Missing agentSessionId" });
+    if (!conversationId) {
+      return res.status(400).json({ error: "Missing conversationId" });
     }
 
     // Normalize: structured answers take priority, fall back to simple string
@@ -81,19 +81,19 @@ router.post(
     }
 
     const resolved = AgenticLoopService.resolveUserQuestion(
-      agentSessionId,
+      conversationId,
       normalizedAnswers,
     );
 
     if (!resolved) {
       return res.status(404).json({
-        error: "No pending question for this agent session",
-        agentSessionId,
+        error: "No pending question for this conversation",
+        conversationId,
       });
     }
 
     logger.info(
-      `[agent/answer] ${normalizedAnswers.length} answer(s) for session ${agentSessionId}`,
+      `[agent/answer] ${normalizedAnswers.length} answer(s) for conversation ${conversationId}`,
     );
 
     res.json({ ok: true });
@@ -103,27 +103,27 @@ router.post(
 // ─── live vision frame streaming ────────────────────────────
 
 /**
- * POST /agent/session/:agentSessionId/frame
+ * POST /agent/session/:conversationId/frame
  *
  * Body:
  *   { frameDataUrl: string } // base64 JPEG data URL
  *
- * Receives the latest frame for a session and adds it to the rolling buffer.
+ * Receives the latest frame for a conversation and adds it to the rolling buffer.
  */
 router.post(
-  "/session/:agentSessionId/frame",
+  "/session/:conversationId/frame",
   asyncHandler(async (request: Request, response: Response) => {
-    const { agentSessionId } = request.params;
+    const { conversationId } = request.params;
     const { frameDataUrl } = request.body;
 
-    if (!agentSessionId) {
-      return response.status(400).json({ error: "Missing agentSessionId" });
+    if (!conversationId) {
+      return response.status(400).json({ error: "Missing conversationId" });
     }
     if (!frameDataUrl) {
       return response.status(400).json({ error: "Missing frameDataUrl" });
     }
 
-    LiveFrameService.pushFrame(agentSessionId as string, frameDataUrl as string);
+    LiveFrameService.pushFrame(conversationId as string, frameDataUrl as string);
     response.json({ ok: true });
   }),
 );

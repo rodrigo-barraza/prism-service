@@ -154,6 +154,7 @@ export default class CoordinatorService {
       resolvedModel,
       traceId,
       agentSessionId: parentAgentSessionId,
+      conversationId: parentConversationId,
       maxWorkerIterations: clientMaxWorkerIter,
       minContextLength,
       workspaceRoot: coordinatorWorkspaceRoot,
@@ -313,6 +314,7 @@ export default class CoordinatorService {
       traceId,
       maxIterations: resolvedMaxWorkerIterations,
       minContextLength: minContextLength || null,
+      parentConversationId,
     };
 
     activeWorkers.set(agentId, workerState);
@@ -479,14 +481,14 @@ export default class CoordinatorService {
     return buildWorkerResult(worker);
   }
 
-  static async abortWorkersBySession(parentAgentSessionId: string) {
+  static async abortWorkersByConversation(parentConversationId: string) {
     const sessionWorkers = [...activeWorkers.values()].filter(
-      (worker) => worker.parentAgentSessionId === parentAgentSessionId,
+      (worker) => worker.parentConversationId === parentConversationId,
     );
     if (sessionWorkers.length === 0) return;
 
     logger.info(
-      `[Coordinator] Aborting ${sessionWorkers.length} worker(s) for session ${parentAgentSessionId}`,
+      `[Coordinator] Aborting ${sessionWorkers.length} worker(s) for conversation ${parentConversationId}`,
     );
 
     const cleanupPromises = [];
@@ -526,10 +528,10 @@ export default class CoordinatorService {
     };
   }
 
-  static listWorkers({ parentAgentSessionId }: { parentAgentSessionId?: string } = {}) {
+  static listWorkers({ parentConversationId }: { parentConversationId?: string } = {}) {
     let list = Array.from(activeWorkers.values());
-    if (parentAgentSessionId) {
-      list = list.filter((worker) => worker.parentAgentSessionId === parentAgentSessionId);
+    if (parentConversationId) {
+      list = list.filter((worker) => worker.parentConversationId === parentConversationId);
     }
     return list.map((worker) => ({
       agentId: worker.agentId,
@@ -737,7 +739,7 @@ export default class CoordinatorService {
         },
         agentSessionId: worker.workerAgentSessionId,
         parentAgentSessionId: worker.parentAgentSessionId,
-        conversationId: worker.parentAgentSessionId,
+        conversationId: worker.parentConversationId,
         traceId: worker.traceId,
         project: worker.project,
         username: worker.username,

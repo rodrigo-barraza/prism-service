@@ -236,6 +236,7 @@ agentSessionRouter.get(
                   $match: {
                     $or: [
                       { agentSessionId: { $in: sessionIds } },
+                      { conversationId: { $in: sessionIds } },
                       { parentAgentSessionId: { $in: sessionIds } },
                     ],
                   },
@@ -251,7 +252,7 @@ agentSessionRouter.get(
                           ],
                         },
                         "$parentAgentSessionId",
-                        "$agentSessionId",
+                        { $ifNull: ["$conversationId", "$agentSessionId"] },
                       ],
                     },
                     totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },

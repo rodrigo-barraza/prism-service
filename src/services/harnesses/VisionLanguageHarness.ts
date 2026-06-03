@@ -234,7 +234,7 @@ Use these images to observe the environment, notice changes, animations, or user
       }
 
       // ── Live Vision Frame Injection ────────────────────────
-      const liveFrames = LiveFrameService.getFrames(agentSessionId);
+      const liveFrames = LiveFrameService.getFrames(context.conversationId);
       if (liveFrames && liveFrames.length > 0) {
         const lastUserMessage = [...currentMessages]
           .reverse()

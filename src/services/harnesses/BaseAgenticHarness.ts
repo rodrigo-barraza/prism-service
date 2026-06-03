@@ -594,7 +594,7 @@ export default class BaseAgenticHarness {
   ): Promise<void> {
     const context = this.ctx;
     const state = this.state;
-    const { agentSessionId, project, username } = context;
+    const { agentSessionId, conversationId, project, username } = context;
     const requestStart = context.requestStart ?? performance.now();
 
     const now = performance.now();
@@ -624,7 +624,7 @@ export default class BaseAgenticHarness {
     );
 
     logger.info(
-      `[AgenticLoop] finalize: session=${agentSessionId} project=${project} ` +
+      `[AgenticLoop] finalize: session=${agentSessionId} conversation=${conversationId} project=${project} ` +
         `originalMsgCount=${state.originalMessageCount} currentMsgs=${currentMessages.length} ` +
         `newTurnMsgs=${newTurnMessages.length} ` +
         `roles=[${newTurnMessages.map((m) => m.role).join(",")}] ` +
@@ -663,13 +663,13 @@ export default class BaseAgenticHarness {
     if (
       // TODO(cleanup): Remove "team_create" once historical sessions have aged out
       state.streamedToolCalls.some((toolCall) => toolCall.name === "create_team" || toolCall.name === "team_create") &&
-      agentSessionId
+      conversationId
     ) {
       try {
         const { default: CoordinatorService } =
           await import("../CoordinatorService.js");
         const activeWorkersList = CoordinatorService.listWorkers({
-          parentAgentSessionId: agentSessionId,
+          parentConversationId: conversationId,
         });
         if (activeWorkersList.length > 0) {
           const collection = MongoWrapper.getCollection(
@@ -677,7 +677,7 @@ export default class BaseAgenticHarness {
             COLLECTIONS.AGENT_CONVERSATIONS,
           );
           const agentSessionDocument = await collection.findOne(
-            { id: agentSessionId, project, username },
+            { id: conversationId, project, username },
             { projection: { workers: 1 } },
           );
           const existingWorkersList = (agentSessionDocument && agentSessionDocument.workers) || [];
@@ -690,7 +690,7 @@ export default class BaseAgenticHarness {
           }
           const finalWorkersList = Array.from(mergedWorkersMap.values());
           await collection.updateOne(
-            { id: agentSessionId, project, username },
+            { id: conversationId, project, username },
             {
               $set: {
                 workers: finalWorkersList,
@@ -699,7 +699,7 @@ export default class BaseAgenticHarness {
             },
           );
           logger.info(
-            `[AgenticLoop] Persisted ${finalWorkersList.length} worker(s) to session ${agentSessionId}`,
+            `[AgenticLoop] Persisted ${finalWorkersList.length} worker(s) to conversation ${conversationId}`,
           );
         }
       } catch (error: unknown) {
