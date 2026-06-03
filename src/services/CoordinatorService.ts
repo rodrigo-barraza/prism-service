@@ -737,6 +737,7 @@ export default class CoordinatorService {
         },
         agentSessionId: worker.workerAgentSessionId,
         parentAgentSessionId: worker.parentAgentSessionId,
+        conversationId: worker.parentAgentSessionId,
         traceId: worker.traceId,
         project: worker.project,
         username: worker.username,

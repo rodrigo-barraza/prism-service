@@ -195,7 +195,7 @@ export interface AgenticContext {
   requestStart?: number;
   clientIp?: string | null;
   workspaceRoot?: string | null;
-  conversationId?: string | null;
+  conversationId: string;
   originalMessages?: ConversationMessage[] | null;
   userMessage?: ConversationMessage | null;
   conversationMeta?: Record<string, unknown> | null;

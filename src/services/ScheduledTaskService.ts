@@ -311,6 +311,7 @@ const ScheduledTaskService = {
           ...(task.toolConfig?.disabledTools && { disabledTools: task.toolConfig.disabledTools }),
         },
         agentSessionId: resolvedSessionId,
+        conversationId: resolvedSessionId,
         userMessage: userTriggerMessage as ConversationMessage,
         conversationMeta: {
           title: task.name,

@@ -26,8 +26,8 @@ export interface FinalizerContext {
   messages: MessagePayload[];
   originalMessages?: MessagePayload[];
   options: LlmOptions;
-  conversationId?: string | null;
-  agentSessionId?: string | null;
+  conversationId: string | null;
+  agentSessionId: string | null;
   parentAgentSessionId?: string | null;
   userMessage?: MessagePayload | null;
   conversationMeta?: Record<string, unknown> | null;
@@ -117,7 +117,7 @@ export async function finalizeTextGeneration(
     messages,
     originalMessages,
     options,
-    conversationId: rawConversationId,
+    conversationId,
     agentSessionId,
     parentAgentSessionId,
     userMessage,
@@ -132,8 +132,6 @@ export async function finalizeTextGeneration(
     emit,
     signal,
   } = context;
-  // Agent sessions use agentSessionId as the persistence key
-  const conversationId = rawConversationId ?? agentSessionId;
 
 /**
  * Swap content and rawContent if present to ensure the database and caller get clean text.
@@ -308,10 +306,9 @@ function swapMsgContent(message: MessagePayload) {
       agent,
       provider: providerName,
       model: resolvedModel,
-      conversationId: conversationId || null,
-      // When Direct Chat routes through /chat, agentSessionId maps the
-      // request to the correct agent session for stats aggregation.
-      agentSessionId: agentSessionId || conversationId || null,
+      conversationId,
+      agentSessionId,
+      parentAgentSessionId,
       traceId: traceId || null,
       success: true,
       usage: usage || undefined,

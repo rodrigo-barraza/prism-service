@@ -472,7 +472,13 @@ export async function handleConversation(
     conversationMeta = { traceId };
   }
   // Merge conversation identity into ctx for sub-handlers
-  const fullCtx = { ...context, conversationId, conversationMeta, traceId };
+  const fullCtx = {
+    ...context,
+    conversationId: conversationId || null,
+    agentSessionId: null as string | null,
+    conversationMeta,
+    traceId,
+  };
   try {
     try {
       if (context.isImageAPIModel) {
@@ -593,6 +599,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
   // ── Agent session identity ─────────────────────────────────
   const agentSessionId =
     incomingAgentSessionId || incomingConversationId || crypto.randomUUID();
+  const conversationId = incomingConversationId || agentSessionId;
   const traceId = incomingTraceId || null;
   const conversationMeta = incomingConversationMeta || null;
   // ── Eager session stub ───────────────────────────────────────
@@ -630,25 +637,26 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
 
       await AgenticLoopService.runAgenticLoop({
         provider: context.provider as import("../services/harnesses/types.ts").LLMProvider,
-                providerName,
-                resolvedModel,
-                modelDef: context.modelDef,
-                messages: context.messages,
-                originalMessages: context.originalMessages as ConversationMessage[],
-                options,
-                agentSessionId,
-                userMessage: context.userMessage as ConversationMessage | null,
-                conversationMeta,
-                traceId,
-                project,
-                username,
-                clientIp,
-                agent,
-                workspaceRoot: context.workspaceRoot,
-                requestId,
-                requestStart,
-                emit,
-                signal,
+        providerName,
+        resolvedModel,
+        modelDef: context.modelDef,
+        messages: context.messages,
+        originalMessages: context.originalMessages as ConversationMessage[],
+        options,
+        agentSessionId,
+        conversationId,
+        userMessage: context.userMessage as ConversationMessage | null,
+        conversationMeta,
+        traceId,
+        project,
+        username,
+        clientIp,
+        agent,
+        workspaceRoot: context.workspaceRoot,
+        requestId,
+        requestStart,
+        emit,
+        signal,
       });
     } finally {
       if (localRelease) {
@@ -685,7 +693,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
       clientIp,
       provider: providerName,
       model: resolvedModel || requestedModel || "any",
-      agentSessionId,
+      agentSessionId: agentSessionId,
       traceId: traceId || null,
       success: false,
             errorMessage: getErrorMessage(error),
@@ -864,10 +872,10 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
 }
 
 type GenerationContext = Awaited<ReturnType<typeof prepareGenerationContext>> & {
-  conversationId?: string | null;
+  conversationId: string | null;
   conversationMeta?: Record<string, unknown> | null;
   traceId?: string | null;
-  agentSessionId?: string | null;
+  agentSessionId: string | null;
 };
 
 async function handleStreamingText(context: GenerationContext) {
