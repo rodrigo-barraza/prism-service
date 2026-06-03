@@ -249,6 +249,8 @@ export const LuposPersona: Persona = {
   name: "Lupos",
   type: "conversational",
   project: "lupos",
+  avatar: "/lupos-agent-avatar.png",
+  color: "#7c3aed",
   identity: (context) => {
     const aprilFools = context?.agentContext?.aprilFoolsMode === true;
     const isClockCrew = context?.agentContext?.guildId === "249010731910037507";
