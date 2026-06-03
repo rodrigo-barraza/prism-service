@@ -19,6 +19,14 @@ import {
   checkForPlanModeEntry,
 } from "./lifecycle/PlanModeController.ts";
 import { validateAfterToolExecution } from "./lifecycle/ValidationInterceptor.ts";
+import {
+  isOutputTruncated,
+  injectContinuationContext,
+  injectErrorAsConversationMessage,
+  buildExhaustedRecoveryMessage,
+  buildProviderErrorMessage,
+  MAX_OUTPUT_TRUNCATION_RECOVERIES,
+} from "./lifecycle/OutputTruncationRecovery.ts";
 
 import PlanningModeService from "../PlanningModeService.ts";
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
@@ -71,6 +79,7 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
           : MAX_TOOL_ITERATIONS;
 
     let currentMessages: ConversationMessage[] = [...context.messages];
+    let truncationRecoveryCount = 0;
 
     // ── Initialize lifecycle hooks ──────────────────────────
     const { hooks, approvalEngine } = createStandardHooks({
@@ -492,7 +501,36 @@ Use these images to observe the environment, notice changes, animations, or user
         break;
       }
 
-      // ── Empty output — break ────────────────────────────────
+      // ── Empty output — check for truncation recovery ─────────
+      if (isOutputTruncated(pass)) {
+        truncationRecoveryCount++;
+        const configuredMaxTokens = context.options.maxTokens || "default";
+        logger.warn(
+          `[VisionLanguageHarness] Max tokens truncation detected on iteration ${state.iterations} — ` +
+            `Recovery attempt ${truncationRecoveryCount}/${MAX_OUTPUT_TRUNCATION_RECOVERIES}.`,
+        );
+
+        if (truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES) {
+          const escalatedMaxTokens = injectContinuationContext(
+            currentMessages,
+            pass,
+            context,
+            truncationRecoveryCount,
+          );
+          context.options.maxTokens = escalatedMaxTokens;
+          this.logIteration(pass, currentMessages);
+          continue;
+        }
+
+        const exhaustionMessage = buildExhaustedRecoveryMessage(
+          MAX_OUTPUT_TRUNCATION_RECOVERIES,
+          configuredMaxTokens,
+        );
+        injectErrorAsConversationMessage(currentMessages, exhaustionMessage, context);
+        this.logIteration(pass, currentMessages);
+        break;
+      }
+
       logger.warn(
         `[VisionLanguageHarness] Empty model output on iteration ${state.iterations} — ` +
           `text=${pass.streamedText.length}, thinking=${pass.streamedThinking.length}, ` +
@@ -519,6 +557,13 @@ Use these images to observe the environment, notice changes, animations, or user
       logger.error(
         `[VisionLanguageHarness] Loop error on iteration ${state.iterations}: ${loopError instanceof Error ? loopError.message : String(loopError)}. Persisting ${currentMessages.length - state.originalMessageCount} accumulated message(s).`,
       );
+
+      injectErrorAsConversationMessage(
+        currentMessages,
+        buildProviderErrorMessage(loopError, state.iterations),
+        context,
+      );
+
       try {
         await this.finalize(currentMessages, hooks);
       } catch (persistError: unknown) {
