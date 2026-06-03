@@ -821,14 +821,17 @@ export default class ToolOrchestratorService {
       }
     }
 
-    // Inject the user's attached image as a texture URL for 3D model/scene tools.
+    // Inject the user's attached image as a texture URL or default image URL.
     // Models cannot reproduce base64 data in tool arguments — they see the image in
     // conversation context but have no mechanism to pass it into the deeply-nested
-    // material.textureUrl properties. Resolve the image to a browser-loadable data URL
-    // and inject it as a top-level `referenceTextureUrl` arg so the tools-service route
-    // can apply it to objects that lack an explicit textureUrl.
+    // properties. Resolve the image to a browser-loadable data URL
+    // and inject it as a top-level reference argument.
     const THREE_DIMENSIONAL_TEXTURE_TOOLS = ["create_3d_model", "create_3d_scene"];
-    if (THREE_DIMENSIONAL_TEXTURE_TOOLS.includes(name) && context.messages) {
+    const VECTOR_ANIMATION_TOOLS = ["create_vector_animation"];
+    const isThreeDimensionalTextureTool = THREE_DIMENSIONAL_TEXTURE_TOOLS.includes(name);
+    const isVectorAnimationTool = VECTOR_ANIMATION_TOOLS.includes(name);
+
+    if ((isThreeDimensionalTextureTool || isVectorAnimationTool) && context.messages) {
       for (let messageIndex = context.messages.length - 1; messageIndex >= 0; messageIndex--) {
         const message = context.messages[messageIndex];
         if (
@@ -839,12 +842,12 @@ export default class ToolOrchestratorService {
         ) {
           const imageReference = message.images[0];
           if (typeof imageReference === "string") {
-            let resolvedTextureUrl: string | null = null;
+            let resolvedImageUrl: string | null = null;
 
             if (imageReference.startsWith("data:")) {
-              resolvedTextureUrl = imageReference;
+              resolvedImageUrl = imageReference;
               logger.info(
-                `[ToolOrchestrator] ${name}: using data URL as texture (${(imageReference.length / 1024).toFixed(0)} KB)`,
+                `[ToolOrchestrator] ${name}: using data URL as image (${(imageReference.length / 1024).toFixed(0)} KB)`,
               );
             } else if (imageReference.startsWith("minio://")) {
               try {
@@ -858,28 +861,35 @@ export default class ToolOrchestratorService {
                   }
                   const buffer = Buffer.concat(chunks);
                   const base64 = buffer.toString("base64");
-                  resolvedTextureUrl = `data:${file.contentType};base64,${base64}`;
+                  resolvedImageUrl = `data:${file.contentType};base64,${base64}`;
                   logger.info(
-                    `[ToolOrchestrator] ${name}: resolved minio ref to data URL texture (${(resolvedTextureUrl.length / 1024).toFixed(0)} KB)`,
+                    `[ToolOrchestrator] ${name}: resolved minio ref to data URL image (${(resolvedImageUrl.length / 1024).toFixed(0)} KB)`,
                   );
                 }
               } catch (error: unknown) {
                 logger.warn(
-                  `[ToolOrchestrator] ${name}: failed to resolve minio texture: ${getErrorMessage(error)}`,
+                  `[ToolOrchestrator] ${name}: failed to resolve minio image: ${getErrorMessage(error)}`,
                 );
               }
             } else if (imageReference.startsWith("http://") || imageReference.startsWith("https://")) {
-              resolvedTextureUrl = imageReference;
+              resolvedImageUrl = imageReference;
               logger.info(
-                `[ToolOrchestrator] ${name}: using HTTP URL as texture (${imageReference.substring(0, 80)})`,
+                `[ToolOrchestrator] ${name}: using HTTP URL as image (${imageReference.substring(0, 80)})`,
               );
             }
 
-            if (resolvedTextureUrl) {
-              args = { ...args, referenceTextureUrl: resolvedTextureUrl };
-              logger.info(
-                `[ToolOrchestrator] ${name}: injected referenceTextureUrl into tool args`,
-              );
+            if (resolvedImageUrl) {
+              if (isThreeDimensionalTextureTool) {
+                args = { ...args, referenceTextureUrl: resolvedImageUrl };
+                logger.info(
+                  `[ToolOrchestrator] ${name}: injected referenceTextureUrl into tool args`,
+                );
+              } else if (isVectorAnimationTool) {
+                args = { ...args, referenceImageUrl: resolvedImageUrl };
+                logger.info(
+                  `[ToolOrchestrator] ${name}: injected referenceImageUrl into tool args`,
+                );
+              }
             }
           }
           break;

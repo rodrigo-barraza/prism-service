@@ -310,4 +310,171 @@ describe("ToolOrchestratorService", () => {
       expect(capturedBody.referenceTextureUrl).toBe("data:image/png;base64,ZmFrZS1taW5pby1pbWFnZS1ieXRlcw==");
     });
   });
+
+  describe("executeTool image-to-vector-animation data injection", () => {
+    const mockSchemas = [
+      {
+        name: "create_vector_animation",
+        description: "Create vector animation",
+        parameters: { type: "object", properties: {} },
+        domain: "Creative",
+        endpoint: { path: "/creative/vector-animation", method: "POST" },
+      },
+    ];
+
+    it("does not inject referenceImageUrl when no images are present in messages", async () => {
+      let capturedBody: any = null;
+
+      vi.mocked(global.fetch).mockImplementation(async (url, requestOptions) => {
+        const urlString = String(url);
+        if (urlString.includes("/creative/vector-animation")) {
+          if (requestOptions && requestOptions.body) {
+            capturedBody = JSON.parse(requestOptions.body as string);
+          }
+          return {
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            json: async () => ({ success: true }),
+          } as any;
+        }
+        if (urlString.includes("/admin/tool-schemas")) {
+          return {
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            json: async () => mockSchemas,
+          } as any;
+        }
+        return {
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          json: async () => ({}),
+        } as any;
+      });
+
+      await ToolOrchestratorService.refreshSchemas();
+
+      await ToolOrchestratorService.executeTool(
+        "create_vector_animation",
+        { animation: { layers: [] } },
+        {
+          messages: [
+            {
+              role: "user",
+              content: "Hello",
+            },
+          ],
+        }
+      );
+
+      expect(capturedBody).toBeDefined();
+      expect(capturedBody.referenceImageUrl).toBeUndefined();
+    });
+
+    it("injects data URL as referenceImageUrl when a data URL image is attached", async () => {
+      let capturedBody: any = null;
+
+      vi.mocked(global.fetch).mockImplementation(async (url, requestOptions) => {
+        const urlString = String(url);
+        if (urlString.includes("/creative/vector-animation")) {
+          if (requestOptions && requestOptions.body) {
+            capturedBody = JSON.parse(requestOptions.body as string);
+          }
+          return {
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            json: async () => ({ success: true }),
+          } as any;
+        }
+        if (urlString.includes("/admin/tool-schemas")) {
+          return {
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            json: async () => mockSchemas,
+          } as any;
+        }
+        return {
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          json: async () => ({}),
+        } as any;
+      });
+
+      await ToolOrchestratorService.refreshSchemas();
+
+      const fakeDataUrl = "data:image/png;base64,fakebase64data";
+      await ToolOrchestratorService.executeTool(
+        "create_vector_animation",
+        { animation: { layers: [] } },
+        {
+          messages: [
+            {
+              role: "user",
+              images: [fakeDataUrl],
+            },
+          ],
+        }
+      );
+
+      expect(capturedBody).toBeDefined();
+      expect(capturedBody.referenceImageUrl).toBe(fakeDataUrl);
+    });
+
+    it("resolves and injects minio URL as base64 data URL image", async () => {
+      let capturedBody: any = null;
+
+      vi.mocked(global.fetch).mockImplementation(async (url, requestOptions) => {
+        const urlString = String(url);
+        if (urlString.includes("/creative/vector-animation")) {
+          if (requestOptions && requestOptions.body) {
+            capturedBody = JSON.parse(requestOptions.body as string);
+          }
+          return {
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            json: async () => ({ success: true }),
+          } as any;
+        }
+        if (urlString.includes("/admin/tool-schemas")) {
+          return {
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            json: async () => mockSchemas,
+          } as any;
+        }
+        return {
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          json: async () => ({}),
+        } as any;
+      });
+
+      await ToolOrchestratorService.refreshSchemas();
+
+      const minioReference = "minio://valid-image.png";
+      await ToolOrchestratorService.executeTool(
+        "create_vector_animation",
+        { animation: { layers: [] } },
+        {
+          messages: [
+            {
+              role: "user",
+              images: [minioReference],
+            },
+          ],
+        }
+      );
+
+      expect(capturedBody).toBeDefined();
+      expect(capturedBody.referenceImageUrl).toBe("data:image/png;base64,ZmFrZS1taW5pby1pbWFnZS1ieXRlcw==");
+    });
+  });
 });
