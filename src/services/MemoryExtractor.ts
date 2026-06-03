@@ -311,9 +311,26 @@ export default class MemoryExtractor {
         }
       }
 
-      const memories = parseJsonFromLlmResponse(result!.text) as ExtractedMemory[] | null;
+      let memories = parseJsonFromLlmResponse(result!.text) as any;
+      if (memories && typeof memories === "object" && !Array.isArray(memories)) {
+        if (Array.isArray(memories.memories)) {
+          memories = memories.memories;
+        } else if (Array.isArray(memories.extractedMemories)) {
+          memories = memories.extractedMemories;
+        } else if (memories.type && memories.title && memories.content) {
+          memories = [memories];
+        } else {
+          const arrayKey = Object.keys(memories).find((key) => Array.isArray(memories[key]));
+          if (arrayKey) {
+            memories = memories[arrayKey];
+          }
+        }
+      }
+
       if (!Array.isArray(memories)) {
-        logger.warn("[MemoryExtractor] Response was not an array");
+        logger.warn(
+          `[MemoryExtractor] Response was not an array or a recognized memory structure. Text: ${result!.text ? result!.text.substring(0, 200) : "empty"}`
+        );
         return [];
       }
 

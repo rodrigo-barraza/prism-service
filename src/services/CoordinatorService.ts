@@ -158,6 +158,7 @@ export default class CoordinatorService {
       maxWorkerIterations: clientMaxWorkerIter,
       minContextLength,
       workspaceRoot: coordinatorWorkspaceRoot,
+      enabledTools,
     } = coordinatorCtx;
 
     // Resolve max worker iterations: 0 = unlimited (Infinity), positive = clamped 1-100, default = constant
@@ -315,6 +316,7 @@ export default class CoordinatorService {
       maxIterations: resolvedMaxWorkerIterations,
       minContextLength: minContextLength || null,
       parentConversationId,
+      enabledTools: enabledTools || null,
     };
 
     activeWorkers.set(agentId, workerState);
@@ -691,28 +693,22 @@ export default class CoordinatorService {
     const workerEmit = telemetry.createEmitFunction();
 
     // Build enabled tools list for the worker.
-    // If the parent agent has a persona with scoped tools (e.g. Lupos),
-    // let AgenticLoopService resolve enabledTools from the persona — don't
-    // override with all tools. For coding agents (no persona), build the
-    // full list minus coordinator-only tools.
+    // Build enabled tools list for the worker.
+    // Sub-agents always inherit the same tools that the parent has (minus coordinator-only tools to avoid infinite nesting).
     let workerEnabledTools: string[] | undefined;
-    if (worker.agent) {
-      const { default: AgentPersonaRegistry } =
-        await import("./AgentPersonaRegistry.js");
-      const persona = AgentPersonaRegistry.get(worker.agent as string);
-      if (persona?.availableTools) {
-        // Inherit the parent's persona-scoped tools
-        workerEnabledTools = persona.availableTools;
-      }
+    if (worker.enabledTools) {
+      const coordinatorToolNames = new Set(COORDINATOR_ONLY_TOOLS);
+      workerEnabledTools = worker.enabledTools.filter(
+        (name) => !coordinatorToolNames.has(name)
+      );
     }
 
     if (!workerEnabledTools) {
-      // Default: all tools minus coordinator-only (for coding agents)
-      const allSchemas = ToolOrchestratorService.getToolSchemas();
-      const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
-      workerEnabledTools = allSchemas
-        .map((t: Record<string, unknown>) => t.name as string)
-        .filter((name: string) => !coordinatorSet.has(name));
+      const allToolSchemas = ToolOrchestratorService.getToolSchemas();
+      const coordinatorToolNames = new Set(COORDINATOR_ONLY_TOOLS);
+      workerEnabledTools = allToolSchemas
+        .map((toolSchema: Record<string, unknown>) => toolSchema.name as string)
+        .filter((name: string) => !coordinatorToolNames.has(name));
     }
 
     const workerProvider = getProvider(worker.providerName);
