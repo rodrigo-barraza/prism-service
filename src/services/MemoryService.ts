@@ -307,6 +307,9 @@ const MemoryService = {
     }
     const now = new Date().toISOString();
     const memory = {
+      // Spread agent-specific metadata first — core fields below take precedence
+      // to prevent accidental overwrites of id, agent, embedding, etc.
+      ...metadata,
       id: crypto.randomUUID(),
       agent,
       project: project || null,
@@ -318,8 +321,6 @@ const MemoryService = {
       conversationId: conversationId || null,
       createdAt: now,
       updatedAt: now,
-      // Spread agent-specific metadata at top level for efficient querying
-            ...metadata,
     };
     await collection.insertOne(memory);
     logger.info(

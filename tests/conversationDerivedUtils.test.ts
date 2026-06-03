@@ -1,0 +1,424 @@
+/**
+ * Conversation Derived Utils — direct unit tests for computeModalities,
+ * extractProviders, computeTotalCost, and buildConversationPatchFields.
+ *
+ * These utility functions drive the conversation filter UI in the client.
+ * Wrong modality tags = conversations become invisible in filtered views.
+ * Wrong cost = incorrect billing display. Wrong providers = broken model filters.
+ */
+import { describe, it, expect, vi } from "vitest";
+
+vi.mock("../src/services/FileService.ts", () => ({
+  default: {
+    isExternalStorage: () => false,
+    isMinioRef: () => false,
+    uploadFile: vi.fn().mockResolvedValue({ ref: "minio://test/ref" }),
+  },
+}));
+
+vi.mock("../src/utils/logger.ts", () => ({
+  default: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+const {
+  computeModalities,
+  extractProviders,
+  computeTotalCost,
+  buildConversationPatchFields,
+} = await import("../src/services/conversation/utils.ts");
+
+// ── Type alias for convenience ────────────────────────────────
+type TestMessage = Record<string, unknown>;
+
+// ═══════════════════════════════════════════════════════════════
+describe("computeModalities", () => {
+  it("should detect textIn from user messages", () => {
+    const messages: TestMessage[] = [
+      { role: "user", content: "Hello" },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.textIn).toBe(true);
+    expect(modalities.textOut).toBe(false);
+  });
+
+  it("should detect textOut from assistant messages", () => {
+    const messages: TestMessage[] = [
+      { role: "assistant", content: "Hi there!" },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.textOut).toBe(true);
+  });
+
+  it("should detect textOut from assistant messages with toolCalls", () => {
+    const messages: TestMessage[] = [
+      {
+        role: "assistant",
+        toolCalls: [{ name: "read_file", args: { path: "/etc/hosts" } }],
+      },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.textOut).toBe(true);
+    expect(modalities.functionCalling).toBe(true);
+  });
+
+  it("should detect imageIn from user messages with images", () => {
+    const messages: TestMessage[] = [
+      { role: "user", content: "What is this?", images: ["data:image/png;base64,abc"] },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.imageIn).toBe(true);
+    expect(modalities.imageOut).toBe(false);
+  });
+
+  it("should detect imageOut from assistant messages with images", () => {
+    const messages: TestMessage[] = [
+      { role: "assistant", content: "Here's your image", images: ["minio://img/1.png"] },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.imageOut).toBe(true);
+  });
+
+  it("should detect audioIn from user messages with audio", () => {
+    const messages: TestMessage[] = [
+      { role: "user", audio: "data:audio/wav;base64,abc" },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.audioIn).toBe(true);
+  });
+
+  it("should detect audioOut from assistant messages with audio", () => {
+    const messages: TestMessage[] = [
+      { role: "assistant", audio: "minio://audio/clip.mp3" },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.audioOut).toBe(true);
+  });
+
+  it("should detect docIn from messages with documents", () => {
+    const messages: TestMessage[] = [
+      { role: "user", content: "Analyze this", documents: ["doc.pdf"] },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.docIn).toBe(true);
+  });
+
+  it("should detect docIn from PDF image references", () => {
+    const messages: TestMessage[] = [
+      { role: "user", content: "Read this", images: ["report.pdf"] },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.docIn).toBe(true);
+  });
+
+  it("should detect webSearch from search tool calls", () => {
+    const messages: TestMessage[] = [
+      {
+        role: "assistant",
+        toolCalls: [{ name: "search_web", args: { query: "test" } }],
+      },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.webSearch).toBe(true);
+  });
+
+  it("should detect webSearch from inline sources marker", () => {
+    const messages: TestMessage[] = [
+      {
+        role: "assistant",
+        content: "Here are the results:\n> **Sources:**\n- source1\n- source2",
+      },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.webSearch).toBe(true);
+  });
+
+  it("should detect codeExecution from code_execution tool calls", () => {
+    const messages: TestMessage[] = [
+      {
+        role: "assistant",
+        toolCalls: [{ name: "code_execution", args: {} }],
+      },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.codeExecution).toBe(true);
+  });
+
+  it("should detect codeExecution from inline exec blocks", () => {
+    const messages: TestMessage[] = [
+      {
+        role: "assistant",
+        content: "```exec-python\nprint('hello')\n```",
+      },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.codeExecution).toBe(true);
+  });
+
+  it("should detect functionCalling from tool role messages", () => {
+    const messages: TestMessage[] = [
+      { role: "tool", content: JSON.stringify({ result: "ok" }) },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.functionCalling).toBe(true);
+  });
+
+  it("should detect thinking from assistant messages with thinking field", () => {
+    const messages: TestMessage[] = [
+      { role: "assistant", content: "Answer", thinking: "Let me reason about this..." },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.thinking).toBe(true);
+  });
+
+  it("should skip deleted messages", () => {
+    const messages: TestMessage[] = [
+      { role: "user", content: "Hello", deleted: true },
+      { role: "assistant", content: "Hi", deleted: true },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.textIn).toBe(false);
+    expect(modalities.textOut).toBe(false);
+  });
+
+  it("should not count liveTranscription messages as textIn", () => {
+    const messages: TestMessage[] = [
+      { role: "user", content: "live audio text", liveTranscription: true },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.textIn).toBe(false);
+  });
+
+  it("should return all false for empty messages array", () => {
+    const modalities = computeModalities([] as any);
+
+    expect(modalities.textIn).toBe(false);
+    expect(modalities.textOut).toBe(false);
+    expect(modalities.imageIn).toBe(false);
+    expect(modalities.imageOut).toBe(false);
+    expect(modalities.audioIn).toBe(false);
+    expect(modalities.audioOut).toBe(false);
+    expect(modalities.webSearch).toBe(false);
+    expect(modalities.functionCalling).toBe(false);
+    expect(modalities.thinking).toBe(false);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+describe("extractProviders", () => {
+  it("should extract providers from messages", () => {
+    const messages: TestMessage[] = [
+      { role: "assistant", content: "Hi", provider: "OpenAI" },
+      { role: "assistant", content: "Hello", provider: "Anthropic" },
+    ];
+
+    const providers = extractProviders(messages as any, null);
+
+    expect(providers).toContain("openai");
+    expect(providers).toContain("anthropic");
+  });
+
+  it("should normalize providers to lowercase", () => {
+    const messages: TestMessage[] = [
+      { role: "assistant", content: "Hi", provider: "GOOGLE" },
+    ];
+
+    const providers = extractProviders(messages as any, null);
+
+    expect(providers).toContain("google");
+  });
+
+  it("should deduplicate providers", () => {
+    const messages: TestMessage[] = [
+      { role: "assistant", content: "A", provider: "openai" },
+      { role: "assistant", content: "B", provider: "openai" },
+    ];
+
+    const providers = extractProviders(messages as any, null);
+
+    expect(providers.filter((provider: string) => provider === "openai")).toHaveLength(1);
+  });
+
+  it("should include provider from settings", () => {
+    const messages: TestMessage[] = [];
+    const settings = { provider: "Google", model: "gemini-3.5-flash" };
+
+    const providers = extractProviders(messages as any, settings as any);
+
+    expect(providers).toContain("google");
+  });
+
+  it("should skip deleted messages", () => {
+    const messages: TestMessage[] = [
+      { role: "assistant", content: "Hi", provider: "openai", deleted: true },
+    ];
+
+    const providers = extractProviders(messages as any, null);
+
+    expect(providers).toHaveLength(0);
+  });
+
+  it("should return empty array for empty messages and no settings", () => {
+    const providers = extractProviders([] as any, null);
+
+    expect(providers).toEqual([]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+describe("computeTotalCost", () => {
+  it("should accumulate estimatedCost across messages", () => {
+    const messages: TestMessage[] = [
+      { role: "assistant", content: "A", estimatedCost: 0.001 },
+      { role: "assistant", content: "B", estimatedCost: 0.002 },
+      { role: "assistant", content: "C", estimatedCost: 0.0005 },
+    ];
+
+    const totalCost = computeTotalCost(messages as any);
+
+    expect(totalCost).toBeCloseTo(0.0035);
+  });
+
+  it("should skip deleted messages", () => {
+    const messages: TestMessage[] = [
+      { role: "assistant", content: "A", estimatedCost: 0.01 },
+      { role: "assistant", content: "B", estimatedCost: 0.02, deleted: true },
+    ];
+
+    const totalCost = computeTotalCost(messages as any);
+
+    expect(totalCost).toBeCloseTo(0.01);
+  });
+
+  it("should return 0 for messages without estimatedCost", () => {
+    const messages: TestMessage[] = [
+      { role: "user", content: "Hello" },
+      { role: "assistant", content: "Hi" },
+    ];
+
+    const totalCost = computeTotalCost(messages as any);
+
+    expect(totalCost).toBe(0);
+  });
+
+  it("should return 0 for empty array", () => {
+    const totalCost = computeTotalCost([] as any);
+
+    expect(totalCost).toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+describe("buildConversationPatchFields", () => {
+  it("should include title when provided", () => {
+    const fields = buildConversationPatchFields({ title: "My Chat" });
+
+    expect(fields.title).toBe("My Chat");
+    expect(fields.updatedAt).toBeDefined();
+  });
+
+  it("should recompute modalities, providers, and totalCost when messages are provided", () => {
+    const fields = buildConversationPatchFields({
+      messages: [
+        { role: "user", content: "Hello" },
+        {
+          role: "assistant",
+          content: "Hi",
+          provider: "openai",
+          estimatedCost: 0.001,
+        },
+      ] as any,
+      settings: { provider: "openai", model: "gpt-4o" },
+    });
+
+    expect(fields.modalities).toBeDefined();
+    expect(fields.modalities!.textIn).toBe(true);
+    expect(fields.modalities!.textOut).toBe(true);
+    expect(fields.providers).toContain("openai");
+    expect(fields.totalCost).toBeCloseTo(0.001);
+  });
+
+  it("should include systemPrompt when provided", () => {
+    const fields = buildConversationPatchFields({
+      systemPrompt: "You are a helpful assistant.",
+    });
+
+    expect(fields.systemPrompt).toBe("You are a helpful assistant.");
+  });
+
+  it("should include settings with systemPrompt embedded", () => {
+    const fields = buildConversationPatchFields({
+      settings: { provider: "google", model: "gemini-3.5-flash" },
+      systemPrompt: "Be concise.",
+    });
+
+    expect(fields.settings).toBeDefined();
+    expect(fields.settings!.provider).toBe("google");
+    expect(fields.settings!.systemPrompt).toBe("Be concise.");
+  });
+
+  it("should set empty systemPrompt in settings when systemPrompt is not provided", () => {
+    const fields = buildConversationPatchFields({
+      settings: { provider: "openai" },
+    });
+
+    expect(fields.settings!.systemPrompt).toBe("");
+  });
+
+  it("should always include updatedAt", () => {
+    const fields = buildConversationPatchFields({});
+
+    expect(fields.updatedAt).toBeDefined();
+    expect(typeof fields.updatedAt).toBe("string");
+  });
+
+  it("should not include undefined fields", () => {
+    const fields = buildConversationPatchFields({});
+
+    expect(fields).not.toHaveProperty("title");
+    expect(fields).not.toHaveProperty("messages");
+    expect(fields).not.toHaveProperty("modalities");
+    expect(fields).not.toHaveProperty("providers");
+    expect(fields).not.toHaveProperty("totalCost");
+    expect(fields).not.toHaveProperty("systemPrompt");
+    expect(fields).not.toHaveProperty("settings");
+  });
+});

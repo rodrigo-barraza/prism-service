@@ -1001,7 +1001,7 @@ export default class ToolOrchestratorService {
         return CoordinatorService.getTaskOutput(args.agent_id as string);
 
       case "delete_team":
-        return CoordinatorService.deleteTeam(args.teamName as string);
+        return CoordinatorService.deleteTeam(args.teamName as string, coordinatorContext as CoordinatorContext);
 
       default:
         return { error: `Unknown coordinator tool: ${name}` };

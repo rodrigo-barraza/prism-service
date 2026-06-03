@@ -187,11 +187,18 @@ const ScheduledTaskService = {
             updateFields.enabled = false;
           }
  
-          // Mark as run for this minute key to prevent double execution in cluster setups
-          await db.collection(COLLECTIONS.SCHEDULED_TASKS).updateOne(
-            { id: task.id },
-            { $set: updateFields }
+          // Atomically claim this task for this minute — prevents double execution
+          // in multi-instance cluster setups. Only the first instance to update
+          // will get a non-null result; subsequent instances skip.
+          const claimResult = await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOneAndUpdate(
+            { id: task.id, lastRunMinute: { $ne: minuteKey } },
+            { $set: updateFields },
           );
+
+          if (!claimResult) {
+            logger.info(`[ScheduledTasks] Task "${task.name}" already claimed by another instance.`);
+            continue;
+          }
  
           // Trigger execution in the background asynchronously
           this.executeTask(task, undefined, { username: task.username || "system" }).catch((error: unknown) =>
@@ -310,7 +317,7 @@ const ScheduledTaskService = {
           ...(task.toolConfig?.enabledTools && { enabledTools: task.toolConfig.enabledTools }),
           ...(task.toolConfig?.disabledTools && { disabledTools: task.toolConfig.disabledTools }),
         },
-        agentSessionId: crypto.randomUUID(),
+        agentSessionId: resolvedSessionId,
         conversationId: resolvedSessionId,
         userMessage: userTriggerMessage as ConversationMessage,
         conversationMeta: {
@@ -338,7 +345,9 @@ const ScheduledTaskService = {
       await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).updateOne(
         { id: resolvedSessionId },
         { $set: { isGenerating: false, updatedAt: new Date().toISOString() } },
-      ).catch(() => {});
+      ).catch((cleanupError: unknown) =>
+        logger.warn(`[ScheduledTasks] Failed to reset isGenerating for session ${resolvedSessionId}: ${getErrorMessage(cleanupError)}`),
+      );
 
       throw error;
     }
@@ -346,31 +355,29 @@ const ScheduledTaskService = {
     return { agentSessionId: resolvedSessionId };
   },
 
-  // ─── CRUD REST Helpers ─────────────────────────────────────────────────────────
 
-  // Helper to determine if a project is a client UI project and build an appropriate query filter
-  async _getQueryFilter(id: string, project: string, username: string): Promise<Record<string, unknown>> {
+  /**
+   * Determine if a project name is a client UI project (vs a registered workspace
+   * or agent project). Client projects skip project/username scoping in queries.
+   */
+  async _isClientProject(project: string): Promise<boolean> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
-    let isClientProject = true;
+    if (!project || !db) return true;
 
-    if (project && db) {
-      // Check if project is a registered workspace root
-      const workspaceExists = await db.collection("workspaces").findOne({ name: project });
-      if (workspaceExists) {
-        isClientProject = false;
-      } else {
-        // Fallback: check registered agent projects
-        const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.ts");
-        const agentProjects = AgentPersonaRegistry.list().map((project) => {
-          const persona = AgentPersonaRegistry.get(project.id);
-          return persona?.project;
-        }).filter(Boolean);
-        
-        if (agentProjects.includes(project)) {
-          isClientProject = false;
-        }
-      }
-    }
+    const workspaceExists = await db.collection("workspaces").findOne({ name: project });
+    if (workspaceExists) return false;
+
+    const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.ts");
+    const agentProjects = AgentPersonaRegistry.list().map((entry) => {
+      const persona = AgentPersonaRegistry.get(entry.id);
+      return persona?.project;
+    }).filter(Boolean);
+
+    return !agentProjects.includes(project);
+  },
+
+  async _getQueryFilter(id: string, project: string, username: string): Promise<Record<string, unknown>> {
+    const isClientProject = await this._isClientProject(project);
 
     const filter: Record<string, unknown> = { id };
     if (!isClientProject) {
@@ -386,25 +393,7 @@ const ScheduledTaskService = {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return [];
 
-    let isClientProject = true;
-    if (project && db) {
-      // Check if project is a registered workspace root
-      const workspaceExists = await db.collection("workspaces").findOne({ name: project });
-      if (workspaceExists) {
-        isClientProject = false;
-      } else {
-        // Fallback: check registered agent projects
-        const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.ts");
-        const agentProjects = AgentPersonaRegistry.list().map((project) => {
-          const persona = AgentPersonaRegistry.get(project.id);
-          return persona?.project;
-        }).filter(Boolean);
-        
-        if (agentProjects.includes(project)) {
-          isClientProject = false;
-        }
-      }
-    }
+    const isClientProject = await this._isClientProject(project);
 
     const query: Record<string, unknown> = {};
     if (!isClientProject) {

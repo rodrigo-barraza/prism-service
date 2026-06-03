@@ -628,7 +628,11 @@ function handleWsLive(
                       response: truncateToolResult(r.result) as Record<string, unknown>,
                     }));
 
-                    liveSession!.sendToolResponse({ functionResponses });
+                    if (liveSession) {
+                      liveSession.sendToolResponse({ functionResponses });
+                    } else {
+                      logger.warn("[Live API] Cannot send tool response — session closed before response was ready");
+                    }
                   } catch (error: unknown) {
                     logger.error(
                       `[Live API] Error executing tools: ${getErrorMessage(error)}`,
