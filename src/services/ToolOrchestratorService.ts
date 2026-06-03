@@ -821,6 +821,72 @@ export default class ToolOrchestratorService {
       }
     }
 
+    // Inject the user's attached image as a texture URL for 3D model/scene tools.
+    // Models cannot reproduce base64 data in tool arguments — they see the image in
+    // conversation context but have no mechanism to pass it into the deeply-nested
+    // material.textureUrl properties. Resolve the image to a browser-loadable data URL
+    // and inject it as a top-level `referenceTextureUrl` arg so the tools-service route
+    // can apply it to objects that lack an explicit textureUrl.
+    const THREE_DIMENSIONAL_TEXTURE_TOOLS = ["create_3d_model", "create_3d_scene"];
+    if (THREE_DIMENSIONAL_TEXTURE_TOOLS.includes(name) && context.messages) {
+      for (let messageIndex = context.messages.length - 1; messageIndex >= 0; messageIndex--) {
+        const message = context.messages[messageIndex];
+        if (
+          message.role === "user" &&
+          message.images &&
+          Array.isArray(message.images) &&
+          message.images.length > 0
+        ) {
+          const imageReference = message.images[0];
+          if (typeof imageReference === "string") {
+            let resolvedTextureUrl: string | null = null;
+
+            if (imageReference.startsWith("data:")) {
+              resolvedTextureUrl = imageReference;
+              logger.info(
+                `[ToolOrchestrator] ${name}: using data URL as texture (${(imageReference.length / 1024).toFixed(0)} KB)`,
+              );
+            } else if (imageReference.startsWith("minio://")) {
+              try {
+                const FileService = (await import("./FileService.js")).default;
+                const key = FileService.extractKey(imageReference);
+                const file = await FileService.getFile(key);
+                if (file) {
+                  const chunks: Buffer[] = [];
+                  for await (const chunk of file.stream) {
+                    chunks.push(chunk);
+                  }
+                  const buffer = Buffer.concat(chunks);
+                  const base64 = buffer.toString("base64");
+                  resolvedTextureUrl = `data:${file.contentType};base64,${base64}`;
+                  logger.info(
+                    `[ToolOrchestrator] ${name}: resolved minio ref to data URL texture (${(resolvedTextureUrl.length / 1024).toFixed(0)} KB)`,
+                  );
+                }
+              } catch (error: unknown) {
+                logger.warn(
+                  `[ToolOrchestrator] ${name}: failed to resolve minio texture: ${getErrorMessage(error)}`,
+                );
+              }
+            } else if (imageReference.startsWith("http://") || imageReference.startsWith("https://")) {
+              resolvedTextureUrl = imageReference;
+              logger.info(
+                `[ToolOrchestrator] ${name}: using HTTP URL as texture (${imageReference.substring(0, 80)})`,
+              );
+            }
+
+            if (resolvedTextureUrl) {
+              args = { ...args, referenceTextureUrl: resolvedTextureUrl };
+              logger.info(
+                `[ToolOrchestrator] ${name}: injected referenceTextureUrl into tool args`,
+              );
+            }
+          }
+          break;
+        }
+      }
+    }
+
     const result = await executeToolGeneric(name, args, context);
 
     // Post-process: upload generated images to MinIO
