@@ -144,6 +144,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     }
 
     // ── Main loop ────────────────────────────────────────────
+    // Wrapped in try/catch for error-path message persistence.
+    try {
     while (state.iterations < resolvedMaxIterations) {
       state.iterations++;
 
@@ -486,7 +488,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       await runExhaustionRecoveryPass(this, context, state, currentMessages);
     }
 
-    // ── Finalization ─────────────────────────────────────────
+    // ── Finalization (happy path) ──────────────────────────────
     logger.info(
       `[TreeOfThought] Session complete: ${state.iterations} iterations, ` +
         `${state.branchesExplored} branches explored, ` +
@@ -495,6 +497,20 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
 
     await this.finalize(currentMessages, hooks);
     return { messages: currentMessages };
+
+    } catch (loopError: unknown) {
+      logger.error(
+        `[TreeOfThought] Loop error on iteration ${state.iterations}: ${loopError instanceof Error ? loopError.message : String(loopError)}. Persisting ${currentMessages.length - state.originalMessageCount} accumulated message(s).`,
+      );
+      try {
+        await this.finalize(currentMessages, hooks);
+      } catch (persistError: unknown) {
+        logger.error(
+          `[TreeOfThought] Failed to persist messages on error path: ${persistError instanceof Error ? persistError.message : String(persistError)}`,
+        );
+      }
+      throw loopError;
+    }
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
