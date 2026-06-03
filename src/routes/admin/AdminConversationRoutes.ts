@@ -184,14 +184,27 @@ router.get(
         return 0;
       });
 
-      const docs = merged.slice(skip, skip + limit);
+      const paginatedDocuments = merged.slice(skip, skip + limit);
 
-      const finalDocIds = docs.map((doc) => (doc as Document).id);
+      const paginatedDocumentIds = paginatedDocuments.map((document) => (document as Document).id);
+      const agentSessionIds = paginatedDocuments
+        .filter((document) => document.type === "agent")
+        .map((document) => (document as any).id as string)
+        .filter(Boolean);
+
       const requests = await req.db
         .collection(REQUESTS_COL)
-        .find({ conversationId: { $in: finalDocIds } })
+        .find({
+          $or: [
+            { conversationId: { $in: paginatedDocumentIds } },
+            { agentSessionId: { $in: agentSessionIds } },
+            { parentAgentSessionId: { $in: agentSessionIds } },
+          ],
+        })
         .project({
           conversationId: 1,
+          agentSessionId: 1,
+          parentAgentSessionId: 1,
           inputTokens: 1,
           outputTokens: 1,
           model: 1,
@@ -199,57 +212,96 @@ router.get(
           totalTime: 1,
           toolDisplayNames: 1,
           toolApiNames: 1,
+          estimatedCost: 1,
         })
         .toArray();
 
-      const requestMap = new Map();
+      const requestLogMap = new Map<string, Document[]>();
       for (const requestItem of requests) {
-        const conversationId = requestItem.conversationId || "";
-        if (!requestMap.has(conversationId)) requestMap.set(conversationId, []);
-        requestMap.get(conversationId).push(requestItem);
+        let targetId = "";
+        if (
+          requestItem.parentAgentSessionId &&
+          agentSessionIds.includes(requestItem.parentAgentSessionId)
+        ) {
+          targetId = requestItem.parentAgentSessionId;
+        } else if (
+          requestItem.agentSessionId &&
+          agentSessionIds.includes(requestItem.agentSessionId)
+        ) {
+          targetId = requestItem.agentSessionId;
+        } else if (requestItem.conversationId) {
+          targetId = requestItem.conversationId;
+        }
+
+        if (targetId) {
+          if (!requestLogMap.has(targetId)) {
+            requestLogMap.set(targetId, []);
+          }
+          requestLogMap.get(targetId)!.push(requestItem);
+        }
       }
 
-      const enrichedDocs = docs.map((doc: Record<string, unknown>) => {
-        const reqs = requestMap.get(doc.id) || ([] as Document[]);
-        const models = Array.from(new Set(reqs.map((r: Document) => r.model).filter(Boolean)));
+      const enrichedDocuments = paginatedDocuments.map((document: Record<string, unknown>) => {
+        const associatedRequests = requestLogMap.get(document.id as string) || ([] as Document[]);
+        const models = Array.from(
+          new Set(associatedRequests.map((requestItem: Document) => requestItem.model).filter(Boolean))
+        );
         const toolDisplayNames = Array.from(
-          new Set(reqs.flatMap((r: Document) => (r.toolDisplayNames as string[]) || []).filter(Boolean))
+          new Set(
+            associatedRequests
+              .flatMap((requestItem: Document) => (requestItem.toolDisplayNames as string[]) || [])
+              .filter(Boolean)
+          )
         );
         const toolApiNames = Array.from(
-          new Set(reqs.flatMap((r: Document) => (r.toolApiNames as string[]) || []).filter(Boolean))
+          new Set(
+            associatedRequests
+              .flatMap((requestItem: Document) => (requestItem.toolApiNames as string[]) || [])
+              .filter(Boolean)
+          )
         );
 
         let inputTokens = 0;
         let outputTokens = 0;
         let totalLatency = 0;
-        let tpsSum = 0;
-        let tpsCount = 0;
+        let tokensPerSecondSum = 0;
+        let tokensPerSecondCount = 0;
+        let aggregatedCost = 0;
 
-        for (const requestItem of reqs) {
+        for (const requestItem of associatedRequests) {
           inputTokens += requestItem.inputTokens || 0;
           outputTokens += requestItem.outputTokens || 0;
           totalLatency += requestItem.totalTime || 0;
+          aggregatedCost += requestItem.estimatedCost || 0;
           if (requestItem.tokensPerSec && requestItem.tokensPerSec > 0) {
-            tpsSum += requestItem.tokensPerSec;
-            tpsCount++;
+            tokensPerSecondSum += requestItem.tokensPerSec;
+            tokensPerSecondCount++;
           }
         }
 
+        // Apply cost overlay for agent sessions
+        const originalCost = (document.totalCost as number) || 0;
+        const totalCost =
+          document.type === "agent" && aggregatedCost > 0
+            ? Math.max(originalCost, aggregatedCost)
+            : originalCost;
+
         return {
-          ...doc,
-          requestCount: reqs.length,
+          ...document,
+          totalCost,
+          requestCount: associatedRequests.length,
           inputTokens,
           outputTokens,
           models,
           toolDisplayNames,
           toolApiNames,
-          avgTokensPerSec: tpsCount > 0 ? tpsSum / tpsCount : null,
+          avgTokensPerSec: tokensPerSecondCount > 0 ? tokensPerSecondSum / tokensPerSecondCount : null,
           totalLatency,
         };
       });
 
       res.json({
-        data: enrichedDocs,
+        data: enrichedDocuments,
         total: totalConvs + totalSessions,
         page: parsePaginationParams(req.query).page,
         limit,

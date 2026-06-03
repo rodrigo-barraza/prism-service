@@ -204,25 +204,88 @@ agentSessionRouter.get(
 
       const { skip, limit, page, sortDirection } = parsePaginationParams(req.query);
 
-      const filter: Record<string, unknown> = {};
-      if (project) filter.project = project;
-      if (agent) filter.agent = agent;
-      applyDateRangeFilter(filter, from as string, to as string, "updatedAt");
+      const queryFilter: Record<string, unknown> = {};
+      if (project) queryFilter.project = project;
+      if (agent) queryFilter.agent = agent;
+      applyDateRangeFilter(queryFilter, from as string, to as string, "updatedAt");
 
-      const [docs, total] = await Promise.all([
+      const [sessionDocuments, totalSessionsCount] = await Promise.all([
         req.db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .find(filter, {
+          .find(queryFilter, {
             projection: { messages: 0 },
           })
           .sort({ [sort as string]: sortDirection })
           .skip(skip)
           .limit(limit)
           .toArray(),
-        req.db.collection(COLLECTIONS.AGENT_CONVERSATIONS).countDocuments(filter),
+        req.db.collection(COLLECTIONS.AGENT_CONVERSATIONS).countDocuments(queryFilter),
       ]);
 
-      res.json({ data: docs, total, page, limit });
+      if (sessionDocuments.length > 0) {
+        const sessionIds = sessionDocuments
+          .map((session) => (session as Record<string, unknown>).id as string)
+          .filter(Boolean);
+
+        if (sessionIds.length > 0) {
+          try {
+            const costAggregation = await req.db
+              .collection(COLLECTIONS.REQUESTS)
+              .aggregate<{ _id: string; totalCost: number }>([
+                {
+                  $match: {
+                    $or: [
+                      { agentSessionId: { $in: sessionIds } },
+                      { parentAgentSessionId: { $in: sessionIds } },
+                    ],
+                  },
+                },
+                {
+                  $group: {
+                    _id: {
+                      $cond: [
+                        {
+                          $and: [
+                            { $ne: ["$parentAgentSessionId", null] },
+                            { $in: ["$parentAgentSessionId", sessionIds] },
+                          ],
+                        },
+                        "$parentAgentSessionId",
+                        "$agentSessionId",
+                      ],
+                    },
+                    totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },
+                  },
+                },
+              ])
+              .toArray();
+
+            if (costAggregation.length > 0) {
+              const costMap = new Map(
+                costAggregation.map((costEntry) => [costEntry._id, costEntry.totalCost])
+              );
+              for (const session of sessionDocuments) {
+                const sessionId = (session as Record<string, unknown>).id as string;
+                const requestLogCost = costMap.get(sessionId);
+                if (requestLogCost !== undefined && requestLogCost > 0) {
+                  (session as Record<string, unknown>).totalCost = Math.max(
+                    (session.totalCost as number) || 0,
+                    requestLogCost,
+                  );
+                }
+              }
+            }
+          } catch (costError: unknown) {
+            logger.warn(
+              `Failed to enrich admin agent session costs: ${
+                costError instanceof Error ? costError.message : String(costError)
+              }`
+            );
+          }
+        }
+      }
+
+      res.json({ data: sessionDocuments, total: totalSessionsCount, page, limit });
     } catch (error: unknown) {
       logger.error(`Admin /agent-sessions error: ${getErrorMessage(error)}`);
       next(error);
