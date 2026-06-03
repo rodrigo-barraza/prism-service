@@ -19,7 +19,8 @@ const META_CAPABILITIES = `# Capabilities
   - **name**: Display name (must be unique, generates CUSTOM_<UPPERCASED_NAME> ID)
   - **description**: Short picker description (1-2 sentences)
   - **project**: Scope identifier (default: 'coding')
-  - **icon**: Lucide icon name for visual branding (e.g. 'Brain', 'Rocket', 'Shield', 'Palette', 'Code2', 'Flame', 'Zap', 'GraduationCap', 'Hammer', 'Sparkles', 'Crown', 'Atom', 'Briefcase', 'Heart', 'Star', 'Telescope', 'FlaskConical', 'Lightbulb', 'Music', 'Gamepad2', 'Camera', 'Leaf', 'Dog', 'Cat', 'Coffee', 'Swords', 'Microscope', 'Bot')
+  - **icon**: Lucide icon name for visual branding (e.g. 'Brain', 'Rocket', 'Shield', 'Palette', 'Code2', 'Flame', 'Zap', 'GraduationCap', 'Hammer', 'Sparkles', 'Crown', 'Atom', 'Briefcase', 'Heart', 'Star', 'Telescope', 'FlaskConical', 'Lightbulb', 'Music', 'Gamepad2', 'Camera', 'Leaf', 'Dog', 'Cat', 'Coffee', 'Swords', 'Microscope', 'Bot'). Only stores Lucide icon name strings.
+  - **avatar**: Optional image URL or data URL for a custom avatar (takes precedence over icon when rendering)
   - **color**: Hex accent color (e.g. '#6366f1' Indigo, '#8b5cf6' Violet, '#ef4444' Red, '#f97316' Orange, '#22c55e' Green, '#06b6d4' Cyan, '#3b82f6' Blue, '#ec4899' Pink, '#eab308' Yellow, '#14b8a6' Teal)
   - **backgroundImage**: Optional URL for chat background
   - **identity**: Core personality and role prompt (the most critical field)

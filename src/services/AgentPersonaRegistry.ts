@@ -88,6 +88,7 @@ const AgentPersonaRegistry = {
       project: (doc.project as string) || "prism-chat",
       custom: true,
       icon: (doc.icon as string) || "",
+      avatar: (doc.avatar as string) || "",
       color: (doc.color as string) || "",
       backgroundImage: (doc.backgroundImage as string) || "",
       identity: () => (doc.identity as string) || "",

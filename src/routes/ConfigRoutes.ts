@@ -358,6 +358,7 @@ router.get(
         description: persona?.description || "",
         custom: first.custom || false,
         icon: persona?.icon || "",
+        avatar: persona?.avatar || "",
         color: persona?.color || "",
         backgroundImage: persona?.backgroundImage || "",
         project: persona?.project,

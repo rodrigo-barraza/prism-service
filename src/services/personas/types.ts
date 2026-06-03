@@ -47,6 +47,7 @@ export interface Persona {
   custom?: boolean;
   description?: string;
   icon?: string;
+  avatar?: string;
   color?: string;
   backgroundImage?: string;
   identity: (context: PersonaContext) => string;

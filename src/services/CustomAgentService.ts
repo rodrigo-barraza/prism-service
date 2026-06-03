@@ -66,6 +66,7 @@ const CustomAgentService = {
       description: data.description || "",
       project: data.project || "coding",
       icon: data.icon || "",
+      avatar: data.avatar || "",
       color: data.color || "",
       backgroundImage: data.backgroundImage || "",
       identity: data.identity || "",
