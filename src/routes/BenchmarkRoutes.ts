@@ -823,6 +823,10 @@ router.post(
       const modelTargets = (previousRun.models || []).map((modelResult: BenchmarkResult) => ({
         provider: modelResult.provider,
         model: modelResult.model,
+        display_name: modelResult.label,
+        thinkingEnabled: modelResult.thinkingEnabled,
+        toolsEnabled: modelResult.toolsEnabled,
+        agent: modelResult.agent || undefined,
       }));
 
       const run = await BenchmarkService.runBenchmark(
