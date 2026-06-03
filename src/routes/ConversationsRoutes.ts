@@ -176,12 +176,15 @@ router.get(
               .toArray();
 
             if (costAgg.length > 0) {
-              const costMap = new Map(costAgg.map((r) => [r._id, r.totalCost]));
+              const costMap = new Map(costAgg.map((costEntry) => [costEntry._id, costEntry.totalCost]));
               for (const session of agentConversations) {
-                const sid = (session as Record<string, unknown>).id as string;
-                const realCost = costMap.get(sid);
-                if (realCost !== undefined && realCost > 0) {
-                  (session as Record<string, unknown>).totalCost = realCost;
+                const sessionId = (session as Record<string, unknown>).id as string;
+                const requestLogCost = costMap.get(sessionId);
+                if (requestLogCost !== undefined && requestLogCost > 0) {
+                  (session as Record<string, unknown>).totalCost = Math.max(
+                    (session.totalCost as number) || 0,
+                    requestLogCost,
+                  );
                 }
               }
             }

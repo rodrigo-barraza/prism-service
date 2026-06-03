@@ -13,7 +13,7 @@
  * request_logs and overlays it onto session.totalCost, matching the
  * pattern already used for toolCounts enrichment.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Mock logger (top-level as vitest requires) ──────────────────
 vi.mock("../src/utils/logger.ts", () => ({
@@ -328,6 +328,144 @@ describe("Session Cost Reconciliation", () => {
       const brokenCost = calculateTextCost(brokenUsage, pricing);
       // Now it merges safely and computes the exact correct cost instead of being NaN/lower
       expect(brokenCost!).toBeCloseTo(cost!, 6);
+    });
+  });
+
+  // ── GET /admin routes integration ──────────────────────────────
+  describe("GET /admin routes integration", () => {
+    let agentConversations: any[] = [];
+    let modelConversations: any[] = [];
+    let requests: any[] = [];
+
+    beforeEach(async () => {
+      const request = (await import("supertest")).default;
+      const { app } = await import("./setup.ts");
+      const adminRouter = (await import("../src/routes/AdminRoutes.ts")).default;
+      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+
+      try {
+        app.use("/admin", adminRouter);
+      } catch (err) {}
+
+      agentConversations = [
+        {
+          id: "session-123",
+          title: "OMNI Session",
+          totalCost: 4.21,
+          updatedAt: new Date().toISOString(),
+          agent: "OMNI",
+        },
+      ];
+
+      modelConversations = [
+        {
+          id: "direct-123",
+          title: "Direct Session",
+          totalCost: 1.50,
+          updatedAt: new Date().toISOString(),
+        },
+      ];
+
+      requests = [
+        {
+          agentSessionId: "session-123",
+          estimatedCost: 2.43,
+        },
+        {
+          parentAgentSessionId: "session-123",
+          estimatedCost: 4.21,
+        },
+        {
+          conversationId: "direct-123",
+          estimatedCost: 1.50,
+        },
+      ];
+
+      const mockDb = {
+        collection: (collectionName: string) => {
+          return {
+            find: (queryFilter: any) => {
+              let docs: any[] = [];
+              if (collectionName === "agent_conversations") {
+                docs = agentConversations;
+              } else if (collectionName === "model_conversations") {
+                docs = modelConversations;
+              } else if (collectionName === "requests") {
+                docs = requests;
+              }
+
+              const chain = {
+                project: () => chain,
+                sort: () => chain,
+                skip: () => chain,
+                limit: () => chain,
+                toArray: async () => docs,
+              };
+              return chain;
+            },
+            countDocuments: async () => {
+              if (collectionName === "agent_conversations") {
+                return agentConversations.length;
+              }
+              if (collectionName === "model_conversations") {
+                return modelConversations.length;
+              }
+              return 0;
+            },
+            aggregate: (pipeline: any[]) => {
+              return {
+                toArray: async () => {
+                  return [
+                    {
+                      _id: "session-123",
+                      totalCost: 6.64,
+                    },
+                  ];
+                },
+              };
+            },
+          };
+        },
+      };
+
+      vi.mocked(MongoWrapper.getDb).mockReturnValue(mockDb as any);
+    });
+
+    it("should return correct totalCost from requests overlay for GET /admin/agent-sessions", async () => {
+      const request = (await import("supertest")).default;
+      const { app } = await import("./setup.ts");
+      const apiResponse = await request(app)
+        .get("/admin/agent-sessions")
+        .set("x-gateway-secret", "test-secret")
+        .expect(200);
+
+      const targetSession = apiResponse.body.data.find(
+        (session: any) => session.id === "session-123"
+      );
+      expect(targetSession).toBeDefined();
+      expect(targetSession.totalCost).toBeCloseTo(6.64, 2);
+    });
+
+    it("should return correct totalCost from requests overlay for GET /admin/conversations", async () => {
+      const request = (await import("supertest")).default;
+      const { app } = await import("./setup.ts");
+      const apiResponse = await request(app)
+        .get("/admin/conversations")
+        .set("x-gateway-secret", "test-secret")
+        .expect(200);
+
+      const targetAgentSession = apiResponse.body.data.find(
+        (document: any) => document.id === "session-123"
+      );
+      const targetDirectSession = apiResponse.body.data.find(
+        (document: any) => document.id === "direct-123"
+      );
+
+      expect(targetAgentSession).toBeDefined();
+      expect(targetDirectSession).toBeDefined();
+
+      expect(targetAgentSession.totalCost).toBeCloseTo(6.64, 2);
+      expect(targetDirectSession.totalCost).toBeCloseTo(1.50, 2);
     });
   });
 });
