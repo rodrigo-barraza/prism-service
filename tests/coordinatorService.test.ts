@@ -1,0 +1,139 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// Mock the GitWorktreeHelper to avoid disk operations
+vi.mock("../src/services/coordinator/GitWorktreeHelper.ts", () => ({
+  GitWorktreeHelper: {
+    getDefaultWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
+    resolveRepoPath: vi.fn().mockReturnValue("/workspace"),
+    createWorktree: vi.fn().mockResolvedValue({ worktreePath: "/workspace/worktree-1" }),
+    removeWorktree: vi.fn().mockResolvedValue({}),
+    toolsApiPost: vi.fn().mockResolvedValue({}),
+    getWorktreeDiff: vi.fn().mockResolvedValue({
+      hasChanges: false,
+      additions: 0,
+      deletions: 0,
+      files: [],
+    }),
+  },
+}));
+
+import AgenticLoopService from "../src/services/AgenticLoopService.ts";
+import CoordinatorService from "../src/services/CoordinatorService.ts";
+import AgentPersonaRegistry from "../src/services/AgentPersonaRegistry.ts";
+import { GitWorktreeHelper } from "../src/services/coordinator/GitWorktreeHelper.ts";
+
+const mockRunAgenticLoop = vi.fn().mockResolvedValue({
+  messages: [{ role: "assistant", content: "Mock worker output" }],
+});
+
+describe("CoordinatorService Spawning & Agent Types", () => {
+  let coordinatorCtx: any;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    vi.spyOn(AgenticLoopService, "runAgenticLoop").mockImplementation(mockRunAgenticLoop);
+
+    coordinatorCtx = {
+      project: "test-project",
+      username: "test-user",
+      agent: "CODING",
+      providerName: "google",
+      resolvedModel: "gemini-3-flash-preview",
+      traceId: "trace-id-123",
+      agentSessionId: "session-id-456",
+      conversationId: "conv-id-789",
+      enabledTools: ["read_file", "write_file", "search_web"],
+      emit: vi.fn(),
+    };
+  });
+
+  it("should spawn worker that inherits parent agent type and enabled tools by default", async () => {
+    const result = await CoordinatorService.spawnFromTool({
+      description: "Default spawn worker",
+      prompt: "Do default stuff",
+      files: [],
+      coordinatorCtx,
+    });
+
+    expect(result).toBeDefined();
+    expect(result.error).toBeUndefined();
+
+    // Verify AgenticLoopService.runAgenticLoop was called with parent context details
+    expect(mockRunAgenticLoop).toHaveBeenCalled();
+    const runArgs = mockRunAgenticLoop.mock.calls[0][0];
+
+    // Inherited parent agent "CODING"
+    expect(runArgs.agent).toBe("CODING");
+    // Inherited parent enabledTools
+    expect(runArgs.options.enabledTools).toEqual(["read_file", "write_file", "search_web"]);
+  });
+
+  it("should spawn worker with custom agent type and its native tools when agent is specified", async () => {
+    // LuposPersona is a registered built-in persona
+    const luposPersona = AgentPersonaRegistry.get("LUPOS");
+    expect(luposPersona).not.toBeNull();
+    const luposTools = luposPersona!.availableTools;
+
+    // Clear calls for this test to have predictable indices
+    mockRunAgenticLoop.mockClear();
+
+    const result = await CoordinatorService.spawnFromTool({
+      description: "Custom Lupos worker",
+      prompt: "Do Lupos stuff",
+      agent: "Lupos",
+      files: [],
+      coordinatorCtx,
+    });
+
+    expect(result).toBeDefined();
+    expect(result.error).toBeUndefined();
+
+    expect(mockRunAgenticLoop).toHaveBeenCalled();
+    const runArgs = mockRunAgenticLoop.mock.calls[0][0]; // first call in this test
+
+    // Worker agent type is LUPOS
+    expect(runArgs.agent).toBe("LUPOS");
+    // Worker tools are Lupos's availableTools, NOT inherited parent tools
+    expect(runArgs.options.enabledTools).toEqual(luposTools);
+  });
+
+  it("should support custom agents specified via createTeam members", async () => {
+    const luposPersona = AgentPersonaRegistry.get("LUPOS");
+    expect(luposPersona).not.toBeNull();
+    const luposTools = luposPersona!.availableTools;
+
+    const teamArgs = {
+      name: "custom_team",
+      members: [
+        {
+          description: "Worker 1 (default)",
+          prompt: "Default prompt",
+        },
+        {
+          description: "Worker 2 (Lupos)",
+          prompt: "Lupos prompt",
+          agent: "Lupos",
+        },
+      ],
+    };
+
+    // Clear calls for this test to have predictable indices
+    mockRunAgenticLoop.mockClear();
+
+    const results = await CoordinatorService.createTeam(teamArgs, coordinatorCtx);
+
+    expect(results).toHaveLength(2);
+    expect(mockRunAgenticLoop).toHaveBeenCalledTimes(2);
+
+    const call1Args = mockRunAgenticLoop.mock.calls[0][0];
+    const call2Args = mockRunAgenticLoop.mock.calls[1][0];
+
+    // First call (default) inherits parent agent & tools
+    expect(call1Args.agent).toBe("CODING");
+    expect(call1Args.options.enabledTools).toEqual(["read_file", "write_file", "search_web"]);
+
+    // Second call uses overridden agent (LUPOS) and its tools
+    expect(call2Args.agent).toBe("LUPOS");
+    expect(call2Args.options.enabledTools).toEqual(luposTools);
+  });
+});

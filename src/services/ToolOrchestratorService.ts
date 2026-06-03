@@ -447,6 +447,11 @@ const COORDINATOR_TOOL_SCHEMAS = [
                 description:
                   "Optional: model override for this worker (defaults to coordinator's model).",
               },
+              agent: {
+                type: "string",
+                description:
+                  "Optional: the agent type/persona to spawn (e.g. 'Lupos', 'Coding'). Defaults to the parent agent's type.",
+              },
             },
             required: ["description", "prompt"],
           },

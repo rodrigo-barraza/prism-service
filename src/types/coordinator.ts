@@ -95,6 +95,7 @@ export interface CoordinatorSpawnParams {
   prompt: string;
   files?: string[];
   model?: string;
+  agent?: string;
   assignedProvider?: string;
   assignedModel?: string;
   coordinatorCtx: CoordinatorContext;
@@ -143,6 +144,7 @@ export interface TeamMember {
   prompt: string;
   files?: string[];
   model?: string;
+  agent?: string;
 }
 
 export interface TeamMemberResult {

@@ -12,6 +12,7 @@ import localModelQueue from "./LocalModelQueue.ts";
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
 import { COORDINATOR_ONLY_TOOLS } from "./CoordinatorPrompt.ts";
 import SettingsService from "./SettingsService.ts";
+import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import { createAbortController } from "../utils/AbortController.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
 import { resolveModelForInstances } from "../utils/ModelResolution.ts";
@@ -34,8 +35,7 @@ import type {
   TeamMember,
 } from "../types/coordinator.ts";
 
-import type { ConversationMessage, EmitFn, ToolCall } from "./harnesses/types.ts";
-import type { InstanceEntry } from "../types/ProviderTypes.ts";
+import type { ConversationMessage, ToolCall } from "./harnesses/types.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 // ────────────────────────────────────────────────────────────
@@ -142,6 +142,7 @@ export default class CoordinatorService {
     prompt,
     files,
     model,
+    agent: memberAgentName,
     assignedProvider,
     assignedModel,
     coordinatorCtx,
@@ -285,6 +286,27 @@ export default class CoordinatorService {
 
     const workerAgentSessionId = crypto.randomUUID();
 
+    // Resolve worker agent type and its tools
+    let workerAgent = agent;
+    let workerEnabledTools = enabledTools || null;
+
+    if (memberAgentName) {
+      const persona = AgentPersonaRegistry.get(memberAgentName);
+      if (persona) {
+        workerAgent = persona.id;
+        workerEnabledTools = persona.availableTools.includes("*")
+          ? null
+          : persona.availableTools;
+        logger.info(
+          `[Coordinator] Spawning specified worker agent type "${persona.id}" with availableTools: [${(workerEnabledTools || ["*"]).join(", ")}]`,
+        );
+      } else {
+        logger.warn(
+          `[Coordinator] Requested agent type "${memberAgentName}" not found in registry. Spawning default "${agent}".`,
+        );
+      }
+    }
+
     const workerState: WorkerState = {
       agentId,
       workerAgentSessionId,
@@ -309,14 +331,14 @@ export default class CoordinatorService {
       // Carry coordinator context for continuation
       project,
       username,
-      agent,
+      agent: workerAgent,
       providerName: workerProvider,
       resolvedModel: workerModel,
       traceId,
       maxIterations: resolvedMaxWorkerIterations,
       minContextLength: minContextLength || null,
       parentConversationId,
-      enabledTools: enabledTools || null,
+      enabledTools: workerEnabledTools || null,
     };
 
     activeWorkers.set(agentId, workerState);
@@ -618,6 +640,7 @@ export default class CoordinatorService {
         prompt: member.prompt,
         files: member.files,
         model: member.model,
+        agent: member.agent,
         assignedProvider,
         assignedModel,
         coordinatorCtx,
