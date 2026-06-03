@@ -177,10 +177,10 @@ router.get(
         ...convs.map((item) => ({ ...item, type: "direct" as const })),
         ...sessions.map((session) => ({ ...session, type: "agent" as const })),
       ].sort((firstItem, secondItem) => {
-        const valA = String((firstItem as Record<string, unknown>)[sort as string] ?? "");
-        const valB = String((secondItem as Record<string, unknown>)[sort as string] ?? "");
-        if (valA < valB) return -sortDir;
-        if (valA > valB) return sortDir;
+        const valueA = String((firstItem as Record<string, unknown>)[sort as string] ?? "");
+        const valueB = String((secondItem as Record<string, unknown>)[sort as string] ?? "");
+        if (valueA < valueB) return -sortDir;
+        if (valueA > valueB) return sortDir;
         return 0;
       });
 
@@ -189,7 +189,7 @@ router.get(
       const paginatedDocumentIds = paginatedDocuments.map((document) => (document as Document).id);
       const agentSessionIds = paginatedDocuments
         .filter((document) => document.type === "agent")
-        .map((document) => (document as any).id as string)
+        .map((document) => (document as Record<string, unknown>).id as string)
         .filter(Boolean);
 
       const requests = await req.db
@@ -454,13 +454,13 @@ router.get(
       };
       ChangeStreamService.subscribe(onEvent);
 
-      let prevNonConvCount = 0;
+      let previousNonConversationCount = 0;
       const generationPoll = setInterval(() => {
         const count =
           BenchmarkService.activeGenerationCount +
           ActiveGenerationTracker.count;
-        if (count > 0 || prevNonConvCount > 0) sendStats();
-        prevNonConvCount = count;
+        if (count > 0 || previousNonConversationCount > 0) sendStats();
+        previousNonConversationCount = count;
       }, 1000);
 
       const keepAlive = setInterval(() => {

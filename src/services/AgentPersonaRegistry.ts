@@ -27,12 +27,12 @@ const AgentPersonaRegistry = {
 
   list() {
     return [...PERSONAS.values()]
-      .sort((a, b) => (a.displayOrder ?? 100) - (b.displayOrder ?? 100))
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        type: p.type || "",
-        ...(p.custom ? { custom: true } : {}),
+      .sort((firstPersona, secondPersona) => (firstPersona.displayOrder ?? 100) - (secondPersona.displayOrder ?? 100))
+      .map((persona) => ({
+        id: persona.id,
+        name: persona.name,
+        type: persona.type || "",
+        ...(persona.custom ? { custom: true } : {}),
       }));
   },
 
@@ -93,7 +93,7 @@ const AgentPersonaRegistry = {
       identity: () => (doc.identity as string) || "",
       guidelines: (doc.guidelines as string) || "",
       interactionRules: "",
-      toolPolicy: (ctx: PersonaContext) => {
+      toolPolicy: (personaContext: PersonaContext) => {
         // Support structured ToolPolicySection[] stored in MongoDB,
         // or fall back to wrapping a plain string as a single section.
         const raw = doc.toolPolicy;
@@ -109,7 +109,7 @@ const AgentPersonaRegistry = {
           sections = text ? [{ content: text }] : [];
         }
 
-        return buildToolPolicy(sections, ctx);
+        return buildToolPolicy(sections, personaContext);
       },
       availableTools: Array.isArray(doc.availableTools) ? (doc.availableTools as string[]) : Array.isArray(doc.enabledTools) ? (doc.enabledTools as string[]) : [],
       policies: policies.length > 0 ? policies : undefined,

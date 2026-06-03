@@ -141,11 +141,11 @@ function mcpToolToSchema(serverName: string, mcpTool: MCPRawTool): MCPToolSchema
 function parseMCPToolName(fullName: string): { serverName: string; toolName: string } | null {
   if (!fullName.startsWith(MCP_PREFIX)) return null;
   const rest = fullName.slice(MCP_PREFIX.length);
-  const delimIdx = rest.indexOf(MCP_DELIMITER);
-  if (delimIdx === -1) return null;
+  const delimiterIndex = rest.indexOf(MCP_DELIMITER);
+  if (delimiterIndex === -1) return null;
   return {
-    serverName: rest.slice(0, delimIdx),
-    toolName: rest.slice(delimIdx + MCP_DELIMITER.length),
+    serverName: rest.slice(0, delimiterIndex),
+    toolName: rest.slice(delimiterIndex + MCP_DELIMITER.length),
   };
 }
 
@@ -335,9 +335,9 @@ const MCPClientService = {
         try {
           await this.reconnect(serverName);
           return this.callTool(serverName, toolName, args);
-        } catch (reconnectErr: unknown) {
+        } catch (reconnectError: unknown) {
           return {
-            error: `MCP server "${serverName}" connection lost and reconnect failed: ${getErrorMessage(reconnectErr)}`,
+            error: `MCP server "${serverName}" connection lost and reconnect failed: ${getErrorMessage(reconnectError)}`,
           };
         }
       }

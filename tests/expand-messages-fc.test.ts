@@ -176,7 +176,7 @@ describe("expandMessagesForFC — basic expansion", () => {
         content: "Searching...",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "search_web",
             args: { query: "cats" },
             result: { results: ["found cats"] },
@@ -192,7 +192,7 @@ describe("expandMessagesForFC — basic expansion", () => {
     expect(expanded[2].toolCalls).toHaveLength(1);
     expect(expanded[3].role).toBe("tool");
     expect(expanded[3].name).toBe("search_web");
-    expect(expanded[3].tool_call_id).toBe("tc-0");
+    expect(expanded[3].tool_call_id).toBe("toolCall-0");
     expect(expanded[3].content).toContain("found cats");
   });
 
@@ -203,7 +203,7 @@ describe("expandMessagesForFC — basic expansion", () => {
         content: "Creating audio",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: { title: "War Song" },
             result: {
@@ -234,7 +234,7 @@ describe("expandMessagesForFC — basic expansion", () => {
         content: "Working",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             result: undefined,
@@ -263,7 +263,7 @@ describe("expandMessagesForFC — basic expansion", () => {
         content: "Working",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             result: null,
@@ -289,13 +289,13 @@ describe("expandMessagesForFC — basic expansion", () => {
         content: "Doing both",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "search_web",
             args: {},
             result: { found: true },
           },
           {
-            id: "tc-1",
+            id: "toolCall-1",
             name: "generate_audio",
             args: {},
             result: undefined, // This one has no result
@@ -335,7 +335,7 @@ describe("expandMessagesForFC — iteration 2 context", () => {
         content: "I'll create an original song about war for you!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {
               title: "Echoes of War",
@@ -392,7 +392,7 @@ describe("expandMessagesForFC — iteration 2 context", () => {
         content: "Creating!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             result: {
@@ -453,7 +453,7 @@ describe("expandMessagesForFC — deleted message filtering", () => {
         content: "",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "test_tool",
             args: {},
             result: { ok: true },

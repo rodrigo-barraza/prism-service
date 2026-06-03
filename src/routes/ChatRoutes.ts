@@ -45,19 +45,23 @@ import {
 import { handleSseRequest, handleJsonRequest } from "../utils/SseUtilities.ts";
 import { SseEvent } from "../types/SseTypes.ts";
 import { ChatRequestSchema } from "../types/index.ts";
-import type { ConversationMessage, EmitFn } from "../services/harnesses/types.ts";
+import type { ConversationMessage, EmitFunction, ToolSchema } from "../services/harnesses/types.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+
+interface ToolSchemaWithDomain extends ToolSchema {
+  domain?: string;
+}
 
 const router = express.Router();
 function injectToolsIntoSystemPrompt(
   messages: Array<{ role: string; content?: string; [key: string]: unknown }>,
-  tools: any[],
+  tools: ToolSchemaWithDomain[],
 ) {
   if (!tools || tools.length === 0) {
     return;
   }
 
-  const groups = new Map<string, any[]>();
+  const groups = new Map<string, ToolSchemaWithDomain[]>();
   for (const tool of tools) {
     const domain = ((tool.domain as string) || "Other").replace(/^Agentic:\s*/i, "");
     if (!groups.has(domain)) {
@@ -111,7 +115,7 @@ function injectToolsIntoSystemPrompt(
  */
 async function prepareGenerationContext(
   params: Record<string, unknown>,
-  emit: EmitFn,
+  emit: EmitFunction,
   { signal }: { signal?: AbortSignal } = {},
 ) {
   const requestStart = performance.now();
@@ -426,7 +430,7 @@ async function prepareGenerationContext(
  */
 export async function handleConversation(
   params: Record<string, unknown>,
-  emit: EmitFn,
+  emit: EmitFunction,
   { signal }: { signal?: AbortSignal } = {},
 ) {
   let context: Awaited<ReturnType<typeof prepareGenerationContext>> | null = null;
@@ -499,18 +503,18 @@ export async function handleConversation(
         let tools = builtInTools;
         if (options.enabledTools && Array.isArray(options.enabledTools)) {
           const enabledSet = new Set(options.enabledTools as string[]);
-          tools = tools.filter((t) => enabledSet.has(t.name));
+          tools = tools.filter((toolItem) => enabledSet.has(toolItem.name));
         } else if (
           options.disabledTools &&
           Array.isArray(options.disabledTools)
         ) {
           const disabledSet = new Set(options.disabledTools as string[]);
-          tools = tools.filter((t) => !disabledSet.has(t.name));
+          tools = tools.filter((toolItem) => !disabledSet.has(toolItem.name));
         }
         options.tools = tools;
 
         // Inject tool descriptions into the system prompt
-        injectToolsIntoSystemPrompt(fullCtx.messages as any[], tools);
+        injectToolsIntoSystemPrompt(fullCtx.messages as Array<{ role: string; content?: string; [key: string]: unknown }>, tools as ToolSchemaWithDomain[]);
 
         if (useNativeMcp && (modelDef as Record<string, unknown> | null)?.contextLength) {
           options.contextLength = (modelDef as Record<string, unknown>).contextLength;
@@ -670,8 +674,8 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
           const { default: CoordinatorService } =
             await import("../services/CoordinatorService.js");
           await CoordinatorService.abortWorkersByConversation(conversationId);
-        } catch (cleanupErr: unknown) {
-                    logger.warn(`[agent] Worker cleanup failed: ${getErrorMessage(cleanupErr)}`);
+        } catch (cleanupError: unknown) {
+                    logger.warn(`[agent] Worker cleanup failed: ${getErrorMessage(cleanupError)}`);
         }
       }
     }
@@ -781,9 +785,9 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
         username,
       );
       minioRef = ref;
-    } catch (uploadErr: unknown) {
+    } catch (uploadError: unknown) {
       logger.error(
-                `[chat/image-api] MinIO upload failed: ${getErrorMessage(uploadErr)}`,
+                `[chat/image-api] MinIO upload failed: ${getErrorMessage(uploadError)}`,
       );
     }
   }
@@ -1079,7 +1083,7 @@ async function handleStreamingText(context: GenerationContext) {
     });
     emit({
       type: SSE_EVENT_TYPES.STATUS,
-      message: (STATUS_MESSAGES as any).MAX_TOKENS_TRUNCATED || "max_tokens_truncated",
+      message: (STATUS_MESSAGES as Record<string, string>).MAX_TOKENS_TRUNCATED || "max_tokens_truncated",
       phase: "truncated",
     });
     streamState.text = truncationWarning;
@@ -1099,7 +1103,7 @@ async function handleStreamingText(context: GenerationContext) {
     audioChunks: streamState.audioChunks,
     audioSampleRate: streamState.audioSampleRate,
     usage: streamState.usage as FinalizerTokenUsage | null,
-    resolvedEnabledTools: (options.tools as any[])?.map((t) => t.name) || null,
+    resolvedEnabledTools: (options.tools as ToolSchema[] | undefined)?.map((toolSchema) => toolSchema.name) || null,
     outputCharacters: streamState.outputCharacters,
     timeToGenerationSec: streamState.firstTokenTime
       ? (streamState.firstTokenTime - requestStart) / 1000
@@ -1197,9 +1201,9 @@ async function handleNonStreamingText(context: GenerationContext) {
             username,
           );
           minioRef = ref;
-        } catch (uploadErr: unknown) {
+        } catch (uploadError: unknown) {
           logger.error(
-            `[chat/non-stream] MinIO upload failed: ${getErrorMessage(uploadErr)}`,
+            `[chat/non-stream] MinIO upload failed: ${getErrorMessage(uploadError)}`,
           );
         }
         images.push(
@@ -1229,7 +1233,7 @@ async function handleNonStreamingText(context: GenerationContext) {
     audioChunks: [],
     audioSampleRate: 24000,
     usage: genResult.usage || { inputTokens: 0, outputTokens: 0 },
-    resolvedEnabledTools: (options.tools as any[])?.map((t) => t.name) || null,
+    resolvedEnabledTools: (options.tools as ToolSchema[] | undefined)?.map((toolSchema) => toolSchema.name) || null,
     outputCharacters: genResult.text ? genResult.text.length : 0,
     timeToGenerationSec: (generationStart - requestStart) / 1000,
     generationSec: (now - generationStart) / 1000,

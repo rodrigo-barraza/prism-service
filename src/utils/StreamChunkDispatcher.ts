@@ -168,16 +168,16 @@ export async function dispatchChunk(
   // Non-object chunks are treated as text (raw string from provider)
   if (!chunk || typeof chunk !== "object") {
     emitFirstToken(state, emit);
-    const rawStr = typeof chunk === "string" ? chunk : "";
-    state.text += rawStr;
+    const rawString = typeof chunk === "string" ? chunk : "";
+    state.text += rawString;
     // Strip tool call XML markup leaked by some local models (Gemma 4)
     const cleanText = stripToolCallMarkup(state.text);
-    const chunkStr = cleanText.slice(state.outputCharacters);
+    const chunkString = cleanText.slice(state.outputCharacters);
     state.outputCharacters = cleanText.length;
-    if (chunkStr)
+    if (chunkString)
       emit({
         type: SSE_EVENT_TYPES.CHUNK,
-        content: chunkStr,
+        content: chunkString,
         outputCharacters: state.outputCharacters,
       });
     return true;
@@ -271,9 +271,9 @@ export async function dispatchChunk(
 
       if (chunk.status === "done" || chunk.status === "error") {
         const existing = state.toolCalls.find(
-          (tc) =>
-            (chunk.id && tc.id === chunk.id) ||
-            (!chunk.id && tc.name === chunk.name && !tc.result),
+          (toolCall) =>
+            (chunk.id && toolCall.id === chunk.id) ||
+            (!chunk.id && toolCall.name === chunk.name && !toolCall.result),
         );
         if (existing) {
           existing.result = chunk.result || undefined;
@@ -325,16 +325,16 @@ export async function dispatchChunk(
     default: {
       // Unknown typed chunk — treat as text
       emitFirstToken(state, emit);
-      const rawStr = typeof chunk === "string" ? chunk : "";
-      state.text += rawStr;
+      const rawString = typeof chunk === "string" ? chunk : "";
+      state.text += rawString;
       // Strip tool call XML markup leaked by some local models (Gemma 4)
       const cleanText = stripToolCallMarkup(state.text);
-      const chunkStr = cleanText.slice(state.outputCharacters);
+      const chunkString = cleanText.slice(state.outputCharacters);
       state.outputCharacters = cleanText.length;
-      if (chunkStr)
+      if (chunkString)
         emit({
           type: SSE_EVENT_TYPES.CHUNK,
-          content: chunkStr,
+          content: chunkString,
           outputCharacters: state.outputCharacters,
         });
       return true;

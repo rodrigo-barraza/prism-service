@@ -27,13 +27,13 @@ const mockRunAgenticLoop = vi.fn().mockResolvedValue({
 });
 
 describe("CoordinatorService Spawning & Agent Types", () => {
-  let coordinatorCtx: any;
+  let coordinatorContext: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.spyOn(AgenticLoopService, "runAgenticLoop").mockImplementation(mockRunAgenticLoop);
 
-    coordinatorCtx = {
+    coordinatorContext = {
       project: "test-project",
       username: "test-user",
       agent: "CODING",
@@ -52,7 +52,7 @@ describe("CoordinatorService Spawning & Agent Types", () => {
       description: "Default spawn worker",
       prompt: "Do default stuff",
       files: [],
-      coordinatorCtx,
+      coordinatorContext,
     });
 
     expect(result).toBeDefined();
@@ -82,7 +82,7 @@ describe("CoordinatorService Spawning & Agent Types", () => {
       prompt: "Do Lupos stuff",
       agent: "Lupos",
       files: [],
-      coordinatorCtx,
+      coordinatorContext,
     });
 
     expect(result).toBeDefined();
@@ -120,7 +120,7 @@ describe("CoordinatorService Spawning & Agent Types", () => {
     // Clear calls for this test to have predictable indices
     mockRunAgenticLoop.mockClear();
 
-    const results = await CoordinatorService.createTeam(teamArgs, coordinatorCtx);
+    const results = await CoordinatorService.createTeam(teamArgs, coordinatorContext);
 
     expect(results).toHaveLength(2);
     expect(mockRunAgenticLoop).toHaveBeenCalledTimes(2);

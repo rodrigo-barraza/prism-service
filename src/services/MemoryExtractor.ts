@@ -14,7 +14,7 @@ import {
 } from "../utils/CostCalculator.ts";
 import { TYPES, getPricing } from "../config.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import type { ConversationMessage, ToolCall, EmitFn, AgenticContext } from "./harnesses/types.ts";
+import type { ConversationMessage, ToolCall, EmitFunction, AgenticContext } from "./harnesses/types.ts";
 import type { GenerateTextResult } from "../types/provider.ts";
 import type { MessagePayload } from "./RequestLogger.ts";
 
@@ -120,7 +120,7 @@ interface MemoryExtractionContext {
   endpoint?: string | null;
   agent?: string | null;
   toolCalls?: ToolCall[];
-  emit?: EmitFn | null;
+  emit?: EmitFunction | null;
 }
 
 interface MemorySettingsSection {
@@ -311,18 +311,19 @@ export default class MemoryExtractor {
         }
       }
 
-      let memories = parseJsonFromLlmResponse(result!.text) as any;
+      let memories: unknown = parseJsonFromLlmResponse(result!.text);
       if (memories && typeof memories === "object" && !Array.isArray(memories)) {
-        if (Array.isArray(memories.memories)) {
-          memories = memories.memories;
-        } else if (Array.isArray(memories.extractedMemories)) {
-          memories = memories.extractedMemories;
-        } else if (memories.type && memories.title && memories.content) {
-          memories = [memories];
+        const memoriesRecord = memories as Record<string, unknown>;
+        if (Array.isArray(memoriesRecord.memories)) {
+          memories = memoriesRecord.memories;
+        } else if (Array.isArray(memoriesRecord.extractedMemories)) {
+          memories = memoriesRecord.extractedMemories;
+        } else if (memoriesRecord.type && memoriesRecord.title && memoriesRecord.content) {
+          memories = [memoriesRecord];
         } else {
-          const arrayKey = Object.keys(memories).find((key) => Array.isArray(memories[key]));
+          const arrayKey = Object.keys(memoriesRecord).find((key) => Array.isArray(memoriesRecord[key]));
           if (arrayKey) {
-            memories = memories[arrayKey];
+            memories = memoriesRecord[arrayKey];
           }
         }
       }
@@ -334,16 +335,18 @@ export default class MemoryExtractor {
         return [];
       }
 
+      const extractedMemories = memories as ExtractedMemory[];
+
       // ── Store each memory via MemoryService ─────────────────────
       const agentId = agent || "CODING";
       const stored: StoredMemory[] = [];
 
-      for (const memObject of memories) {
-        if (!memObject.content || !memObject.title) continue;
+      for (const memoryObject of extractedMemories) {
+        if (!memoryObject.content || !memoryObject.title) continue;
 
         // Validate type — default to "project" if unknown
-        const type = CODING_MEMORY_TYPES.includes(memObject.type)
-          ? memObject.type
+        const type = CODING_MEMORY_TYPES.includes(memoryObject.type)
+          ? memoryObject.type
           : "project";
 
         try {
@@ -352,8 +355,8 @@ export default class MemoryExtractor {
             project,
             username,
             type,
-            title: memObject.title,
-            content: memObject.content,
+            title: memoryObject.title,
+            content: memoryObject.content,
             conversationId: conversationId || undefined,
             traceId: traceId || undefined,
             agentSessionId: agentSessionId || undefined,
@@ -361,13 +364,13 @@ export default class MemoryExtractor {
           });
 
           if (storeResult) {
-            stored.push({ type, id: storeResult.id, title: memObject.title });
+            stored.push({ type, id: storeResult.id, title: memoryObject.title });
             logger.info(
-              `[MemoryExtractor] Stored [${type}] "${memObject.title.substring(0, 60)}"`,
+              `[MemoryExtractor] Stored [${type}] "${memoryObject.title.substring(0, 60)}"`,
             );
           } else {
             logger.info(
-              `[MemoryExtractor] Skipped duplicate [${type}] "${memObject.title.substring(0, 60)}"`,
+              `[MemoryExtractor] Skipped duplicate [${type}] "${memoryObject.title.substring(0, 60)}"`,
             );
           }
         } catch (error: unknown) {
@@ -376,7 +379,7 @@ export default class MemoryExtractor {
       }
 
       logger.info(
-        `[MemoryExtractor] Stored ${stored.length}/${memories.length} memories from conversation ${conversationId || "unknown"}`,
+        `[MemoryExtractor] Stored ${stored.length}/${extractedMemories.length} memories from conversation ${conversationId || "unknown"}`,
       );
 
       // Emit usage for the embedding calls that happened during storage.

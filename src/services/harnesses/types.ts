@@ -107,7 +107,7 @@ export interface ValidationFeedback {
 
 // ── SSE Emission ────────────────────────────────────────────
 
-export type EmitFn = (event: { type: string; [key: string]: unknown }) => void;
+export type EmitFunction = (event: { type: string; [key: string]: unknown }) => void;
 
 // ── LLM Provider ────────────────────────────────────────────
 
@@ -190,7 +190,7 @@ export interface AgenticContext {
   providerName: string;
   resolvedModel: string;
   signal?: AbortSignal | null;
-  emit: EmitFn;
+  emit: EmitFunction;
   requestId?: string;
   requestStart?: number;
   clientIp?: string | null;
@@ -230,7 +230,7 @@ export type ChunkAction =
   | { action: "continue" }
   | { action: "break" }
   | { action: "skip" }
-  | { action: "toolCall"; tc: ToolCall };
+  | { action: "toolCall"; toolCall: ToolCall };
 
 // ── AgenticLoopState Constructor ────────────────────────────
 

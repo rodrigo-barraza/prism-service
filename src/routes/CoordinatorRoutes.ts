@@ -4,6 +4,17 @@ import CoordinatorService from "../services/CoordinatorService.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
+interface WorkerSummary {
+  agentId: string;
+  description: string;
+  status: string;
+  providerName?: string;
+  resolvedModel?: string;
+  durationMs: number;
+  toolUses: number;
+  hasChanges: boolean;
+}
+
 const router = Router();
 
 
@@ -26,7 +37,7 @@ router.get(
       parentConversationId: conversationIdentifier,
     });
 
-    let persistedWorkersList: any[] = [];
+    let persistedWorkersList: WorkerSummary[] = [];
     if (conversationIdentifier) {
       try {
         const { default: MongoWrapper } =
@@ -55,7 +66,7 @@ router.get(
       }
     }
 
-    const mergedWorkersMap = new Map<string, any>();
+    const mergedWorkersMap = new Map<string, WorkerSummary>();
     for (const worker of persistedWorkersList) {
       mergedWorkersMap.set(worker.agentId, worker);
     }

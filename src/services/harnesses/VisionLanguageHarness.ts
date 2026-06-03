@@ -95,7 +95,7 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
     }
 
     // ── Inject live vision system instruction ─────────────────
-    const systemMessage = currentMessages.find((m) => m.role === "system");
+    const systemMessage = currentMessages.find((message) => message.role === "system");
     const visionInstruction = `
 
 ## 🎥 LIVE VISION FEED ACTIVE
@@ -142,13 +142,13 @@ Use these images to observe the environment, notice changes, animations, or user
         await hooks.run("beforePrompt" as Parameters<typeof hooks.run>[0], hookContext as Parameters<typeof hooks.run>[1]);
 
         // ── Persist assembled system prompt to conversationMeta ──
-        const assembledSystemMsg = currentMessages.find(
-          (m) => m.role === "system",
+        const assembledSystemMessage = currentMessages.find(
+          (message) => message.role === "system",
         );
-        if (assembledSystemMsg?.content) {
+        if (assembledSystemMessage?.content) {
           context.conversationMeta = {
             ...(context.conversationMeta || {}),
-            systemPrompt: assembledSystemMsg.content,
+            systemPrompt: assembledSystemMessage.content,
           };
         }
 

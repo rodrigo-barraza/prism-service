@@ -393,8 +393,8 @@ class LocalProviderGateway {
           { models: [] },
         )) as ListModelsResponse | null | undefined;
         const models = result?.models || result?.data || [];
-        const found = models.some((m: Record<string, unknown>) => {
-          const key = (m.key || m.id || m.model || m.name) as string | undefined;
+        const found = models.some((modelEntry: Record<string, unknown>) => {
+          const key = (modelEntry.key || modelEntry.id || modelEntry.model || modelEntry.name) as string | undefined;
           return key === modelName;
         });
         return found ? instance : null;

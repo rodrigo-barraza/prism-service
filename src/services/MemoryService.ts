@@ -152,12 +152,12 @@ async function extractFactsFromConversation(
   const requestStart = performance.now();
     const participantList = participants
     .map(
-      (p: Record<string, unknown>) =>
-        `- ID: ${p.id}, Username: ${p.username}, Display: ${p.displayName || p.username}`,
+      (participant: Record<string, unknown>) =>
+        `- ID: ${participant.id}, Username: ${participant.username}, Display: ${participant.displayName || participant.username}`,
     )
     .join("\n");
     const conversationText = messages
-    .map((m: Record<string, unknown>) => `${m.name || m.role}: ${m.content}`)
+    .map((message: Record<string, unknown>) => `${message.name || message.role}: ${message.content}`)
     .join("\n");
   const systemPrompt = `You are a memory extraction system. Analyze the conversation and extract notable personal facts about the participants. Focus on:
 - Personal information (location, occupation, hobbies, pets, family)
@@ -230,12 +230,12 @@ ${participantList}`;
   if (!Array.isArray(facts)) return [];
   // Validate each fact has the required fields
   return (facts as Record<string, unknown>[]).filter(
-        (f: Record<string, unknown>) =>
-      f.fact &&
-      f.aboutUserId &&
-      f.aboutUsername &&
-      typeof f.confidence === "number" &&
-      f.confidence >= 0.5,
+        (fact: Record<string, unknown>) =>
+      fact.fact &&
+      fact.aboutUserId &&
+      fact.aboutUsername &&
+      typeof fact.confidence === "number" &&
+      fact.confidence >= 0.5,
   ) as unknown as ExtractedFact[];
 }
 // ─── Unified Memory Service ──────────────────────────────────────────────────
@@ -450,22 +450,22 @@ const MemoryService = {
     if (memories.length === 0) return [];
     // Compute cosine similarity and sort
     const scored = memories
-      .filter((m: Record<string, unknown>) => m.embedding && (m.embedding as number[]).length > 0)
-      .map((m: Record<string, unknown>) => ({
-        id: m._id,
-        type: m.type || "other",
-                title: m.title || (m.content ? (m.content as string).substring(0, 60) : "untitled"),
-        content: m.content || "",
-        aboutUserId: m.aboutUserId,
-        aboutUsername: m.aboutUsername,
-        confidence: m.confidence,
-        createdAt: m.createdAt,
-                age: memoryAge(m.createdAt as string),
-                ageDays: memoryAgeDays(m.createdAt as string),
-                score: cosineSimilarity(queryEmbedding as number[], m.embedding as number[]),
+      .filter((memory: Record<string, unknown>) => memory.embedding && (memory.embedding as number[]).length > 0)
+      .map((memory: Record<string, unknown>) => ({
+        id: memory._id,
+        type: memory.type || "other",
+                title: memory.title || (memory.content ? (memory.content as string).substring(0, 60) : "untitled"),
+        content: memory.content || "",
+        aboutUserId: memory.aboutUserId,
+        aboutUsername: memory.aboutUsername,
+        confidence: memory.confidence,
+        createdAt: memory.createdAt,
+                age: memoryAge(memory.createdAt as string),
+                ageDays: memoryAgeDays(memory.createdAt as string),
+                score: cosineSimilarity(queryEmbedding as number[], memory.embedding as number[]),
       }))
       .filter((message) => message.score > RELEVANCE_THRESHOLD)
-      .sort((firstItem, b) => b.score - firstItem.score)
+      .sort((firstItem, secondItem) => secondItem.score - firstItem.score)
             .slice(0, limit);
     logger.info(
       `[MemoryService] Search found ${scored.length} relevant memories for ${agent} (from ${memories.length} total)`,
@@ -558,11 +558,11 @@ const MemoryService = {
   formatForPrompt(memories: Record<string, unknown>[]) {
     if (!memories || memories.length === 0) return "";
         return memories
-      .map((m: Record<string, unknown>) => {
-        const badge = `[${m.type}]`;
-        const age = m.age !== "today" ? ` (${m.age})` : "";
-                const caveat = freshnessCaveat(m.createdAt as string);
-        return `- ${badge} **${m.title}**${age}: ${m.content}${caveat}`;
+      .map((memory: Record<string, unknown>) => {
+        const badge = `[${memory.type}]`;
+        const age = memory.age !== "today" ? ` (${memory.age})` : "";
+                const caveat = freshnessCaveat(memory.createdAt as string);
+        return `- ${badge} **${memory.title}**${age}: ${memory.content}${caveat}`;
       })
       .join("\n");
   },

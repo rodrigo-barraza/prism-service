@@ -11,8 +11,8 @@ console.log("🔒 Connecting to Synology Vault at http://192.168.86.2:5599...");
 try {
   const { bootstrapEnv } = await import("@rodrigo-barraza/utilities-library/vault");
   await bootstrapEnv();
-} catch (err: any) {
-  console.log("⚠️  bootstrapEnv failed:", err.message);
+} catch (error: any) {
+  console.log("⚠️  bootstrapEnv failed:", error.message);
 }
 
 const { getProvider } = await import("../src/providers/index.ts");

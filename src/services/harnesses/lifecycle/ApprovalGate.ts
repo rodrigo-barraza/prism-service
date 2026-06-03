@@ -73,7 +73,10 @@ export async function checkAndWaitForApproval(
         id: toolCall.id,
         name: toolCall.name,
         args: toolCall.args,
-        _approval: toolCall._approval,
+        _approval: {
+          tier: String(toolCall._approval.tier),
+          tierLabel: toolCall._approval.tierLabel,
+        },
       })),
     });
   });

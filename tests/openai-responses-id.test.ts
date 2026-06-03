@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { prepareResponsesInput, OpenAIMsg } from "../src/providers/openai.ts";
+import { prepareResponsesInput, OpenAIMessage } from "../src/providers/openai.ts";
 
 describe("OpenAI Responses API input preparation", () => {
   it("converts function call IDs to begin with 'fc' if they start with 'call_'", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         content: "Here is the audio",
@@ -40,7 +40,7 @@ describe("OpenAI Responses API input preparation", () => {
   });
 
   it("preserves function call IDs that already start with 'fc'", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         toolCalls: [
@@ -66,7 +66,7 @@ describe("OpenAI Responses API input preparation", () => {
   });
 
   it("handles empty toolCall IDs and generates a valid 'fc_' prefixed random ID", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         toolCalls: [
@@ -91,7 +91,7 @@ describe("OpenAI Responses API input preparation", () => {
   });
 
   it("handles non-standard toolCall IDs and prepends them with 'fc_'", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         toolCalls: [
@@ -117,7 +117,7 @@ describe("OpenAI Responses API input preparation", () => {
   });
 
   it("prefers responsesItemId if it starts with 'fc'", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         toolCalls: [
@@ -146,7 +146,7 @@ describe("OpenAI Responses API input preparation", () => {
   // ── Multi-turn correlation edge cases ─────────────────────────
 
   it("correctly correlates function_call and function_call_output call_ids in multi-turn conversations", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       { role: "system", content: "You are a helpful assistant." },
       { role: "user", content: "Generate a song" },
       {
@@ -189,7 +189,7 @@ describe("OpenAI Responses API input preparation", () => {
   });
 
   it("handles multiple tool calls in a single assistant message", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         content: "I'll do both tasks.",
@@ -237,7 +237,7 @@ describe("OpenAI Responses API input preparation", () => {
       summary: [{ type: "summary_text", text: "Thinking about what to generate..." }],
     };
 
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         toolCalls: [
@@ -267,7 +267,7 @@ describe("OpenAI Responses API input preparation", () => {
   });
 
   it("handles assistant message without text content (tool calls only)", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         content: "",
@@ -289,7 +289,7 @@ describe("OpenAI Responses API input preparation", () => {
   });
 
   it("handles tool results loaded from database (missing tool_call_id, using id fallback)", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         toolCalls: [
@@ -324,7 +324,7 @@ describe("OpenAI Responses API input preparation", () => {
   });
 
   it("converts system role to developer role", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       { role: "system", content: "You are a helpful assistant." },
       { role: "user", content: "Hello" },
     ];
@@ -335,7 +335,7 @@ describe("OpenAI Responses API input preparation", () => {
   });
 
   it("handles responsesItemId that does NOT start with 'fc' — falls through to fallback", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         toolCalls: [
@@ -358,7 +358,7 @@ describe("OpenAI Responses API input preparation", () => {
   });
 
   it("serializes object args to JSON string", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         toolCalls: [
@@ -379,7 +379,7 @@ describe("OpenAI Responses API input preparation", () => {
   // ── Compact format edge cases (non-streaming path) ─────────
 
   it("generates function_call_output from compact-format embedded results", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         content: "I generated the audio.",
@@ -413,7 +413,7 @@ describe("OpenAI Responses API input preparation", () => {
   });
 
   it("generates function_call_output for multiple compact-format tool calls", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         toolCalls: [
@@ -449,7 +449,7 @@ describe("OpenAI Responses API input preparation", () => {
   });
 
   it("does NOT generate function_call_output for tool calls without results (pending execution)", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         toolCalls: [
@@ -469,7 +469,7 @@ describe("OpenAI Responses API input preparation", () => {
   });
 
   it("handles expanded-format (separate tool messages) without duplicating function_call_output", () => {
-    const messages: OpenAIMsg[] = [
+    const messages: OpenAIMessage[] = [
       {
         role: "assistant",
         toolCalls: [

@@ -258,12 +258,12 @@ describe("checkBatch", () => {
     expect(needsApproval).toHaveLength(2);
 
     // Auto-approved should be the read-only tools
-    expect(autoApproved.map((t) => t.name)).toEqual(
+    expect(autoApproved.map((tool) => tool.name)).toEqual(
       expect.arrayContaining(["read_file", "grep_search"]),
     );
 
     // Needs approval should be write + danger
-    expect(needsApproval.map((t) => t.name)).toEqual(
+    expect(needsApproval.map((tool) => tool.name)).toEqual(
       expect.arrayContaining(["write_file", "execute_shell"]),
     );
   });
@@ -345,14 +345,14 @@ describe("checkBatch", () => {
   it("preserves original tool call properties", () => {
     const engine = new AutoApprovalEngine();
     const toolCalls = [
-      { name: "read_file", args: { path: "/foo/bar.js" }, id: "tc-abc-123" },
+      { name: "read_file", args: { path: "/foo/bar.js" }, id: "toolCall-abc-123" },
     ];
 
     const { autoApproved } = engine.checkBatch(toolCalls);
 
     expect(autoApproved[0].name).toBe("read_file");
     expect(autoApproved[0].args).toEqual({ path: "/foo/bar.js" });
-    expect(autoApproved[0].id).toBe("tc-abc-123");
+    expect(autoApproved[0].id).toBe("toolCall-abc-123");
   });
 });
 
@@ -563,7 +563,7 @@ describe("check — policy integration", () => {
 
     const { autoApproved, needsApproval } = engine.checkBatch(toolCalls);
     expect(autoApproved).toHaveLength(2);
-    expect(autoApproved.map(t => t.name)).toEqual(
+    expect(autoApproved.map(tool => tool.name)).toEqual(
       expect.arrayContaining(["read_file", "execute_shell"]),
     );
     expect(needsApproval).toHaveLength(1);

@@ -18,7 +18,7 @@ import {
 } from "./CompactionPrompt.ts";
 import type { ChatMessage } from "../../types/admin.ts";
 import type { GenerateTextResult } from "../../types/provider.ts";
-import type { EmitFn } from "../harnesses/types.ts";
+import type { EmitFunction } from "../harnesses/types.ts";
 
 // ────────────────────────────────────────────────────────────
 // CompactionService — LLM-Powered Conversation Summarization
@@ -68,7 +68,7 @@ interface CompactionOptions {
   agentSessionId: string;
   traceId?: string | null;
   agent?: string | null;
-  emit?: EmitFn | null;
+  emit?: EmitFunction | null;
   signal?: AbortSignal;
 }
 

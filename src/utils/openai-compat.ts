@@ -205,17 +205,17 @@ export function extractToolCallsFromMessage(message: OpenAIMessage | null | unde
   if (!message?.tool_calls || message.tool_calls.length === 0) return null;
 
   return message.tool_calls.map((toolCall) => {
-    const fnName = toolCall.function?.name || toolCall.name || "";
-    const fnArgs = toolCall.function?.arguments || toolCall.arguments || "{}";
+    const functionName = toolCall.function?.name || toolCall.name || "";
+    const functionArguments = toolCall.function?.arguments || toolCall.arguments || "{}";
     let args: Record<string, unknown> = {};
     try {
-      args = JSON.parse(fnArgs);
+      args = JSON.parse(functionArguments);
     } catch {
       /* ignore */
     }
     return {
       id: toolCall.id || null,
-      name: fnName,
+      name: functionName,
       args,
     };
   });
@@ -699,15 +699,15 @@ export async function fetchOpenAICompat(
 
   if (!response.ok) {
     const errorText = await response.text();
-    let errorMsg = `API error: ${response.status} ${errorText}`;
+    let errorMessage = `API error: ${response.status} ${errorText}`;
     try {
       const parsed = JSON.parse(errorText);
-      if (parsed?.error?.message) errorMsg = parsed.error.message;
-      else if (parsed?.message) errorMsg = parsed.message;
+      if (parsed?.error?.message) errorMessage = parsed.error.message;
+      else if (parsed?.message) errorMessage = parsed.message;
     } catch {
       /* raw text fallback */
     }
-    throw new Error(errorMsg);
+    throw new Error(errorMessage);
   }
 
   return response;

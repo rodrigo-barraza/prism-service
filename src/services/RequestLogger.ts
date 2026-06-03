@@ -128,26 +128,26 @@ export interface LogBackgroundLlmCallParams extends LogParams {
   extraResponsePayload?: Record<string, unknown>;
 }
 
-function sanitizeMsg(m: MessagePayload) {
-  const sanitizeStr = (s: unknown) =>
+function sanitizeMsg(message: MessagePayload) {
+  const sanitizeString = (s: unknown) =>
         typeof s === "string" && s.startsWith("data:") ? `[base64 data]` : s;
   const sanitizeMedia = (value: unknown) => {
-    if (Array.isArray(value)) return value.map(sanitizeStr);
-    if (typeof value === "string") return sanitizeStr(value);
+    if (Array.isArray(value)) return value.map(sanitizeString);
+    if (typeof value === "string") return sanitizeString(value);
     return value;
   };
   return {
-    role: m.role,
-    content: m.content,
-        ...(m.images?.length ? { images: sanitizeMedia(m.images) } : {}),
-        ...(m.audio?.length ? { audio: sanitizeMedia(m.audio) } : {}),
-        ...(m.video?.length ? { video: sanitizeMedia(m.video) } : {}),
-        ...(m.pdf?.length ? { pdf: sanitizeMedia(m.pdf) } : {}),
-        ...(m.toolCalls ? { toolCalls: m.toolCalls } : {}),
-        ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
-        ...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
-        ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}),
-        ...(m.name ? { name: m.name } : {}),
+    role: message.role,
+    content: message.content,
+        ...(message.images?.length ? { images: sanitizeMedia(message.images) } : {}),
+        ...(message.audio?.length ? { audio: sanitizeMedia(message.audio) } : {}),
+        ...(message.video?.length ? { video: sanitizeMedia(message.video) } : {}),
+        ...(message.pdf?.length ? { pdf: sanitizeMedia(message.pdf) } : {}),
+        ...(message.toolCalls ? { toolCalls: message.toolCalls } : {}),
+        ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
+        ...(message.toolCallId ? { toolCallId: message.toolCallId } : {}),
+        ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
+        ...(message.name ? { name: message.name } : {}),
   };
 }
 const RequestLogger = {
@@ -328,7 +328,7 @@ const RequestLogger = {
           ? [
               ...new Set(
                                 toolCalls.map(
-                                    (tc) => (API_TO_CANONICAL as Record<string, string>)[tc.name] || tc.name,
+                                    (toolCall) => (API_TO_CANONICAL as Record<string, string>)[toolCall.name] || toolCall.name,
                 ),
               ),
             ]
@@ -355,8 +355,8 @@ const RequestLogger = {
       stopSequences: options?.stopSequences ?? null,
       messageCount: messages?.length ?? 0,
       inputCharacters: messages?.reduce(
-        (sum, m) =>
-                    sum + (typeof m.content === "string" ? m.content.length : 0),
+        (sum, message) =>
+                    sum + (typeof message.content === "string" ? message.content.length : 0),
         0,
       ) ?? 0,
       outputCharacters,

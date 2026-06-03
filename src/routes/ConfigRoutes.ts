@@ -116,7 +116,7 @@ function lookupArenaScores(modelName: string) {
     if (!scores || typeof scores !== "object") continue;
 
     let bestMatch: number | null = null;
-    let bestLen = 0;
+    let bestLength = 0;
 
     for (const [arenaName, score] of Object.entries(scores)) {
       const normalizedArenaName = arenaName.toLowerCase();
@@ -134,9 +134,9 @@ function lookupArenaScores(modelName: string) {
         key.includes(normalizedArenaName) ||
         normalizedArenaName.includes(cleaned);
 
-      if (matched && normalizedArenaName.length > bestLen) {
+      if (matched && normalizedArenaName.length > bestLength) {
         bestMatch = score as number;
-        bestLen = normalizedArenaName.length;
+        bestLength = normalizedArenaName.length;
       }
     }
 

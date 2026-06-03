@@ -369,22 +369,22 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           const modelsResult = await this.listModels();
           const models = (modelsResult as { models?: Array<Record<string, unknown>> }).models;
           if (options.signal?.aborted) return;
-          const modelEntry = (models || []).find((m: Record<string, unknown>) => m.key === model) as Record<string, unknown> | undefined;
+          const modelEntry = (models || []).find((modelItem: Record<string, unknown>) => modelItem.key === model) as Record<string, unknown> | undefined;
           const isLoaded = (modelEntry?.loaded_instances as Array<Record<string, unknown>>)?.length > 0;
           // Capture loaded context for tool cap calculation
           if (isLoaded) {
-            const loadedCtx =
+            const loadedContext =
               (modelEntry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
-            if (loadedCtx?.context_length) options._loadedContextLength = loadedCtx.context_length as number;
+            if (loadedContext?.context_length) options._loadedContextLength = loadedContext.context_length as number;
           }
           // If minContextLength is requested (e.g. agentic mode) and model is loaded
           // with insufficient context, force a reload with the required minimum.
           // BUT: skip reload if the model is already at its maximum context — reloading
           // would just load the same max again, creating an infinite unload/reload loop
           // (e.g. minContextLength=150k but model max is 32k → loads at 32k → 32k<150k → reload → 32k → …).
-          const modelMaxCtx = (modelEntry as Record<string, unknown>)?.max_context_length as number || 0;
+          const modelMaximumContext = (modelEntry as Record<string, unknown>)?.max_context_length as number || 0;
           const alreadyAtMax =
-            modelMaxCtx > 0 && (options._loadedContextLength as number) >= modelMaxCtx;
+            modelMaximumContext > 0 && (options._loadedContextLength as number) >= modelMaximumContext;
           const needsReload =
             isLoaded &&
                         options.minContextLength &&
@@ -397,8 +397,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
             (options._loadedContextLength as number) < options.minContextLength
           ) {
                         logger.info(
-                            `[LM-Studio] Model ${model} already at max context (${options._loadedContextLength}/${modelMaxCtx}) — skipping reload (requested ${options.minContextLength})`,
-            );
+                            `[LM-Studio] Model ${model} already at max context (${options._loadedContextLength}/${modelMaximumContext}) — skipping reload (requested ${options.minContextLength})`,
+                        );
           }
           if (needsReload) {
             const target = Math.min(
@@ -448,7 +448,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
               // Model should now be loaded — capture its context length
               const refreshed = await this.listModels();
               const entry = ((refreshed as Record<string, unknown>).models as Array<Record<string, unknown>> || []).find(
-                (m: Record<string, unknown>) => m.key === model,
+                (modelItem: Record<string, unknown>) => modelItem.key === model,
               );
               if (entry?.loaded_instances) {
                 const instances = entry.loaded_instances as Array<Record<string, unknown>>;
@@ -478,7 +478,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
               // Check if the model was loaded by a previous singleflight or externally
               const recheck = await this.listModels()
                 .then(({ models: ms }: Record<string, unknown>) =>
-                  ((ms || []) as Array<Record<string, unknown>>).find((m: Record<string, unknown>) => m.key === model),
+                  ((ms || []) as Array<Record<string, unknown>>).find((modelItem: Record<string, unknown>) => modelItem.key === model),
                 )
                 .catch(() => null);
               const isNowLoaded = (recheck as Record<string, unknown>)?.loaded_instances &&
@@ -492,7 +492,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                 // ── SYNCHRONOUS registration — no awaits after this point ──
                 // Double-check: between our listModels() and here, another
                 // worker may have registered. Only register if still clear.
-                let resolveInflight: (() => void) | undefined, rejectInflight: ((err: unknown) => void) | undefined;
+                let resolveInflight: (() => void) | undefined, rejectInflight: ((error: unknown) => void) | undefined;
                 const inflightPromise = new Promise<void>((res, rej) => {
                   resolveInflight = res;
                   rejectInflight = rej;
@@ -502,9 +502,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                 try {
                   // Unload any other loaded models first (single-model enforcement)
                   if (!needsReload) {
-                    for (const message of (models as Array<Record<string, unknown>>) || []) {
+                    for (const currentModelEntry of (models as Array<Record<string, unknown>>) || []) {
                       if (options.signal?.aborted) return;
-                      for (const inst of ((message as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>) || []) {
+                      for (const inst of ((currentModelEntry as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>) || []) {
                         yield {
                           type: "status",
                           message: "Unloading previous model…",
@@ -557,7 +557,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                     });
                   const startTime = Date.now();
                   const EXPECTED_LOAD_MS = 15_000;
-                  let lastPct = 0;
+                  let lastPercentage = 0;
                   while (!loadDone) {
                     await sleep(500);
                                         if (options.signal?.aborted) {
@@ -579,8 +579,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                         (elapsed / (elapsed + EXPECTED_LOAD_MS)) * 100,
                       ),
                     );
-                    if (percentage > lastPct) {
-                      lastPct = percentage;
+                    if (percentage > lastPercentage) {
+                      lastPercentage = percentage;
                       yield {
                         type: "status",
                         message: `Loading model… ${percentage}%`,
@@ -613,7 +613,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                   try {
                     const refreshed = await this.listModels();
                     const entry = ((refreshed as Record<string, unknown>).models as Array<Record<string, unknown>> || []).find(
-                      (m: Record<string, unknown>) => m.key === model,
+                      (modelItem: Record<string, unknown>) => modelItem.key === model,
                     );
                     const context =
                       (entry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
@@ -647,7 +647,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
                   models: [],
                 }));
                 const entry = ((refreshed as Record<string, unknown>).models as Array<Record<string, unknown>> || []).find(
-                  (m: Record<string, unknown>) => m.key === model,
+                  (modelItem: Record<string, unknown>) => modelItem.key === model,
                 );
                 const context =
                   (entry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
@@ -655,34 +655,34 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
               }
             }
           }
-        } catch (loadCheckErr: unknown) {
+        } catch (loadCheckError: unknown) {
           // If model load explicitly failed, re-throw so the generator exits
           // cleanly. runSingleModel will catch it and record an error result,
           // allowing the benchmark to continue to the next model.
           const isModelLoadFailed =
-            loadCheckErr instanceof Error &&
-            loadCheckErr.cause &&
-            typeof loadCheckErr.cause === "object" &&
-            "type" in loadCheckErr.cause &&
-            (loadCheckErr.cause as { type?: unknown }).type === "model_load_failed";
+            loadCheckError instanceof Error &&
+            loadCheckError.cause &&
+            typeof loadCheckError.cause === "object" &&
+            "type" in loadCheckError.cause &&
+            (loadCheckError.cause as { type?: unknown }).type === "model_load_failed";
 
           if (
             isModelLoadFailed ||
-            getErrorMessage(loadCheckErr)?.includes("Failed to load") ||
-            getErrorMessage(loadCheckErr)?.includes("API error")
+            getErrorMessage(loadCheckError)?.includes("Failed to load") ||
+            getErrorMessage(loadCheckError)?.includes("API error")
           ) {
-            throw loadCheckErr;
+            throw loadCheckError;
           }
           logger.warn(
-                        `Could not check/load model before streaming: ${getErrorMessage(loadCheckErr)}`,
+                        `Could not check/load model before streaming: ${getErrorMessage(loadCheckError)}`,
           );
         }
                 if (options.signal?.aborted) return;
         // Expand video attachments to image frames (ffmpeg) before message prep.
         // This lets the model analyze video content as a sequence of frames,
         // which is the standard approach for Gemma 4 and other VLMs.
-        const hasVideo = messages.some((m: ChatMessage) => {
-          const message = m as unknown as Record<string, unknown>;
+        const hasVideo = messages.some((messageItem: ChatMessage) => {
+          const message = messageItem as unknown as Record<string, unknown>;
           return "video" in message && Array.isArray(message.video) && message.video.length > 0;
         });
         if (hasVideo) {
@@ -722,9 +722,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
           store: false,
         };
         // Extract system prompt from messages
-        const systemMsg = prepared.find((message) => message.role === "system");
-        if (systemMsg?.content) {
-          (nativePayload as Record<string, unknown>).system_prompt = systemMsg.content;
+        const systemMessage = prepared.find((message) => message.role === "system");
+        if (systemMessage?.content) {
+          (nativePayload as Record<string, unknown>).system_prompt = systemMessage.content;
         }
         // Temperature & max tokens from options
         const params = buildPayloadParams(options);
@@ -797,12 +797,12 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         // Some models (e.g. DeepSeek R1 Distill) don't expose reasoning config.
         // If the request fails with a reasoning-related error, retry without it.
         const makeRequest = async (payload: Record<string, unknown>) => {
-          const payloadStr = JSON.stringify(payload, null, 2);
+          const payloadString = JSON.stringify(payload, null, 2);
           const inputShape = Array.isArray(payload.input)
             ? `array[${payload.input.length}]: ${payload.input.map((p: Record<string, unknown>) => p.type).join(", ")}`
             : `string[${((payload.input || "") as string).length}]`;
           logger.info(
-            `[LM-Studio] Native API: reasoning=${payload.reasoning || "default"}, tools=${payload.integrations ? "mcp" : "none"}, input=${inputShape}, ${payloadStr.length} chars`,
+            `[LM-Studio] Native API: reasoning=${payload.reasoning || "default"}, tools=${payload.integrations ? "mcp" : "none"}, input=${inputShape}, ${payloadString.length} chars`,
           );
           const response = await fetch(`${baseUrl}/api/v1/chat`, {
             method: "POST",
@@ -1027,28 +1027,28 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
       modelKey: string,
       loadOptions: ProviderOptions = {},
       signal?: AbortSignal,
-      onStatus?: (msg: string) => void,
+      onStatus?: (message: string) => void,
     ) {
       if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
       const { models: ensureModels } = await this.listModels() as { models: Array<Record<string, unknown>> };
       if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
       // Check if the requested model is already loaded
-      const modelEntry = (ensureModels || []).find((m: Record<string, unknown>) => m.key === modelKey) as Record<string, unknown> | undefined;
+      const modelEntry = (ensureModels || []).find((modelItem: Record<string, unknown>) => modelItem.key === modelKey) as Record<string, unknown> | undefined;
       const isLoaded = (modelEntry?.loaded_instances as Array<Record<string, unknown>>)?.length > 0;
       if (isLoaded) {
-        const loadedCtx =
+        const loadedContext =
           (modelEntry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
-        const loadedCtxVal = (loadedCtx?.context_length as number) || null;
+        const loadedContextValue = (loadedContext?.context_length as number) || null;
         logger.info(
-          `[LM-Studio] Model ${modelKey} already loaded (ctx=${loadedCtxVal})`,
+          `[LM-Studio] Model ${modelKey} already loaded (ctx=${loadedContextValue})`,
         );
-        return { alreadyLoaded: true, contextLength: loadedCtxVal };
+        return { alreadyLoaded: true, contextLength: loadedContextValue };
       }
       // Unload any other loaded models first (single-model enforcement)
-      for (const message of ensureModels || []) {
+      for (const currentModelEntry of ensureModels || []) {
         if (signal?.aborted)
           return { alreadyLoaded: false, contextLength: null };
-        for (const inst of ((message as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>) || []) {
+        for (const inst of ((currentModelEntry as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>) || []) {
           onStatus?.("Unloading previous model…");
           logger.info(
             `[LM-Studio] Auto-unloading ${inst.id} before loading ${modelKey}`,
@@ -1066,7 +1066,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
       try {
         const refreshed = await this.listModels();
         const entry = ((refreshed as Record<string, unknown>).models as Array<Record<string, unknown>> || []).find(
-          (m: Record<string, unknown>) => m.key === modelKey,
+          (modelItem: Record<string, unknown>) => modelItem.key === modelKey,
         );
         const context =
           (entry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
@@ -1145,9 +1145,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
     async unloadModelByKey(modelKey: string) {
       try {
         const { models } = await this.listModels() as { models: Array<Record<string, unknown>> };
-        for (const message of models || []) {
-          if (message.key !== modelKey) continue;
-          for (const inst of (message.loaded_instances as Array<Record<string, unknown>>) || []) {
+        for (const modelEntry of models || []) {
+          if (modelEntry.key !== modelKey) continue;
+          for (const inst of (modelEntry.loaded_instances as Array<Record<string, unknown>>) || []) {
             logger.info(
               `[LM-Studio] Unloading ${inst.id} (cleanup after abort)`,
             );

@@ -125,7 +125,7 @@ async function prepareMessages(messages: ChatMessage[]) {
   let systemMessage: string | undefined;
 
   // Extract system message
-  const conversation = messages.map((m: ChatMessage) => ({ ...m }));
+  const conversation = messages.map((chatMessage: ChatMessage) => ({ ...chatMessage }));
   if (conversation.length > 0 && conversation[0].role === "system") {
     systemMessage = conversation.shift()?.content as string | undefined;
   }
@@ -137,8 +137,8 @@ async function prepareMessages(messages: ChatMessage[]) {
   const cleaned = await Promise.all(
     conversation
       .filter(
-        (m: ChatMessage) =>
-          m.role === "user" || m.role === "assistant" || m.role === "tool",
+        (chatMessage: ChatMessage) =>
+          chatMessage.role === "user" || chatMessage.role === "assistant" || chatMessage.role === "tool",
       )
       .map(async (message: ChatMessage) => {
         // Convert tool role messages to tool_result user messages for Anthropic
@@ -179,7 +179,7 @@ async function prepareMessages(messages: ChatMessage[]) {
           for (const toolCall of message.toolCalls) {
             contentBlocks.push({
               type: "tool_use",
-              id: toolCall.id || toolCall.name || `tc-${Date.now()}`,
+              id: toolCall.id || toolCall.name || `toolCall-${Date.now()}`,
               name: toolCall.name,
               input: toolCall.args || {},
             });
@@ -311,7 +311,7 @@ async function prepareMessages(messages: ChatMessage[]) {
         previous.content += `\n\n${current.content}`;
       } else {
         // Convert both to arrays and concat
-        const prevBlocks =
+        const previousBlocks =
           typeof previous.content === "string"
             ? [{ type: "text", text: previous.content }]
             : previous.content;
@@ -319,7 +319,7 @@ async function prepareMessages(messages: ChatMessage[]) {
           typeof current.content === "string"
             ? [{ type: "text", text: current.content }]
             : current.content;
-        previous.content = [...prevBlocks, ...currentBlocks];
+        previous.content = [...previousBlocks, ...currentBlocks];
       }
     } else {
       acc.push({ ...current });

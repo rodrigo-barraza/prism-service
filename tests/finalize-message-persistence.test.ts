@@ -96,7 +96,7 @@ describe("newTurnMessages slice — normal flow (no compaction)", () => {
         content: "I'll create a song for you!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: { title: "War Song" },
             result: { success: true, audioRef: "minio://audio/war.wav" },
@@ -155,7 +155,7 @@ describe("newTurnMessages slice — normal flow (no compaction)", () => {
         content: "Let me search first.",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "search_web",
             args: { query: "X" },
             result: { results: [] },
@@ -167,7 +167,7 @@ describe("newTurnMessages slice — normal flow (no compaction)", () => {
         content: "Now generating audio.",
         toolCalls: [
           {
-            id: "tc-1",
+            id: "toolCall-1",
             name: "generate_audio",
             args: { title: "X Song" },
             result: { success: true },
@@ -235,7 +235,7 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
         content: "Creating your song!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: { title: "War" },
             result: { success: true },
@@ -295,7 +295,7 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
         content: "Creating your song!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: { title: "War" },
             result: { success: true },
@@ -340,7 +340,7 @@ describe("newTurnMessages slice — first turn", () => {
         content: "Creating a cat image!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_image",
             args: { prompt: "cat" },
             result: { success: true },
@@ -397,7 +397,7 @@ describe("newTurnMessages slice — context window enforcement", () => {
         content: "Using tool",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             result: { success: true },
@@ -437,7 +437,7 @@ describe("newTurnMessages slice — edge cases", () => {
         content: "Hi!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "test_tool",
             args: {},
             result: {},
@@ -523,7 +523,7 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
         content: "I'll create an original song about war!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {
               title: "Echoes of War",
@@ -596,7 +596,7 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
         content: "Creating your song!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             result: { success: true },
@@ -642,7 +642,7 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
         content: "Making your song!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             result: { success: true },
@@ -685,7 +685,7 @@ describe("Finalizer messagesToAppend — what gets $pushed to MongoDB", () => {
         content: "Creating your song!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             result: { success: true },
@@ -719,7 +719,7 @@ describe("Finalizer messagesToAppend — what gets $pushed to MongoDB", () => {
         role: "assistant",
         content: "Creating!",
         toolCalls: [
-          { id: "tc-0", name: "generate_audio", args: {}, result: {} },
+          { id: "toolCall-0", name: "generate_audio", args: {}, result: {} },
         ],
       },
     ];
@@ -769,7 +769,7 @@ describe("Full round-trip: DB state after appendAndFinalize", () => {
         content: "I'll create a song!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: { title: "War" },
             result: {
@@ -830,7 +830,7 @@ describe("Full round-trip: DB state after appendAndFinalize", () => {
         content: "Creating!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             result: { success: true },
@@ -908,7 +908,7 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
         content: "Starting database check...",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "run_integrity_check",
             args: {},
             result: { success: true },
@@ -1049,7 +1049,7 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
         role: "assistant",
         content: "Timer set!",
         toolCalls: [
-          { id: "tc-0", name: "set_timer", args: { durationSeconds: 60 }, result: { success: true } },
+          { id: "toolCall-0", name: "set_timer", args: { durationSeconds: 60 }, result: { success: true } },
         ],
       },
       {
@@ -1098,14 +1098,14 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
         role: "assistant",
         content: "Starting backup...",
         toolCalls: [
-          { id: "tc-0", name: "create_backup", args: {}, result: { success: true } },
+          { id: "toolCall-0", name: "create_backup", args: {}, result: { success: true } },
         ],
       },
       {
         role: "assistant",
         content: "Verifying backup integrity...",
         toolCalls: [
-          { id: "tc-1", name: "verify_backup", args: {}, result: { verified: true } },
+          { id: "toolCall-1", name: "verify_backup", args: {}, result: { verified: true } },
         ],
       },
       { role: "assistant", content: "Backup complete and verified! ✅" },

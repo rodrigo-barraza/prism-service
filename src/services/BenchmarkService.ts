@@ -190,12 +190,12 @@ function evaluateAssertions(response: string, benchmark: BenchmarkDoc): boolean 
   );
 }
 // ─── behavioral assertions ──────────────────────────────────
-const COMPARATORS: Record<string, (a: number, b: number) => boolean> = {
-  gte: (a, b) => a >= b,
-  lte: (a, b) => a <= b,
-  gt: (a, b) => a > b,
-  lt: (a, b) => a < b,
-  eq: (a, b) => a === b,
+const COMPARATORS: Record<string, (firstValue: number, secondValue: number) => boolean> = {
+  gte: (firstValue, secondValue) => firstValue >= secondValue,
+  lte: (firstValue, secondValue) => firstValue <= secondValue,
+  gt: (firstValue, secondValue) => firstValue > secondValue,
+  lt: (firstValue, secondValue) => firstValue < secondValue,
+  eq: (firstValue, secondValue) => firstValue === secondValue,
 };
 
 interface ExecutionData {
@@ -216,8 +216,8 @@ function evaluateSingleAgentAssertion(assertion: AgentAssertion, executionData: 
       const count = executionData.toolCalls?.length || 0;
       const target = parseInt(operand || "", 10);
       if (isNaN(target)) return count > 0; // Fallback: any tool calls
-      const compareFn = COMPARATORS[operator || "gte"];
-      return compareFn ? compareFn(count, target) : count >= target;
+      const compareFunction = COMPARATORS[operator || "gte"];
+      return compareFunction ? compareFunction(count, target) : count >= target;
     }
     case "thought":
       return (
@@ -227,8 +227,8 @@ function evaluateSingleAgentAssertion(assertion: AgentAssertion, executionData: 
       const turns = executionData.turnCount || 1;
       const limit = parseInt(operand || "", 10);
       if (isNaN(limit)) return true; // No limit specified
-      const compareFn = COMPARATORS[operator || "lte"];
-      return compareFn ? compareFn(turns, limit) : turns <= limit;
+      const compareFunction = COMPARATORS[operator || "lte"];
+      return compareFunction ? compareFunction(turns, limit) : turns <= limit;
     }
     default:
       logger.warn(`[benchmark] Unknown agent assertion type: ${type}`);

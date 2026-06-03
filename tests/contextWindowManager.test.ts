@@ -44,7 +44,7 @@ describe("Token estimation", () => {
   });
 
   it("includes tool call overhead (name + args + result)", () => {
-    const msg = {
+    const message = {
       role: "assistant",
       content: "",
       toolCalls: [
@@ -55,7 +55,7 @@ describe("Token estimation", () => {
         },
       ],
     };
-    const tokens = ContextWindowManager.estimateMessageTokens(msg);
+    const tokens = ContextWindowManager.estimateMessageTokens(message);
     // 4 overhead + 0 content + read_file tokens + args tokens + result tokens
     expect(tokens).toBeGreaterThan(4);
   });
@@ -206,8 +206,8 @@ describe("ContextWindowManager.enforce — tool result truncation", () => {
     // But with 20k context the whole thing might fit without truncation
     if (!result.truncated) {
       // It fit without truncation — expected for this message count + 20k window
-      const tc = result.messages[2].toolCalls[0];
-      expect(tc.result).toBe(bigResult);
+      const toolCall = result.messages[2].toolCalls[0];
+      expect(toolCall.result).toBe(bigResult);
     }
   });
 });
@@ -273,9 +273,9 @@ describe("ContextWindowManager.enforce — assistant compression", () => {
       const oldAssistants = result.messages.filter(
         (m, i) => m.role === "assistant" && i < result.messages.length - 2,
       );
-      for (const msg of oldAssistants) {
-        if (msg.content?.startsWith("[Earlier response")) {
-          expect(msg.thinking).toBeUndefined();
+      for (const messageItem of oldAssistants) {
+        if (messageItem.content?.startsWith("[Earlier response")) {
+          expect(messageItem.thinking).toBeUndefined();
         }
       }
     }

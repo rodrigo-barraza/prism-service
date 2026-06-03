@@ -140,13 +140,13 @@ export default class ReActHarness extends BaseAgenticHarness {
         // SystemPromptAssembler prepends the system message at runtime
         // but never stores it on the conversation doc. Extract it here
         // so the Finalizer persists it for the admin chat viewer.
-        const assembledSystemMsg = currentMessages.find(
-          (m) => m.role === "system",
+        const assembledSystemMessage = currentMessages.find(
+          (message) => message.role === "system",
         );
-        if (assembledSystemMsg?.content) {
+        if (assembledSystemMessage?.content) {
           context.conversationMeta = {
             ...(context.conversationMeta || {}),
-            systemPrompt: assembledSystemMsg.content,
+            systemPrompt: assembledSystemMessage.content,
           };
         }
 

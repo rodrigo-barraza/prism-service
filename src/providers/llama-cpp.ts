@@ -286,11 +286,11 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
         }
         const data = await response.json() as LlamaCppModelsResponse;
         // Normalize to our standard { models: [...] } format
-        const models = (data.data || []).map((m: LlamaCppModel) => ({
-          key: m.id,
-          display_name: m.id,
+        const models = (data.data || []).map((model: LlamaCppModel) => ({
+          key: model.id,
+          display_name: model.id,
           type: "llm",
-          loaded_instances: [{ id: m.id }], // llama.cpp models are always loaded
+          loaded_instances: [{ id: model.id }], // llama.cpp models are always loaded
         }));
         return { models };
       } catch (error: unknown) {

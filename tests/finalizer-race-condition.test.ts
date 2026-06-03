@@ -118,7 +118,7 @@ describe("Finalizer message assembly", () => {
         content: "I'll create a song!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: { title: "War Song" },
             result: {
@@ -161,7 +161,7 @@ describe("Finalizer message assembly", () => {
           content: "Searching...",
           toolCalls: [
             {
-              id: "tc-0",
+              id: "toolCall-0",
               name: "search_web",
               args: {},
               result: { results: [] },
@@ -173,7 +173,7 @@ describe("Finalizer message assembly", () => {
           content: "Making audio...",
           toolCalls: [
             {
-              id: "tc-1",
+              id: "toolCall-1",
               name: "generate_audio",
               args: {},
               result: { success: true },
@@ -186,8 +186,8 @@ describe("Finalizer message assembly", () => {
       images: [],
       audioRef: null,
       toolCalls: [
-        { id: "tc-0", name: "search_web", args: {}, result: { results: [] } },
-        { id: "tc-1", name: "generate_audio", args: {}, result: { success: true } },
+        { id: "toolCall-0", name: "search_web", args: {}, result: { results: [] } },
+        { id: "toolCall-1", name: "generate_audio", args: {}, result: { success: true } },
       ],
       resolvedModel: "claude-haiku-4-5-20250514",
       providerName: "anthropic",
@@ -210,7 +210,7 @@ describe("Finalizer message assembly", () => {
       images: [],
       audioRef: null,
       toolCalls: [
-        { id: "tc-0", name: "mcp_query", args: {}, result: { rows: [] } },
+        { id: "toolCall-0", name: "mcp_query", args: {}, result: { rows: [] } },
       ],
       resolvedModel: "qwen3-8b",
       providerName: "lm-studio",
@@ -236,7 +236,7 @@ describe("Finalizer message assembly", () => {
           role: "assistant",
           content: "Making it!",
           toolCalls: [
-            { id: "tc-0", name: "generate_audio", args: {}, result: {} },
+            { id: "toolCall-0", name: "generate_audio", args: {}, result: {} },
           ],
         },
       ],
@@ -318,7 +318,7 @@ describe("done event → appendAndFinalize race condition", () => {
         content: "I'll create a song!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             result: { success: true, audioRef: "minio://audio/war.wav" },
@@ -577,7 +577,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
         content: "I'll create an original song about war!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {
               title: "Echoes of War",

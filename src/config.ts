@@ -1286,10 +1286,10 @@ export interface ModelOptionEntry {
  */
 function getModels(inputType: string, outputType: string): ModelDefinition[] {
   return Object.values(MODELS).filter(
-    (m) => {
-      const model = m as ModelDefinition & Record<string, unknown>;
-      return (model.inputTypes as string[])?.includes(inputType) &&
-        (model.outputTypes as string[])?.includes(outputType);
+    (model) => {
+      const modelRecord = model as ModelDefinition & Record<string, unknown>;
+      return (modelRecord.inputTypes as string[])?.includes(inputType) &&
+        (modelRecord.outputTypes as string[])?.includes(outputType);
     },
   );
 }
@@ -1300,16 +1300,16 @@ function getModels(inputType: string, outputType: string): ModelDefinition[] {
  * Returns: { [provider]: [{ name, label, ... }, ...] }
  */
 function getModelOptions(inputType: string, outputType: string): Record<string, ModelOptionEntry[]> {
-  const opts: Record<string, ModelOptionEntry[]> = {};
-  for (const m of getModels(inputType, outputType)) {
-    const modelRecord = m as ModelDefinition & Record<string, unknown>;
+  const optionsMap: Record<string, ModelOptionEntry[]> = {};
+  for (const model of getModels(inputType, outputType)) {
+    const modelRecord = model as ModelDefinition & Record<string, unknown>;
     if (modelRecord.listed !== false) {
-      const entry: ModelOptionEntry = { name: m.name, label: m.label };
+      const entry: ModelOptionEntry = { name: model.name, label: model.label };
       if (modelRecord.thinking) entry.thinking = true;
-      if (m.inputTypes?.includes(TYPES.IMAGE)) entry.vision = true;
+      if (model.inputTypes?.includes(TYPES.IMAGE)) entry.vision = true;
       if (modelRecord.webSearch) entry.webSearch = modelRecord.webSearch as boolean | string;
-      if (m.inputTypes) entry.inputTypes = m.inputTypes;
-      if (m.outputTypes) entry.outputTypes = m.outputTypes;
+      if (model.inputTypes) entry.inputTypes = model.inputTypes;
+      if (model.outputTypes) entry.outputTypes = model.outputTypes;
       if (modelRecord.tools) entry.tools = modelRecord.tools as string[];
       if (modelRecord.pricing) entry.pricing = modelRecord.pricing as Record<string, number>;
       if (modelRecord.arena) entry.arena = modelRecord.arena as Record<string, number>;
@@ -1318,8 +1318,8 @@ function getModelOptions(inputType: string, outputType: string): Record<string, 
       if (modelRecord.assistantImages === false) entry.assistantImages = false;
       // JSON mode: OpenAI + Google support response_format / responseMimeType
       if (
-        m.modelType === MODEL_TYPES.CONVERSATION &&
-        [PROVIDERS.OPENAI, PROVIDERS.GOOGLE].includes(m.provider)
+        model.modelType === MODEL_TYPES.CONVERSATION &&
+        [PROVIDERS.OPENAI, PROVIDERS.GOOGLE].includes(model.provider)
       ) {
         entry.jsonMode = true;
       }
@@ -1332,7 +1332,7 @@ function getModelOptions(inputType: string, outputType: string): Record<string, 
       if (modelRecord.reasoningSummary) entry.reasoningSummary = true;
       if (modelRecord.responsesAPI) entry.responsesAPI = true;
       if (modelRecord.size) entry.size = modelRecord.size as string;
-      if (m.modelType) entry.modelType = m.modelType;
+      if (model.modelType) entry.modelType = model.modelType;
       if (modelRecord.liveAPI) entry.liveAPI = true;
       if (modelRecord.thinkingLevels) entry.thinkingLevels = modelRecord.thinkingLevels as string[];
       if (modelRecord.mediaLimits) entry.mediaLimits = modelRecord.mediaLimits as Record<string, unknown>;
@@ -1342,11 +1342,11 @@ function getModelOptions(inputType: string, outputType: string): Record<string, 
       entry.supportsSystemPrompt =
         modelRecord.supportsSystemPrompt !== undefined
           ? modelRecord.supportsSystemPrompt as boolean
-          : m.outputTypes.includes(TYPES.TEXT);
-      (opts[m.provider] ??= []).push(entry);
+          : model.outputTypes.includes(TYPES.TEXT);
+      (optionsMap[model.provider] ??= []).push(entry);
     }
   }
-  return opts;
+  return optionsMap;
 }
 
 /**
@@ -1356,10 +1356,10 @@ function getModelOptions(inputType: string, outputType: string): Record<string, 
  */
 function getDefaultModels(inputType: string, outputType: string): Record<string, string> {
   const defaults: Record<string, string> = {};
-  for (const m of getModels(inputType, outputType)) {
-    const modelRecord = m as ModelDefinition & Record<string, unknown>;
+  for (const model of getModels(inputType, outputType)) {
+    const modelRecord = model as ModelDefinition & Record<string, unknown>;
     if (modelRecord.default) {
-      defaults[m.provider] = m.name;
+      defaults[model.provider] = model.name;
     }
   }
   return defaults;
@@ -1371,10 +1371,10 @@ function getDefaultModels(inputType: string, outputType: string): Record<string,
  */
 function getPricing(inputType: string, outputType: string): Record<string, Record<string, number>> {
   const pricing: Record<string, Record<string, number>> = {};
-  for (const m of getModels(inputType, outputType)) {
-    const modelRecord = m as ModelDefinition & Record<string, unknown>;
+  for (const model of getModels(inputType, outputType)) {
+    const modelRecord = model as ModelDefinition & Record<string, unknown>;
     if (modelRecord.pricing) {
-      pricing[m.name] = modelRecord.pricing as Record<string, number>;
+      pricing[model.name] = modelRecord.pricing as Record<string, number>;
     }
   }
   return pricing;
@@ -1385,7 +1385,7 @@ function getPricing(inputType: string, outputType: string): Record<string, Recor
  * Returns the model object or null.
  */
 function getModelByName(name: string): ModelDefinition | null {
-  return Object.values(MODELS).find((m) => (m as ModelDefinition).name === name) as ModelDefinition | null ?? null;
+  return Object.values(MODELS).find((model) => (model as ModelDefinition).name === name) as ModelDefinition | null ?? null;
 }
 
 // ─── VOICES (per provider — applies to TEXT → AUDIO models) ─

@@ -145,7 +145,7 @@ export default class CoordinatorService {
     agent: memberAgentName,
     assignedProvider,
     assignedModel,
-    coordinatorCtx,
+    coordinatorContext,
   }: CoordinatorSpawnParams) {
     const {
       project,
@@ -160,7 +160,7 @@ export default class CoordinatorService {
       minContextLength,
       workspaceRoot: coordinatorWorkspaceRoot,
       enabledTools,
-    } = coordinatorCtx;
+    } = coordinatorContext;
 
     // Resolve max worker iterations: 0 = unlimited (Infinity), positive = clamped 1-100, default = constant
     const resolvedMaxWorkerIterations =
@@ -349,8 +349,8 @@ export default class CoordinatorService {
 
     // Emit early so the frontend can show live status immediately
     // (before the blocking loop starts and before a result is available)
-    if (coordinatorCtx.emit) {
-      coordinatorCtx.emit({
+    if (coordinatorContext.emit) {
+      coordinatorContext.emit({
         type: "worker_status",
         workerId: agentId,
         message: "spawned",
@@ -364,7 +364,7 @@ export default class CoordinatorService {
       await CoordinatorService._runWorkerLoop(
         workerState,
         prompt,
-        coordinatorCtx,
+        coordinatorContext,
       );
     } catch (error: unknown) {
       logger.error(
@@ -379,16 +379,16 @@ export default class CoordinatorService {
         await GitWorktreeHelper.removeWorktree(
           workerState.repoPath,
           workerState.worktreePath,
-        ).catch((cleanupErr: unknown) =>
+        ).catch((cleanupError: unknown) =>
           logger.warn(
-            `[Coordinator] Worktree cleanup failed for ${agentId}: ${getErrorMessage(cleanupErr)}`,
+            `[Coordinator] Worktree cleanup failed for ${agentId}: ${getErrorMessage(cleanupError)}`,
           ),
         );
       }
 
       // Notify frontend immediately so the StatusBar stops showing "Generating..."
-      if (coordinatorCtx.emit) {
-        coordinatorCtx.emit({
+      if (coordinatorContext.emit) {
+        coordinatorContext.emit({
           type: SSE_EVENT_TYPES.WORKER_STATUS,
           workerId: agentId,
           message: "failed",
@@ -398,8 +398,8 @@ export default class CoordinatorService {
     }
 
     // Notify UI that worker state changed
-    if (coordinatorCtx.emit) {
-      coordinatorCtx.emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.WORKERS_UPDATED });
+    if (coordinatorContext.emit) {
+      coordinatorContext.emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.WORKERS_UPDATED });
     }
 
     const workerResult = buildWorkerResult(workerState);
@@ -409,7 +409,7 @@ export default class CoordinatorService {
     return workerResult;
   }
 
-  static async sendMessage(agentId: string, message: string, coordinatorCtx: CoordinatorContext) {
+  static async sendMessage(agentId: string, message: string, coordinatorContext: CoordinatorContext) {
     const worker = activeWorkers.get(agentId);
     if (!worker) {
       return { error: `Worker "${agentId}" not found` };
@@ -438,7 +438,7 @@ export default class CoordinatorService {
 
     logger.info(`[Coordinator] Continuing worker ${agentId} with follow-up`);
 
-    CoordinatorService._runWorkerLoop(worker, message, coordinatorCtx).catch(
+    CoordinatorService._runWorkerLoop(worker, message, coordinatorContext).catch(
       (error: unknown) => {
         logger.error(
           `[Coordinator] Worker ${agentId} continuation error: ${getErrorMessage(error)}`,
@@ -529,8 +529,8 @@ export default class CoordinatorService {
             .then(() => {
               worker.worktreePath = null;
             })
-            .catch((err: Error) =>
-              logger.warn(`[Coordinator] Worktree cleanup failed for ${worker.agentId}: ${err.message}`)
+            .catch((error: Error) =>
+              logger.warn(`[Coordinator] Worktree cleanup failed for ${worker.agentId}: ${error.message}`)
             )
         : Promise.resolve();
 
@@ -571,8 +571,8 @@ export default class CoordinatorService {
 
   static cleanupSession(parentAgentSessionId: string) {
     const keys = [];
-    for (const [key, val] of activeWorkers.entries()) {
-      if (val.parentAgentSessionId === parentAgentSessionId) {
+    for (const [key, workerState] of activeWorkers.entries()) {
+      if (workerState.parentAgentSessionId === parentAgentSessionId) {
         keys.push(key);
       }
     }
@@ -582,8 +582,8 @@ export default class CoordinatorService {
     logger.info(`[Coordinator] Cleaned up session ${parentAgentSessionId} from active registry`);
   }
 
-  static async createTeam(args: { name: string; members: TeamMember[] }, coordinatorCtx: CoordinatorContext) {
-    const { providerName, resolvedModel } = coordinatorCtx;
+  static async createTeam(args: { name: string; members: TeamMember[] }, coordinatorContext: CoordinatorContext) {
+    const { providerName, resolvedModel } = coordinatorContext;
     logger.info(
       `[Coordinator] createTeam: batch assignment of ${args.members.length} worker(s)...`,
     );
@@ -643,7 +643,7 @@ export default class CoordinatorService {
         agent: member.agent,
         assignedProvider,
         assignedModel,
-        coordinatorCtx,
+        coordinatorContext,
       });
     }
 
@@ -675,7 +675,7 @@ export default class CoordinatorService {
    * Run the worker's agentic loop in its isolated worktree.
    * @private
    */
-  static async _runWorkerLoop(worker: WorkerState, prompt: string, coordinatorCtx: CoordinatorContext) {
+  static async _runWorkerLoop(worker: WorkerState, prompt: string, coordinatorContext: CoordinatorContext) {
     const { default: AgenticLoopService } =
       await import("./AgenticLoopService.js");
 
@@ -705,13 +705,13 @@ export default class CoordinatorService {
     // SSE stream. This lets the frontend display live worker tool activity
     // without polling — events arrive as `worker_tool_execution`, `worker_tool_output`,
     // and `worker_status` with the worker's agentId for disambiguation.
-    const parentEmit = coordinatorCtx.emit;
+    const parentEmit = coordinatorContext.emit;
     // ── Worker Telemetry ────────────────────────────────────
     const telemetry = new WorkerTelemetryEmitter({
       workerId: worker.agentId,
       workerDescription: worker.description,
       parentEmit,
-      parentSessionId: coordinatorCtx.agentSessionId,
+      parentSessionId: coordinatorContext.agentSessionId,
     });
     const workerEmit = telemetry.createEmitFunction();
 
@@ -847,7 +847,7 @@ export default class CoordinatorService {
     // ── VRAM eviction for secondary instances ──────────────────
     await evictIdleSecondaryModel(
       worker,
-      coordinatorCtx.providerName,
+      coordinatorContext.providerName,
       activeWorkers,
     );
   }

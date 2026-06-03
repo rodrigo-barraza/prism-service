@@ -213,7 +213,7 @@ export default {
     }
 
     const totalOptions = normalizedQuestions.reduce(
-      (sum, q) => sum + q.options.length,
+      (sum, questionObject) => sum + questionObject.options.length,
       0,
     );
     logger.info(

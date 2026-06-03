@@ -345,7 +345,7 @@ describe("Session Cost Reconciliation", () => {
 
       try {
         app.use("/admin", adminRouter);
-      } catch (err) {}
+      } catch (error) {}
 
       agentConversations = [
         {

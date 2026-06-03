@@ -1,7 +1,7 @@
 import AgenticToolResolver from "./AgenticToolResolver.ts";
 import AgenticLoopState from "./AgenticLoopState.ts";
 import HarnessRegistry from "./harnesses/HarnessRegistry.ts";
-import { pendingApprovals, pendingQuestions } from "./ApprovalRegistry.ts";
+import { pendingApprovals, pendingQuestions, type PendingToolCallSummary, type QuestionDefinition, type QuestionAnswer } from "./ApprovalRegistry.ts";
 import SessionGenerationTracker from "./SessionGenerationTracker.ts";
 import ToolContext from "./ToolContext.ts";
 import logger from "../utils/logger.ts";
@@ -128,7 +128,7 @@ export default class AgenticLoopService {
     pending: boolean;
     type?: string;
     tools?: string[];
-    toolCalls?: any[];
+    toolCalls?: PendingToolCallSummary[];
   } {
     const entry = pendingApprovals.get(conversationId);
     if (!entry) return { pending: false };
@@ -146,9 +146,9 @@ export default class AgenticLoopService {
   static _setPendingQuestion(
     conversationId: string,
     entry: {
-      resolve: (value: { answers: Array<{ answer: string | string[]; annotations?: string }> | null; timedOut?: boolean }) => void;
+      resolve: (value: { answers: QuestionAnswer[] | null; timedOut?: boolean }) => void;
       question?: string;
-      questions?: Array<{ question: string; [key: string]: unknown }>;
+      questions?: QuestionDefinition[];
       choices?: string[];
     },
   ): void {
@@ -158,7 +158,7 @@ export default class AgenticLoopService {
   /** Resolve a pending question for a conversation. */
   static resolveUserQuestion(
     conversationId: string,
-    answers: Array<{ answer: string | string[]; annotations?: string }>,
+    answers: QuestionAnswer[],
   ): boolean {
     const entry = pendingQuestions.get(conversationId);
     if (!entry) return false;
@@ -171,7 +171,7 @@ export default class AgenticLoopService {
   static getPendingQuestion(conversationId: string): {
     pending: boolean;
     question?: string;
-    questions?: any[];
+    questions?: QuestionDefinition[];
     choices?: string[];
   } {
     const entry = pendingQuestions.get(conversationId);

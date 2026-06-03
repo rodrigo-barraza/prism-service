@@ -137,7 +137,7 @@ export async function finalizeTextGeneration(
  * Swap content and rawContent if present to ensure the database and caller get clean text.
  * Fallback to regex parsing for legacy/unmigrated messages to populate rawContent and clean content.
  */
-function swapMsgContent(message: MessagePayload) {
+function swapMessageContent(message: MessagePayload) {
   if (message.role === "user" && typeof message.content === "string") {
     if (message.rawContent?.startsWith("[System Context]") || message.rawContent?.startsWith("[System Context - Local Time:")) {
       return;
@@ -149,9 +149,9 @@ function swapMsgContent(message: MessagePayload) {
     } else if (message.content.startsWith("[System Context]")) {
       const dirty = message.content;
       let clean = message.content;
-      const splitIdx = message.content.indexOf("\n\n[User Message]\n");
-      if (splitIdx !== -1) {
-        clean = message.content.substring(splitIdx + "\n\n[User Message]\n".length);
+      const splitIndex = message.content.indexOf("\n\n[User Message]\n");
+      if (splitIndex !== -1) {
+        clean = message.content.substring(splitIndex + "\n\n[User Message]\n".length);
       } else {
         const altSplit = message.content.indexOf("[User Message]\n");
         if (altSplit !== -1) {
@@ -176,16 +176,16 @@ function swapMsgContent(message: MessagePayload) {
   // Swap content and rawContent if present to ensure the database and caller get clean text
   if (messages) {
     for (const message of messages) {
-      swapMsgContent(message);
+      swapMessageContent(message);
     }
   }
   if (overrideMessagesToAppend) {
     for (const message of overrideMessagesToAppend) {
-      swapMsgContent(message);
+      swapMessageContent(message);
     }
   }
   if (userMessage) {
-    swapMsgContent(userMessage);
+    swapMessageContent(userMessage);
   }
   // ── Cost calculation ──────────────────────────────────────────
   let estimatedCost: number | null = null;
@@ -232,7 +232,7 @@ function swapMsgContent(message: MessagePayload) {
   // ── Console logging ───────────────────────────────────────────
     const inputTokens = usage ? getTotalInputTokens(usage as Parameters<typeof getTotalInputTokens>[0]) : 0;
     const outputTokens = usage?.outputTokens || 0;
-  const tokensPerSecStr =
+  const tokensPerSecondString =
     tokensPerSec !== null ? tokensPerSec.toFixed(1) : "N/A";
   const cacheInfo =
         usage?.cacheReadInputTokens || usage?.cacheCreationInputTokens
@@ -244,7 +244,7 @@ function swapMsgContent(message: MessagePayload) {
     clientIp || null,
     `[chat] ${providerName} ${resolvedModel} — ` +
       `in: ${inputTokens} tokens, out: ${outputTokens} tokens${cacheInfo}, ` +
-      `speed: ${tokensPerSecStr} tok/s, ` +
+      `speed: ${tokensPerSecondString} tok/s, ` +
             `ttg: ${timeToGenerationSec != null ? timeToGenerationSec.toFixed(2) + "s" : "N/A"}, ` +
             `generation: ${generationSec != null ? generationSec.toFixed(2) + "s" : "N/A"}, ` +
             `total: ${totalSec != null ? totalSec.toFixed(2) : "0.00"}s` +
@@ -258,10 +258,10 @@ function swapMsgContent(message: MessagePayload) {
                 Buffer.from(b64, "base64"),
       );
       const pcmData = Buffer.concat(pcmBuffers);
-      const numChannels = 1;
+      const numberOfChannels = 1;
       const bitsPerSample = 16;
-            const byteRate = audioSampleRate * numChannels * (bitsPerSample / 8);
-      const blockAlign = numChannels * (bitsPerSample / 8);
+            const byteRate = audioSampleRate * numberOfChannels * (bitsPerSample / 8);
+      const blockAlign = numberOfChannels * (bitsPerSample / 8);
       const wavHeader = Buffer.alloc(44);
       wavHeader.write("RIFF", 0);
       wavHeader.writeUInt32LE(36 + pcmData.length, 4);
@@ -269,7 +269,7 @@ function swapMsgContent(message: MessagePayload) {
       wavHeader.write("fmt ", 12);
       wavHeader.writeUInt32LE(16, 16);
       wavHeader.writeUInt16LE(1, 20);
-      wavHeader.writeUInt16LE(numChannels, 22);
+      wavHeader.writeUInt16LE(numberOfChannels, 22);
             wavHeader.writeUInt32LE(audioSampleRate, 24);
       wavHeader.writeUInt32LE(byteRate, 28);
       wavHeader.writeUInt16LE(blockAlign, 32);
@@ -346,7 +346,7 @@ function swapMsgContent(message: MessagePayload) {
       // message is the sole assistant message — segments preserve the
       // thinking ↔ tools ↔ text interleaving for that case.
             const hasIntermediateToolMessages = overrideMessagesToAppend.some(
-                (m) => m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0,
+                (message) => message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0,
       );
       // Append the final LLM response block (contains telemetry and final text step)
             messagesToAppend.push({
@@ -438,7 +438,7 @@ function swapMsgContent(message: MessagePayload) {
     if (resolvedEnabledTools) {
       const disabledTools =
         (options.disabledTools as string[]) ||
-        ((conversationMeta as any)?.settings?.toolConfig as any)?.disabledTools ||
+        ((conversationMeta?.settings as Record<string, unknown> | undefined)?.toolConfig as Record<string, unknown> | undefined)?.disabledTools as string[] ||
         [];
       let availableTools: string[] = [];
       if (agent) {
@@ -488,7 +488,7 @@ function swapMsgContent(message: MessagePayload) {
     const sanitizedMessagesToAppend = messagesToAppend
       .map((message) => {
         const cloned = { ...message };
-        swapMsgContent(cloned);
+        swapMessageContent(cloned);
         return cloned;
       })
       .filter((message) => {

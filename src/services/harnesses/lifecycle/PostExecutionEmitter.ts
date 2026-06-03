@@ -3,7 +3,7 @@ import { TOOL_NAMES } from "../../ToolTaxonomyConstants.ts";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
-import type { ToolCall, ToolResult, PassState, EmitFn } from "../types.ts";
+import type { ToolCall, ToolResult, PassState, EmitFunction } from "../types.ts";
 import FileService from "../../FileService.ts";
 
 /**
@@ -19,7 +19,7 @@ import FileService from "../../FileService.ts";
 /** Emit status notifications based on which tools were executed. */
 export function emitPostExecutionStatus(
   toolCalls: ToolCall[],
-  emit: EmitFn,
+  emit: EmitFunction,
 ): void {
   if (
     toolCalls.some(
@@ -54,25 +54,25 @@ export async function processToolResultMedia(
   results: ToolResult[],
   state: AgenticLoopState,
   pass: PassState,
-  emit: EmitFn,
+  emit: EmitFunction,
 ): Promise<void> {
   for (const toolCall of toolCalls) {
-    const res = results.find(
+    const toolResult = results.find(
       (r) => r.id === toolCall.id || (!r.id && r.name === toolCall.name),
     );
-    const resultObj = res?.result as Record<string, unknown> | null;
-    const hasError = !!resultObj?.error;
+    const resultObject = toolResult?.result as Record<string, unknown> | null;
+    const hasError = !!resultObject?.error;
 
     // Check if result has raw audio data, upload it if so
-    const audioResult = resultObj?.audio as Record<string, string> | undefined;
+    const audioResult = resultObject?.audio as Record<string, string> | undefined;
     if (audioResult?.data) {
       const mimeType = audioResult.mimeType || "audio/wav";
       const dataUrl = `data:${mimeType};base64,${audioResult.data}`;
       try {
         const uploadResult = await FileService.uploadFile(dataUrl, "generations");
-        if (resultObj) {
-          resultObj.audioRef = uploadResult.ref;
-          delete resultObj.audio;
+        if (resultObject) {
+          resultObject.audioRef = uploadResult.ref;
+          delete resultObject.audio;
         }
       } catch (uploadError) {
         logger.error(`[PostExecutionEmitter] Failed to upload audio:`, uploadError);
@@ -86,17 +86,17 @@ export async function processToolResultMedia(
         args: toolCall.args || {},
         id: toolCall.id,
         responsesItemId: toolCall.responsesItemId,
-        result: resultObj,
+        result: resultObject,
       },
       status: hasError ? "error" : "done",
     });
 
-    if (resultObj?.screenshotRef) {
-      state.streamedImages.push(resultObj.screenshotRef as string);
-      pass.streamedImages.push(resultObj.screenshotRef as string);
+    if (resultObject?.screenshotRef) {
+      state.streamedImages.push(resultObject.screenshotRef as string);
+      pass.streamedImages.push(resultObject.screenshotRef as string);
     }
 
-    const imageResult = resultObj?.image as Record<string, string> | undefined;
+    const imageResult = resultObject?.image as Record<string, string> | undefined;
     if (imageResult?.data) {
       const toolImgRef =
         imageResult.minioRef || `data:${imageResult.mimeType};base64,${imageResult.data}`;
@@ -108,7 +108,7 @@ export async function processToolResultMedia(
         mimeType: imageResult.mimeType,
         minioRef: imageResult.minioRef,
       });
-      if (resultObj) delete resultObj.image;
+      if (resultObject) delete resultObject.image;
     }
   }
 }
@@ -119,13 +119,13 @@ export function trackToolErrors(
   results: ToolResult[],
   state: AgenticLoopState,
   maxConsecutiveErrors: number,
-  emit: EmitFn,
+  emit: EmitFunction,
 ): void {
   for (const toolCall of toolCalls) {
-    const res = results.find(
+    const toolResult = results.find(
       (r) => r.id === toolCall.id || (!r.id && r.name === toolCall.name),
     );
-    const hasError = !!(res?.result as Record<string, unknown>)?.error;
+    const hasError = !!(toolResult?.result as Record<string, unknown>)?.error;
 
     if (hasError) {
       const count = (state.toolErrorCounts.get(toolCall.name) || 0) + 1;

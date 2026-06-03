@@ -38,7 +38,7 @@ describe("Live Function Calling Orchestration", () => {
     expect(Array.isArray(data.toolCalls)).toBe(true);
     expect(data.toolCalls.length).toBeGreaterThan(0);
     
-    const weatherCall = data.toolCalls.find((tc) => tc.name === "get_current_weather");
+    const weatherCall = data.toolCalls.find((toolCall) => toolCall.name === "get_current_weather");
     expect(weatherCall).toBeDefined();
     
     expect(data.usage).toBeDefined();

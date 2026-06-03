@@ -81,9 +81,9 @@ router.get(
           const config = (await configRes.json()) as WorkspaceConfig;
           agents = config.agents || [];
         }
-      } catch (agentErr: unknown) {
+      } catch (agentError: unknown) {
         logger.warn(
-          `GET /workspaces/full agent fetch failed: ${getErrorMessage(agentErr)}`,
+          `GET /workspaces/full agent fetch failed: ${getErrorMessage(agentError)}`,
         );
       }
 

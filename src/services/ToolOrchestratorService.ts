@@ -185,9 +185,9 @@ async function fetchSchemas() {
           cachedStaticRoots = config.staticRoots;
         }
       }
-    } catch (cfgErr: unknown) {
+    } catch (configError: unknown) {
       logger.warn(
-                `[ToolOrchestrator] Could not fetch workspace config: ${getErrorMessage(cfgErr)}`,
+                `[ToolOrchestrator] Could not fetch workspace config: ${getErrorMessage(configError)}`,
       );
     }
   } catch (error: unknown) {
@@ -217,9 +217,9 @@ function buildUrlFromEndpoint(endpoint: ToolEndpoint, args: Record<string, unkno
 
   const pathParams = new Set(endpoint.pathParams || []);
   for (const param of pathParams) {
-    const pVal = args[param];
-    if (pVal !== undefined && pVal !== null) {
-      path = path.replace(`:${param}`, encodeURIComponent(String(pVal)));
+    const parameterValue = args[param];
+    if (parameterValue !== undefined && parameterValue !== null) {
+      path = path.replace(`:${param}`, encodeURIComponent(String(parameterValue)));
     }
   }
 
@@ -234,10 +234,10 @@ function buildUrlFromEndpoint(endpoint: ToolEndpoint, args: Record<string, unkno
   }
 
   if (args.fields) {
-    const fieldsStr = Array.isArray(args.fields)
+    const fieldsString = Array.isArray(args.fields)
       ? args.fields.join(",")
       : String(args.fields);
-    params.set("fields", fieldsStr);
+    params.set("fields", fieldsString);
   }
 
   const queryString = params.toString();
@@ -347,9 +347,9 @@ async function fetchJson(url: string, extraHeaders: Record<string, string> = {},
     });
     if (!response.ok) {
       try {
-        const errBody = await response.json() as Record<string, unknown>;
+        const errorBody = await response.json() as Record<string, unknown>;
         return {
-          error: errBody.error || `API returned ${response.status}: ${response.statusText}`,
+          error: errorBody.error || `API returned ${response.status}: ${response.statusText}`,
         };
       } catch {
         return { error: `API returned ${response.status}: ${response.statusText}` };
@@ -380,9 +380,9 @@ async function fetchJsonPost(
     if (!response.ok) {
       // Forward the actual error body from tools-api for debugging
       try {
-        const errBody = await response.json() as Record<string, unknown>;
+        const errorBody = await response.json() as Record<string, unknown>;
         return {
-          error: errBody.error || `API returned ${response.status}: ${response.statusText}`,
+          error: errorBody.error || `API returned ${response.status}: ${response.statusText}`,
         };
       } catch {
         return { error: `API returned ${response.status}: ${response.statusText}` };
@@ -959,8 +959,8 @@ export default class ToolOrchestratorService {
     const { default: CoordinatorService } =
       await import("./CoordinatorService.js");
 
-    // Build coordinatorCtx from the loop's context
-    const coordinatorCtx = {
+    // Build coordinatorContext from the loop's context
+    const coordinatorContext = {
       project: context.project,
       username: context.username,
       agent: context.agent,
@@ -985,13 +985,13 @@ export default class ToolOrchestratorService {
 
     switch (name) {
       case "create_team":
-        return CoordinatorService.createTeam(args as { name: string; members: TeamMember[] }, coordinatorCtx as CoordinatorContext);
+        return CoordinatorService.createTeam(args as { name: string; members: TeamMember[] }, coordinatorContext as CoordinatorContext);
 
       case "send_message":
         return CoordinatorService.sendMessage(
           args.to as string,
           args.message as string,
-          coordinatorCtx as CoordinatorContext,
+          coordinatorContext as CoordinatorContext,
         );
 
       case "stop_agent":
@@ -1204,9 +1204,9 @@ export default class ToolOrchestratorService {
         );
         if (!response.ok) {
           try {
-            const errBody = await response.json();
+            const errorBody = await response.json();
             return {
-              error: (errBody as Record<string, unknown>).error || `Execution failed: ${response.status}`,
+              error: (errorBody as Record<string, unknown>).error || `Execution failed: ${response.status}`,
             };
           } catch {
             return {

@@ -528,7 +528,7 @@ function handleWsLive(
                       type: "toolCall",
                       functionCalls: [
                         {
-                          id: `live-tc-${crypto.randomUUID()}`,
+                          id: `live-toolCall-${crypto.randomUUID()}`,
                           name: part.functionCall.name,
                           args: part.functionCall.args || {},
                         },
@@ -542,7 +542,7 @@ function handleWsLive(
               if (serverMessage.toolCall?.functionCalls) {
                 const functionCalls: FunctionCallRef[] = serverMessage.toolCall.functionCalls.map(
                   (fc: Record<string, unknown>) => ({
-                    id: (fc.id as string) || `live-tc-${crypto.randomUUID()}`,
+                    id: (fc.id as string) || `live-toolCall-${crypto.randomUUID()}`,
                     name: fc.name as string,
                     args: (fc.args as Record<string, unknown>) || {},
                   }),
