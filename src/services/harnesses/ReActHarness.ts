@@ -18,6 +18,14 @@ import {
   checkForPlanModeEntry,
 } from "./lifecycle/PlanModeController.ts";
 import { validateAfterToolExecution } from "./lifecycle/ValidationInterceptor.ts";
+import {
+  isOutputTruncated,
+  injectContinuationContext,
+  injectErrorAsConversationMessage,
+  buildExhaustedRecoveryMessage,
+  buildProviderErrorMessage,
+  MAX_OUTPUT_TRUNCATION_RECOVERIES,
+} from "./lifecycle/OutputTruncationRecovery.ts";
 
 import PlanningModeService from "../PlanningModeService.ts";
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
@@ -82,6 +90,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           : MAX_TOOL_ITERATIONS;
 
     let currentMessages: ConversationMessage[] = [...context.messages];
+    let truncationRecoveryCount = 0;
 
     // ── Initialize lifecycle hooks ──────────────────────────
     const { hooks, approvalEngine } = createStandardHooks({
@@ -511,36 +520,44 @@ export default class ReActHarness extends BaseAgenticHarness {
         break;
       }
 
-      // ── Empty output — break ────────────────────────────────
-      const isTruncated = pass.stopReason === "length" || pass.stopReason === "max_tokens";
-      if (isTruncated) {
+      // ── Empty output — check for truncation recovery ─────────
+      if (isOutputTruncated(pass)) {
+        truncationRecoveryCount++;
         const configuredMaxTokens = context.options.maxTokens || "default";
         logger.warn(
           `[AgenticLoop] Max tokens truncation detected on iteration ${state.iterations} — ` +
             `stopReason=${pass.stopReason}, maxTokens=${configuredMaxTokens}. ` +
-            `The model could not complete its response within the token budget.`,
+            `Recovery attempt ${truncationRecoveryCount}/${MAX_OUTPUT_TRUNCATION_RECOVERIES}.`,
         );
-        const truncationWarning =
-          `⚠️ The model's response was cut short because the **max_tokens** limit ` +
-          `(${configuredMaxTokens}) was reached before it could finish generating. ` +
-          `This is especially likely during tool calls, which require more output tokens. ` +
-          `Try increasing the **Max Tokens** setting in your model configuration.`;
-        context.emit({
-          type: SSE_EVENT_TYPES.CHUNK,
-          content: truncationWarning,
-        });
-        context.emit({
-          type: SSE_EVENT_TYPES.STATUS,
-          message: (STATUS_MESSAGES as any).MAX_TOKENS_TRUNCATED || "max_tokens_truncated",
-          phase: "truncated",
-        });
-      } else {
-        logger.warn(
-          `[AgenticLoop] Empty model output on iteration ${state.iterations} — ` +
-            `text=${pass.streamedText.length}, thinking=${pass.streamedThinking.length}, ` +
-            `toolCalls=${pass.pendingToolCalls.length}. Breaking.`,
+
+        if (truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES) {
+          const escalatedMaxTokens = injectContinuationContext(
+            currentMessages,
+            pass,
+            context,
+            truncationRecoveryCount,
+          );
+          context.options.maxTokens = escalatedMaxTokens;
+          this.logIteration(pass, currentMessages);
+          continue;
+        }
+
+        // All recovery attempts exhausted — inject error as conversation context
+        const exhaustionMessage = buildExhaustedRecoveryMessage(
+          MAX_OUTPUT_TRUNCATION_RECOVERIES,
+          configuredMaxTokens,
         );
+        injectErrorAsConversationMessage(currentMessages, exhaustionMessage, context);
+        this.logIteration(pass, currentMessages);
+        break;
       }
+
+      // Genuinely empty output (not truncation)
+      logger.warn(
+        `[AgenticLoop] Empty model output on iteration ${state.iterations} — ` +
+          `text=${pass.streamedText.length}, thinking=${pass.streamedThinking.length}, ` +
+          `toolCalls=${pass.pendingToolCalls.length}. Breaking.`,
+      );
       this.logIteration(pass, currentMessages);
       break;
     }
@@ -562,9 +579,18 @@ export default class ReActHarness extends BaseAgenticHarness {
       // ── Error-path persistence ─────────────────────────────
       // Persist whatever messages accumulated before the error so
       // the session isn't left as an empty stub in MongoDB.
+      // Also inject the error as a conversation message so the LLM
+      // has context about the failure on the next turn.
       logger.error(
         `[ReActHarness] Loop error on iteration ${state.iterations}: ${loopError instanceof Error ? loopError.message : String(loopError)}. Persisting ${currentMessages.length - state.originalMessageCount} accumulated message(s).`,
       );
+
+      injectErrorAsConversationMessage(
+        currentMessages,
+        buildProviderErrorMessage(loopError, state.iterations),
+        context,
+      );
+
       try {
         await this.finalize(currentMessages, hooks);
       } catch (persistError: unknown) {

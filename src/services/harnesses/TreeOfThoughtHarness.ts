@@ -13,6 +13,14 @@ import {
 import { runExhaustionRecoveryPass } from "./lifecycle/ExhaustionRecovery.ts";
 import { reloadIfCustomToolsMutated } from "./lifecycle/ToolHotReloader.ts";
 import { validateAfterToolExecution } from "./lifecycle/ValidationInterceptor.ts";
+import {
+  isOutputTruncated,
+  injectContinuationContext,
+  injectErrorAsConversationMessage,
+  buildExhaustedRecoveryMessage,
+  buildProviderErrorMessage,
+  MAX_OUTPUT_TRUNCATION_RECOVERIES,
+} from "./lifecycle/OutputTruncationRecovery.ts";
 
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
 import AutoCompactionTrigger from "../compact/AutoCompactionTrigger.ts";
@@ -101,6 +109,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
           : MAX_TOOL_ITERATIONS;
 
     let currentMessages: ConversationMessage[] = [...context.messages];
+    let truncationRecoveryCount = 0;
 
     const { hooks, approvalEngine } = createStandardHooks({
       workspaceRoot: workspaceRoot || undefined,
@@ -471,7 +480,36 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
         break;
       }
 
-      // ── Empty output — break ────────────────────────────────
+      // ── Empty output — check for truncation recovery ─────────
+      if (isOutputTruncated(selectedPass)) {
+        truncationRecoveryCount++;
+        const configuredMaxTokens = context.options.maxTokens || "default";
+        logger.warn(
+          `[TreeOfThought] Max tokens truncation detected on iteration ${state.iterations} — ` +
+            `Recovery attempt ${truncationRecoveryCount}/${MAX_OUTPUT_TRUNCATION_RECOVERIES}.`,
+        );
+
+        if (truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES) {
+          const escalatedMaxTokens = injectContinuationContext(
+            currentMessages,
+            selectedPass,
+            context,
+            truncationRecoveryCount,
+          );
+          context.options.maxTokens = escalatedMaxTokens;
+          this.logIteration(selectedPass, currentMessages);
+          continue;
+        }
+
+        const exhaustionMessage = buildExhaustedRecoveryMessage(
+          MAX_OUTPUT_TRUNCATION_RECOVERIES,
+          configuredMaxTokens,
+        );
+        injectErrorAsConversationMessage(currentMessages, exhaustionMessage, context);
+        this.logIteration(selectedPass, currentMessages);
+        break;
+      }
+
       logger.warn(
         `[TreeOfThought] Empty model output on iteration ${state.iterations}. Breaking.`,
       );
@@ -502,6 +540,13 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       logger.error(
         `[TreeOfThought] Loop error on iteration ${state.iterations}: ${loopError instanceof Error ? loopError.message : String(loopError)}. Persisting ${currentMessages.length - state.originalMessageCount} accumulated message(s).`,
       );
+
+      injectErrorAsConversationMessage(
+        currentMessages,
+        buildProviderErrorMessage(loopError, state.iterations),
+        context,
+      );
+
       try {
         await this.finalize(currentMessages, hooks);
       } catch (persistError: unknown) {
