@@ -666,9 +666,77 @@ export default class CoordinatorService {
     return spawnResults;
   }
 
-  static async deleteTeam(teamName: string) {
-    logger.info(`[Coordinator] deleteTeam: ${teamName} (noop)`);
-    return { name: teamName, deleted: true };
+  static async deleteTeam(teamName: string, coordinatorContext?: CoordinatorContext) {
+    const parentConversationId = coordinatorContext?.conversationId;
+
+    // Find all workers belonging to this coordinator session
+    const teamWorkers = [...activeWorkers.entries()].filter(([, worker]) => {
+      if (parentConversationId) {
+        return worker.parentConversationId === parentConversationId;
+      }
+      return false;
+    });
+
+    if (teamWorkers.length === 0) {
+      logger.info(`[Coordinator] deleteTeam "${teamName}": no active workers found`);
+      return { name: teamName, deleted: true, workersAborted: 0 };
+    }
+
+    logger.info(
+      `[Coordinator] deleteTeam "${teamName}": aborting ${teamWorkers.length} worker(s)…`,
+    );
+
+    const cleanupPromises: Promise<void>[] = [];
+
+    for (const [key, worker] of teamWorkers) {
+      // Abort running workers
+      if (worker.status === "running") {
+        worker.abortController?.abort();
+        worker.status = "stopped";
+        worker.durationMs = Date.now() - worker.startedAt;
+      }
+
+      // Release load balancer reservation
+      if (!worker.reservationReleased) {
+        InstanceLoadBalancer.releaseReservation(worker.providerName);
+        worker.reservationReleased = true;
+      }
+
+      // Remove isolated worktrees
+      if (worker.isolated && worker.worktreePath) {
+        const workerWorktreePath = worker.worktreePath;
+        const workerRepoPath = worker.repoPath;
+        const workerAgentId = worker.agentId;
+        cleanupPromises.push(
+          GitWorktreeHelper.removeWorktree(workerRepoPath, workerWorktreePath)
+            .then(() => {
+              worker.worktreePath = null;
+            })
+            .catch((error: Error) =>
+              logger.warn(
+                `[Coordinator] deleteTeam worktree cleanup failed for ${workerAgentId}: ${error.message}`,
+              ),
+            ),
+        );
+      }
+
+      // Remove from active registry
+      activeWorkers.delete(key);
+    }
+
+    if (cleanupPromises.length > 0) {
+      await Promise.allSettled(cleanupPromises);
+    }
+
+    logger.info(
+      `[Coordinator] deleteTeam "${teamName}": aborted ${teamWorkers.length} worker(s)`,
+    );
+
+    return {
+      name: teamName,
+      deleted: true,
+      workersAborted: teamWorkers.length,
+    };
   }
 
   /**
@@ -789,23 +857,29 @@ export default class CoordinatorService {
     worker.messages = finalMessages as ConversationMessage[];
     worker.durationMs = Date.now() - worker.startedAt;
 
-    // Stage and commit changes in the worktree
-    await GitWorktreeHelper.toolsApiPost("/agentic/command/run", {
-      command: "git add -A",
-      cwd: worker.worktreePath,
-    });
-    await GitWorktreeHelper.toolsApiPost("/agentic/command/run", {
-      command: `git commit -m "coordinator: ${worker.agentId} — ${worker.description}" --allow-empty`,
-      cwd: worker.worktreePath,
-    });
+    if (worker.status !== "stopped") {
+      // Stage and commit changes in the worktree
+      await GitWorktreeHelper.toolsApiPost("/agentic/command/run", {
+        command: "git add -A",
+        cwd: worker.worktreePath,
+      });
+      await GitWorktreeHelper.toolsApiPost("/agentic/command/run", {
+        command: `git commit -m "coordinator: ${worker.agentId} — ${worker.description}" --allow-empty`,
+        cwd: worker.worktreePath,
+      });
 
-    // Collect diff
-    const diffResult = await GitWorktreeHelper.getWorktreeDiff(
-      worker.repoPath,
-      worker.branchName!,
-    );
-    worker.diff = diffResult.error ? null : (diffResult as WorktreeDiff);
-    worker.status = "complete";
+      // Collect diff (only if the worktree created a branch)
+      if (worker.branchName) {
+        const diffResult = await GitWorktreeHelper.getWorktreeDiff(
+          worker.repoPath,
+          worker.branchName,
+        );
+        worker.diff = diffResult.error ? null : (diffResult as WorktreeDiff);
+      } else {
+        worker.diff = null;
+      }
+      worker.status = "complete";
+    }
 
     // ── Release heavy data from completed workers ──────────────
     // The messages array can be tens of MBs (includes tool results,
@@ -815,7 +889,7 @@ export default class CoordinatorService {
     worker.abortController = null;
     // Remove worktree now that the diff has been collected — prevents orphaned
     // worktrees from accumulating on disk across sessions.
-    if (worker.isolated && worker.worktreePath) {
+    if (worker.status !== "stopped" && worker.isolated && worker.worktreePath) {
       await GitWorktreeHelper.removeWorktree(worker.repoPath, worker.worktreePath).catch(
         (error: unknown) =>
           logger.warn(
@@ -838,7 +912,10 @@ export default class CoordinatorService {
     );
 
     // Release the per-instance reservation (synchronous counter)
-    InstanceLoadBalancer.releaseReservation(worker.providerName);
+    if (!worker.reservationReleased) {
+      InstanceLoadBalancer.releaseReservation(worker.providerName);
+      worker.reservationReleased = true;
+    }
 
     logger.info(
       `[Coordinator] Agent ${worker.agentId} completed in ${worker.durationMs}ms (${telemetry.toolCalls.length} tool calls)`,

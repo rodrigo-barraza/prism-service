@@ -83,9 +83,13 @@ export default class AgenticLoopService {
       pendingApprovals.delete(conversationId);
       pendingQuestions.delete(conversationId);
 
+      // Always clean up per-session tracker entries to prevent memory leaks —
+      // worker sessions have their own agentSessionId that must be released.
+      SessionGenerationTracker.cleanup(agentSessionId);
+
+      // Only clean up coordinator state for root sessions — workers are
+      // cleaned by the parent session's CoordinatorService.cleanupSession().
       if (!parentAgentSessionId) {
-        const trackerSessionId = parentAgentSessionId || agentSessionId;
-        SessionGenerationTracker.cleanup(trackerSessionId);
         try {
           const { default: CoordinatorService } =
             await import("./CoordinatorService.js");

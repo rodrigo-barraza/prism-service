@@ -43,6 +43,7 @@ export interface WorkerState {
   parentConversationId: string;
   pendingMessages?: string[];
   enabledTools?: string[] | null;
+  reservationReleased?: boolean;
 }
 
 export interface WorktreeDiff {

@@ -387,8 +387,8 @@ describe("AgenticLoopService", () => {
       })
     );
 
-    // Verify cleanup was NOT called for workers (coordinator cleans it up)
-    expect(SessionGenerationTracker.cleanup).not.toHaveBeenCalledWith("worker-456");
+    // Verify cleanup WAS called for workers to prevent memory leaks
+    expect(SessionGenerationTracker.cleanup).toHaveBeenCalledWith("worker-456");
   });
 
   it("should load custom tools from MongoDB and pass them to the LLM", async () => {
