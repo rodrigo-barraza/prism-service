@@ -4,7 +4,7 @@ import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { COORDINATOR_ONLY_TOOLS } from "./CoordinatorPrompt.ts";
 import { createAbortController } from "../utils/AbortController.ts";
-import { DOMAINS, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { DOMAINS, TOOL_NAMES, TOOL_INPUT_MODALITIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   TOOL_SCHEMA_FETCH_TIMEOUT_MS,
   TOOL_CONFIG_FETCH_TIMEOUT_MS,
@@ -570,6 +570,7 @@ export default class ToolOrchestratorService {
       ...tool,
       domainKey: (tool.domainKey as string) || resolveDomainKey(tool.domain || "Other"),
       system: tool.domain === "Core Tools",
+      ...(TOOL_INPUT_MODALITIES[tool.name] && { inputModalities: [...TOOL_INPUT_MODALITIES[tool.name]] }),
     }));
 
     const mcpClient = ToolOrchestratorService.getMCPToolSchemas().map((tool) => ({
