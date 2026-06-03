@@ -42,6 +42,7 @@ export interface WorkerState {
   minContextLength: number | null;
   parentConversationId: string;
   pendingMessages?: string[];
+  enabledTools?: string[] | null;
 }
 
 export interface WorktreeDiff {
@@ -112,6 +113,7 @@ export interface CoordinatorContext {
   minContextLength?: number;
   workspaceRoot?: string | null;
   emit?: EmitFn;
+  enabledTools?: string[] | null;
   [key: string]: unknown;
 }
 

@@ -956,23 +956,26 @@ export default class ToolOrchestratorService {
 
     // Build coordinatorCtx from the loop's context
     const coordinatorCtx = {
-            project: context.project,
-            username: context.username,
-            agent: context.agent,
-            providerName: context._providerName,
-            resolvedModel: context._resolvedModel,
-            agentSessionId: context.agentSessionId,
-            conversationId: context.conversationId,
-            traceId: context.traceId,
+      project: context.project,
+      username: context.username,
+      agent: context.agent,
+      providerName: context._providerName,
+      resolvedModel: context._resolvedModel,
+      agentSessionId: context.agentSessionId,
+      conversationId: context.conversationId,
+      traceId: context.traceId,
 
       // Pass the parent's emit so workers can forward live events
-            emit: context._emit || null,
+      emit: context._emit || null,
 
       // User-configured max iterations for worker agents
-            maxWorkerIterations: context._maxWorkerIterations,
+      maxWorkerIterations: context._maxWorkerIterations,
 
       // Inherit context window size so workers load with the same context
-            minContextLength: context._minContextLength,
+      minContextLength: context._minContextLength,
+
+      // Inherit the exact list of tools enabled in the parent context
+      enabledTools: context.enabledTools || null,
     };
 
     switch (name) {
