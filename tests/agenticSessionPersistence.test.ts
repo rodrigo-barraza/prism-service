@@ -154,26 +154,26 @@ describe("finalizeTextGeneration — segment deduplication", () => {
         role: "assistant",
         content: "I'll run npm install for you.",
         toolCalls: [
-          { id: "tc-1", name: "run_command", args: { command: "npm install" }, result: { success: true, stdout: "added 50 packages", stderr: "", exitCode: 0 } },
+          { id: "toolCall-1", name: "run_command", args: { command: "npm install" }, result: { success: true, stdout: "added 50 packages", stderr: "", exitCode: 0 } },
         ],
       },
     ];
 
     const segments = [
       { type: "text", fragmentIndex: 0 },
-      { type: "tools", toolIds: ["tc-1"] },
+      { type: "tools", toolIds: ["toolCall-1"] },
       { type: "text", fragmentIndex: 1 },
     ];
     const fragments = ["I'll run npm install for you.", "✅ npm install completed successfully."];
 
-    const ctx = makeCtx();
+    const context = makeCtx();
     const gen = makeGenerationResult({
       text: "✅ npm install completed successfully.",
       contentSegments: segments,
       textFragments: fragments,
     });
 
-    await finalizeTextGeneration(ctx, gen, intermediateMessages);
+    await finalizeTextGeneration(context, gen, intermediateMessages);
 
     expect(ConversationService.appendMessages).toHaveBeenCalledTimes(1);
 
@@ -181,14 +181,14 @@ describe("finalizeTextGeneration — segment deduplication", () => {
     // Should have: user, intermediate assistant, final assistant
     expect(appendedMessages).toHaveLength(3);
 
-    const finalMsg = appendedMessages[appendedMessages.length - 1];
-    expect(finalMsg.role).toBe("assistant");
-    expect(finalMsg.content).toBe("✅ npm install completed successfully.");
+    const finalMessage = appendedMessages[appendedMessages.length - 1];
+    expect(finalMessage.role).toBe("assistant");
+    expect(finalMessage.content).toBe("✅ npm install completed successfully.");
 
     // Key assertion: segments must NOT be on the final message
-    expect(finalMsg.contentSegments).toBeUndefined();
-    expect(finalMsg.textFragments).toBeUndefined();
-    expect(finalMsg.thinkingFragments).toBeUndefined();
+    expect(finalMessage.contentSegments).toBeUndefined();
+    expect(finalMessage.textFragments).toBeUndefined();
+    expect(finalMessage.thinkingFragments).toBeUndefined();
   });
 
   it("should NOT attach toolCalls on final message when intermediate messages already have them", async () => {
@@ -198,24 +198,24 @@ describe("finalizeTextGeneration — segment deduplication", () => {
         role: "assistant",
         content: "Let me check.",
         toolCalls: [
-          { id: "tc-1", name: "read_file", args: { path: "/test" }, result: { content: "file data" } },
+          { id: "toolCall-1", name: "read_file", args: { path: "/test" }, result: { content: "file data" } },
         ],
       },
     ];
 
-    const ctx = makeCtx();
+    const context = makeCtx();
     const gen = makeGenerationResult({
       text: "Here are the files.",
-      toolCalls: [{ id: "tc-1", name: "read_file", args: { path: "/test" } }],
+      toolCalls: [{ id: "toolCall-1", name: "read_file", args: { path: "/test" } }],
     });
 
-    await finalizeTextGeneration(ctx, gen, intermediateMessages);
+    await finalizeTextGeneration(context, gen, intermediateMessages);
 
     const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
-    const finalMsg = appendedMessages[appendedMessages.length - 1];
+    const finalMessage = appendedMessages[appendedMessages.length - 1];
 
     // toolCalls should NOT be duplicated on the final message
-    expect(finalMsg.toolCalls).toBeUndefined();
+    expect(finalMessage.toolCalls).toBeUndefined();
   });
 
   // ── Single iteration: segments SHOULD be attached ───────────
@@ -232,7 +232,7 @@ describe("finalizeTextGeneration — segment deduplication", () => {
     const textFragments = ["A closure is a function that captures variables from its outer scope."];
     const thinkingFragments = ["Let me explain closures clearly."];
 
-    const ctx = makeCtx();
+    const context = makeCtx();
     const gen = makeGenerationResult({
       text: "A closure is a function that captures variables from its outer scope.",
       thinking: "Let me explain closures clearly.",
@@ -241,15 +241,15 @@ describe("finalizeTextGeneration — segment deduplication", () => {
       thinkingFragments,
     });
 
-    await finalizeTextGeneration(ctx, gen, intermediateMessages);
+    await finalizeTextGeneration(context, gen, intermediateMessages);
 
     const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
-    const finalMsg = appendedMessages[appendedMessages.length - 1];
+    const finalMessage = appendedMessages[appendedMessages.length - 1];
 
     // Segments SHOULD be present for single-iteration turns
-    expect(finalMsg.contentSegments).toEqual(segments);
-    expect(finalMsg.textFragments).toEqual(textFragments);
-    expect(finalMsg.thinkingFragments).toEqual(thinkingFragments);
+    expect(finalMessage.contentSegments).toEqual(segments);
+    expect(finalMessage.textFragments).toEqual(textFragments);
+    expect(finalMessage.thinkingFragments).toEqual(thinkingFragments);
   });
 
   it("should ATTACH segments when override messages exist but none have toolCalls", async () => {
@@ -263,21 +263,21 @@ describe("finalizeTextGeneration — segment deduplication", () => {
     const segments = [{ type: "text", fragmentIndex: 0 }];
     const textFragments = ["How can I help you?"];
 
-    const ctx = makeCtx();
+    const context = makeCtx();
     const gen = makeGenerationResult({
       text: "How can I help you?",
       contentSegments: segments,
       textFragments,
     });
 
-    await finalizeTextGeneration(ctx, gen, intermediateMessages);
+    await finalizeTextGeneration(context, gen, intermediateMessages);
 
     const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
-    const finalMsg = appendedMessages[appendedMessages.length - 1];
+    const finalMessage = appendedMessages[appendedMessages.length - 1];
 
     // Segments should be present since no intermediate has toolCalls
-    expect(finalMsg.contentSegments).toEqual(segments);
-    expect(finalMsg.textFragments).toEqual(textFragments);
+    expect(finalMessage.contentSegments).toEqual(segments);
+    expect(finalMessage.textFragments).toEqual(textFragments);
   });
 
   // ── Edge: MCP native tool calls (no intermediate messages) ──
@@ -291,19 +291,19 @@ describe("finalizeTextGeneration — segment deduplication", () => {
       { id: "ntc-1", name: "search_web", args: { query: "test" }, result: { results: [] } },
     ];
 
-    const ctx = makeCtx();
+    const context = makeCtx();
     const gen = makeGenerationResult({
       text: "Here are the search results.",
       toolCalls: nativeToolCalls,
     });
 
-    await finalizeTextGeneration(ctx, gen, intermediateMessages);
+    await finalizeTextGeneration(context, gen, intermediateMessages);
 
     const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
-    const finalMsg = appendedMessages[appendedMessages.length - 1];
+    const finalMessage = appendedMessages[appendedMessages.length - 1];
 
     // toolCalls SHOULD be on the final message (no intermediate tool messages)
-    expect(finalMsg.toolCalls).toEqual(nativeToolCalls);
+    expect(finalMessage.toolCalls).toEqual(nativeToolCalls);
   });
 
   // ── Multi-tool-iteration stress test ────────────────────────
@@ -313,31 +313,31 @@ describe("finalizeTextGeneration — segment deduplication", () => {
       {
         role: "assistant",
         content: "Let me read the file first.",
-        toolCalls: [{ id: "tc-1", name: "read_file", args: { path: "/src/app.js" }, result: { content: "old code" } }],
+        toolCalls: [{ id: "toolCall-1", name: "read_file", args: { path: "/src/app.js" }, result: { content: "old code" } }],
       },
       {
         role: "assistant",
         content: "Now I'll write the updated file.",
-        toolCalls: [{ id: "tc-2", name: "write_file", args: { path: "/src/app.js", content: "new code" }, result: { success: true } }],
+        toolCalls: [{ id: "toolCall-2", name: "write_file", args: { path: "/src/app.js", content: "new code" }, result: { success: true } }],
       },
       {
         role: "assistant",
         content: "Let me verify with tests.",
-        toolCalls: [{ id: "tc-3", name: "run_command", args: { command: "npm test" }, result: { success: true, stdout: "all tests pass", stderr: "", exitCode: 0 } }],
+        toolCalls: [{ id: "toolCall-3", name: "run_command", args: { command: "npm test" }, result: { success: true, stdout: "all tests pass", stderr: "", exitCode: 0 } }],
       },
     ];
 
     const fullSegments = [
       { type: "text", fragmentIndex: 0 },
-      { type: "tools", toolIds: ["tc-1"] },
+      { type: "tools", toolIds: ["toolCall-1"] },
       { type: "text", fragmentIndex: 1 },
-      { type: "tools", toolIds: ["tc-2"] },
+      { type: "tools", toolIds: ["toolCall-2"] },
       { type: "text", fragmentIndex: 2 },
-      { type: "tools", toolIds: ["tc-3"] },
+      { type: "tools", toolIds: ["toolCall-3"] },
       { type: "text", fragmentIndex: 3 },
     ];
 
-    const ctx = makeCtx();
+    const context = makeCtx();
     const gen = makeGenerationResult({
       text: "All done! The refactoring is complete.",
       contentSegments: fullSegments,
@@ -345,22 +345,22 @@ describe("finalizeTextGeneration — segment deduplication", () => {
       thinkingFragments: [],
     });
 
-    await finalizeTextGeneration(ctx, gen, intermediateMessages);
+    await finalizeTextGeneration(context, gen, intermediateMessages);
 
     const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
-    const finalMsg = appendedMessages[appendedMessages.length - 1];
+    const finalMessage = appendedMessages[appendedMessages.length - 1];
 
     // None of the segment data should be on the final message
-    expect(finalMsg.contentSegments).toBeUndefined();
-    expect(finalMsg.textFragments).toBeUndefined();
-    expect(finalMsg.thinkingFragments).toBeUndefined();
+    expect(finalMessage.contentSegments).toBeUndefined();
+    expect(finalMessage.textFragments).toBeUndefined();
+    expect(finalMessage.thinkingFragments).toBeUndefined();
 
     // Only the final text should be the content
-    expect(finalMsg.content).toBe("All done! The refactoring is complete.");
+    expect(finalMessage.content).toBe("All done! The refactoring is complete.");
 
     // Verify intermediate messages are preserved as-is
     const toolMessages = appendedMessages.filter(
-      (m) => m.role === "assistant" && m.toolCalls?.length > 0,
+      (message) => message.role === "assistant" && message.toolCalls?.length > 0,
     );
     expect(toolMessages).toHaveLength(3);
   });
@@ -383,7 +383,7 @@ describe("message persistence contract for TerminalRenderer", () => {
         content: "I'll run npm install for you.",
         toolCalls: [
           {
-            id: "tc-1",
+            id: "toolCall-1",
             name: "run_command",
             args: { command: "npm install", cwd: "/project" },
             result: {
@@ -407,8 +407,8 @@ describe("message persistence contract for TerminalRenderer", () => {
     ];
 
     // Verify the data shape that TerminalRenderer expects
-    const intermediateMsg = storedMessages[1];
-    const toolCall = intermediateMsg.toolCalls[0];
+    const intermediateMessage = storedMessages[1];
+    const toolCall = intermediateMessage.toolCalls[0];
 
     // The result must be an object (not a string)
     expect(typeof toolCall.result).toBe("object");
@@ -421,14 +421,14 @@ describe("message persistence contract for TerminalRenderer", () => {
     expect(toolCall.result).toHaveProperty("success");
 
     // Verify content isn't on both messages
-    expect(intermediateMsg.content).toBe("I'll run npm install for you.");
+    expect(intermediateMessage.content).toBe("I'll run npm install for you.");
     expect(storedMessages[2].content).toBe("✅ npm install completed successfully.");
     expect(storedMessages[2].contentSegments).toBeUndefined();
 
     // No content duplication: each message has its own unique text
     const allTexts = storedMessages
-      .filter((m) => m.role === "assistant")
-      .map((m) => m.content);
+      .filter((message) => message.role === "assistant")
+      .map((message) => message.content);
     const uniqueTexts = new Set(allTexts);
     expect(uniqueTexts.size).toBe(allTexts.length);
   });
@@ -450,10 +450,10 @@ describe("message persistence contract for TerminalRenderer", () => {
       },
     ];
 
-    const finalMsg = storedMessages[1];
-    expect(finalMsg.contentSegments).toBeDefined();
-    expect(finalMsg.contentSegments).toHaveLength(2);
-    expect(finalMsg.textFragments).toBeDefined();
-    expect(finalMsg.thinkingFragments).toBeDefined();
+    const finalMessage = storedMessages[1];
+    expect(finalMessage.contentSegments).toBeDefined();
+    expect(finalMessage.contentSegments).toHaveLength(2);
+    expect(finalMessage.textFragments).toBeDefined();
+    expect(finalMessage.thinkingFragments).toBeDefined();
   });
 });

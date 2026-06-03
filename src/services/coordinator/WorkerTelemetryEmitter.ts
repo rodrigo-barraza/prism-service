@@ -6,12 +6,12 @@
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
 import { estimateTokens } from "./WorkerResultBuilder.ts";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import type { EmitFn } from "../harnesses/types.ts";
+import type { EmitFunction } from "../harnesses/types.ts";
 
 interface WorkerTelemetryConfig {
   workerId: string;
   workerDescription: string;
-  parentEmit: EmitFn | null | undefined;
+  parentEmit: EmitFunction | null | undefined;
   parentSessionId: string | null | undefined;
 }
 
@@ -25,7 +25,7 @@ interface WorkerTelemetryConfig {
 export class WorkerTelemetryEmitter {
   private workerId: string;
   private workerDescription: string;
-  private parentEmit: EmitFn | null | undefined;
+  private parentEmit: EmitFunction | null | undefined;
   private parentSessionId: string | null | undefined;
 
   // Timing
@@ -140,10 +140,10 @@ export class WorkerTelemetryEmitter {
   }
 
   /**
-   * The EmitFn to pass to the agentic loop.
+   * The EmitFunction to pass to the agentic loop.
    * Routes worker events to the parent SSE stream with telemetry.
    */
-  createEmitFunction(): EmitFn {
+  createEmitFunction(): EmitFunction {
     return (event) => {
       if (event.type === "chunk") {
         this.output += (event.content as string) || "";

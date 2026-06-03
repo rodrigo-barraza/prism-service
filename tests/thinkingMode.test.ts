@@ -365,7 +365,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
   describe("AgenticLoopState Integration", () => {
     it("properly appends thinking chunks, displays segments, and emits thinking events", async () => {
       const emittedEvents: any[] = [];
-      const mockCtx: any = {
+      const mockContext: any = {
         providerName: "google",
         resolvedModel: MODELS.GEMINI_35_FLASH.name,
         modelDef: MODELS.GEMINI_35_FLASH,
@@ -409,16 +409,16 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       }
 
       SessionGenerationTracker.register(
-        mockCtx.agentSessionId,
-        mockCtx.requestId,
+        mockContext.agentSessionId,
+        mockContext.requestId,
         {
-          provider: mockCtx.providerName,
-          model: mockCtx.resolvedModel,
+          provider: mockContext.providerName,
+          model: mockContext.resolvedModel,
         }
       );
 
       const pass: any = {
-        requestId: mockCtx.requestId,
+        requestId: mockContext.requestId,
         start: performance.now(),
         firstTokenTime: null,
         generationEnd: null,
@@ -429,7 +429,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
         pendingToolCalls: [],
       };
 
-      const harness = new DummyHarness(mockCtx, state, mockTools);
+      const harness = new DummyHarness(mockContext, state, mockTools);
 
       await harness.testProcessChunk(
         { type: "thinking", content: "Analyzing request... " },
@@ -479,7 +479,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       });
 
       // Cleanup
-      SessionGenerationTracker.cleanup(mockCtx.agentSessionId);
+      SessionGenerationTracker.cleanup(mockContext.agentSessionId);
     });
   });
 });
@@ -689,7 +689,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
   describe("AgenticLoopState Integration with Anthropic", () => {
     it("properly appends thinking, captures signature, and emits thinking events", async () => {
       const emittedEvents: any[] = [];
-      const mockCtx: any = {
+      const mockContext: any = {
         providerName: "anthropic",
         resolvedModel: MODELS.SONNET_46.name,
         modelDef: MODELS.SONNET_46,
@@ -732,16 +732,16 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       }
 
       SessionGenerationTracker.register(
-        mockCtx.agentSessionId,
-        mockCtx.requestId,
+        mockContext.agentSessionId,
+        mockContext.requestId,
         {
-          provider: mockCtx.providerName,
-          model: mockCtx.resolvedModel,
+          provider: mockContext.providerName,
+          model: mockContext.resolvedModel,
         }
       );
 
       const pass: any = {
-        requestId: mockCtx.requestId,
+        requestId: mockContext.requestId,
         start: performance.now(),
         firstTokenTime: null,
         generationEnd: null,
@@ -753,7 +753,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
         pendingToolCalls: [],
       };
 
-      const harness = new DummyHarness(mockCtx, state, mockTools);
+      const harness = new DummyHarness(mockContext, state, mockTools);
 
       await harness.testProcessChunk(
         { type: "thinking", content: "Evaluating factors: " },
@@ -790,7 +790,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       );
 
       // Cleanup
-      SessionGenerationTracker.cleanup(mockCtx.agentSessionId);
+      SessionGenerationTracker.cleanup(mockContext.agentSessionId);
     });
   });
 });

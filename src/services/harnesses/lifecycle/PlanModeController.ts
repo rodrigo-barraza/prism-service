@@ -10,7 +10,7 @@ import type {
   PassState,
   ConversationMessage,
   AgenticContext,
-  EmitFn,
+  EmitFunction,
 } from "../types.ts";
 
 /**
@@ -173,7 +173,7 @@ export function checkForPlanModeEntry(
   executedToolCalls: ToolCall[],
   currentMessages: ConversationMessage[],
   state: AgenticLoopState,
-  emit: EmitFn,
+  emit: EmitFunction,
 ): void {
   const hasEnterPlanMode = executedToolCalls.some(
     (toolCall) => toolCall.name === "enter_plan_mode",

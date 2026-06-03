@@ -5,7 +5,7 @@
  * Covers worker state, results, instance selection, and git worktree ops.
  */
 
-import type { ConversationMessage, EmitFn, ToolCall } from "../services/harnesses/types.ts";
+import type { ConversationMessage, EmitFunction, ToolCall } from "../services/harnesses/types.ts";
 
 // ── Worker State ────────────────────────────────────────────
 
@@ -98,7 +98,7 @@ export interface CoordinatorSpawnParams {
   agent?: string;
   assignedProvider?: string;
   assignedModel?: string;
-  coordinatorCtx: CoordinatorContext;
+  coordinatorContext: CoordinatorContext;
 }
 
 export interface CoordinatorContext {
@@ -113,7 +113,7 @@ export interface CoordinatorContext {
   maxWorkerIterations?: number;
   minContextLength?: number;
   workspaceRoot?: string | null;
-  emit?: EmitFn;
+  emit?: EmitFunction;
   enabledTools?: string[] | null;
   [key: string]: unknown;
 }

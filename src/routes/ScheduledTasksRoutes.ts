@@ -17,7 +17,7 @@ router.get(
     const username: string = typeof req.username === "string" ? req.username : "system";
 
     try {
-      const tasks = await ScheduledTaskService.listTasks(project as string, username as string);
+      const tasks = await ScheduledTaskService.listTasks(project, username);
       res.json(tasks);
     } catch (error: unknown) {
       logger.error(`[ScheduledTasks][GET] Error listing tasks: ${getErrorMessage(error)}`);
@@ -79,7 +79,7 @@ router.post(
         enabled: true,
         project: project as string,
         username: username as string,
-      } as any);
+      } as Omit<import("../services/ScheduledTaskService.ts").ScheduledTask, "id" | "createdAt" | "updatedAt"> & { username: string });
 
       res.status(201).json(task);
     } catch (error: unknown) {
@@ -102,7 +102,7 @@ router.patch(
     const updates = req.body;
 
     try {
-      const updatedTask = await ScheduledTaskService.updateTask(id as string, project as string, username as string, updates as any);
+      const updatedTask = await ScheduledTaskService.updateTask(id as string, project, username, updates);
       res.json(updatedTask);
     } catch (error: unknown) {
       logger.error(`[ScheduledTasks][PATCH] Error updating task ${id}: ${getErrorMessage(error)}`);
@@ -123,7 +123,7 @@ router.delete(
     const username: string = typeof req.username === "string" ? req.username : "system";
 
     try {
-      const success = await ScheduledTaskService.deleteTask(id as string, project as string, username as string);
+      const success = await ScheduledTaskService.deleteTask(id as string, project, username);
       res.json({ success });
     } catch (error: unknown) {
       logger.error(`[ScheduledTasks][DELETE] Error deleting task ${id}: ${getErrorMessage(error)}`);
@@ -145,7 +145,7 @@ router.post(
     const { payload } = req.body;
 
     try {
-      const result = await ScheduledTaskService.triggerTask(id as string, project as string, username as string, payload);
+      const result = await ScheduledTaskService.triggerTask(id as string, project, username, payload);
       res.json(result);
     } catch (error: unknown) {
       logger.error(`[ScheduledTasks][TRIGGER] Error triggering task ${id}: ${getErrorMessage(error)}`);

@@ -3,7 +3,7 @@ import { MONGO_DB_NAME } from "../../../../config.ts";
 import logger from "../../../utils/logger.ts";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-import type { ToolCall, ResolvedTools, EmitFn } from "../types.ts";
+import type { ToolCall, ResolvedTools, EmitFunction } from "../types.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 /**
@@ -34,7 +34,7 @@ export async function reloadIfCustomToolsMutated(
   tools: ResolvedTools,
   project: string,
   username: string,
-  emit: EmitFn,
+  emit: EmitFunction,
 ): Promise<boolean> {
   const hasMutations = executedToolCalls.some((toolCall) =>
     CUSTOM_TOOL_MUTATION_NAMES.has(toolCall.name),

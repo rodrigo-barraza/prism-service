@@ -442,7 +442,7 @@ describe("Recovery Flow Sequence", () => {
       {
         role: "assistant",
         content: "I'll start by...",
-        toolCalls: [{ id: "tc-1", name: "read_file", args: { path: "/tmp/file.txt" } }],
+        toolCalls: [{ id: "toolCall-1", name: "read_file", args: { path: "/tmp/file.txt" } }],
       },
     ];
     const mockContext = createMockContext();

@@ -134,7 +134,7 @@ vi.mock("../src/services/PlanningModeService.ts", () => ({
 
 describe("AgenticLoopService", () => {
   let mockProvider;
-  let mockCtx;
+  let mockContext;
   let emittedEvents;
 
   beforeEach(() => {
@@ -148,7 +148,7 @@ describe("AgenticLoopService", () => {
       }),
     };
 
-    mockCtx = {
+    mockContext = {
       provider: mockProvider,
       providerName: "test-provider",
       resolvedModel: "test-model",
@@ -174,9 +174,9 @@ describe("AgenticLoopService", () => {
   });
 
   it("should execute a single loop and emit chunks", async () => {
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
-    expect(mockCtx.emit).toHaveBeenCalled();
+    expect(mockContext.emit).toHaveBeenCalled();
     const chunks = emittedEvents.filter(e => e.type === "chunk");
     expect(chunks.length).toBe(2);
     expect(chunks[0].content).toBe("Hello");
@@ -184,55 +184,55 @@ describe("AgenticLoopService", () => {
   });
 
   it("should filter out native search_web tool if options.webSearch is true", async () => {
-    mockCtx.options.webSearch = true;
-    mockCtx.options.enabledTools = ["search_web", "read_file"];
+    mockContext.options.webSearch = true;
+    mockContext.options.enabledTools = ["search_web", "read_file"];
 
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
     const passTools = callArgs.tools;
     
-    expect(passTools.find(t => t.name === "search_web")).toBeUndefined();
-    expect(passTools.find(t => t.name === "read_file")).toBeDefined();
+    expect(passTools.find(tool => tool.name === "search_web")).toBeUndefined();
+    expect(passTools.find(tool => tool.name === "read_file")).toBeDefined();
   });
 
   it("should filter out generate_image if model natively outputs images", async () => {
-    mockCtx.modelDef.outputTypes = [TYPES.TEXT, TYPES.IMAGE];
-    mockCtx.options.enabledTools = ["generate_image", "read_file"];
+    mockContext.modelDef.outputTypes = [TYPES.TEXT, TYPES.IMAGE];
+    mockContext.options.enabledTools = ["generate_image", "read_file"];
 
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
     const passTools = callArgs.tools;
     
-    expect(passTools.find(t => t.name === "generate_image")).toBeUndefined();
-    expect(passTools.find(t => t.name === "read_file")).toBeDefined();
+    expect(passTools.find(tool => tool.name === "generate_image")).toBeUndefined();
+    expect(passTools.find(tool => tool.name === "read_file")).toBeDefined();
   });
 
   it("should filter out describe_image if model natively inputs images", async () => {
-    mockCtx.modelDef.inputTypes = [TYPES.TEXT, TYPES.IMAGE];
-    mockCtx.options.enabledTools = ["describe_image", "read_file"];
+    mockContext.modelDef.inputTypes = [TYPES.TEXT, TYPES.IMAGE];
+    mockContext.options.enabledTools = ["describe_image", "read_file"];
 
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
     const passTools = callArgs.tools;
     
-    expect(passTools.find(t => t.name === "describe_image")).toBeUndefined();
-    expect(passTools.find(t => t.name === "read_file")).toBeDefined();
+    expect(passTools.find(tool => tool.name === "describe_image")).toBeUndefined();
+    expect(passTools.find(tool => tool.name === "read_file")).toBeDefined();
   });
 
   it("should expand domain and label selectors for enabledTools", async () => {
-    mockCtx.options.enabledTools = ["domain:knowledge"];
+    mockContext.options.enabledTools = ["domain:knowledge"];
 
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
     const passTools = callArgs.tools;
     
     // getClientToolSchemas returns search_web as domain:knowledge
     expect(passTools.length).toBeGreaterThan(0);
-    expect(passTools.find(t => t.name === "search_web")).toBeDefined();
+    expect(passTools.find(tool => tool.name === "search_web")).toBeDefined();
   });
 
   it("should handle context truncation", async () => {
@@ -243,7 +243,7 @@ describe("AgenticLoopService", () => {
       estimatedTokens: 5,
     });
 
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     const callArgs = mockProvider.generateTextStream.mock.calls[0][0];
     expect(callArgs[0].content).toBe("Truncated");
@@ -253,15 +253,15 @@ describe("AgenticLoopService", () => {
   });
   
   it("should properly support plan mode", async () => {
-    mockCtx.options.planFirst = true;
+    mockContext.options.planFirst = true;
 
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
     const passTools = callArgs.tools;
     
     // Should only have exit_plan_mode
-    expect(passTools.every(t => t.name === "exit_plan_mode")).toBe(true);
+    expect(passTools.every(tool => tool.name === "exit_plan_mode")).toBe(true);
     
     const enterEvents = emittedEvents.filter(e => e.message === "plan_mode_entered");
     expect(enterEvents.length).toBe(1);
@@ -273,7 +273,7 @@ describe("AgenticLoopService", () => {
       yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
     });
 
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     const thinkingEvents = emittedEvents.filter(e => e.type === "thinking");
     expect(thinkingEvents.length).toBeGreaterThan(0);
@@ -284,14 +284,14 @@ describe("AgenticLoopService", () => {
   });
 
   it("should drop tool calls not in the allowed schema", async () => {
-    mockCtx.options.enabledTools = ["read_file"];
+    mockContext.options.enabledTools = ["read_file"];
     mockProvider.generateTextStream.mockImplementation(async function* () {
       // Mock yielding a tool call that is not in the enabled schema
       yield { type: "toolCall", name: "dangerous_tool", args: {} };
       yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
     });
 
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     const toolExecutionEvents = emittedEvents.filter(e => e.type === "tool_execution");
     // Should be 0 since dangerous_tool is not allowed and dropped
@@ -311,7 +311,7 @@ describe("AgenticLoopService", () => {
       yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
     });
 
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     const toolCallEvents = emittedEvents.filter(e => e.type === "toolCall");
     expect(toolCallEvents.length).toBe(1);
@@ -324,13 +324,13 @@ describe("AgenticLoopService", () => {
   });
 
   it("should iterate multiple times when tools are executed and maxIterations > 1", async () => {
-    mockCtx.options.maxIterations = 3;
-    mockCtx.options.autoApprove = true;
-    mockCtx.options.enabledTools = ["read_file"];
+    mockContext.options.maxIterations = 3;
+    mockContext.options.autoApprove = true;
+    mockContext.options.enabledTools = ["read_file"];
 
     // First iteration: Model calls read_file
     mockProvider.generateTextStream.mockImplementationOnce(async function* () {
-      yield { type: "toolCall", name: "read_file", args: { path: "test.txt" }, id: "tc-1" };
+      yield { type: "toolCall", name: "read_file", args: { path: "test.txt" }, id: "toolCall-1" };
       yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
     });
 
@@ -340,7 +340,7 @@ describe("AgenticLoopService", () => {
       yield { type: "usage", usage: { inputTokens: 10, outputTokens: 5 } };
     });
 
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     // It should have called the provider twice
     expect(mockProvider.generateTextStream).toHaveBeenCalledTimes(2);
@@ -362,17 +362,17 @@ describe("AgenticLoopService", () => {
     // Wait, let's just check the provider calls
     const secondCallArgs = mockProvider.generateTextStream.mock.calls[1][0];
     expect(secondCallArgs.length).toBeGreaterThan(1);
-    const lastMsgBeforeSecondIter = secondCallArgs[secondCallArgs.length - 1];
-    expect(lastMsgBeforeSecondIter.role).toBe("tool");
+    const lastMessageBeforeSecondIteration = secondCallArgs[secondCallArgs.length - 1];
+    expect(lastMessageBeforeSecondIteration.role).toBe("tool");
   });
 
   it("should configure session tracking correctly for worker sub-agents", async () => {
     // Set up a worker context
-    mockCtx.parentAgentSessionId = "coordinator-123";
-    mockCtx.agentSessionId = "worker-456";
-    mockCtx.options.maxIterations = 1;
+    mockContext.parentAgentSessionId = "coordinator-123";
+    mockContext.agentSessionId = "worker-456";
+    mockContext.options.maxIterations = 1;
 
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     // Should register generation against the parent/coordinator session
     const SessionGenerationTracker = (await import("../src/services/SessionGenerationTracker.ts")).default;
@@ -407,42 +407,42 @@ describe("AgenticLoopService", () => {
     });
 
     // Make sure we just use the dynamic tools 
-    mockCtx.options.enabledTools = null;
+    mockContext.options.enabledTools = null;
 
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
     const passTools = callArgs.tools;
     
-    expect(passTools.find(t => t.name === "custom_db_tool")).toBeDefined();
-    expect(passTools.find(t => t.name === "custom_db_tool").description).toBe("A tool from the database");
+    expect(passTools.find(tool => tool.name === "custom_db_tool")).toBeDefined();
+    expect(passTools.find(tool => tool.name === "custom_db_tool").description).toBe("A tool from the database");
   });
 
   it("should resolve disabledTools mode correctly", async () => {
-    mockCtx.options.enabledTools = null;
-    mockCtx.options.disabledTools = ["generate_image"];
+    mockContext.options.enabledTools = null;
+    mockContext.options.disabledTools = ["generate_image"];
     
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
     const passTools = callArgs.tools;
     
     // Should contain search_web (as it's in the schemas), but NOT generate_image
-    expect(passTools.find(t => t.name === "search_web")).toBeDefined();
-    expect(passTools.find(t => t.name === "generate_image")).toBeUndefined();
+    expect(passTools.find(tool => tool.name === "search_web")).toBeDefined();
+    expect(passTools.find(tool => tool.name === "generate_image")).toBeUndefined();
   });
 
   it("should block unauthorized tools in plan mode by dropping them via schema enforcer", async () => {
-    mockCtx.options.maxIterations = 2;
-    mockCtx.options.planFirst = true;
+    mockContext.options.maxIterations = 2;
+    mockContext.options.planFirst = true;
     
     // Iteration 1: model tries to use read_file (not allowed in plan mode)
     mockProvider.generateTextStream.mockImplementationOnce(async function* () {
-      yield { type: "toolCall", name: "read_file", args: {}, id: "tc-bad" };
+      yield { type: "toolCall", name: "read_file", args: {}, id: "toolCall-bad" };
       yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
     });
 
-    await AgenticLoopService.runAgenticLoop(mockCtx);
+    await AgenticLoopService.runAgenticLoop(mockContext);
 
     // Because it's dropped by the schema enforcer, no tool execution occurs
     const toolExecEvents = emittedEvents.filter(e => e.type === "tool_execution");

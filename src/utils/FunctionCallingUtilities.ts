@@ -92,9 +92,9 @@ export function expandMessagesForFC(
 ): ExpandedMessage[] {
   const filtered = filterDeleted
     ? messages.filter(
-        (m) =>
-          !(m as ChatMessage & { deleted?: boolean }).deleted &&
-          (m.role !== "assistant" || m.content?.toString().trim() || m.toolCalls?.length),
+        (messageItem) =>
+          !(messageItem as ChatMessage & { deleted?: boolean }).deleted &&
+          (messageItem.role !== "assistant" || messageItem.content?.toString().trim() || messageItem.toolCalls?.length),
       )
     : messages;
 
@@ -102,7 +102,7 @@ export function expandMessagesForFC(
     // Expand assistant messages with toolCalls into
     // [assistant(tool_calls), tool(result1), tool(result2), ...]
     if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
-      const assistantMsg: ExpandedMessage = {
+      const assistantMessage: ExpandedMessage = {
         role: "assistant",
         content: message.content?.toString().trim() || null,
         // Preserve thinking + signature for Anthropic multi-turn round-trips
@@ -110,33 +110,33 @@ export function expandMessagesForFC(
         ...((message as ChatMessage & { thinkingSignature?: string }).thinkingSignature && {
           thinkingSignature: (message as ChatMessage & { thinkingSignature?: string }).thinkingSignature,
         }),
-        toolCalls: message.toolCalls.map((tc: ToolCallEntry) => ({
-          id: tc.id,
-          name: tc.name,
-          args: tc.args,
-          ...(tc.responsesItemId
-            ? { responsesItemId: tc.responsesItemId }
+        toolCalls: message.toolCalls.map((toolCall: ToolCallEntry) => ({
+          id: toolCall.id,
+          name: toolCall.name,
+          args: toolCall.args,
+          ...(toolCall.responsesItemId
+            ? { responsesItemId: toolCall.responsesItemId }
             : {}),
-          ...(tc.thoughtSignature
-            ? { thoughtSignature: tc.thoughtSignature }
+          ...(toolCall.thoughtSignature
+            ? { thoughtSignature: toolCall.thoughtSignature }
             : {}),
-          ...(tc.reasoningItem
-            ? { reasoningItem: tc.reasoningItem }
+          ...(toolCall.reasoningItem
+            ? { reasoningItem: toolCall.reasoningItem }
             : {}),
         })),
       };
-      const toolMsgs: ExpandedMessage[] = message.toolCalls
-        .filter((tc: ToolCallEntry) => tc.result !== undefined)
-        .map((tc: ToolCallEntry) => ({
+      const toolMessages: ExpandedMessage[] = message.toolCalls
+        .filter((toolCall: ToolCallEntry) => toolCall.result !== undefined)
+        .map((toolCall: ToolCallEntry) => ({
           role: "tool",
-          name: tc.name,
-          tool_call_id: tc.id,
+          name: toolCall.name,
+          tool_call_id: toolCall.id,
           content:
-            typeof tc.result === "string"
-              ? tc.result
-              : JSON.stringify(truncateToolResult(tc.result)),
+            typeof toolCall.result === "string"
+              ? toolCall.result
+              : JSON.stringify(truncateToolResult(toolCall.result)),
         }));
-      return [assistantMsg, ...toolMsgs];
+      return [assistantMessage, ...toolMessages];
     }
 
     // Pass through tool messages with their required fields

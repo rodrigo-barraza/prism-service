@@ -139,7 +139,7 @@ router.post(
       let needsLoad = true;
       try {
         const { models } = await provider.listModels();
-        const modelEntry = (models || []).find((m: Record<string, unknown>) => m.key === model);
+        const modelEntry = (models || []).find((entry: Record<string, unknown>) => entry.key === model);
         const isLoaded = modelEntry?.loaded_instances?.length > 0;
         if (isLoaded) {
           // Already loaded — skip entirely
@@ -159,9 +159,9 @@ router.post(
             }
           }
         }
-      } catch (listErr: unknown) {
+      } catch (listError: unknown) {
         logger.warn(
-                    `[load-stream] Could not check models before loading: ${getErrorMessage(listErr)}`,
+                    `[load-stream] Could not check models before loading: ${getErrorMessage(listError)}`,
         );
       }
       if (!needsLoad || aborted) {
@@ -182,14 +182,14 @@ router.post(
         });
       const startTime = Date.now();
       const EXPECTED_LOAD_MS = 15_000;
-      let lastPct = 0;
+      let lastPercentage = 0;
       while (!loadDone && !aborted) {
         await sleep(300);
         if (loadDone || aborted) break;
         const elapsed = Date.now() - startTime;
         const percentage = Math.min(0.95, elapsed / (elapsed + EXPECTED_LOAD_MS));
-        if (percentage > lastPct + 0.005) {
-          lastPct = percentage;
+        if (percentage > lastPercentage + 0.005) {
+          lastPercentage = percentage;
           send({ type: "progress", progress: parseFloat(percentage.toFixed(3)) });
         }
       }
@@ -265,7 +265,7 @@ router.post(
       const result = await provider.listModels();
       const allModels = result?.data || result?.models || [];
       const modelData = allModels.find(
-        (m: Record<string, unknown>) => m.id === model || m.path === model || m.key === model,
+        (modelItem: Record<string, unknown>) => modelItem.id === model || modelItem.path === model || modelItem.key === model,
       );
       if (!modelData) {
         return res.status(404).json({ error: `Model '${model}' not found` });

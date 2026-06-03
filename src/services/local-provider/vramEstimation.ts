@@ -72,8 +72,8 @@ export async function estimateVRAMForModel(
   const result = await provider.listModels();
   const allModels = result?.data || result?.models || [];
   const modelData = allModels.find(
-    (m: Record<string, unknown>) =>
-      m.id === modelKey || m.path === modelKey || m.key === modelKey,
+    (modelEntry: Record<string, unknown>) =>
+      modelEntry.id === modelKey || modelEntry.path === modelKey || modelEntry.key === modelKey,
   ) as LmStudioRawModel | undefined;
 
   if (!modelData) return null;

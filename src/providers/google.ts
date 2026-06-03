@@ -32,7 +32,7 @@ interface GoogleToolDeclaration {
   [key: string]: unknown;
 }
 
-export interface ConversationMsg {
+export interface ConversationMessage {
   role: string;
   content?: string;
   name?: string;
@@ -77,7 +77,7 @@ function isSafetyBlockError(error: unknown): boolean {
     message.includes("response was blocked")
   );
 }
-function addWavHeader(buffer: Buffer, sampleRate: number = 24000, numChannels: number = 1): Buffer {
+function addWavHeader(buffer: Buffer, sampleRate: number = 24000, channelCount: number = 1): Buffer {
   const headerLength = 44;
   const dataLength = buffer.length;
   const fileSize = dataLength + headerLength - 8;
@@ -89,10 +89,10 @@ function addWavHeader(buffer: Buffer, sampleRate: number = 24000, numChannels: n
   header.write("fmt ", 12);
   header.writeUInt32LE(16, 16);
   header.writeUInt16LE(1, 20);
-  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt16LE(channelCount, 22);
   header.writeUInt32LE(sampleRate, 24);
-  header.writeUInt32LE(sampleRate * numChannels * 2, 28);
-  header.writeUInt16LE(numChannels * 2, 32);
+  header.writeUInt32LE(sampleRate * channelCount * 2, 28);
+  header.writeUInt16LE(channelCount * 2, 32);
   header.writeUInt16LE(16, 34);
   header.write("data", 36);
   header.writeUInt32LE(dataLength, 40);
@@ -179,7 +179,7 @@ export function convertToolsToGoogle(
  * Centralizes the repeated config-building pattern across generateText,
  * generateTextStream, and generateTextStreamLive.
  */
-function buildGenerateConfig(options: ProviderOptions, modelDef: ModelDef | null | undefined): GenerateContentConfig {
+function buildGenerateConfig(options: ProviderOptions, modelDefinition: ModelDef | null | undefined): GenerateContentConfig {
   const config: GenerateContentConfig = {};
 
   if (options.temperature !== undefined) config.temperature = options.temperature;
@@ -203,7 +203,7 @@ function buildGenerateConfig(options: ProviderOptions, modelDef: ModelDef | null
   }
 
   // Thinking config
-  const supportsThinking = modelDef?.thinking === true;
+  const supportsThinking = modelDefinition?.thinking === true;
   if (
     supportsThinking &&
     options.thinkingEnabled !== false
@@ -211,7 +211,7 @@ function buildGenerateConfig(options: ProviderOptions, modelDef: ModelDef | null
     config.thinkingConfig = { includeThoughts: true };
     if (options.thinkingBudget !== undefined && options.thinkingBudget !== "") {
       config.thinkingConfig.thinkingBudget = parseInt(String(options.thinkingBudget));
-    } else if (options.thinkingLevel && modelDef?.thinkingLevels) {
+    } else if (options.thinkingLevel && modelDefinition?.thinkingLevels) {
       config.thinkingConfig.thinkingLevel = options.thinkingLevel as ThinkingLevel;
     }
   }
@@ -224,7 +224,7 @@ function buildGenerateConfig(options: ProviderOptions, modelDef: ModelDef | null
   return config;
 }
 
-async function convertMessages(messages: ConversationMsg[]): Promise<Content[]> {
+async function convertMessages(messages: ConversationMessage[]): Promise<Content[]> {
   const result: Content[] = [];
 
   for (let i = 0; i < messages.length; i++) {
@@ -238,15 +238,15 @@ async function convertMessages(messages: ConversationMsg[]): Promise<Content[]> 
       const responseParts: Part[] = [];
       let j = i;
       while (j < messages.length && messages[j].role === "tool") {
-        const toolMsg = messages[j];
+        const toolMessage = messages[j];
         responseParts.push({
           functionResponse: {
-            name: toolMsg.name || "any",
+            name: toolMessage.name || "any",
             response: {
               result:
-                typeof toolMsg.content === "string"
-                  ? toolMsg.content
-                  : JSON.stringify(toolMsg.content),
+                typeof toolMessage.content === "string"
+                  ? toolMessage.content
+                  : JSON.stringify(toolMessage.content),
             },
           },
         });
@@ -289,9 +289,9 @@ async function convertMessages(messages: ConversationMsg[]): Promise<Content[]> 
                     inlineData: { mimeType, data: base64Data },
                   });
                 }
-              } catch (fetchErr: unknown) {
+              } catch (fetchError: unknown) {
                 logger.warn(
-                  `[Google] Failed to fetch media URL for inline data: ${getErrorMessage(fetchErr)}`,
+                  `[Google] Failed to fetch media URL for inline data: ${getErrorMessage(fetchError)}`,
                 );
               }
             }
@@ -328,15 +328,15 @@ const googleProvider = {
   name: "google",
 
   async generateText(
-    messages: ConversationMsg[],
+    messages: ConversationMessage[],
     model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).google,
     options: ProviderOptions = {},
   ) {
     logger.provider("Google", `generateText model=${model}`);
     try {
       const contents = await convertMessages(messages);
-      const modelDef = Object.values(MODELS).find((mDef) => mDef.name === model) as ModelDef | undefined;
-      const config = buildGenerateConfig(options, modelDef);
+      const modelDefinition = Object.values(MODELS).find((modelDefinitionItem) => modelDefinitionItem.name === model) as ModelDef | undefined;
+      const config = buildGenerateConfig(options, modelDefinition);
 
       // Web search
       if (options.webSearch) {
@@ -351,7 +351,7 @@ const googleProvider = {
 
       // For models that output images, set responseModalities explicitly.
       // These models REQUIRE ["TEXT", "IMAGE"] — ["TEXT"] alone returns 0 tokens.
-      if (modelDef?.outputTypes && (modelDef.outputTypes as string[]).includes(TYPES.IMAGE)) {
+      if (modelDefinition?.outputTypes && (modelDefinition.outputTypes as string[]).includes(TYPES.IMAGE)) {
         config.responseModalities = options.forceImageGeneration
           ? ["IMAGE"]
           : ["TEXT", "IMAGE"];
@@ -373,7 +373,7 @@ const googleProvider = {
       for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.functionCall) {
           toolCalls.push({
-            id: `google-tc-${crypto.randomUUID()}`,
+            id: `google-toolCall-${crypto.randomUUID()}`,
             name: part.functionCall.name || "any",
             args: (part.functionCall.args || {}) as Record<string, unknown>,
             thoughtSignature: (part as Record<string, unknown>).thoughtSignature as string | undefined,
@@ -418,15 +418,15 @@ const googleProvider = {
   },
 
   async *generateTextStream(
-    messages: ConversationMsg[],
+    messages: ConversationMessage[],
     model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).google,
     options: ProviderOptions = {},
   ) {
     logger.provider("Google", `generateTextStream model=${model}`);
     try {
       const contents = await convertMessages(messages);
-      const modelDef = Object.values(MODELS).find((mDef) => mDef.name === model) as ModelDef | undefined;
-      const config = buildGenerateConfig(options, modelDef);
+      const modelDefinition = Object.values(MODELS).find((modelDefinitionItem) => modelDefinitionItem.name === model) as ModelDef | undefined;
+      const config = buildGenerateConfig(options, modelDefinition);
 
       // Build tools array based on enabled options
       const tools: Record<string, unknown>[] = [];
@@ -441,7 +441,7 @@ const googleProvider = {
       if (tools.length > 0) config.tools = tools;
 
       // For models that output images, set responseModalities explicitly.
-      if (modelDef?.outputTypes && (modelDef.outputTypes as string[]).includes(TYPES.IMAGE)) {
+      if (modelDefinition?.outputTypes && (modelDefinition.outputTypes as string[]).includes(TYPES.IMAGE)) {
         config.responseModalities = options.forceImageGeneration
           ? ["IMAGE"]
           : ["TEXT", "IMAGE"];
@@ -471,7 +471,7 @@ const googleProvider = {
             if (part.functionCall) {
               yield {
                 type: "toolCall",
-                id: `google-tc-${crypto.randomUUID()}`,
+                id: `google-toolCall-${crypto.randomUUID()}`,
                 name: part.functionCall.name || "any",
                 args: (part.functionCall.args || {}) as Record<string, unknown>,
                 thoughtSignature: (part as Record<string, unknown>).thoughtSignature as string | undefined,
@@ -547,9 +547,9 @@ const googleProvider = {
    * Bridges the event-driven Live API into an async generator matching
    * the same interface as generateTextStream().
    */
-  async *generateTextStreamLive(messages: ConversationMsg[], model: string, options: ProviderOptions = {}) {
+  async *generateTextStreamLive(messages: ConversationMessage[], model: string, options: ProviderOptions = {}) {
     logger.provider("Google", `generateTextStreamLive (Live API) model=${model}`);
-    const modelDef = Object.values(MODELS).find((mDef) => mDef.name === model) as ModelDef | undefined;
+    const modelDefinition = Object.values(MODELS).find((modelDefinitionItem) => modelDefinitionItem.name === model) as ModelDef | undefined;
     let session: Awaited<ReturnType<GoogleGenAI["live"]["connect"]>> | null = null;
     try {
       // ── Build Live API config ────────────────────────────────────
@@ -567,18 +567,18 @@ const googleProvider = {
         liveConfig.maxOutputTokens = options.maxTokens;
       }
 
-      const supportsThinking = modelDef?.thinking === true;
+      const supportsThinking = modelDefinition?.thinking === true;
       if (
         supportsThinking &&
         options.thinkingEnabled !== false
       ) {
-        const thinkCfg: Record<string, unknown> = { includeThoughts: true };
+        const thinkingConfig: Record<string, unknown> = { includeThoughts: true };
         if (options.thinkingBudget !== undefined && options.thinkingBudget !== "") {
-          thinkCfg.thinkingBudget = parseInt(String(options.thinkingBudget));
-        } else if (options.thinkingLevel && modelDef?.thinkingLevels) {
-          thinkCfg.thinkingLevel = options.thinkingLevel;
+          thinkingConfig.thinkingBudget = parseInt(String(options.thinkingBudget));
+        } else if (options.thinkingLevel && modelDefinition?.thinkingLevels) {
+          thinkingConfig.thinkingLevel = options.thinkingLevel;
         }
-        liveConfig.thinkingConfig = thinkCfg;
+        liveConfig.thinkingConfig = thinkingConfig;
       }
 
       // Tools
@@ -589,9 +589,9 @@ const googleProvider = {
       if (tools.length > 0) liveConfig.tools = tools;
 
       // System instruction from messages[0] if role === "system"
-      const systemMsg = messages.find((message) => message.role === "system");
-      if (systemMsg?.content) {
-        liveConfig.systemInstruction = systemMsg.content;
+      const systemMessage = messages.find((message) => message.role === "system");
+      if (systemMessage?.content) {
+        liveConfig.systemInstruction = systemMessage.content;
       }
 
       // ── Async queue to bridge callbacks → async generator ─────────
@@ -664,7 +664,7 @@ const googleProvider = {
                 } else if (part.functionCall) {
                   enqueue({
                     type: "toolCall",
-                    id: `google-tc-${crypto.randomUUID()}`,
+                    id: `google-toolCall-${crypto.randomUUID()}`,
                     name: part.functionCall.name,
                     args: part.functionCall.args || {},
                     thoughtSignature: part.thoughtSignature || undefined,
@@ -687,7 +687,7 @@ const googleProvider = {
               for (const fc of message.toolCall.functionCalls) {
                 enqueue({
                   type: "toolCall",
-                  id: `google-tc-${crypto.randomUUID()}`,
+                  id: `google-toolCall-${crypto.randomUUID()}`,
                   name: fc.name || "any",
                   args: (fc.args || {}) as Record<string, unknown>,
                 });
@@ -719,8 +719,8 @@ const googleProvider = {
           },
           onerror: (e: unknown) => {
             const errorObject = e as Record<string, unknown> | null;
-            const innerErr = (errorObject?.error ?? null) as Record<string, unknown> | null;
-            const errorMessage = (innerErr?.message as string) || (errorObject?.message as string) || "unknown error";
+            const innerError = (errorObject?.error ?? null) as Record<string, unknown> | null;
+            const errorMessage = (innerError?.message as string) || (errorObject?.message as string) || "unknown error";
             logger.error(
               `[Google Live API] Error: ${errorMessage}`,
             );
@@ -753,9 +753,9 @@ const googleProvider = {
       // So we seed history with sendClientContent, then send the last
       // user message via sendRealtimeInput.
       const nonSystemMessages = messages.filter(
-        (m) => m.role !== "system",
+        (message) => message.role !== "system",
       );
-      const lastUserMsg = nonSystemMessages[nonSystemMessages.length - 1];
+      const lastUserMessage = nonSystemMessages[nonSystemMessages.length - 1];
       const priorMessages = nonSystemMessages.slice(0, -1);
 
       // Build Content objects for prior history turns
@@ -785,8 +785,8 @@ const googleProvider = {
       }
 
       // Send the final user message via sendRealtimeInput
-      if (lastUserMsg?.content) {
-        session.sendRealtimeInput({ text: lastUserMsg.content });
+      if (lastUserMessage?.content) {
+        session.sendRealtimeInput({ text: lastUserMessage.content });
       }
 
       // ── Yield chunks from the queue ───────────────────────────────

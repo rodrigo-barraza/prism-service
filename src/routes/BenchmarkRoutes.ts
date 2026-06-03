@@ -308,7 +308,7 @@ router.get(
 
       // Sort by pass rate descending, then by total benchmarks descending
       models.sort(
-        (a, b) => b.passRate - a.passRate || b.total - a.total,
+        (firstModel, secondModel) => secondModel.passRate - firstModel.passRate || secondModel.total - firstModel.total,
       );
 
       res.json({
@@ -371,7 +371,7 @@ router.post(
       if (
         benchmarkMode !== "agent" &&
         !expectedValue &&
-        (!assertions || !assertions.some((a: TextAssertion) => a.expectedValue))
+        (!assertions || !assertions.some((assertion: TextAssertion) => assertion.expectedValue))
       ) {
         return res.status(400).json({
           error:
@@ -820,9 +820,9 @@ router.post(
       }
 
       // Re-run with the same model set from the previous run
-      const modelTargets = (previousRun.models || []).map((m: BenchmarkResult) => ({
-        provider: m.provider,
-        model: m.model,
+      const modelTargets = (previousRun.models || []).map((modelResult: BenchmarkResult) => ({
+        provider: modelResult.provider,
+        model: modelResult.model,
       }));
 
       const run = await BenchmarkService.runBenchmark(

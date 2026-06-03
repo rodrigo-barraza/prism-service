@@ -112,9 +112,9 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
               }
             }
           }
-        } catch (unloadErr: unknown) {
+        } catch (unloadError: unknown) {
           logger.warn(
-                        `Ollama: could not check/unload models: ${getErrorMessage(unloadErr)}`,
+                        `Ollama: could not check/unload models: ${getErrorMessage(unloadError)}`,
           );
         }
 

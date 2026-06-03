@@ -300,13 +300,13 @@ async function processBatch(
   // Parse response with enhanced diagnostics
   const parsed = parseJsonFromLlmResponse(result.text) as { actions?: ConsolidationAction[] } | null;
   if (!parsed) {
-    const responseLen = result.text?.length || 0;
+    const responseLength = result.text?.length || 0;
     const snippet = result.text?.substring(0, 300) || "(empty)";
     const tail =
-      responseLen > 300 ? result.text.substring(responseLen - 200) : "";
+      responseLength > 300 ? result.text.substring(responseLength - 200) : "";
     logger.warn(
       `[MemoryConsolidation] ${batchLabel} Failed to parse LLM response ` +
-        `(${responseLen} chars, ~${outputTokens} tokens). ` +
+        `(${responseLength} chars, ~${outputTokens} tokens). ` +
         `Head: ${snippet}${tail ? `\n  Tail: ${tail}` : ""}`,
     );
     return [];

@@ -80,7 +80,7 @@ describe("MicroCompactionService", () => {
       {
         role: "assistant",
         content: "Running file tool",
-        toolCalls: [{ id: "tc-1", name: "read_file", args: {}, result: largeResult }],
+        toolCalls: [{ id: "toolCall-1", name: "read_file", args: {}, result: largeResult }],
       },
     ];
 
@@ -97,7 +97,7 @@ describe("MicroCompactionService", () => {
       {
         role: "assistant",
         content: "First turn",
-        toolCalls: [{ id: "tc-old", name: "read_file", args: {}, result: largeResult }],
+        toolCalls: [{ id: "toolCall-old", name: "read_file", args: {}, result: largeResult }],
       },
       { role: "user", content: "Q1" }, // Turn 5 (counting backwards)
       { role: "assistant", content: "A1" },
@@ -125,7 +125,7 @@ describe("MicroCompactionService", () => {
       {
         role: "assistant",
         content: "First turn",
-        toolCalls: [{ id: "tc-old", name: "read_file", args: {}, result: smallResult }],
+        toolCalls: [{ id: "toolCall-old", name: "read_file", args: {}, result: smallResult }],
       },
       { role: "user", content: "Q1" },
       { role: "user", content: "Q2" },
@@ -146,7 +146,7 @@ describe("MicroCompactionService", () => {
       {
         role: "assistant",
         content: "First turn",
-        toolCalls: [{ id: "tc-old", name: "upsert_memory", args: {}, result: largeResult }],
+        toolCalls: [{ id: "toolCall-old", name: "upsert_memory", args: {}, result: largeResult }],
       },
       { role: "user", content: "Q1" },
       { role: "user", content: "Q2" },
@@ -381,8 +381,8 @@ describe("Compaction Integration with Harness and WindowManager", () => {
 
     expect(postEnforce.length).toBeLessThan(messages.length);
     // originalMessageCount should have been decreased by the exact number of dropped messages
-    const expectedOriginalMsgCount = 15 - (messages.length - postEnforce.length);
-    expect(state.originalMessageCount).toBe(Math.max(0, expectedOriginalMsgCount));
+    const expectedOriginalMessageCount = 15 - (messages.length - postEnforce.length);
+    expect(state.originalMessageCount).toBe(Math.max(0, expectedOriginalMessageCount));
   });
 
   it("integrates Micro-compaction within ContextWindowManager.enforce flow", () => {
@@ -393,7 +393,7 @@ describe("Compaction Integration with Harness and WindowManager", () => {
       {
         role: "assistant",
         content: "read file done",
-        toolCalls: [{ id: "tc-old", name: "read_file", args: {}, result: largeResult }],
+        toolCalls: [{ id: "toolCall-old", name: "read_file", args: {}, result: largeResult }],
       },
       // Protected window user messages (5 turns total, placing index 2 outside boundary)
       { role: "user", content: "Q2" },

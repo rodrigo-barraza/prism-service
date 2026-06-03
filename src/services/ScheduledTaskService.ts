@@ -44,20 +44,20 @@ function matchCronField(pattern: string, value: number): boolean {
     return pattern.split(",").some((pattern) => matchCronField(pattern, value));
   }
   if (pattern.includes("/")) {
-    const [range, stepStr] = pattern.split("/");
-    const step = parseInt(stepStr, 10);
+    const [range, stepString] = pattern.split("/");
+    const step = parseInt(stepString, 10);
     if (isNaN(step)) return false;
     if (range === "*") {
       return value % step === 0;
     }
-    const [startStr] = range.split("-");
-    const start = parseInt(startStr, 10);
+    const [startString] = range.split("-");
+    const start = parseInt(startString, 10);
     return !isNaN(start) && value >= start && (value - start) % step === 0;
   }
   if (pattern.includes("-")) {
-    const [startStr, endStr] = pattern.split("-");
-    const start = parseInt(startStr, 10);
-    const end = parseInt(endStr, 10);
+    const [startString, endString] = pattern.split("-");
+    const start = parseInt(startString, 10);
+    const end = parseInt(endString, 10);
     return !isNaN(start) && !isNaN(end) && value >= start && value <= end;
   }
   return parseInt(pattern, 10) === value;
@@ -95,13 +95,13 @@ const ScheduledTaskService = {
     // Align tick to the next local minute boundary for timing precision
     const secondsToNextMinute = 60 - new Date().getSeconds();
     setTimeout(() => {
-      this.tick().catch((err: unknown) =>
-        logger.error(`[ScheduledTasks] Initial tick error: ${getErrorMessage(err)}`),
+      this.tick().catch((error: unknown) =>
+        logger.error(`[ScheduledTasks] Initial tick error: ${getErrorMessage(error)}`),
       );
  
       tickingInterval = setInterval(() => {
-        this.tick().catch((err: unknown) =>
-          logger.error(`[ScheduledTasks] Tick error: ${getErrorMessage(err)}`),
+        this.tick().catch((error: unknown) =>
+          logger.error(`[ScheduledTasks] Tick error: ${getErrorMessage(error)}`),
         );
       }, 60000);
     }, secondsToNextMinute * 1000);
@@ -194,12 +194,12 @@ const ScheduledTaskService = {
           );
  
           // Trigger execution in the background asynchronously
-          this.executeTask(task, undefined, { username: task.username || "system" }).catch((err: unknown) =>
-            logger.error(`[ScheduledTasks] Execution failed for task "${task.name}": ${getErrorMessage(err)}`),
+          this.executeTask(task, undefined, { username: task.username || "system" }).catch((error: unknown) =>
+            logger.error(`[ScheduledTasks] Execution failed for task "${task.name}": ${getErrorMessage(error)}`),
           );
         }
-      } catch (err: unknown) {
-        logger.error(`[ScheduledTasks] Failed to parse/check task "${task.name}": ${getErrorMessage(err)}`);
+      } catch (error: unknown) {
+        logger.error(`[ScheduledTasks] Failed to parse/check task "${task.name}": ${getErrorMessage(error)}`);
       }
     }
   },
@@ -331,8 +331,8 @@ const ScheduledTaskService = {
       });
 
       logger.success(`[ScheduledTasks] Task "${task.name}" completed execution successfully.`);
-    } catch (err: unknown) {
-      logger.error(`[ScheduledTasks] Agent loop error for task "${task.name}": ${getErrorMessage(err)}`);
+    } catch (error: unknown) {
+      logger.error(`[ScheduledTasks] Agent loop error for task "${task.name}": ${getErrorMessage(error)}`);
       
       // Ensure the generated session is not stuck as "generating"
       await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).updateOne(
@@ -340,7 +340,7 @@ const ScheduledTaskService = {
         { $set: { isGenerating: false, updatedAt: new Date().toISOString() } },
       ).catch(() => {});
 
-      throw err;
+      throw error;
     }
 
     return { agentSessionId: resolvedSessionId };
@@ -513,8 +513,8 @@ const ScheduledTaskService = {
       { ...task, id: task.id },
       payload,
       { username, agentSessionId },
-    ).catch((err: unknown) => {
-      logger.error(`[ScheduledTasks] Manual trigger failed for task "${task.name}": ${getErrorMessage(err)}`);
+    ).catch((error: unknown) => {
+      logger.error(`[ScheduledTasks] Manual trigger failed for task "${task.name}": ${getErrorMessage(error)}`);
     });
 
     return { success: true, agentSessionId };

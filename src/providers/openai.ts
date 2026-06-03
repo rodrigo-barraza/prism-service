@@ -39,7 +39,7 @@ function getClient(): OpenAI {
 }
 
 /** OpenAI conversation message (same shape as Google's ConversationMsg) */
-export interface OpenAIMsg {
+export interface OpenAIMessage {
   role: string;
   content?: string;
   name?: string;
@@ -174,8 +174,8 @@ export function normalizeResponsesUsage(
 
   return usage;
 }
-function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletionMessageParam[] {
-  return messages.map((message: OpenAIMsg): OpenAI.Chat.ChatCompletionMessageParam => {
+function prepareOpenAIMessages(messages: OpenAIMessage[]): OpenAI.Chat.ChatCompletionMessageParam[] {
+  return messages.map((message: OpenAIMessage): OpenAI.Chat.ChatCompletionMessageParam => {
     // Tool result messages — include tool_call_id for correlation
     if (message.role === "tool") {
       return {
@@ -313,7 +313,7 @@ function prepareOpenAIMessages(messages: OpenAIMsg[]): OpenAI.Chat.ChatCompletio
  * Convert messages to Responses API input format.
  * System messages become developer messages; images use input_image, PDFs use input_file.
  */
-export function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.ResponseInputItem[] {
+export function prepareResponsesInput(messages: OpenAIMessage[]): OpenAI.Responses.ResponseInputItem[] {
   const result: OpenAI.Responses.ResponseInputItem[] = [];
   for (const message of messages) {
     // Assistant message with tool calls → expand into function_call items
@@ -393,7 +393,7 @@ export function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.R
 
     // Standard message (system, user, assistant without tools)
     const role = message.role === "system" ? ("developer" as const) : (message.role as "developer" | "user" | "assistant");
-    const nameObj = message.name ? { name: message.name } : {};
+    const nameObject = message.name ? { name: message.name } : {};
 
     if (message.images && message.images.length > 0) {
       const content: OpenAI.Responses.ResponseInputContent[] = [];
@@ -461,7 +461,7 @@ export function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.R
       }
       result.push({
         role,
-        ...nameObj,
+        ...nameObject,
         content,
       } as OpenAI.Responses.ResponseInputItem);
       continue;
@@ -469,7 +469,7 @@ export function prepareResponsesInput(messages: OpenAIMsg[]): OpenAI.Responses.R
     // Responses API requires content to be a string or array, never null
     result.push({
       role,
-      ...nameObj,
+      ...nameObject,
       content: message.content ?? "",
     } as OpenAI.Responses.ResponseInputItem);
   }
@@ -480,7 +480,7 @@ const openaiProvider = {
   name: "openai",
 
   async generateText(
-    messages: OpenAIMsg[],
+    messages: OpenAIMessage[],
     model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai,
     options: ProviderOptions = {},
   ) {
@@ -494,7 +494,7 @@ const openaiProvider = {
       toProviderError(error);
     }
   },
-  async _generateTextResponses(messages: OpenAIMsg[], model: string, options: ProviderOptions) {
+  async _generateTextResponses(messages: OpenAIMessage[], model: string, options: ProviderOptions) {
     const input = prepareResponsesInput(messages);
     const payload: OpenAI.Responses.ResponseCreateParamsNonStreaming & {
       seed?: number;
@@ -649,7 +649,7 @@ const openaiProvider = {
     if (rateLimits) result.rateLimits = rateLimits;
     return result;
   },
-  async _generateTextChatCompletions(messages: OpenAIMsg[], model: string, options: ProviderOptions) {
+  async _generateTextChatCompletions(messages: OpenAIMessage[], model: string, options: ProviderOptions) {
     const modelDef = getModelByName(model);
     const isReasoning =
       (modelDef && "thinking" in modelDef && (modelDef as { thinking?: boolean }).thinking === true) || model.includes("o1") || model.includes("o3");
@@ -775,7 +775,7 @@ const openaiProvider = {
   },
 
   async *generateTextStream(
-    messages: OpenAIMsg[],
+    messages: OpenAIMessage[],
     model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai,
     options: ProviderOptions = {},
   ) {
@@ -791,7 +791,7 @@ const openaiProvider = {
       toProviderError(error);
     }
   },
-  async *_streamResponses(messages: OpenAIMsg[], model: string, options: ProviderOptions) {
+  async *_streamResponses(messages: OpenAIMessage[], model: string, options: ProviderOptions) {
     const input = prepareResponsesInput(messages);
     const payload: OpenAI.Responses.ResponseCreateParamsStreaming & {
       seed?: number;
@@ -1029,7 +1029,7 @@ const openaiProvider = {
       yield { type: "rateLimits", rateLimits };
     }
   },
-  async *_streamChatCompletions(messages: OpenAIMsg[], model: string, options: ProviderOptions) {
+  async *_streamChatCompletions(messages: OpenAIMessage[], model: string, options: ProviderOptions) {
     const modelDef = getModelByName(model);
     const isReasoning =
       (modelDef && "thinking" in modelDef && (modelDef as { thinking?: boolean }).thinking === true) || model.includes("o1") || model.includes("o3");

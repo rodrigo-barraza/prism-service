@@ -15,7 +15,7 @@ import {
 
 describe("PostExecutionEmitter", () => {
   describe("emitPostExecutionStatus", () => {
-    let mockEmit: ReturnType<typeof vi.fn>;
+    let mockEmit: any;
 
     beforeEach(() => {
       mockEmit = vi.fn();
@@ -102,7 +102,7 @@ describe("PostExecutionEmitter", () => {
   });
 
   describe("processToolResultMedia", () => {
-    let mockEmit: ReturnType<typeof vi.fn>;
+    let mockEmit: any;
     let state: any;
     let pass: any;
 
@@ -113,8 +113,8 @@ describe("PostExecutionEmitter", () => {
     });
 
     it("should emit tool_execution with done status for successful results", async () => {
-      const toolCalls = [{ name: "read_file", id: "tc-1", args: { path: "/a" } }];
-      const results = [{ name: "read_file", id: "tc-1", result: { content: "hello" } }];
+      const toolCalls = [{ name: "read_file", id: "toolCall-1", args: { path: "/a" } }];
+      const results = [{ name: "read_file", id: "toolCall-1", result: { content: "hello" } }];
 
       await processToolResultMedia(toolCalls, results, state, pass, mockEmit);
 
@@ -122,17 +122,17 @@ describe("PostExecutionEmitter", () => {
         expect.objectContaining({
           type: "tool_execution",
           status: "done",
-          tool: expect.objectContaining({ name: "read_file", id: "tc-1" }),
+          tool: expect.objectContaining({ name: "read_file", id: "toolCall-1" }),
         }),
       );
     });
 
     it("should emit tool_execution with error status for failed results", async () => {
-      const toolCalls = [{ name: "write_file", id: "tc-2", args: {} }];
+      const toolCalls = [{ name: "write_file", id: "toolCall-2", args: {} }];
       const results = [
         {
           name: "write_file",
-          id: "tc-2",
+          id: "toolCall-2",
           result: { error: "Permission denied" },
         },
       ];
@@ -148,11 +148,11 @@ describe("PostExecutionEmitter", () => {
     });
 
     it("should track screenshot references in state and pass", async () => {
-      const toolCalls = [{ name: "browser_screenshot", id: "tc-3", args: {} }];
+      const toolCalls = [{ name: "browser_screenshot", id: "toolCall-3", args: {} }];
       const results = [
         {
           name: "browser_screenshot",
-          id: "tc-3",
+          id: "toolCall-3",
           result: { screenshotRef: "minio://screenshots/abc.png" },
         },
       ];
@@ -164,11 +164,11 @@ describe("PostExecutionEmitter", () => {
     });
 
     it("should emit image event and track image data in state", async () => {
-      const toolCalls = [{ name: "generate_image", id: "tc-4", args: {} }];
+      const toolCalls = [{ name: "generate_image", id: "toolCall-4", args: {} }];
       const results = [
         {
           name: "generate_image",
-          id: "tc-4",
+          id: "toolCall-4",
           result: {
             image: {
               data: "base64data",
@@ -193,11 +193,11 @@ describe("PostExecutionEmitter", () => {
     });
 
     it("should upload raw audio results to MinIO and set audioRef in resultObj", async () => {
-      const toolCalls = [{ name: "generate_audio", id: "tc-5", args: {} }];
+      const toolCalls = [{ name: "generate_audio", id: "toolCall-5", args: {} }];
       const results = [
         {
           name: "generate_audio",
-          id: "tc-5",
+          id: "toolCall-5",
           result: {
             audio: {
               data: "base64audiodata",
@@ -217,7 +217,7 @@ describe("PostExecutionEmitter", () => {
   });
 
   describe("trackToolErrors", () => {
-    let mockEmit: ReturnType<typeof vi.fn>;
+    let mockEmit: any;
     let state: any;
 
     beforeEach(() => {
@@ -226,9 +226,9 @@ describe("PostExecutionEmitter", () => {
     });
 
     it("should increment error count on failure", () => {
-      const toolCalls = [{ name: "write_file", id: "tc-1" }];
+      const toolCalls = [{ name: "write_file", id: "toolCall-1" }];
       const results = [
-        { name: "write_file", id: "tc-1", result: { error: "failed" } },
+        { name: "write_file", id: "toolCall-1", result: { error: "failed" } },
       ];
 
       trackToolErrors(toolCalls, results, state, 3, mockEmit);
@@ -238,9 +238,9 @@ describe("PostExecutionEmitter", () => {
 
     it("should clear error count on success", () => {
       state.toolErrorCounts.set("write_file", 2);
-      const toolCalls = [{ name: "write_file", id: "tc-1" }];
+      const toolCalls = [{ name: "write_file", id: "toolCall-1" }];
       const results = [
-        { name: "write_file", id: "tc-1", result: { content: "ok" } },
+        { name: "write_file", id: "toolCall-1", result: { content: "ok" } },
       ];
 
       trackToolErrors(toolCalls, results, state, 3, mockEmit);
@@ -250,9 +250,9 @@ describe("PostExecutionEmitter", () => {
 
     it("should emit status when error limit is reached", () => {
       state.toolErrorCounts.set("write_file", 2);
-      const toolCalls = [{ name: "write_file", id: "tc-1" }];
+      const toolCalls = [{ name: "write_file", id: "toolCall-1" }];
       const results = [
-        { name: "write_file", id: "tc-1", result: { error: "failed again" } },
+        { name: "write_file", id: "toolCall-1", result: { error: "failed again" } },
       ];
 
       trackToolErrors(toolCalls, results, state, 3, mockEmit);
@@ -278,7 +278,7 @@ describe("PlanModeController", () => {
   describe("blockUnauthorizedToolCalls", () => {
     it("should not block exit_plan_mode", () => {
       const pendingToolCalls = [
-        { name: "exit_plan_mode", id: "tc-1", args: {} },
+        { name: "exit_plan_mode", id: "toolCall-1", args: {} },
       ];
       const currentMessages: any[] = [];
       const pass = { streamedText: "", streamedThinking: "" };
@@ -296,8 +296,8 @@ describe("PlanModeController", () => {
 
     it("should block non-exit tool calls and add system message", () => {
       const pendingToolCalls = [
-        { name: "write_file", id: "tc-1", args: {} },
-        { name: "read_file", id: "tc-2", args: {} },
+        { name: "write_file", id: "toolCall-1", args: {} },
+        { name: "read_file", id: "toolCall-2", args: {} },
       ];
       const currentMessages: any[] = [];
       const pass = { streamedText: "some text", streamedThinking: "" };
@@ -318,8 +318,8 @@ describe("PlanModeController", () => {
 
     it("should allow exit_plan_mode while blocking others", () => {
       const pendingToolCalls = [
-        { name: "write_file", id: "tc-1", args: {} },
-        { name: "exit_plan_mode", id: "tc-2", args: {} },
+        { name: "write_file", id: "toolCall-1", args: {} },
+        { name: "exit_plan_mode", id: "toolCall-2", args: {} },
       ];
       const currentMessages: any[] = [];
       const pass = { streamedText: "" };
@@ -344,7 +344,7 @@ describe("PlanModeController", () => {
       const currentMessages: any[] = [];
 
       checkForPlanModeEntry(
-        [{ name: "enter_plan_mode", id: "tc-1", args: {} }],
+        [{ name: "enter_plan_mode", id: "toolCall-1", args: {} }],
         currentMessages,
         state,
         mockEmit,
@@ -364,7 +364,7 @@ describe("PlanModeController", () => {
       const currentMessages: any[] = [];
 
       checkForPlanModeEntry(
-        [{ name: "read_file", id: "tc-1", args: {} }],
+        [{ name: "read_file", id: "toolCall-1", args: {} }],
         currentMessages,
         state,
         mockEmit,
@@ -381,7 +381,7 @@ import { checkAndWaitForApproval } from "../src/services/harnesses/lifecycle/App
 
 describe("ApprovalGate", () => {
   it("should auto-approve when no tools need approval", async () => {
-    const toolCalls = [{ name: "read_file", id: "tc-1", args: {} }];
+    const toolCalls = [{ name: "read_file", id: "toolCall-1", args: {} }];
     const context = {
       agentSessionId: "sess-1",
       emit: vi.fn(),
@@ -401,7 +401,7 @@ describe("ApprovalGate", () => {
   });
 
   it("should auto-approve when options.autoApprove is true", async () => {
-    const toolCalls = [{ name: "write_file", id: "tc-1", args: {} }];
+    const toolCalls = [{ name: "write_file", id: "toolCall-1", args: {} }];
     const context = {
       agentSessionId: "sess-1",
       emit: vi.fn(),
@@ -412,7 +412,7 @@ describe("ApprovalGate", () => {
         needsApproval: [
           {
             name: "write_file",
-            id: "tc-1",
+            id: "toolCall-1",
             args: {},
             _approval: { tier: 2, tierLabel: "Write" },
           },

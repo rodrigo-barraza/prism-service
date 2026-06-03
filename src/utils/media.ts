@@ -163,10 +163,10 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
     return compressWithSharp(base64Data, maxBytes);
   }
 
-  let tmpDir = null;
+  let temporaryDirectory = null;
   try {
-    tmpDir = await mkdtemp(join(tmpdir(), "prism-gif-"));
-    const inputPath = join(tmpDir, "input.gif");
+    temporaryDirectory = await mkdtemp(join(tmpdir(), "prism-gif-"));
+    const inputPath = join(temporaryDirectory, "input.gif");
     const buffer = Buffer.from(base64Data, "base64");
     await writeFile(inputPath, buffer);
 
@@ -177,7 +177,7 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
         for ( const factor of scaleFactors) {
       cumulativeScale *= factor;
       const outputPath = join(
-        tmpDir,
+        temporaryDirectory,
         `output_${Math.round(cumulativeScale * 100)}.gif`,
       );
 
@@ -222,7 +222,7 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
     }
 
     // Final fallback: tiny GIF
-    const fallbackPath = join(tmpDir, "output_fallback.gif");
+    const fallbackPath = join(temporaryDirectory, "output_fallback.gif");
     await new Promise<void>((resolve, reject) => {
       execFile(
         "ffmpeg",
@@ -259,8 +259,8 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
       mediaType: "image/gif",
     };
   } finally {
-    if (tmpDir) {
-      rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    if (temporaryDirectory) {
+      rm(temporaryDirectory, { recursive: true, force: true }).catch(() => {});
     }
   }
 }
@@ -381,7 +381,7 @@ export async function extractVideoFrames(videoDataUrl: string, options: { fps?: 
     );
   }
 
-  let tmpDir = null;
+  let temporaryDirectory = null;
 
   try {
     // Decode video data URL to a temp file.
@@ -396,9 +396,9 @@ export async function extractVideoFrames(videoDataUrl: string, options: { fps?: 
     const base64Data = videoDataUrl.slice(markerIdx + b64Marker.length);
     const ext = mime.split("/")[1]?.split(";")[0] || "mp4";
 
-    tmpDir = await mkdtemp(join(tmpdir(), "prism-frames-"));
-    const inputPath = join(tmpDir, `input.${ext}`);
-    const outputPattern = join(tmpDir, "frame_%04d.jpg");
+    temporaryDirectory = await mkdtemp(join(tmpdir(), "prism-frames-"));
+    const inputPath = join(temporaryDirectory, `input.${ext}`);
+    const outputPattern = join(temporaryDirectory, "frame_%04d.jpg");
 
     // Write video to temp file
     const videoBuffer = Buffer.from(base64Data, "base64");
@@ -443,7 +443,7 @@ export async function extractVideoFrames(videoDataUrl: string, options: { fps?: 
     // Read extracted frames and convert to data URLs
     const frames: string[] = [];
     for (let i = 1; i <= maxFrames; i++) {
-      const framePath = join(tmpDir, `frame_${String(i).padStart(4, "0")}.jpg`);
+      const framePath = join(temporaryDirectory, `frame_${String(i).padStart(4, "0")}.jpg`);
       try {
         const frameBuffer = await readFile(framePath);
         const frameBase64 = frameBuffer.toString("base64");
@@ -468,8 +468,8 @@ export async function extractVideoFrames(videoDataUrl: string, options: { fps?: 
     );
     return frames;
   } finally {
-    if (tmpDir) {
-      rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    if (temporaryDirectory) {
+      rm(temporaryDirectory, { recursive: true, force: true }).catch(() => {});
     }
   }
 }

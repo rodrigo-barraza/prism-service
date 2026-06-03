@@ -257,9 +257,9 @@ export default class BaseAgenticHarness {
     if (streamChunk?.type === "usage") {
       mergeUsage(state.overallUsage, streamChunk.usage as Parameters<typeof mergeUsage>[1]);
       mergeUsage(pass.usage, streamChunk.usage as Parameters<typeof mergeUsage>[1]);
-      const usageObj = streamChunk.usage as Record<string, number> | undefined;
+      const usageObject = streamChunk.usage as Record<string, number> | undefined;
       const reportedInput =
-        usageObj?.inputTokens || usageObj?.promptTokens || 0;
+        usageObject?.inputTokens || usageObject?.promptTokens || 0;
       if (reportedInput > 0 && pass.requestId) {
         SessionGenerationTracker.update(pass.requestId, {
           inputTokens: reportedInput,
@@ -350,18 +350,18 @@ export default class BaseAgenticHarness {
       // Native MCP tool calls: pass through directly
       if (streamChunk.native) {
         if (streamChunk.status === "calling") {
-          const tcId = streamChunk.id || `ntc-${state.streamedToolCalls.length}`;
+          const toolCallId = streamChunk.id || `ntc-${state.streamedToolCalls.length}`;
           state.streamedToolCalls.push({
-            id: tcId,
+            id: toolCallId,
             name: streamChunk.name || "",
             args: streamChunk.args || {},
           });
-          this._trackToolDisplaySegment(tcId);
+          this._trackToolDisplaySegment(toolCallId);
         } else if (streamChunk.status === "done" || streamChunk.status === "error") {
           const existing = state.streamedToolCalls.find(
-            (tc) =>
-              (streamChunk.id && tc.id === streamChunk.id) ||
-              (!streamChunk.id && tc.name === streamChunk.name),
+            (toolCall) =>
+              (streamChunk.id && toolCall.id === streamChunk.id) ||
+              (!streamChunk.id && toolCall.name === streamChunk.name),
           );
           if (existing) {
             existing.result = streamChunk.result;
@@ -390,9 +390,9 @@ export default class BaseAgenticHarness {
         return { action: "skip" };
       }
 
-      const stdTcId = streamChunk.id || `tc-${state.streamedToolCalls.length}`;
+      const standardToolCallId = streamChunk.id || `toolCall-${state.streamedToolCalls.length}`;
       const toolCall: ToolCall = {
-        id: stdTcId,
+        id: standardToolCallId,
         responsesItemId: streamChunk.responsesItemId || undefined,
         name: toolName,
         args: streamChunk.args || {},
@@ -401,13 +401,13 @@ export default class BaseAgenticHarness {
       };
       pass.pendingToolCalls.push(toolCall);
       state.streamedToolCalls.push({ ...toolCall });
-      this._trackToolDisplaySegment(stdTcId);
+      this._trackToolDisplaySegment(standardToolCallId);
       emit({
         type: SSE_EVENT_TYPES.TOOL_EXECUTION,
-        tool: { name: toolName, args: streamChunk.args || {}, id: stdTcId },
+        tool: { name: toolName, args: streamChunk.args || {}, id: standardToolCallId },
         status: "calling",
       });
-      return { action: "toolCall", tc: toolCall };
+      return { action: "toolCall", toolCall: toolCall };
     }
 
     // ── Image ────────────────────────────────────────────
@@ -454,16 +454,16 @@ export default class BaseAgenticHarness {
     // ── Text chunk (default) ─────────────────────────────
     this._recordFirstToken(pass);
     this._recordTiming(pass);
-    const rawChunkStr = typeof chunk === "string" ? chunk : "";
-    state.overallOutputCharacters += rawChunkStr.length;
-    pass.outputCharacters += rawChunkStr.length;
-    pass.streamedText += rawChunkStr;
+    const rawChunkString = typeof chunk === "string" ? chunk : "";
+    state.overallOutputCharacters += rawChunkString.length;
+    pass.outputCharacters += rawChunkString.length;
+    pass.streamedText += rawChunkString;
     // Strip tool call XML markup leaked by some local models
     const cleanedPassText = stripToolCallMarkup(pass.streamedText);
-    const chunkStr = cleanedPassText.slice((pass.finalStreamedText || "").length);
+    const chunkString = cleanedPassText.slice((pass.finalStreamedText || "").length);
     pass.finalStreamedText = cleanedPassText;
     state.finalStreamedText = cleanedPassText;
-    if (state.planModeActive) state.planModeText += chunkStr;
+    if (state.planModeActive) state.planModeText += chunkString;
     // Display segment tracking
     if (state.lastDisplaySegType !== "text") {
       state.displaySegments.push({
@@ -474,17 +474,17 @@ export default class BaseAgenticHarness {
       state.lastDisplaySegType = "text";
     }
     state.displayTextFragments[state.displayTextFragments.length - 1] +=
-      chunkStr;
+      chunkString;
     if (pass.requestId) {
       SessionGenerationTracker.recordChunkTiming(
         pass.requestId,
-        rawChunkStr.length,
+        rawChunkString.length,
       );
     }
-    if (chunkStr)
+    if (chunkString)
       emit({
         type: SSE_EVENT_TYPES.CHUNK,
-        content: chunkStr,
+        content: chunkString,
         outputCharacters: state.overallOutputCharacters,
       });
     this.maybeEmitProgress();
@@ -607,7 +607,7 @@ export default class BaseAgenticHarness {
     // we slice from originalMessageCount so we don't append it again. Otherwise, we slice from
     // originalMessageCount - 1 to capture the user's triggering message for this turn.
     const lastOriginalMessage = context.messages[state.originalMessageCount - 1];
-    const isLastAlreadyPersisted = lastOriginalMessage && (lastOriginalMessage as any)._alreadyPersisted;
+    const isLastAlreadyPersisted = lastOriginalMessage && lastOriginalMessage._alreadyPersisted === true;
 
     const sliceIndex = isLastAlreadyPersisted
       ? state.originalMessageCount
@@ -620,7 +620,7 @@ export default class BaseAgenticHarness {
           typeof message.content === "string" &&
           message.content.startsWith("[CONTEXT NOTE:")
         ) &&
-        !(message as any)._alreadyPersisted,
+        !message._alreadyPersisted,
     );
 
     logger.info(
@@ -681,7 +681,7 @@ export default class BaseAgenticHarness {
             { projection: { workers: 1 } },
           );
           const existingWorkersList = (agentSessionDocument && agentSessionDocument.workers) || [];
-          const mergedWorkersMap = new Map<string, any>();
+          const mergedWorkersMap = new Map<string, Record<string, unknown>>();
           for (const worker of existingWorkersList) {
             mergedWorkersMap.set(worker.agentId, worker);
           }
@@ -745,13 +745,13 @@ export default class BaseAgenticHarness {
     pass.generationEnd = performance.now();
   }
 
-  private _trackToolDisplaySegment(tcId: string): void {
+  private _trackToolDisplaySegment(toolCallId: string): void {
     const state = this.state;
     const lastSeg = state.displaySegments[state.displaySegments.length - 1];
     if (state.lastDisplaySegType === "tools" && lastSeg?.type === "tools") {
-      lastSeg.toolIds.push(tcId);
+      lastSeg.toolIds.push(toolCallId);
     } else {
-      state.displaySegments.push({ type: "tools", toolIds: [tcId] });
+      state.displaySegments.push({ type: "tools", toolIds: [toolCallId] });
       state.lastDisplaySegType = "tools";
     }
   }

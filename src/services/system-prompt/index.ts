@@ -66,43 +66,43 @@ export default class SystemPromptAssembler {
 
     // ── 2. Agent Context (runtime data from caller) ──────────────
     if (context.agentContext) {
-      const agentCtx = context.agentContext;
+      const agentContext = context.agentContext;
 
-      if (agentCtx.discordContext) {
-        sections.push(agentCtx.discordContext as string);
+      if (agentContext.discordContext) {
+        sections.push(agentContext.discordContext as string);
       }
-      if (agentCtx.serverContext) {
-        sections.push(agentCtx.serverContext as string);
+      if (agentContext.serverContext) {
+        sections.push(agentContext.serverContext as string);
       }
-      if (agentCtx.imageContext) {
-        sections.push(agentCtx.imageContext as string);
+      if (agentContext.imageContext) {
+        sections.push(agentContext.imageContext as string);
       }
-      if (agentCtx.clockCrewContext) {
-        sections.push(agentCtx.clockCrewContext as string);
-      }
-
-      if (agentCtx.stickersContext) {
-        sections.push(agentCtx.stickersContext as string);
-      }
-      if (agentCtx.emotionContext) {
-        sections.push(agentCtx.emotionContext as string);
-      }
-      if (agentCtx.visualContext) {
-        sections.push(agentCtx.visualContext as string);
+      if (agentContext.clockCrewContext) {
+        sections.push(agentContext.clockCrewContext as string);
       }
 
-      if (agentCtx.guildId) {
-        let idsBlock = `# Discord IDs\n- Guild ID: ${agentCtx.guildId}`;
-        if (agentCtx.channelId) idsBlock += `\n- Channel ID: ${agentCtx.channelId}`;
+      if (agentContext.stickersContext) {
+        sections.push(agentContext.stickersContext as string);
+      }
+      if (agentContext.emotionContext) {
+        sections.push(agentContext.emotionContext as string);
+      }
+      if (agentContext.visualContext) {
+        sections.push(agentContext.visualContext as string);
+      }
+
+      if (agentContext.guildId) {
+        let idsBlock = `# Discord IDs\n- Guild ID: ${agentContext.guildId}`;
+        if (agentContext.channelId) idsBlock += `\n- Channel ID: ${agentContext.channelId}`;
         sections.push(idsBlock);
       }
 
-      if (agentCtx.lightsContext) {
-        sections.push(agentCtx.lightsContext as string);
+      if (agentContext.lightsContext) {
+        sections.push(agentContext.lightsContext as string);
       }
 
-      if (agentCtx.somaticState) {
-        const somatic = agentCtx.somaticState as Record<string, { level: number; label?: string; name?: string }>;
+      if (agentContext.somaticState) {
+        const somatic = agentContext.somaticState as Record<string, { level: number; label?: string; name?: string }>;
         const entries = Object.entries(somatic);
         if (entries.length > 0) {
           let block = `# Your Current Physical & Emotional State`;
@@ -192,7 +192,7 @@ export default class SystemPromptAssembler {
         return new Set(context.enabledTools);
       })();
       const coordinatorAvailable = resolvedEnabledSet
-        ? COORDINATOR_ONLY_TOOLS.some((t: string) => resolvedEnabledSet.has(t))
+        ? COORDINATOR_ONLY_TOOLS.some((toolName: string) => resolvedEnabledSet.has(toolName))
         : true;
 
       if (coordinatorAvailable) {
@@ -200,7 +200,7 @@ export default class SystemPromptAssembler {
         const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
         const workerTools = allSchemas
           .map((tool) => tool.name as string)
-          .filter((name: string) => !coordinatorSet.has(name));
+          .filter((toolName: string) => !coordinatorSet.has(toolName));
         sections.push(getCoordinatorPromptAddendum({ workerTools }));
       }
     }
@@ -221,10 +221,10 @@ export default class SystemPromptAssembler {
     }
 
     // ── 8. Project Skills (relevance-filtered) ────────────────────
-    const lastUserMsg = [...(context.messages || [])]
+    const lastUserMessage = [...(context.messages || [])]
       .reverse()
       .find((message) => message.role === "user");
-    const queryText = (lastUserMsg?.content as string) || "";
+    const queryText = (lastUserMessage?.content as string) || "";
 
     const skills = await this.scorer.fetchSkills(
       context.project || null,
@@ -252,9 +252,9 @@ export default class SystemPromptAssembler {
     let memoriesText = "";
 
     if (memoryQuery) {
-      const agentCtxForMemory = context.agentContext || {};
-      const memoryGuildId = agentCtxForMemory.guildId as string | undefined;
-      const memoryUserIds = agentCtxForMemory.participantUserIds as string[] | undefined;
+      const agentContextForMemory = context.agentContext || {};
+      const memoryGuildId = agentContextForMemory.guildId as string | undefined;
+      const memoryUserIds = agentContextForMemory.participantUserIds as string[] | undefined;
 
       const memories = await this.scorer.fetchMemories(
         agentId,
@@ -295,19 +295,19 @@ export default class SystemPromptAssembler {
 
         context._injectedSkills = skillNames;
 
-        const systemIdx = context.messages?.findIndex(
-          (m) => m.role === "system",
+        const systemMessageIndex = context.messages?.findIndex(
+          (message) => message.role === "system",
         );
-        if (systemIdx !== undefined && systemIdx >= 0) {
-          context.messages![systemIdx].content = systemPrompt;
+        if (systemMessageIndex !== undefined && systemMessageIndex >= 0) {
+          context.messages![systemMessageIndex].content = systemPrompt;
         } else {
           context.messages?.unshift({ role: "system", content: systemPrompt });
         }
 
         if (context.messages) {
           const userMessages = context.messages.filter((message) => message.role === "user");
-          const lastUserMsg = userMessages[userMessages.length - 1];
-          if (lastUserMsg && typeof lastUserMsg.content === "string") {
+          const lastUserMessage = userMessages[userMessages.length - 1];
+          if (lastUserMessage && typeof lastUserMessage.content === "string") {
             const contextLines: string[] = [];
 
             contextLines.push(
@@ -327,12 +327,12 @@ export default class SystemPromptAssembler {
               systemContextBlock += `${memoriesText}\n\n`;
             }
 
-            if (!lastUserMsg.content.startsWith("[System Context]")) {
-              const msgIdx = context.messages.indexOf(lastUserMsg);
-              if (msgIdx !== -1) {
-                const originalContent = lastUserMsg.content;
-                context.messages[msgIdx] = {
-                  ...lastUserMsg,
+            if (!lastUserMessage.content.startsWith("[System Context]")) {
+              const messageIndex = context.messages.indexOf(lastUserMessage);
+              if (messageIndex !== -1) {
+                const originalContent = lastUserMessage.content;
+                context.messages[messageIndex] = {
+                  ...lastUserMessage,
                   rawContent: originalContent,
                   content: systemContextBlock + `[User Message]\n${originalContent}`,
                 };

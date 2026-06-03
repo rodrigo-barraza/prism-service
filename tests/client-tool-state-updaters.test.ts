@@ -240,9 +240,9 @@ describe("applyToolExecutionToMessages", () => {
 
     const result = applyToolExecutionToMessages(
       messages,
-      "tc-0",
+      "toolCall-0",
       {
-        id: "tc-0",
+        id: "toolCall-0",
         name: "generate_audio",
         args: { title: "War Song" },
         status: "calling",
@@ -264,7 +264,7 @@ describe("applyToolExecutionToMessages", () => {
         content: "Creating!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: { title: "War" },
             status: "calling",
@@ -276,9 +276,9 @@ describe("applyToolExecutionToMessages", () => {
 
     const result = applyToolExecutionToMessages(
       messages,
-      "tc-0",
+      "toolCall-0",
       {
-        id: "tc-0",
+        id: "toolCall-0",
         name: "generate_audio",
         args: { title: "War" },
         status: "done",
@@ -308,7 +308,7 @@ describe("applyToolExecutionToMessages", () => {
 
     applyToolExecutionToMessages(
       original,
-      "tc-0",
+      "toolCall-0",
       { name: "test_tool", status: "calling" },
       emptySnapshot,
     );
@@ -322,15 +322,15 @@ describe("applyToolExecutionToMessages", () => {
         role: "assistant",
         content: "Working...",
         toolCalls: [
-          { id: "tc-0", name: "generate_audio", args: {}, status: "calling" },
+          { id: "toolCall-0", name: "generate_audio", args: {}, status: "calling" },
         ],
       },
     ];
 
     const result = applyToolExecutionToMessages(
       messages,
-      "tc-0",
-      { id: "tc-0", name: "generate_audio", args: {}, status: "calling" },
+      "toolCall-0",
+      { id: "toolCall-0", name: "generate_audio", args: {}, status: "calling" },
       emptySnapshot,
     );
 
@@ -345,7 +345,7 @@ describe("applyToolExecutionToMessages", () => {
 
     const result = applyToolExecutionToMessages(
       messages,
-      "tc-0",
+      "toolCall-0",
       { name: "generate_audio", status: "calling" },
       emptySnapshot,
     );
@@ -366,7 +366,7 @@ describe("applyToolExecutionToMessages", () => {
 
     const result = applyToolExecutionToMessages(
       messages,
-      "tc-0",
+      "toolCall-0",
       { name: "generate_audio", status: "calling" },
       emptySnapshot,
     );
@@ -388,7 +388,7 @@ describe("applyToolExecutionToMessages", () => {
         content: "Creating your song!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             status: "done",
@@ -427,7 +427,7 @@ describe("prepareDisplayMessages", () => {
       { role: "system", content: "You are helpful" },
       { role: "user", content: "hello" },
       { role: "assistant", content: "Hi!" },
-      { role: "tool", content: "tool result", tool_call_id: "tc-0" },
+      { role: "tool", content: "tool result", tool_call_id: "toolCall-0" },
     ];
 
     const result = prepareDisplayMessages(raw);
@@ -456,7 +456,7 @@ describe("prepareDisplayMessages", () => {
         content: "",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             status: "done",
@@ -489,13 +489,13 @@ describe("prepareDisplayMessages", () => {
         role: "assistant",
         content: "Searching...",
         toolCalls: [
-          { id: "tc-0", name: "search_web", args: { query: "test" } },
+          { id: "toolCall-0", name: "search_web", args: { query: "test" } },
         ],
       },
       {
         role: "tool",
         content: '{"results": ["found it"]}',
-        tool_call_id: "tc-0",
+        tool_call_id: "toolCall-0",
       },
       { role: "assistant", content: "Found it!" },
     ];
@@ -522,7 +522,7 @@ describe("prepareDisplayMessages", () => {
         content: "Doing it",
         tool_calls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             result: { success: true },
@@ -549,7 +549,7 @@ describe("prepareDisplayMessages", () => {
         content: "I'll create a song!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: { title: "War" },
             status: "done",
@@ -597,7 +597,7 @@ describe("prepareDisplayMessages", () => {
         content: "Creating your song!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             status: "done",
@@ -666,7 +666,7 @@ describe("Post-stream refresh — race condition detection", () => {
         content: "Creating your song!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             status: "done",
@@ -685,7 +685,7 @@ describe("Post-stream refresh — race condition detection", () => {
         content: "Creating your song!",
         toolCalls: [
           {
-            id: "tc-0",
+            id: "toolCall-0",
             name: "generate_audio",
             args: {},
             status: "done",
