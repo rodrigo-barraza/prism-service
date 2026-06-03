@@ -100,7 +100,7 @@ function makeCtx(overrides = {}) {
     messages: [],
     originalMessages: [],
     options: { temperature: 0.7, maxTokens: 8192, thinkingEnabled: false },
-    conversationId: undefined,
+    conversationId: "session-123",
     agentSessionId: "session-123",
     parentAgentSessionId: undefined,
     userMessage: null,

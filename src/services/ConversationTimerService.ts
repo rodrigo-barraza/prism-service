@@ -404,6 +404,7 @@ const ConversationTimerService = {
           ...(settings.toolConfig?.disabledTools && { disabledTools: settings.toolConfig.disabledTools }),
         },
         agentSessionId: timer.conversationId,
+        conversationId: timer.conversationId,
         userMessage: reminderMessage,
         conversationMeta: { title: (conversation.title as string) || "Background Agent", settings },
         traceId,
