@@ -32,6 +32,7 @@ export default class AgenticLoopService {
       modelDef,
       messages,
       agentSessionId,
+      conversationId,
       parentAgentSessionId,
     } = context;
 
@@ -75,10 +76,13 @@ export default class AgenticLoopService {
       await ToolContext.ensureLoaded(agentSessionId);
       return await harness.run();
     } finally {
-      // Clean up
-      pendingApprovals.delete(agentSessionId);
-      pendingQuestions.delete(agentSessionId);
+      // Clean up in-memory state keyed by agentSessionId (per-run)
       ToolContext.cleanup(agentSessionId);
+
+      // Clean up in-memory state keyed by conversationId (client-facing)
+      pendingApprovals.delete(conversationId);
+      pendingQuestions.delete(conversationId);
+
       if (!parentAgentSessionId) {
         const trackerSessionId = parentAgentSessionId || agentSessionId;
         SessionGenerationTracker.cleanup(trackerSessionId);
@@ -94,14 +98,17 @@ export default class AgenticLoopService {
   }
 
   // ── Approval Resolution API ─────────────────────────────
+  // Keyed by conversationId — the client-facing conversation identifier.
+  // Only one agentic run is active per conversation at a time, so there
+  // is no collision risk.
 
-  /** Resolve a pending approval for an agent session. */
+  /** Resolve a pending approval for a conversation. */
   static resolveApproval(
-    agentSessionId: string,
+    conversationId: string,
     approved: boolean,
     { approveAll = false }: { approveAll?: boolean } = {},
   ): boolean {
-    const entry = pendingApprovals.get(agentSessionId);
+    const entry = pendingApprovals.get(conversationId);
     if (!entry) return false;
 
     if (entry.type === "plan") {
@@ -116,14 +123,14 @@ export default class AgenticLoopService {
     return true;
   }
 
-  /** Check if an agent session has a pending approval. */
-  static getPendingApproval(agentSessionId: string): {
+  /** Check if a conversation has a pending approval. */
+  static getPendingApproval(conversationId: string): {
     pending: boolean;
     type?: string;
     tools?: string[];
     toolCalls?: any[];
   } {
-    const entry = pendingApprovals.get(agentSessionId);
+    const entry = pendingApprovals.get(conversationId);
     if (!entry) return { pending: false };
     return {
       pending: true,
@@ -137,7 +144,7 @@ export default class AgenticLoopService {
 
   /** Store a pending question resolver (called by ToolOrchestratorService). */
   static _setPendingQuestion(
-    agentSessionId: string,
+    conversationId: string,
     entry: {
       resolve: (value: { answers: Array<{ answer: string | string[]; annotations?: string }> | null; timedOut?: boolean }) => void;
       question?: string;
@@ -145,29 +152,29 @@ export default class AgenticLoopService {
       choices?: string[];
     },
   ): void {
-    pendingQuestions.set(agentSessionId, entry);
+    pendingQuestions.set(conversationId, entry);
   }
 
-  /** Resolve a pending question for an agent session. */
+  /** Resolve a pending question for a conversation. */
   static resolveUserQuestion(
-    agentSessionId: string,
+    conversationId: string,
     answers: Array<{ answer: string | string[]; annotations?: string }>,
   ): boolean {
-    const entry = pendingQuestions.get(agentSessionId);
+    const entry = pendingQuestions.get(conversationId);
     if (!entry) return false;
-    pendingQuestions.delete(agentSessionId);
+    pendingQuestions.delete(conversationId);
     entry.resolve({ answers });
     return true;
   }
 
-  /** Check if an agent session has a pending question. */
-  static getPendingQuestion(agentSessionId: string): {
+  /** Check if a conversation has a pending question. */
+  static getPendingQuestion(conversationId: string): {
     pending: boolean;
     question?: string;
     questions?: any[];
     choices?: string[];
   } {
-    const entry = pendingQuestions.get(agentSessionId);
+    const entry = pendingQuestions.get(conversationId);
     if (!entry) return { pending: false };
     return {
       pending: true,

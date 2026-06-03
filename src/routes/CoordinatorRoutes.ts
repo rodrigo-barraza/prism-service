@@ -16,18 +16,18 @@ const router = Router();
 /**
  * GET /coordinator/workers
  * List all active workers spawned via chat tools.
- * Optional query: ?agentSessionId=xxx to filter by parent coordinator session.
+ * Optional query: ?conversationId=xxx to filter by parent conversation.
  */
 router.get(
   "/workers",
   asyncHandler(async (req: Request, res: Response) => {
-    const agentSessionIdentifier = req.query.agentSessionId as string | undefined;
+    const conversationIdentifier = req.query.conversationId as string | undefined;
     const activeWorkersList = CoordinatorService.listWorkers({
-      parentAgentSessionId: agentSessionIdentifier,
+      parentConversationId: conversationIdentifier,
     });
 
     let persistedWorkersList: any[] = [];
-    if (agentSessionIdentifier) {
+    if (conversationIdentifier) {
       try {
         const { default: MongoWrapper } =
           await import("../wrappers/MongoWrapper.js");
@@ -38,7 +38,7 @@ router.get(
           COLLECTIONS.AGENT_CONVERSATIONS,
         );
         const agentSessionDocument = await collection.findOne(
-          { id: agentSessionIdentifier },
+          { id: conversationIdentifier },
           { projection: { workers: 1 } },
         );
         if (
@@ -70,21 +70,21 @@ router.get(
 
 /**
  * POST /coordinator/workers/stop
- * Abort all running workers for a given parent agent session.
+ * Abort all running workers for a given parent conversation.
  * Called by the frontend when the user presses stop.
  *
- * Body: { agentSessionId: string }
+ * Body: { conversationId: string }
  */
 router.post(
   "/workers/stop",
   asyncHandler(async (req: Request, res: Response) => {
-    const { agentSessionId } = req.body;
-    if (!agentSessionId) {
-      return res.status(400).json({ error: "'agentSessionId' is required" });
+    const { conversationId } = req.body;
+    if (!conversationId) {
+      return res.status(400).json({ error: "'conversationId' is required" });
     }
 
     const result =
-      await CoordinatorService.abortWorkersBySession(agentSessionId);
+      await CoordinatorService.abortWorkersByConversation(conversationId);
     res.json(result);
   }),
 );

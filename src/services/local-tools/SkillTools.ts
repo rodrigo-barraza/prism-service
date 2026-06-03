@@ -1,7 +1,7 @@
 import logger from "../../utils/logger.ts";
 
 interface ToolContext {
-  agentSessionId?: string;
+  conversationId?: string;
   project?: string;
   _emit?: (event: { type: string; [key: string]: unknown }) => void;
   [key: string]: unknown;

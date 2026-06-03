@@ -24,7 +24,7 @@ export async function checkAndWaitForApproval(
   context: AgenticContext,
   approvalEngine: AutoApprovalEngine,
 ): Promise<{ approved: boolean; approveAll: boolean }> {
-  const { agentSessionId, emit, options } = context;
+  const { conversationId, emit, options } = context;
 
   const { needsApproval } = approvalEngine.checkBatch(toolCalls);
 
@@ -53,18 +53,18 @@ export async function checkAndWaitForApproval(
     reason?: string;
   }>((resolve) => {
     const timeoutId = setTimeout(() => {
-      pendingApprovals.delete(agentSessionId);
+      pendingApprovals.delete(conversationId);
       resolve({ approved: false, reason: "timeout" });
     }, APPROVAL_TIMEOUT_MS);
 
-    pendingApprovals.set(agentSessionId, {
+    pendingApprovals.set(conversationId, {
       resolve: (value: {
         approved: boolean;
         approveAll?: boolean;
         reason?: string;
       }) => {
         clearTimeout(timeoutId);
-        pendingApprovals.delete(agentSessionId);
+        pendingApprovals.delete(conversationId);
         resolve(value);
       },
       type: "tool",

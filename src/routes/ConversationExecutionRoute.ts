@@ -9,33 +9,33 @@ const router = express.Router();
 
 /**
  * POST /conversation/approve
- * Body: { agentSessionId, approved, approveAll }
+ * Body: { conversationId, approved, approveAll }
  * Resolves pending plan/tool approvals for agent loops.
  */
 router.post(
   "/approve",
   asyncHandler(async (req: Request, res: Response) => {
-    const { agentSessionId, approved, approveAll } = req.body;
+    const { conversationId, approved, approveAll } = req.body;
 
-    if (!agentSessionId) {
-      return res.status(400).json({ error: "Missing agentSessionId" });
+    if (!conversationId) {
+      return res.status(400).json({ error: "Missing conversationId" });
     }
 
     const resolved = AgenticLoopService.resolveApproval(
-      agentSessionId,
+      conversationId,
       approved !== false,
       { approveAll: approveAll === true },
     );
 
     if (!resolved) {
       return res.status(404).json({
-        error: "No pending approval for this agent session",
-        agentSessionId,
+        error: "No pending approval for this conversation",
+        conversationId,
       });
     }
 
     logger.info(
-      `[conversation/approve] ${approved !== false ? "Approved" : "Rejected"}${approveAll ? " (all future)" : ""} for session ${agentSessionId}`,
+      `[conversation/approve] ${approved !== false ? "Approved" : "Rejected"}${approveAll ? " (all future)" : ""} for conversation ${conversationId}`,
     );
 
     res.json({ ok: true, approved: approved !== false });
@@ -44,16 +44,16 @@ router.post(
 
 /**
  * POST /conversation/answer
- * Body: { agentSessionId, answer, answers }
+ * Body: { conversationId, answer, answers }
  * Resolves pending ask_user_question prompts for agent loops.
  */
 router.post(
   "/answer",
   asyncHandler(async (req: Request, res: Response) => {
-    const { agentSessionId, answer, answers } = req.body;
+    const { conversationId, answer, answers } = req.body;
 
-    if (!agentSessionId) {
-      return res.status(400).json({ error: "Missing agentSessionId" });
+    if (!conversationId) {
+      return res.status(400).json({ error: "Missing conversationId" });
     }
 
     let normalizedAnswers: { answer: string | string[]; annotations?: string }[];
@@ -66,19 +66,19 @@ router.post(
     }
 
     const resolved = AgenticLoopService.resolveUserQuestion(
-      agentSessionId,
+      conversationId,
       normalizedAnswers,
     );
 
     if (!resolved) {
       return res.status(404).json({
-        error: "No pending question for this agent session",
-        agentSessionId,
+        error: "No pending question for this conversation",
+        conversationId,
       });
     }
 
     logger.info(
-      `[conversation/answer] ${normalizedAnswers.length} answer(s) for session ${agentSessionId}`,
+      `[conversation/answer] ${normalizedAnswers.length} answer(s) for conversation ${conversationId}`,
     );
 
     res.json({ ok: true });

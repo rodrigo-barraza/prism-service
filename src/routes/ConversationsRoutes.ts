@@ -147,6 +147,7 @@ router.get(
                   $match: {
                     $or: [
                       { agentSessionId: { $in: sessionIds } },
+                      { conversationId: { $in: sessionIds } },
                       { parentAgentSessionId: { $in: sessionIds } },
                     ],
                     project,
@@ -155,7 +156,7 @@ router.get(
                 },
                 {
                   // Group under the parent session when present, otherwise
-                  // use the request's own agentSessionId (top-level request).
+                  // use the request's own conversationId (the document persistence key).
                   $group: {
                     _id: {
                       $cond: [
@@ -166,7 +167,7 @@ router.get(
                           ],
                         },
                         "$parentAgentSessionId",
-                        "$agentSessionId",
+                        { $ifNull: ["$conversationId", "$agentSessionId"] },
                       ],
                     },
                     totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },

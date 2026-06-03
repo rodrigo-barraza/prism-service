@@ -55,6 +55,7 @@ interface ToolExecutionContext {
   requestId?: string;
   traceId?: string | null;
   agentSessionId?: string | null;
+  conversationId?: string | null;
   iteration?: number;
   workspaceRoot?: string | null;
   signal?: AbortSignal;
@@ -324,6 +325,7 @@ function buildContextHeaders(context: ToolExecutionContext = {}): Record<string,
   if (context.requestId) headers["X-Request-Id"] = context.requestId;
   if (context.traceId) headers["X-Trace-Id"] = context.traceId;
   if (context.agentSessionId) headers["X-Agent-Session-Id"] = context.agentSessionId;
+  if (context.conversationId) headers["X-Conversation-Id"] = context.conversationId;
   if (context.iteration !== undefined && context.iteration !== null)
     headers["X-Iteration"] = String(context.iteration);
   // Multi-workspace: when the user has selected a non-default workspace root,
@@ -960,6 +962,7 @@ export default class ToolOrchestratorService {
             providerName: context._providerName,
             resolvedModel: context._resolvedModel,
             agentSessionId: context.agentSessionId,
+            conversationId: context.conversationId,
             traceId: context.traceId,
 
       // Pass the parent's emit so workers can forward live events

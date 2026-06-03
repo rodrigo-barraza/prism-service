@@ -22,7 +22,7 @@ interface UserQuestionEmitEvent {
 }
 
 interface ToolContext {
-  agentSessionId?: string;
+  conversationId?: string;
   _emit?: (event: UserQuestionEmitEvent) => void;
 }
 
@@ -204,11 +204,11 @@ export default {
       };
     }
 
-    const sessionId = context.agentSessionId;
+    const sessionId = context.conversationId;
     if (!sessionId) {
       return {
         error:
-          "No agent session — ask_user_question requires an active session",
+          "No conversation — ask_user_question requires an active session",
       };
     }
 

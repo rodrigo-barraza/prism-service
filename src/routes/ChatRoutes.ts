@@ -598,8 +598,8 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
   } = context;
   // ── Agent session identity ─────────────────────────────────
   const agentSessionId =
-    incomingAgentSessionId || incomingConversationId || crypto.randomUUID();
-  const conversationId = incomingConversationId || agentSessionId;
+    incomingAgentSessionId || crypto.randomUUID();
+  const conversationId = incomingConversationId || crypto.randomUUID();
   const traceId = incomingTraceId || null;
   const conversationMeta = incomingConversationMeta || null;
   // ── Eager session stub ───────────────────────────────────────
@@ -607,7 +607,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
   // GET /agent-sessions/:id never 404s while the loop is running
   // (e.g. when the user switches away and back during generation).
   markGenerating(
-    agentSessionId,
+    conversationId,
     project,
     username,
     true,
@@ -669,7 +669,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
         try {
           const { default: CoordinatorService } =
             await import("../services/CoordinatorService.js");
-          await CoordinatorService.abortWorkersBySession(agentSessionId);
+          await CoordinatorService.abortWorkersByConversation(conversationId);
         } catch (cleanupErr: unknown) {
                     logger.warn(`[agent] Worker cleanup failed: ${getErrorMessage(cleanupErr)}`);
         }
@@ -677,7 +677,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
     }
   } catch (error: unknown) {
     markGenerating(
-      agentSessionId,
+      conversationId,
       project,
       username,
       false,
@@ -694,6 +694,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
       provider: providerName,
       model: resolvedModel || requestedModel || "any",
       agentSessionId: agentSessionId,
+      conversationId: conversationId || null,
       traceId: traceId || null,
       success: false,
             errorMessage: getErrorMessage(error),
