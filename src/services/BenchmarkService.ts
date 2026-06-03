@@ -339,7 +339,7 @@ async function runSingleModel(
   logger.info(`[benchmark] ▶ Running ${model.provider}/${model.model}`);
   try {
     const events: BenchmarkEvent[] = [];
-    const handler = model.agent ? handleAgent : handleConversation;
+    const handler = (model.agent || model.toolsEnabled) ? handleAgent : handleConversation;
     await handler(
       {
         provider: model.provider,
@@ -351,8 +351,8 @@ async function runSingleModel(
         username,
         skipConversation: true,
         thinkingEnabled: model.thinkingEnabled || false,
-        ...(model.agent && {
-          agent: model.agent,
+        ...((model.agent || model.toolsEnabled) && {
+          ...(model.agent && { agent: model.agent }),
           agenticLoopEnabled: true,
           autoApprove: true,
           maxIterations: 10,
@@ -562,7 +562,7 @@ const BenchmarkService = {
         return {
           provider: tool.provider,
           model: tool.model,
-          label: modelDefinition?.label || tool.display_name || tool.model,
+          label: tool.display_name || modelDefinition?.label || tool.model,
           thinkingEnabled: tool.thinkingEnabled || false,
           toolsEnabled: tool.toolsEnabled || false,
           ...(tool.agent && { agent: tool.agent }),

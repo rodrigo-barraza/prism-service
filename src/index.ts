@@ -62,6 +62,7 @@ import settingsRouter from "./routes/SettingsRoutes.ts";
 import customAgentsRouter from "./routes/CustomAgentsRoutes.ts";
 import workspacesRouter from "./routes/WorkspacesRoutes.ts";
 import scheduledTasksRouter from "./routes/ScheduledTasksRoutes.ts";
+import promptsRouter from "./routes/PromptsRoutes.ts";
 
 const app = express();
 const server = http.createServer(app);
@@ -120,6 +121,7 @@ const ENDPOINTS = {
     "/custom-agents",
     "/workspaces",
     "/scheduled-tasks",
+    "/prompts",
   ],
   websocket: ["/ws/chat", "/ws/text-to-audio"],
   admin: ["/admin", "/admin/lm-studio"],
@@ -180,6 +182,7 @@ app.use("/settings", settingsRouter);
 app.use("/custom-agents", customAgentsRouter);
 app.use("/workspaces", workspacesRouter);
 app.use("/scheduled-tasks", scheduledTasksRouter);
+app.use("/prompts", promptsRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);
@@ -288,6 +291,9 @@ setupWebSocket(wss);
         // workspaces
         db.collection("workspaces").createIndex({ project: 1, username: 1 }),
         db.collection("workspaces").createIndex({ id: 1 }, { unique: true }),
+        // prompts
+        db.collection("prompts").createIndex({ project: 1, username: 1, updatedAt: -1 }),
+        db.collection("prompts").createIndex({ id: 1 }, { unique: true }),
       ]);
       logger.success("Database indexes ensured");
     }

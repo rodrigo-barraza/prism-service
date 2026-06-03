@@ -56,7 +56,7 @@ const CustomAgentService = {
     // Check for duplicate agentId
     const existing = await collection.findOne({ agentId });
     if (existing) {
-      throw new Error(`Agent with ID "${agentId}" already exists`);
+      throw new Error(`Agent with name "${data.name}" already exists`);
     }
 
     const document = {
@@ -89,10 +89,18 @@ const CustomAgentService = {
     const collection = getCollection();
     if (!collection) throw new Error("Database not available");
 
-    // If name changed, re-derive agentId
+    // If name changed, re-derive agentId and verify uniqueness
     const setFields: Record<string, unknown> = { ...updates, updatedAt: new Date().toISOString() };
     if (updates.name) {
-      setFields.agentId = deriveAgentId(updates.name as string);
+      const newAgentId = deriveAgentId(updates.name as string);
+      const conflictingAgent = await collection.findOne({
+        agentId: newAgentId,
+        _id: { $ne: new ObjectId(id) },
+      });
+      if (conflictingAgent) {
+        throw new Error(`Agent with name "${updates.name}" already exists`);
+      }
+      setFields.agentId = newAgentId;
     }
 
     // Remove _id from $set if present

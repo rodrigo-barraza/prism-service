@@ -52,6 +52,9 @@ export {
   PutRuleSchema,
   GetAgentSessionsQuerySchema,
   GetVramBenchmarksQuerySchema,
+  PostPromptSchema,
+  PatchPromptSchema,
+  GetPromptsQuerySchema,
 } from "./schemas.ts";
 
 export type { ChatRequest } from "./schemas.ts";
