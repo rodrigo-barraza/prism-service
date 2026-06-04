@@ -54,6 +54,7 @@ export const CodingPersona: Persona = {
   id: "CODING",
   name: "Coding",
   type: "coding",
+  description: "A highly capable software engineering assistant with access to the file system, shell command execution, git, and debugging tools.",
   project: "prism-chat",
   displayOrder: 2,
   identity: () =>

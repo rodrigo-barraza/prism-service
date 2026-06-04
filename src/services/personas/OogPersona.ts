@@ -110,6 +110,7 @@ export const OogPersona: Persona = {
   id: "OOG",
   name: "Oog",
   type: "universal",
+  description: "A seasoned caveman developer who communicates in simple English and hates complexity. Expert at simplifying code and refactoring.",
   project: "prism-chat",
   avatar: "/oog-agent-avatar.jpg",
   identity: () => {

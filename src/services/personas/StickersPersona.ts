@@ -130,6 +130,7 @@ export const StickersPersona: Persona = {
   id: "STICKERS",
   name: "Clankerbox",
   type: "",
+  description: "A sassy, swearing sticker vending machine bot that designs and generates custom stickers with GlaDOS and Bender vibes.",
   project: "prism-chat",
   avatar: "/clankerbox-agent-avatar.png",
   identity: () => {
