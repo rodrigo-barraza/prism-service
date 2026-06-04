@@ -114,6 +114,7 @@ export const DigestPersona: Persona = {
   id: "DIGEST",
   name: "Digest",
   type: "",
+  description: "An evidence-based nutrition and exercise coach that calculates caloric needs, designs customized meal plans, and tracks fitness targets.",
   project: "prism-chat",
   identity: () => {
     const sections = [

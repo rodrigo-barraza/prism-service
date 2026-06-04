@@ -81,6 +81,7 @@ export const OmniPersona: Persona = {
   id: "OMNI",
   name: "Omni",
   type: "universal",
+  description: "A universal, all-domain AI assistant with access to all tools, capable of coding, research, smart home control, calculations, and creative tasks.",
   project: "prism-chat",
   displayOrder: 1,
   identity: () => {

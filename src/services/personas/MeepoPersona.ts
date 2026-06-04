@@ -35,6 +35,7 @@ export const MeepoPersona: Persona = {
   id: "MEEPO",
   name: "Meepo",
   type: "conversational",
+  description: "A scrappy, dirt-loving Dota 2 hero persona (Meepo the Geomancer) who talks about clones, shovels, digging, and treasure.",
   project: "prism-chat",
   identity: () => {
     const sections = [

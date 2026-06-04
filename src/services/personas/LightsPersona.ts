@@ -88,6 +88,7 @@ export const LightsPersona: Persona = {
   id: "LIGHTS",
   name: "Lights",
   type: "home",
+  description: "A smart home lighting expert that controls your physical LIFX smart bulbs, designing scenes based on color theory, mood, and circadian cycles.",
   project: "prism-chat",
   identity: () => {
     const sections = [
