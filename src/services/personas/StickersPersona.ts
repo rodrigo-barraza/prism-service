@@ -131,6 +131,7 @@ export const StickersPersona: Persona = {
   name: "Clankerbox",
   type: "",
   project: "prism-chat",
+  avatar: "/clankerbox-agent-avatar.png",
   identity: () => {
     const sections = [
       STICKERS_CORE_PERSONALITY,
