@@ -82,9 +82,15 @@ router.get(
         return res.status(400).json({ error: parsed.error.format() });
       }
 
-      const { limit, cursor, agent, type = "all" } = parsed.data;
+      const { limit, cursor, agent, type = "all", taskId } = parsed.data;
 
-      const filter: Record<string, unknown> = { project, username };
+      const filter: Record<string, unknown> = {};
+      if (taskId) {
+        filter.taskId = taskId;
+      } else {
+        filter.project = project;
+        filter.username = username;
+      }
       if (cursor) {
         filter.updatedAt = { $lt: cursor };
       }

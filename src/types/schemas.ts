@@ -221,6 +221,7 @@ export const GetConversationsQuerySchema = z.object({
   cursor: z.string().nullable().optional(),
   agent: z.string().nullable().optional(),
   type: z.enum(["direct", "agent", "all"]).optional().default("all"),
+  taskId: z.string().nullable().optional(),
 });
 
 export const PostConversationMessagesBodySchema = z.object({

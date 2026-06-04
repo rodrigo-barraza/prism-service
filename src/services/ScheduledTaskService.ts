@@ -277,6 +277,7 @@ const ScheduledTaskService = {
       username,
       title: task.name,
       agent: task.agent,
+      taskId: task.id,
       messages: [userTriggerMessage],
       systemPrompt: "",
       settings,
