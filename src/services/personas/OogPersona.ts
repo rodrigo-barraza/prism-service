@@ -111,6 +111,7 @@ export const OogPersona: Persona = {
   name: "Oog",
   type: "universal",
   project: "prism-chat",
+  avatar: "/oog-agent-avatar.jpg",
   identity: () => {
     const sections = [
       OOG_CORE_IDENTITY,
