@@ -23,6 +23,10 @@ router.get(
         from,
         to,
         sort = "createdAt",
+        provider,
+        model,
+        agent,
+        workspace,
       } = req.query;
 
       const { skip, limit, page, sortDirection } = parsePaginationParams(req.query);
@@ -30,7 +34,57 @@ router.get(
       const match: Record<string, unknown> = { traceId: { $ne: null } };
       if (project) match.project = project;
       if (username) match.username = username;
+
+      if (agent) {
+        const agentIds = String(agent).split(",").filter(Boolean);
+        if (agentIds.length === 1) {
+          match.agent = agentIds[0];
+        } else if (agentIds.length > 1) {
+          match.agent = { $in: agentIds };
+        }
+      }
+
+      if (provider) {
+        const providerNames = String(provider).split(",").filter(Boolean);
+        if (providerNames.length === 1) {
+          match.provider = providerNames[0];
+        } else if (providerNames.length > 1) {
+          match.provider = { $in: providerNames };
+        }
+      }
+
+      if (model) {
+        const modelNames = String(model).split(",").filter(Boolean);
+        if (modelNames.length === 1) {
+          match.model = modelNames[0];
+        } else if (modelNames.length > 1) {
+          match.model = { $in: modelNames };
+        }
+      }
+
       applyDateRangeFilter(match, from as string, to as string);
+
+      if (workspace) {
+        const [convDocs, agentConvDocs] = await Promise.all([
+          req.db
+            .collection(COLLECTIONS.MODEL_CONVERSATIONS)
+            .find({ workspaceRoot: workspace })
+            .project({ id: 1 })
+            .toArray(),
+          req.db
+            .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+            .find({ workspaceRoot: workspace })
+            .project({ id: 1 })
+            .toArray(),
+        ]);
+        const convIds = convDocs.map((d) => d.id);
+        const agentSessionIds = agentConvDocs.map((d) => d.id);
+        match.$or = [
+          { conversationId: { $in: convIds } },
+          { agentSessionId: { $in: agentSessionIds } },
+          { parentAgentSessionId: { $in: agentSessionIds } },
+        ];
+      }
 
       const pipeline: Record<string, unknown>[] = [
         { $match: match },

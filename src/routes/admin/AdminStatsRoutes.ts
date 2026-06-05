@@ -26,15 +26,75 @@ const {
 
 router.use(requireDb);
 
+async function buildMatchFilter(req: Request): Promise<Record<string, unknown>> {
+  const { from, to, project, agent, provider, model, workspace } = req.query;
+  const match: Record<string, unknown> = {};
+
+  if (project) {
+    match.project = project;
+  }
+
+  if (agent) {
+    const agentIds = String(agent).split(",").filter(Boolean);
+    if (agentIds.length === 1) {
+      match.agent = agentIds[0];
+    } else if (agentIds.length > 1) {
+      match.agent = { $in: agentIds };
+    }
+  }
+
+  if (provider) {
+    const providerNames = String(provider).split(",").filter(Boolean);
+    if (providerNames.length === 1) {
+      match.provider = providerNames[0];
+    } else if (providerNames.length > 1) {
+      match.provider = { $in: providerNames };
+    }
+  }
+
+  if (model) {
+    const modelNames = String(model).split(",").filter(Boolean);
+    if (modelNames.length === 1) {
+      match.model = modelNames[0];
+    } else if (modelNames.length > 1) {
+      match.model = { $in: modelNames };
+    }
+  }
+
+  applyDateRangeFilter(match, from as string, to as string);
+
+  if (workspace) {
+    const [convDocs, agentConvDocs] = await Promise.all([
+      req.db
+        .collection(COLLECTIONS.MODEL_CONVERSATIONS)
+        .find({ workspaceRoot: workspace })
+        .project({ id: 1 })
+        .toArray(),
+      req.db
+        .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+        .find({ workspaceRoot: workspace })
+        .project({ id: 1 })
+        .toArray(),
+    ]);
+    const convIds = convDocs.map((d) => d.id);
+    const agentSessionIds = agentConvDocs.map((d) => d.id);
+    match.$or = [
+      { conversationId: { $in: convIds } },
+      { agentSessionId: { $in: agentSessionIds } },
+      { parentAgentSessionId: { $in: agentSessionIds } },
+    ];
+  }
+
+  return match;
+}
+
 // ─── GET /stats — aggregate stats ─────────────────────
 router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { from, to, project } = req.query;
-      const match: Record<string, unknown> = {};
-      if (project) match.project = project;
-      applyDateRangeFilter(match, from as string, to as string);
+      const match = await buildMatchFilter(req);
+      const { from, to, project, provider, model, workspace } = req.query;
 
       const pipeline: Record<string, unknown>[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
@@ -67,11 +127,20 @@ router.get(
 
       const convMatch: Record<string, unknown> = {};
       if (project) convMatch.project = project;
+      if (workspace) convMatch.workspaceRoot = workspace;
+      if (provider) {
+        const providerNames = String(provider).split(",").filter(Boolean);
+        if (providerNames.length === 1) convMatch.providers = providerNames[0];
+        else if (providerNames.length > 1) convMatch.providers = { $in: providerNames };
+      }
+      if (model) {
+        const modelNames = String(model).split(",").filter(Boolean);
+        if (modelNames.length === 1) convMatch["messages.model"] = modelNames[0];
+        else if (modelNames.length > 1) convMatch["messages.model"] = { $in: modelNames };
+      }
       applyDateRangeFilter(convMatch, from as string, to as string, "createdAt");
 
-      const traceMatch: Record<string, unknown> = { traceId: { $ne: null } };
-      if (project) traceMatch.project = project;
-      applyDateRangeFilter(traceMatch, from as string, to as string);
+      const traceMatch = { ...match, traceId: { $ne: null } };
 
       const traceCountPipeline: Record<string, unknown>[] = [
         { $match: traceMatch },
@@ -122,10 +191,8 @@ router.get(
   "/projects",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { from, to, project } = req.query;
-      const match: Record<string, unknown> = {};
-      if (project) match.project = project;
-      applyDateRangeFilter(match, from as string, to as string);
+      const match = await buildMatchFilter(req);
+      const { from, to, project, provider, model, workspace } = req.query;
 
       const pipeline: Record<string, unknown>[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
@@ -174,12 +241,29 @@ router.get(
         { $project: { _id: 1, workflowCount: { $size: "$workflowIds" } } },
       ];
 
+      const convMatch: Record<string, unknown> = {};
+      if (project) convMatch.project = project;
+      if (workspace) convMatch.workspaceRoot = workspace;
+      if (provider) {
+        const providerNames = String(provider).split(",").filter(Boolean);
+        if (providerNames.length === 1) convMatch.providers = providerNames[0];
+        else if (providerNames.length > 1) convMatch.providers = { $in: providerNames };
+      }
+      if (model) {
+        const modelNames = String(model).split(",").filter(Boolean);
+        if (modelNames.length === 1) convMatch["messages.model"] = modelNames[0];
+        else if (modelNames.length > 1) convMatch["messages.model"] = { $in: modelNames };
+      }
+      applyDateRangeFilter(convMatch, from as string, to as string, "updatedAt");
+
       const convPipeline: Record<string, unknown>[] = [
+        ...(Object.keys(convMatch).length ? [{ $match: convMatch }] : []),
         { $group: { _id: "$project", conversationCount: { $sum: 1 } } },
       ];
 
+      const traceMatch = { ...match, traceId: { $ne: null } };
       const tracePipeline: Record<string, unknown>[] = [
-        { $match: { traceId: { $ne: null } } },
+        { $match: traceMatch },
         { $group: { _id: { project: "$project", traceId: "$traceId" } } },
         { $group: { _id: "$_id.project", traceCount: { $sum: 1 } } },
       ];
@@ -239,7 +323,9 @@ router.get(
   "/users",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const match = await buildMatchFilter(req);
       const pipeline: Record<string, unknown>[] = [
+        ...(Object.keys(match).length ? [{ $match: match }] : []),
         {
           $group: {
             _id: "$username",
@@ -280,10 +366,7 @@ router.get(
   "/models",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { from, to, project } = req.query;
-      const match: Record<string, unknown> = {};
-      if (project) match.project = project;
-      applyDateRangeFilter(match, from as string, to as string);
+      const match = await buildMatchFilter(req);
 
       const pipeline: Record<string, unknown>[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
@@ -395,10 +478,9 @@ router.get(
   "/tools",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { from, to, project, tool } = req.query;
-      const match: Record<string, unknown> = { toolApiNames: { $exists: true, $ne: [] } };
-      if (project) match.project = project;
-      applyDateRangeFilter(match, from as string, to as string);
+      const match = await buildMatchFilter(req);
+      match.toolApiNames = { $exists: true, $ne: [] };
+      const { tool } = req.query;
 
       const pipeline: Record<string, unknown>[] = [
         { $match: match },
@@ -518,9 +600,7 @@ router.get(
   "/endpoints",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { from, to } = req.query;
-      const match: Record<string, unknown> = {};
-      applyDateRangeFilter(match, from as string, to as string);
+      const match = await buildMatchFilter(req);
 
       const pipeline: Record<string, unknown>[] = [
         ...(Object.keys(match).length ? [{ $match: match }] : []),
@@ -566,9 +646,7 @@ router.get(
   "/costs",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { from, to } = req.query;
-      const match: Record<string, unknown> = {};
-      applyDateRangeFilter(match, from as string, to as string);
+      const match = await buildMatchFilter(req);
       const matchStage = Object.keys(match).length ? [{ $match: match }] : [];
 
       const groupFields = {
@@ -956,9 +1034,8 @@ router.get(
       const timeMatch: Record<string, string> = { $gte: sinceDate.toISOString() };
       if (untilDate) timeMatch.$lte = untilDate!.toISOString();
 
-      const matchFilter: Record<string, unknown> = { timestamp: timeMatch };
-      if (project) matchFilter.project = project;
-      if (agent) matchFilter.agent = agent;
+      const matchFilter = await buildMatchFilter(req);
+      matchFilter.timestamp = timeMatch;
 
       const pipeline: Record<string, unknown>[] = [
         { $match: matchFilter },
@@ -1015,10 +1092,8 @@ router.get(
   "/agents",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { from, to, project } = req.query;
-      const match: Record<string, unknown> = { agent: { $exists: true, $ne: null } };
-      if (project) match.project = project;
-      applyDateRangeFilter(match, from as string, to as string);
+      const match = await buildMatchFilter(req);
+      match.agent = { $exists: true, $ne: null };
 
       const pipeline: Record<string, unknown>[] = [
         { $match: match },

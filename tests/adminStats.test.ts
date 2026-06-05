@@ -48,7 +48,7 @@ function runAggregation(documents: any[], pipeline: any[]): any[] {
                 doc[key] = Array.isArray(doc[fieldName]) ? doc[fieldName].length : 0;
               }
             } else if ("$size" in doc && typeof expression === "string") {
-              const fieldName = expression.replace("$", "");
+              const fieldName = (expression as any).replace("$", "");
               doc[key] = Array.isArray(doc[fieldName]) ? doc[fieldName].length : 0;
             }
           }
@@ -259,5 +259,193 @@ describe("GET /admin/stats/tools", () => {
     expect(searchWebData.totalCost).toBeCloseTo(0.03);
     expect(searchWebData.totalInputTokens).toBe(1500);
     expect(searchWebData.totalOutputTokens).toBe(500);
+  });
+
+  describe("GET /admin/stats with advanced filters", () => {
+    let mockRequests: any[] = [];
+    let mockModelConvs: any[] = [];
+    let mockAgentConvs: any[] = [];
+
+    beforeEach(() => {
+      mockRequests = [
+        {
+          requestId: "req-1",
+          conversationId: "conv-1",
+          project: "project-a",
+          agent: "agent-a",
+          provider: "openai",
+          model: "gpt-4o",
+          inputTokens: 100,
+          outputTokens: 50,
+          estimatedCost: 0.01,
+          totalTime: 5,
+          success: true,
+          timestamp: "2026-05-30T10:00:00Z"
+        },
+        {
+          requestId: "req-2",
+          agentSessionId: "session-2",
+          project: "project-b",
+          agent: "agent-b",
+          provider: "anthropic",
+          model: "claude-3",
+          inputTokens: 200,
+          outputTokens: 100,
+          estimatedCost: 0.02,
+          totalTime: 10,
+          success: true,
+          timestamp: "2026-05-30T10:05:00Z"
+        }
+      ];
+
+      mockModelConvs = [
+        { id: "conv-1", workspaceRoot: "/workspace/a" }
+      ];
+
+      mockAgentConvs = [
+        { id: "session-2", workspaceRoot: "/workspace/b" }
+      ];
+
+      const mockDb = {
+        collection: (name: string) => {
+          if (name === "requests") {
+            return {
+              aggregate: (pipeline: any[]) => {
+                return {
+                  toArray: async () => {
+                    const matchStage = pipeline.find(stage => stage.$match)?.$match || {};
+                    let filtered = [...mockRequests];
+                    if (matchStage) {
+                      filtered = filtered.filter(doc => {
+                        if (matchStage.project && doc.project !== matchStage.project) return false;
+                        if (matchStage.agent) {
+                          if (matchStage.agent.$in) {
+                            if (!matchStage.agent.$in.includes(doc.agent)) return false;
+                          } else if (doc.agent !== matchStage.agent) return false;
+                        }
+                        if (matchStage.provider) {
+                          if (matchStage.provider.$in) {
+                            if (!matchStage.provider.$in.includes(doc.provider)) return false;
+                          } else if (doc.provider !== matchStage.provider) return false;
+                        }
+                        if (matchStage.model) {
+                          if (matchStage.model.$in) {
+                            if (!matchStage.model.$in.includes(doc.model)) return false;
+                          } else if (doc.model !== matchStage.model) return false;
+                        }
+                        if (matchStage.$or) {
+                          const orMatch = matchStage.$or.some((clause: any) => {
+                            if (clause.conversationId && clause.conversationId.$in) {
+                              return clause.conversationId.$in.includes(doc.conversationId);
+                            }
+                            if (clause.agentSessionId && clause.agentSessionId.$in) {
+                              return clause.agentSessionId.$in.includes(doc.agentSessionId);
+                            }
+                            return false;
+                          });
+                          if (!orMatch) return false;
+                        }
+                        return true;
+                      });
+                    }
+
+                    const groupStage = pipeline.find(stage => stage.$group)?.$group;
+                    if (groupStage) {
+                      if (groupStage._id === null) {
+                        return [{
+                          totalRequests: filtered.length,
+                          totalInputTokens: filtered.reduce((sum, d) => sum + d.inputTokens, 0),
+                          totalOutputTokens: filtered.reduce((sum, d) => sum + d.outputTokens, 0),
+                          totalCost: filtered.reduce((sum, d) => sum + d.estimatedCost, 0),
+                          avgLatency: filtered.length ? filtered.reduce((sum, d) => sum + d.totalTime, 0) / filtered.length : 0,
+                          successCount: filtered.filter(d => d.success).length,
+                          errorCount: filtered.filter(d => !d.success).length,
+                        }];
+                      }
+                    }
+                    return filtered;
+                  }
+                };
+              },
+              countDocuments: async () => mockRequests.length
+            };
+          } else if (name === "model_conversations") {
+            return {
+              find: (query: any) => {
+                const filtered = mockModelConvs.filter(c => c.workspaceRoot === query.workspaceRoot);
+                return {
+                  project: () => ({
+                    toArray: async () => filtered
+                  })
+                };
+              },
+              countDocuments: async (query: any) => {
+                let filtered = [...mockModelConvs];
+                if (query.project) filtered = filtered.filter(c => c.project === query.project);
+                if (query.workspaceRoot) filtered = filtered.filter(c => c.workspaceRoot === query.workspaceRoot);
+                return filtered.length;
+              }
+            };
+          } else if (name === "agent_conversations") {
+            return {
+              find: (query: any) => {
+                const filtered = mockAgentConvs.filter(c => c.workspaceRoot === query.workspaceRoot);
+                return {
+                  project: () => ({
+                    toArray: async () => filtered
+                  })
+                };
+              },
+              countDocuments: async (query: any) => {
+                let filtered = [...mockAgentConvs];
+                if (query.project) filtered = filtered.filter(c => c.project === query.project);
+                if (query.workspaceRoot) filtered = filtered.filter(c => c.workspaceRoot === query.workspaceRoot);
+                return filtered.length;
+              }
+            };
+          }
+          return {
+            find: () => ({ toArray: async () => [] }),
+            countDocuments: async () => 0
+          };
+        }
+      };
+
+      vi.mocked(MongoWrapper.getDb).mockReturnValue(mockDb as any);
+    });
+
+    it("filters stats by provider and model", async () => {
+      const resOpenai = await request(app)
+        .get("/admin/stats?provider=openai")
+        .set("x-gateway-secret", "test-secret")
+        .expect(200);
+      expect(resOpenai.body.totalRequests).toBe(1);
+
+      const resAnthropic = await request(app)
+        .get("/admin/stats?provider=anthropic")
+        .set("x-gateway-secret", "test-secret")
+        .expect(200);
+      expect(resAnthropic.body.totalRequests).toBe(1);
+
+      const resGpt = await request(app)
+        .get("/admin/stats?model=gpt-4o")
+        .set("x-gateway-secret", "test-secret")
+        .expect(200);
+      expect(resGpt.body.totalRequests).toBe(1);
+    });
+
+    it("filters stats by workspace", async () => {
+      const resWorkspaceA = await request(app)
+        .get("/admin/stats?workspace=%2Fworkspace%2Fa")
+        .set("x-gateway-secret", "test-secret")
+        .expect(200);
+      expect(resWorkspaceA.body.totalRequests).toBe(1);
+
+      const resWorkspaceB = await request(app)
+        .get("/admin/stats?workspace=%2Fworkspace%2Fb")
+        .set("x-gateway-secret", "test-secret")
+        .expect(200);
+      expect(resWorkspaceB.body.totalRequests).toBe(1);
+    });
   });
 });
