@@ -87,6 +87,7 @@ export async function processToolResultMedia(
         id: toolCall.id,
         responsesItemId: toolCall.responsesItemId,
         result: resultObject,
+        durationMs: toolResult?.durationMs,
       },
       status: hasError ? "error" : "done",
     });
