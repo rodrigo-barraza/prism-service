@@ -171,7 +171,7 @@ function handleWsVoice(
   project: string,
   username: string,
   clientIp: string,
-  agent: string | null,
+  _agent: string | null,
 ) {
   ws.on("message", async (rawData: Buffer | string) => {
     let data: Record<string, unknown>;

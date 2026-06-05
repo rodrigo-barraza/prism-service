@@ -21,6 +21,7 @@ vi.mock('../config.ts', () => ({
     TOOLS_SERVICE_URL: 'http://localhost:5590',
     MONGO_URI: 'mongodb://test:test@localhost:27017/?directConnection=true&replicaSet=rs0&authSource=admin',
     MONGO_DB_NAME: 'prism-test',
+    LIVE_AUDIO_MODEL: 'gemini-2.0-flash-live-001',
 }));
 
 // ── Mock global fetch for tools-api ───────────────────────────────────
