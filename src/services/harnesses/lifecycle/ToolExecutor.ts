@@ -46,15 +46,18 @@ export async function executeToolBatch(
 
       const customDefinition = tools.customToolMap.get(toolCall.name);
       if (customDefinition) {
+        const startTime = Date.now();
         const result = await ToolOrchestratorService.executeCustomTool(
           customDefinition,
           toolCall.args as Record<string, unknown>,
         );
+        const durationMs = Date.now() - startTime;
         await hooks.run("afterToolCall", toolCall, result, context);
-        return { name: toolCall.name, id: toolCall.id, result };
+        return { name: toolCall.name, id: toolCall.id, result, durationMs };
       }
 
       if (ToolOrchestratorService.isStreamable(toolCall.name)) {
+        const startTime = Date.now();
         const result = await ToolOrchestratorService.executeToolStreaming(
           toolCall.name,
           toolCall.args as Record<string, unknown>,
@@ -80,10 +83,12 @@ export async function executeToolBatch(
             _toolState: ToolContext.getStore(agentSessionId),
           },
         );
+        const durationMs = Date.now() - startTime;
         await hooks.run("afterToolCall", toolCall, result, context);
-        return { name: toolCall.name, id: toolCall.id, result };
+        return { name: toolCall.name, id: toolCall.id, result, durationMs };
       }
 
+      const startTime = Date.now();
       const result = await ToolOrchestratorService.executeTool(
         toolCall.name,
         toolCall.args as Record<string, unknown>,
@@ -109,8 +114,9 @@ export async function executeToolBatch(
           enabledTools: tools.finalTools.map((toolSchema) => toolSchema.name),
         },
       );
+      const durationMs = Date.now() - startTime;
       await hooks.run("afterToolCall", toolCall, result, context);
-      return { name: toolCall.name, id: toolCall.id, result };
+      return { name: toolCall.name, id: toolCall.id, result, durationMs };
     }),
   );
 

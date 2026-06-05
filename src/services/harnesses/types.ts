@@ -48,12 +48,14 @@ export interface ToolCall {
   _approval?: { tier: string; tierLabel: string };
   result?: unknown;
   status?: string;
+  durationMs?: number;
 }
 
 export interface ToolResult {
   name: string;
   id: string | null;
   result: unknown;
+  durationMs?: number;
 }
 
 export interface ResolvedTools {
