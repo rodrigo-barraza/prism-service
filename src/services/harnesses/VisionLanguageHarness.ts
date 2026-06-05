@@ -402,6 +402,7 @@ Use these images to observe the environment, notice changes, animations, or user
                 name: toolCall.name,
                 args: toolCall.args,
                 result: matchingResult ? matchingResult.result : null,
+                durationMs: matchingResult?.durationMs,
               };
             }),
           });
@@ -466,6 +467,7 @@ Use these images to observe the environment, notice changes, animations, or user
               thoughtSignature: toolCall.thoughtSignature || undefined,
               reasoningItem: toolCall.reasoningItem || undefined,
               result: matchingResult ? matchingResult.result : null,
+              durationMs: matchingResult?.durationMs,
             };
           }),
         };
