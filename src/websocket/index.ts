@@ -604,6 +604,15 @@ function handleWsLive(
                           result = await ToolOrchestratorService.executeTool(
                             toolCall.name,
                             toolCall.args,
+                            {
+                              project,
+                              username,
+                              agent: agent || null,
+                              conversationId: activeConversationId || null,
+                              clientIp: _clientIp || null,
+                              _providerName: "google",
+                              _resolvedModel: activeModel,
+                            },
                           ) as Record<string, unknown>;
                         }
                         return { id: toolCall.id, name: toolCall.name, result };
