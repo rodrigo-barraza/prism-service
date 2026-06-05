@@ -41,6 +41,7 @@ export interface ToolCallPayload {
   id?: string | null;
   args?: Record<string, unknown> | string;
   thoughtSignature?: string;
+  durationMs?: number;
 }
 
 export interface MessagePayload {

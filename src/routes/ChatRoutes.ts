@@ -967,14 +967,17 @@ async function handleStreamingText(context: GenerationContext) {
         args: toolCall.args,
         status: "calling",
       });
+      const startTime = Date.now();
       try {
         const result = await ToolOrchestratorService.executeTool(
           toolCall.name as string,
           toolCall.args as Record<string, unknown>,
           { project, username },
         );
+        const durationMs = Date.now() - startTime;
         toolCall.result = result;
         toolCall.status = (result && typeof result === "object" && "error" in result && result.error) ? "error" : "done";
+        toolCall.durationMs = durationMs;
         emit({
           type: SSE_EVENT_TYPES.TOOL_CALL,
           id: toolCall.id,
@@ -982,10 +985,13 @@ async function handleStreamingText(context: GenerationContext) {
           args: toolCall.args,
           result,
           status: toolCall.status,
+          durationMs,
         });
       } catch (error: unknown) {
+        const durationMs = Date.now() - startTime;
         toolCall.result = { error: getErrorMessage(error) };
         toolCall.status = "error";
+        toolCall.durationMs = durationMs;
         emit({
           type: SSE_EVENT_TYPES.TOOL_CALL,
           id: toolCall.id,
@@ -993,6 +999,7 @@ async function handleStreamingText(context: GenerationContext) {
           args: toolCall.args,
           result: toolCall.result,
           status: "error",
+          durationMs,
         });
       }
     }
@@ -1099,6 +1106,7 @@ async function handleStreamingText(context: GenerationContext) {
       id: toolCall.id,
       args: toolCall.args as Record<string, unknown>,
       ...(toolCall.thoughtSignature ? { thoughtSignature: toolCall.thoughtSignature } : {}),
+      durationMs: toolCall.durationMs,
     })),
     audioChunks: streamState.audioChunks,
     audioSampleRate: streamState.audioSampleRate,
@@ -1229,6 +1237,7 @@ async function handleNonStreamingText(context: GenerationContext) {
         name: toolCall.name,
         args: toolCall.args || {},
         thoughtSignature: toolCall.thoughtSignature || undefined,
+        durationMs: toolCall.durationMs as number | undefined,
       })) || [],
     audioChunks: [],
     audioSampleRate: 24000,
