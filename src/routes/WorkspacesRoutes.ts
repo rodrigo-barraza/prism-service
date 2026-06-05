@@ -40,17 +40,40 @@ router.get(
       // Refresh from tools-api to pick up agent-registered roots
       await ToolOrchestratorService.refreshWorkspaceRoots();
 
-      const roots = ToolOrchestratorService.getWorkspaceRoots() as string[];
-      const staticRoots = ToolOrchestratorService.getStaticRoots() as string[];
+      const workspaceRoots = ToolOrchestratorService.getWorkspaceRoots() as string[];
+      const staticWorkspaceRoots = ToolOrchestratorService.getStaticRoots() as string[];
 
-      const workspaces = roots.map((rootPath: string) => ({
+      let connectedAgents: WorkspaceAgent[] = [];
+      try {
+        const configApiResponse = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
+          signal: AbortSignal.timeout(3000),
+        });
+        if (configApiResponse.ok) {
+          const workspaceConfig = (await configApiResponse.json()) as WorkspaceConfig;
+          connectedAgents = workspaceConfig.agents || [];
+        }
+      } catch (error: unknown) {
+        logger.warn(
+          `GET /workspaces agent fetch failed: ${getErrorMessage(error)}`,
+        );
+      }
+
+      const agentServedRoots = new Set<string>();
+      for (const agent of connectedAgents) {
+        for (const root of agent.roots || []) {
+          agentServedRoots.add(root);
+        }
+      }
+
+      const mappedWorkspaces = workspaceRoots.map((rootPath: string) => ({
         id: rootPath,
         name: basename(rootPath),
         path: rootPath,
-        isPinned: staticRoots.includes(rootPath),
+        isPinned: staticWorkspaceRoots.includes(rootPath),
+        isAgentServed: agentServedRoots.has(rootPath),
       }));
 
-      res.json(workspaces);
+      res.json(mappedWorkspaces);
     } catch (error: unknown) {
       logger.error(`GET /workspaces error: ${getErrorMessage(error)}`);
       res.status(500).json({ error: "Failed to retrieve workspace roots" });
