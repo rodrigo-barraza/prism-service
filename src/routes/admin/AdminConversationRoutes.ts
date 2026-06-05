@@ -40,6 +40,7 @@ router.get(
         order = "desc",
         agent,
         type,
+        workspace,
       } = req.query;
 
       const { skip, limit, sortDirection } = parsePaginationParams(req.query);
@@ -48,6 +49,7 @@ router.get(
       if (trace) filter.traceId = trace;
       if (project) filter.project = project;
       if (username) filter.username = username;
+      if (workspace) filter.workspaceRoot = workspace;
 
       if (search) {
         const regex = { $regex: search, $options: "i" };

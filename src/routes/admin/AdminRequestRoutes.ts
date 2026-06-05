@@ -33,6 +33,7 @@ router.get(
         from,
         to,
         sort = "timestamp",
+        workspace,
       } = req.query;
 
       const { skip, limit, page, sortDirection } = parsePaginationParams(req.query);
@@ -41,6 +42,28 @@ router.get(
       if (project) filter.project = project;
       if (username) filter.username = username;
       if (model) filter.model = model;
+
+      if (workspace) {
+        const [convDocs, agentConvDocs] = await Promise.all([
+          req.db
+            .collection(COLLECTIONS.MODEL_CONVERSATIONS)
+            .find({ workspaceRoot: workspace })
+            .project({ id: 1 })
+            .toArray(),
+          req.db
+            .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+            .find({ workspaceRoot: workspace })
+            .project({ id: 1 })
+            .toArray(),
+        ]);
+        const convIds = convDocs.map((d) => d.id);
+        const agentSessionIds = agentConvDocs.map((d) => d.id);
+        filter.$or = [
+          { conversationId: { $in: convIds } },
+          { agentSessionId: { $in: agentSessionIds } },
+          { parentAgentSessionId: { $in: agentSessionIds } },
+        ];
+      }
 
       const applyCommaSeparatedFilter = (key: string, value: unknown) => {
         if (!value) return;
