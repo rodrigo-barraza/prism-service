@@ -892,8 +892,12 @@ async function handleStreamingText(context: GenerationContext) {
     messages,
     options,
     conversationId,
+    traceId,
     project,
     username,
+    clientIp,
+    agent,
+    requestId,
     requestStart,
     emit,
     signal,
@@ -972,7 +976,18 @@ async function handleStreamingText(context: GenerationContext) {
         const result = await ToolOrchestratorService.executeTool(
           toolCall.name as string,
           toolCall.args as Record<string, unknown>,
-          { project, username },
+          {
+            project,
+            username,
+            agent: agent || null,
+            requestId,
+            conversationId: conversationId || null,
+            traceId: traceId || null,
+            clientIp: clientIp || null,
+            iteration: fcIteration,
+            _providerName: providerName,
+            _resolvedModel: resolvedModel,
+          },
         );
         const durationMs = Date.now() - startTime;
         toolCall.result = result;
