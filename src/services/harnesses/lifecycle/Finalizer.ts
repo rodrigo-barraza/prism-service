@@ -333,7 +333,12 @@ function swapMessageContent(message: MessagePayload) {
   // DB fetch sees the complete conversation. Previously, `done` fired first
   // and `appendAndFinalize` was fire-and-forget, causing a race condition
   // where the client fetched stale data from MongoDB.
-  if (conversationId) {
+  //
+  // Workers share the parent's conversationId for telemetry correlation but
+  // must NOT persist their messages into the parent conversation document —
+  // their output is returned via the create_team tool call result instead.
+  const isWorkerSession = !!parentAgentSessionId;
+  if (conversationId && !isWorkerSession) {
     let messagesToAppend: MessagePayload[] = [];
     if (overrideMessagesToAppend) {
             messagesToAppend = [...overrideMessagesToAppend];
