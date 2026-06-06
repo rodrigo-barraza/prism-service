@@ -187,6 +187,7 @@ export interface AgenticContext {
   messages: ConversationMessage[];
   agentSessionId: string;
   parentAgentSessionId?: string | null;
+  parentConversationId?: string | null;
   traceId?: string | null;
   provider: LLMProvider;
   providerName: string;

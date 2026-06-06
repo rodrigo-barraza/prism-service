@@ -29,6 +29,7 @@ export interface FinalizerContext {
   conversationId: string | null;
   agentSessionId: string | null;
   parentAgentSessionId?: string | null;
+  parentConversationId?: string | null;
   userMessage?: MessagePayload | null;
   conversationMeta?: Record<string, unknown> | null;
   traceId?: string | null;
@@ -120,6 +121,7 @@ export async function finalizeTextGeneration(
     conversationId,
     agentSessionId,
     parentAgentSessionId,
+    parentConversationId,
     userMessage,
     conversationMeta,
     traceId,
@@ -337,8 +339,7 @@ function swapMessageContent(message: MessagePayload) {
   // Workers share the parent's conversationId for telemetry correlation but
   // must NOT persist their messages into the parent conversation document —
   // their output is returned via the create_team tool call result instead.
-  const isWorkerSession = !!parentAgentSessionId;
-  if (conversationId && !isWorkerSession) {
+  if (conversationId) {
     let messagesToAppend: MessagePayload[] = [];
     if (overrideMessagesToAppend) {
             messagesToAppend = [...overrideMessagesToAppend];
@@ -480,6 +481,10 @@ function swapMessageContent(message: MessagePayload) {
 
     if (parentAgentSessionId) {
       finalMeta.parentAgentSessionId = parentAgentSessionId;
+      finalMeta.isWorker = true;
+    }
+    if (parentConversationId) {
+      finalMeta.parentConversationId = parentConversationId;
     }
     if (workspaceRoot) {
       finalMeta.workspaceRoot = workspaceRoot;
