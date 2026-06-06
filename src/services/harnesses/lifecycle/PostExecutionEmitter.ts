@@ -3,8 +3,9 @@ import { TOOL_NAMES } from "../../ToolTaxonomyConstants.ts";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
-import type { ToolCall, ToolResult, PassState, EmitFunction } from "../types.ts";
+import type { ToolCall, ToolResult, PassState, EmitFunction, AgenticContext } from "../types.ts";
 import FileService from "../../FileService.ts";
+import WebhookEventBus from "../../WebhookEventBus.ts";
 
 /**
  * PostExecutionEmitter — status notifications emitted after tool execution.
@@ -55,6 +56,7 @@ export async function processToolResultMedia(
   state: AgenticLoopState,
   pass: PassState,
   emit: EmitFunction,
+  context?: AgenticContext,
 ): Promise<void> {
   for (const toolCall of toolCalls) {
     const toolResult = results.find(
@@ -90,6 +92,22 @@ export async function processToolResultMedia(
         durationMs: toolResult?.durationMs,
       },
       status: hasError ? "error" : "done",
+    });
+
+    WebhookEventBus.emit("request.tool_call.completed", {
+      requestId: context?.requestId || null,
+      toolName: toolCall.name,
+      toolCallId: toolCall.id,
+      toolResult: resultObject,
+      durationMs: toolResult?.durationMs || null,
+      status: hasError ? "error" : "done",
+      agent: context?.agent || null,
+      conversationId: context?.conversationId || null,
+      agentSessionId: context?.agentSessionId || null,
+      project: context?.project || null,
+      username: context?.username || null,
+      provider: context?.providerName || null,
+      model: context?.resolvedModel || null,
     });
 
     if (resultObject?.screenshotRef) {

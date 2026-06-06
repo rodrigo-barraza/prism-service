@@ -336,6 +336,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           state,
           pass,
           emit,
+          context,
         );
 
         trackToolErrors(

@@ -250,6 +250,7 @@ const { default: chatRouter } = await import('../src/routes/ChatRoutes.ts');
 const { default: audioRouter } = await import('../src/routes/AudioRoutes.ts');
 const { default: embedRouter } = await import('../src/routes/EmbedRoutes.ts');
 const { default: configRouter } = await import('../src/routes/ConfigRoutes.ts');
+const { default: webhookRouter } = await import('../src/routes/WebhookRoutes.ts');
 
 export const app = express();
 app.use(cors());
@@ -266,6 +267,7 @@ app.get('/', (_req, res) => {
                 '/chat',
                 '/audio',
                 '/embed',
+                '/webhooks',
             ],
             websocket: ['/ws/chat', '/ws/text-to-audio'],
         },
@@ -277,6 +279,7 @@ app.use('/config', configRouter);
 app.use('/chat', chatRouter);
 app.use('/text-to-audio', audioRouter);
 app.use('/embed', embedRouter);
+app.use('/webhooks', webhookRouter);
 app.use(errorHandler);
 
 // ── Helpers ───────────────────────────────────────────────────
