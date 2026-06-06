@@ -231,10 +231,14 @@ vi.mock("../src/utils/logger.ts", () => ({
 
 // ── Mock constants ───────────────────────────────────────────────────
 
-vi.mock("../src/constants.ts", () => ({
-  DIRECTORY_CACHE_TTL_MS: 60_000,
-  DIRECTORY_FETCH_TIMEOUT_MS: 5_000,
-}));
+vi.mock("../src/constants.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/constants.ts")>();
+  return {
+    ...actual,
+    DIRECTORY_CACHE_TTL_MS: 60_000,
+    DIRECTORY_FETCH_TIMEOUT_MS: 5_000,
+  };
+});
 
 // ── Mock fetch for directory tree ────────────────────────────────────
 
@@ -250,7 +254,9 @@ global.fetch = vi.fn().mockImplementation(async (url) => {
   if (originalFetch) {
     try {
       return await originalFetch(url);
-    } catch {}
+    } catch {
+      // Ignore network errors on originalFetch fallbacks
+    }
   }
   return { ok: false, json: async () => ({ error: "Not mocked" }) } as any;
 });
