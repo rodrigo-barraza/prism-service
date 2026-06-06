@@ -87,6 +87,7 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
     executeTool: vi.fn(),
     getWorkspaceRoot: vi.fn().mockReturnValue("/home/rodrigo/development"),
     isStreamable: vi.fn().mockReturnValue(false),
+    getToolEmoji: vi.fn().mockReturnValue(null),
   },
 }));
 
