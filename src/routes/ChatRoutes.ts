@@ -194,7 +194,7 @@ async function prepareGenerationContext(
     autoApprove,
     planFirst,
     maxIterations,
-    maxWorkerIterations,
+    maxSubAgentIterations,
     agentContext,
     // Multi-workspace: user-selected workspace root path (absolute fs path).
     workspaceRoot,
@@ -248,7 +248,7 @@ async function prepareGenerationContext(
     ...(autoApprove != null && { autoApprove }),
     ...(planFirst != null && { planFirst }),
     ...(maxIterations != null && { maxIterations }),
-    ...(maxWorkerIterations != null && { maxWorkerIterations }),
+    ...(maxSubAgentIterations != null && { maxSubAgentIterations }),
     ...(agentContext != null && { agentContext }),
     ...(enableCriticGate != null && { enableCriticGate }),
     ...(criticModel != null && { criticModel }),
@@ -311,7 +311,7 @@ async function prepareGenerationContext(
   // When the caller sends a base provider type (e.g. "lm-studio") and
   // multiple instances are registered, verify the model is available on
   // each instance (with quant-level fallback) and pick the least-busy
-  // usable instance. Same model resolution logic as CoordinatorService.
+  // usable instance. Same model resolution logic as OrchestratorService.
   let resolvedModel =
     requestedModel || getDefaultModels(TYPES.TEXT, TYPES.TEXT)[providerName as string];
   if (localModelQueue.isLocal(providerName)) {
@@ -668,14 +668,14 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
         logger.info(`[agent] 🔓 Released local GPU lock for ${resolvedModel}`);
       }
       // When the SSE connection is severed (user pressed stop), abort any
-      // spawned workers that are still running under this coordinator session.
+      // spawned sub-agents that are still running under this orchestrator session.
       if (signal?.aborted) {
         try {
-          const { default: CoordinatorService } =
-            await import("../services/CoordinatorService.js");
-          await CoordinatorService.abortWorkersByConversation(conversationId);
+          const { default: OrchestratorService } =
+            await import("../services/OrchestratorService.js");
+          await OrchestratorService.abortSubAgentsByConversation(conversationId);
         } catch (cleanupError: unknown) {
-                    logger.warn(`[agent] Worker cleanup failed: ${getErrorMessage(cleanupError)}`);
+                    logger.warn(`[agent] Sub-agent cleanup failed: ${getErrorMessage(cleanupError)}`);
         }
       }
     }

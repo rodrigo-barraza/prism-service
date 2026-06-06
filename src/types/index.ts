@@ -77,18 +77,18 @@ export type {
 } from "./memory.ts";
 
 export type {
-  WorkerState,
+  SubAgentState,
   WorktreeDiff,
-  WorkerResult,
+  SubAgentResult,
   InstanceInfo,
   InstanceAssignment,
-  CoordinatorSpawnParams,
-  CoordinatorContext,
+  OrchestratorSpawnParams,
+  OrchestratorContext,
   ToolsApiResponse,
   TeamEntry,
   TeamMember,
   TeamMemberResult,
-} from "./coordinator.ts";
+} from "./orchestrator.ts";
 
 
 export type {

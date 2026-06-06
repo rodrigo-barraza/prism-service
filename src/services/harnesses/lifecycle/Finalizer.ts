@@ -336,7 +336,7 @@ function swapMessageContent(message: MessagePayload) {
   // and `appendAndFinalize` was fire-and-forget, causing a race condition
   // where the client fetched stale data from MongoDB.
   //
-  // Workers share the parent's conversationId for telemetry correlation but
+  // Sub-agents share the parent's conversationId for telemetry correlation but
   // must NOT persist their messages into the parent conversation document —
   // their output is returned via the create_team tool call result instead.
   if (conversationId) {

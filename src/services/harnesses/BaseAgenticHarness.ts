@@ -37,10 +37,10 @@ import type {
 } from "./types.ts";
 
 /**
- * Snapshot of a coordinator worker for persistence.
- * Captures the essential identifiers and metadata for each spawned worker.
+ * Snapshot of an orchestrator sub-agent for persistence.
+ * Captures the essential identifiers and metadata for each spawned sub-agent.
  */
-interface WorkerSnapshot {
+interface SubAgentSnapshot {
   agentId: string;
   [key: string]: unknown;
 }
@@ -239,7 +239,7 @@ export default class BaseAgenticHarness {
     SessionGenerationTracker.register(this.trackerSessionId, passRequestId, {
       provider: providerName,
       model: resolvedModel,
-      source: parentAgentSessionId ? "worker" : "orchestrator",
+      source: parentAgentSessionId ? "sub-agent" : "orchestrator",
       workerId: parentAgentSessionId ? agentSessionId : null,
     });
   }
@@ -648,7 +648,7 @@ export default class BaseAgenticHarness {
 
   /**
    * Shared finalization logic — cost calculation, persistence,
-   * done event, worker snapshot persistence, and afterResponse hooks.
+   * done event, sub-agent snapshot persistence, and afterResponse hooks.
    *
    * Lifted from ReActHarness so all harnesses share the same
    * finalization path without copy-paste.
@@ -724,51 +724,52 @@ export default class BaseAgenticHarness {
       newTurnMessages as MessagePayload[],
     );
 
-    // Persist worker snapshots for coordinator sessions
+    // Persist sub-agent snapshots for orchestrator sessions
     if (
       // TODO(cleanup): Remove "team_create" once historical sessions have aged out
       state.streamedToolCalls.some((toolCall) => toolCall.name === "create_team" || toolCall.name === "team_create") &&
       conversationId
     ) {
       try {
-        const { default: CoordinatorService } =
-          await import("../CoordinatorService.js");
-        const activeWorkersList = CoordinatorService.listWorkers({
+        const { default: OrchestratorService } =
+          await import("../OrchestratorService.js");
+        const activeSubAgentsList = OrchestratorService.listSubAgents({
           parentConversationId: conversationId,
         });
-        if (activeWorkersList.length > 0) {
+        if (activeSubAgentsList.length > 0) {
           const collection = MongoWrapper.getCollection(
             MONGO_DB_NAME,
             COLLECTIONS.AGENT_CONVERSATIONS,
           );
           const agentSessionDocument = await collection.findOne(
             { id: conversationId, project, username },
-            { projection: { workers: 1 } },
+            { projection: { workers: 1, subAgents: 1 } },
           );
-          const existingWorkersList = (agentSessionDocument && agentSessionDocument.workers) || [];
-          const mergedWorkersMap = new Map<string, WorkerSnapshot>();
-          for (const worker of existingWorkersList) {
-            mergedWorkersMap.set(worker.agentId, worker);
+          // Read from both old "workers" field and new "subAgents" field for backward compatibility
+          const existingSubAgentsList = (agentSessionDocument && (agentSessionDocument.subAgents || agentSessionDocument.workers)) || [];
+          const mergedSubAgentsMap = new Map<string, SubAgentSnapshot>();
+          for (const subAgent of existingSubAgentsList) {
+            mergedSubAgentsMap.set(subAgent.agentId, subAgent);
           }
-          for (const worker of activeWorkersList) {
-            mergedWorkersMap.set(worker.agentId, worker);
+          for (const subAgent of activeSubAgentsList) {
+            mergedSubAgentsMap.set(subAgent.agentId, subAgent);
           }
-          const finalWorkersList = Array.from(mergedWorkersMap.values());
+          const finalSubAgentsList = Array.from(mergedSubAgentsMap.values());
           await collection.updateOne(
             { id: conversationId, project, username },
             {
               $set: {
-                workers: finalWorkersList,
-                workersUpdatedAt: new Date().toISOString(),
+                subAgents: finalSubAgentsList,
+                subAgentsUpdatedAt: new Date().toISOString(),
               },
             },
           );
           logger.info(
-            `[AgenticLoop] Persisted ${finalWorkersList.length} worker(s) to conversation ${conversationId}`,
+            `[AgenticLoop] Persisted ${finalSubAgentsList.length} sub-agent(s) to conversation ${conversationId}`,
           );
         }
       } catch (error: unknown) {
-        logger.error(`[AgenticLoop] Failed to persist workers: ${errorMessage(error)}`);
+        logger.error(`[AgenticLoop] Failed to persist sub-agents: ${errorMessage(error)}`);
       }
     }
 

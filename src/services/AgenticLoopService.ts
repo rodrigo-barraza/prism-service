@@ -84,18 +84,18 @@ export default class AgenticLoopService {
       pendingQuestions.delete(conversationId);
 
       // Always clean up per-session tracker entries to prevent memory leaks —
-      // worker sessions have their own agentSessionId that must be released.
+      // sub-agent sessions have their own agentSessionId that must be released.
       SessionGenerationTracker.cleanup(agentSessionId);
 
-      // Only clean up coordinator state for root sessions — workers are
-      // cleaned by the parent session's CoordinatorService.cleanupSession().
+      // Only clean up orchestrator state for root sessions — sub-agents are
+      // cleaned by the parent session's OrchestratorService.cleanupSession().
       if (!parentAgentSessionId) {
         try {
-          const { default: CoordinatorService } =
-            await import("./CoordinatorService.js");
-          CoordinatorService.cleanupSession(agentSessionId);
+          const { default: OrchestratorService } =
+            await import("./OrchestratorService.js");
+          OrchestratorService.cleanupSession(agentSessionId);
         } catch {
-          /* CoordinatorService may not be used */
+          /* OrchestratorService may not be used */
         }
       }
     }

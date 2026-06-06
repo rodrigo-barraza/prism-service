@@ -8,7 +8,7 @@
 //
 // Each active LLM request registers itself here with timing and
 // token data. The aggregate session tok/s is computed on demand
-// from all active requests — covering the coordinator, workers,
+// from all active requests — covering the orchestrator, sub-agents,
 // and tool sub-requests (e.g. generate_image → Prism /chat).
 //
 // Tracked metrics per request:
@@ -336,7 +336,7 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
     const avgTtft = allTtftCount > 0 ? allTtftSum / allTtftCount : null;
 
     // Tok/s: aggregate throughput across all active requests (sum, not average).
-    // When multiple workers generate in parallel, the session-level rate
+    // When multiple sub-agents generate in parallel, the session-level rate
     // reflects total tokens/sec being produced across the entire session.
     let tokPerSec: number | null = null;
     if (generatingCount > 0) {

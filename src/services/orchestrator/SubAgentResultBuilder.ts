@@ -1,4 +1,4 @@
-import type { WorkerResult, WorkerState } from "../../types/coordinator.ts";
+import type { SubAgentResult, SubAgentState } from "../../types/orchestrator.ts";
 import type { ConversationMessage } from "../harnesses/types.ts";
 
 /**
@@ -28,54 +28,54 @@ export function estimateTokens(characterCount: number): number {
   return Math.ceil(characterCount / 4);
 }
 
-export function buildWorkerResult(worker: WorkerState): WorkerResult {
-  const status = worker.status === "complete" ? "completed" : worker.status;
+export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
+  const status = subAgent.status === "complete" ? "completed" : subAgent.status;
   const summary =
     status === "completed"
-      ? `Agent "${worker.description}" completed`
+      ? `Agent "${subAgent.description}" completed`
       : status === "failed"
-        ? `Agent "${worker.description}" failed: ${worker.error || "Unknown error"}`
-        : `Agent "${worker.description}" was stopped`;
+        ? `Agent "${subAgent.description}" failed: ${subAgent.error || "Unknown error"}`
+        : `Agent "${subAgent.description}" was stopped`;
 
-  // worker.output is set during _runWorkerLoop from getLastAssistantText()
+  // subAgent.output is set during _runSubAgentLoop from getLastAssistantText()
   // on the live messages array, then falls back to telemetry.output (streamed
-  // chunks). worker.messages is nulled after the loop to release memory, so
-  // we use worker.output directly as the primary text source.
-  const lastText = (worker.output || "").trim() || getLastAssistantText(worker.messages || []);
+  // chunks). subAgent.messages is nulled after the loop to release memory, so
+  // we use subAgent.output directly as the primary text source.
+  const lastText = (subAgent.output || "").trim() || getLastAssistantText(subAgent.messages || []);
 
   // Aggregate tool call names into { name: count } for frontend badge display
   const toolNames: Record<string, number> = {};
-  if (worker.toolCalls?.length) {
-    for (const toolCall of worker.toolCalls) {
+  if (subAgent.toolCalls?.length) {
+    for (const toolCall of subAgent.toolCalls) {
       const name = toolCall.name || "unknown";
       toolNames[name] = (toolNames[name] || 0) + 1;
     }
   }
 
-  const result: WorkerResult = {
-    agent_id: worker.agentId,
-    description: worker.description,
+  const result: SubAgentResult = {
+    agent_id: subAgent.agentId,
+    description: subAgent.description,
     status,
     summary,
     result: lastText || null,
-    toolUses: worker.toolCalls?.length || 0,
+    toolUses: subAgent.toolCalls?.length || 0,
     toolNames: Object.keys(toolNames).length > 0 ? toolNames : undefined,
-    iterations: worker.iterations || 0,
-    durationMs: worker.durationMs || 0,
+    iterations: subAgent.iterations || 0,
+    durationMs: subAgent.durationMs || 0,
     // Include full conversation for frontend MessageList rendering.
     // Strip system messages — they're large and not useful for display.
-    messages: (worker.messages || []).filter((message) => message.role !== "system"),
+    messages: (subAgent.messages || []).filter((message) => message.role !== "system"),
   };
 
-  if (worker.diff?.hasChanges) {
+  if (subAgent.diff?.hasChanges) {
     result.diff = {
-      additions: worker.diff.additions || 0,
-      deletions: worker.diff.deletions || 0,
-      files: worker.diff.files || [],
+      additions: subAgent.diff.additions || 0,
+      deletions: subAgent.diff.deletions || 0,
+      files: subAgent.diff.files || [],
     };
   }
 
-  if (worker.error) result.error = worker.error;
+  if (subAgent.error) result.error = subAgent.error;
 
   return result;
 }

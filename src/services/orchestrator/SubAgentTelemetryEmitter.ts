@@ -1,30 +1,30 @@
-// ─── Worker Telemetry Emitter ────────────────────────────────
-// Encapsulates all worker SSE telemetry: burst token counting,
+// ─── Sub-Agent Telemetry Emitter ─────────────────────────────
+// Encapsulates all sub-agent SSE telemetry: burst token counting,
 // phase transitions, HWM aggregate progress, and event routing.
-// Extracted from CoordinatorService._runWorkerLoop()
+// Extracted from OrchestratorService._runSubAgentLoop()
 
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
-import { estimateTokens } from "./WorkerResultBuilder.ts";
+import { estimateTokens } from "./SubAgentResultBuilder.ts";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { EmitFunction } from "../harnesses/types.ts";
 
-interface WorkerTelemetryConfig {
-  workerId: string;
-  workerDescription: string;
+interface SubAgentTelemetryConfig {
+  subAgentId: string;
+  subAgentDescription: string;
   parentEmit: EmitFunction | null | undefined;
   parentSessionId: string | null | undefined;
 }
 
 /**
- * Manages per-worker SSE telemetry for the Coordinator.
+ * Manages per-sub-agent SSE telemetry for the Orchestrator.
  *
  * Tracks burst-scoped token counters, phase transitions
  * (thinking ↔ generating), high-water-mark aggregate progress,
  * and forwards namespaced events to the parent SSE stream.
  */
-export class WorkerTelemetryEmitter {
-  private workerId: string;
-  private workerDescription: string;
+export class SubAgentTelemetryEmitter {
+  private subAgentId: string;
+  private subAgentDescription: string;
   private parentEmit: EmitFunction | null | undefined;
   private parentSessionId: string | null | undefined;
 
@@ -58,9 +58,9 @@ export class WorkerTelemetryEmitter {
   usage: Record<string, number> | null = null;
   iterations: number | null = null;
 
-  constructor(config: WorkerTelemetryConfig) {
-    this.workerId = config.workerId;
-    this.workerDescription = config.workerDescription;
+  constructor(config: SubAgentTelemetryConfig) {
+    this.subAgentId = config.subAgentId;
+    this.subAgentDescription = config.subAgentDescription;
     this.parentEmit = config.parentEmit;
     this.parentSessionId = config.parentSessionId;
   }
@@ -68,19 +68,19 @@ export class WorkerTelemetryEmitter {
   /** Build the generation_progress payload for the frontend. */
   private buildProgress() {
     const burstTokens = estimateTokens(this.burstOutputCharacters);
-    let workerTokPerSec = null;
+    let subAgentTokPerSec = null;
     if (burstTokens > 1 && this.burstFirstChunkTime && this.lastChunkTime) {
       const elapsedSec = (this.lastChunkTime - this.burstFirstChunkTime) / 1000;
-      if (elapsedSec > 0.1) workerTokPerSec = burstTokens / elapsedSec;
+      if (elapsedSec > 0.1) subAgentTokPerSec = burstTokens / elapsedSec;
     }
     return {
-      type: "worker_status",
-      workerId: this.workerId,
+      type: "sub_agent_status",
+      workerId: this.subAgentId,
       message: "generation_progress",
       outputTokens: burstTokens,
       firstChunkTime: this.burstFirstChunkTime,
       lastChunkTime: this.lastChunkTime,
-      tokPerSec: workerTokPerSec,
+      tokPerSec: subAgentTokPerSec,
       totalOutputTokens: estimateTokens(this.cumulativeOutputCharacters),
     };
   }
@@ -135,13 +135,13 @@ export class WorkerTelemetryEmitter {
   private shouldEmitProgress(): boolean {
     return (
       this.burstChunkCount === 1 ||
-      this.burstChunkCount % WorkerTelemetryEmitter.PROGRESS_INTERVAL === 0
+      this.burstChunkCount % SubAgentTelemetryEmitter.PROGRESS_INTERVAL === 0
     );
   }
 
   /**
    * The EmitFunction to pass to the agentic loop.
-   * Routes worker events to the parent SSE stream with telemetry.
+   * Routes sub-agent events to the parent SSE stream with telemetry.
    */
   createEmitFunction(): EmitFunction {
     return (event) => {
@@ -160,8 +160,8 @@ export class WorkerTelemetryEmitter {
         if (this.parentEmit && this.lastPhase !== "generating") {
           this.lastPhase = "generating";
           this.parentEmit({
-            type: "worker_status",
-            workerId: this.workerId,
+            type: "sub_agent_status",
+            workerId: this.subAgentId,
             message: "phase",
             phase: "generating",
           });
@@ -185,8 +185,8 @@ export class WorkerTelemetryEmitter {
         if (this.parentEmit && this.lastPhase !== "thinking") {
           this.lastPhase = "thinking";
           this.parentEmit({
-            type: "worker_status",
-            workerId: this.workerId,
+            type: "sub_agent_status",
+            workerId: this.subAgentId,
             message: "phase",
             phase: "thinking",
           });
@@ -212,9 +212,9 @@ export class WorkerTelemetryEmitter {
 
         if (this.parentEmit) {
           this.parentEmit({
-            type: "worker_tool_execution",
-            workerId: this.workerId,
-            workerDescription: this.workerDescription,
+            type: "sub_agent_tool_execution",
+            workerId: this.subAgentId,
+            workerDescription: this.subAgentDescription,
             tool: event.tool,
             status: event.status,
           });
@@ -222,8 +222,8 @@ export class WorkerTelemetryEmitter {
       } else if (event.type === "tool_output") {
         if (this.parentEmit) {
           this.parentEmit({
-            type: "worker_tool_output",
-            workerId: this.workerId,
+            type: "sub_agent_tool_output",
+            workerId: this.subAgentId,
             toolCallId: event.toolCallId,
             name: event.name,
             event: event.event,
@@ -245,12 +245,12 @@ export class WorkerTelemetryEmitter {
   private handleStatusEvent(event: Record<string, unknown>) {
     if (
       this.parentEmit &&
-      (event.message === "iteration_progress" || event.message === "workers_updated")
+      (event.message === "iteration_progress" || event.message === "sub_agents_updated")
     ) {
       if (event.iteration) this.iterations = event.iteration as number;
       this.parentEmit({
-        type: "worker_status",
-        workerId: this.workerId,
+        type: "sub_agent_status",
+        workerId: this.subAgentId,
         message: event.message as string,
         iteration: event.iteration,
         maxIterations: event.maxIterations,
@@ -258,8 +258,8 @@ export class WorkerTelemetryEmitter {
     }
     if (this.parentEmit && event.message === "generation_started") {
       this.parentEmit({
-        type: "worker_status",
-        workerId: this.workerId,
+        type: "sub_agent_status",
+        workerId: this.subAgentId,
         message: "generation_started",
         timeToFirstToken: event.timeToFirstToken,
       });
@@ -267,8 +267,8 @@ export class WorkerTelemetryEmitter {
     if (this.parentEmit && event.phase) {
       this.lastPhase = event.phase as string;
       this.parentEmit({
-        type: "worker_status",
-        workerId: this.workerId,
+        type: "sub_agent_status",
+        workerId: this.subAgentId,
         message: "phase",
         phase: event.phase,
         label: event.message || undefined,
@@ -288,8 +288,8 @@ export class WorkerTelemetryEmitter {
       const finalOutputTokens = (event.usage as Record<string, number>).outputTokens || estimatedOutput;
       const burstTokens = estimateTokens(this.burstOutputCharacters);
       this.parentEmit({
-        type: "worker_status",
-        workerId: this.workerId,
+        type: "sub_agent_status",
+        workerId: this.subAgentId,
         message: "generation_progress",
         outputTokens: burstTokens || finalOutputTokens,
         firstChunkTime: this.burstFirstChunkTime || this.firstChunkTime,
@@ -309,8 +309,8 @@ export class WorkerTelemetryEmitter {
   ) {
     if (this.parentEmit) {
       this.parentEmit({
-        type: "worker_status",
-        workerId: this.workerId,
+        type: "sub_agent_status",
+        workerId: this.subAgentId,
         message: "complete",
         durationMs,
         toolCount: this.toolCalls.length,

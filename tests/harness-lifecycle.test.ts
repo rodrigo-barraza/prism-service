@@ -35,25 +35,25 @@ describe("PostExecutionEmitter", () => {
       });
     });
 
-    it("should emit workers_updated when create_team was called", () => {
+    it("should emit sub_agents_updated when create_team was called", () => {
       const executedToolCalls = [{ name: "create_team", id: "1", args: {} }];
 
       emitPostExecutionStatus(executedToolCalls, mockEmit);
 
       expect(mockEmit).toHaveBeenCalledWith({
         type: "status",
-        message: "workers_updated",
+        message: "sub_agents_updated",
       });
     });
 
-    it("should emit workers_updated when stop_agent was called", () => {
+    it("should emit sub_agents_updated when stop_agent was called", () => {
       const executedToolCalls = [{ name: "stop_agent", id: "1", args: {} }];
 
       emitPostExecutionStatus(executedToolCalls, mockEmit);
 
       expect(mockEmit).toHaveBeenCalledWith({
         type: "status",
-        message: "workers_updated",
+        message: "sub_agents_updated",
       });
     });
 

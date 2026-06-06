@@ -1,17 +1,17 @@
 /**
- * Coordinator Type Definitions
+ * Orchestrator Type Definitions
  *
- * Shared interfaces for CoordinatorService multi-agent orchestration.
- * Covers worker state, results, instance selection, and git worktree ops.
+ * Shared interfaces for OrchestratorService multi-agent orchestration.
+ * Covers sub-agent state, results, instance selection, and git worktree ops.
  */
 
 import type { ConversationMessage, EmitFunction, ToolCall } from "../services/harnesses/types.ts";
 
-// ── Worker State ────────────────────────────────────────────
+// ── Sub-Agent State ────────────────────────────────────────
 
-export interface WorkerState {
+export interface SubAgentState {
   agentId: string;
-  workerAgentSessionId: string;
+  subAgentSessionId: string;
   parentAgentSessionId: string;
   description: string;
   branchName: string | null;
@@ -31,7 +31,7 @@ export interface WorkerState {
   messages: ConversationMessage[] | null;
   files: string[];
   iterations?: number;
-  // Coordinator context fields
+  // Orchestrator context fields
   project: string;
   username: string;
   agent: string | null;
@@ -53,9 +53,9 @@ export interface WorktreeDiff {
   files: string[];
 }
 
-// ── Worker Result ───────────────────────────────────────────
+// ── Sub-Agent Result ───────────────────────────────────────
 
-export interface WorkerResult {
+export interface SubAgentResult {
   agent_id: string;
   description: string;
   status: string;
@@ -89,9 +89,9 @@ export interface InstanceAssignment {
   slotsAvailable: number;
 }
 
-// ── Coordinator Context ─────────────────────────────────────
+// ── Orchestrator Context ────────────────────────────────────
 
-export interface CoordinatorSpawnParams {
+export interface OrchestratorSpawnParams {
   description: string;
   prompt: string;
   files?: string[];
@@ -99,10 +99,10 @@ export interface CoordinatorSpawnParams {
   agent?: string;
   assignedProvider?: string;
   assignedModel?: string;
-  coordinatorContext: CoordinatorContext;
+  orchestratorContext: OrchestratorContext;
 }
 
-export interface CoordinatorContext {
+export interface OrchestratorContext {
   project: string;
   username: string;
   agent: string | null;
@@ -111,7 +111,7 @@ export interface CoordinatorContext {
   traceId: string | null;
   agentSessionId: string;
   conversationId: string;
-  maxWorkerIterations?: number;
+  maxSubAgentIterations?: number;
   minContextLength?: number;
   workspaceRoot?: string | null;
   emit?: EmitFunction;
@@ -156,4 +156,3 @@ export interface TeamMemberResult {
   error?: string;
   [key: string]: unknown;
 }
-

@@ -6,7 +6,7 @@ import type {
   ToolsApiResponse,
   WorktreeCreateResponse,
   WorktreeDiff,
-} from "../../types/coordinator.ts";
+} from "../../types/orchestrator.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
@@ -20,7 +20,7 @@ export class GitWorktreeHelper {
   }
 
   /**
-   * Derive the git repo path from a worker's file list.
+   * Derive the git repo path from a sub-agent's file list.
    *
    * If files live under a git subdirectory of the workspace root
    * (e.g. /workspace/projectA/.git exists), return that subdirectory

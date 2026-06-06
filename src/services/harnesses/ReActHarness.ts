@@ -82,7 +82,7 @@ const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
  * Supports:
  *   - Plan mode (planFirst / enter_plan_mode / exit_plan_mode)
  *   - Auto-approval engine
- *   - Coordinator (multi-agent) worker tracking
+ *   - Orchestrator (multi-agent) sub-agent tracking
  *   - Streaming tool output (shell, python, js)
  *
  * Lifecycle phases are delegated to composable modules in ./lifecycle/

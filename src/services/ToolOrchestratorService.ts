@@ -2,7 +2,7 @@ import { TOOLS_SERVICE_URL } from "../../config.ts";
 import MCPClientService from "./MCPClientService.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { COORDINATOR_ONLY_TOOLS } from "./CoordinatorPrompt.ts";
+import { ORCHESTRATOR_ONLY_TOOLS } from "./OrchestratorPrompt.ts";
 import { createAbortController } from "../utils/AbortController.ts";
 import { DOMAINS, TOOL_NAMES, TOOL_INPUT_MODALITIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
@@ -13,7 +13,7 @@ import {
   TOOL_API_HEALTH_TIMEOUT_MS
 } from "../constants.ts";
 import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
-import type { CoordinatorContext, TeamMember } from "../types/coordinator.ts";
+import type { OrchestratorContext, TeamMember } from "../types/orchestrator.ts";
 
 // ────────────────────────────────────────────────────────────
 // Types
@@ -63,7 +63,7 @@ interface ToolExecutionContext {
   _providerName?: string;
   _resolvedModel?: string;
   _emit?: ((event: { type: string; [key: string]: unknown }) => void) | null;
-  _maxWorkerIterations?: number;
+  _maxSubAgentIterations?: number;
   _minContextLength?: number;
   enabledTools?: string[];
   [key: string]: unknown;
@@ -402,15 +402,15 @@ async function fetchJsonPost(
 // ────────────────────────────────────────────────────────────
 
 // ────────────────────────────────────────────────────────────
-// Coordinator Tool Schemas — Prism-local, not routed to tools-api
+// Orchestrator Tool Schemas — Prism-local, not routed to tools-api
 // ────────────────────────────────────────────────────────────
 
-const COORDINATOR_TOOL_SCHEMAS = [
+const ORCHESTRATOR_TOOL_SCHEMAS = [
   {
     name: "create_team",
     description:
-      "Spawn one or more worker agents that execute in parallel, each in an isolated git worktree. " +
-      "Workers have access to the full tool suite (read, write, search, shell). " +
+      "Spawn one or more sub-agents that execute in parallel, each in an isolated git worktree. " +
+      "Sub-agents have access to the full tool suite (read, write, search, shell). " +
       "Use for parallelizable research, implementation, or verification tasks. " +
       "For a single task, provide one member. For parallel work, provide up to 10 members in a single call. " +
       "Returns results from all members when they all complete.",
@@ -430,22 +430,22 @@ const COORDINATOR_TOOL_SCHEMAS = [
             properties: {
               description: {
                 type: "string",
-                description: "Short label for this worker (shown in UI).",
+                description: "Short label for this sub-agent (shown in UI).",
               },
               prompt: {
                 type: "string",
                 description:
-                  "Self-contained task prompt. Include file paths, line numbers, and exact instructions. Workers cannot see the coordinator's conversation.",
+                  "Self-contained task prompt. Include file paths, line numbers, and exact instructions. Sub-agents cannot see the orchestrator's conversation.",
               },
               files: {
                 type: "array",
                 items: { type: "string" },
-                description: "Optional: file paths the worker should focus on.",
+                description: "Optional: file paths the sub-agent should focus on.",
               },
               model: {
                 type: "string",
                 description:
-                  "Optional: model override for this worker (defaults to coordinator's model).",
+                  "Optional: model override for this sub-agent (defaults to orchestrator's model).",
               },
               agent: {
                 type: "string",
@@ -456,7 +456,7 @@ const COORDINATOR_TOOL_SCHEMAS = [
             required: ["description", "prompt"],
           },
           description:
-            "Array of worker definitions (max 10). Each member runs autonomously in its own worktree.",
+            "Array of sub-agent definitions (max 10). Each member runs autonomously in its own worktree.",
         },
       },
       required: ["name", "members"],
@@ -465,14 +465,14 @@ const COORDINATOR_TOOL_SCHEMAS = [
   {
     name: "send_message",
     description:
-      "Send a follow-up message to a running or completed worker agent. Use to continue work, provide corrections, or give new instructions.",
+      "Send a follow-up message to a running or completed sub-agent. Use to continue work, provide corrections, or give new instructions.",
     parameters: {
       type: "object",
       properties: {
         to: { type: "string", description: "Agent ID returned by create_team" },
         message: {
           type: "string",
-          description: "Follow-up instructions for the worker",
+          description: "Follow-up instructions for the sub-agent",
         },
       },
       required: ["to", "message"],
@@ -481,7 +481,7 @@ const COORDINATOR_TOOL_SCHEMAS = [
   {
     name: "stop_agent",
     description:
-      "Stop a running worker agent. The worker's worktree is cleaned up.",
+      "Stop a running sub-agent. The sub-agent's worktree is cleaned up.",
     parameters: {
       type: "object",
       properties: {
@@ -493,9 +493,9 @@ const COORDINATOR_TOOL_SCHEMAS = [
   {
     name: "get_task_output",
     description:
-      "Read the output from a previously spawned worker agent by its agent ID. " +
-      "Use this to check on a worker's result after it has completed, or to read " +
-      "partial output from a still-running worker. Returns the worker's final text, " +
+      "Read the output from a previously spawned sub-agent by its agent ID. " +
+      "Use this to check on a sub-agent's result after it has completed, or to read " +
+      "partial output from a still-running sub-agent. Returns the sub-agent's final text, " +
       "tool usage stats, diff summary, and status.",
     parameters: {
       type: "object",
@@ -511,7 +511,7 @@ const COORDINATOR_TOOL_SCHEMAS = [
   {
     name: "delete_team",
     description:
-      "Stop and remove all workers in a named team. Cleans up worktrees for all members.",
+      "Stop and remove all sub-agents in a named team. Cleans up worktrees for all members.",
     parameters: {
       type: "object",
       properties: {
@@ -543,7 +543,7 @@ export default class ToolOrchestratorService {
         return [
             ...cachedAISchemas,
       ...InternalToolRegistry.getSchemas(),
-      ...COORDINATOR_TOOL_SCHEMAS,
+      ...ORCHESTRATOR_TOOL_SCHEMAS,
     ];
   }
 
@@ -558,8 +558,8 @@ export default class ToolOrchestratorService {
     }
     const resolveDomainKey = (domain: string) => domainDisplayNameToKey.get(domain) || domain.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 
-    // Coordinator tools are Prism-local — add domain metadata for UI grouping
-    const coordinatorClient = COORDINATOR_TOOL_SCHEMAS.map((tool) => ({
+    // Orchestrator tools are Prism-local — add domain metadata for UI grouping
+    const orchestratorClient = ORCHESTRATOR_TOOL_SCHEMAS.map((tool) => ({
       ...tool,
       domain: "Core Tools",
       domainKey: "core",
@@ -593,7 +593,7 @@ export default class ToolOrchestratorService {
     return [
       ...clientSchemasEnriched,
       ...internalClient,
-      ...coordinatorClient,
+      ...orchestratorClient,
       ...mcpClient,
     ];
   }
@@ -741,9 +741,9 @@ export default class ToolOrchestratorService {
       return InternalToolRegistry.execute(name, args, context);
     }
 
-    // Route coordinator tools to CoordinatorService (Prism-local)
-    if (COORDINATOR_ONLY_TOOLS.includes(name)) {
-      return ToolOrchestratorService.executeCoordinatorTool(name, args, context);
+    // Route orchestrator tools to OrchestratorService (Prism-local)
+    if (ORCHESTRATOR_ONLY_TOOLS.includes(name)) {
+      return ToolOrchestratorService.executeOrchestratorTool(name, args, context);
     }
 
     // Route MCP tools to MCPClientService
@@ -957,15 +957,15 @@ export default class ToolOrchestratorService {
   }
 
   /**
-   * Execute a coordinator tool (create_team, send_message, stop_agent).
-   * These are Prism-local — they dispatch to CoordinatorService in-process.
+   * Execute a orchestrator tool (create_team, send_message, stop_agent).
+   * These are Prism-local — they dispatch to OrchestratorService in-process.
    */
-  static async executeCoordinatorTool(name: string, args: Record<string, unknown> = {}, context: ToolExecutionContext = {}) {
-    const { default: CoordinatorService } =
-      await import("./CoordinatorService.js");
+  static async executeOrchestratorTool(name: string, args: Record<string, unknown> = {}, context: ToolExecutionContext = {}) {
+    const { default: OrchestratorService } =
+      await import("./OrchestratorService.js");
 
-    // Build coordinatorContext from the loop's context
-    const coordinatorContext = {
+    // Build orchestratorContext from the loop's context
+    const orchestratorContext = {
       project: context.project,
       username: context.username,
       agent: context.agent,
@@ -975,13 +975,13 @@ export default class ToolOrchestratorService {
       conversationId: context.conversationId,
       traceId: context.traceId,
 
-      // Pass the parent's emit so workers can forward live events
+      // Pass the parent's emit so sub-agents can forward live events
       emit: context._emit || null,
 
-      // User-configured max iterations for worker agents
-      maxWorkerIterations: context._maxWorkerIterations,
+      // User-configured max iterations for sub-agents
+      maxSubAgentIterations: context._maxSubAgentIterations,
 
-      // Inherit context window size so workers load with the same context
+      // Inherit context window size so sub-agents load with the same context
       minContextLength: context._minContextLength,
 
       // Inherit the exact list of tools enabled in the parent context
@@ -990,26 +990,26 @@ export default class ToolOrchestratorService {
 
     switch (name) {
       case "create_team":
-        return CoordinatorService.createTeam(args as { name: string; members: TeamMember[] }, coordinatorContext as CoordinatorContext);
+        return OrchestratorService.createTeam(args as { name: string; members: TeamMember[] }, orchestratorContext as OrchestratorContext);
 
       case "send_message":
-        return CoordinatorService.sendMessage(
+        return OrchestratorService.sendMessage(
           args.to as string,
           args.message as string,
-          coordinatorContext as CoordinatorContext,
+          orchestratorContext as OrchestratorContext,
         );
 
       case "stop_agent":
-        return CoordinatorService.stopAgent(args.agent_id as string);
+        return OrchestratorService.stopAgent(args.agent_id as string);
 
       case "get_task_output":
-        return CoordinatorService.getTaskOutput(args.agent_id as string);
+        return OrchestratorService.getTaskOutput(args.agent_id as string);
 
       case "delete_team":
-        return CoordinatorService.deleteTeam(args.teamName as string, coordinatorContext as CoordinatorContext);
+        return OrchestratorService.deleteTeam(args.teamName as string, orchestratorContext as OrchestratorContext);
 
       default:
-        return { error: `Unknown coordinator tool: ${name}` };
+        return { error: `Unknown orchestrator tool: ${name}` };
     }
   }
 

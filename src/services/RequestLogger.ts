@@ -396,7 +396,7 @@ const RequestLogger = {
   /**
    * Log a background (non-streaming) LLM call with automatic cost estimation.
    * Centralises the identical pattern used by MemoryService, MemoryExtractor,
-   * MemoryConsolidationService, and CoordinatorService for fire-and-forget
+   * MemoryConsolidationService, and OrchestratorService for fire-and-forget
    * AI calls (extraction, consolidation, decomposition).
    *
    * Handles: estimateTokens, getPricing, calculateTextCost, calculateTokensPerSec,

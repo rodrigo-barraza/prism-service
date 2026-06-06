@@ -130,13 +130,13 @@ const executeSkill = {
     );
     if (prepared.error) return prepared;
 
-    // Execute via coordinator's create_team mechanism
+    // Execute via orchestrator's create_team mechanism
     logger.info(
       `[SkillExecute] Executing skill "${prepared.name}" (${prepared.skillId})`
     );
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
-    return ToolOrchestratorService.executeCoordinatorTool(
+    return ToolOrchestratorService.executeOrchestratorTool(
       "create_team",
       {
         name: `skill_${prepared.skillId}`,
