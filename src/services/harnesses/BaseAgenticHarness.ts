@@ -19,6 +19,7 @@ import logger from "../../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
+import WebhookEventBus from "../WebhookEventBus.ts";
 import type AgenticLoopState from "../AgenticLoopState.ts";
 import type AgentHooks from "../AgentHooks.ts";
 import type {
@@ -349,14 +350,31 @@ export default class BaseAgenticHarness {
 
       // Native MCP tool calls: pass through directly
       if (streamChunk.native) {
+        const toolName = streamChunk.name || "";
+        const toolCallId = streamChunk.id || `ntc-${state.streamedToolCalls.length}`;
+
         if (streamChunk.status === "calling") {
-          const toolCallId = streamChunk.id || `ntc-${state.streamedToolCalls.length}`;
           state.streamedToolCalls.push({
             id: toolCallId,
-            name: streamChunk.name || "",
+            name: toolName,
             args: streamChunk.args || {},
           });
           this._trackToolDisplaySegment(toolCallId);
+
+          WebhookEventBus.emit("request.tool_call.started", {
+            requestId: this.ctx.requestId || null,
+            toolName,
+            toolCallId,
+            toolArgs: streamChunk.args || {},
+            agent: this.ctx.agent || null,
+            conversationId: this.ctx.conversationId || null,
+            agentSessionId: this.ctx.agentSessionId || null,
+            project: this.ctx.project,
+            username: this.ctx.username,
+            provider: this.ctx.providerName,
+            model: this.ctx.resolvedModel,
+            iteration: this.state.iterations,
+          });
         } else if (streamChunk.status === "done" || streamChunk.status === "error") {
           const existing = state.streamedToolCalls.find(
             (toolCall) =>
@@ -369,6 +387,22 @@ export default class BaseAgenticHarness {
             if (streamChunk.args && Object.keys(streamChunk.args).length > 0)
               existing.args = streamChunk.args;
           }
+
+          WebhookEventBus.emit("request.tool_call.completed", {
+            requestId: this.ctx.requestId || null,
+            toolName,
+            toolCallId,
+            toolResult: streamChunk.result || null,
+            durationMs: null,
+            status: streamChunk.status,
+            agent: this.ctx.agent || null,
+            conversationId: this.ctx.conversationId || null,
+            agentSessionId: this.ctx.agentSessionId || null,
+            project: this.ctx.project,
+            username: this.ctx.username,
+            provider: this.ctx.providerName,
+            model: this.ctx.resolvedModel,
+          });
         }
         emit({
           type: SSE_EVENT_TYPES.TOOL_CALL,
@@ -406,6 +440,20 @@ export default class BaseAgenticHarness {
         type: SSE_EVENT_TYPES.TOOL_EXECUTION,
         tool: { name: toolName, args: streamChunk.args || {}, id: standardToolCallId },
         status: "calling",
+      });
+      WebhookEventBus.emit("request.tool_call.started", {
+        requestId: this.ctx.requestId || null,
+        toolName,
+        toolCallId: standardToolCallId,
+        toolArgs: streamChunk.args || {},
+        agent: this.ctx.agent || null,
+        conversationId: this.ctx.conversationId || null,
+        agentSessionId: this.ctx.agentSessionId || null,
+        project: this.ctx.project,
+        username: this.ctx.username,
+        provider: this.ctx.providerName,
+        model: this.ctx.resolvedModel,
+        iteration: this.state.iterations,
       });
       return { action: "toolCall", toolCall: toolCall };
     }

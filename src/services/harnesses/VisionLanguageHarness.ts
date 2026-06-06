@@ -347,6 +347,7 @@ Use these images to observe the environment, notice changes, animations, or user
           state,
           pass,
           emit,
+          context,
         );
 
         trackToolErrors(

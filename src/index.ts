@@ -63,6 +63,7 @@ import customAgentsRouter from "./routes/CustomAgentsRoutes.ts";
 import workspacesRouter from "./routes/WorkspacesRoutes.ts";
 import scheduledTasksRouter from "./routes/ScheduledTasksRoutes.ts";
 import promptsRouter from "./routes/PromptsRoutes.ts";
+import webhookRouter from "./routes/WebhookRoutes.ts";
 
 const app = express();
 const server = http.createServer(app);
@@ -122,6 +123,7 @@ const ENDPOINTS = {
     "/workspaces",
     "/scheduled-tasks",
     "/prompts",
+    "/webhooks",
   ],
   websocket: ["/ws/chat", "/ws/text-to-audio"],
   admin: ["/admin", "/admin/lm-studio"],
@@ -183,6 +185,7 @@ app.use("/custom-agents", customAgentsRouter);
 app.use("/workspaces", workspacesRouter);
 app.use("/scheduled-tasks", scheduledTasksRouter);
 app.use("/prompts", promptsRouter);
+app.use("/webhooks", webhookRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);
@@ -294,6 +297,9 @@ setupWebSocket(wss);
         // prompts
         db.collection("prompts").createIndex({ project: 1, username: 1, updatedAt: -1 }),
         db.collection("prompts").createIndex({ id: 1 }, { unique: true }),
+        // webhook_subscriptions
+        db.collection("webhook_subscriptions").createIndex({ id: 1 }, { unique: true }),
+        db.collection("webhook_subscriptions").createIndex({ enabled: 1 }),
       ]);
       logger.success("Database indexes ensured");
     }
@@ -501,6 +507,15 @@ setupWebSocket(wss);
     registerCleanup(async () => ConversationTimerService.destroy());
   } catch (error: unknown) {
     logger.error("Failed to initialize Conversation Timers daemon: " + errorMessage(error));
+  }
+
+  // ── Webhook Dispatcher ─────────────────────────────────────
+  try {
+    const { default: WebhookDispatcher } = await import("./services/WebhookDispatcher.ts");
+    await WebhookDispatcher.init();
+    registerCleanup(async () => WebhookDispatcher.destroy());
+  } catch (error: unknown) {
+    logger.error("Failed to initialize Webhook Dispatcher: " + errorMessage(error));
   }
 
   // ── Background Housekeeping ────────────────────────────────

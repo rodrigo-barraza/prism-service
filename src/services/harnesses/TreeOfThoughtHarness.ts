@@ -357,6 +357,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
           state,
           selectedPass,
           emit,
+          context,
         );
 
         trackToolErrors(

@@ -11,6 +11,7 @@ import { computeModalities } from "./conversation/index.ts";
 import { COLLECTIONS } from "../constants.ts";
 import { TYPES, getPricing } from "../config.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";
+import WebhookEventBus from "./WebhookEventBus.ts";
 const COLLECTION = COLLECTIONS.REQUESTS;
 // Maps provider-native API tool/feature names to human-readable display names.
 // These are NOT our custom tool names — they are keys from Anthropic/OpenAI/Google APIs.
@@ -243,6 +244,8 @@ const RequestLogger = {
         rateLimits,
       };
       await db.collection(COLLECTION).insertOne(document);
+
+      WebhookEventBus.emit("request.created", { ...document });
     } catch (error: unknown) {
             logger.error("RequestLogger: failed to save request", getErrorMessage(error));
     }

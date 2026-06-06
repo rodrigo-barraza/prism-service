@@ -55,6 +55,7 @@ export const COLLECTIONS = {
   SCHEDULED_TASKS: "scheduled_tasks",
   CONVERSATION_TIMERS: "conversation_timers",
   PROMPTS: "prompts",
+  WEBHOOK_SUBSCRIPTIONS: "webhook_subscriptions",
 };
 
 /**
