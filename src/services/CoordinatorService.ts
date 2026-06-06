@@ -831,6 +831,7 @@ export default class CoordinatorService {
         project: worker.project,
         username: worker.username,
         agent: worker.agent,
+        requestId: crypto.randomUUID(),
         requestStart: performance.now(),
         emit: workerEmit,
         signal: worker.abortController?.signal,

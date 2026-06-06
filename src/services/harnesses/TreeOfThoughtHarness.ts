@@ -615,7 +615,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     }
 
     const pass = this.createPassState(passOptions);
-    const passRequestId = `${this.context.requestId || this.context.agentSessionId}-iter-${this.state.iterations}-branch-${branchIndex}`;
+    const requestIdBase = this.context.requestId || this.context.agentSessionId || crypto.randomUUID();
+    const passRequestId = `${requestIdBase}-iter-${this.state.iterations}-branch-${branchIndex}`;
     pass.requestId = passRequestId;
     this.registerTrackerRequest(passRequestId);
 

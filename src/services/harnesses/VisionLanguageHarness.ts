@@ -283,7 +283,8 @@ Use these images to observe the environment, notice changes, animations, or user
 
       // ── Create per-iteration pass state ────────────────────
       const pass = this.createPassState(passOptions);
-      const passRequestId = `${context.requestId || agentSessionId}-iter-${state.iterations}`;
+      const requestIdBase = context.requestId || agentSessionId || crypto.randomUUID();
+      const passRequestId = `${requestIdBase}-iter-${state.iterations}`;
       pass.requestId = passRequestId;
 
       this.registerTrackerRequest(passRequestId);
