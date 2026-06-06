@@ -77,6 +77,12 @@ export async function processToolResultMedia(
           resultObject.audioRef = uploadResult.ref;
           delete resultObject.audio;
         }
+        emit({
+          type: SSE_EVENT_TYPES.AUDIO,
+          data: uploadResult.ref,
+          mimeType,
+          minioRef: uploadResult.ref,
+        });
       } catch (uploadError) {
         logger.error(`[PostExecutionEmitter] Failed to upload audio:`, uploadError);
       }
