@@ -37,10 +37,10 @@ const HarnessRegistry = {
     return registry.get(id) || registry.get("standard");
   },
   list() {
-    return [...registry.values()].map((H) => ({
-      id: H.id,
-      label: H.label,
-      description: H.description,
+    return [...registry.values()].map((harness) => ({
+      id: harness.id,
+      label: harness.label,
+      description: harness.description,
     }));
   },
   has(id: string) {

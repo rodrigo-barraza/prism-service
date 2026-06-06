@@ -66,7 +66,7 @@ export default class ReActHarness extends BaseAgenticHarness {
     "Reason→Act→Observe tool-use loop with plan mode, approval gating, and exhaustion recovery.";
 
   async run(): Promise<{ messages: ConversationMessage[] }> {
-    const context = this.ctx;
+    const context = this.context;
     const state = this.state;
     const {
       options,

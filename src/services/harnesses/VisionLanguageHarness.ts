@@ -55,7 +55,7 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
     "Reason→Act→Observe tool-use loop with real-time rolling webcam/screen streaming injection.";
 
   async run(): Promise<{ messages: ConversationMessage[] }> {
-    const context = this.ctx;
+    const context = this.context;
     const state = this.state;
     const {
       options,

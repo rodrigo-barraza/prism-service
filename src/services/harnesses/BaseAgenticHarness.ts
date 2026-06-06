@@ -55,7 +55,7 @@ export default class BaseAgenticHarness {
   static label = "Base (abstract)";
   static description = "Abstract base harness — do not use directly.";
 
-  protected ctx: AgenticContext;
+  protected context: AgenticContext;
   protected state: AgenticLoopState;
   protected tools: ResolvedTools;
   protected trackerSessionId: string;
@@ -65,7 +65,7 @@ export default class BaseAgenticHarness {
     state: AgenticLoopState,
     tools: ResolvedTools,
   ) {
-    this.ctx = context;
+    this.context = context;
     this.state = state;
     this.tools = tools;
     this.trackerSessionId =
@@ -87,7 +87,7 @@ export default class BaseAgenticHarness {
 
   /** Emit a generation_progress status event with current session stats. */
   emitGenerationProgress(): void {
-    const { emit } = this.ctx;
+    const { emit } = this.context;
     const state = this.state;
     const stats = SessionGenerationTracker.getSessionStats(
       this.trackerSessionId,
@@ -142,7 +142,7 @@ export default class BaseAgenticHarness {
     messages: ConversationMessage[],
     toolCount: number,
   ): ConversationMessage[] {
-    const { modelDef, options, emit } = this.ctx;
+    const { modelDef, options, emit } = this.context;
     const preEnforceCount = messages.length;
     const contextResult = ContextWindowManager.enforce(messages as Parameters<typeof ContextWindowManager.enforce>[0], {
       maxInputTokens: modelDef?.maxInputTokens || 128_000,
@@ -182,7 +182,7 @@ export default class BaseAgenticHarness {
     messages: ConversationMessage[],
     passOptions: Record<string, unknown>,
   ): AsyncIterable<unknown> {
-    const { provider, resolvedModel, modelDef, signal } = this.ctx;
+    const { provider, resolvedModel, modelDef, signal } = this.context;
     const expandedMessages = expandMessagesForFC(messages as Parameters<typeof expandMessagesForFC>[0], {
       filterDeleted: false,
     });
@@ -223,7 +223,7 @@ export default class BaseAgenticHarness {
   /** Register a request with SessionGenerationTracker. */
   registerTrackerRequest(passRequestId: string): void {
     const { providerName, resolvedModel, parentAgentSessionId, agentSessionId } =
-      this.ctx;
+      this.context;
     SessionGenerationTracker.register(this.trackerSessionId, passRequestId, {
       provider: providerName,
       model: resolvedModel,
@@ -247,7 +247,7 @@ export default class BaseAgenticHarness {
     pass: PassState,
     allowedToolNames: Set<string>,
   ): ChunkAction | Promise<ChunkAction> {
-    const { emit, signal } = this.ctx;
+    const { emit, signal } = this.context;
     const state = this.state;
     // Cast to a loose typed object — we branch on `type` below
     const streamChunk = chunk as StreamChunk;
@@ -363,18 +363,18 @@ export default class BaseAgenticHarness {
           this._trackToolDisplaySegment(toolCallId);
 
           WebhookEventBus.emit("request.tool_call.started", {
-            requestId: this.ctx.requestId || null,
+            requestId: this.context.requestId || null,
             toolName,
             toolEmoji: ToolOrchestratorService.getToolEmoji(toolName),
             toolCallId,
             toolArgs: streamChunk.args || {},
-            agent: this.ctx.agent || null,
-            conversationId: this.ctx.conversationId || null,
-            agentSessionId: this.ctx.agentSessionId || null,
-            project: this.ctx.project,
-            username: this.ctx.username,
-            provider: this.ctx.providerName,
-            model: this.ctx.resolvedModel,
+            agent: this.context.agent || null,
+            conversationId: this.context.conversationId || null,
+            agentSessionId: this.context.agentSessionId || null,
+            project: this.context.project,
+            username: this.context.username,
+            provider: this.context.providerName,
+            model: this.context.resolvedModel,
             iteration: this.state.iterations,
           });
         } else if (streamChunk.status === "done" || streamChunk.status === "error") {
@@ -391,20 +391,20 @@ export default class BaseAgenticHarness {
           }
 
           WebhookEventBus.emit("request.tool_call.completed", {
-            requestId: this.ctx.requestId || null,
+            requestId: this.context.requestId || null,
             toolName,
             toolEmoji: ToolOrchestratorService.getToolEmoji(toolName),
             toolCallId,
             toolResult: streamChunk.result || null,
             durationMs: null,
             status: streamChunk.status,
-            agent: this.ctx.agent || null,
-            conversationId: this.ctx.conversationId || null,
-            agentSessionId: this.ctx.agentSessionId || null,
-            project: this.ctx.project,
-            username: this.ctx.username,
-            provider: this.ctx.providerName,
-            model: this.ctx.resolvedModel,
+            agent: this.context.agent || null,
+            conversationId: this.context.conversationId || null,
+            agentSessionId: this.context.agentSessionId || null,
+            project: this.context.project,
+            username: this.context.username,
+            provider: this.context.providerName,
+            model: this.context.resolvedModel,
           });
         }
         emit({
@@ -445,18 +445,18 @@ export default class BaseAgenticHarness {
         status: "calling",
       });
       WebhookEventBus.emit("request.tool_call.started", {
-        requestId: this.ctx.requestId || null,
+        requestId: this.context.requestId || null,
         toolName,
         toolEmoji: ToolOrchestratorService.getToolEmoji(toolName),
         toolCallId: standardToolCallId,
         toolArgs: streamChunk.args || {},
-        agent: this.ctx.agent || null,
-        conversationId: this.ctx.conversationId || null,
-        agentSessionId: this.ctx.agentSessionId || null,
-        project: this.ctx.project,
-        username: this.ctx.username,
-        provider: this.ctx.providerName,
-        model: this.ctx.resolvedModel,
+        agent: this.context.agent || null,
+        conversationId: this.context.conversationId || null,
+        agentSessionId: this.context.agentSessionId || null,
+        project: this.context.project,
+        username: this.context.username,
+        provider: this.context.providerName,
+        model: this.context.resolvedModel,
         iteration: this.state.iterations,
       });
       return { action: "toolCall", toolCall: toolCall };
@@ -498,7 +498,7 @@ export default class BaseAgenticHarness {
       return { action: "continue" };
     }
     if (streamChunk?.type === "status") {
-      const { type: _t, ...statusRest } = streamChunk;
+      const { type: _type, ...statusRest } = streamChunk;
       emit({ type: SSE_EVENT_TYPES.STATUS, ...statusRest });
       return { action: "continue" };
     }
@@ -557,7 +557,7 @@ export default class BaseAgenticHarness {
       agentSessionId,
       parentAgentSessionId,
       traceId,
-    } = this.ctx;
+    } = this.context;
     const state = this.state;
     const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
 
@@ -573,12 +573,12 @@ export default class BaseAgenticHarness {
     const passEstimatedCost = calculateTextCost(pass.usage as Parameters<typeof calculateTextCost>[0], pricing);
 
     RequestLogger.logChatGeneration({
-      requestId: `${this.ctx.requestId}-${state.iterations}`,
+      requestId: `${this.context.requestId}-${state.iterations}`,
       endpoint: "/agent",
       operation: "agent:iteration",
       project,
       username,
-      clientIp: this.ctx.clientIp,
+      clientIp: this.context.clientIp,
       agent: agent || null,
       provider: providerName,
       model: resolvedModel,
@@ -644,7 +644,7 @@ export default class BaseAgenticHarness {
     currentMessages: ConversationMessage[],
     hooks: AgentHooks,
   ): Promise<void> {
-    const context = this.ctx;
+    const context = this.context;
     const state = this.state;
     const { agentSessionId, conversationId, project, username } = context;
     const requestStart = context.requestStart ?? performance.now();
@@ -784,7 +784,7 @@ export default class BaseAgenticHarness {
       pass.firstTokenTime = performance.now();
       const ttftSec = (pass.firstTokenTime - pass.start) / 1000;
       if (pass.requestId) SessionGenerationTracker.update(pass.requestId, { ttft: ttftSec });
-      this.ctx.emit({
+      this.context.emit({
         type: SSE_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.GENERATION_STARTED,
         timeToFirstToken: ttftSec,
@@ -812,7 +812,7 @@ export default class BaseAgenticHarness {
     chunk: Record<string, unknown>,
     pass: PassState,
   ): Promise<ChunkAction> {
-    const { emit, project, username } = this.ctx;
+    const { emit, project, username } = this.context;
     const state = this.state;
     let minioRef = null;
     if (chunk.data) {

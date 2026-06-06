@@ -81,7 +81,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     "Non-linear branching harness with parallel candidate generation, scoring, and backtracking.";
 
   async run(): Promise<{ messages: ConversationMessage[] }> {
-    const context = this.ctx;
+    const context = this.context;
     const state = this.state;
     const {
       options,
@@ -591,7 +591,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     }
 
     const pass = this.createPassState(passOptions);
-    const passRequestId = `${this.ctx.requestId || this.ctx.agentSessionId}-iter-${this.state.iterations}-branch-${branchIndex}`;
+    const passRequestId = `${this.context.requestId || this.context.agentSessionId}-iter-${this.state.iterations}-branch-${branchIndex}`;
     pass.requestId = passRequestId;
     this.registerTrackerRequest(passRequestId);
 
@@ -654,9 +654,9 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       };
 
       let scoreResponseText = "";
-      const scoringStream = this.ctx.provider.generateTextStream(
+      const scoringStream = this.context.provider.generateTextStream(
         scoringMessages,
-        this.ctx.resolvedModel,
+        this.context.resolvedModel,
         scoringOptions,
       );
 

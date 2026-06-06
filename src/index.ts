@@ -204,13 +204,13 @@ setupWebSocket(wss);
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (db) {
       const collections = await db.listCollections().toArray();
-      const colNames = collections.map(c => c.name);
+      const collectionNames = collections.map(collection => collection.name);
 
-      if (colNames.includes("conversations") && !colNames.includes("model_conversations")) {
+      if (collectionNames.includes("conversations") && !collectionNames.includes("model_conversations")) {
         await db.collection("conversations").rename("model_conversations");
         logger.info("Migrated MongoDB collection: conversations → model_conversations");
       }
-      if (colNames.includes("agent_sessions") && !colNames.includes("agent_conversations")) {
+      if (collectionNames.includes("agent_sessions") && !collectionNames.includes("agent_conversations")) {
         await db.collection("agent_sessions").rename("agent_conversations");
         logger.info("Migrated MongoDB collection: agent_sessions → agent_conversations");
       }
@@ -424,8 +424,8 @@ setupWebSocket(wss);
             }
             logger.info(`Seeded ${defaults.length} default MCP server(s) from environment`);
           }
-        } catch (seedErr: unknown) {
-          logger.warn(`Failed to parse/seed DEFAULT_MCP_SERVERS: ${errorMessage(seedErr)}`);
+        } catch (seedError: unknown) {
+          logger.warn(`Failed to parse/seed DEFAULT_MCP_SERVERS: ${errorMessage(seedError)}`);
         }
       }
 
@@ -569,17 +569,17 @@ setupWebSocket(wss);
       embedding: [6, 182, 212], // #06b6d4 — cyan
     };
     const coloredModalities = Object.values(TYPES)
-      .map((t: string) => {
-        const [r, g, b] = MODALITY_COLORS[t] || [255, 255, 255];
-        return `\x1b[38;2;${r};${g};${b}m${t}\x1b[0m`;
+      .map((modality: string) => {
+        const [r, g, b] = MODALITY_COLORS[modality] || [255, 255, 255];
+        return `\x1b[38;2;${r};${g};${b}m${modality}\x1b[0m`;
       })
       .join(", ");
     logger.info("Available modalities:", coloredModalities);
-    for (const ep of ENDPOINTS.rest) {
-      logger.info(`  REST  →  http://localhost:${PORT}${ep}`);
+    for (const endpoint of ENDPOINTS.rest) {
+      logger.info(`  REST  →  http://localhost:${PORT}${endpoint}`);
     }
-    for (const ep of ENDPOINTS.websocket) {
-      logger.info(`  WS    →  ws://localhost:${PORT}${ep}`);
+    for (const endpoint of ENDPOINTS.websocket) {
+      logger.info(`  WS    →  ws://localhost:${PORT}${endpoint}`);
     }
   });
 })();
