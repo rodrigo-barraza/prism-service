@@ -276,7 +276,8 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       // ── Create per-iteration pass state ────────────────────
       const pass = this.createPassState(passOptions);
-      const passRequestId = `${context.requestId || agentSessionId}-iter-${state.iterations}`;
+      const requestIdBase = context.requestId || agentSessionId || crypto.randomUUID();
+      const passRequestId = `${requestIdBase}-iter-${state.iterations}`;
       pass.requestId = passRequestId;
 
       this.registerTrackerRequest(passRequestId);
