@@ -28,7 +28,7 @@ import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 /** Worktrees older than this are considered orphaned */
 const WORKTREE_MAX_AGE_MS = MS_PER_DAY;
 
-/** Temp worktree root directory used by CoordinatorService */
+/** Temp worktree root directory used by OrchestratorService */
 const WORKTREE_ROOT = "/tmp/prism-worktrees";
 
 /** Request logs older than this are pruned (keep 90 days) */
@@ -60,7 +60,7 @@ export interface HousekeepingResult {
 
 /**
  * Remove orphaned worktrees in /tmp/prism-worktrees/ older than 24h.
- * These accumulate when workers crash or the process is killed without
+ * These accumulate when sub-agents crash or the process is killed without
  * running CleanupRegistry teardown.
  */
 async function pruneOrphanedWorktrees(): Promise<HousekeepingWorktreeResult> {

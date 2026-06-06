@@ -43,7 +43,7 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   get_task_output: APPROVAL_TIERS.AUTO,
   write_todo: APPROVAL_TIERS.AUTO,
 
-  // Tier 1 — coordinator orchestration
+  // Tier 1 — orchestrator orchestration
   create_team: APPROVAL_TIERS.AUTO,
   send_message: APPROVAL_TIERS.AUTO,
   stop_agent: APPROVAL_TIERS.AUTO,
@@ -77,7 +77,7 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   execute_skill: APPROVAL_TIERS.WRITE,
   delete_skill: APPROVAL_TIERS.WRITE,
 
-  // Tier 2 — team deletion (stops workers)
+  // Tier 2 — team deletion (stops sub-agents)
   delete_team: APPROVAL_TIERS.WRITE,
 
   // Tier 2 — worktree isolation (creates/merges git branches)

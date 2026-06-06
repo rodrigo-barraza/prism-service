@@ -96,7 +96,7 @@ export const ChatRequestSchema = z
     autoApprove: z.boolean().nullable().optional(),
     planFirst: z.boolean().nullable().optional(),
     maxIterations: z.number().nullable().optional(),
-    maxWorkerIterations: z.number().nullable().optional(),
+    maxSubAgentIterations: z.number().nullable().optional(),
     agentContext: z.unknown().nullable().optional(),
     workspaceRoot: z.string().nullable().optional(),
     enableCriticGate: z.boolean().nullable().optional(),

@@ -1,13 +1,13 @@
 import logger from "../utils/logger.ts";
 
 // ────────────────────────────────────────────────────────────
-// MutationQueue — File-Write Serialization for Coordinator Mode
+// MutationQueue — File-Write Serialization for Orchestrator Mode
 // ────────────────────────────────────────────────────────────
-// Prevents concurrent agent workers from writing to the same
+// Prevents concurrent sub-agents from writing to the same
 // file simultaneously. Uses per-path FIFO queues with async
 // lock semantics.
 //
-// In practice, workers operate in isolated git worktrees, so
+// In practice, sub-agents operate in isolated git worktrees, so
 // contention is rare. This is a safety net for shared files
 // (e.g., package.json, config files) that might be accessed
 // from the main repo during execution.

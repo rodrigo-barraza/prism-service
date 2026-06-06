@@ -3,9 +3,9 @@ import AgentPersonaRegistry from "../AgentPersonaRegistry.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import {
-  getCoordinatorPromptAddendum,
-  COORDINATOR_ONLY_TOOLS,
-} from "../CoordinatorPrompt.ts";
+  getOrchestratorPromptAddendum,
+  ORCHESTRATOR_ONLY_TOOLS,
+} from "../OrchestratorPrompt.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 
 import { DirectoryTreeFormatter } from "./DirectoryTreeFormatter.ts";
@@ -178,7 +178,7 @@ export default class SystemPromptAssembler {
       }
     }
 
-    // ── 5b. Coordinator Mode Addendum (when coordinator tools available) ──
+    // ── 5b. Orchestrator Mode Addendum (when orchestrator tools available) ──
     if (!isDirectMode && (codingFallback || persona?.usesCodingGuidelines)) {
       const resolvedEnabledSet = (() => {
         if (!context.enabledTools) return null;
@@ -191,17 +191,17 @@ export default class SystemPromptAssembler {
         }
         return new Set(context.enabledTools);
       })();
-      const coordinatorAvailable = resolvedEnabledSet
-        ? COORDINATOR_ONLY_TOOLS.some((toolName: string) => resolvedEnabledSet.has(toolName))
+      const orchestratorAvailable = resolvedEnabledSet
+        ? ORCHESTRATOR_ONLY_TOOLS.some((toolName: string) => resolvedEnabledSet.has(toolName))
         : true;
 
-      if (coordinatorAvailable) {
+      if (orchestratorAvailable) {
         const allSchemas = ToolOrchestratorService.getToolSchemas();
-        const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
-        const workerTools = allSchemas
+        const orchestratorSet = new Set(ORCHESTRATOR_ONLY_TOOLS);
+        const subAgentTools = allSchemas
           .map((tool) => tool.name as string)
-          .filter((toolName: string) => !coordinatorSet.has(toolName));
-        sections.push(getCoordinatorPromptAddendum({ workerTools }));
+          .filter((toolName: string) => !orchestratorSet.has(toolName));
+        sections.push(getOrchestratorPromptAddendum({ subAgentTools }));
       }
     }
 

@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // Model Resolution Utilities
 // ─────────────────────────────────────────────────────────────
-// Shared by the /chat route load balancer and CoordinatorService.
+// Shared by the /chat route load balancer and OrchestratorService.
 // Handles GGUF quantization-aware model matching across instances.
 
 import logger from "./logger.ts";
@@ -117,7 +117,7 @@ export function findBestQuantFallback(targetModel: string, availableModels: Avai
  * Returns only the instances where the model (or a quant variant) exists,
  * along with per-instance model overrides when a quant fallback is used.
  *
- * This is the same logic the CoordinatorService uses for worker agents.
+ * This is the same logic the OrchestratorService uses for sub-agents.
  */
 export async function resolveModelForInstances(
   modelKey: string,

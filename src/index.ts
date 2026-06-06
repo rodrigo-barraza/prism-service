@@ -57,7 +57,7 @@ import statsRouter from "./routes/StatsRoutes.ts";
 import benchmarkRouter from "./routes/BenchmarkRoutes.ts";
 import synthesisRouter from "./routes/SynthesisRoutes.ts";
 import vramBenchmarksRouter from "./routes/VramBenchmarksRoutes.ts";
-import coordinatorRouter from "./routes/CoordinatorRoutes.ts";
+import orchestratorRouter from "./routes/OrchestratorRoutes.ts";
 import settingsRouter from "./routes/SettingsRoutes.ts";
 import customAgentsRouter from "./routes/CustomAgentsRoutes.ts";
 import workspacesRouter from "./routes/WorkspacesRoutes.ts";
@@ -117,7 +117,7 @@ const ENDPOINTS = {
     "/benchmark",
     "/synthesis",
     "/vram-benchmarks",
-    "/coordinator",
+    "/orchestrator",
     "/settings",
     "/custom-agents",
     "/workspaces",
@@ -179,7 +179,9 @@ app.use("/stats", statsRouter);
 app.use("/benchmark", benchmarkRouter);
 app.use("/synthesis", synthesisRouter);
 app.use("/vram-benchmarks", vramBenchmarksRouter);
-app.use("/coordinator", coordinatorRouter);
+app.use("/orchestrator", orchestratorRouter);
+// Backward-compatible alias — keep /coordinator/* alive during migration
+app.use("/coordinator", orchestratorRouter);
 app.use("/settings", settingsRouter);
 app.use("/custom-agents", customAgentsRouter);
 app.use("/workspaces", workspacesRouter);

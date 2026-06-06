@@ -107,7 +107,7 @@ export async function executeToolBatch(
           _providerName: providerName,
           _resolvedModel: resolvedModel,
           _emit: emit,
-          _maxWorkerIterations: context.options?.maxWorkerIterations,
+          _maxSubAgentIterations: context.options?.maxSubAgentIterations,
           _minContextLength: context.options?.minContextLength,
           workspaceRoot,
           _toolState: ToolContext.getStore(agentSessionId),

@@ -232,7 +232,7 @@ const ConversationService: ConversationServiceInterface = {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return null;
 
-    // Recursively discover all descendant session IDs (multi-level workers)
+    // Recursively discover all descendant session IDs (multi-level sub-agents)
     const allSessionIds = await discoverDescendantSessionIds(db, sessionId, { project, username });
 
     const requests = await db
@@ -315,7 +315,7 @@ const ConversationService: ConversationServiceInterface = {
       null as string | null,
     );
 
-    // Wall-clock elapsed time: from first request to last request (includes workers)
+    // Wall-clock elapsed time: from first request to last request (includes sub-agents)
     const totalElapsedTime =
       createdAt && updatedAt
         ? Math.max(

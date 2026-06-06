@@ -11,7 +11,7 @@ import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
 /**
  * PostExecutionEmitter — status notifications emitted after tool execution.
  *
- * Checks tool calls for specific side-effect patterns (tasks, workers,
+ * Checks tool calls for specific side-effect patterns (tasks, sub-agents,
  * memories, custom tools) and emits appropriate status events to the
  * frontend so the UI can refresh relevant panels.
  *
@@ -42,7 +42,7 @@ export function emitPostExecutionStatus(
         toolCall.name === "stop_agent",
     )
   ) {
-    emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.WORKERS_UPDATED });
+    emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.SUB_AGENTS_UPDATED });
   }
 
   if (toolCalls.some((toolCall) => toolCall.name === TOOL_NAMES.UPSERT_MEMORY)) {

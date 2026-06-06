@@ -3,7 +3,7 @@ import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
-import { COORDINATOR_ONLY_TOOLS } from "./CoordinatorPrompt.ts";
+import { ORCHESTRATOR_ONLY_TOOLS } from "./OrchestratorPrompt.ts";
 import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
 import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TYPES } from "../config.ts";
@@ -60,8 +60,8 @@ interface ResolveParams {
   modelDef?: ModelDef;
 }
 
-/** Coordinator tools bypass the enabledTools filter (always available) */
-const COORDINATOR_TOOL_NAMES = new Set(COORDINATOR_ONLY_TOOLS);
+/** Orchestrator tools bypass the enabledTools filter (always available) */
+const ORCHESTRATOR_TOOL_NAMES = new Set(ORCHESTRATOR_ONLY_TOOLS);
 
 /** Core agentic tools bypass the enabledTools filter (always available to all agents as part of the core cognitive architecture) */
 const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
@@ -243,7 +243,7 @@ export default class AgenticToolResolver {
           tool._isCustom ||
           tool.name.startsWith("mcp__") ||
           (isCoreToolsLocked && CORE_AGENTIC_TOOLS.has(tool.name)) ||
-          COORDINATOR_TOOL_NAMES.has(tool.name) ||
+          ORCHESTRATOR_TOOL_NAMES.has(tool.name) ||
           PRISM_LOCAL_TOOL_NAMES.has(tool.name),
       );
 

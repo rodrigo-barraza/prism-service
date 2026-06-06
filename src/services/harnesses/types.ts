@@ -156,7 +156,7 @@ export interface AgenticOptions {
   thinkingBudget?: number;
   webSearch?: boolean;
   agentContext?: unknown;
-  maxWorkerIterations?: number;
+  maxSubAgentIterations?: number;
   minContextLength?: number;
   tools?: ToolSchema[];
   /** Declarative tool call policies (allow/deny/askUser with argument predicates). */

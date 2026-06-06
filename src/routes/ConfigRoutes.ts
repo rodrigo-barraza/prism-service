@@ -18,7 +18,7 @@ import AgentPersonaRegistry from "../services/AgentPersonaRegistry.ts";
 import rateLimitStore from "../services/RateLimitStore.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import LocalProviderGateway from "../services/LocalProviderGateway.ts";
-import { COORDINATOR_ONLY_TOOLS } from "../services/CoordinatorPrompt.ts";
+import { ORCHESTRATOR_ONLY_TOOLS } from "../services/OrchestratorPrompt.ts";
 import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
 import {
   OPENAI_API_KEY,
@@ -365,7 +365,7 @@ router.get(
         toolCount: finalToolsCount,
         enabledToolNames: finalToolNames,
         coreToolsLocked: persona?.coreToolsLocked ?? true,
-        canSpawnWorkers: COORDINATOR_ONLY_TOOLS.includes("create_team"),
+        canSpawnSubAgents: ORCHESTRATOR_ONLY_TOOLS.includes("create_team"),
         usesDirectoryTree: persona?.usesDirectoryTree || false,
         usesCodingGuidelines: persona?.usesCodingGuidelines || false,
       };

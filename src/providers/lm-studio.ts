@@ -30,7 +30,7 @@ import {
   type PreparedMessage,
   type OpenAICompletionResponse,
 } from "../utils/openai-compat.ts";
-import { COORDINATOR_ONLY_TOOLS } from "../services/CoordinatorPrompt.ts";
+import { ORCHESTRATOR_ONLY_TOOLS } from "../services/OrchestratorPrompt.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 // ── Native /api/v1/chat SSE stream parser ────────────────────
 // The native endpoint emits named SSE events: reasoning.start/delta/end,
@@ -701,14 +701,14 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         // the loop to LM Studio, which conflicts with Prism's approval
         // gating, error budgets, and context window management.
         //
-        // Coordinator tools (team_create, etc.) are Prism-local and
+        // Orchestrator tools (team_create, etc.) are Prism-local and
         // also require this path since they can't route via MCP.
-        const coordinatorSet = new Set(COORDINATOR_ONLY_TOOLS);
-        const hasCoordinatorTools = options.tools?.some((tool) =>
-          coordinatorSet.has(tool.name),
+        const orchestratorSet = new Set(ORCHESTRATOR_ONLY_TOOLS);
+        const hasOrchestratorTools = options.tools?.some((tool) =>
+          orchestratorSet.has(tool.name),
         );
-                if (options.agent || hasCoordinatorTools) {
-          // ── OpenAI-compat path (agentic + coordinator) ─────────
+                if (options.agent || hasOrchestratorTools) {
+          // ── OpenAI-compat path (agentic + orchestrator) ─────────
           yield* this._streamOpenAICompat(prepared, model, options, baseUrl);
           return;
         }
@@ -844,7 +844,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
       }
     },
     /**
-     * OpenAI-compat streaming path — used when coordinator tools are enabled.
+     * OpenAI-compat streaming path — used when orchestrator tools are enabled.
      * Sends a standard /v1/chat/completions request with `tools` array.
      * Tool calls yield as non-native events, so Prism's agentic loop
      * executes them (including team_create, send_message, stop_agent).

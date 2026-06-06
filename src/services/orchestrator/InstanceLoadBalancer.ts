@@ -1,5 +1,5 @@
 import logger from "../../utils/logger.ts";
-import type { InstanceAssignment, WorkerState } from "../../types/coordinator.ts";
+import type { InstanceAssignment, SubAgentState } from "../../types/orchestrator.ts";
 import type { InstanceEntry } from "../../types/ProviderTypes.ts";
 
 /**
@@ -12,50 +12,50 @@ import type { InstanceEntry } from "../../types/ProviderTypes.ts";
 const instanceReservations = new Map<string, number>();
 
 export class InstanceLoadBalancer {
-  static getActiveOn(instanceId: string, activeWorkers: Map<string, WorkerState>): number {
+  static getActiveOn(instanceId: string, activeSubAgents: Map<string, SubAgentState>): number {
     const reserved = instanceReservations.get(instanceId) || 0;
-    const running = [...activeWorkers.values()].filter(
-      (worker) => worker.providerName === instanceId && worker.status === "running",
+    const running = [...activeSubAgents.values()].filter(
+      (subAgent) => subAgent.providerName === instanceId && subAgent.status === "running",
     ).length;
     return reserved + running;
   }
 
   static selectAndReserveInstance(
     siblings: InstanceEntry[],
-    coordinatorInstanceId: string,
+    orchestratorInstanceId: string,
     instanceModelOverrides: Map<string, string>,
     defaultModel: string,
-    activeWorkers: Map<string, WorkerState>,
+    activeSubAgents: Map<string, SubAgentState>,
   ): InstanceAssignment | null {
     // Debug: log the full instance state for tracing assignment decisions
     const stateSnapshot = siblings
       .map((sibling) => {
-        const active = InstanceLoadBalancer.getActiveOn(sibling.id, activeWorkers);
+        const active = InstanceLoadBalancer.getActiveOn(sibling.id, activeSubAgents);
         return `${sibling.id}(concurrency=${sibling.concurrency}, active=${active}, free=${sibling.concurrency - active})`;
       })
       .join(", ");
     logger.info(
-      `[Coordinator] selectAndReserveInstance: siblings=[${stateSnapshot}], coordinator=${coordinatorInstanceId}`,
+      `[Orchestrator] selectAndReserveInstance: siblings=[${stateSnapshot}], orchestrator=${orchestratorInstanceId}`,
     );
 
     // Two-phase assignment strategy:
     //
     // Phase 1 — Fill-first (bin-packing): saturate each instance's
     // concurrency in declaration order before spilling to the next.
-    // The coordinator's own instance gets priority when it has slots
-    // (its orchestrator inference is IDLE while workers run).
+    // The orchestrator's own instance gets priority when it has slots
+    // (its orchestrator inference is IDLE while sub-agents run).
     //
     // Phase 2 — Least-loaded overflow: when ALL instances are at
     // capacity, distribute the overflow evenly by picking the instance
-    // with the fewest active workers. This prevents piling all excess
-    // workers onto a single instance or falling through to cloud
+    // with the fewest active sub-agents. This prevents piling all excess
+    // sub-agents onto a single instance or falling through to cloud
     // fallback unnecessarily.
 
-    // Build ordered candidate list: coordinator's instance first, then rest in order
+    // Build ordered candidate list: orchestrator's instance first, then rest in order
     const ordered: InstanceEntry[] = [];
     for (const inst of siblings) {
-      if (inst.id === coordinatorInstanceId) {
-        ordered.unshift(inst); // coordinator instance goes first
+      if (inst.id === orchestratorInstanceId) {
+        ordered.unshift(inst); // orchestrator instance goes first
       } else {
         ordered.push(inst);
       }
@@ -64,7 +64,7 @@ export class InstanceLoadBalancer {
     // Phase 1: find the first instance with free concurrency slots
     let bestInstance: InstanceEntry | null = null;
     for (const inst of ordered) {
-      const active = InstanceLoadBalancer.getActiveOn(inst.id, activeWorkers);
+      const active = InstanceLoadBalancer.getActiveOn(inst.id, activeSubAgents);
       const available = inst.concurrency - active;
       if (available > 0) {
         bestInstance = inst;
@@ -78,7 +78,7 @@ export class InstanceLoadBalancer {
     if (!bestInstance && siblings.length > 0) {
       let minActive = Infinity;
       for (const inst of ordered) {
-        const active = InstanceLoadBalancer.getActiveOn(inst.id, activeWorkers);
+        const active = InstanceLoadBalancer.getActiveOn(inst.id, activeSubAgents);
         if (active < minActive) {
           minActive = active;
           bestInstance = inst;
@@ -86,18 +86,18 @@ export class InstanceLoadBalancer {
       }
       const overload = minActive - bestInstance!.concurrency;
       logger.info(
-        `[Coordinator] selectAndReserveInstance: all at capacity — overflow to ${bestInstance!.id} (active=${minActive}, overload=+${overload + 1})`,
+        `[Orchestrator] selectAndReserveInstance: all at capacity — overflow to ${bestInstance!.id} (active=${minActive}, overload=+${overload + 1})`,
       );
     }
 
     if (!bestInstance) {
       logger.info(
-        `[Coordinator] selectAndReserveInstance: no instances available`,
+        `[Orchestrator] selectAndReserveInstance: no instances available`,
       );
       return null;
     }
 
-    const activeCountForSelected = InstanceLoadBalancer.getActiveOn(bestInstance.id, activeWorkers);
+    const activeCountForSelected = InstanceLoadBalancer.getActiveOn(bestInstance.id, activeSubAgents);
     const available = bestInstance.concurrency - activeCountForSelected;
 
     // Increment reservation synchronously so the next call sees it
