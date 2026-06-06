@@ -378,12 +378,12 @@ describe("AgenticLoopService", () => {
     // Should register generation against the parent/coordinator session
     const SessionGenerationTracker = (await import("../src/services/SessionGenerationTracker.ts")).default;
     
-    // Verify register was called with the parent session ID and source: worker
+    // Verify register was called with the parent session ID and source: sub-agent
     expect(SessionGenerationTracker.register).toHaveBeenCalledWith(
       "coordinator-123", 
       expect.any(String), 
       expect.objectContaining({
-        source: "worker",
+        source: "sub-agent",
         workerId: "worker-456"
       })
     );
