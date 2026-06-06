@@ -20,6 +20,7 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import WebhookEventBus from "../WebhookEventBus.ts";
+import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import type AgenticLoopState from "../AgenticLoopState.ts";
 import type AgentHooks from "../AgentHooks.ts";
 import type {
@@ -364,6 +365,7 @@ export default class BaseAgenticHarness {
           WebhookEventBus.emit("request.tool_call.started", {
             requestId: this.ctx.requestId || null,
             toolName,
+            toolEmoji: ToolOrchestratorService.getToolEmoji(toolName),
             toolCallId,
             toolArgs: streamChunk.args || {},
             agent: this.ctx.agent || null,
@@ -391,6 +393,7 @@ export default class BaseAgenticHarness {
           WebhookEventBus.emit("request.tool_call.completed", {
             requestId: this.ctx.requestId || null,
             toolName,
+            toolEmoji: ToolOrchestratorService.getToolEmoji(toolName),
             toolCallId,
             toolResult: streamChunk.result || null,
             durationMs: null,
@@ -444,6 +447,7 @@ export default class BaseAgenticHarness {
       WebhookEventBus.emit("request.tool_call.started", {
         requestId: this.ctx.requestId || null,
         toolName,
+        toolEmoji: ToolOrchestratorService.getToolEmoji(toolName),
         toolCallId: standardToolCallId,
         toolArgs: streamChunk.args || {},
         agent: this.ctx.agent || null,
