@@ -43,7 +43,7 @@ export function createStandardHooks({
   if (enableCriticGate) {
     const criticGate = new CriticGate({ model: criticModel });
     hooks.register(
-      "beforeToolCall" as Parameters<typeof hooks.register>[0],
+      "beforeToolCall",
       criticGate.createHook() as HookHandler,
       "CriticGate",
       "decide",
@@ -55,7 +55,7 @@ export function createStandardHooks({
     policies: policies || [],
   });
   hooks.register(
-    "beforeToolCall" as Parameters<typeof hooks.register>[0],
+    "beforeToolCall",
     approvalEngine.createHook() as HookHandler,
     "AutoApprovalEngine",
     "decide",
@@ -65,14 +65,14 @@ export function createStandardHooks({
     workspaceRoot: workspaceRoot || undefined,
   });
   hooks.register(
-    "beforePrompt" as Parameters<typeof hooks.register>[0],
+    "beforePrompt",
     assembler.createHook() as HookHandler,
     "SystemPromptAssembler",
     "transform",
   );
 
   hooks.register(
-    "afterResponse" as Parameters<typeof hooks.register>[0],
+    "afterResponse",
     MemoryExtractor.createHook() as HookHandler,
     "MemoryExtractor",
     "inspect",

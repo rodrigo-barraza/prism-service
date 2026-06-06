@@ -9,7 +9,7 @@ import { getPricing, TYPES } from "../../config.ts";
 import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.ts";
 import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
-import RequestLogger, { TokenUsage, MessagePayload, ToolCallPayload } from "../RequestLogger.ts";
+import RequestLogger from "../RequestLogger.ts";
 import FileService from "../FileService.ts";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
@@ -23,8 +23,11 @@ import WebhookEventBus from "../WebhookEventBus.ts";
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import type AgenticLoopState from "../AgenticLoopState.ts";
 import type AgentHooks from "../AgentHooks.ts";
+import type { ChatMessage, TokenUsage } from "../../types/admin.ts";
+import type { MessagePayload, ToolCallPayload } from "../conversation/types.ts";
 import type {
   AgenticContext,
+  AgenticOptions,
   ResolvedTools,
   PassState,
   ChunkAction,
@@ -32,6 +35,15 @@ import type {
   StreamChunk,
   ToolCall,
 } from "./types.ts";
+
+/**
+ * Snapshot of a coordinator worker for persistence.
+ * Captures the essential identifiers and metadata for each spawned worker.
+ */
+interface WorkerSnapshot {
+  agentId: string;
+  [key: string]: unknown;
+}
 
 /**
  * BaseAgenticHarness — abstract base class that defines the contract
@@ -144,7 +156,7 @@ export default class BaseAgenticHarness {
   ): ConversationMessage[] {
     const { modelDef, options, emit } = this.context;
     const preEnforceCount = messages.length;
-    const contextResult = ContextWindowManager.enforce(messages as Parameters<typeof ContextWindowManager.enforce>[0], {
+    const contextResult = ContextWindowManager.enforce(messages as ChatMessage[], {
       maxInputTokens: modelDef?.maxInputTokens || 128_000,
       maxOutputTokens: options.maxTokens || 8192,
       toolCount,
@@ -167,7 +179,7 @@ export default class BaseAgenticHarness {
           this.state.originalMessageCount - droppedCount,
         );
       }
-      return contextResult.messages as ConversationMessage[];
+      return contextResult.messages as unknown as ConversationMessage[];
     }
     return messages;
   }
@@ -180,10 +192,10 @@ export default class BaseAgenticHarness {
    */
   createProviderStream(
     messages: ConversationMessage[],
-    passOptions: Record<string, unknown>,
+    passOptions: AgenticOptions,
   ): AsyncIterable<unknown> {
     const { provider, resolvedModel, modelDef, signal } = this.context;
-    const expandedMessages = expandMessagesForFC(messages as Parameters<typeof expandMessagesForFC>[0], {
+    const expandedMessages = expandMessagesForFC(messages as ChatMessage[], {
       filterDeleted: false,
     });
     return modelDef?.liveAPI && provider.generateTextStreamLive
@@ -257,11 +269,12 @@ export default class BaseAgenticHarness {
 
     // ── Usage event ──────────────────────────────────────
     if (streamChunk?.type === "usage") {
-      mergeUsage(state.overallUsage, streamChunk.usage as Parameters<typeof mergeUsage>[1]);
-      mergeUsage(pass.usage, streamChunk.usage as Parameters<typeof mergeUsage>[1]);
-      const usageObject = streamChunk.usage as Record<string, number> | undefined;
+      const usageChunk = streamChunk.usage as TokenUsage | undefined;
+      mergeUsage(state.overallUsage, usageChunk);
+      mergeUsage(pass.usage, usageChunk);
+      const rawUsage = streamChunk.usage as Record<string, number> | undefined;
       const reportedInput =
-        usageObject?.inputTokens || usageObject?.promptTokens || 0;
+        usageChunk?.inputTokens || rawUsage?.promptTokens || 0;
       if (reportedInput > 0 && pass.requestId) {
         SessionGenerationTracker.update(pass.requestId, {
           inputTokens: reportedInput,
@@ -570,7 +583,7 @@ export default class BaseAgenticHarness {
       pass.usage.outputTokens,
       passGenerationSec,
     );
-    const passEstimatedCost = calculateTextCost(pass.usage as Parameters<typeof calculateTextCost>[0], pricing);
+    const passEstimatedCost = calculateTextCost(pass.usage, pricing);
 
     RequestLogger.logChatGeneration({
       requestId: `${this.context.requestId}-${state.iterations}`,
@@ -587,7 +600,7 @@ export default class BaseAgenticHarness {
       parentAgentSessionId: parentAgentSessionId || null,
       traceId: traceId || null,
       success: true,
-      usage: pass.usage as unknown as TokenUsage,
+      usage: pass.usage,
       estimatedCost: passEstimatedCost,
       tokensPerSec: passTokensPerSec,
       timeToGenerationSec: pass.firstTokenTime
@@ -596,11 +609,11 @@ export default class BaseAgenticHarness {
       generationSec: passGenerationSec,
       totalSec: passTotalSec,
       options: pass.options,
-      messages: currentMessages as unknown as MessagePayload[],
+      messages: currentMessages as MessagePayload[],
       text: pass.streamedText,
       thinking: pass.streamedThinking,
       images: pass.streamedImages,
-      toolCalls: pass.pendingToolCalls as unknown as ToolCallPayload[],
+      toolCalls: pass.pendingToolCalls as ToolCallPayload[],
       outputCharacters: pass.outputCharacters,
       agenticIteration: state.iterations,
     }).catch((error: Error) =>
@@ -613,7 +626,7 @@ export default class BaseAgenticHarness {
   // ── Per-iteration pass state factory ──────────────────────
 
   /** Create a fresh per-iteration pass state object. */
-  createPassState(passOptions: Record<string, unknown>): PassState {
+  createPassState(passOptions: AgenticOptions): PassState {
     return {
       streamedText: "",
       finalStreamedText: "",
@@ -692,7 +705,7 @@ export default class BaseAgenticHarness {
         toolCalls: state.streamedToolCalls,
         audioChunks: state.streamedAudioChunks,
         audioSampleRate: state.audioSampleRate,
-        usage: state.overallUsage as Parameters<typeof finalizeTextGeneration>[1]["usage"],
+        usage: state.overallUsage,
         outputCharacters: state.overallOutputCharacters,
         timeToGenerationSec: state.overallFirstTokenTime
           ? (state.overallFirstTokenTime - requestStart) / 1000
@@ -708,7 +721,7 @@ export default class BaseAgenticHarness {
         thinkingFragments: cleanThinkingFragments,
         resolvedEnabledTools: this.tools.resolvedEnabledTools,
       },
-      newTurnMessages as Parameters<typeof finalizeTextGeneration>[2],
+      newTurnMessages as MessagePayload[],
     );
 
     // Persist worker snapshots for coordinator sessions
@@ -733,7 +746,7 @@ export default class BaseAgenticHarness {
             { projection: { workers: 1 } },
           );
           const existingWorkersList = (agentSessionDocument && agentSessionDocument.workers) || [];
-          const mergedWorkersMap = new Map<string, Record<string, unknown>>();
+          const mergedWorkersMap = new Map<string, WorkerSnapshot>();
           for (const worker of existingWorkersList) {
             mergedWorkersMap.set(worker.agentId, worker);
           }
@@ -761,7 +774,7 @@ export default class BaseAgenticHarness {
 
     // afterResponse hook (fire-and-forget)
     hooks
-      .run("afterResponse" as Parameters<typeof hooks.run>[0], context, {
+      .run("afterResponse", context, {
         text: state.finalStreamedText,
         thinking: state.streamedThinking,
         toolCalls: state.streamedToolCalls,
@@ -809,7 +822,7 @@ export default class BaseAgenticHarness {
   }
 
   private async _handleImageChunk(
-    chunk: Record<string, unknown>,
+    chunk: StreamChunk,
     pass: PassState,
   ): Promise<ChunkAction> {
     const { emit, project, username } = this.context;

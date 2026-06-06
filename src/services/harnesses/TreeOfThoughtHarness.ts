@@ -28,13 +28,37 @@ import CompactionService from "../compact/CompactionService.ts";
 import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import type { ChatMessage } from "../../types/admin.ts";
 import type {
   ConversationMessage,
   ToolCall,
   ToolSchema,
   ToolResult,
   PassState,
+  AgenticOptions,
 } from "./types.ts";
+
+/** Context passed to the beforePrompt lifecycle hook. */
+interface BeforePromptHookContext {
+  messages: ConversationMessage[];
+  project: string;
+  username: string;
+  agent?: string | null;
+  traceId?: string | null;
+  agentSessionId: string;
+  agentContext?: unknown;
+  enabledTools: string[] | null;
+  workspaceRoot?: string;
+  _injectedSkills?: string[];
+  [key: string]: unknown;
+}
+
+/** Per-iteration pass options with runtime context fields. */
+interface IterationPassOptions extends AgenticOptions {
+  project: string;
+  agent?: string | null;
+  username: string;
+}
 
 const MAX_TOOL_ITERATIONS = 25;
 const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
@@ -96,7 +120,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     } = context;
 
     const branchCount = Math.min(
-      (options as Record<string, unknown>).branchCount as number || DEFAULT_BRANCH_COUNT,
+      options.branchCount || DEFAULT_BRANCH_COUNT,
       5,
     );
 
@@ -120,7 +144,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     });
 
     // ── beforePrompt hook (once) ──────────────────────────
-    const hookContext: Record<string, unknown> & { messages: ConversationMessage[]; _injectedSkills?: string[] } = {
+    const hookContext: BeforePromptHookContext = {
       messages: currentMessages,
       project,
       username,
@@ -131,7 +155,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       enabledTools: this.tools.resolvedEnabledTools,
       workspaceRoot: workspaceRoot || undefined,
     };
-    await hooks.run("beforePrompt" as Parameters<typeof hooks.run>[0], hookContext as Parameters<typeof hooks.run>[1]);
+    await hooks.run("beforePrompt", hookContext);
 
     const assembledSystemMessage = currentMessages.find((message) => message.role === "system");
     if (assembledSystemMessage?.content) {
@@ -166,7 +190,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
         harness: "tree_of_thought",
       });
 
-      const passOptions: Record<string, unknown> = {
+      const passOptions: IterationPassOptions = {
         ...options,
         project,
         agent,
@@ -178,7 +202,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       const contextWindowSize = context.modelDef?.maxInputTokens || 128_000;
       const maxOutputTokens = options.maxTokens || 8192;
       const preEnforceTokenEstimate = ContextWindowManager.estimateTokens(
-        currentMessages as Parameters<typeof ContextWindowManager.estimateTokens>[0],
+        currentMessages as ChatMessage[],
       );
 
       const autoCompactEvaluation = AutoCompactionTrigger.evaluate(
@@ -190,7 +214,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
 
       if (autoCompactEvaluation.shouldCompact) {
         const compactionResult = await CompactionService.compactConversation(
-          currentMessages as Parameters<typeof CompactionService.compactConversation>[0],
+          currentMessages as ChatMessage[],
           {
             project: project || "",
             username: username || "",
@@ -228,7 +252,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
         iteration: state.iterations,
       });
 
-      const branchPassOptions: Record<string, unknown> = {
+      const branchPassOptions: IterationPassOptions = {
         ...passOptions,
         tools: this.tools.finalTools,
       };
@@ -573,7 +597,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     branchIndex: number,
     totalBranches: number,
     currentMessages: ConversationMessage[],
-    passOptions: Record<string, unknown>,
+    passOptions: IterationPassOptions,
     allowedToolNames: Set<string>,
   ): Promise<ScoredBranch> {
     const branchMessages = [...currentMessages];
