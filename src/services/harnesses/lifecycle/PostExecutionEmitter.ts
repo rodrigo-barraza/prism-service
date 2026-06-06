@@ -61,7 +61,7 @@ export async function processToolResultMedia(
 ): Promise<void> {
   for (const toolCall of toolCalls) {
     const toolResult = results.find(
-      (r) => r.id === toolCall.id || (!r.id && r.name === toolCall.name),
+      (result) => result.id === toolCall.id || (!result.id && result.name === toolCall.name),
     );
     const resultObject = toolResult?.result as Record<string, unknown> | null;
     const hasError = !!resultObject?.error;
@@ -150,7 +150,7 @@ export function trackToolErrors(
 ): void {
   for (const toolCall of toolCalls) {
     const toolResult = results.find(
-      (r) => r.id === toolCall.id || (!r.id && r.name === toolCall.name),
+      (result) => result.id === toolCall.id || (!result.id && result.name === toolCall.name),
     );
     const hasError = !!(toolResult?.result as Record<string, unknown>)?.error;
 
