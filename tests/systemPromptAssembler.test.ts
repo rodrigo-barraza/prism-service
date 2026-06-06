@@ -176,11 +176,11 @@ vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
 
 // ── Mock CoordinatorPrompt ───────────────────────────────────────────
 
-vi.mock("../src/services/CoordinatorPrompt.ts", () => ({
-  getCoordinatorPromptAddendum: vi.fn(
-    () => "## Coordinator Mode — Multi-Agent Orchestration\n\nMocked coordinator prompt addendum.",
+vi.mock("../src/services/OrchestratorPrompt.ts", () => ({
+  getOrchestratorPromptAddendum: vi.fn(
+    () => "## Orchestrator Mode — Multi-Agent Orchestration\n\nMocked coordinator prompt addendum.",
   ),
-  COORDINATOR_ONLY_TOOLS: ["create_team", "send_message", "stop_agent", "get_task_output", "delete_team"],
+  ORCHESTRATOR_ONLY_TOOLS: ["create_team", "send_message", "stop_agent", "get_task_output", "delete_team"],
 }));
 
 // ── Mock MongoWrapper (no DB needed) ─────────────────────────────────
@@ -264,7 +264,7 @@ global.fetch = vi.fn().mockImplementation(async (url) => {
 // ── Import after mocks ──────────────────────────────────────────────
 
 const { default: SystemPromptAssembler } = await import("../src/services/SystemPromptAssembler.ts");
-const { getCoordinatorPromptAddendum } = await import("../src/services/CoordinatorPrompt.ts");
+const { getOrchestratorPromptAddendum } = await import("../src/services/OrchestratorPrompt.ts");
 
 // ── Helper ──────────────────────────────────────────────────────────
 
@@ -278,18 +278,18 @@ describe("SystemPromptAssembler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Reset the coordinator prompt mock to return consistent output
-    (getCoordinatorPromptAddendum as ReturnType<typeof vi.fn>).mockReturnValue(
-      "## Coordinator Mode — Multi-Agent Orchestration\n\nMocked coordinator prompt addendum.",
+    // Reset the orchestrator prompt mock to return consistent output
+    (getOrchestratorPromptAddendum as ReturnType<typeof vi.fn>).mockReturnValue(
+      "## Orchestrator Mode — Multi-Agent Orchestration\n\nMocked coordinator prompt addendum.",
     );
   });
 
   // ──────────────────────────────────────────────────────────
-  // Coordinator Mode Prompt Injection
+  // Orchestrator Mode Prompt Injection
   // ──────────────────────────────────────────────────────────
 
-  describe("coordinator mode prompt injection", () => {
-    it("injects coordinator prompt when enabledTools uses label: prefix that expands to include coordinator tools", async () => {
+  describe("orchestrator mode prompt injection", () => {
+    it("injects orchestrator prompt when enabledTools uses label: prefix that expands to include orchestrator tools", async () => {
       const assembler = createAssembler();
       const { prompt } = await assembler.assemble({
         agent: "CODING",
@@ -298,11 +298,11 @@ describe("SystemPromptAssembler", () => {
         enabledTools: ["label:coding"],
       });
 
-      expect(prompt).toContain("Coordinator Mode — Multi-Agent Orchestration");
-      expect(getCoordinatorPromptAddendum).toHaveBeenCalled();
+      expect(prompt).toContain("Orchestrator Mode — Multi-Agent Orchestration");
+      expect(getOrchestratorPromptAddendum).toHaveBeenCalled();
     });
 
-    it("injects coordinator prompt when enabledTools contains explicit coordinator tool names", async () => {
+    it("injects orchestrator prompt when enabledTools contains explicit orchestrator tool names", async () => {
       const assembler = createAssembler();
       const { prompt } = await assembler.assemble({
         agent: "CODING",
@@ -311,11 +311,11 @@ describe("SystemPromptAssembler", () => {
         enabledTools: ["read_file", "write_file", "create_team", "send_message"],
       });
 
-      expect(prompt).toContain("Coordinator Mode — Multi-Agent Orchestration");
-      expect(getCoordinatorPromptAddendum).toHaveBeenCalled();
+      expect(prompt).toContain("Orchestrator Mode — Multi-Agent Orchestration");
+      expect(getOrchestratorPromptAddendum).toHaveBeenCalled();
     });
 
-    it("skips coordinator prompt when enabledTools resolves to no coordinator tools", async () => {
+    it("skips orchestrator prompt when enabledTools resolves to no orchestrator tools", async () => {
       const assembler = createAssembler();
       const { prompt } = await assembler.assemble({
         agent: "CODING",
@@ -324,11 +324,11 @@ describe("SystemPromptAssembler", () => {
         enabledTools: ["label:weather"],
       });
 
-      expect(prompt).not.toContain("Coordinator Mode — Multi-Agent Orchestration");
-      expect(getCoordinatorPromptAddendum).not.toHaveBeenCalled();
+      expect(prompt).not.toContain("Orchestrator Mode — Multi-Agent Orchestration");
+      expect(getOrchestratorPromptAddendum).not.toHaveBeenCalled();
     });
 
-    it("injects coordinator prompt when enabledTools is null (all tools assumed available)", async () => {
+    it("injects orchestrator prompt when enabledTools is null (all tools assumed available)", async () => {
       const assembler = createAssembler();
       const { prompt } = await assembler.assemble({
         agent: "CODING",
@@ -337,10 +337,10 @@ describe("SystemPromptAssembler", () => {
         enabledTools: undefined,
       });
 
-      expect(prompt).toContain("Coordinator Mode — Multi-Agent Orchestration");
+      expect(prompt).toContain("Orchestrator Mode — Multi-Agent Orchestration");
     });
 
-    it("skips coordinator prompt when explicit tool list has no coordinator tools", async () => {
+    it("skips orchestrator prompt when explicit tool list has no orchestrator tools", async () => {
       const assembler = createAssembler();
       const { prompt } = await assembler.assemble({
         agent: "CODING",
@@ -349,10 +349,10 @@ describe("SystemPromptAssembler", () => {
         enabledTools: ["read_file", "write_file", "get_weather"],
       });
 
-      expect(prompt).not.toContain("Coordinator Mode — Multi-Agent Orchestration");
+      expect(prompt).not.toContain("Orchestrator Mode — Multi-Agent Orchestration");
     });
 
-    it("injects coordinator prompt when enabledTools uses domainKey: prefix for core tools", async () => {
+    it("injects orchestrator prompt when enabledTools uses domainKey: prefix for core tools", async () => {
       const assembler = createAssembler();
       const { prompt } = await assembler.assemble({
         agent: "CODING",
@@ -361,10 +361,10 @@ describe("SystemPromptAssembler", () => {
         enabledTools: ["domainKey:core"],
       });
 
-      expect(prompt).toContain("Coordinator Mode — Multi-Agent Orchestration");
+      expect(prompt).toContain("Orchestrator Mode — Multi-Agent Orchestration");
     });
 
-    it("injects coordinator prompt when enabledTools uses domain: prefix for Core Tools", async () => {
+    it("injects orchestrator prompt when enabledTools uses domain: prefix for Core Tools", async () => {
       const assembler = createAssembler();
       const { prompt } = await assembler.assemble({
         agent: "CODING",
@@ -373,10 +373,10 @@ describe("SystemPromptAssembler", () => {
         enabledTools: ["domain:Core Tools"],
       });
 
-      expect(prompt).toContain("Coordinator Mode — Multi-Agent Orchestration");
+      expect(prompt).toContain("Orchestrator Mode — Multi-Agent Orchestration");
     });
 
-    it("skips coordinator prompt for persona with usesCodingGuidelines: false even if tools are available", async () => {
+    it("skips orchestrator prompt for persona with usesCodingGuidelines: false even if tools are available", async () => {
       const assembler = createAssembler();
       const { prompt } = await assembler.assemble({
         agent: "LUPOS",
@@ -385,10 +385,10 @@ describe("SystemPromptAssembler", () => {
         enabledTools: ["create_team", "send_message"],
       });
 
-      expect(prompt).not.toContain("Coordinator Mode — Multi-Agent Orchestration");
+      expect(prompt).not.toContain("Orchestrator Mode — Multi-Agent Orchestration");
     });
 
-    it("ensures parent and cron job paths produce identical coordinator behavior for label:coding", async () => {
+    it("ensures parent and cron job paths produce identical orchestrator behavior for label:coding", async () => {
       const assembler = createAssembler();
 
       // Path 1: Parent request — uses label: prefix (the previously-broken path)
@@ -407,12 +407,12 @@ describe("SystemPromptAssembler", () => {
         enabledTools: ["read_file", "write_file", "search_web", "create_team", "send_message", "stop_agent", "think"],
       });
 
-      const parentHasCoordinator = parentResult.prompt.includes("Coordinator Mode — Multi-Agent Orchestration");
-      const cronHasCoordinator = cronResult.prompt.includes("Coordinator Mode — Multi-Agent Orchestration");
+      const parentHasOrchestrator = parentResult.prompt.includes("Orchestrator Mode — Multi-Agent Orchestration");
+      const cronHasOrchestrator = cronResult.prompt.includes("Orchestrator Mode — Multi-Agent Orchestration");
 
-      expect(parentHasCoordinator).toBe(true);
-      expect(cronHasCoordinator).toBe(true);
-      expect(parentHasCoordinator).toBe(cronHasCoordinator);
+      expect(parentHasOrchestrator).toBe(true);
+      expect(cronHasOrchestrator).toBe(true);
+      expect(parentHasOrchestrator).toBe(cronHasOrchestrator);
     });
   });
 
@@ -444,7 +444,7 @@ describe("SystemPromptAssembler", () => {
       expect(prompt).not.toContain("Coding Guidelines");
     });
 
-    it("skips coordinator prompt in direct mode", async () => {
+    it("skips orchestrator prompt in direct mode", async () => {
       const assembler = createAssembler();
       const { prompt } = await assembler.assemble({
         agent: null,
@@ -453,7 +453,7 @@ describe("SystemPromptAssembler", () => {
         enabledTools: ["create_team", "send_message"],
       });
 
-      expect(prompt).not.toContain("Coordinator Mode");
+      expect(prompt).not.toContain("Orchestrator Mode");
     });
 
     it("still includes environment section in direct mode", async () => {

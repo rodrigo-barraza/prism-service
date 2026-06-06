@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock the GitWorktreeHelper to avoid disk operations
-vi.mock("../src/services/coordinator/GitWorktreeHelper.ts", () => ({
+vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
   GitWorktreeHelper: {
     getDefaultWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
     resolveRepoPath: vi.fn().mockReturnValue("/workspace"),
@@ -18,22 +18,22 @@ vi.mock("../src/services/coordinator/GitWorktreeHelper.ts", () => ({
 }));
 
 import AgenticLoopService from "../src/services/AgenticLoopService.ts";
-import CoordinatorService from "../src/services/CoordinatorService.ts";
+import OrchestratorService from "../src/services/OrchestratorService.ts";
 import AgentPersonaRegistry from "../src/services/AgentPersonaRegistry.ts";
-import { GitWorktreeHelper } from "../src/services/coordinator/GitWorktreeHelper.ts";
+import { GitWorktreeHelper } from "../src/services/orchestrator/GitWorktreeHelper.ts";
 
 const mockRunAgenticLoop = vi.fn().mockResolvedValue({
-  messages: [{ role: "assistant", content: "Mock worker output" }],
+  messages: [{ role: "assistant", content: "Mock sub-agent output" }],
 });
 
-describe("CoordinatorService Spawning & Agent Types", () => {
-  let coordinatorContext: any;
+describe("OrchestratorService Spawning & Agent Types", () => {
+  let orchestratorContext: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.spyOn(AgenticLoopService, "runAgenticLoop").mockImplementation(mockRunAgenticLoop);
 
-    coordinatorContext = {
+    orchestratorContext = {
       project: "test-project",
       username: "test-user",
       agent: "CODING",
@@ -47,12 +47,12 @@ describe("CoordinatorService Spawning & Agent Types", () => {
     };
   });
 
-  it("should spawn worker that inherits parent agent type and enabled tools by default", async () => {
-    const result = await CoordinatorService.spawnFromTool({
-      description: "Default spawn worker",
+  it("should spawn sub-agent that inherits parent agent type and enabled tools by default", async () => {
+    const result = await OrchestratorService.spawnFromTool({
+      description: "Default spawn sub-agent",
       prompt: "Do default stuff",
       files: [],
-      coordinatorContext,
+      orchestratorContext,
     });
 
     expect(result).toBeDefined();
@@ -68,7 +68,7 @@ describe("CoordinatorService Spawning & Agent Types", () => {
     expect(runArgs.options.enabledTools).toEqual(["read_file", "write_file", "search_web"]);
   });
 
-  it("should spawn worker with custom agent type and its native tools when agent is specified", async () => {
+  it("should spawn sub-agent with custom agent type and its native tools when agent is specified", async () => {
     // LuposPersona is a registered built-in persona
     const luposPersona = AgentPersonaRegistry.get("LUPOS");
     expect(luposPersona).not.toBeNull();
@@ -77,12 +77,12 @@ describe("CoordinatorService Spawning & Agent Types", () => {
     // Clear calls for this test to have predictable indices
     mockRunAgenticLoop.mockClear();
 
-    const result = await CoordinatorService.spawnFromTool({
-      description: "Custom Lupos worker",
+    const result = await OrchestratorService.spawnFromTool({
+      description: "Custom Lupos sub-agent",
       prompt: "Do Lupos stuff",
       agent: "Lupos",
       files: [],
-      coordinatorContext,
+      orchestratorContext,
     });
 
     expect(result).toBeDefined();
@@ -91,9 +91,9 @@ describe("CoordinatorService Spawning & Agent Types", () => {
     expect(mockRunAgenticLoop).toHaveBeenCalled();
     const runArgs = mockRunAgenticLoop.mock.calls[0][0]; // first call in this test
 
-    // Worker agent type is LUPOS
+    // Sub-agent agent type is LUPOS
     expect(runArgs.agent).toBe("LUPOS");
-    // Worker tools are Lupos's availableTools, NOT inherited parent tools
+    // Sub-agent tools are Lupos's availableTools, NOT inherited parent tools
     expect(runArgs.options.enabledTools).toEqual(luposTools);
   });
 
@@ -106,11 +106,11 @@ describe("CoordinatorService Spawning & Agent Types", () => {
       name: "custom_team",
       members: [
         {
-          description: "Worker 1 (default)",
+          description: "Sub-agent 1 (default)",
           prompt: "Default prompt",
         },
         {
-          description: "Worker 2 (Lupos)",
+          description: "Sub-agent 2 (Lupos)",
           prompt: "Lupos prompt",
           agent: "Lupos",
         },
@@ -120,7 +120,7 @@ describe("CoordinatorService Spawning & Agent Types", () => {
     // Clear calls for this test to have predictable indices
     mockRunAgenticLoop.mockClear();
 
-    const results = await CoordinatorService.createTeam(teamArgs, coordinatorContext);
+    const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
 
     expect(results).toHaveLength(2);
     expect(mockRunAgenticLoop).toHaveBeenCalledTimes(2);
