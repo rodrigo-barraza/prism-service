@@ -25,6 +25,7 @@ export interface ChangeStreamEventPayload {
   updatedFields: string[] | null;
   timestamp: string;
   isGenerating?: boolean;
+  conversationId?: string | null;
 }
 
 export type ChangeStreamCallback = (payload: ChangeStreamEventPayload) => void;
@@ -78,6 +79,11 @@ function openStream(db: Db, collectionName: string) {
         } else if (fullDocument?.isGenerating !== undefined) {
           payload.isGenerating = fullDocument.isGenerating as boolean;
         }
+      }
+
+      // Enrich requests with conversationId for session-scoped live updates
+      if (collectionName === COLLECTIONS.REQUESTS && fullDocument?.conversationId) {
+        payload.conversationId = fullDocument.conversationId as string;
       }
 
       // Broadcast to all registered listeners
