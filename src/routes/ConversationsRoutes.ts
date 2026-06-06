@@ -37,6 +37,7 @@ const CONVERSATION_LIST_PROJECTION = {
   model: 1,
   modelNames: 1,
   settings: 1,
+  parentAgentSessionId: 1,
 } as const;
 
 interface ConversationDocument {
