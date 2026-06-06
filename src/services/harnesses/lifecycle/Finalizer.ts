@@ -218,11 +218,11 @@ function swapMessageContent(message: MessagePayload) {
         );
       } else {
                 const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
-                estimatedCost = calculateTextCost(usage as Parameters<typeof calculateTextCost>[0], pricing);
+                estimatedCost = calculateTextCost(usage, pricing);
       }
     } else {
             const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
-            estimatedCost = calculateTextCost(usage as Parameters<typeof calculateTextCost>[0], pricing);
+            estimatedCost = calculateTextCost(usage, pricing);
     }
         tokensPerSec = calculateTokensPerSec(usage.outputTokens || 0, generationSec, {
             providerReported: usage.tokensPerSec as number | undefined,
@@ -230,7 +230,7 @@ function swapMessageContent(message: MessagePayload) {
     });
   }
   // ── Console logging ───────────────────────────────────────────
-    const inputTokens = usage ? getTotalInputTokens(usage as Parameters<typeof getTotalInputTokens>[0]) : 0;
+    const inputTokens = usage ? getTotalInputTokens(usage) : 0;
     const outputTokens = usage?.outputTokens || 0;
   const tokensPerSecondString =
     tokensPerSec !== null ? tokensPerSec.toFixed(1) : "N/A";

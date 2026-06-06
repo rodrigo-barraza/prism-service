@@ -220,7 +220,7 @@ export interface PassState {
   generationEnd: number | null;
   outputCharacters: number;
   usage: UsageAccumulator;
-  options: Record<string, unknown>;
+  options: AgenticOptions;
   requestId: string | null;
   /** Provider stop reason — "length"/"max_tokens" when output was truncated by token budget. */
   stopReason?: string;

@@ -33,7 +33,37 @@ import AutoCompactionTrigger from "../compact/AutoCompactionTrigger.ts";
 import CompactionService from "../compact/CompactionService.ts";
 import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 
-import type { ConversationMessage, ToolCall, ToolSchema, ToolResult } from "./types.ts";
+import type { ChatMessage } from "../../types/admin.ts";
+import type { ConversationMessage, ToolCall, ToolSchema, ToolResult, AgenticOptions } from "./types.ts";
+
+/**
+ * Context object passed to the beforePrompt lifecycle hook.
+ * Carries all the data the hook pipeline needs to assemble the system prompt,
+ * inject skills, and mutate the message array before the first LLM call.
+ */
+interface BeforePromptHookContext {
+  messages: ConversationMessage[];
+  project: string;
+  username: string;
+  agent?: string | null;
+  traceId?: string | null;
+  agentSessionId: string;
+  agentContext?: unknown;
+  enabledTools: string[] | null;
+  workspaceRoot?: string;
+  _injectedSkills?: string[];
+  [key: string]: unknown;
+}
+
+/**
+ * Per-iteration pass options combining the user's AgenticOptions with
+ * runtime context fields needed by the provider and lifecycle modules.
+ */
+interface IterationPassOptions extends AgenticOptions {
+  project: string;
+  agent?: string | null;
+  username: string;
+}
 
 const MAX_TOOL_ITERATIONS = 25;
 const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
@@ -123,7 +153,7 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       // ── beforePrompt hook (iteration 1 only) ──────────────
       if (state.iterations === 1) {
-        const hookContext: Record<string, unknown> & { messages: ConversationMessage[]; _injectedSkills?: string[] } = {
+        const hookContext: BeforePromptHookContext = {
           messages: currentMessages,
           project,
           username,
@@ -134,7 +164,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           enabledTools: this.tools.resolvedEnabledTools,
           workspaceRoot: workspaceRoot || undefined,
         };
-        await hooks.run("beforePrompt" as Parameters<typeof hooks.run>[0], hookContext as Parameters<typeof hooks.run>[1]);
+        await hooks.run("beforePrompt", hookContext);
 
         // ── Persist assembled system prompt to conversationMeta ──
         // SystemPromptAssembler prepends the system message at runtime
@@ -167,25 +197,27 @@ export default class ReActHarness extends BaseAgenticHarness {
       }
 
       // ── Build pass options ─────────────────────────────────
-      const passOptions: Record<string, unknown> = {
+      const passOptions: IterationPassOptions = {
         ...options,
         project,
         agent,
         username,
       };
       if (state.planModeActive) {
-        passOptions.tools = this.tools.finalTools.filter(
+        const planModeTools = this.tools.finalTools.filter(
           (tool: ToolSchema) => tool.name === "exit_plan_mode",
         );
+        passOptions.tools = planModeTools;
         logger.info(
-          `[PlanningMode] Sending ${(passOptions.tools as ToolSchema[]).length} tools to provider: ${(passOptions.tools as ToolSchema[]).map((tool: ToolSchema) => tool.name).join(", ")}`,
+          `[PlanningMode] Sending ${planModeTools.length} tools to provider: ${planModeTools.map((tool: ToolSchema) => tool.name).join(", ")}`,
         );
       } else {
         passOptions.tools = this.tools.finalTools;
       }
 
+      const resolvedPassTools = passOptions.tools || [];
       const allowedToolNames = new Set(
-        ((passOptions.tools as ToolSchema[]) || []).map((tool: ToolSchema) => tool.name),
+        resolvedPassTools.map((tool: ToolSchema) => tool.name),
       );
 
       // ── Auto-compaction trigger ─────────────────────────────
@@ -195,7 +227,7 @@ export default class ReActHarness extends BaseAgenticHarness {
       const contextWindowSize = context.modelDef?.maxInputTokens || 128_000;
       const maxOutputTokens = options.maxTokens || 8192;
       const preEnforceTokenEstimate = ContextWindowManager.estimateTokens(
-        currentMessages as Parameters<typeof ContextWindowManager.estimateTokens>[0],
+        currentMessages as ChatMessage[],
       );
 
       const autoCompactEvaluation = AutoCompactionTrigger.evaluate(
@@ -207,7 +239,7 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       if (autoCompactEvaluation.shouldCompact) {
         const compactionResult = await CompactionService.compactConversation(
-          currentMessages as Parameters<typeof CompactionService.compactConversation>[0],
+          currentMessages as ChatMessage[],
           {
             project: project || "",
             username: username || "",
