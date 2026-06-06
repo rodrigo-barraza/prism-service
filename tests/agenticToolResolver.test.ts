@@ -79,6 +79,7 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
         labels: ["coding"],
       })),
     ),
+    getToolEmoji: vi.fn().mockReturnValue(null),
   },
 }));
 

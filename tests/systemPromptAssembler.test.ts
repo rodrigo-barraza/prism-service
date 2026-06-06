@@ -121,6 +121,7 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
     getToolSchemas: vi.fn(() => ALL_AI_SCHEMAS),
     getClientToolSchemas: vi.fn(() => ALL_CLIENT_SCHEMAS),
     getWorkspaceRoot: vi.fn(() => "/home/rodrigo/development"),
+    getToolEmoji: vi.fn().mockReturnValue(null),
   },
 }));
 

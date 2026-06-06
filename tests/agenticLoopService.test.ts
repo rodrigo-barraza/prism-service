@@ -30,6 +30,7 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
     getMCPToolSchemas: vi.fn().mockReturnValue([]),
     executeTool: vi.fn().mockResolvedValue({ success: true, result: "mocked" }),
     isStreamable: vi.fn().mockReturnValue(false),
+    getToolEmoji: vi.fn().mockReturnValue(null),
   },
 }));
 
