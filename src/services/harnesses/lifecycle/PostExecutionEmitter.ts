@@ -6,6 +6,7 @@ import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type { ToolCall, ToolResult, PassState, EmitFunction, AgenticContext } from "../types.ts";
 import FileService from "../../FileService.ts";
 import WebhookEventBus from "../../WebhookEventBus.ts";
+import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
 
 /**
  * PostExecutionEmitter — status notifications emitted after tool execution.
@@ -97,6 +98,7 @@ export async function processToolResultMedia(
     WebhookEventBus.emit("request.tool_call.completed", {
       requestId: context?.requestId || null,
       toolName: toolCall.name,
+      toolEmoji: ToolOrchestratorService.getToolEmoji(toolCall.name),
       toolCallId: toolCall.id,
       toolResult: resultObject,
       durationMs: toolResult?.durationMs || null,

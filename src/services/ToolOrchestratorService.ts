@@ -685,6 +685,11 @@ export default class ToolOrchestratorService {
     return activeWorktrees.get(agentSessionId) || null;
   }
 
+  static getToolEmoji(toolName: string): string | null {
+    const schema = toolMap.get(toolName);
+    return (schema?.emoji as string) ?? null;
+  }
+
   static getToolFields(toolName: string) {
     const tool = cachedAISchemas.find((tool) => tool.name === toolName);
     if (!tool) return null;
