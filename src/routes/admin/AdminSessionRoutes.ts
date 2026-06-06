@@ -197,6 +197,7 @@ agentSessionRouter.get(
       const {
         project,
         agent,
+        search,
         from,
         to,
         sort = "updatedAt",
@@ -207,6 +208,14 @@ agentSessionRouter.get(
       const queryFilter: Record<string, unknown> = {};
       if (project) queryFilter.project = project;
       if (agent) queryFilter.agent = agent;
+      if (search) {
+        const regex = { $regex: search, $options: "i" };
+        queryFilter.$or = [
+          { title: regex },
+          { project: regex },
+          { agent: regex },
+        ];
+      }
       applyDateRangeFilter(queryFilter, from as string, to as string, "updatedAt");
 
       const [sessionDocuments, totalSessionsCount] = await Promise.all([
