@@ -403,6 +403,7 @@ export default class CoordinatorService {
     }
 
     const workerResult = buildWorkerResult(workerState);
+    workerState.messages = null; // Release heavy message data from RAM after copying to result
     logger.info(
       `[Coordinator] Worker ${agentId} result: status=${workerResult.status} toolUses=${workerResult.toolUses} durationMs=${workerResult.durationMs}`,
     );
@@ -502,7 +503,9 @@ export default class CoordinatorService {
       };
     }
 
-    return buildWorkerResult(worker);
+    const workerResult = buildWorkerResult(worker);
+    worker.messages = null; // Release heavy message data from RAM after copying to result
+    return workerResult;
   }
 
   static async abortWorkersByConversation(parentConversationId: string) {
@@ -852,8 +855,19 @@ export default class CoordinatorService {
     // workerMessages on error/abort paths where the loop didn't return.
     const finalMessages = loopResult?.messages || workerMessages;
 
-    // Always populate — including on abort/error paths
-    worker.output = getLastAssistantText(finalMessages as ConversationMessage[]) || telemetry.output;
+    // Capture output using a robust fallback chain:
+    // 1. Last assistant message from the harness's returned conversation
+    // 2. Telemetry-captured streamed chunks (accumulated from chunk events)
+    // 3. Empty string as last resort
+    const messagesOutput = getLastAssistantText(finalMessages as ConversationMessage[]);
+    const telemetryOutput = (telemetry.output || "").trim();
+    worker.output = messagesOutput || telemetryOutput;
+    if (!worker.output && worker.status !== "stopped") {
+      logger.warn(
+        `[Coordinator] Worker ${worker.agentId} completed with empty output. ` +
+          `messages=${finalMessages.length}, telemetryOutput=${telemetryOutput.length}chars`,
+      );
+    }
     worker.toolCalls = telemetry.toolCalls as ToolCall[];
     worker.messages = finalMessages as ConversationMessage[];
     worker.durationMs = Date.now() - worker.startedAt;
@@ -884,9 +898,9 @@ export default class CoordinatorService {
 
     // ── Release heavy data from completed workers ──────────────
     // The messages array can be tens of MBs (includes tool results,
-    // code snippets, base64 images). Strip it now — getTaskOutput
-    // only needs worker.output (the final assistant text).
-    worker.messages = null;
+    // code snippets, base64 images). We release this memory from RAM
+    // in spawnFromTool and getTaskOutput once the orchestrator builds
+    // the result payload.
     worker.abortController = null;
     // Remove worktree now that the diff has been collected — prevents orphaned
     // worktrees from accumulating on disk across sessions.

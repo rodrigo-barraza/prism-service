@@ -37,9 +37,11 @@ export function buildWorkerResult(worker: WorkerState): WorkerResult {
         ? `Agent "${worker.description}" failed: ${worker.error || "Unknown error"}`
         : `Agent "${worker.description}" was stopped`;
 
-  // Return the full last assistant message text (no truncation).
-  // Like Claude Code, we trust the model to produce a concise final report.
-  const lastText = getLastAssistantText(worker.messages || []);
+  // worker.output is set during _runWorkerLoop from getLastAssistantText()
+  // on the live messages array, then falls back to telemetry.output (streamed
+  // chunks). worker.messages is nulled after the loop to release memory, so
+  // we use worker.output directly as the primary text source.
+  const lastText = (worker.output || "").trim() || getLastAssistantText(worker.messages || []);
 
   // Aggregate tool call names into { name: count } for frontend badge display
   const toolNames: Record<string, number> = {};
@@ -55,7 +57,7 @@ export function buildWorkerResult(worker: WorkerState): WorkerResult {
     description: worker.description,
     status,
     summary,
-    result: lastText || (worker.output || "").trim() || null,
+    result: lastText || null,
     toolUses: worker.toolCalls?.length || 0,
     toolNames: Object.keys(toolNames).length > 0 ? toolNames : undefined,
     iterations: worker.iterations || 0,
