@@ -472,6 +472,8 @@ function swapMessageContent(message: MessagePayload) {
       agent: agent || undefined,
       workspaceRoot: workspaceRoot || undefined,
       toolConfig: toolConfig || undefined,
+      harness: options.harness || undefined,
+      topology: options.topology || undefined,
     };
 
     const finalMeta: Record<string, unknown> = {

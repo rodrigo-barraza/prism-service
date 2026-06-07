@@ -143,9 +143,10 @@ vi.mock('../src/services/ConversationService.ts', () => ({
 vi.mock('../src/services/RequestLogger.ts', () => ({
     default: {
         log: vi.fn(),
-        logChatGeneration: vi.fn(),
+        logChatGeneration: vi.fn().mockResolvedValue(undefined),
     },
 }));
+
 
 // ── Build mock provider functions ─────────────────────────────────────
 export const MOCK_GENERATE_TEXT = vi.fn().mockResolvedValue({

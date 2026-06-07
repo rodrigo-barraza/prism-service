@@ -986,6 +986,9 @@ export default class ToolOrchestratorService {
 
       // Inherit the exact list of tools enabled in the parent context
       enabledTools: context.enabledTools || null,
+
+      // Topology to use for sub-agent coordination
+      topology: context._topology || null,
     };
 
     switch (name) {

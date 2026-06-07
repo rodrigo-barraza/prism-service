@@ -53,17 +53,21 @@ export default class AgenticLoopService {
 
     // 3. Select harness (from request option → persisted settings → default)
     let harnessId = options.harness;
-    if (!harnessId) {
+    let topologyId = options.topology;
+    if (!harnessId || !topologyId) {
       try {
         const { default: SettingsService } =
           await import("./SettingsService.js");
         const agentSettings = await SettingsService.getSection("agents");
-        harnessId = agentSettings?.harness || "standard";
+        if (!harnessId) harnessId = agentSettings?.harness || "standard";
+        if (!topologyId) topologyId = agentSettings?.topology || "hierarchical";
       } catch {
-        harnessId = "standard";
+        if (!harnessId) harnessId = "standard";
+        if (!topologyId) topologyId = "hierarchical";
       }
     }
     options.harness = harnessId;
+    options.topology = topologyId;
     const HarnessClass = HarnessRegistry.get(harnessId)!;
     logger.info(
       `[AgenticLoop] Using harness: "${HarnessClass.id}" (${HarnessClass.label})`,

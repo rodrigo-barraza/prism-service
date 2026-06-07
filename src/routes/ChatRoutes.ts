@@ -159,6 +159,7 @@ async function prepareGenerationContext(
     clientIp,
     agent,
     harness,
+    topology,
     // Generation options — flat at top-level (OpenAI-style)
     tools,
     temperature,
@@ -253,6 +254,7 @@ async function prepareGenerationContext(
     ...(enableCriticGate != null && { enableCriticGate }),
     ...(criticModel != null && { criticModel }),
     ...(harness != null && { harness }),
+    ...(topology != null && { topology }),
     ...(parallelToolCalls != null && { parallelToolCalls }),
     ...(candidateCount != null && { candidateCount }),
     ...(responseMimeType != null && responseMimeType !== "" && { responseMimeType }),
