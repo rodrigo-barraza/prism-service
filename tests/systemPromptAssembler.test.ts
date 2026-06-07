@@ -271,7 +271,7 @@ global.fetch = vi.fn().mockImplementation(async (url) => {
 
 // ── Import after mocks ──────────────────────────────────────────────
 
-const { default: SystemPromptAssembler } = await import("../src/services/SystemPromptAssembler.ts");
+const { default: SystemPromptAssembler } = await import("../src/services/system-prompt/index.ts");
 const { getOrchestratorPromptAddendum } = await import("../src/services/OrchestratorPrompt.ts");
 
 // ── Helper ──────────────────────────────────────────────────────────

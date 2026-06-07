@@ -2,7 +2,7 @@
 
 import logger from "../utils/logger.ts";
 import { getInstance, isInstance } from "../providers/instance-registry.ts";
-import { LOCAL_PROVIDER_TYPES } from "./LocalProviderGateway.ts";
+import { LOCAL_PROVIDER_TYPES } from "./local-provider/constants.ts";
 
 // Providers that hit the local GPU — sourced from LocalProviderGateway
 const LOCAL_PROVIDERS = LOCAL_PROVIDER_TYPES;

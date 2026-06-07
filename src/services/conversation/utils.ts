@@ -97,8 +97,7 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
     thinking: false,
   };
 
-  // TODO(cleanup): Remove "web_search" and "web_search_preview" once historical sessions have aged out
-  const WEB_SEARCH_NAMES: Set<string> = new Set([TOOL_NAMES.WEB_SEARCH, TOOL_NAMES.SEARCH_WEB, TOOL_NAMES.WEB_SEARCH_PREVIEW, TOOL_NAMES.SEARCH_WEB_PREVIEW]);
+  const WEB_SEARCH_NAMES: Set<string> = new Set([TOOL_NAMES.SEARCH_WEB, TOOL_NAMES.SEARCH_WEB_PREVIEW]);
   const CODE_EXEC_NAMES: Set<string> = new Set([TOOL_NAMES.CODE_EXECUTION]);
 
   for (const m of messages || []) {

@@ -238,7 +238,6 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       expect.objectContaining({
         $set: expect.objectContaining({
           "settings.agents.topology": "peer_to_peer",
-          "settings.topology": "peer_to_peer",
         }),
       })
     );
