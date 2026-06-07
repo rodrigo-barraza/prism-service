@@ -215,6 +215,26 @@ describe("Topology Routers Test Suite", () => {
       expect(GitWorktreeHelper.mergeWorktree).toHaveBeenCalledTimes(4);
     });
 
+    it("should scale max turns dynamically to cover all members when team size exceeds 8", async () => {
+      const router = new PeerToPeerRouter();
+      const members = Array.from({ length: 10 }, (_, index) => ({
+        agent: `Agent-${index}`,
+        description: `Task ${index}`,
+        prompt: `Prompt ${index}`,
+      }));
+
+      const results = await router.execute("large-team", members, orchestratorContext, spawnSubAgentMock);
+
+      // Math.max(10, Math.min(20, 10 * 2)) = 20 turns
+      expect(results).toHaveLength(20);
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(20);
+
+      // Check that every agent gets spawned at least once (first 10 calls should map to indices 0 to 9)
+      for (let index = 0; index < 10; index++) {
+        expect(spawnSubAgentMock.mock.calls[index][0].agent).toBe(`Agent-${index}`);
+      }
+    });
+
     it("should exit early when an agent replies with [DONE]", async () => {
       const router = new PeerToPeerRouter();
       const members = [
