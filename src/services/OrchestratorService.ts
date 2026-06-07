@@ -656,6 +656,36 @@ export default class OrchestratorService {
       `[Orchestrator] createTeam: routing via active topology "${topology}" for ${args.members.length} member(s)...`,
     );
 
+    // Sync the active topology to the session settings in MongoDB so the UI badge and state match execution
+    if (orchestratorContext.conversationId) {
+      try {
+        const { MONGO_DB_NAME: dbName } = await import("../../config.ts");
+        const { COLLECTIONS: colNames } = await import("../constants.ts");
+        const MongoWrapper = (await import("../wrappers/MongoWrapper.ts")).default;
+        const dbCollection = MongoWrapper.getCollection(dbName, colNames.AGENT_CONVERSATIONS);
+        
+        if (dbCollection) {
+          await dbCollection.updateOne(
+            { id: orchestratorContext.conversationId },
+            {
+              $set: {
+                "settings.agents.topology": topology,
+                "settings.topology": topology, // sync legacy fallback
+                updatedAt: new Date().toISOString(),
+              },
+            }
+          );
+          logger.info(
+            `[Orchestrator] Updated session settings topology to "${topology}" for conversation ${orchestratorContext.conversationId}`
+          );
+        }
+      } catch (dbError) {
+        logger.warn(
+          `[Orchestrator] Failed to update session settings topology in MongoDB: ${getErrorMessage(dbError)}`
+        );
+      }
+    }
+
     let router: TopologyRouter;
     if (topology === "sequential") {
       const { SequentialRouter } = await import("./orchestrator/routers/SequentialRouter.ts");
