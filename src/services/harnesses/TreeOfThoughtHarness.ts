@@ -294,6 +294,10 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       const selectedBranch = scoredBranches[0];
       state.selectedBranchScores.push(selectedBranch.score);
 
+      // Update the shared state with the selected branch's content to fix the race condition where parallel branches overwrite the shared state
+      state.finalStreamedText = selectedBranch.pass.finalStreamedText;
+      state.streamedThinking = selectedBranch.pass.streamedThinking;
+
       emit({
         type: SSE_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.BRANCH_SELECTED,
@@ -547,8 +551,10 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     }
 
     // ── Exhaustion Recovery Pass ─────────────────────────────
-    // Triggers when the loop hit max iterations without a clean text-only break.
-    if (state.iterations >= resolvedMaxIterations && !hasCleanTextBreak) {
+    // Triggers when the agent used tools but never produced a clean text-only
+    // break — regardless of how the loop exited (max iterations, empty output,
+    // truncation exhaustion). Skipped when signal is aborted.
+    if (!hasCleanTextBreak && state.streamedToolCalls.length > 0 && !signal?.aborted) {
       await runExhaustionRecoveryPass(this, context, state, currentMessages);
     }
 

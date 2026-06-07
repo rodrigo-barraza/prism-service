@@ -347,5 +347,98 @@ describe("Topology Routers Test Suite", () => {
       expect(results).toHaveLength(3);
       expect(spawnSubAgentMock).toHaveBeenCalledTimes(3);
     });
+
+    it("should use structured tool-call fallback in shared discussion when result is null", async () => {
+      const router = new PeerToPeerRouter();
+      const members = [
+        { agent: "Researcher", description: "Research Agent", prompt: "Research topic X" },
+        { agent: "Analyst", description: "Analysis Agent", prompt: "Analyze findings" },
+      ];
+
+      // First agent returns null result with tool metadata (simulates exhaustion without recovery text)
+      spawnSubAgentMock.mockResolvedValueOnce({
+        agent_id: "agent-researcher",
+        description: "Research Agent",
+        status: "completed",
+        result: null,
+        summary: 'Agent "Research Agent" completed',
+        toolUses: 8,
+        toolNames: { web_search: 5, read_file: 3 },
+        iterations: 15,
+        durationMs: 30000,
+        messages: [],
+      });
+
+      // Second agent gets the discussion board — verify it got the structured fallback
+      spawnSubAgentMock.mockImplementationOnce(async (assignment: OrchestratorSpawnParams) => {
+        // The prompt should contain structured tool-call info, NOT the boilerplate summary
+        expect(assignment.prompt).toContain("web_search (5×)");
+        expect(assignment.prompt).toContain("read_file (3×)");
+        expect(assignment.prompt).toContain("15 iterations");
+        expect(assignment.prompt).not.toContain('Agent "Research Agent" completed');
+
+        return {
+          agent_id: "agent-analyst",
+          description: "Analysis Agent",
+          status: "completed",
+          result: "Analysis complete. [DONE]",
+          summary: "Done",
+          toolUses: 0,
+          iterations: 1,
+          durationMs: 1000,
+          messages: [],
+        };
+      });
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+      expect(results).toHaveLength(2);
+    });
+  });
+
+  describe("SequentialRouter — Structured Fallback", () => {
+    it("should use structured tool-call fallback in accumulated context when result is null", async () => {
+      const router = new SequentialRouter();
+      const members = [
+        { description: "Step A", prompt: "Do A" },
+        { description: "Step B", prompt: "Do B" },
+      ];
+
+      // First step returns null result with tool metadata
+      spawnSubAgentMock.mockResolvedValueOnce({
+        agent_id: "agent-step-a",
+        description: "Step A",
+        status: "completed",
+        result: null,
+        summary: 'Agent "Step A" completed',
+        toolUses: 6,
+        toolNames: { write_file: 4, run_command: 2 },
+        iterations: 10,
+        durationMs: 20000,
+        messages: [],
+      });
+
+      // Second step gets the accumulated context — verify it got the structured fallback
+      spawnSubAgentMock.mockImplementationOnce(async (assignment: OrchestratorSpawnParams) => {
+        expect(assignment.prompt).toContain("write_file (4×)");
+        expect(assignment.prompt).toContain("run_command (2×)");
+        expect(assignment.prompt).toContain("10 iterations");
+        expect(assignment.prompt).not.toContain('Agent "Step A" completed');
+
+        return {
+          agent_id: "agent-step-b",
+          description: "Step B",
+          status: "completed",
+          result: "Step B done",
+          summary: "Done",
+          toolUses: 0,
+          iterations: 1,
+          durationMs: 1000,
+          messages: [],
+        };
+      });
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+      expect(results).toHaveLength(2);
+    });
   });
 });

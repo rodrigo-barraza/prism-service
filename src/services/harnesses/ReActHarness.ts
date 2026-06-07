@@ -601,14 +601,13 @@ export default class ReActHarness extends BaseAgenticHarness {
     }
 
     // ── Exhaustion Recovery Pass ─────────────────────────────
-    // Triggers when the loop hit max iterations without a clean text-only break.
-    // This covers two scenarios:
-    //   1. Agent exhausted iterations while still making tool calls — 
-    //      state.finalStreamedText contains interim planning text, not a final summary
-    //   2. Agent produced zero text and zero tool calls (original condition)
-    // Without this, the shared discussion board shows planning text like
-    // "Let me search for..." instead of actual findings.
-    if (state.iterations >= resolvedMaxIterations && !hasCleanTextBreak) {
+    // Triggers when the agent used tools but never produced a clean text-only
+    // break — regardless of how the loop exited (max iterations, empty output,
+    // truncation exhaustion). In all these cases, state.finalStreamedText
+    // contains stale per-pass planning text ("Let me search for...") instead
+    // of a synthesized final summary.
+    // Skipped when signal is aborted (provider would reject the call).
+    if (!hasCleanTextBreak && state.streamedToolCalls.length > 0 && !signal?.aborted) {
       await runExhaustionRecoveryPass(this, context, state, currentMessages);
     }
 

@@ -79,3 +79,32 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
 
   return result;
 }
+
+/**
+ * Build a structured fallback summary from tool-call metadata when the
+ * agent's result text is null. Used by PeerToPeerRouter and SequentialRouter
+ * to inject at least some useful context into the Shared Discussion Board
+ * instead of the useless boilerplate summary ("Agent X completed").
+ */
+export function buildToolCallFallbackSummary(agentResult: SubAgentResult): string | null {
+  if (agentResult.toolUses === 0 && !agentResult.iterations) return null;
+
+  const toolBreakdown = agentResult.toolNames
+    ? Object.entries(agentResult.toolNames)
+        .map(([toolName, callCount]) => `${toolName} (${callCount}×)`)
+        .join(", ")
+    : null;
+
+  const iterationLabel = agentResult.iterations === 1
+    ? "1 iteration"
+    : `${agentResult.iterations} iterations`;
+
+  if (toolBreakdown) {
+    return (
+      `Agent completed ${iterationLabel} using ${toolBreakdown} ` +
+      `but did not produce a final summary.`
+    );
+  }
+
+  return `Agent completed ${iterationLabel} with ${agentResult.toolUses} tool call(s) but did not produce a final summary.`;
+}

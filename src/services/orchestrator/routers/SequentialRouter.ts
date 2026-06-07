@@ -5,6 +5,7 @@ import type {
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
 import type { TopologyRouter } from "../TopologyRouter.ts";
+import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import { InstanceLoadBalancer } from "../InstanceLoadBalancer.ts";
 import { resolveModelForInstances } from "../../../utils/ModelResolution.ts";
 import { getInstancesByType, getInstanceType } from "../../../providers/instance-registry.ts";
@@ -155,7 +156,7 @@ export class SequentialRouter implements TopologyRouter {
       }
 
       // 5. Accumulate text result for the next agent
-      accumulatedContext = `Step ${index + 1} (${member.description}):\n${spawnResult.result || spawnResult.summary}`;
+      accumulatedContext = `Step ${index + 1} (${member.description}):\n${spawnResult.result || buildToolCallFallbackSummary(spawnResult) || spawnResult.summary}`;
     }
 
     return results;
