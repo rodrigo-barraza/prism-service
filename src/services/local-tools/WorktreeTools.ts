@@ -1,5 +1,5 @@
 import logger from "../../utils/logger.ts";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 // ── Worktree Isolation Tools ────────────────────────────────
 // Allows the agent to self-isolate into a git worktree for
@@ -33,9 +33,9 @@ interface ExitWorktreeArgs {
 }
 
 const enterWorktree = {
-  name: "enter_worktree",
+  name: TOOL_NAMES.ENTER_WORKTREE,
   schema: {
-    name: "enter_worktree",
+    name: TOOL_NAMES.ENTER_WORKTREE,
     description:
       "Enter an isolated git worktree for the current conversation. Creates a new branch " +
       "and redirects all file/git/shell tool calls to the worktree directory. " +
@@ -135,9 +135,9 @@ const enterWorktree = {
 };
 
 const exitWorktree = {
-  name: "exit_worktree",
+  name: TOOL_NAMES.EXIT_WORKTREE,
   schema: {
-    name: "exit_worktree",
+    name: TOOL_NAMES.EXIT_WORKTREE,
     description:
       "Exit the current isolated worktree and return to the main workspace. " +
       "Choose to 'merge' changes back to the main branch or 'discard' them entirely. " +

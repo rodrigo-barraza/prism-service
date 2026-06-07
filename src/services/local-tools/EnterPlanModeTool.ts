@@ -1,14 +1,15 @@
 import logger from "../../utils/logger.ts";
+import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 interface EnterPlanModeArgs {
   reason?: string;
 }
 
 export default {
-  name: "enter_plan_mode",
+  name: TOOL_NAMES.ENTER_PLAN_MODE,
 
   schema: {
-    name: "enter_plan_mode",
+    name: TOOL_NAMES.ENTER_PLAN_MODE,
     description:
       "Switch into planning mode. While in plan mode, you will not have access to any tools — " +
       "you can only output text. Use this to produce a structured implementation plan before " +

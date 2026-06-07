@@ -1,7 +1,7 @@
 import PlanningModeService from "../../PlanningModeService.ts";
 import { pendingApprovals } from "../../ApprovalRegistry.ts";
 import logger from "../../../utils/logger.ts";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type {
@@ -38,7 +38,7 @@ export function blockUnauthorizedToolCalls(
   _state: AgenticLoopState,
 ): { allBlocked: boolean } {
   const blockedToolCalls = pendingToolCalls.filter(
-    (toolCall) => toolCall.name !== "exit_plan_mode",
+    (toolCall) => toolCall.name !== TOOL_NAMES.EXIT_PLAN_MODE,
   );
 
   if (blockedToolCalls.length === 0) {
@@ -151,7 +151,7 @@ export async function handleExitPlanMode(
   // Inject approved plan text into the exit_plan_mode result
   const exitResult = toolResults.find(
     (result) =>
-      result.id === exitPlanToolCall.id || result.name === "exit_plan_mode",
+      result.id === exitPlanToolCall.id || result.name === TOOL_NAMES.EXIT_PLAN_MODE,
   );
   if (exitResult) {
     exitResult.result = {
@@ -176,7 +176,7 @@ export function checkForPlanModeEntry(
   emit: EmitFunction,
 ): void {
   const hasEnterPlanMode = executedToolCalls.some(
-    (toolCall) => toolCall.name === "enter_plan_mode",
+    (toolCall) => toolCall.name === TOOL_NAMES.ENTER_PLAN_MODE,
   );
 
   if (hasEnterPlanMode) {

@@ -1,5 +1,5 @@
 import logger from "../../utils/logger.ts";
-import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SSE_EVENT_TYPES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 interface TodoItemInput {
   content: string;
@@ -36,10 +36,10 @@ interface TodoContext {
 }
 
 export default {
-  name: "write_todo",
+  name: TOOL_NAMES.WRITE_TODO,
 
   schema: {
-    name: "write_todo",
+    name: TOOL_NAMES.WRITE_TODO,
     description:
       "Write or update a persistent TODO checklist for the current project. " +
       "Maintains a structured list of items with completion status. " +

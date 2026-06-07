@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import MCPClientService from "../MCPClientService.ts";
 
 interface ListMcpResourcesArgs {
@@ -19,9 +20,9 @@ interface McpAuthenticateArgs {
 }
 
 const listMcpResources = {
-  name: "list_mcp_resources",
+  name: TOOL_NAMES.LIST_MCP_RESOURCES,
   schema: {
-    name: "list_mcp_resources",
+    name: TOOL_NAMES.LIST_MCP_RESOURCES,
     description: "List available resources from a connected MCP server.",
     parameters: {
       type: "object",
@@ -70,9 +71,9 @@ const listMcpResources = {
 };
 
 const readMcpResource = {
-  name: "read_mcp_resource",
+  name: TOOL_NAMES.READ_MCP_RESOURCE,
   schema: {
-    name: "read_mcp_resource",
+    name: TOOL_NAMES.READ_MCP_RESOURCE,
     description:
       "Read a specific resource from a connected MCP server by its URI.",
     parameters: {
@@ -100,9 +101,9 @@ const readMcpResource = {
 };
 
 const mcpAuthenticate = {
-  name: "authenticate_mcp_server",
+  name: TOOL_NAMES.AUTHENTICATE_MCP_SERVER,
   schema: {
-    name: "authenticate_mcp_server",
+    name: TOOL_NAMES.AUTHENTICATE_MCP_SERVER,
     description:
       "Authenticate with a connected MCP server by providing credentials.",
     parameters: {

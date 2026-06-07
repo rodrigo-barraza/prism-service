@@ -2,6 +2,7 @@ import logger from "../utils/logger.ts";
 import type { ToolCall, AgenticContext } from "./harnesses/types.ts";
 import PolicyEngine from "./PolicyEngine.ts";
 import type { PolicyRule } from "./PolicyEngine.ts";
+import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 /**
  * Tool approval tiers — deterministic, rule-based permission system.
@@ -21,82 +22,82 @@ type ApprovalTier = typeof APPROVAL_TIERS[keyof typeof APPROVAL_TIERS];
 /** Default tier assignments for built-in tools */
 const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   // Tier 1 — read-only
-  read_file: APPROVAL_TIERS.AUTO,
-  list_directory: APPROVAL_TIERS.AUTO,
-  search_file_contents: APPROVAL_TIERS.AUTO,
-  find_files: APPROVAL_TIERS.AUTO,
-  search_web: APPROVAL_TIERS.AUTO,
-  read_web_page: APPROVAL_TIERS.AUTO,
-  read_files: APPROVAL_TIERS.AUTO,
-  get_file_info: APPROVAL_TIERS.AUTO,
-  diff_files: APPROVAL_TIERS.AUTO,
-  git_status: APPROVAL_TIERS.AUTO,
-  git_diff: APPROVAL_TIERS.AUTO,
-  git_log: APPROVAL_TIERS.AUTO,
-  summarize_project: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.READ_FILE]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.LIST_DIRECTORY]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.SEARCH_FILE_CONTENTS]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.FIND_FILES]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.SEARCH_WEB]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.READ_WEB_PAGE]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.READ_FILES]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.GET_FILE_INFO]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.DIFF_FILES]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.GIT_STATUS]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.GIT_DIFF]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.GIT_LOG]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.SUMMARIZE_PROJECT]: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — task management (agent's own scratchpad, not user files)
-  create_task: APPROVAL_TIERS.AUTO,
-  get_task: APPROVAL_TIERS.AUTO,
-  list_tasks: APPROVAL_TIERS.AUTO,
-  update_task: APPROVAL_TIERS.AUTO,
-  get_task_output: APPROVAL_TIERS.AUTO,
-  write_todo: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.CREATE_TASK]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.GET_TASK]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.LIST_TASKS]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.UPDATE_TASK]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.GET_TASK_OUTPUT]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.WRITE_TODO]: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — orchestrator orchestration
-  create_team: APPROVAL_TIERS.AUTO,
-  send_message: APPROVAL_TIERS.AUTO,
-  stop_agent: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.CREATE_TEAM]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.SEND_MESSAGE]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.STOP_AGENT]: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — memory management (non-destructive upsert)
-  upsert_memory: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.UPSERT_MEMORY]: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — control flow (no side effects)
-  sleep: APPROVAL_TIERS.AUTO,
-  enter_plan_mode: APPROVAL_TIERS.AUTO,
-  exit_plan_mode: APPROVAL_TIERS.AUTO,
-  search_tools: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.SLEEP]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.ENTER_PLAN_MODE]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.EXIT_PLAN_MODE]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.SEARCH_TOOLS]: APPROVAL_TIERS.AUTO,
 
   // Tier 2 — scheduling / notebook (creates persistent state)
-  create_cron: APPROVAL_TIERS.WRITE,
-  remote_trigger: APPROVAL_TIERS.WRITE,
-  create_cron_job: APPROVAL_TIERS.WRITE,
-  list_cron_jobs: APPROVAL_TIERS.WRITE,
-  delete_cron_job: APPROVAL_TIERS.WRITE,
-  trigger_cron_job: APPROVAL_TIERS.WRITE,
-  edit_notebook: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.CREATE_CRON]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.REMOTE_TRIGGER]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.CREATE_CRON_JOB]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.LIST_CRON_JOBS]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.DELETE_CRON_JOB]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.TRIGGER_CRON_JOB]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.EDIT_NOTEBOOK]: APPROVAL_TIERS.WRITE,
 
   // Tier 1 — skill management (read-only discovery)
-  list_skills: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.LIST_SKILLS]: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — structured output (data formatting only)
-  emit_structured_output: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.EMIT_STRUCTURED_OUTPUT]: APPROVAL_TIERS.AUTO,
 
   // Tier 2 — skill mutations + execution
-  create_skill: APPROVAL_TIERS.WRITE,
-  execute_skill: APPROVAL_TIERS.WRITE,
-  delete_skill: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.CREATE_SKILL]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.EXECUTE_SKILL]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.DELETE_SKILL]: APPROVAL_TIERS.WRITE,
 
   // Tier 2 — team deletion (stops sub-agents)
-  delete_team: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.DELETE_TEAM]: APPROVAL_TIERS.WRITE,
 
   // Tier 2 — worktree isolation (creates/merges git branches)
-  enter_worktree: APPROVAL_TIERS.WRITE,
-  exit_worktree: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.ENTER_WORKTREE]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.EXIT_WORKTREE]: APPROVAL_TIERS.WRITE,
 
   // Tier 2 — write operations
-  write_file: APPROVAL_TIERS.WRITE,
-  replace_in_file: APPROVAL_TIERS.WRITE,
-  patch_file: APPROVAL_TIERS.WRITE,
-  move_file: APPROVAL_TIERS.WRITE,
-  delete_file: APPROVAL_TIERS.WRITE,
-  control_browser: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.WRITE_FILE]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.REPLACE_IN_FILE]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.PATCH_FILE]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.MOVE_FILE]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.DELETE_FILE]: APPROVAL_TIERS.WRITE,
+  [TOOL_NAMES.CONTROL_BROWSER]: APPROVAL_TIERS.WRITE,
 
   // Tier 3 — destructive / arbitrary execution
-  execute_shell: APPROVAL_TIERS.DANGER,
-  execute_python: APPROVAL_TIERS.DANGER,
-  execute_javascript: APPROVAL_TIERS.DANGER,
-  execute_command: APPROVAL_TIERS.DANGER,
+  [TOOL_NAMES.EXECUTE_SHELL]: APPROVAL_TIERS.DANGER,
+  [TOOL_NAMES.EXECUTE_PYTHON]: APPROVAL_TIERS.DANGER,
+  [TOOL_NAMES.EXECUTE_JAVASCRIPT]: APPROVAL_TIERS.DANGER,
+  [TOOL_NAMES.EXECUTE_COMMAND]: APPROVAL_TIERS.DANGER,
 };
 
 const TIER_LABELS: Record<number, string> = {
