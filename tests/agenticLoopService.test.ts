@@ -300,7 +300,12 @@ describe("AgenticLoopService", () => {
   });
 
   it("should handle native MCP tool call streaming directly", async () => {
-    mockProvider.generateTextStream.mockImplementation(async function* () {
+    mockProvider.generateTextStream.mockImplementation(async function* (messages, model, options) {
+      if (options && !options.tools) {
+        yield "Recovery summary text";
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+        return;
+      }
       yield { 
         type: "toolCall", 
         name: "mcp__server__tool", 

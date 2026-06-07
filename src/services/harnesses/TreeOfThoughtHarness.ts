@@ -134,6 +134,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
 
     let currentMessages: ConversationMessage[] = [...context.messages];
     let truncationRecoveryCount = 0;
+    let hasCleanTextBreak = false;
 
     const { hooks, approvalEngine } = createStandardHooks({
       workspaceRoot: workspaceRoot || undefined,
@@ -504,6 +505,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       // ── No tools — final text response ──────────────────────
       if (selectedPass.streamedText || selectedPass.streamedThinking) {
         this.logIteration(selectedPass, currentMessages);
+        hasCleanTextBreak = true;
         break;
       }
 
@@ -545,11 +547,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     }
 
     // ── Exhaustion Recovery Pass ─────────────────────────────
-    if (
-      state.iterations >= resolvedMaxIterations &&
-      !state.finalStreamedText?.trim() &&
-      state.streamedToolCalls.length === 0
-    ) {
+    // Triggers when the loop hit max iterations without a clean text-only break.
+    if (state.iterations >= resolvedMaxIterations && !hasCleanTextBreak) {
       await runExhaustionRecoveryPass(this, context, state, currentMessages);
     }
 

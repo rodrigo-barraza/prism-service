@@ -103,6 +103,7 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
 
     let currentMessages: ConversationMessage[] = [...context.messages];
     let truncationRecoveryCount = 0;
+    let hasCleanTextBreak = false;
 
     // ── Initialize lifecycle hooks ──────────────────────────
     const { hooks, approvalEngine } = createStandardHooks({
@@ -527,6 +528,7 @@ Use these images to observe the environment, notice changes, animations, or user
           continue;
         }
         this.logIteration(pass, currentMessages);
+        hasCleanTextBreak = true;
         break;
       }
 
@@ -570,11 +572,8 @@ Use these images to observe the environment, notice changes, animations, or user
     }
 
     // ── Exhaustion Recovery Pass ─────────────────────────────
-    if (
-      state.iterations >= resolvedMaxIterations &&
-      !state.finalStreamedText?.trim() &&
-      state.streamedToolCalls.length === 0
-    ) {
+    // Triggers when the loop hit max iterations without a clean text-only break.
+    if (state.iterations >= resolvedMaxIterations && !hasCleanTextBreak) {
       await runExhaustionRecoveryPass(this, context, state, currentMessages);
     }
 
