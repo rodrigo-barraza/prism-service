@@ -7,7 +7,6 @@ import type {
   WorktreeCreateResponse,
   WorktreeDiff,
 } from "../../types/orchestrator.ts";
-import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
 export class GitWorktreeHelper {
@@ -20,18 +19,18 @@ export class GitWorktreeHelper {
   }
 
   /**
-   * Derive the git repo path from a sub-agent's file list.
+   * Derive the git repository path from a sub-agent's file list.
    *
    * If files live under a git subdirectory of the workspace root
    * (e.g. /workspace/projectA/.git exists), return that subdirectory
-   * as the repo path so worktrees branch from it.
+   * as the repository path so worktrees branch from it.
    *
-   * Falls back to workspaceRoot if no git repo is found.
+   * Falls back to workspaceRoot if no git repository is found.
    */
-  static resolveRepoPath(workspaceRoot: string, files: string[]): string {
+  static resolveRepositoryPath(workspaceRoot: string, files: string[]): string {
     if (!files?.length) return workspaceRoot;
 
-    // Check if workspace root itself is a git repo
+    // Check if workspace root itself is a git repository
     if (existsSync(resolve(workspaceRoot, ".git"))) return workspaceRoot;
 
     // Take the first file, get its path relative to workspace root,
@@ -49,7 +48,10 @@ export class GitWorktreeHelper {
     return workspaceRoot;
   }
 
-  static async toolsApiPost(path: string, body: Record<string, unknown>): Promise<ToolsApiResponse> {
+  static async toolsApiPost<T extends ToolsApiResponse>(
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<T> {
     try {
       const response = await fetch(`${TOOLS_SERVICE_URL}${path}`, {
         method: "POST",
@@ -57,45 +59,67 @@ export class GitWorktreeHelper {
         body: JSON.stringify(body),
       });
       if (!response.ok) {
-        const error = (await response.json().catch(() => ({}))) as ToolsApiResponse;
-        return { error: error.error || `API returned ${response.status}` };
+        const errorData = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+        const errorMessage =
+          typeof errorData.error === "string"
+            ? errorData.error
+            : `API returned ${response.status}`;
+        return { error: errorMessage } as unknown as T;
       }
-      return (await response.json()) as ToolsApiResponse;
+      return (await response.json()) as T;
     } catch (error: unknown) {
-      return { error: `Failed to reach tools-api: ${getErrorMessage(error)}` };
+      return { error: `Failed to reach tools-api: ${getErrorMessage(error)}` } as unknown as T;
     }
   }
 
-  static async createWorktree(repoPath: string, branchName: string): Promise<WorktreeCreateResponse> {
-    return GitWorktreeHelper.toolsApiPost("/agentic/git/worktree/create", {
-      path: repoPath,
+  static async createWorktree(
+    repositoryPath: string,
+    branchName: string,
+  ): Promise<WorktreeCreateResponse> {
+    return GitWorktreeHelper.toolsApiPost<WorktreeCreateResponse>("/agentic/git/worktree/create", {
+      path: repositoryPath,
       branch: branchName,
-    }) as Promise<WorktreeCreateResponse>;
+    });
   }
 
-  static async removeWorktree(repoPath: string, worktreePath: string): Promise<ToolsApiResponse> {
-    return GitWorktreeHelper.toolsApiPost("/agentic/git/worktree/remove", {
-      path: repoPath,
+  static async removeWorktree(
+    repositoryPath: string,
+    worktreePath: string,
+  ): Promise<ToolsApiResponse> {
+    return GitWorktreeHelper.toolsApiPost<ToolsApiResponse>("/agentic/git/worktree/remove", {
+      path: repositoryPath,
       worktreePath,
     });
   }
 
-  static async getWorktreeDiff(repoPath: string, branchName: string): Promise<ToolsApiResponse & Partial<WorktreeDiff>> {
-    return GitWorktreeHelper.toolsApiPost("/agentic/git/worktree/diff", {
-      path: repoPath,
-      branch: branchName,
-    }) as Promise<ToolsApiResponse & Partial<WorktreeDiff>>;
+  static async getWorktreeDiff(
+    repositoryPath: string,
+    branchName: string,
+  ): Promise<ToolsApiResponse & Partial<WorktreeDiff>> {
+    return GitWorktreeHelper.toolsApiPost<ToolsApiResponse & Partial<WorktreeDiff>>(
+      "/agentic/git/worktree/diff",
+      {
+        path: repositoryPath,
+        branch: branchName,
+      },
+    );
   }
 
-  static async mergeWorktree(repoPath: string, branchName: string, message: string): Promise<ToolsApiResponse> {
-    return GitWorktreeHelper.toolsApiPost("/agentic/git/worktree/merge", {
-      path: repoPath,
+  static async mergeWorktree(
+    repositoryPath: string,
+    branchName: string,
+    message: string,
+  ): Promise<ToolsApiResponse> {
+    return GitWorktreeHelper.toolsApiPost<ToolsApiResponse>("/agentic/git/worktree/merge", {
+      path: repositoryPath,
       branch: branchName,
       message,
     });
   }
 
-  static async cleanupWorktrees(repoPath: string): Promise<ToolsApiResponse> {
-    return GitWorktreeHelper.toolsApiPost("/agentic/git/worktree/cleanup", { path: repoPath });
+  static async cleanupWorktrees(repositoryPath: string): Promise<ToolsApiResponse> {
+    return GitWorktreeHelper.toolsApiPost<ToolsApiResponse>("/agentic/git/worktree/cleanup", {
+      path: repositoryPath,
+    });
   }
 }

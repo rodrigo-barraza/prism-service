@@ -22,6 +22,7 @@ interface SettingsData {
     subagentProvider: string;
     subagentModel: string;
     harness: string;
+    topology: string;
     [key: string]: string;
   };
   security: {
@@ -37,6 +38,7 @@ interface SettingsData {
     speechToTextProvider?: string;
     speechToTextModel?: string;
   };
+  [key: string]: unknown;
 }
 
 let _cache: SettingsData | null = null;
@@ -54,6 +56,7 @@ const DEFAULTS: SettingsData = {
     subagentProvider: "",
     subagentModel: "",
     harness: "standard",
+    topology: "hierarchical",
   },
   security: {
     allowEnvFiles: false,
@@ -96,7 +99,10 @@ const SettingsService = {
     }
 
     // Deep merge: defaults ← stored
-    _cache = deepMerge(DEFAULTS as unknown as Record<string, unknown>, (document.data || {}) as Record<string, unknown>) as unknown as SettingsData;
+    _cache = deepMerge(
+      DEFAULTS as Record<string, unknown>,
+      (document.data || {}) as Record<string, unknown>,
+    ) as SettingsData;
     return _cache;
   },
   async getSection<K extends keyof SettingsData>(section: K): Promise<SettingsData[K]> {
@@ -111,7 +117,10 @@ const SettingsService = {
     if (!collection) throw new Error("Database not available");
 
     const current = await this.get();
-    const merged = deepMerge(current as unknown as Record<string, unknown>, data as unknown as Record<string, unknown>) as unknown as SettingsData;
+    const merged = deepMerge(
+      current as Record<string, unknown>,
+      data as Record<string, unknown>,
+    ) as SettingsData;
 
     await collection.updateOne(
       { _key: "global" },
