@@ -655,9 +655,31 @@ export default class OrchestratorService {
       return [{ error: errorMessage }];
     }
 
+    if (!args || !args.members || !Array.isArray(args.members)) {
+      const errorMessage = "Invalid or missing 'members' array in createTeam arguments.";
+      logger.error(`[Orchestrator] createTeam: ${errorMessage}`);
+      return [{ error: errorMessage }];
+    }
+
     logger.info(
       `[Orchestrator] createTeam: routing via active topology "${topology}" for ${args.members.length} member(s)...`,
     );
+
+    // Validate member prompts before routing — undefined/empty prompts cause
+    // runaway loops where sub-agents report "no task" without converging.
+    // Return an actionable error so the orchestrator LLM can retry with proper prompts.
+    const membersWithMissingPrompts = args.members
+      .map((member, memberIndex) => ({ member, memberIndex }))
+      .filter(({ member }) => !member.prompt || typeof member.prompt !== "string" || member.prompt.trim().length === 0);
+
+    if (membersWithMissingPrompts.length > 0) {
+      const missingDescriptions = membersWithMissingPrompts.map(
+        ({ member, memberIndex }) => `member[${memberIndex}] "${member.description || "(no description)"}"`
+      );
+      const errorMessage = `${membersWithMissingPrompts.length} member(s) have missing or empty prompts: ${missingDescriptions.join(", ")}. Every member requires a non-empty 'prompt' field with a self-contained task description.`;
+      logger.error(`[Orchestrator] createTeam: ${errorMessage}`);
+      return [{ error: errorMessage }];
+    }
 
     // Sync the active topology to the session settings in MongoDB so the UI badge and state match execution
     if (orchestratorContext.conversationId) {
