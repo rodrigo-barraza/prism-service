@@ -35,7 +35,7 @@ import { resolveMessageMediaReferences } from "../services/MediaResolutionServic
 import SessionGenerationTracker from "../services/SessionGenerationTracker.ts";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
 import localModelQueue from "../services/LocalModelQueue.ts";
-import LocalProviderGateway from "../services/LocalProviderGateway.ts";
+import LocalProviderGateway from "../services/local-provider/index.ts";
 import { getInstancesByType } from "../providers/instance-registry.ts";
 import { resolveModelForInstances } from "../utils/ModelResolution.ts";
 import {

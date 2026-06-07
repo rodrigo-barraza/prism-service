@@ -19,8 +19,8 @@ interface SettingsData {
     [key: string]: string; // Support dynamic string index for provider/model retrieval
   };
   agents: {
-    subagentProvider: string;
-    subagentModel: string;
+    subAgentProvider: string;
+    subAgentModel: string;
     harness: string;
     topology: string;
     [key: string]: string;
@@ -53,8 +53,8 @@ const DEFAULTS: SettingsData = {
     embeddingModel: "",
   },
   agents: {
-    subagentProvider: "",
-    subagentModel: "",
+    subAgentProvider: "",
+    subAgentModel: "",
     harness: "standard",
     topology: "hierarchical",
   },

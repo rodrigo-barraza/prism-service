@@ -19,7 +19,7 @@ import AgentPersonaRegistry from "../services/AgentPersonaRegistry.ts";
 import SettingsService from "../services/SettingsService.ts";
 import rateLimitStore from "../services/RateLimitStore.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
-import LocalProviderGateway from "../services/LocalProviderGateway.ts";
+import LocalProviderGateway from "../services/local-provider/index.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "../services/OrchestratorPrompt.ts";
 import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
 import {

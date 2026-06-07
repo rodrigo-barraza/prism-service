@@ -747,8 +747,7 @@ export default class BaseAgenticHarness {
 
     // Persist sub-agent snapshots for orchestrator sessions
     if (
-      // TODO(cleanup): Remove "team_create" once historical sessions have aged out
-      state.streamedToolCalls.some((toolCall) => toolCall.name === "create_team" || toolCall.name === "team_create") &&
+      state.streamedToolCalls.some((toolCall) => toolCall.name === "create_team") &&
       conversationId
     ) {
       try {
@@ -764,10 +763,9 @@ export default class BaseAgenticHarness {
           );
           const agentSessionDocument = await collection.findOne(
             { id: conversationId, project, username },
-            { projection: { workers: 1, subAgents: 1 } },
+            { projection: { subAgents: 1 } },
           );
-          // Read from both old "workers" field and new "subAgents" field for backward compatibility
-          const existingSubAgentsList = (agentSessionDocument && (agentSessionDocument.subAgents || agentSessionDocument.workers)) || [];
+          const existingSubAgentsList = agentSessionDocument?.subAgents || [];
           const mergedSubAgentsMap = new Map<string, SubAgentSnapshot>();
           for (const subAgent of existingSubAgentsList) {
             mergedSubAgentsMap.set(subAgent.agentId, subAgent);

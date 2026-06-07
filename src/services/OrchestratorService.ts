@@ -73,10 +73,6 @@ async function getSubAgentFallback(): Promise<{ provider: string; model: string 
     if (agents?.subAgentProvider && agents?.subAgentModel) {
       return { provider: agents.subAgentProvider as string, model: agents.subAgentModel as string };
     }
-    // Fallback: read old field names for backward compatibility with existing settings
-    if (agents?.subagentProvider && agents?.subagentModel) {
-      return { provider: agents.subagentProvider as string, model: agents.subagentModel as string };
-    }
     return null;
   } catch {
     return null;
@@ -695,7 +691,6 @@ export default class OrchestratorService {
             {
               $set: {
                 "settings.agents.topology": topology,
-                "settings.topology": topology, // sync legacy fallback
                 updatedAt: new Date().toISOString(),
               },
             }

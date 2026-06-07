@@ -180,8 +180,6 @@ app.use("/benchmark", benchmarkRouter);
 app.use("/synthesis", synthesisRouter);
 app.use("/vram-benchmarks", vramBenchmarksRouter);
 app.use("/orchestrator", orchestratorRouter);
-// Backward-compatible alias — keep /coordinator/* alive during migration
-app.use("/coordinator", orchestratorRouter);
 app.use("/settings", settingsRouter);
 app.use("/custom-agents", customAgentsRouter);
 app.use("/workspaces", workspacesRouter);
@@ -201,25 +199,7 @@ setupWebSocket(wss);
     await MongoWrapper.createClient(MONGO_DB_NAME, MONGO_URI as string);
   await MemoryService.ensureIndexes();
 
-  // ── Collection Rename Migration: conversations/agent_sessions → model_conversations/agent_conversations ──
-  try {
-    const db = MongoWrapper.getDb(MONGO_DB_NAME);
-    if (db) {
-      const collections = await db.listCollections().toArray();
-      const collectionNames = collections.map(collection => collection.name);
 
-      if (collectionNames.includes("conversations") && !collectionNames.includes("model_conversations")) {
-        await db.collection("conversations").rename("model_conversations");
-        logger.info("Migrated MongoDB collection: conversations → model_conversations");
-      }
-      if (collectionNames.includes("agent_sessions") && !collectionNames.includes("agent_conversations")) {
-        await db.collection("agent_sessions").rename("agent_conversations");
-        logger.info("Migrated MongoDB collection: agent_sessions → agent_conversations");
-      }
-    }
-  } catch (error: unknown) {
-    logger.warn("Collection migration check failed: " + errorMessage(error));
-  }
 
   // ── Ensure collection indexes ──────────────────────────────────
   // Critical for $lookup aggregation performance (conversations ↔ requests).
@@ -335,42 +315,7 @@ setupWebSocket(wss);
         logger.error(`Failed to clear stale isGenerating flags: ${errorMessage(error)}`);
   }
 
-  // ── One-time migration: conversations → agent_sessions ──────────
-  // Move any existing agent project conversations to the new collection.
-  try {
-    const { default: AgentPersonaRegistry } =
-      await import("./services/AgentPersonaRegistry.js");
-    const agentProjects = AgentPersonaRegistry.list()
-      .map((persona) => {
-        const personaDoc = AgentPersonaRegistry.get(persona.id);
-        return personaDoc?.project;
-      })
-      .filter(Boolean);
 
-    const db = MongoWrapper.getDb(MONGO_DB_NAME);
-    if (db && agentProjects.length > 0) {
-      const agentConvs = await db
-        .collection("model_conversations")
-        .find({ project: { $in: agentProjects } })
-        .toArray();
-      if (agentConvs.length > 0) {
-        // Strip _id to avoid duplicate key errors on insert
-        const docs = agentConvs.map(({ _id, ...rest }) => rest);
-        await db
-          .collection("agent_conversations")
-          .insertMany(docs, { ordered: false })
-          .catch(() => {});
-        await db
-          .collection("model_conversations")
-          .deleteMany({ project: { $in: agentProjects } });
-        logger.info(
-          `Migrated ${agentConvs.length} agent conversation(s) → agent_sessions`,
-        );
-      }
-    }
-  } catch (error: unknown) {
-        logger.error(`Agent session migration failed: ${errorMessage(error)}`);
-  }
 
   // Load custom agents from database into the persona registry
   try {

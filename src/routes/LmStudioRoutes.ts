@@ -4,7 +4,7 @@ import express, { Request, Response, NextFunction } from "express";
 import { getProvider } from "../providers/index.ts";
 import { isInstance } from "../providers/instance-registry.ts";
 import logger from "../utils/logger.ts";
-import LocalProviderGateway from "../services/LocalProviderGateway.ts";
+import LocalProviderGateway from "../services/local-provider/index.ts";
 import { initSseResponse } from "../utils/SseUtilities.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 const router = express.Router();

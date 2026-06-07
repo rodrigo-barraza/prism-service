@@ -51,13 +51,11 @@ router.get(
         );
         const agentSessionDocument = await collection.findOne(
           { id: conversationIdentifier },
-          { projection: { workers: 1, subAgents: 1 } },
+          { projection: { subAgents: 1 } },
         );
-        // Read from both old "workers" field and new "subAgents" field for backward compatibility
-        if (agentSessionDocument) {
-          const persistedData = agentSessionDocument.subAgents || agentSessionDocument.workers;
-          if (persistedData && persistedData.length > 0) {
-            persistedSubAgentsList = persistedData;
+        if (agentSessionDocument && agentSessionDocument.subAgents) {
+          if (agentSessionDocument.subAgents.length > 0) {
+            persistedSubAgentsList = agentSessionDocument.subAgents;
           }
         }
       } catch (error: unknown) {
@@ -76,8 +74,7 @@ router.get(
     }
     const finalSubAgentsList = Array.from(mergedSubAgentsMap.values());
 
-    // Respond with both field names for backward compatibility
-    response.json({ subAgents: finalSubAgentsList, workers: finalSubAgentsList });
+    response.json({ subAgents: finalSubAgentsList });
   }),
 );
 
@@ -107,36 +104,6 @@ router.post(
  * Get the status of a specific chat-spawned sub-agent.
  */
 router.get("/sub-agents/:agentId", (request: Request, response: Response) => {
-  const agentId = request.params.agentId;
-  if (typeof agentId !== "string" || !agentId) {
-    return response.status(400).json({ error: "agentId is required" });
-  }
-  const status = OrchestratorService.getSubAgentStatus(agentId);
-  if (!status) {
-    return response.status(404).json({ error: "Sub-agent not found" });
-  }
-  response.json(status);
-});
-
-// ═══════════════════════════════════════════════════════════════
-// Backward-Compatible Legacy Routes
-// Keep /coordinator/workers/* paths alive during migration
-// ═══════════════════════════════════════════════════════════════
-
-router.get("/workers", (request: Request, response: Response) => {
-  response.redirect(301, `/orchestrator/sub-agents${request.url.includes("?") ? request.url.slice(request.url.indexOf("?")) : ""}`);
-});
-
-router.post("/workers/stop", asyncHandler(async (request: Request, response: Response) => {
-  const { conversationId } = request.body;
-  if (!conversationId) {
-    return response.status(400).json({ error: "'conversationId' is required" });
-  }
-  const result = await OrchestratorService.abortSubAgentsByConversation(conversationId);
-  response.json(result);
-}));
-
-router.get("/workers/:agentId", (request: Request, response: Response) => {
   const agentId = request.params.agentId;
   if (typeof agentId !== "string" || !agentId) {
     return response.status(400).json({ error: "agentId is required" });

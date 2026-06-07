@@ -99,7 +99,7 @@ vi.mock("../src/services/SessionGenerationTracker.ts", () => ({
   },
 }));
 
-vi.mock("../src/services/SystemPromptAssembler.ts", () => ({
+vi.mock("../src/services/system-prompt/index.ts", () => ({
   default: class {
     constructor() {}
     createHook() {

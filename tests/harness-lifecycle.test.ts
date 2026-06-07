@@ -25,7 +25,7 @@ import SessionGenerationTracker from "../src/services/SessionGenerationTracker.t
 import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
 import AgentHooks from "../src/services/AgentHooks.ts";
 import AutoApprovalEngine from "../src/services/AutoApprovalEngine.ts";
-import SystemPromptAssembler from "../src/services/SystemPromptAssembler.ts";
+import SystemPromptAssembler from "../src/services/system-prompt/index.ts";
 
 vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
   default: {

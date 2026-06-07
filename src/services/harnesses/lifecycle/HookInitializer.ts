@@ -1,6 +1,6 @@
 import AgentHooks, { type HookHandler } from "../../AgentHooks.ts";
 import AutoApprovalEngine from "../../AutoApprovalEngine.ts";
-import SystemPromptAssembler from "../../SystemPromptAssembler.ts";
+import SystemPromptAssembler from "../../system-prompt/index.ts";
 import MemoryExtractor from "../../MemoryExtractor.ts";
 import CriticGate from "./CriticGate.ts";
 import type { PolicyRule } from "../../PolicyEngine.ts";
