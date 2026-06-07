@@ -8,7 +8,7 @@ import logger from "../../utils/logger.ts";
 import type { SubAgentState } from "../../types/orchestrator.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
-/**
+/*
  * Evict the model from a secondary GPU instance when no other sub-agents
  * are still active on it. The primary (orchestrator) instance is never evicted.
  *

@@ -24,15 +24,16 @@ const router = Router();
 // Chat-Spawned Sub-Agent Endpoints
 // ═══════════════════════════════════════════════════════════════
 
-/**
+/*
  * GET /orchestrator/sub-agents
  * List all active sub-agents spawned via chat tools.
  * Optional query: ?conversationId=xxx to filter by parent conversation.
  */
 router.get(
   "/sub-agents",
-  asyncHandler(async (req: Request, res: Response) => {
-    const conversationIdentifier = req.query.conversationId as string | undefined;
+  asyncHandler(async (request: Request, response: Response) => {
+    const conversationIdQuery = request.query.conversationId;
+    const conversationIdentifier = typeof conversationIdQuery === "string" ? conversationIdQuery : undefined;
     const activeSubAgentsList = OrchestratorService.listSubAgents({
       parentConversationId: conversationIdentifier,
     });
@@ -76,11 +77,11 @@ router.get(
     const finalSubAgentsList = Array.from(mergedSubAgentsMap.values());
 
     // Respond with both field names for backward compatibility
-    res.json({ subAgents: finalSubAgentsList, workers: finalSubAgentsList });
+    response.json({ subAgents: finalSubAgentsList, workers: finalSubAgentsList });
   }),
 );
 
-/**
+/*
  * POST /orchestrator/sub-agents/stop
  * Abort all running sub-agents for a given parent conversation.
  * Called by the frontend when the user presses stop.
@@ -89,28 +90,32 @@ router.get(
  */
 router.post(
   "/sub-agents/stop",
-  asyncHandler(async (req: Request, res: Response) => {
-    const { conversationId } = req.body;
+  asyncHandler(async (request: Request, response: Response) => {
+    const { conversationId } = request.body;
     if (!conversationId) {
-      return res.status(400).json({ error: "'conversationId' is required" });
+      return response.status(400).json({ error: "'conversationId' is required" });
     }
 
     const result =
       await OrchestratorService.abortSubAgentsByConversation(conversationId);
-    res.json(result);
+    response.json(result);
   }),
 );
 
-/**
+/*
  * GET /orchestrator/sub-agents/:agentId
  * Get the status of a specific chat-spawned sub-agent.
  */
-router.get("/sub-agents/:agentId", (req: Request, res: Response) => {
-  const status = OrchestratorService.getSubAgentStatus(req.params.agentId as string);
-  if (!status) {
-    return res.status(404).json({ error: "Sub-agent not found" });
+router.get("/sub-agents/:agentId", (request: Request, response: Response) => {
+  const agentId = request.params.agentId;
+  if (typeof agentId !== "string" || !agentId) {
+    return response.status(400).json({ error: "agentId is required" });
   }
-  res.json(status);
+  const status = OrchestratorService.getSubAgentStatus(agentId);
+  if (!status) {
+    return response.status(404).json({ error: "Sub-agent not found" });
+  }
+  response.json(status);
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -132,7 +137,11 @@ router.post("/workers/stop", asyncHandler(async (request: Request, response: Res
 }));
 
 router.get("/workers/:agentId", (request: Request, response: Response) => {
-  const status = OrchestratorService.getSubAgentStatus(request.params.agentId as string);
+  const agentId = request.params.agentId;
+  if (typeof agentId !== "string" || !agentId) {
+    return response.status(400).json({ error: "agentId is required" });
+  }
+  const status = OrchestratorService.getSubAgentStatus(agentId);
   if (!status) {
     return response.status(404).json({ error: "Sub-agent not found" });
   }

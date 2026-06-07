@@ -6,13 +6,29 @@
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
 import { estimateTokens } from "./SubAgentResultBuilder.ts";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import type { EmitFunction } from "../harnesses/types.ts";
+import type { EmitFunction, ToolCall } from "../harnesses/types.ts";
 
 interface SubAgentTelemetryConfig {
   subAgentId: string;
   subAgentDescription: string;
   parentEmit: EmitFunction | null | undefined;
   parentSessionId: string | null | undefined;
+}
+
+function isToolCall(value: unknown): value is ToolCall {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.name === "string";
+}
+
+function isUsageRecord(value: unknown): value is Record<string, number> {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  return Object.values(candidate).every((val) => typeof val === "number");
 }
 
 /**
@@ -53,7 +69,7 @@ export class SubAgentTelemetryEmitter {
 
   // Public access for the parent to read accumulated output/tool state
   output = "";
-  toolCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+  toolCalls: ToolCall[] = [];
   totalCost: number | null = null;
   usage: Record<string, number> | null = null;
   iterations: number | null = null;
@@ -68,10 +84,10 @@ export class SubAgentTelemetryEmitter {
   /** Build the generation_progress payload for the frontend. */
   private buildProgress() {
     const burstTokens = estimateTokens(this.burstOutputCharacters);
-    let subAgentTokPerSec = null;
+    let subAgentTokensPerSecond = null;
     if (burstTokens > 1 && this.burstFirstChunkTime && this.lastChunkTime) {
-      const elapsedSec = (this.lastChunkTime - this.burstFirstChunkTime) / 1000;
-      if (elapsedSec > 0.1) subAgentTokPerSec = burstTokens / elapsedSec;
+      const elapsedSeconds = (this.lastChunkTime - this.burstFirstChunkTime) / 1000;
+      if (elapsedSeconds > 0.1) subAgentTokensPerSecond = burstTokens / elapsedSeconds;
     }
     return {
       type: "sub_agent_status",
@@ -80,7 +96,7 @@ export class SubAgentTelemetryEmitter {
       outputTokens: burstTokens,
       firstChunkTime: this.burstFirstChunkTime,
       lastChunkTime: this.lastChunkTime,
-      tokPerSec: subAgentTokPerSec,
+      tokPerSec: subAgentTokensPerSecond,
       totalOutputTokens: estimateTokens(this.cumulativeOutputCharacters),
     };
   }
@@ -146,8 +162,9 @@ export class SubAgentTelemetryEmitter {
   createEmitFunction(): EmitFunction {
     return (event) => {
       if (event.type === "chunk") {
-        this.output += (event.content as string) || "";
-        const chunkCharacters = ((event.content as string) || "").length;
+        const contentStr = typeof event.content === "string" ? event.content : "";
+        this.output += contentStr;
+        const chunkCharacters = contentStr.length;
 
         // Reset burst counters on phase transition (thinking → generating)
         if (this.lastPhase === "thinking" && this.burstOutputCharacters > 0) {
@@ -172,7 +189,8 @@ export class SubAgentTelemetryEmitter {
           this.emitAggregateProgress();
         }
       } else if (event.type === "thinking") {
-        const thinkingCharacters = ((event.content as string) || "").length;
+        const contentStr = typeof event.content === "string" ? event.content : "";
+        const thinkingCharacters = contentStr.length;
 
         // Reset burst counters on phase transition (generating → thinking)
         if (this.lastPhase === "generating" && this.burstOutputCharacters > 0) {
@@ -197,10 +215,11 @@ export class SubAgentTelemetryEmitter {
           this.emitAggregateProgress();
         }
       } else if (event.type === "tool_execution") {
-        if (event.status === "calling") {
+        if (event.status === "calling" && isToolCall(event.tool)) {
           this.toolCalls.push({
-            name: (event.tool as Record<string, unknown>)?.name as string,
-            args: (event.tool as Record<string, unknown>)?.args as Record<string, unknown>,
+            id: event.tool.id ?? null,
+            name: event.tool.name,
+            args: event.tool.args,
           });
         }
         // Flush generation progress before tool execution pauses generation
@@ -247,11 +266,11 @@ export class SubAgentTelemetryEmitter {
       this.parentEmit &&
       (event.message === "iteration_progress" || event.message === "sub_agents_updated")
     ) {
-      if (event.iteration) this.iterations = event.iteration as number;
+      if (typeof event.iteration === "number") this.iterations = event.iteration;
       this.parentEmit({
         type: "sub_agent_status",
         workerId: this.subAgentId,
-        message: event.message as string,
+        message: typeof event.message === "string" ? event.message : "",
         iteration: event.iteration,
         maxIterations: event.maxIterations,
       });
@@ -264,14 +283,14 @@ export class SubAgentTelemetryEmitter {
         timeToFirstToken: event.timeToFirstToken,
       });
     }
-    if (this.parentEmit && event.phase) {
-      this.lastPhase = event.phase as string;
+    if (this.parentEmit && typeof event.phase === "string") {
+      this.lastPhase = event.phase;
       this.parentEmit({
         type: "sub_agent_status",
         workerId: this.subAgentId,
         message: "phase",
         phase: event.phase,
-        label: event.message || undefined,
+        label: typeof event.message === "string" ? event.message : undefined,
         ...(event.progress != null && { progress: event.progress }),
       });
     }
@@ -279,13 +298,13 @@ export class SubAgentTelemetryEmitter {
 
   private handleDoneEvent(event: Record<string, unknown>) {
     // Capture cost and usage from finalizeTextGeneration
-    this.totalCost = (event.estimatedCost as number) || null;
-    this.usage = (event.usage as Record<string, number>) || null;
+    this.totalCost = typeof event.estimatedCost === "number" ? event.estimatedCost : null;
+    this.usage = isUsageRecord(event.usage) ? event.usage : null;
 
-    if (this.parentEmit && event.usage) {
-      const finalTokPerSec = event.tokensPerSec || null;
+    if (this.parentEmit && isUsageRecord(event.usage)) {
+      const finalTokPerSec = typeof event.tokensPerSec === "number" ? event.tokensPerSec : null;
       const estimatedOutput = estimateTokens(this.cumulativeOutputCharacters);
-      const finalOutputTokens = (event.usage as Record<string, number>).outputTokens || estimatedOutput;
+      const finalOutputTokens = event.usage.outputTokens || estimatedOutput;
       const burstTokens = estimateTokens(this.burstOutputCharacters);
       this.parentEmit({
         type: "sub_agent_status",

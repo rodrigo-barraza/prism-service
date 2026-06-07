@@ -1,7 +1,7 @@
 import type { SubAgentResult, SubAgentState } from "../../types/orchestrator.ts";
 import type { ConversationMessage } from "../harnesses/types.ts";
 
-/**
+/*
  * Extract the text content from the last assistant message in a conversation.
  * Mirrors Claude Code's finalizeAgentTool pattern — only the final report is
  * returned to the orchestrator, keeping the parent context clean.
@@ -20,7 +20,7 @@ export function getLastAssistantText(messages: ConversationMessage[]): string {
   return "";
 }
 
-/**
+/*
  * Helper to estimate tokens from accumulated characters.
  * Falls back to chars/4 estimation from accumulated characters.
  */

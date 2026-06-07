@@ -16,7 +16,7 @@ export interface SubAgentState {
   description: string;
   branchName: string | null;
   worktreePath: string | null;
-  repoPath: string;
+  repositoryPath: string;
   isolated: boolean;
   status: "running" | "complete" | "failed" | "stopped" | "idle";
   output: string;

@@ -26,6 +26,7 @@ import {
 } from "./orchestrator/SubAgentResultBuilder.ts";
 import { SubAgentTelemetryEmitter } from "./orchestrator/SubAgentTelemetryEmitter.ts";
 import { evictIdleSecondaryModel } from "./orchestrator/VramEvictionPolicy.ts";
+import type { TopologyRouter } from "./orchestrator/TopologyRouter.ts";
 
 import type {
   SubAgentState,
@@ -33,9 +34,10 @@ import type {
   OrchestratorSpawnParams,
   OrchestratorContext,
   TeamMember,
+  SubAgentResult,
 } from "../types/orchestrator.ts";
 
-import type { ConversationMessage, ToolCall } from "./harnesses/types.ts";
+import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 // ────────────────────────────────────────────────────────────
@@ -106,13 +108,13 @@ registerCleanup(async () => {
   const cleanups = running
     .filter((item) => item.isolated && item.worktreePath)
     .map((item) =>
-      GitWorktreeHelper.removeWorktree(item.repoPath, item.worktreePath!)
+      GitWorktreeHelper.removeWorktree(item.repositoryPath, item.worktreePath!)
         .then(() => {
           item.worktreePath = null;
         })
-        .catch((error: Error) =>
+        .catch((error: unknown) =>
           logger.warn(
-            `[Orchestrator] Shutdown worktree cleanup failed for ${item.agentId}: ${error.message}`,
+            `[Orchestrator] Shutdown worktree cleanup failed for ${item.agentId}: ${getErrorMessage(error)}`,
           ),
         ),
     );
@@ -150,7 +152,7 @@ export default class OrchestratorService {
     assignedProvider,
     assignedModel,
     orchestratorContext,
-  }: OrchestratorSpawnParams) {
+  }: OrchestratorSpawnParams): Promise<SubAgentResult | { error: string }> {
     const {
       project,
       username,
@@ -160,7 +162,7 @@ export default class OrchestratorService {
       traceId,
       agentSessionId: parentAgentSessionId,
       conversationId: parentConversationId,
-      maxSubAgentIterations: clientMaxSubAgentIter,
+      maxSubAgentIterations: clientMaxSubAgentIterations,
       minContextLength,
       workspaceRoot: orchestratorWorkspaceRoot,
       enabledTools,
@@ -168,10 +170,10 @@ export default class OrchestratorService {
 
     // Resolve max sub-agent iterations: 0 = unlimited (Infinity), positive = clamped 1-100, default = constant
     const resolvedMaxSubAgentIterations =
-      clientMaxSubAgentIter === 0
+      clientMaxSubAgentIterations === 0
         ? Infinity
-        : clientMaxSubAgentIter
-          ? Math.min(100, Math.max(1, clientMaxSubAgentIter))
+        : clientMaxSubAgentIterations
+          ? Math.min(100, Math.max(1, clientMaxSubAgentIterations))
           : MAX_SUB_AGENT_ITERATIONS;
 
     // Check concurrency limit
@@ -270,15 +272,15 @@ export default class OrchestratorService {
     const branchName = `orchestrator/${agentId}`;
     const workspaceRoot = GitWorktreeHelper.getDefaultWorkspaceRoot(orchestratorWorkspaceRoot ?? undefined);
 
-    // Derive the git repo path from sub-agent files.
+    // Derive the git repository path from sub-agent files.
     // If files live under a git subdirectory (e.g. /workspace/projectA/),
     // use that as the worktree source. Otherwise fall back to workspace root.
-    const repoPath = GitWorktreeHelper.resolveRepoPath(workspaceRoot, files || []);
+    const repositoryPath = GitWorktreeHelper.resolveRepositoryPath(workspaceRoot, files || []);
 
     // Attempt git worktree creation — best-effort
     // Non-git workspaces gracefully degrade to shared directory mode
     let worktreePath = null;
-    const worktreeResult = await GitWorktreeHelper.createWorktree(repoPath, branchName);
+    const worktreeResult = await GitWorktreeHelper.createWorktree(repositoryPath, branchName);
     if (worktreeResult.error) {
       logger.warn(
         `[Orchestrator] Worktree creation skipped for ${agentId}: ${worktreeResult.error}. Running in workspace root.`,
@@ -318,7 +320,7 @@ export default class OrchestratorService {
       description,
       branchName: worktreeResult.error ? null : branchName,
       worktreePath,
-      repoPath,
+      repositoryPath,
       isolated: !worktreeResult.error, // true if running in a worktree
       status: "running",
       output: "",
@@ -381,7 +383,7 @@ export default class OrchestratorService {
       // Clean up worktree on failure to prevent orphaned branches
       if (subAgentState.isolated && subAgentState.worktreePath) {
         await GitWorktreeHelper.removeWorktree(
-          subAgentState.repoPath,
+          subAgentState.repositoryPath,
           subAgentState.worktreePath,
         ).catch((cleanupError: unknown) =>
           logger.warn(
@@ -414,7 +416,11 @@ export default class OrchestratorService {
     return subAgentResult;
   }
 
-  static async sendMessage(agentId: string, message: string, orchestratorContext: OrchestratorContext) {
+  static async sendMessage(
+    agentId: string,
+    message: string,
+    orchestratorContext: OrchestratorContext,
+  ): Promise<{ error: string } | { agent_id: string; status: string; message: string }> {
     const subAgent = activeSubAgents.get(agentId);
     if (!subAgent) {
       return { error: `Sub-agent "${agentId}" not found` };
@@ -460,7 +466,9 @@ export default class OrchestratorService {
     };
   }
 
-  static async stopAgent(agentId: string) {
+  static async stopAgent(
+    agentId: string,
+  ): Promise<{ error: string } | { agent_id: string; status: string }> {
     const subAgent = activeSubAgents.get(agentId);
     if (!subAgent) {
       return { error: `Sub-agent "${agentId}" not found` };
@@ -473,7 +481,7 @@ export default class OrchestratorService {
 
     // Clean up worktree (only if sub-agent was running in an isolated worktree)
     if (subAgent.isolated && subAgent.worktreePath) {
-      await GitWorktreeHelper.removeWorktree(subAgent.repoPath, subAgent.worktreePath);
+      await GitWorktreeHelper.removeWorktree(subAgent.repositoryPath, subAgent.worktreePath);
       subAgent.worktreePath = null;
     }
 
@@ -489,7 +497,18 @@ export default class OrchestratorService {
    * Read the output from a previously spawned sub-agent.
    * Returns the full result if completed, or partial status if still running.
    */
-  static getTaskOutput(agentId: string) {
+  static getTaskOutput(
+    agentId: string,
+  ):
+    | SubAgentResult
+    | { error: string }
+    | {
+        agent_id: string;
+        description: string;
+        status: string;
+        partialOutput: string | null;
+        toolUses: number;
+      } {
     const subAgent = activeSubAgents.get(agentId);
     if (!subAgent) {
       return {
@@ -512,7 +531,7 @@ export default class OrchestratorService {
     return subAgentResult;
   }
 
-  static async abortSubAgentsByConversation(parentConversationId: string) {
+  static async abortSubAgentsByConversation(parentConversationId: string): Promise<void> {
     const sessionSubAgents = [...activeSubAgents.values()].filter(
       (subAgent) => subAgent.parentConversationId === parentConversationId,
     );
@@ -522,7 +541,7 @@ export default class OrchestratorService {
       `[Orchestrator] Aborting ${sessionSubAgents.length} sub-agent(s) for conversation ${parentConversationId}`,
     );
 
-    const cleanupPromises = [];
+    const cleanupPromises: Promise<unknown>[] = [];
     for (const subAgent of sessionSubAgents) {
       if (subAgent.status === "running") {
         subAgent.abortController?.abort();
@@ -531,15 +550,18 @@ export default class OrchestratorService {
       }
 
       // Cleanup isolated worktrees immediately
-      const cleanupPromise = subAgent.isolated && subAgent.worktreePath
-        ? GitWorktreeHelper.removeWorktree(subAgent.repoPath, subAgent.worktreePath)
-            .then(() => {
-              subAgent.worktreePath = null;
-            })
-            .catch((error: Error) =>
-              logger.warn(`[Orchestrator] Worktree cleanup failed for ${subAgent.agentId}: ${error.message}`)
-            )
-        : Promise.resolve();
+      const cleanupPromise =
+        subAgent.isolated && subAgent.worktreePath
+          ? GitWorktreeHelper.removeWorktree(subAgent.repositoryPath, subAgent.worktreePath)
+              .then(() => {
+                subAgent.worktreePath = null;
+              })
+              .catch((error: unknown) =>
+                logger.warn(
+                  `[Orchestrator] Worktree cleanup failed for ${subAgent.agentId}: ${getErrorMessage(error)}`,
+                ),
+              )
+          : Promise.resolve();
 
       cleanupPromises.push(cleanupPromise);
     }
@@ -547,7 +569,13 @@ export default class OrchestratorService {
     await Promise.allSettled(cleanupPromises);
   }
 
-  static getSubAgentStatus(agentId: string) {
+  static getSubAgentStatus(agentId: string): {
+    agentId: string;
+    status: "running" | "complete" | "failed" | "stopped" | "idle";
+    error: string | null;
+    diff: WorktreeDiff | null;
+    durationMs: number;
+  } | null {
     const subAgent = activeSubAgents.get(agentId);
     if (!subAgent) return null;
     return {
@@ -559,7 +587,16 @@ export default class OrchestratorService {
     };
   }
 
-  static listSubAgents({ parentConversationId }: { parentConversationId?: string } = {}) {
+  static listSubAgents({ parentConversationId }: { parentConversationId?: string } = {}): Array<{
+    agentId: string;
+    description: string;
+    status: string;
+    providerName: string;
+    resolvedModel: string;
+    durationMs: number;
+    toolUses: number;
+    hasChanges: boolean;
+  }> {
     let list = Array.from(activeSubAgents.values());
     if (parentConversationId) {
       list = list.filter((subAgent) => subAgent.parentConversationId === parentConversationId);
@@ -570,13 +607,14 @@ export default class OrchestratorService {
       status: subAgent.status,
       providerName: subAgent.providerName,
       resolvedModel: subAgent.resolvedModel,
-      durationMs: subAgent.status === "running" ? Date.now() - subAgent.startedAt : subAgent.durationMs,
+      durationMs:
+        subAgent.status === "running" ? Date.now() - subAgent.startedAt : subAgent.durationMs,
       toolUses: subAgent.toolCalls?.length || 0,
       hasChanges: subAgent.diff?.hasChanges || false,
     }));
   }
 
-  static cleanupSession(parentAgentSessionId: string) {
+  static cleanupSession(parentAgentSessionId: string): void {
     const keys = [];
     for (const [key, subAgentState] of activeSubAgents.entries()) {
       if (subAgentState.parentAgentSessionId === parentAgentSessionId) {
@@ -589,85 +627,46 @@ export default class OrchestratorService {
     logger.info(`[Orchestrator] Cleaned up session ${parentAgentSessionId} from active registry`);
   }
 
-  static async createTeam(args: { name: string; members: TeamMember[] }, orchestratorContext: OrchestratorContext) {
-    const { providerName, resolvedModel } = orchestratorContext;
+  static async createTeam(
+    args: { name: string; members: TeamMember[] },
+    orchestratorContext: OrchestratorContext,
+  ): Promise<(SubAgentResult | { error: string })[]> {
+    const settings = await SettingsService.getSection("agents");
+    const topology =
+      (orchestratorContext.topology as string) || settings?.topology || "hierarchical";
+
     logger.info(
-      `[Orchestrator] createTeam: batch assignment of ${args.members.length} sub-agent(s)...`,
+      `[Orchestrator] createTeam: routing via active topology "${topology}" for ${args.members.length} member(s)...`,
     );
 
-    // Filter siblings & track override quant versions for Heterogeneous GPUs.
-    const isLocal = localModelQueue.isLocal(providerName);
-    const providerType = getInstanceType(providerName) || providerName;
-    let siblings = getInstancesByType(providerType);
-    let instanceModelOverrides = new Map();
-
-    if (isLocal && siblings.length > 1) {
-      const { usable, modelOverrides } = await resolveModelForInstances(
-        resolvedModel,
-        siblings,
-      );
-      instanceModelOverrides = modelOverrides;
-      if (usable.length > 0) {
-        siblings = usable;
-      } else {
-        logger.warn(
-          `[Orchestrator] Model "${resolvedModel}" not available on any ${providerType} instance`,
-        );
-        siblings = [];
-      }
+    let router: TopologyRouter;
+    if (topology === "sequential") {
+      const { SequentialRouter } = await import("./orchestrator/routers/SequentialRouter.ts");
+      router = new SequentialRouter();
+    } else if (topology === "peer_to_peer" || topology === "p2p") {
+      const { PeerToPeerRouter } = await import("./orchestrator/routers/PeerToPeerRouter.ts");
+      router = new PeerToPeerRouter();
+    } else {
+      const { HierarchicalRouter } = await import("./orchestrator/routers/HierarchicalRouter.ts");
+      router = new HierarchicalRouter();
     }
 
-    // Resolve pre-allocations serial-style using the InstanceLoadBalancer
-    const assignments = [];
-    const orchestratorFallback = await getSubAgentFallback();
-
-    for (const member of args.members) {
-      let assignedProvider = providerName;
-      let assignedModel = member.model || resolvedModel;
-
-      if (isLocal && siblings.length > 0) {
-        const assigned = InstanceLoadBalancer.selectAndReserveInstance(
-          siblings,
-          providerName,
-          instanceModelOverrides,
-          assignedModel,
-          activeSubAgents,
-        );
-        if (assigned) {
-          assignedProvider = assigned.provider;
-          assignedModel = assigned.model;
-        } else if (orchestratorFallback) {
-          assignedProvider = orchestratorFallback.provider;
-          assignedModel = orchestratorFallback.model;
-        }
-      }
-
-      assignments.push({
-        description: member.description,
-        prompt: member.prompt,
-        files: member.files,
-        model: member.model,
-        agent: member.agent,
-        assignedProvider,
-        assignedModel,
-        orchestratorContext,
-      });
-    }
-
-    // Execute concurrently inside the orchestrator loop
-    const spawnPromises = assignments.map((assignment) =>
-      OrchestratorService.spawnFromTool(assignment),
+    const spawnResults = await router.execute(
+      args.name,
+      args.members,
+      orchestratorContext,
+      (assignment: OrchestratorSpawnParams) => OrchestratorService.spawnFromTool(assignment),
     );
-
-    const spawnResults = await Promise.all(spawnPromises);
 
     const teamEntry = {
-      agentIds: spawnResults.map((result) => "agent_id" in result ? result.agent_id : undefined).filter(Boolean) as string[],
+      agentIds: spawnResults
+        .map((result: SubAgentResult | { error: string }) => ("agent_id" in result ? result.agent_id : undefined))
+        .filter(Boolean) as string[],
       createdAt: Date.now(),
     };
 
     logger.info(
-      `[Orchestrator] createTeam complete: created ${teamEntry.agentIds.length} agents`,
+      `[Orchestrator] createTeam complete: created ${teamEntry.agentIds.length} agents via topology "${topology}"`,
     );
 
     return spawnResults;
@@ -712,16 +711,16 @@ export default class OrchestratorService {
       // Remove isolated worktrees
       if (subAgent.isolated && subAgent.worktreePath) {
         const subAgentWorktreePath = subAgent.worktreePath;
-        const subAgentRepoPath = subAgent.repoPath;
+        const subAgentRepositoryPath = subAgent.repositoryPath;
         const subAgentId = subAgent.agentId;
         cleanupPromises.push(
-          GitWorktreeHelper.removeWorktree(subAgentRepoPath, subAgentWorktreePath)
+          GitWorktreeHelper.removeWorktree(subAgentRepositoryPath, subAgentWorktreePath)
             .then(() => {
               subAgent.worktreePath = null;
             })
-            .catch((error: Error) =>
+            .catch((error: unknown) =>
               logger.warn(
-                `[Orchestrator] deleteTeam worktree cleanup failed for ${subAgentId}: ${error.message}`,
+                `[Orchestrator] deleteTeam worktree cleanup failed for ${subAgentId}: ${getErrorMessage(error)}`,
               ),
             ),
         );
@@ -804,18 +803,21 @@ export default class OrchestratorService {
       const allToolSchemas = ToolOrchestratorService.getToolSchemas();
       const orchestratorToolNames = new Set(ORCHESTRATOR_ONLY_TOOLS);
       subAgentEnabledTools = allToolSchemas
-        .map((toolSchema: Record<string, unknown>) => toolSchema.name as string)
+        .map((toolSchema) => toolSchema.name)
         .filter((name: string) => !orchestratorToolNames.has(name));
     }
 
     const subAgentProviderInstance = getProvider(subAgent.providerName);
+    if (!subAgentProviderInstance) {
+      throw new Error(`Provider not found: ${subAgent.providerName}`);
+    }
     const { getModelByName } = await import("../config.js");
     const subAgentModelDef = getModelByName(subAgent.resolvedModel);
 
     let loopResult: { messages?: ConversationMessage[] } | undefined;
     try {
       loopResult = await AgenticLoopService.runAgenticLoop({
-        provider: subAgentProviderInstance as import("./harnesses/types.ts").LLMProvider,
+        provider: subAgentProviderInstance as LLMProvider,
         providerName: subAgent.providerName,
         resolvedModel: subAgent.resolvedModel,
         modelDef: subAgentModelDef,
@@ -863,7 +865,7 @@ export default class OrchestratorService {
     // 1. Last assistant message from the harness's returned conversation
     // 2. Telemetry-captured streamed chunks (accumulated from chunk events)
     // 3. Empty string as last resort
-    const messagesOutput = getLastAssistantText(finalMessages as ConversationMessage[]);
+    const messagesOutput = getLastAssistantText(finalMessages);
     const telemetryOutput = (telemetry.output || "").trim();
     subAgent.output = messagesOutput || telemetryOutput;
     if (!subAgent.output && subAgent.status !== "stopped") {
@@ -872,8 +874,8 @@ export default class OrchestratorService {
           `messages=${finalMessages.length}, telemetryOutput=${telemetryOutput.length}chars`,
       );
     }
-    subAgent.toolCalls = telemetry.toolCalls as ToolCall[];
-    subAgent.messages = finalMessages as ConversationMessage[];
+    subAgent.toolCalls = telemetry.toolCalls;
+    subAgent.messages = finalMessages;
     subAgent.durationMs = Date.now() - subAgent.startedAt;
 
     if (subAgent.status !== "stopped") {
@@ -890,7 +892,7 @@ export default class OrchestratorService {
       // Collect diff (only if the worktree created a branch)
       if (subAgent.branchName) {
         const diffResult = await GitWorktreeHelper.getWorktreeDiff(
-          subAgent.repoPath,
+          subAgent.repositoryPath,
           subAgent.branchName,
         );
         subAgent.diff = diffResult.error ? null : (diffResult as WorktreeDiff);
@@ -909,7 +911,7 @@ export default class OrchestratorService {
     // Remove worktree now that the diff has been collected — prevents orphaned
     // worktrees from accumulating on disk across sessions.
     if (subAgent.status !== "stopped" && subAgent.isolated && subAgent.worktreePath) {
-      await GitWorktreeHelper.removeWorktree(subAgent.repoPath, subAgent.worktreePath).catch(
+      await GitWorktreeHelper.removeWorktree(subAgent.repositoryPath, subAgent.worktreePath).catch(
         (error: unknown) =>
           logger.warn(
             `[Orchestrator] Post-completion worktree cleanup failed for ${subAgent.agentId}: ${getErrorMessage(error)}`,

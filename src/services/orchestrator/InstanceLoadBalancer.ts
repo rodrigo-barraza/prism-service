@@ -53,21 +53,21 @@ export class InstanceLoadBalancer {
 
     // Build ordered candidate list: orchestrator's instance first, then rest in order
     const ordered: InstanceEntry[] = [];
-    for (const inst of siblings) {
-      if (inst.id === orchestratorInstanceId) {
-        ordered.unshift(inst); // orchestrator instance goes first
+    for (const instance of siblings) {
+      if (instance.id === orchestratorInstanceId) {
+        ordered.unshift(instance); // orchestrator instance goes first
       } else {
-        ordered.push(inst);
+        ordered.push(instance);
       }
     }
 
     // Phase 1: find the first instance with free concurrency slots
     let bestInstance: InstanceEntry | null = null;
-    for (const inst of ordered) {
-      const active = InstanceLoadBalancer.getActiveOn(inst.id, activeSubAgents);
-      const available = inst.concurrency - active;
+    for (const instance of ordered) {
+      const active = InstanceLoadBalancer.getActiveOn(instance.id, activeSubAgents);
+      const available = instance.concurrency - active;
       if (available > 0) {
-        bestInstance = inst;
+        bestInstance = instance;
         break; // fill-first: take the first instance with any availability
       }
     }
@@ -77,11 +77,11 @@ export class InstanceLoadBalancer {
     // null (which would force all overflow to cloud fallback or queue).
     if (!bestInstance && siblings.length > 0) {
       let minActive = Infinity;
-      for (const inst of ordered) {
-        const active = InstanceLoadBalancer.getActiveOn(inst.id, activeSubAgents);
+      for (const instance of ordered) {
+        const active = InstanceLoadBalancer.getActiveOn(instance.id, activeSubAgents);
         if (active < minActive) {
           minActive = active;
-          bestInstance = inst;
+          bestInstance = instance;
         }
       }
       const overload = minActive - bestInstance!.concurrency;
@@ -113,9 +113,9 @@ export class InstanceLoadBalancer {
   }
 
   static releaseReservation(instanceId: string): void {
-    const currentRes = instanceReservations.get(instanceId) || 0;
-    if (currentRes > 0) {
-      instanceReservations.set(instanceId, currentRes - 1);
+    const currentReservations = instanceReservations.get(instanceId) || 0;
+    if (currentReservations > 0) {
+      instanceReservations.set(instanceId, currentReservations - 1);
     }
   }
 

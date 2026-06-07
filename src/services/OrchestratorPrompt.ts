@@ -144,7 +144,7 @@ After synthesizing, decide whether the sub-agent's existing context helps or hur
 - Be precise about git operations — specify branch names, commit hashes`;
 }
 
-/**
+/*
  * Get the list of tool names that sub-agents should NOT have access to.
  * Sub-agents cannot spawn sub-sub-agents (prevents recursion).
  */

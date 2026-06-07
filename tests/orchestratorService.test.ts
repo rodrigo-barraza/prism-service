@@ -1,10 +1,11 @@
+import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock the GitWorktreeHelper to avoid disk operations
 vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
   GitWorktreeHelper: {
     getDefaultWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
-    resolveRepoPath: vi.fn().mockReturnValue("/workspace"),
+    resolveRepositoryPath: vi.fn().mockReturnValue("/workspace"),
     createWorktree: vi.fn().mockResolvedValue({ worktreePath: "/workspace/worktree-1" }),
     removeWorktree: vi.fn().mockResolvedValue({}),
     toolsApiPost: vi.fn().mockResolvedValue({}),
@@ -17,6 +18,7 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
   },
 }));
 
+import type { OrchestratorContext } from "../src/types/orchestrator.ts";
 import AgenticLoopService from "../src/services/AgenticLoopService.ts";
 import OrchestratorService from "../src/services/OrchestratorService.ts";
 import AgentPersonaRegistry from "../src/services/AgentPersonaRegistry.ts";
@@ -27,7 +29,7 @@ const mockRunAgenticLoop = vi.fn().mockResolvedValue({
 });
 
 describe("OrchestratorService Spawning & Agent Types", () => {
-  let orchestratorContext: any;
+  let orchestratorContext: OrchestratorContext;
 
   beforeEach(async () => {
     vi.clearAllMocks();
