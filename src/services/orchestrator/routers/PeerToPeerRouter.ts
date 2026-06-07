@@ -5,6 +5,7 @@ import type {
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
 import type { TopologyRouter } from "../TopologyRouter.ts";
+import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import { InstanceLoadBalancer } from "../InstanceLoadBalancer.ts";
 import { resolveModelForInstances } from "../../../utils/ModelResolution.ts";
 import { getInstancesByType, getInstanceType } from "../../../providers/instance-registry.ts";
@@ -178,7 +179,7 @@ export class PeerToPeerRouter implements TopologyRouter {
       }
 
       // 5. Append speaker output to shared thread
-      const responseText = spawnResult.result || spawnResult.summary;
+      const responseText = spawnResult.result || buildToolCallFallbackSummary(spawnResult) || spawnResult.summary;
       sharedDiscussion.push(`[${speakerName}]: ${responseText}`);
 
       // 6. Early exit check: if an agent signs off with [DONE] or all tasks are finished
