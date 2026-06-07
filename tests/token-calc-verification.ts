@@ -101,7 +101,7 @@ async function streamAgentRequest(prompt: string, options: any = {}) {
       { role: "user", content: prompt },
     ],
     functionCallingEnabled: true,
-    enabledTools: options.enabledTools || ["read_file", "write_file", "list_dir", "run_command"],
+    enabledTools: options.enabledTools || ["read_file", "write_file", "list_dir", "execute_command"],
     maxTokens: options.maxTokens || 2048,
     temperature: options.temperature ?? 0.7,
     thinkingEnabled: true,
@@ -350,7 +350,7 @@ Do NOT do the work yourself. Use create_team immediately.`;
     maxIterations: 10,
     maxWorkerIterations: 3,
     title: "Coordinator Token Test",
-    enabledTools: ["read_file", "write_file", "list_dir", "run_command", "create_team", "send_message", "stop_agent"],
+    enabledTools: ["read_file", "write_file", "list_dir", "execute_command", "create_team", "send_message", "stop_agent"],
   });
 
   const { chunkCount, thinkingChunkCount, doneEvent, usageUpdateEvents, workerCompleteEvents, workerProgressEvents: _workerProgressEvents, workerStatusEvents, maxOutputTokensFromChunks } = result;

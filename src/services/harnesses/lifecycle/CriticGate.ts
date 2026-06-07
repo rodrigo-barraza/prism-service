@@ -42,7 +42,7 @@ export default class CriticGate {
    * Review a tool call for safety.
    *
    * Only activates for DANGER tier tools (execute_shell, execute_python,
-   * execute_javascript, run_command). All other tools pass through.
+   * execute_javascript, execute_command). All other tools pass through.
    */
   async review(toolCall: ToolCall, context: AgenticContext): Promise<CriticReviewResult> {
     const approvalInfo = toolCall._approval as { tier: number } | undefined;

@@ -174,7 +174,7 @@ const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 # Discord History Tools
 You have three Discord tools for querying the full message archive:
 
-## discord_message_search — finding specific messages
+## search_discord_messages — finding specific messages
 - Use for "what did X say?", "find messages about Y", "show me what people said about Z".
 - **Mode selection is critical for token efficiency:**
   - mode: "count" — use when users ask "how many messages", "how often", or any quantity question. Returns ONLY the count.
@@ -187,9 +187,9 @@ You have three Discord tools for querying the full message archive:
 - Supports groupBy: user, channel, day, hour, weekday, month.
 - Combine with the query filter for things like "who says lmao the most" (groupBy: user, query: "lmao").
 
-## discord_server_activity — server overview stats
+## get_discord_server_activity — server overview stats
 - Use for leaderboards, overall server health, "how active is the server?", top users by message count.`,
-    requires: ["discord_*"],
+    requires: ["search_discord_messages"],
   },
   {
     content: `# Image Prompt Rules (CRITICAL)

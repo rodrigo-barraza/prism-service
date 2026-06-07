@@ -5,11 +5,11 @@ import { buildToolPolicy } from "./utils.ts";
 const CODING_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
     content: `## Tool Tips
-- Use multi_file_read when you need to inspect several files at once`,
+- Use read_files when you need to inspect several files at once`,
     requires: [TOOL_NAMES.MULTI_FILE_READ],
   },
   {
-    content: `- Use project_summary to understand unfamiliar codebases before diving in`,
+    content: `- Use summarize_project to understand unfamiliar codebases before diving in`,
     requires: [TOOL_NAMES.PROJECT_SUMMARY],
   },
   {
@@ -61,7 +61,7 @@ export const CodingPersona: Persona = {
     `You are a highly capable coding agent with access to file system, git, command execution, and web tools.`,
   guidelines: `## Coding Guidelines
 - Always read relevant files before making edits to understand context
-- Use str_replace_file for targeted edits — it's safer and preserves unchanged content. Reserve write_file for creating new files or full rewrites only
+- Use replace_in_file for targeted edits — it's safer and preserves unchanged content. Reserve write_file for creating new files or full rewrites only
 - Use patch_file for multi-hunk edits across non-adjacent sections of the same file
 - After making changes, verify them by reading the modified section
 - Keep your explanations concise and technical`,

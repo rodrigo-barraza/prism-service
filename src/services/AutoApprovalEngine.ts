@@ -23,17 +23,17 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   // Tier 1 — read-only
   read_file: APPROVAL_TIERS.AUTO,
   list_directory: APPROVAL_TIERS.AUTO,
-  grep_search: APPROVAL_TIERS.AUTO,
-  glob_files: APPROVAL_TIERS.AUTO,
+  search_file_contents: APPROVAL_TIERS.AUTO,
+  find_files: APPROVAL_TIERS.AUTO,
   search_web: APPROVAL_TIERS.AUTO,
   read_web_page: APPROVAL_TIERS.AUTO,
-  multi_file_read: APPROVAL_TIERS.AUTO,
-  file_info: APPROVAL_TIERS.AUTO,
-  file_diff: APPROVAL_TIERS.AUTO,
+  read_files: APPROVAL_TIERS.AUTO,
+  get_file_info: APPROVAL_TIERS.AUTO,
+  diff_files: APPROVAL_TIERS.AUTO,
   git_status: APPROVAL_TIERS.AUTO,
   git_diff: APPROVAL_TIERS.AUTO,
   git_log: APPROVAL_TIERS.AUTO,
-  project_summary: APPROVAL_TIERS.AUTO,
+  summarize_project: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — task management (agent's own scratchpad, not user files)
   create_task: APPROVAL_TIERS.AUTO,
@@ -64,13 +64,13 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   list_cron_jobs: APPROVAL_TIERS.WRITE,
   delete_cron_job: APPROVAL_TIERS.WRITE,
   trigger_cron_job: APPROVAL_TIERS.WRITE,
-  notebook_edit: APPROVAL_TIERS.WRITE,
+  edit_notebook: APPROVAL_TIERS.WRITE,
 
   // Tier 1 — skill management (read-only discovery)
   list_skills: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — structured output (data formatting only)
-  synthetic_output: APPROVAL_TIERS.AUTO,
+  emit_structured_output: APPROVAL_TIERS.AUTO,
 
   // Tier 2 — skill mutations + execution
   create_skill: APPROVAL_TIERS.WRITE,
@@ -86,17 +86,17 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
 
   // Tier 2 — write operations
   write_file: APPROVAL_TIERS.WRITE,
-  str_replace_file: APPROVAL_TIERS.WRITE,
+  replace_in_file: APPROVAL_TIERS.WRITE,
   patch_file: APPROVAL_TIERS.WRITE,
   move_file: APPROVAL_TIERS.WRITE,
   delete_file: APPROVAL_TIERS.WRITE,
-  browser_action: APPROVAL_TIERS.WRITE,
+  control_browser: APPROVAL_TIERS.WRITE,
 
   // Tier 3 — destructive / arbitrary execution
   execute_shell: APPROVAL_TIERS.DANGER,
   execute_python: APPROVAL_TIERS.DANGER,
   execute_javascript: APPROVAL_TIERS.DANGER,
-  run_command: APPROVAL_TIERS.DANGER,
+  execute_command: APPROVAL_TIERS.DANGER,
 };
 
 const TIER_LABELS: Record<number, string> = {

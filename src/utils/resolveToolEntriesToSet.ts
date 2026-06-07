@@ -7,7 +7,7 @@
 //   - "label:discord"           → all tools with labels containing "discord"
 //   - "domainKey:workspace"     → all tools with domainKey === "workspace"
 //   - "domain:Core Tools"       → all tools with domain === "Core Tools"
-//   - "calculate_precise"       → exact tool name passthrough
+//   - "evaluate_expression"       → exact tool name passthrough
 //
 // Used by AgenticToolResolver, SystemPromptAssembler, and ConfigRoutes
 // to avoid duplicating prefix expansion logic.

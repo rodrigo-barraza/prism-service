@@ -12,7 +12,7 @@ export interface PersonaContext {
  * When `requires` is set, the section is only injected into the system
  * prompt when at least one of the listed tools is present in the
  * resolved `enabledTools`. Supports exact names (`"generate_image"`)
- * and prefix globs (`"discord_*"`, `"lifx_*"`).
+ * and prefix globs (`"get_discord_*"`, `"list_lights"`).
  *
  * When `requires` is omitted or empty, the section is always included.
  */

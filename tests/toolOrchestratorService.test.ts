@@ -36,7 +36,7 @@ describe("ToolOrchestratorService", () => {
           endpoint: { path: "/generate" },
         },
         {
-          name: "speech_to_text",
+          name: "transcribe_audio",
           description: "Speech to text conversion",
           domain: "Audio",
           endpoint: { path: "/speech" },
@@ -75,9 +75,9 @@ describe("ToolOrchestratorService", () => {
       expect(generateImageSchema).toBeDefined();
       expect(generateImageSchema?.inputModalities).toEqual(["image"]);
 
-      const speechToTextSchema = clientSchemas.find((tool) => tool.name === "speech_to_text") as any;
-      expect(speechToTextSchema).toBeDefined();
-      expect(speechToTextSchema?.inputModalities).toEqual(["audio"]);
+      const transcribeAudioSchema = clientSchemas.find((tool) => tool.name === "transcribe_audio") as any;
+      expect(transcribeAudioSchema).toBeDefined();
+      expect(transcribeAudioSchema?.inputModalities).toEqual(["audio"]);
 
       const getWeatherSchema = clientSchemas.find((tool) => tool.name === "get_weather") as any;
       expect(getWeatherSchema).toBeDefined();

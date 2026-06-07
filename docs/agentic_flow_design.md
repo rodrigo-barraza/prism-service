@@ -73,7 +73,7 @@ The agentic loop is gated on a dedicated REST endpoint:
 - `execute_shell` → `/compute/shell/stream` (SSE)
 - `execute_python` → `/utility/python/stream` (SSE)
 - `execute_javascript` → `/compute/js/stream` (SSE)
-- `run_command` → `/agentic/command/stream` (SSE)
+- `execute_command` → `/agentic/command/stream` (SSE)
 
 All use POST + SSE streaming with 65s timeout, stdout/stderr separation, and exit code tracking. Non-streamable tools use direct REST calls to `tools-api`.
 
@@ -109,13 +109,13 @@ Prism dynamically loads tool schemas from `tools-api/admin/tool-schemas` at boot
 
 | Service                 | Tools                                                                                                                                |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `AgenticFileService`    | `read_file`, `write_file`, `str_replace_file`, `patch_file`, `multi_file_read`, `file_info`, `file_diff`, `move_file`, `delete_file` |
-| `AgenticCommandService` | `execute_shell`, `execute_python`, `execute_javascript`, `run_command`                                                               |
-| `AgenticProjectService` | `list_directory`, `grep_search`, `glob_files`, `project_summary`                                                                     |
+| `AgenticFileService`    | `read_file`, `write_file`, `replace_in_file`, `patch_file`, `read_files`, `get_file_info`, `diff_files`, `move_file`, `delete_file` |
+| `AgenticCommandService` | `execute_shell`, `execute_python`, `execute_javascript`, `execute_command`                                                               |
+| `AgenticProjectService` | `list_directory`, `search_file_contents`, `find_files`, `summarize_project`                                                                     |
 | `AgenticWebService`     | `fetch_url`, `web_search`                                                                                                            |
 | `AgenticGitService`     | `git_status`, `git_diff`, `git_log` (+ worktree ops)                                                                                 |
-| `AgenticBrowserService` | `browser_action`                                                                                                                     |
-| `AgenticTaskService`    | `task_create`, `task_get`, `task_list`, `task_update`                                                                                |
+| `AgenticBrowserService` | `control_browser`                                                                                                                     |
+| `AgenticTaskService`    | `create_task`, `get_task`, `list_tasks`, `update_task`                                                                                |
 
 Additionally, custom tools can be defined per-project in MongoDB (`custom_tools` collection) with arbitrary HTTP endpoints.
 
@@ -129,19 +129,19 @@ Additionally, custom tools can be defined per-project in MongoDB (`custom_tools`
 2. ✅ **Browser Automation ("Computer Use")**:
    - **What**: Headless Playwright-based browser tool for SPA navigation, E2E testing, and visual QA.
    - **Why**: `fetch_url` can't handle JavaScript-rendered pages, authentication flows, or visual regression testing.
-   - **Implementation**: `AgenticBrowserService` in `tools-api` manages a Playwright browser instance via `browser_action` tool. Supports `navigate`, `click`, `type`, `screenshot`, `scroll`, `evaluate`, `get_elements` (DOM inspection with CSS selectors). Screenshots uploaded to MinIO as `screenshotRef` values and promoted into conversation `images` arrays.
+   - **Implementation**: `AgenticBrowserService` in `tools-api` manages a Playwright browser instance via `control_browser` tool. Supports `navigate`, `click`, `type`, `screenshot`, `scroll`, `evaluate`, `get_elements` (DOM inspection with CSS selectors). Screenshots uploaded to MinIO as `screenshotRef` values and promoted into conversation `images` arrays.
    - **Files**: `tools-api/services/AgenticBrowserService.js`, `AgenticRoutes.js` (`/agentic/browser/action`), `prism-client/src/components/ToolResultRenderers.js`
 
 3. ✅ **Semantic Code Navigation (LSP)**:
-   - **What**: Exposing Language Server Protocol (LSP) capabilities to the agent for compiler-grade code intelligence instead of relying purely on regex `grep_search`.
+   - **What**: Exposing Language Server Protocol (LSP) capabilities to the agent for compiler-grade code intelligence instead of relying purely on regex `search_file_contents`.
    - **Why**: Allows the agent to precisely find definitions, trace references across files, and inspect type signatures natively, massively reducing hallucination on complex codebases.
-   - **Implementation**: `AgenticLspService` in `tools-api` wrapping LSP servers (`typescript-language-server`, `pyright-langserver`) via `vscode-jsonrpc` stdio transport. Single `lsp_action` tool with operation enum: `goToDefinition`, `findReferences`, `hover`, `documentSymbol`, `goToImplementation`. Servers lazy-started on first request per language. `LspClient` handles JSON-RPC framing, `LspServerInstance` manages lifecycle with exponential backoff retry, `LspServerManager` routes requests by file extension.
+   - **Implementation**: `AgenticLspService` in `tools-api` wrapping LSP servers (`typescript-language-server`, `pyright-langserver`) via `vscode-jsonrpc` stdio transport. Single `query_language_server` tool with operation enum: `goToDefinition`, `findReferences`, `hover`, `documentSymbol`, `goToImplementation`. Servers lazy-started on first request per language. `LspClient` handles JSON-RPC framing, `LspServerInstance` manages lifecycle with exponential backoff retry, `LspServerManager` routes requests by file extension.
    - **Files**: `tools-api/services/lsp/LspClient.js`, `LspServerInstance.js`, `LspServerManager.js`, `lspConfig.js`, `AgenticLspService.js`, `AgenticRoutes.js` (`/agentic/lsp/action`, `/agentic/lsp/health`, `/agentic/lsp/shutdown`)
 
 4. ✅ **Task & State Management**:
    - **What**: A persistent, MongoDB-backed task list that survives context window truncation and memory consolidation — functioning as reliable **Working Memory** for multi-step agent workflows.
    - **Why**: As contexts slide and memory gets consolidated, agents lose track of complex multi-stage tasks. A persistent scratchpad decouples task tracking from the ephemeral conversation window.
-   - **Implementation**: `AgenticTaskService` in `tools-api` with four tools: `task_create` (with subject, description, status, metadata), `task_get` (single task by ID), `task_list` (filterable by status, returns summary counts), `task_update` (status transitions, metadata merge). MongoDB `agent_tasks` collection with project-scoped isolation, monotonic IDs via `agent_task_counters`. All four tools registered as **Tier 1 (auto-approve)** in `AutoApprovalEngine` since they only modify the agent's own scratchpad, not user files. 200-task-per-project cap.
+   - **Implementation**: `AgenticTaskService` in `tools-api` with four tools: `create_task` (with subject, description, status, metadata), `get_task` (single task by ID), `list_tasks` (filterable by status, returns summary counts), `update_task` (status transitions, metadata merge). MongoDB `agent_tasks` collection with project-scoped isolation, monotonic IDs via `agent_task_counters`. All four tools registered as **Tier 1 (auto-approve)** in `AutoApprovalEngine` since they only modify the agent's own scratchpad, not user files. 200-task-per-project cap.
    - **Files**: `tools-api/services/AgenticTaskService.js`, `AgenticRoutes.js` (`/agentic/task/{create,list,get,update,delete}`), `ToolSchemaService.js`, `prism/src/services/AutoApprovalEngine.js`
 
 5. 🔲 **Background Execution Monitoring (Terminal Capture)**:
@@ -160,25 +160,25 @@ Complete tool-by-tool mapping between Claude Code (from [razakiau/claude-code `s
 | Claude Code Tool | Prism Equivalent | Parity | Notes |
 |---|---|---|---|
 | `ReadTool` | `read_file` | ✅ Match | Single-file read with line range support |
-| `ReadTool` (multi) | `multi_file_read` | ✅ **Superior** | Batch read multiple files in one call — CC requires sequential reads |
+| `ReadTool` (multi) | `read_files` | ✅ **Superior** | Batch read multiple files in one call — CC requires sequential reads |
 | `WriteTool` | `write_file` | ✅ Match | Full file creation/overwrite |
-| `EditTool` | `str_replace_file`, `patch_file` | ✅ **Superior** | Two edit strategies: search-and-replace (`str_replace_file`) and unified diff (`patch_file`). CC only has search-and-replace. `patch_file` applies multi-hunk diffs in a single tool call |
-| — | `file_info` | ✅ **Extra** | File metadata (size, mtime, permissions, MIME type) — no CC equivalent |
-| — | `file_diff` | ✅ **Extra** | Structured diff between two files or file versions — no CC equivalent |
+| `EditTool` | `replace_in_file`, `patch_file` | ✅ **Superior** | Two edit strategies: search-and-replace (`replace_in_file`) and unified diff (`patch_file`). CC only has search-and-replace. `patch_file` applies multi-hunk diffs in a single tool call |
+| — | `get_file_info` | ✅ **Extra** | File metadata (size, mtime, permissions, MIME type) — no CC equivalent |
+| — | `diff_files` | ✅ **Extra** | Structured diff between two files or file versions — no CC equivalent |
 | — | `move_file` | ✅ **Extra** | Rename/move files — CC uses shell commands for this |
 | — | `delete_file` | ✅ **Extra** | Delete files with safety checks — CC uses shell commands |
 
-**Architectural note:** CC has a single `EditTool` that does search-and-replace. Our dual approach (`str_replace_file` for surgical edits, `patch_file` for multi-hunk diffs) is more expressive — `patch_file` can apply an entire unified diff in one tool call, which CC would need multiple sequential `EditTool` invocations for.
+**Architectural note:** CC has a single `EditTool` that does search-and-replace. Our dual approach (`replace_in_file` for surgical edits, `patch_file` for multi-hunk diffs) is more expressive — `patch_file` can apply an entire unified diff in one tool call, which CC would need multiple sequential `EditTool` invocations for.
 
 #### Code Intelligence & Search
 
 | Claude Code Tool | Prism Equivalent | Parity | Notes |
 |---|---|---|---|
-| `GrepTool` | `grep_search` | ✅ Match | Regex/literal search across project files |
-| `GlobTool` | `glob_files` | ✅ Match | File discovery by glob pattern |
+| `GrepTool` | `search_file_contents` | ✅ Match | Regex/literal search across project files |
+| `GlobTool` | `find_files` | ✅ Match | File discovery by glob pattern |
 | `ListTool` | `list_directory` | ✅ Match | Directory listing with recursive support |
-| — | `project_summary` | ✅ **Extra** | Full project tree snapshot — no CC equivalent |
-| — | `lsp_action` | ✅ **Superior** | LSP-based code intelligence (goToDefinition, findReferences, hover, documentSymbol, goToImplementation). CC relies on `GrepTool` for code navigation — no compiler-grade intelligence |
+| — | `summarize_project` | ✅ **Extra** | Full project tree snapshot — no CC equivalent |
+| — | `query_language_server` | ✅ **Superior** | LSP-based code intelligence (goToDefinition, findReferences, hover, documentSymbol, goToImplementation). CC relies on `GrepTool` for code navigation — no compiler-grade intelligence |
 
 **Architectural note:** CC's code navigation is purely grep-based. Our `AgenticLspService` wraps actual language servers (`typescript-language-server`, `pyright-langserver`) for compiler-grade precision — zero hallucination on symbol resolution, type information, and cross-file reference tracing.
 
@@ -186,7 +186,7 @@ Complete tool-by-tool mapping between Claude Code (from [razakiau/claude-code `s
 
 | Claude Code Tool | Prism Equivalent | Parity | Notes |
 |---|---|---|---|
-| `BashTool` | `execute_shell`, `run_command` | ✅ **Superior** | Two execution modes: `execute_shell` (raw shell via tools-api sandbox) and `run_command` (agentic command execution with working directory control). Both stream via SSE. CC's `BashTool` is a single shell executor |
+| `BashTool` | `execute_shell`, `execute_command` | ✅ **Superior** | Two execution modes: `execute_shell` (raw shell via tools-api sandbox) and `execute_command` (agentic command execution with working directory control). Both stream via SSE. CC's `BashTool` is a single shell executor |
 | `REPLTool` (JS) | `execute_javascript` | ✅ Match | Both spawn a fresh subprocess per call — neither is a true REPL (no state persistence between calls). CC's naming is misleading |
 | `REPLTool` (Python) | `execute_python` | ✅ **Superior** | Our Python executor has better sandboxing: memory limit (256MB via `resource.setrlimit`), network disabled (socket creation blocked), dangerous module blocking (`subprocess`, `shutil`, `ctypes`, `multiprocessing`, `signal`). Also supports SSE streaming of stdout/stderr chunks |
 
@@ -198,7 +198,7 @@ Complete tool-by-tool mapping between Claude Code (from [razakiau/claude-code `s
 |---|---|---|---|
 | `WebFetchTool` | `fetch_url` | ✅ Match | Fetch URL content with HTML-to-markdown conversion |
 | `WebSearchTool` | `web_search` | ✅ Match | Web search with provider abstraction |
-| — | `browser_action` | ✅ **Superior** | Playwright-based headless browser automation (navigate, click, type, screenshot, evaluate JS, DOM inspection). CC has `ComputerTool` but it's screen-pixel-based — our DOM-level interaction is more reliable and faster |
+| — | `control_browser` | ✅ **Superior** | Playwright-based headless browser automation (navigate, click, type, screenshot, evaluate JS, DOM inspection). CC has `ComputerTool` but it's screen-pixel-based — our DOM-level interaction is more reliable and faster |
 
 #### Git
 
@@ -240,22 +240,22 @@ Complete tool-by-tool mapping between Claude Code (from [razakiau/claude-code `s
 |---|---|---|---|
 | `ThinkTool` | `think` | ✅ Match | Extended reasoning scratchpad — contents not shown to user, used for complex multi-step planning |
 | `TodoWriteTool` | `todo_write` | ✅ Match | Persistent session-based checklist with `pending`/`in_progress`/`completed` status. Emits `todo_update` SSE event to Prism Client for live UI rendering |
-| `BriefTool` | `brief` | ✅ Match | Context summarization — private working memory for long sessions. Agent writes compressed summaries with key files, open questions, and progress. Emits `brief_update` SSE event |
-| `AskUserQuestionTool` | `ask_user_question` | ✅ Match | Pauses the agentic loop to present a question to the user. Supports freeform text or multiple-choice via `choices` array. Uses the same Promise-based pause/resume pattern as tool approvals. 5-minute timeout with graceful fallback |
+| `BriefTool` | `summarize_conversation` | ✅ Match | Context summarization — private working memory for long sessions. Agent writes compressed summaries with key files, open questions, and progress. Emits `brief_update` SSE event |
+| `AskUserQuestionTool` | `ask_user` | ✅ Match | Pauses the agentic loop to present a question to the user. Supports freeform text or multiple-choice via `choices` array. Uses the same Promise-based pause/resume pattern as tool approvals. 5-minute timeout with graceful fallback |
 | `MemoryTool` (read/write) | `upsert_memory`, `search_memories`, `delete_memory` | ✅ **Superior** | CC has a single `MemoryTool` with read/write. We have 3 dedicated memory tools + a 5-store cognitive memory architecture (episodic, semantic, procedural, prospective, working). See Section 7.7 for deep comparison |
 | — | `sleep` | ✅ **Extra** | Pause execution for a specified duration — useful for rate limiting and polling |
 | — | `enter_plan_mode`, `exit_plan_mode` | ✅ **Extra** | Toggle planning mode from within the agentic loop — no CC equivalent (CC's planning is UI-triggered only) |
-| — | `synthetic_output` | ✅ **Extra** | Emit structured JSON output for programmatic consumption — no CC equivalent |
+| — | `emit_structured_output` | ✅ **Extra** | Emit structured JSON output for programmatic consumption — no CC equivalent |
 | — | `skill_create`, `skill_execute`, `skill_list`, `skill_delete` | ✅ **Extra** | Full CRUD for project-scoped skills — no CC equivalent (CC skills are file-based, read-only) |
 
-**Architectural note for `ask_user_question`:** This implements a **pause/resume loop** using the `pendingQuestions` registry in `AgenticLoopService` (same pattern as `pendingApprovals`). The agent calls the tool → handler emits `user_question` SSE event → Prism Client renders UI → user submits → `POST /agent/answer` resolves the pending promise → loop continues. This is architecturally identical to CC's implementation but adapted for our HTTP request lifecycle (CC's REPL loop is always alive).
+**Architectural note for `ask_user`:** This implements a **pause/resume loop** using the `pendingQuestions` registry in `AgenticLoopService` (same pattern as `pendingApprovals`). The agent calls the tool → handler emits `user_question` SSE event → Prism Client renders UI → user submits → `POST /agent/answer` resolves the pending promise → loop continues. This is architecturally identical to CC's implementation but adapted for our HTTP request lifecycle (CC's REPL loop is always alive).
 
 #### Task Management (Persistent Working Memory)
 
 | Claude Code Tool | Prism Equivalent | Parity | Notes |
 |---|---|---|---|
 | `TodoWriteTool` | `todo_write` (Prism-local) | ✅ Match | Session-scoped checklist |
-| — | `task_create`, `task_get`, `task_list`, `task_update` | ✅ **Superior** | Full persistent task system in MongoDB with status tracking, metadata, project-scoped isolation, filterable queries. CC's `TodoWriteTool` is session-only; our `AgenticTaskService` persists across sessions |
+| — | `create_task`, `get_task`, `list_tasks`, `update_task` | ✅ **Superior** | Full persistent task system in MongoDB with status tracking, metadata, project-scoped isolation, filterable queries. CC's `TodoWriteTool` is session-only; our `AgenticTaskService` persists across sessions |
 
 **Architectural note:** We have TWO task systems: (1) `todo_write` (Prism-local, session-scoped, matches CC's `TodoWriteTool`) for lightweight checklists, and (2) `AgenticTaskService` (MongoDB-backed, persistent, 4 CRUD tools) for complex multi-session workflows. CC only has option 1.
 
@@ -263,14 +263,14 @@ Complete tool-by-tool mapping between Claude Code (from [razakiau/claude-code `s
 
 | Category | CC Tools | Prism Tools | Status |
 |---|---|---|---|
-| Filesystem & Editing | 3 (Read, Write, Edit) | 9 (read_file, write_file, str_replace_file, patch_file, multi_file_read, file_info, file_diff, move_file, delete_file) | ✅ **Superior** |
-| Code Intelligence | 3 (Grep, Glob, List) | 5 (grep_search, glob_files, list_directory, project_summary, lsp_action) | ✅ **Superior** |
-| Execution | 2 (Bash, REPL) | 4 (execute_shell, run_command, execute_python, execute_javascript) | ✅ **Superior** |
-| Web & Network | 2 (WebFetch, WebSearch) | 3 (fetch_url, web_search, browser_action) | ✅ **Superior** |
+| Filesystem & Editing | 3 (Read, Write, Edit) | 9 (read_file, write_file, replace_in_file, patch_file, read_files, get_file_info, diff_files, move_file, delete_file) | ✅ **Superior** |
+| Code Intelligence | 3 (Grep, Glob, List) | 5 (search_file_contents, find_files, list_directory, summarize_project, query_language_server) | ✅ **Superior** |
+| Execution | 2 (Bash, REPL) | 4 (execute_shell, execute_command, execute_python, execute_javascript) | ✅ **Superior** |
+| Web & Network | 2 (WebFetch, WebSearch) | 3 (fetch_url, web_search, control_browser) | ✅ **Superior** |
 | Git | 1 (GitDiff) | 5 (git_status, git_diff, git_log, enter_worktree, exit_worktree) | ✅ **Superior** |
 | MCP | 4 (MCPTool, ListResources, ReadResource, Auth) | 3 + transparent injection (list_mcp_resources, read_mcp_resource, mcp_authenticate, + auto-injected tools) | ✅ **Match** |
 | Orchestration | 3 (Agent, SendMessage, TaskOutput) | 4 (team_create, send_message, stop_agent, task_output) | ✅ **Superior** |
-| Meta & Control | 4 (Think, TodoWrite, Brief, AskUser) | 10 (think, todo_write, brief, ask_user_question, sleep, enter_plan_mode, exit_plan_mode, synthetic_output, skill_*) | ✅ **Superior** |
+| Meta & Control | 4 (Think, TodoWrite, Brief, AskUser) | 10 (think, todo_write, summarize_conversation, ask_user, sleep, enter_plan_mode, exit_plan_mode, emit_structured_output, skill_*) | ✅ **Superior** |
 | Memory | 1 (MemoryTool) | 3 (upsert_memory, search_memories, delete_memory) | ✅ **Superior** |
 
 **Total: 23 CC tools → 46+ Prism tools.** Full coverage with significant depth advantages in filesystem operations, code intelligence (LSP), execution sandboxing, git integration, and memory architecture.
@@ -374,7 +374,7 @@ Claude Code is a CLI REPL — its main loop is always alive, waiting for user in
 - **In-process async** — workers are concurrent async loops in the same Node.js process (like Claude Code's `inProcessRunner`), not separate processes. Each gets isolated conversation context
 - **Workers cannot spawn sub-workers** — `team_create`/`send_message`/`stop_agent` excluded from worker tool sets to prevent recursion
 - **Coordinator is a mode, not a persona** — the coordinator system prompt is injected as an addendum to the existing `CODING` persona when coordinator tools are available, not a separate identity
-- **File paths optional for chat-triggered flow** — the coordinator LLM discovers files via its existing tools (`project_summary`, `grep_search`). Manual panel still requires explicit file paths
+- **File paths optional for chat-triggered flow** — the coordinator LLM discovers files via its existing tools (`summarize_project`, `search_file_contents`). Manual panel still requires explicit file paths
 
 ### ✅ Multi-System Cognitive Memory Architecture
 
@@ -497,9 +497,9 @@ A **rule-based** permission system for tool execution, replacing the need for ex
 
 | Tier                      | Risk                    | Tools                                                                                                                                                                                                                                             | Behavior                                                            |
 | ------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| **Tier 1: Auto-Approve**  | Read-only / Scratchpad  | `read_file`, `list_directory`, `grep_search`, `glob_files`, `web_search`, `fetch_url`, `multi_file_read`, `file_info`, `file_diff`, `git_status`, `git_diff`, `git_log`, `project_summary`, `task_create`, `task_get`, `task_list`, `task_update` | Always execute without prompting                                    |
-| **Tier 2: Configurable**  | Write                   | `write_file`, `str_replace_file`, `patch_file`, `move_file`, `delete_file`, `browser_action`                                                                                                                                                      | Auto-approve when user enables "Auto Mode" toggle; otherwise prompt |
-| **Tier 3: Always Prompt** | Destructive / Arbitrary | `execute_shell`, `execute_python`, `execute_javascript`, `run_command`                                                                                                                                                                            | Always require explicit user approval                               |
+| **Tier 1: Auto-Approve**  | Read-only / Scratchpad  | `read_file`, `list_directory`, `search_file_contents`, `find_files`, `web_search`, `fetch_url`, `read_files`, `get_file_info`, `diff_files`, `git_status`, `git_diff`, `git_log`, `summarize_project`, `create_task`, `get_task`, `list_tasks`, `update_task` | Always execute without prompting                                    |
+| **Tier 2: Configurable**  | Write                   | `write_file`, `replace_in_file`, `patch_file`, `move_file`, `delete_file`, `control_browser`                                                                                                                                                      | Auto-approve when user enables "Auto Mode" toggle; otherwise prompt |
+| **Tier 3: Always Prompt** | Destructive / Arbitrary | `execute_shell`, `execute_python`, `execute_javascript`, `execute_command`                                                                                                                                                                            | Always require explicit user approval                               |
 
 **Implementation**: ✅ Integrated via the `beforeToolCall` hook in `AgentHooks`. Default tier assignments in `AutoApprovalEngine.js`. Unknown tools default to Tier 2. `ApprovalCardComponent` renders approval UI in Prism Client. "Approve All" option (`approveAll`) promotes all remaining tools to auto-approve for the rest of the session. 🔲 Per-tool tier overrides in Prism Client settings UI not yet built (constructor accepts `tierOverrides` but no UI exposes it).
 
@@ -563,7 +563,7 @@ Every agentic iteration is individually logged via `RequestLogger.logChatGenerat
 1. ✅ **Coordinator Mode** — Full implementation: `CoordinatorService`, `CoordinatorPrompt`, worker execution engine, task notification pipeline, instance pooling, git worktree isolation, Prism Client UI
 2. ✅ **Mutation Queue** — `MutationQueue.js`: per-path FIFO mutex singleton for concurrent write safety
 3. ✅ **Memory Consolidation** — `MemoryConsolidationService`: scheduled 6h loop, audit trail, cost guard, real-time broadcast, UI history panel
-4. ✅ **Browser Automation** — `AgenticBrowserService`: Playwright integration with `browser_action` tool, DOM inspection, screenshot persistence
+4. ✅ **Browser Automation** — `AgenticBrowserService`: Playwright integration with `control_browser` tool, DOM inspection, screenshot persistence
 
 ### Phase 4: Hardening & Intelligence ✅ COMPLETE (8/13)
 
@@ -999,7 +999,7 @@ Cleanup targets:
 
 ### 🔲 Tool Execution Sandboxing
 
-**Impact**: Accepted risk — `execute_shell`, `execute_python`, `execute_javascript`, and `run_command` execute arbitrary code on the host system with the user's permissions. The **only** safety layer is the Tier 3 approval gate.
+**Impact**: Accepted risk — `execute_shell`, `execute_python`, `execute_javascript`, and `execute_command` execute arbitrary code on the host system with the user's permissions. The **only** safety layer is the Tier 3 approval gate.
 
 **Current design**: This is an intentional tradeoff for a local-first tool. The agent runs on the user's own machine with their own filesystem access — sandboxing would limit the agent's utility for its primary use case (autonomous coding).
 

@@ -53,9 +53,9 @@ interface AskUserQuestionArgs {
 }
 
 export default {
-  name: "ask_user_question",
+  name: "ask_user",
   schema: {
-    name: "ask_user_question",
+    name: "ask_user",
     description:
       "Ask the user one or more questions and wait for their responses before continuing. " +
       "Use this when you need clarification, a decision between options, or explicit " +
