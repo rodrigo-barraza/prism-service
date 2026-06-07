@@ -635,7 +635,7 @@ export default class OrchestratorService {
   }
 
   static async createTeam(
-    args: { name: string; members: TeamMember[] },
+    args: { name: string; members: TeamMember[]; topology?: string },
     orchestratorContext: OrchestratorContext,
   ): Promise<(SubAgentResult | { error: string })[]> {
     // Warm up/preload AgenticLoopService to avoid ESM concurrent dynamic import race conditions in Vitest
@@ -643,7 +643,14 @@ export default class OrchestratorService {
 
     const settings = await SettingsService.getSection("agents");
     const topology =
-      (orchestratorContext.topology as string) || settings?.topology || "hierarchical";
+      args.topology || (orchestratorContext.topology as string) || settings?.topology || "hierarchical";
+
+    const validTopologies = ["hierarchical", "sequential", "peer_to_peer", "p2p"];
+    if (!validTopologies.includes(topology)) {
+      const errorMessage = `Invalid topology: "${topology}". Available topologies are: hierarchical, sequential, peer_to_peer.`;
+      logger.error(`[Orchestrator] createTeam: ${errorMessage}`);
+      return [{ error: errorMessage }];
+    }
 
     logger.info(
       `[Orchestrator] createTeam: routing via active topology "${topology}" for ${args.members.length} member(s)...`,

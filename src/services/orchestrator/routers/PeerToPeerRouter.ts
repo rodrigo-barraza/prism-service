@@ -146,7 +146,12 @@ export class PeerToPeerRouter implements TopologyRouter {
         );
 
         if (mergeResult.error) {
-          logger.error(`[PeerToPeerRouter] Failed to merge branch for ${subAgentId}: ${mergeResult.error}`);
+          const errorMessage = `Failed to merge branch for ${subAgentId}: ${mergeResult.error}`;
+          logger.error(`[PeerToPeerRouter] ${errorMessage}`);
+          return [
+            ...results,
+            { error: errorMessage }
+          ];
         }
       }
 
