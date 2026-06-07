@@ -15,6 +15,7 @@ import { listInstances } from "../providers/instance-registry.ts";
 import { ARENA_SCORES } from "../arrays.ts";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
 import AgentPersonaRegistry from "../services/AgentPersonaRegistry.ts";
+import SettingsService from "../services/SettingsService.ts";
 import rateLimitStore from "../services/RateLimitStore.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import LocalProviderGateway from "../services/LocalProviderGateway.ts";
@@ -59,7 +60,7 @@ const AVAILABLE_PROVIDERS = new Set<string>([
  * Resolve availableTools entries (may contain "label:X" / "domain:X" prefixes)
  * into a flat Set of concrete tool names using client schemas.
  */
-function resolveAvailableToolsToSet(availableTools: string[] | undefined) {
+function resolveAvailableToolsToSet(availableTools: string[] | undefined, defaultTopology?: string) {
   if (!availableTools || !Array.isArray(availableTools)) return new Set<string>();
 
   // "*" wildcard means all tools — return null sentinel
@@ -70,7 +71,7 @@ function resolveAvailableToolsToSet(availableTools: string[] | undefined) {
   );
   if (!hasPrefixed) return new Set<string>(availableTools);
 
-  const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
+  const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
   return resolveToolEntriesToSet(availableTools, clientSchemas);
 }
 
@@ -210,8 +211,11 @@ router.get(
       }
     }
 
+    const settings = await SettingsService.getSection("agents");
+    const defaultTopology = settings?.topology || "hierarchical";
+
     // Build the dynamic Tool Calling system prompt
-    const schemas = ToolOrchestratorService.getToolSchemas() || [];
+    const schemas = ToolOrchestratorService.getToolSchemas(defaultTopology) || [];
     const toolNames = schemas
       .map((s: Record<string, unknown>) => (s.name as string) || (s.function as Record<string, unknown>)?.name)
       .filter((name): name is string => typeof name === "string")
@@ -321,9 +325,11 @@ router.get(
   "/agents",
   asyncHandler(async (_req: Request, res: Response) => {
     await ToolOrchestratorService.ensureSchemas();
+    const settings = await SettingsService.getSection("agents");
+    const defaultTopology = settings?.topology || "hierarchical";
     const agents = AgentPersonaRegistry.list().map((first) => {
       const persona = AgentPersonaRegistry.get(first.id);
-      const resolvedTools = resolveAvailableToolsToSet(persona?.availableTools);
+      const resolvedTools = resolveAvailableToolsToSet(persona?.availableTools, defaultTopology);
       // null sentinel means "*" wildcard → all tools
       const isWildcard = resolvedTools === null;
 
@@ -331,7 +337,7 @@ router.get(
       let finalToolNames = isWildcard ? ["*"] : [...(resolvedTools || [])];
 
       if (!isWildcard) {
-        const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
+        const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
 
         // System tools auto-included unless core tools are unlocked
         const isCoreToolsLocked = persona?.coreToolsLocked ?? true;
@@ -382,13 +388,15 @@ router.get(
   "/tools",
   asyncHandler(async (_req: Request, res: Response) => {
     await ToolOrchestratorService.ensureSchemas();
-    const schemas = ToolOrchestratorService.getClientToolSchemas() || [];
+    const settings = await SettingsService.getSection("agents");
+    const defaultTopology = settings?.topology || "hierarchical";
+    const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
     const agentId = _req.query.agent as string | undefined;
 
     if (agentId) {
       const persona = AgentPersonaRegistry.get(agentId);
       if (persona?.availableTools) {
-        const enabledSet = resolveAvailableToolsToSet(persona.availableTools);
+        const enabledSet = resolveAvailableToolsToSet(persona.availableTools, defaultTopology);
         const isCoreToolsLocked = persona.coreToolsLocked ?? true;
         // null = wildcard ("*") → return all schemas unfiltered
         if (enabledSet !== null) {

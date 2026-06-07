@@ -92,6 +92,9 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
         find: () => ({ toArray: mockFindToArray }),
       }),
     })),
+    getCollection: vi.fn(() => ({
+      findOne: vi.fn().mockResolvedValue(null),
+    })),
   },
 }));
 

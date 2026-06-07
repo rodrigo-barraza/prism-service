@@ -359,7 +359,10 @@ function handleWsLive(
             .default;
           const { MONGO_DB_NAME } = await import("../../config.js");
 
-          const dynamicTools = [...ToolOrchestratorService.getToolSchemas()];
+          const SettingsService = (await import("../services/SettingsService.js")).default;
+          const settings = await SettingsService.getSection("agents");
+          const defaultTopology = (clientConfig.topology as string) || settings?.topology || "hierarchical";
+          const dynamicTools = [...ToolOrchestratorService.getToolSchemas(defaultTopology)];
 
           const db = MongoWrapper.getDb(MONGO_DB_NAME);
           if (db) {
