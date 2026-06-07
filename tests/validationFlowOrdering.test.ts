@@ -261,7 +261,7 @@ describe("Validation Flow Ordering", () => {
       const feedback = validationFeedback[0];
 
       // Verify the structure matches what the harness will inject
-      expect(feedback.toolName).toBe("run_command");
+      expect(feedback.toolName).toBe("execute_command");
       expect(feedback.filePath).toBe("src/bananas.ts");
       expect(feedback.validatorType).toBe("typescript");
       expect(feedback.errors).toHaveLength(2);
@@ -274,7 +274,7 @@ describe("Validation Flow Ordering", () => {
     it("should produce correctly formatted user-facing validation error message", async () => {
       const validationFeedback: ValidationFeedback[] = [
         {
-          toolName: "run_command",
+          toolName: "execute_command",
           filePath: "src/bananas.ts",
           validatorType: "typescript",
           errors: ["error TS2322: Type 'string' is not assignable to type 'number'."],
@@ -308,14 +308,14 @@ describe("Validation Flow Ordering", () => {
     it("should format multiple file validation errors as separate sections", () => {
       const validationFeedback: ValidationFeedback[] = [
         {
-          toolName: "run_command",
+          toolName: "execute_command",
           filePath: "src/alpha.ts",
           validatorType: "typescript",
           errors: ["error TS2322"],
           rawOutput: "error TS2322: Type 'string' is not assignable to type 'number'.",
         },
         {
-          toolName: "run_command",
+          toolName: "execute_command",
           filePath: "src/beta.tsx",
           validatorType: "typescript",
           errors: ["error TS2304"],
@@ -354,7 +354,7 @@ describe("Validation Flow Ordering", () => {
       ];
       const validationFeedback: ValidationFeedback[] = [
         {
-          toolName: "run_command",
+          toolName: "execute_command",
           filePath: "buggy.ts",
           validatorType: "typescript",
           errors: ["error TS2322"],
@@ -479,7 +479,7 @@ describe("Validation Flow Ordering", () => {
       expect(validationFeedback[0].filePath).toBe("src/index.js");
 
       expect(ToolOrchestratorService.executeTool).toHaveBeenCalledWith(
-        "run_command",
+        "execute_command",
         expect.objectContaining({
           command: "npx eslint --format compact",
         }),
@@ -572,12 +572,12 @@ describe("Validation Flow Ordering", () => {
     it("should validate each file-mutating tool independently", async () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "src/alpha.ts" } },
-        { id: "call-2", name: "str_replace_file", args: { path: "src/beta.tsx" } },
+        { id: "call-2", name: "replace_in_file", args: { path: "src/beta.tsx" } },
         { id: "call-3", name: "read_file", args: { path: "src/gamma.ts" } },
       ];
       const results: ToolResult[] = [
         { id: "call-1", name: "write_file", result: { success: true } },
-        { id: "call-2", name: "str_replace_file", result: { success: true } },
+        { id: "call-2", name: "replace_in_file", result: { success: true } },
         { id: "call-3", name: "read_file", result: { content: "..." } },
       ];
 

@@ -163,7 +163,7 @@ describe("ScheduledTaskService — Tool Configuration & Propagation Tests", () =
       toolConfig: {
         availableTools: ["*"],
         disabledTools: ["search_web", "generate_image"],
-        enabledTools: ["read_file", "write_file", "calculate_precise"],
+        enabledTools: ["read_file", "write_file", "evaluate_expression"],
       },
     };
 
@@ -177,7 +177,7 @@ describe("ScheduledTaskService — Tool Configuration & Propagation Tests", () =
     const loopArguments = mockRunAgenticLoop.mock.calls[0][0];
 
     // Verify that the options inside loop execution contain exact toolConfig parameters
-    expect(loopArguments.options.enabledTools).toEqual(["read_file", "write_file", "calculate_precise"]);
+    expect(loopArguments.options.enabledTools).toEqual(["read_file", "write_file", "evaluate_expression"]);
     expect(loopArguments.options.disabledTools).toEqual(["search_web", "generate_image"]);
   });
 });

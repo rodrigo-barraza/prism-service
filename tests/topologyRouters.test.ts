@@ -411,7 +411,7 @@ describe("Topology Routers Test Suite", () => {
         result: null,
         summary: 'Agent "Step A" completed',
         toolUses: 6,
-        toolNames: { write_file: 4, run_command: 2 },
+        toolNames: { write_file: 4, execute_command: 2 },
         iterations: 10,
         durationMs: 20000,
         messages: [],
@@ -420,7 +420,7 @@ describe("Topology Routers Test Suite", () => {
       // Second step gets the accumulated context — verify it got the structured fallback
       spawnSubAgentMock.mockImplementationOnce(async (assignment: OrchestratorSpawnParams) => {
         expect(assignment.prompt).toContain("write_file (4×)");
-        expect(assignment.prompt).toContain("run_command (2×)");
+        expect(assignment.prompt).toContain("execute_command (2×)");
         expect(assignment.prompt).toContain("10 iterations");
         expect(assignment.prompt).not.toContain('Agent "Step A" completed');
 

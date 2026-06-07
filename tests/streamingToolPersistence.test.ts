@@ -109,7 +109,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
 
     const chunks = [];
     const result = await ToolOrchestratorService.executeToolStreaming(
-      "run_command",
+      "execute_command",
       { command: "echo hello" },
       (event, data) => chunks.push({ event, data }),
     );
@@ -134,7 +134,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
     );
 
     const result = await ToolOrchestratorService.executeToolStreaming(
-      "run_command",
+      "execute_command",
       { command: "failing-command" },
       vi.fn(),
     );
@@ -157,7 +157,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
 
     const chunks = [];
     await ToolOrchestratorService.executeToolStreaming(
-      "run_command",
+      "execute_command",
       { command: "test" },
       (event, data, meta) => chunks.push({ event, data, meta }),
     );
@@ -180,7 +180,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
     );
 
     const result = await ToolOrchestratorService.executeToolStreaming(
-      "run_command",
+      "execute_command",
       { command: "true" },
       vi.fn(),
     );
@@ -201,7 +201,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
     );
 
     const result = await ToolOrchestratorService.executeToolStreaming(
-      "run_command",
+      "execute_command",
       { command: "sleep infinity" },
       vi.fn(),
     );
@@ -222,7 +222,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
     );
 
     const result = await ToolOrchestratorService.executeToolStreaming(
-      "run_command",
+      "execute_command",
       { command: "broken" },
       vi.fn(),
     );
@@ -245,7 +245,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
     globalThis.fetch = vi.fn().mockResolvedValue(createSSEResponse(events));
 
     const result = await ToolOrchestratorService.executeToolStreaming(
-      "run_command",
+      "execute_command",
       { command: "seq 100" },
       vi.fn(),
     );
@@ -267,7 +267,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
     );
 
     const result = await ToolOrchestratorService.executeToolStreaming(
-      "run_command",
+      "execute_command",
       { command: "test" },
       vi.fn(),
     );

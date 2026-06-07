@@ -100,9 +100,9 @@ const readMcpResource = {
 };
 
 const mcpAuthenticate = {
-  name: "mcp_authenticate",
+  name: "authenticate_mcp_server",
   schema: {
-    name: "mcp_authenticate",
+    name: "authenticate_mcp_server",
     description:
       "Authenticate with a connected MCP server by providing credentials.",
     parameters: {

@@ -2,10 +2,10 @@ import logger from "../../utils/logger.ts";
 import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 export default {
-  name: "brief",
+  name: "summarize_conversation",
 
   schema: {
-    name: "brief",
+    name: "summarize_conversation",
     description:
       "Produce a compressed summary of the current conversation context. " +
       "Use this tool when the conversation is getting long and you need to " +

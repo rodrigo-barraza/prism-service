@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { vi, describe, it, expect } from "vitest";
 
 // Suppress logger output during tests
 vi.mock("../src/utils/logger.ts", () => ({
@@ -45,17 +45,17 @@ describe("getTier — default assignments", () => {
   const tier1Tools = [
     "read_file",
     "list_directory",
-    "grep_search",
-    "glob_files",
+    "search_file_contents",
+    "find_files",
     "search_web",
     "read_web_page",
-    "multi_file_read",
-    "file_info",
-    "file_diff",
+    "read_files",
+    "get_file_info",
+    "diff_files",
     "git_status",
     "git_diff",
     "git_log",
-    "project_summary",
+    "summarize_project",
   ];
 
   for (const tool of tier1Tools) {
@@ -68,11 +68,11 @@ describe("getTier — default assignments", () => {
 
   const tier2Tools = [
     "write_file",
-    "str_replace_file",
+    "replace_in_file",
     "patch_file",
     "move_file",
     "delete_file",
-    "browser_action",
+    "control_browser",
   ];
 
   for (const tool of tier2Tools) {
@@ -87,7 +87,7 @@ describe("getTier — default assignments", () => {
     "execute_shell",
     "execute_python",
     "execute_javascript",
-    "run_command",
+    "execute_command",
   ];
 
   for (const tool of tier3Tools) {
@@ -131,7 +131,7 @@ describe("getTier — tier overrides", () => {
       tierOverrides: { write_file: APPROVAL_TIERS.AUTO },
     });
     expect(engine.getTier("write_file")).toBe(APPROVAL_TIERS.AUTO);
-    expect(engine.getTier("str_replace_file")).toBe(APPROVAL_TIERS.WRITE); // Unaffected
+    expect(engine.getTier("replace_in_file")).toBe(APPROVAL_TIERS.WRITE); // Unaffected
     expect(engine.getTier("execute_shell")).toBe(APPROVAL_TIERS.DANGER); // Unaffected
   });
 
@@ -248,7 +248,7 @@ describe("checkBatch", () => {
     const toolCalls = [
       { name: "read_file", args: { path: "test.js" }, id: "tc1" },
       { name: "write_file", args: { path: "out.js", content: "x" }, id: "tc2" },
-      { name: "grep_search", args: { query: "TODO" }, id: "tc3" },
+      { name: "search_file_contents", args: { query: "TODO" }, id: "tc3" },
       { name: "execute_shell", args: { command: "ls" }, id: "tc4" },
     ];
 
@@ -259,7 +259,7 @@ describe("checkBatch", () => {
 
     // Auto-approved should be the read-only tools
     expect(autoApproved.map((tool) => tool.name)).toEqual(
-      expect.arrayContaining(["read_file", "grep_search"]),
+      expect.arrayContaining(["read_file", "search_file_contents"]),
     );
 
     // Needs approval should be write + danger
@@ -319,7 +319,7 @@ describe("checkBatch", () => {
     const toolCalls = [
       { name: "read_file", args: {}, id: "tc1" },
       { name: "list_directory", args: {}, id: "tc2" },
-      { name: "grep_search", args: {}, id: "tc3" },
+      { name: "search_file_contents", args: {}, id: "tc3" },
     ];
 
     const { autoApproved, needsApproval } = engine.checkBatch(toolCalls);
@@ -333,7 +333,7 @@ describe("checkBatch", () => {
     const toolCalls = [
       { name: "execute_shell", args: {}, id: "tc1" },
       { name: "execute_python", args: {}, id: "tc2" },
-      { name: "run_command", args: {}, id: "tc3" },
+      { name: "execute_command", args: {}, id: "tc3" },
     ];
 
     const { autoApproved, needsApproval } = engine.checkBatch(toolCalls);

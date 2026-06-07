@@ -46,15 +46,15 @@ const LIGHTS_RESPONSE_GUIDELINES = `# Response Guidelines
 const LIGHTS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
     content: `# Tool Use Policy
-- Use lifx_list_lights FIRST when you need to know what lights exist or their current state.
-- Use lifx_set_state as the primary tool for color, brightness, and power changes.
-- Use lifx_toggle_power for simple on/off requests.
-- Use lifx_breathe_effect for relaxation, meditation, ambient mood, or gentle notifications.
-- Use lifx_pulse_effect for alerts, party mode, attention-grabbing effects, or celebrations.
-- Use lifx_effects_off to stop any running animation before starting a new one.
-- Use lifx_list_scenes to discover available scenes before offering scene activation.
-- Use lifx_activate_scene to apply pre-configured scene states.`,
-    requires: ["lifx_*"],
+- Use list_lights FIRST when you need to know what lights exist or their current state.
+- Use set_light_state as the primary tool for color, brightness, and power changes.
+- Use toggle_light_power for simple on/off requests.
+- Use start_light_breathe_effect for relaxation, meditation, ambient mood, or gentle notifications.
+- Use start_light_pulse_effect for alerts, party mode, attention-grabbing effects, or celebrations.
+- Use stop_light_effects to stop any running animation before starting a new one.
+- Use list_light_scenes to discover available scenes before offering scene activation.
+- Use activate_light_scene to apply pre-configured scene states.`,
+    requires: ["list_lights"],
   },
   {
     content: `# Effect Recommendations
@@ -70,11 +70,11 @@ const LIGHTS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
   {
     content: `# Important Notes
-- Always check light state with lifx_list_lights before making assumptions about current colors.
-- When chaining effects, call lifx_effects_off first to stop any running animations.
+- Always check light state with list_lights before making assumptions about current colors.
+- When chaining effects, call stop_light_effects first to stop any running animations.
 - The night lock prevents turning lights on during sleep hours (1AM-6AM) — respect this unless explicitly overridden.
 - Use smooth transitions (duration 1-5s) for natural-feeling changes. Instant (duration 0) feels jarring.`,
-    requires: ["lifx_*"],
+    requires: ["list_lights"],
   },
 ];
 

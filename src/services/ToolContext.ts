@@ -19,8 +19,8 @@ import { getErrorMessage } from "../utils/ErrorHelpers.ts";
  *
  * Use cases:
  *   - Pagination cursors (search_web, list_directory)
- *   - Browser tab/session state (browser_action)
- *   - Cumulative diff tracking (str_replace_file rollback)
+ *   - Browser tab/session state (control_browser)
+ *   - Cumulative diff tracking (replace_in_file rollback)
  *   - MCP connection state across invocations
  *
  * Lifecycle:

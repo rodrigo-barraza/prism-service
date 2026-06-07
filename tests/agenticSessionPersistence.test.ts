@@ -154,7 +154,7 @@ describe("finalizeTextGeneration — segment deduplication", () => {
         role: "assistant",
         content: "I'll run npm install for you.",
         toolCalls: [
-          { id: "toolCall-1", name: "run_command", args: { command: "npm install" }, result: { success: true, stdout: "added 50 packages", stderr: "", exitCode: 0 } },
+          { id: "toolCall-1", name: "execute_command", args: { command: "npm install" }, result: { success: true, stdout: "added 50 packages", stderr: "", exitCode: 0 } },
         ],
       },
     ];
@@ -323,7 +323,7 @@ describe("finalizeTextGeneration — segment deduplication", () => {
       {
         role: "assistant",
         content: "Let me verify with tests.",
-        toolCalls: [{ id: "toolCall-3", name: "run_command", args: { command: "npm test" }, result: { success: true, stdout: "all tests pass", stderr: "", exitCode: 0 } }],
+        toolCalls: [{ id: "toolCall-3", name: "execute_command", args: { command: "npm test" }, result: { success: true, stdout: "all tests pass", stderr: "", exitCode: 0 } }],
       },
     ];
 
@@ -384,7 +384,7 @@ describe("message persistence contract for TerminalRenderer", () => {
         toolCalls: [
           {
             id: "toolCall-1",
-            name: "run_command",
+            name: "execute_command",
             args: { command: "npm install", cwd: "/project" },
             result: {
               success: true,

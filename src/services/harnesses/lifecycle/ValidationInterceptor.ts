@@ -11,7 +11,7 @@ import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 /**
  * ValidationInterceptor — automatic linter/AST feedback loop.
  *
- * After file-mutating tool calls (write_file, str_replace_file, patch_file),
+ * After file-mutating tool calls (write_file, replace_in_file, patch_file),
  * runs language-aware validation and returns structured feedback. When errors
  * are detected, the harness injects them as a synthetic user message so the
  * model self-corrects on the next iteration without wasting a tool call.

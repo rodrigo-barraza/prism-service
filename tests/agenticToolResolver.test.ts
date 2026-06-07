@@ -32,7 +32,7 @@ const MOCK_TOOLS_API_SCHEMAS = [
     endpoint: { method: "POST", path: "/weather" },
   },
   {
-    name: "calculate_precise",
+    name: "evaluate_expression",
     description: "Perform precise calculation",
     parameters: { type: "object", properties: {} },
     endpoint: { method: "POST", path: "/calculator" },
@@ -345,7 +345,7 @@ describe("AgenticToolResolver — custom tool handling", () => {
     const toolNames = finalTools.map((tool) => tool.name);
 
     // calculate_precise is a core agentic tool and should be bypassed
-    expect(toolNames).toContain("calculate_precise");
+    expect(toolNames).toContain("evaluate_expression");
   });
 
   it("does NOT automatically enable core agentic tools for LUPOS unless they are explicitly whitelisted", async () => {
@@ -360,7 +360,7 @@ describe("AgenticToolResolver — custom tool handling", () => {
     const toolNames = finalTools.map((tool) => tool.name);
 
     // calculate_precise is a core agentic tool and should NOT be present for LUPOS because LUPOS is restricted
-    expect(toolNames).not.toContain("calculate_precise");
+    expect(toolNames).not.toContain("evaluate_expression");
     // Only explicitly enabled tool 'read_file' should be present
     expect(toolNames).toContain("read_file");
   });

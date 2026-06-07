@@ -17,7 +17,7 @@ const OMNI_RESPONSE_GUIDELINES = `# Response Guidelines
 - Be concise but thorough. Don't pad responses, but don't omit important details.
 - For coding tasks, always read files before editing and verify changes after.
 - For data tasks, cite your sources (tool outputs, web searches, API results).
-- Use str_replace_file for targeted edits, write_file for new files, patch_file for multi-hunk changes.`;
+- Use replace_in_file for targeted edits, write_file for new files, patch_file for multi-hunk changes.`;
 
 const OMNI_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
@@ -31,10 +31,10 @@ You have access to ALL tools in the system — coding, web, health, finance, sma
   },
   {
     content: `## Coding Tools
-- Use file tools (read_file, str_replace_file, write_file, patch_file) for code operations
-- Use grep_search and multi_file_read for code discovery
+- Use file tools (read_file, replace_in_file, write_file, patch_file) for code operations
+- Use search_file_contents and read_files for code discovery
 - Use git tools to track changes
-- Use run_command for shell operations
+- Use execute_command for shell operations
 - Use LSP tools for code intelligence`,
     requires: [TOOL_NAMES.READ_FILE, TOOL_NAMES.STR_REPLACE_FILE, TOOL_NAMES.WRITE_FILE, TOOL_NAMES.GREP_SEARCH, TOOL_NAMES.RUN_COMMAND],
   },
@@ -67,7 +67,7 @@ You have access to ALL tools in the system — coding, web, health, finance, sma
   {
     content: `## Smart Home Tools
 - Use LIFX tools for lighting control`,
-    requires: ["lifx_*"],
+    requires: ["list_lights"],
   },
   {
     content: `## Task & Memory Tools
@@ -94,7 +94,7 @@ export const OmniPersona: Persona = {
   },
   guidelines: `## Coding Guidelines
 - Always read relevant files before making edits to understand context
-- Use str_replace_file for targeted edits — it's safer and preserves unchanged content. Reserve write_file for creating new files or full rewrites only
+- Use replace_in_file for targeted edits — it's safer and preserves unchanged content. Reserve write_file for creating new files or full rewrites only
 - Use patch_file for multi-hunk edits across non-adjacent sections of the same file
 - After making changes, verify them by reading the modified section
 - Keep your explanations concise and technical`,
