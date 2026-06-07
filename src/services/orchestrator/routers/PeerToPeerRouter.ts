@@ -50,16 +50,16 @@ export class PeerToPeerRouter implements TopologyRouter {
     const results: (SubAgentResult | { error: string })[] = [];
     const sharedDiscussion: string[] = [];
     
-    // We execute turn-based speaker turns. Max turns is set to 2 * number of members (up to 8 turns max)
-    const maxTurns = Math.min(8, members.length * 2);
+    // Ensure every member gets at least 1 turn, with up to 2 rounds, capped at a higher limit (e.g., 20)
+    const maxTurnsCount = Math.max(members.length, Math.min(20, members.length * 2));
 
-    for (let turn = 0; turn < maxTurns; turn++) {
-      const memberIndex = turn % members.length;
+    for (let turnIndex = 0; turnIndex < maxTurnsCount; turnIndex++) {
+      const memberIndex = turnIndex % members.length;
       const member = members[memberIndex];
       const speakerName = member.agent || `agent-${memberIndex}`;
 
       logger.info(
-        `[PeerToPeerRouter] Turn ${turn + 1}/${maxTurns}: Active Speaker is "${speakerName}" (${member.description})`
+        `[PeerToPeerRouter] Turn ${turnIndex + 1}/${maxTurnsCount}: Active Speaker is "${speakerName}" (${member.description})`
       );
 
       // 1. Resolve instance
@@ -107,7 +107,7 @@ export class PeerToPeerRouter implements TopologyRouter {
         : member.prompt;
 
       const assignment: OrchestratorSpawnParams = {
-        description: `${member.description} (Turn ${turn + 1})`,
+        description: `${member.description} (Turn ${turnIndex + 1})`,
         prompt: promptHistory,
         files: member.files,
         model: member.model,
@@ -146,7 +146,7 @@ export class PeerToPeerRouter implements TopologyRouter {
         const mergeResult = await GitWorktreeHelper.mergeWorktree(
           repositoryPath,
           branchName,
-          `chore(mesh): merge turn ${turn + 1} from ${speakerName}`
+          `chore(mesh): merge turn ${turnIndex + 1} from ${speakerName}`
         );
 
         if (mergeResult.error) {
