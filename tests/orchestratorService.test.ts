@@ -148,4 +148,22 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     expect(call2Args.agent).toBe("LUPOS");
     expect(call2Args.options.enabledTools).toEqual(luposTools);
   });
+
+  it("should return an error when createTeam is called with an invalid topology", async () => {
+    const teamArgs = {
+      name: "invalid_topology_team",
+      topology: "invalid_topology_mode",
+      members: [
+        {
+          description: "Sub-agent 1",
+          prompt: "Do something",
+        },
+      ],
+    };
+
+    const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
+    expect(results).toHaveLength(1);
+    expect("error" in results[0]).toBe(true);
+    expect((results[0] as { error: string }).error).toContain("Invalid topology");
+  });
 });

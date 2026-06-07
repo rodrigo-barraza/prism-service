@@ -132,7 +132,24 @@ describe("Topology Routers Test Suite", () => {
       // Result should only have the first step
       expect(results).toHaveLength(1);
       expect(spawnSubAgentMock).toHaveBeenCalledTimes(1);
-      expect(GitWorktreeHelper.mergeWorktree).not.toHaveBeenCalled();
+    });
+
+    it("should abort sequence early if git merge fails", async () => {
+      const router = new SequentialRouter();
+      const members = [
+        { description: "Step A", prompt: "Do A" },
+        { description: "Step B", prompt: "Do B" },
+      ];
+
+      // Make merge fail
+      vi.mocked(GitWorktreeHelper.mergeWorktree).mockResolvedValueOnce({ error: "Merge conflict" });
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      // Should have 2 results: Step A's success + the merge error abort
+      expect(results).toHaveLength(2);
+      expect("error" in results[1]).toBe(true);
+      expect((results[1] as { error: string }).error).toContain("Failed to merge branch");
     });
   });
 
@@ -201,6 +218,24 @@ describe("Topology Routers Test Suite", () => {
       // Should stop after the QA turn (2 turns total)
       expect(results).toHaveLength(2);
       expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("should abort mesh early if git merge fails", async () => {
+      const router = new PeerToPeerRouter();
+      const members = [
+        { agent: "Dev", description: "Write Code", prompt: "Code prompt" },
+        { agent: "QA", description: "Verify Code", prompt: "QA prompt" },
+      ];
+
+      // Make merge fail
+      vi.mocked(GitWorktreeHelper.mergeWorktree).mockResolvedValueOnce({ error: "Merge conflict" });
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      // Should have 2 results: Dev's success + the merge error abort
+      expect(results).toHaveLength(2);
+      expect("error" in results[1]).toBe(true);
+      expect((results[1] as { error: string }).error).toContain("Failed to merge branch");
     });
   });
 });

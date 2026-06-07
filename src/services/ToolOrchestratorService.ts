@@ -409,11 +409,13 @@ const ORCHESTRATOR_TOOL_SCHEMAS = [
   {
     name: "create_team",
     description:
-      "Spawn one or more sub-agents that execute in parallel, each in an isolated git worktree. " +
+      "Spawn one or more sub-agents, each in an isolated git worktree. " +
       "Sub-agents have access to the full tool suite (read, write, search, shell). " +
-      "Use for parallelizable research, implementation, or verification tasks. " +
-      "For a single task, provide one member. For parallel work, provide up to 10 members in a single call. " +
-      "Returns results from all members when they all complete.",
+      "Execution mode depends on topology: 'hierarchical' (default) runs all members in parallel, " +
+      "'sequential' runs members one-at-a-time passing each result to the next, " +
+      "'peer_to_peer' runs a turn-based discussion where members take turns seeing a shared thread. " +
+      "For a single task, provide one member. For parallel work, provide up to 10 members. " +
+      "Returns results from all members when execution completes.",
     parameters: {
       type: "object",
       properties: {
@@ -421,6 +423,15 @@ const ORCHESTRATOR_TOOL_SCHEMAS = [
           type: "string",
           description:
             "Team name for identification (e.g. 'auth_refactor', 'research').",
+        },
+        topology: {
+          type: "string",
+          enum: ["hierarchical", "sequential", "peer_to_peer"],
+          description:
+            "Optional: execution topology. 'hierarchical' (default) — all members run in parallel. " +
+            "'sequential' — members run one-at-a-time, each receiving the previous member's output. " +
+            "'peer_to_peer' — turn-based discussion where members take turns on a shared thread. " +
+            "Omit to use the system default.",
         },
         members: {
           type: "array",
@@ -993,7 +1004,7 @@ export default class ToolOrchestratorService {
 
     switch (name) {
       case "create_team":
-        return OrchestratorService.createTeam(args as { name: string; members: TeamMember[] }, orchestratorContext as OrchestratorContext);
+        return OrchestratorService.createTeam(args as { name: string; members: TeamMember[]; topology?: string }, orchestratorContext as OrchestratorContext);
 
       case "send_message":
         return OrchestratorService.sendMessage(

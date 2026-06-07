@@ -127,15 +127,31 @@ export function expandMessagesForFC(
       };
       const toolMessages: ExpandedMessage[] = message.toolCalls
         .filter((toolCall: ToolCallEntry) => toolCall.result !== undefined)
-        .map((toolCall: ToolCallEntry) => ({
-          role: "tool",
-          name: toolCall.name,
-          tool_call_id: toolCall.id,
-          content:
-            typeof toolCall.result === "string"
-              ? toolCall.result
-              : JSON.stringify(truncateToolResult(toolCall.result)),
-        }));
+        .map((toolCall: ToolCallEntry) => {
+          let finalResult = toolCall.result;
+          if (
+            (toolCall.name === "create_team" || toolCall.name === "team_create") &&
+            Array.isArray(toolCall.result)
+          ) {
+            finalResult = toolCall.result.map((subAgentResult) => {
+              if (subAgentResult && typeof subAgentResult === "object") {
+                const { messages: _messages, ...rest } = subAgentResult;
+                return rest;
+              }
+              return subAgentResult;
+            });
+          }
+
+          return {
+            role: "tool",
+            name: toolCall.name,
+            tool_call_id: toolCall.id,
+            content:
+              typeof finalResult === "string"
+                ? finalResult
+                : JSON.stringify(truncateToolResult(finalResult)),
+          };
+        });
       return [assistantMessage, ...toolMessages];
     }
 

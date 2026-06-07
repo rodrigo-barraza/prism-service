@@ -139,7 +139,12 @@ export class SequentialRouter implements TopologyRouter {
         );
 
         if (mergeResult.error) {
-          logger.error(`[SequentialRouter] Failed to merge branch for ${subAgentId}: ${mergeResult.error}`);
+          const errorMessage = `Failed to merge branch for ${subAgentId}: ${mergeResult.error}`;
+          logger.error(`[SequentialRouter] ${errorMessage}`);
+          return [
+            ...results,
+            { error: errorMessage }
+          ];
         }
       }
 
