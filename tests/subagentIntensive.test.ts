@@ -421,6 +421,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       const spawnMock = vi.fn().mockImplementation(async (assignment) => {
         return {
           agent_id: "agent-1",
+          description: assignment.description || "",
           status: "completed",
           result: "Step completed",
           summary: "Done",
@@ -428,6 +429,11 @@ describe("Sub-Agent Intensive Integration Tests", () => {
           durationMs: 50,
           iterations: 1,
           messages: [],
+          diff: {
+            additions: 1,
+            deletions: 0,
+            files: ["test.txt"],
+          },
         };
       });
 
@@ -498,6 +504,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       const spawnMock = vi.fn().mockImplementation(async (assignment) => {
         return {
           agent_id: "agent-arg",
+          description: assignment.description || "",
           status: "completed",
           result: "Point made.",
           summary: "Done",
@@ -505,6 +512,11 @@ describe("Sub-Agent Intensive Integration Tests", () => {
           durationMs: 50,
           iterations: 1,
           messages: [],
+          diff: {
+            additions: 1,
+            deletions: 0,
+            files: ["test.txt"],
+          },
         };
       });
 
