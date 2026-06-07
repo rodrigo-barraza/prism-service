@@ -21,6 +21,7 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
     resolveRepositoryPath: vi.fn().mockReturnValue("/workspace"),
     createWorktree: vi.fn().mockResolvedValue({ worktreePath: "/workspace/worktree-1" }),
     removeWorktree: vi.fn().mockResolvedValue({}),
+    mergeWorktree: vi.fn().mockResolvedValue({ success: true }),
     toolsApiPost: vi.fn().mockResolvedValue({}),
     getWorktreeDiff: vi.fn().mockResolvedValue({
       hasChanges: false,
@@ -34,7 +35,6 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
 import type { OrchestratorContext } from "../src/types/orchestrator.ts";
 import OrchestratorService from "../src/services/OrchestratorService.ts";
 import AgentPersonaRegistry from "../src/services/AgentPersonaRegistry.ts";
-import { GitWorktreeHelper } from "../src/services/orchestrator/GitWorktreeHelper.ts";
 
 
 describe("OrchestratorService Spawning & Agent Types", () => {
@@ -165,5 +165,42 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     expect(results).toHaveLength(1);
     expect("error" in results[0]).toBe(true);
     expect((results[0] as { error: string }).error).toContain("Invalid topology");
+  });
+
+  it("should update session topology in MongoDB when createTeam is called with a specific topology override", async () => {
+    const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+    const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });
+    const mockFindOne = vi.fn().mockResolvedValue({ id: "conv-id-789", settings: {} });
+    const mockCollection = {
+      updateOne: mockUpdateOne,
+      findOne: mockFindOne,
+    };
+    
+    const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(mockCollection as any);
+
+    const teamArgs = {
+      name: "topology_override_team",
+      topology: "peer_to_peer",
+      members: [
+        {
+          description: "Sub-agent 1",
+          prompt: "Do something",
+        },
+      ],
+    };
+
+    const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
+    expect(results).toHaveLength(2);
+    expect(mockUpdateOne).toHaveBeenCalledWith(
+      { id: "conv-id-789" },
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          "settings.agents.topology": "peer_to_peer",
+          "settings.topology": "peer_to_peer",
+        }),
+      })
+    );
+
+    getCollectionSpy.mockRestore();
   });
 });
