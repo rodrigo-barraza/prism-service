@@ -121,6 +121,7 @@ export default class ReActHarness extends BaseAgenticHarness {
 
     let currentMessages: ConversationMessage[] = [...context.messages];
     let truncationRecoveryCount = 0;
+    let hasCleanTextBreak = false;
 
     // ── Initialize lifecycle hooks ──────────────────────────
     const { hooks, approvalEngine } = createStandardHooks({
@@ -553,6 +554,7 @@ export default class ReActHarness extends BaseAgenticHarness {
         }
 
         this.logIteration(pass, currentMessages);
+        hasCleanTextBreak = true;
         break;
       }
 
@@ -599,11 +601,14 @@ export default class ReActHarness extends BaseAgenticHarness {
     }
 
     // ── Exhaustion Recovery Pass ─────────────────────────────
-    if (
-      state.iterations >= resolvedMaxIterations &&
-      !state.finalStreamedText?.trim() &&
-      state.streamedToolCalls.length === 0
-    ) {
+    // Triggers when the loop hit max iterations without a clean text-only break.
+    // This covers two scenarios:
+    //   1. Agent exhausted iterations while still making tool calls — 
+    //      state.finalStreamedText contains interim planning text, not a final summary
+    //   2. Agent produced zero text and zero tool calls (original condition)
+    // Without this, the shared discussion board shows planning text like
+    // "Let me search for..." instead of actual findings.
+    if (state.iterations >= resolvedMaxIterations && !hasCleanTextBreak) {
       await runExhaustionRecoveryPass(this, context, state, currentMessages);
     }
 
