@@ -20,10 +20,6 @@
     "vram:bench": "node scripts/vram-bench.js",
     "vram:quick": "node scripts/vram-bench.js --skip-settings --contexts=4k,8k",
     "vram:model": "node scripts/vram-bench.js --skip-settings --contexts=4k",
-    "consolidate": "node scripts/consolidate-memories.js",
-    "consolidate:all": "node scripts/consolidate-memories.js --all",
-    "consolidate:history": "node scripts/consolidate-memories.js --history",
-    "consolidate:dry": "node scripts/consolidate-memories.js --dry-run",
     "deploy": "bash deploy.sh",
     "deploy:dry": "bash deploy.sh --dry-run"
   },
