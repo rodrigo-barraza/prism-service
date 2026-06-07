@@ -919,6 +919,7 @@ export default class OrchestratorService {
         options: {
           autoApprove: true,
           agenticLoopEnabled: true,
+          isSubAgent: true,
           enabledTools: subAgentEnabledTools,
           maxIterations: subAgent.maxIterations,
           maxTokens: 8192,

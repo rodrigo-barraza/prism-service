@@ -7,6 +7,7 @@
 // Adapted from Claude Code's getCoordinatorSystemPrompt() with
 // modifications for our git-worktree-isolated architecture.
 // ────────────────────────────────────────────────────────────
+import { CORE_ORCHESTRATOR_TOOLS } from "@rodrigo-barraza/utilities-library/taxonomy";
 export function getOrchestratorPromptAddendum({
   subAgentTools = [],
   defaultTopology = "hierarchical",
@@ -160,13 +161,7 @@ After synthesizing, decide whether the sub-agent's existing context helps or hur
 }
 
 /*
- * Get the list of tool names that sub-agents should NOT have access to.
+ * Orchestrator-only tool names derived from the canonical taxonomy constant.
  * Sub-agents cannot spawn sub-sub-agents (prevents recursion).
  */
-export const ORCHESTRATOR_ONLY_TOOLS = [
-  "create_team",
-  "send_message",
-  "stop_agent",
-  "get_task_output",
-  "delete_team",
-];
+export const ORCHESTRATOR_ONLY_TOOLS: string[] = [...CORE_ORCHESTRATOR_TOOLS];
