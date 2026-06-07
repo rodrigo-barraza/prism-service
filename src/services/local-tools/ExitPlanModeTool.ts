@@ -1,14 +1,15 @@
 import logger from "../../utils/logger.ts";
+import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 interface ExitPlanModeArgs {
   summary?: string;
 }
 
 export default {
-  name: "exit_plan_mode",
+  name: TOOL_NAMES.EXIT_PLAN_MODE,
 
   schema: {
-    name: "exit_plan_mode",
+    name: TOOL_NAMES.EXIT_PLAN_MODE,
     description:
       "Exit planning mode and resume normal tool execution. Call this after you have " +
       "produced your plan and are ready to execute it with tools.",

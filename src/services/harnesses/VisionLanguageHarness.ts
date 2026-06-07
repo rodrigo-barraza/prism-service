@@ -1,6 +1,6 @@
 import BaseAgenticHarness from "./BaseAgenticHarness.ts";
 import logger from "../../utils/logger.ts";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import LiveFrameService from "../LiveFrameService.ts";
 
 import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
@@ -201,7 +201,7 @@ Use these images to observe the environment, notice changes, animations, or user
       };
       if (state.planModeActive) {
         const planModeTools = this.tools.finalTools.filter(
-          (tool: ToolSchema) => tool.name === "exit_plan_mode",
+          (tool: ToolSchema) => tool.name === TOOL_NAMES.EXIT_PLAN_MODE,
         );
         passOptions.tools = planModeTools;
         logger.info(
@@ -458,7 +458,7 @@ Use these images to observe the environment, notice changes, animations, or user
         );
 
         const exitPlanToolCall = pass.pendingToolCalls.find(
-          (toolCall) => toolCall.name === "exit_plan_mode",
+          (toolCall) => toolCall.name === TOOL_NAMES.EXIT_PLAN_MODE,
         );
         if (exitPlanToolCall) {
           const { shouldContinueLoop } = await handleExitPlanMode(

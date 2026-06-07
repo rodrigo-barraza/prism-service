@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 interface ToolContext {
   conversationId?: string;
@@ -36,9 +37,9 @@ interface SkillDeleteArgs {
 // Delegates to SkillService for MongoDB persistence.
 
 const createSkill = {
-  name: "create_skill",
+  name: TOOL_NAMES.CREATE_SKILL,
   schema: {
-    name: "create_skill",
+    name: TOOL_NAMES.CREATE_SKILL,
     description:
       "Create a reusable workflow skill. Skills are stored prompt templates with variable " +
       "interpolation ({{variable}}) that can be invoked by name. Use this to capture " +
@@ -96,9 +97,9 @@ const createSkill = {
 };
 
 const executeSkill = {
-  name: "execute_skill",
+  name: TOOL_NAMES.EXECUTE_SKILL,
   schema: {
-    name: "execute_skill",
+    name: TOOL_NAMES.EXECUTE_SKILL,
     description:
       "Execute a previously created skill by its ID. The skill's prompt template is " +
       "interpolated with the provided variables and executed as an inline agentic task. " +
@@ -154,9 +155,9 @@ const executeSkill = {
 };
 
 const listSkills = {
-  name: "list_skills",
+  name: TOOL_NAMES.LIST_SKILLS,
   schema: {
-    name: "list_skills",
+    name: TOOL_NAMES.LIST_SKILLS,
     description:
       "List all available skills. Skills are reusable workflow templates created with create_skill.",
     parameters: {
@@ -180,9 +181,9 @@ const listSkills = {
 };
 
 const deleteSkill = {
-  name: "delete_skill",
+  name: TOOL_NAMES.DELETE_SKILL,
   schema: {
-    name: "delete_skill",
+    name: TOOL_NAMES.DELETE_SKILL,
     description: "Delete a skill by its ID.",
     parameters: {
       type: "object",

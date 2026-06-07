@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import ConversationTimerService from "../ConversationTimerService.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
@@ -12,9 +13,9 @@ interface ToolContext {
 
 // ── Set Timer Tool ─────────────────────────────────────────
 const setTimer = {
-  name: "set_timer",
+  name: TOOL_NAMES.SET_TIMER,
   schema: {
-    name: "set_timer",
+    name: TOOL_NAMES.SET_TIMER,
     description:
       "Set a one-shot timer or a recurring cron within this conversation that fires an instruction or prompt " +
       "back into this conversation after a duration. Use this to wait, sleep, yield, defer execution, " +
@@ -89,9 +90,9 @@ const setTimer = {
 
 // ── List Timers Tool ────────────────────────────────────────
  const listTimers = {
-  name: "list_timers",
+  name: TOOL_NAMES.LIST_TIMERS,
   schema: {
-    name: "list_timers",
+    name: TOOL_NAMES.LIST_TIMERS,
     description: "List all active timers and recurring cron schedules for the current conversation.",
     parameters: {
       type: "object",
@@ -131,9 +132,9 @@ const setTimer = {
 
 // ── Cancel Timer Tool ───────────────────────────────────────
 const cancelTimer = {
-  name: "cancel_timer",
+  name: TOOL_NAMES.CANCEL_TIMER,
   schema: {
-    name: "cancel_timer",
+    name: TOOL_NAMES.CANCEL_TIMER,
     description: "Cancel an active timer or recurring cron in the current conversation.",
     parameters: {
       type: "object",
