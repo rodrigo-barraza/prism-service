@@ -786,6 +786,26 @@ export default class BaseAgenticHarness {
           `[AgenticLoopService] afterResponse hooks failed: ${error.message}`,
         ),
       );
+
+    // Append the final assistant message so that the in-memory messages array
+    // returned to the Orchestrator/caller includes the final text response.
+    currentMessages.push({
+      role: "assistant",
+      content: state.finalStreamedText.trim(),
+      ...(state.streamedThinking.trim() && { thinking: state.streamedThinking.trim() }),
+      ...(state.streamedImages.length > 0 && { images: state.streamedImages }),
+      ...(state.streamedToolCalls.length > 0 && {
+        toolCalls: state.streamedToolCalls.map((toolCall) => ({
+          id: toolCall.id || null,
+          responsesItemId: toolCall.responsesItemId || undefined,
+          name: toolCall.name,
+          args: toolCall.args,
+          thoughtSignature: toolCall.thoughtSignature || undefined,
+          reasoningItem: toolCall.reasoningItem || undefined,
+          result: toolCall.result,
+        })),
+      }),
+    });
   }
 
   // ── Private helpers ───────────────────────────────────────
