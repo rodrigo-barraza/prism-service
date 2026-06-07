@@ -312,10 +312,7 @@ Use these images to observe the environment, notice changes, animations, or user
 
       if (signal?.aborted) break;
 
-      emit({
-        type: SSE_EVENT_TYPES.USAGE_UPDATE,
-        usage: { ...state.overallUsage, requests: state.iterations },
-      });
+      this.emitUsageUpdate();
 
       // ── Tool execution ─────────────────────────────────────
       if (pass.pendingToolCalls.length > 0) {

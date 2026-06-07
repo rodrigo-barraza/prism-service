@@ -339,10 +339,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
         SessionGenerationTracker.complete(selectedPass.requestId);
       }
 
-      emit({
-        type: SSE_EVENT_TYPES.USAGE_UPDATE,
-        usage: { ...state.overallUsage, requests: state.iterations },
-      });
+      this.emitUsageUpdate();
 
       // ── Tool execution from selected branch ─────────────────
       if (selectedPass.pendingToolCalls.length > 0) {

@@ -147,6 +147,27 @@ export default class BaseAgenticHarness {
     }
   }
 
+  /**
+   * Emit a usage_update SSE event with the cumulative usage snapshot
+   * and the server-computed estimatedCost (using CostCalculator).
+   *
+   * This is the authoritative intermediate cost during streaming —
+   * the client should prefer this over any local recalculation.
+   */
+  emitUsageUpdate(): void {
+    const { emit } = this.context;
+    const state = this.state;
+    const usage = { ...state.overallUsage, requests: state.iterations };
+    const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[this.context.resolvedModel];
+    const estimatedCost = calculateTextCost(usage, pricing);
+
+    emit({
+      type: SSE_EVENT_TYPES.USAGE_UPDATE,
+      usage,
+      estimatedCost,
+    });
+  }
+
   // ── Context window enforcement ───────────────────────────
 
   /** Enforce token budget on messages before sending to provider. */
