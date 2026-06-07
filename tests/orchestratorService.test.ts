@@ -184,6 +184,29 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     expect((results[0] as { error: string }).error).toContain("Invalid topology");
   });
 
+  it("should return an error when createTeam is called with a missing or non-array members argument", async () => {
+    // Missing members
+    const teamArgsMissing = {
+      name: "missing_members_team",
+    } as any;
+
+    const resultsMissing = await OrchestratorService.createTeam(teamArgsMissing, orchestratorContext);
+    expect(resultsMissing).toHaveLength(1);
+    expect("error" in resultsMissing[0]).toBe(true);
+    expect((resultsMissing[0] as { error: string }).error).toContain("Invalid or missing 'members' array");
+
+    // Non-array members
+    const teamArgsNonArray = {
+      name: "non_array_members_team",
+      members: "not-an-array" as any,
+    };
+
+    const resultsNonArray = await OrchestratorService.createTeam(teamArgsNonArray, orchestratorContext);
+    expect(resultsNonArray).toHaveLength(1);
+    expect("error" in resultsNonArray[0]).toBe(true);
+    expect((resultsNonArray[0] as { error: string }).error).toContain("Invalid or missing 'members' array");
+  });
+
   it("should update session topology in MongoDB when createTeam is called with a specific topology override", async () => {
     const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
     const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });

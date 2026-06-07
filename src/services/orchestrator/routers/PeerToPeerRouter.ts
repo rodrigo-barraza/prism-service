@@ -43,15 +43,31 @@ export class PeerToPeerRouter implements TopologyRouter {
       `[PeerToPeerRouter] Starting Peer-to-Peer mesh execution of ${members.length} member(s)...`
     );
 
+    // Validate member prompts upfront — undefined/empty prompts cause
+    // runaway loops where every agent reports "no task" without signaling [DONE]
+    const invalidMembers = members.filter(
+      (member) => !member.prompt || typeof member.prompt !== "string" || member.prompt.trim().length === 0
+    );
+    if (invalidMembers.length > 0) {
+      const invalidNames = invalidMembers.map(
+        (member) => member.agent || member.description || "(unnamed)"
+      );
+      const errorMessage = `${invalidMembers.length} member(s) have missing or empty prompts: [${invalidNames.join(", ")}]. Every peer-to-peer member requires a non-empty 'prompt' field.`;
+      logger.error(`[PeerToPeerRouter] ${errorMessage}`);
+      return [{ error: errorMessage }];
+    }
+
     const isLocal = localModelQueue.isLocal(providerName);
     const providerType = getInstanceType(providerName) || providerName;
     const orchestratorFallback = await getSubAgentFallback();
 
     const results: (SubAgentResult | { error: string })[] = [];
     const sharedDiscussion: string[] = [];
+    let consecutiveStallCount = 0;
+    const maximumConsecutiveStalls = 3;
     
-    // Ensure every member gets at least 1 turn, with up to 2 rounds, capped at a higher limit (e.g., 20)
-    const maxTurnsCount = Math.max(members.length, Math.min(20, members.length * 2));
+    // Ensure every member gets at least 1 turn, with up to 2 rounds, capped at 10
+    const maxTurnsCount = Math.max(members.length, Math.min(10, members.length * 2));
 
     for (let turnIndex = 0; turnIndex < maxTurnsCount; turnIndex++) {
       const memberIndex = turnIndex % members.length;
@@ -169,6 +185,32 @@ export class PeerToPeerRouter implements TopologyRouter {
       if (responseText.toUpperCase().includes("[DONE]")) {
         logger.info(`[PeerToPeerRouter] Speaker "${speakerName}" signaled termination ([DONE]). Stopping.`);
         break;
+      }
+
+      // 7. Stall detection — if consecutive agents produce boilerplate "no task" responses,
+      // break the loop early to prevent runaway cycles of empty reports
+      const normalizedResponse = responseText.toLowerCase();
+      const isStallResponse =
+        normalizedResponse.includes("no actionable task") ||
+        normalizedResponse.includes("standing by") ||
+        normalizedResponse.includes("no specific work") ||
+        normalizedResponse.includes("task assigned: `undefined`") ||
+        normalizedResponse.includes("task assigned:**  `undefined`") ||
+        (normalizedResponse.includes("undefined") && normalizedResponse.includes("no pending"));
+
+      if (isStallResponse) {
+        consecutiveStallCount++;
+        logger.warn(
+          `[PeerToPeerRouter] Stall detected from "${speakerName}" (${consecutiveStallCount}/${maximumConsecutiveStalls} consecutive stalls)`
+        );
+        if (consecutiveStallCount >= maximumConsecutiveStalls) {
+          logger.error(
+            `[PeerToPeerRouter] ${maximumConsecutiveStalls} consecutive stall responses detected — aborting mesh to prevent runaway loop`
+          );
+          break;
+        }
+      } else {
+        consecutiveStallCount = 0;
       }
     }
 

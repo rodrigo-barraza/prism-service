@@ -225,11 +225,11 @@ describe("Topology Routers Test Suite", () => {
 
       const results = await router.execute("large-team", members, orchestratorContext, spawnSubAgentMock);
 
-      // Math.max(10, Math.min(20, 10 * 2)) = 20 turns
-      expect(results).toHaveLength(20);
-      expect(spawnSubAgentMock).toHaveBeenCalledTimes(20);
+      // Math.max(10, Math.min(10, 10 * 2)) = 10 turns (capped at 10)
+      expect(results).toHaveLength(10);
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(10);
 
-      // Check that every agent gets spawned at least once (first 10 calls should map to indices 0 to 9)
+      // Check that every agent gets spawned at least once (10 calls map to indices 0 to 9)
       for (let index = 0; index < 10; index++) {
         expect(spawnSubAgentMock.mock.calls[index][0].agent).toBe(`Agent-${index}`);
       }
@@ -289,6 +289,63 @@ describe("Topology Routers Test Suite", () => {
       expect(results).toHaveLength(2);
       expect("error" in results[1]).toBe(true);
       expect((results[1] as { error: string }).error).toContain("Failed to merge branch");
+    });
+
+    it("should reject members with missing or empty prompts", async () => {
+      const router = new PeerToPeerRouter();
+      const members = [
+        { agent: "Dev", description: "Write Code", prompt: "" },
+        { agent: "QA", description: "Verify Code", prompt: "QA prompt" },
+      ];
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(results).toHaveLength(1);
+      expect("error" in results[0]).toBe(true);
+      expect((results[0] as { error: string }).error).toContain("missing or empty prompts");
+      expect(spawnSubAgentMock).not.toHaveBeenCalled();
+    });
+
+    it("should reject members with undefined prompts", async () => {
+      const router = new PeerToPeerRouter();
+      const members = [
+        { agent: "Dev", description: "Write Code", prompt: undefined as unknown as string },
+        { agent: "QA", description: "Verify Code", prompt: undefined as unknown as string },
+      ];
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(results).toHaveLength(1);
+      expect("error" in results[0]).toBe(true);
+      expect((results[0] as { error: string }).error).toContain("2 member(s) have missing or empty prompts");
+      expect(spawnSubAgentMock).not.toHaveBeenCalled();
+    });
+
+    it("should abort mesh after consecutive stall responses", async () => {
+      const router = new PeerToPeerRouter();
+      const members = [
+        { agent: "Dev", description: "Write Code", prompt: "Build the feature" },
+        { agent: "QA", description: "Verify Code", prompt: "Test the feature" },
+      ];
+
+      // Make every agent return a stall response
+      spawnSubAgentMock.mockImplementation(async (assignment: OrchestratorSpawnParams) => ({
+        agent_id: `agent-stall-${Math.random().toString(36).slice(2, 6)}`,
+        description: assignment.description || "",
+        status: "completed",
+        result: "No actionable task was provided. Standing by for a new task definition.",
+        summary: "Standing by",
+        toolUses: 0,
+        durationMs: 10,
+        iterations: 1,
+        messages: [],
+      }));
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      // Should abort after 3 consecutive stalls (not run all 4 turns)
+      expect(results).toHaveLength(3);
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(3);
     });
   });
 });
