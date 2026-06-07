@@ -132,6 +132,13 @@ registerCleanup(async () => {
 // ────────────────────────────────────────────────────────────
 
 export default class OrchestratorService {
+  private static agenticLoopServicePromise: Promise<any> | null = null;
+  private static getAgenticLoopService() {
+    if (!this.agenticLoopServicePromise) {
+      this.agenticLoopServicePromise = import("./AgenticLoopService.js");
+    }
+    return this.agenticLoopServicePromise;
+  }
   // ══════════════════════════════════════════════════════════
   // Chat-Triggered Tools (team_create / send_message / stop_agent)
   // ══════════════════════════════════════════════════════════
@@ -631,6 +638,9 @@ export default class OrchestratorService {
     args: { name: string; members: TeamMember[] },
     orchestratorContext: OrchestratorContext,
   ): Promise<(SubAgentResult | { error: string })[]> {
+    // Warm up/preload AgenticLoopService to avoid ESM concurrent dynamic import race conditions in Vitest
+    await OrchestratorService.getAgenticLoopService();
+
     const settings = await SettingsService.getSection("agents");
     const topology =
       (orchestratorContext.topology as string) || settings?.topology || "hierarchical";
@@ -751,7 +761,7 @@ export default class OrchestratorService {
    */
   static async _runSubAgentLoop(subAgent: SubAgentState, prompt: string, orchestratorContext: OrchestratorContext) {
     const { default: AgenticLoopService } =
-      await import("./AgenticLoopService.js");
+      await OrchestratorService.getAgenticLoopService();
 
     // Build the sub-agent's initial messages
     const commitInstructions = subAgent.isolated

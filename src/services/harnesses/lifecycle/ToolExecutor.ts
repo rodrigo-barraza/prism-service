@@ -112,6 +112,7 @@ export async function executeToolBatch(
           workspaceRoot,
           _toolState: ToolContext.getStore(agentSessionId),
           enabledTools: tools.finalTools.map((toolSchema) => toolSchema.name),
+          _topology: context.options?.topology,
         },
       );
       const durationMs = Date.now() - startTime;

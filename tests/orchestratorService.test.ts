@@ -1,5 +1,18 @@
-import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import "./setup.ts";
+
+const mockRunAgenticLoop = vi.fn().mockResolvedValue({
+  messages: [{ role: "assistant", content: "Mock sub-agent output" }],
+});
+
+vi.mock("../src/services/AgenticLoopService.ts", () => ({
+  default: {
+    runAgenticLoop: (...args: any[]) => mockRunAgenticLoop(...args),
+  },
+}));
+
+import AgenticLoopService from "../src/services/AgenticLoopService.ts";
+
 
 // Mock the GitWorktreeHelper to avoid disk operations
 vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
@@ -19,21 +32,18 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
 }));
 
 import type { OrchestratorContext } from "../src/types/orchestrator.ts";
-import AgenticLoopService from "../src/services/AgenticLoopService.ts";
 import OrchestratorService from "../src/services/OrchestratorService.ts";
 import AgentPersonaRegistry from "../src/services/AgentPersonaRegistry.ts";
 import { GitWorktreeHelper } from "../src/services/orchestrator/GitWorktreeHelper.ts";
 
-const mockRunAgenticLoop = vi.fn().mockResolvedValue({
-  messages: [{ role: "assistant", content: "Mock sub-agent output" }],
-});
 
 describe("OrchestratorService Spawning & Agent Types", () => {
   let orchestratorContext: OrchestratorContext;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    vi.spyOn(AgenticLoopService, "runAgenticLoop").mockImplementation(mockRunAgenticLoop);
+    mockRunAgenticLoop.mockClear();
+    AgenticLoopService.runAgenticLoop = mockRunAgenticLoop;
 
     orchestratorContext = {
       project: "test-project",

@@ -60,6 +60,7 @@ export const ChatRequestSchema = z
     clientIp: z.string().nullable().optional().default(null),
     agent: z.string().nullable().optional().default(null),
     harness: z.string().nullable().optional(),
+    topology: z.string().nullable().optional(),
 
     // Generation options — flat at top-level
     tools: z.array(ToolSchemaSchema).nullable().optional(),
