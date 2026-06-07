@@ -7,6 +7,7 @@ import {
   ORCHESTRATOR_ONLY_TOOLS,
 } from "../OrchestratorPrompt.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
+import SettingsService from "../SettingsService.ts";
 
 import { DirectoryTreeFormatter } from "./DirectoryTreeFormatter.ts";
 import { ToolDocFormatter } from "./ToolDocFormatter.ts";
@@ -34,8 +35,8 @@ export default class SystemPromptAssembler {
     return this.directoryFormatter.fetchDirectoryTree();
   }
 
-  buildToolDescriptions(enabledTools?: string[], agentId?: string | null): string {
-    return this.docFormatter.buildToolDescriptions(enabledTools, agentId);
+  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string): string {
+    return this.docFormatter.buildToolDescriptions(enabledTools, agentId, defaultTopology);
   }
 
   async assemble(context: AssemblerContext) {
@@ -46,6 +47,9 @@ export default class SystemPromptAssembler {
 
     const codingFallback =
       !isDirectMode && (!persona || persona.id === "CODING");
+
+    const settings = await SettingsService.getSection("agents");
+    const defaultTopology = settings?.topology || "hierarchical";
 
     // ── 1. Agent Identity ────────────────────────────────────────
     if (isDirectMode) {
@@ -126,9 +130,9 @@ export default class SystemPromptAssembler {
 
     // ── 4. Available Tools (domain-grouped) ──────────────────────
     {
-      const toolDescriptions = this.buildToolDescriptions(context.enabledTools, agentId);
+      const toolDescriptions = this.buildToolDescriptions(context.enabledTools, agentId, defaultTopology);
       if (toolDescriptions) {
-        const schemas = ToolOrchestratorService.getClientToolSchemas();
+        const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
         let count = schemas.length;
         if (context.enabledTools) {
           const hasPrefixed = context.enabledTools.some(
@@ -186,7 +190,7 @@ export default class SystemPromptAssembler {
           (entry) => entry.startsWith("label:") || entry.startsWith("domain:") || entry.startsWith("domainKey:"),
         );
         if (hasPrefixed) {
-          const schemas = ToolOrchestratorService.getClientToolSchemas();
+          const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
           return resolveToolEntriesToSet(context.enabledTools, schemas);
         }
         return new Set(context.enabledTools);
@@ -196,12 +200,12 @@ export default class SystemPromptAssembler {
         : true;
 
       if (orchestratorAvailable) {
-        const allSchemas = ToolOrchestratorService.getToolSchemas();
+        const allSchemas = ToolOrchestratorService.getToolSchemas(defaultTopology);
         const orchestratorSet = new Set(ORCHESTRATOR_ONLY_TOOLS);
         const subAgentTools = allSchemas
           .map((tool) => tool.name as string)
           .filter((toolName: string) => !orchestratorSet.has(toolName));
-        sections.push(getOrchestratorPromptAddendum({ subAgentTools }));
+        sections.push(getOrchestratorPromptAddendum({ subAgentTools, defaultTopology }));
       }
     }
 

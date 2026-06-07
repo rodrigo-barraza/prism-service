@@ -405,136 +405,156 @@ async function fetchJsonPost(
 // Orchestrator Tool Schemas — Prism-local, not routed to tools-api
 // ────────────────────────────────────────────────────────────
 
-const ORCHESTRATOR_TOOL_SCHEMAS = [
-  {
-    name: "create_team",
-    description:
-      "Spawn one or more sub-agents, each in an isolated git worktree. " +
-      "Sub-agents have access to the full tool suite (read, write, search, shell). " +
-      "Execution mode depends on topology: 'hierarchical' (default) runs all members in parallel, " +
-      "'sequential' runs members one-at-a-time passing each result to the next, " +
-      "'peer_to_peer' runs a turn-based discussion where members take turns seeing a shared thread. " +
-      "For a single task, provide one member. For parallel work, provide up to 10 members. " +
-      "Returns results from all members when execution completes.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description:
-            "Team name for identification (e.g. 'auth_refactor', 'research').",
-        },
-        topology: {
-          type: "string",
-          enum: ["hierarchical", "sequential", "peer_to_peer"],
-          description:
-            "Optional: execution topology. 'hierarchical' (default) — all members run in parallel. " +
-            "'sequential' — members run one-at-a-time, each receiving the previous member's output. " +
-            "'peer_to_peer' — turn-based discussion where members take turns on a shared thread. " +
-            "Omit to use the system default.",
-        },
-        members: {
-          type: "array",
-          maxItems: 10,
-          items: {
-            type: "object",
-            properties: {
-              description: {
-                type: "string",
-                description: "Short label for this sub-agent (shown in UI).",
-              },
-              prompt: {
-                type: "string",
-                description:
-                  "Self-contained task prompt. Include file paths, line numbers, and exact instructions. Sub-agents cannot see the orchestrator's conversation.",
-              },
-              files: {
-                type: "array",
-                items: { type: "string" },
-                description: "Optional: file paths the sub-agent should focus on.",
-              },
-              model: {
-                type: "string",
-                description:
-                  "Optional: model override for this sub-agent (defaults to orchestrator's model).",
-              },
-              agent: {
-                type: "string",
-                description:
-                  "Optional: the agent type/persona to spawn (e.g. 'Lupos', 'Coding'). Defaults to the parent agent's type.",
-              },
-            },
-            required: ["description", "prompt"],
+function getOrchestratorToolSchemas(defaultTopology: string = "hierarchical") {
+  const normalizedTopology = (defaultTopology === "peer_to_peer" || defaultTopology === "p2p")
+    ? "peer_to_peer"
+    : defaultTopology === "sequential"
+    ? "sequential"
+    : "hierarchical";
+
+  const isHierarchical = normalizedTopology === "hierarchical";
+  const isSequential = normalizedTopology === "sequential";
+  const isPeerToPeer = normalizedTopology === "peer_to_peer";
+
+  const hierarchicalLabel = isHierarchical ? "hierarchical (default)" : "hierarchical";
+  const sequentialLabel = isSequential ? "sequential (default)" : "sequential";
+  const peerToPeerLabel = isPeerToPeer ? "peer_to_peer (default)" : "peer_to_peer";
+
+  const hierarchicalDesc = isHierarchical ? "'hierarchical' (default)" : "'hierarchical'";
+  const sequentialDesc = isSequential ? "'sequential' (default)" : "'sequential'";
+  const peerToPeerDesc = isPeerToPeer ? "'peer_to_peer' (default)" : "'peer_to_peer'";
+
+  return [
+    {
+      name: "create_team",
+      description:
+        "Spawn one or more sub-agents, each in an isolated git worktree. " +
+        "Sub-agents have access to the full tool suite (read, write, search, shell). " +
+        `Execution mode depends on topology: ${hierarchicalDesc} runs all members in parallel, ` +
+        `${sequentialDesc} runs members one-at-a-time passing each result to the next, ` +
+        `${peerToPeerDesc} runs a turn-based discussion where members take turns seeing a shared thread. ` +
+        "For a single task, provide one member. For parallel work, provide up to 10 members. " +
+        "Returns results from all members when execution completes.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description:
+              "Team name for identification (e.g. 'auth_refactor', 'research').",
           },
-          description:
-            "Array of sub-agent definitions (max 10). Each member runs autonomously in its own worktree.",
+          topology: {
+            type: "string",
+            enum: ["hierarchical", "sequential", "peer_to_peer"],
+            description:
+              `Optional: execution topology. '${hierarchicalLabel}' — all members run in parallel. ` +
+              `'${sequentialLabel}' — members run one-at-a-time, each receiving the previous member's output. ` +
+              `'${peerToPeerLabel}' — turn-based discussion where members take turns on a shared thread. ` +
+              "Omit to use the system default.",
+          },
+          members: {
+            type: "array",
+            maxItems: 10,
+            items: {
+              type: "object",
+              properties: {
+                description: {
+                  type: "string",
+                  description: "Short label for this sub-agent (shown in UI).",
+                },
+                prompt: {
+                  type: "string",
+                  description:
+                    "Self-contained task prompt. Include file paths, line numbers, and exact instructions. Sub-agents cannot see the orchestrator's conversation.",
+                },
+                files: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "Optional: file paths the sub-agent should focus on.",
+                },
+                model: {
+                  type: "string",
+                  description:
+                    "Optional: model override for this sub-agent (defaults to orchestrator's model).",
+                },
+                agent: {
+                  type: "string",
+                  description:
+                    "Optional: the agent type/persona to spawn (e.g. 'Lupos', 'Coding'). Defaults to the parent agent's type.",
+                },
+              },
+              required: ["description", "prompt"],
+            },
+            description:
+              "Array of sub-agent definitions (max 10). Each member runs autonomously in its own worktree.",
+          },
         },
+        required: ["name", "members"],
       },
-      required: ["name", "members"],
     },
-  },
-  {
-    name: "send_message",
-    description:
-      "Send a follow-up message to a running or completed sub-agent. Use to continue work, provide corrections, or give new instructions.",
-    parameters: {
-      type: "object",
-      properties: {
-        to: { type: "string", description: "Agent ID returned by create_team" },
-        message: {
-          type: "string",
-          description: "Follow-up instructions for the sub-agent",
+    {
+      name: "send_message",
+      description:
+        "Send a follow-up message to a running or completed sub-agent. Use to continue work, provide corrections, or give new instructions.",
+      parameters: {
+        type: "object",
+        properties: {
+          to: { type: "string", description: "Agent ID returned by create_team" },
+          message: {
+            type: "string",
+            description: "Follow-up instructions for the sub-agent",
+          },
         },
+        required: ["to", "message"],
       },
-      required: ["to", "message"],
     },
-  },
-  {
-    name: "stop_agent",
-    description:
-      "Stop a running sub-agent. The sub-agent's worktree is cleaned up.",
-    parameters: {
-      type: "object",
-      properties: {
-        agent_id: { type: "string", description: "Agent ID to stop" },
-      },
-      required: ["agent_id"],
-    },
-  },
-  {
-    name: "get_task_output",
-    description:
-      "Read the output from a previously spawned sub-agent by its agent ID. " +
-      "Use this to check on a sub-agent's result after it has completed, or to read " +
-      "partial output from a still-running sub-agent. Returns the sub-agent's final text, " +
-      "tool usage stats, diff summary, and status.",
-    parameters: {
-      type: "object",
-      properties: {
-        agent_id: {
-          type: "string",
-          description: "The agent ID returned by create_team.",
+    {
+      name: "stop_agent",
+      description:
+        "Stop a running sub-agent. The sub-agent's worktree is cleaned up.",
+      parameters: {
+        type: "object",
+        properties: {
+          agent_id: { type: "string", description: "Agent ID to stop" },
         },
+        required: ["agent_id"],
       },
-      required: ["agent_id"],
     },
-  },
-  {
-    name: "delete_team",
-    description:
-      "Stop and remove all sub-agents in a named team. Cleans up worktrees for all members.",
-    parameters: {
-      type: "object",
-      properties: {
-        teamName: {
-          type: "string",
-          description: "The team name to delete (as provided to create_team).",
+    {
+      name: "get_task_output",
+      description:
+        "Read the output from a previously spawned sub-agent by its agent ID. " +
+        "Use this to check on a sub-agent's result after it has completed, or to read " +
+        "partial output from a still-running sub-agent. Returns the sub-agent's final text, " +
+        "tool usage stats, diff summary, and status.",
+      parameters: {
+        type: "object",
+        properties: {
+          agent_id: {
+            type: "string",
+            description: "The agent ID returned by create_team.",
+          },
         },
+        required: ["agent_id"],
       },
-      required: ["teamName"],
     },
-  },
-];
+    {
+      name: "delete_team",
+      description:
+        "Stop and remove all sub-agents in a named team. Cleans up worktrees for all members.",
+      parameters: {
+        type: "object",
+        properties: {
+          teamName: {
+            type: "string",
+            description: "The team name to delete (as provided to create_team).",
+          },
+        },
+        required: ["teamName"],
+      },
+    },
+  ];
+}
 
 export default class ToolOrchestratorService {
   /**
@@ -550,16 +570,16 @@ export default class ToolOrchestratorService {
   }
 
   /** AI-clean schemas (no endpoint/domain/dataSource/labels) — for LLM tool arrays */
-  static getToolSchemas() {
-        return [
-            ...cachedAISchemas,
+  static getToolSchemas(defaultTopology?: string) {
+    return [
+      ...cachedAISchemas,
       ...InternalToolRegistry.getSchemas(),
-      ...ORCHESTRATOR_TOOL_SCHEMAS,
+      ...getOrchestratorToolSchemas(defaultTopology),
     ];
   }
 
   /** Client-facing schemas (with domain/domainKey/dataSource/labels, no endpoint) — for Prism Client UI */
-  static getClientToolSchemas() {
+  static getClientToolSchemas(defaultTopology?: string) {
     // Reverse map: display name → domainKey (e.g. "Core Tools" → "core")
     const domainDisplayNameToKey = new Map<string, string>();
     for (const entry of Object.values(DOMAINS)) {
@@ -570,7 +590,7 @@ export default class ToolOrchestratorService {
     const resolveDomainKey = (domain: string) => domainDisplayNameToKey.get(domain) || domain.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 
     // Orchestrator tools are Prism-local — add domain metadata for UI grouping
-    const orchestratorClient = ORCHESTRATOR_TOOL_SCHEMAS.map((tool) => ({
+    const orchestratorClient = getOrchestratorToolSchemas(defaultTopology).map((tool) => ({
       ...tool,
       domain: "Core Tools",
       domainKey: "core",

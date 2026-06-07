@@ -10,8 +10,8 @@ export class ToolDocFormatter {
    *   - Name + first sentence of description (capability summary)
    *   - Full parameter listing with required markers
    */
-  buildToolDescriptions(enabledTools?: string[], agentId?: string | null): string {
-    const schemas = ToolOrchestratorService.getClientToolSchemas();
+  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string): string {
+    const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
     if (!enabledTools) {
       return this._formatToolDescriptions(schemas);
     }
