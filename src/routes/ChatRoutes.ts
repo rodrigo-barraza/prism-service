@@ -501,7 +501,10 @@ export async function handleConversation(
       // Resolve and inject tools for /chat function calling
       if (options.functionCallingEnabled && !options.agenticLoopEnabled) {
         const useNativeMcp = LocalProviderGateway.isNativeMCP(providerName);
-        const builtInTools = ToolOrchestratorService.getToolSchemas();
+        const { default: SettingsService } = await import("../services/SettingsService.ts");
+        const settings = await SettingsService.getSection("agents");
+        const defaultTopology = (options.topology as string) || settings?.topology || "hierarchical";
+        const builtInTools = ToolOrchestratorService.getToolSchemas(defaultTopology);
         let tools = builtInTools;
         if (options.enabledTools && Array.isArray(options.enabledTools)) {
           const enabledSet = new Set(options.enabledTools as string[]);

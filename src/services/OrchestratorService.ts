@@ -817,7 +817,9 @@ export default class OrchestratorService {
     }
 
     if (!subAgentEnabledTools) {
-      const allToolSchemas = ToolOrchestratorService.getToolSchemas();
+      const settings = await SettingsService.getSection("agents");
+      const defaultTopology = (orchestratorContext.topology as string) || settings?.topology || "hierarchical";
+      const allToolSchemas = ToolOrchestratorService.getToolSchemas(defaultTopology);
       const orchestratorToolNames = new Set(ORCHESTRATOR_ONLY_TOOLS);
       subAgentEnabledTools = allToolSchemas
         .map((toolSchema) => toolSchema.name)

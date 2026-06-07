@@ -1,4 +1,5 @@
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
+import SettingsService from "./SettingsService.ts";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
@@ -85,7 +86,9 @@ export default class AgenticToolResolver {
     // Ensure tool schemas are loaded from tools-api (lazy init — if tools-api
     // was unreachable at boot, this fetches on-demand before proceeding)
     await ToolOrchestratorService.ensureSchemas();
-    const toolsApiSchemas = ToolOrchestratorService.getToolSchemas();
+    const settings = await SettingsService.getSection("agents");
+    const defaultTopology = settings?.topology || "hierarchical";
+    const toolsApiSchemas = ToolOrchestratorService.getToolSchemas(defaultTopology);
 
     // Load custom tools from MongoDB
     let customToolsData: CustomToolDoc[] = [];
@@ -164,7 +167,7 @@ export default class AgenticToolResolver {
       const baseTools = rawBaseTools?.includes("*") ? null : rawBaseTools;
 
       if (baseTools) {
-        const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
+        const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
         const expandedSet = new Set<string>();
         for (const entry of baseTools) {
           if (entry.startsWith("label:")) {
@@ -222,7 +225,7 @@ export default class AgenticToolResolver {
 
       let enabledSet: Set<string>;
       if (hasPrefixed) {
-        const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
+        const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
         enabledSet = resolveToolEntriesToSet(resolvedEnabledTools, clientSchemas);
         logger.info(
           `[AgenticLoop] Expanded ${resolvedEnabledTools.length} enabledTools entries → ${enabledSet.size} unique tools`,
@@ -247,9 +250,8 @@ export default class AgenticToolResolver {
           PRISM_LOCAL_TOOL_NAMES.has(tool.name),
       );
 
-      // Apply blockedTools post-filter denylist from persona
       if (resolvedPersona?.blockedTools?.length) {
-        const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
+        const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
         const disabledSet = resolveToolEntriesToSet(resolvedPersona.blockedTools, clientSchemas);
         finalTools = finalTools.filter(
           (tool) => !disabledSet.has(tool.name) || enabledSet.has(tool.name),
