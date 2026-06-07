@@ -1442,6 +1442,121 @@ function getModelByName(name: string): ModelDefinition | null {
   return Object.values(MODELS).find((model) => (model as ModelDefinition).name === name) as ModelDefinition | null ?? null;
 }
 
+/**
+ * Resolve the recommended default model for a given input→output type
+ * and set of available providers.
+ *
+ * Priority ladder (cost-optimized):
+ *   1. Gemini 3.5 Flash  (google)    — cheapest high-quality model
+ *   2. Gemini 3 Flash    (google)    — fallback if 3.5 unavailable
+ *   3. Haiku             (anthropic) — fast and cheap
+ *   4. GPT 5.4 Mini/Nano (openai)    — mini/nano tier
+ *   5. GPT 5 Mini/Nano   (openai)    — legacy mini/nano
+ *   6. Any provider's per-provider default (the `default: true` flag)
+ *
+ * When fcOnly is true, only models with "Tool Calling" in their tools
+ * array are considered (for agentic contexts).
+ *
+ * Returns { provider, model, temperature } or null if nothing matches.
+ */
+function resolveRecommendedDefault(
+  inputType: string,
+  outputType: string,
+  availableProviders: Set<string>,
+  fcOnly = false,
+): { provider: string; model: string; temperature: number } | null {
+  const modelOptions = getModelOptions(inputType, outputType);
+
+  const isEligible = (model: ModelOptionEntry): boolean => {
+    if (!fcOnly) return true;
+    return (model.tools || []).includes("Tool Calling");
+  };
+
+  const tryProvider = (
+    providerName: string,
+    candidateNames: string[],
+  ): { provider: string; model: string; temperature: number } | null => {
+    if (!availableProviders.has(providerName)) return null;
+    const providerModels = modelOptions[providerName] || [];
+    for (const candidateName of candidateNames) {
+      const match = providerModels.find(
+        (model) => model.name === candidateName && isEligible(model),
+      );
+      if (match) {
+        return {
+          provider: providerName,
+          model: match.name,
+          temperature: match.defaultTemperature ?? 1.0,
+        };
+      }
+    }
+    // Provider available but no named candidate — try any eligible model
+    const anyEligible = providerModels.find(isEligible);
+    if (anyEligible) {
+      return {
+        provider: providerName,
+        model: anyEligible.name,
+        temperature: anyEligible.defaultTemperature ?? 1.0,
+      };
+    }
+    return null;
+  };
+
+  // Priority 1–2: Google (Gemini Flash variants)
+  const googleResult = tryProvider("google", [
+    "gemini-3.5-flash",
+    "gemini-3-flash-preview",
+  ]);
+  if (googleResult) return googleResult;
+
+  // Priority 3: Anthropic (Haiku)
+  if (availableProviders.has("anthropic")) {
+    const anthropicModels = modelOptions["anthropic"] || [];
+    const haikuMatch = anthropicModels.find(
+      (model) => model.name.toLowerCase().includes("haiku") && isEligible(model),
+    );
+    if (haikuMatch) {
+      return {
+        provider: "anthropic",
+        model: haikuMatch.name,
+        temperature: haikuMatch.defaultTemperature ?? 1.0,
+      };
+    }
+    const anyAnthropic = anthropicModels.find(isEligible);
+    if (anyAnthropic) {
+      return {
+        provider: "anthropic",
+        model: anyAnthropic.name,
+        temperature: anyAnthropic.defaultTemperature ?? 1.0,
+      };
+    }
+  }
+
+  // Priority 4–5: OpenAI (Mini/Nano variants)
+  const openaiResult = tryProvider("openai", [
+    "gpt-5.4-mini",
+    "gpt-5-mini",
+    "gpt-5.4-nano",
+    "gpt-5-nano",
+  ]);
+  if (openaiResult) return openaiResult;
+
+  // Priority 6: Absolute fallback — any available provider with an eligible model
+  for (const providerName of availableProviders) {
+    const providerModels = modelOptions[providerName] || [];
+    const firstEligible = providerModels.find(isEligible);
+    if (firstEligible) {
+      return {
+        provider: providerName,
+        model: firstEligible.name,
+        temperature: firstEligible.defaultTemperature ?? 1.0,
+      };
+    }
+  }
+
+  return null;
+}
+
 // ─── VOICES (per provider — applies to TEXT → AUDIO models) ─
 
 const OPENAI_VOICES = [
@@ -1666,6 +1781,7 @@ export {
   getDefaultModels,
   getPricing,
   getModelByName,
+  resolveRecommendedDefault,
 
   // Voices
   VOICES,

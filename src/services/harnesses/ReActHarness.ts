@@ -305,10 +305,7 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       if (signal?.aborted) break;
 
-      emit({
-        type: SSE_EVENT_TYPES.USAGE_UPDATE,
-        usage: { ...state.overallUsage, requests: state.iterations },
-      });
+      this.emitUsageUpdate();
 
       // ── Tool execution ─────────────────────────────────────
       if (pass.pendingToolCalls.length > 0) {

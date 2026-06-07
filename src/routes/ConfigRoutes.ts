@@ -9,6 +9,7 @@ import {
   getModelOptions,
   getDefaultModels,
   getParameterDescriptors,
+  resolveRecommendedDefault,
 } from "../config.ts";
 import type { ModelOptionEntry } from "../config.ts";
 import { listInstances } from "../providers/instance-registry.ts";
@@ -251,6 +252,12 @@ Guidelines:
       textToText: {
         models: textToTextModels,
         defaults: filterDefaults(getDefaultModels(TYPES.TEXT, TYPES.TEXT)),
+        recommendedDefault: resolveRecommendedDefault(
+          TYPES.TEXT, TYPES.TEXT, AVAILABLE_PROVIDERS, false,
+        ),
+        recommendedAgenticDefault: resolveRecommendedDefault(
+          TYPES.TEXT, TYPES.TEXT, AVAILABLE_PROVIDERS, true,
+        ),
       },
       textToSpeech: {
         models: filterByAvailableProviders(
