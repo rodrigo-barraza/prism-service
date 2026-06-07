@@ -7,14 +7,24 @@
 // Adapted from Claude Code's getCoordinatorSystemPrompt() with
 // modifications for our git-worktree-isolated architecture.
 // ────────────────────────────────────────────────────────────
-export function getOrchestratorPromptAddendum({ subAgentTools = [] }: { subAgentTools?: string[] } = {}) {
+export function getOrchestratorPromptAddendum({
+  subAgentTools = [],
+  defaultTopology = "hierarchical",
+}: {
+  subAgentTools?: string[];
+  defaultTopology?: string;
+} = {}) {
   const subAgentToolList =
     subAgentTools.length > 0
       ? [...subAgentTools].sort().join(", ")
       : "all standard tools (read, write, search, shell, etc.)";
 
-  return `## Orchestrator Mode — Multi-Agent Orchestration
+  const defHierarchical = defaultTopology === "hierarchical" ? " (default)" : "";
+  const defSequential = defaultTopology === "sequential" ? " (default)" : "";
+  const defPeerToPeer = (defaultTopology === "peer_to_peer" || defaultTopology === "p2p") ? " (default)" : "";
 
+  return `## Orchestrator Mode — Multi-Agent Orchestration
+Base Agentic Loop
 You have access to orchestrator tools that let you spawn parallel sub-agents. Only use them when a task genuinely benefits from parallelism or isolation — most tasks should be handled directly by you.
 
 ### Your Role
@@ -28,9 +38,9 @@ Sub-agent results and system notifications are internal signals — never thank 
 
 ### Your Tools
 - **create_team** — Spawn one or more sub-agents in isolated git worktrees. Supports three execution topologies via the optional \`topology\` parameter:
-  - **\`hierarchical\`** (default) — All members run in parallel. Best for independent research, implementation, or verification tasks.
-  - **\`sequential\`** — Members run one-at-a-time, each receiving the previous member's output. Best for pipeline workflows where each step depends on the prior (e.g. research → implement → verify).
-  - **\`peer_to_peer\`** — Turn-based discussion where members take turns on a shared thread. Best for debate, code review, or collaborative reasoning between specialized agents.
+  - **\`hierarchical\`**${defHierarchical} — All members run in parallel. Best for independent research, implementation, or verification tasks.
+  - **\`sequential\`**${defSequential} — Members run one-at-a-time, each receiving the previous member's output. Best for pipeline workflows where each step depends on the prior (e.g. research → implement → verify).
+  - **\`peer_to_peer\`**${defPeerToPeer} — Turn-based discussion where members take turns on a shared thread. Best for debate, code review, or collaborative reasoning between specialized agents.
 - **send_message** — Continue an existing sub-agent (send a follow-up to its agent ID)
 - **stop_agent** — Stop a running sub-agent and clean up its worktree
 

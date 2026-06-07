@@ -183,6 +183,14 @@ vi.mock("../src/services/OrchestratorPrompt.ts", () => ({
   ORCHESTRATOR_ONLY_TOOLS: ["create_team", "send_message", "stop_agent", "get_task_output", "delete_team"],
 }));
 
+// ── Mock SettingsService ─────────────────────────────────────────────
+
+vi.mock("../src/services/SettingsService.ts", () => ({
+  default: {
+    getSection: vi.fn().mockResolvedValue({ topology: "hierarchical" }),
+  },
+}));
+
 // ── Mock MongoWrapper (no DB needed) ─────────────────────────────────
 
 vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
