@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "./setup.ts";
-import * as fs from "node:fs";
 import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
 
 let mockExistsSyncResult: boolean | undefined = undefined;
@@ -24,7 +23,7 @@ const mockRunAgenticLoop = vi.fn().mockResolvedValue({
 
 vi.mock("../src/services/AgenticLoopService.ts", () => ({
   default: {
-    runAgenticLoop: (...args: any[]) => mockRunAgenticLoop(...args),
+    runAgenticLoop: (...args: unknown[]) => mockRunAgenticLoop(...args),
   },
 }));
 
@@ -194,7 +193,9 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       findOne: mockFindOne,
     };
     
-    const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(mockCollection as any);
+    const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+      mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
+    );
 
     const teamArgs = {
       name: "topology_override_team",

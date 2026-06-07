@@ -114,6 +114,7 @@ export interface OrchestratorContext {
   maxSubAgentIterations?: number;
   minContextLength?: number;
   workspaceRoot?: string | null;
+  topology?: string;
   emit?: EmitFunction;
   enabledTools?: string[] | null;
   [key: string]: unknown;

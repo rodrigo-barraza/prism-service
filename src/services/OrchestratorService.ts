@@ -41,6 +41,8 @@ import type {
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
+type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
+
 // ────────────────────────────────────────────────────────────
 // OrchestratorService — Multi-Agent Orchestration
 // ────────────────────────────────────────────────────────────
@@ -133,7 +135,7 @@ registerCleanup(async () => {
 // ────────────────────────────────────────────────────────────
 
 export default class OrchestratorService {
-  private static agenticLoopServicePromise: Promise<any> | null = null;
+  private static agenticLoopServicePromise: Promise<AgenticLoopServiceModule> | null = null;
   private static getAgenticLoopService() {
     if (!this.agenticLoopServicePromise) {
       this.agenticLoopServicePromise = import("./AgenticLoopService.js");
@@ -644,7 +646,7 @@ export default class OrchestratorService {
 
     const settings = await SettingsService.getSection("agents");
     const topology =
-      args.topology || (orchestratorContext.topology as string) || settings?.topology || "hierarchical";
+      args.topology || orchestratorContext.topology || settings?.topology || "hierarchical";
 
     const validTopologies = ["hierarchical", "sequential", "peer_to_peer", "p2p"];
     if (!validTopologies.includes(topology)) {
@@ -680,9 +682,9 @@ export default class OrchestratorService {
             `[Orchestrator] Updated session settings topology to "${topology}" for conversation ${orchestratorContext.conversationId}`
           );
         }
-      } catch (dbError) {
+      } catch (databaseError: unknown) {
         logger.warn(
-          `[Orchestrator] Failed to update session settings topology in MongoDB: ${getErrorMessage(dbError)}`
+          `[Orchestrator] Failed to update session settings topology in MongoDB: ${getErrorMessage(databaseError)}`
         );
       }
     }
@@ -869,7 +871,7 @@ export default class OrchestratorService {
 
     if (!subAgentEnabledTools) {
       const settings = await SettingsService.getSection("agents");
-      const defaultTopology = (orchestratorContext.topology as string) || settings?.topology || "hierarchical";
+      const defaultTopology = orchestratorContext.topology || settings?.topology || "hierarchical";
       const allToolSchemas = ToolOrchestratorService.getToolSchemas(defaultTopology);
       const orchestratorToolNames = new Set(ORCHESTRATOR_ONLY_TOOLS);
       subAgentEnabledTools = allToolSchemas

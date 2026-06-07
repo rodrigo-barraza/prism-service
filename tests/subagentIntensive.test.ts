@@ -3,7 +3,7 @@ import "./setup.ts";
 
 // ── Mocks ─────────────────────────────────────────────────────
 
-const mockRunAgenticLoop = vi.fn().mockImplementation(async (params) => {
+const mockRunAgenticLoop = vi.fn().mockImplementation(async (params: AgenticContext) => {
   const { emit } = params;
   if (emit) {
     emit({ type: "thinking", content: "Agent is thinking..." });
@@ -25,7 +25,7 @@ const mockRunAgenticLoop = vi.fn().mockImplementation(async (params) => {
 
 vi.mock("../src/services/AgenticLoopService.ts", () => ({
   default: {
-    runAgenticLoop: (...args: any[]) => mockRunAgenticLoop(...args),
+    runAgenticLoop: (...args: unknown[]) => mockRunAgenticLoop(...args),
   },
 }));
 
@@ -45,11 +45,11 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
   GitWorktreeHelper: {
     getDefaultWorkspaceRoot: () => "/workspace",
     resolveRepositoryPath: () => "/workspace/repo",
-    createWorktree: (...args: any[]) => mockCreateWorktree(...args),
-    removeWorktree: (...args: any[]) => mockRemoveWorktree(...args),
-    mergeWorktree: (...args: any[]) => mockMergeWorktree(...args),
-    getWorktreeDiff: (...args: any[]) => mockGetWorktreeDiff(...args),
-    toolsApiPost: (...args: any[]) => mockToolsApiPost(...args),
+    createWorktree: (...args: unknown[]) => mockCreateWorktree(...args),
+    removeWorktree: (...args: unknown[]) => mockRemoveWorktree(...args),
+    mergeWorktree: (...args: unknown[]) => mockMergeWorktree(...args),
+    getWorktreeDiff: (...args: unknown[]) => mockGetWorktreeDiff(...args),
+    toolsApiPost: (...args: unknown[]) => mockToolsApiPost(...args),
   },
 }));
 
@@ -71,7 +71,9 @@ import { HierarchicalRouter } from "../src/services/orchestrator/routers/Hierarc
 import { SequentialRouter } from "../src/services/orchestrator/routers/SequentialRouter.ts";
 import { PeerToPeerRouter } from "../src/services/orchestrator/routers/PeerToPeerRouter.ts";
 import { InstanceLoadBalancer } from "../src/services/orchestrator/InstanceLoadBalancer.ts";
-import type { OrchestratorContext, SubAgentResult } from "../src/types/orchestrator.ts";
+import type { InstanceEntry } from "../src/types/ProviderTypes.ts";
+import type { AgenticContext } from "../src/services/harnesses/types.ts";
+import type { OrchestratorContext, SubAgentResult, SubAgentState } from "../src/types/orchestrator.ts";
 
 describe("Sub-Agent Intensive Integration Tests", () => {
   let orchestratorContext: OrchestratorContext;
@@ -90,7 +92,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
     InstanceLoadBalancer.getReservations().clear();
 
     // Default mock implementation
-    mockRunAgenticLoop.mockImplementation(async (params) => {
+    mockRunAgenticLoop.mockImplementation(async (params: AgenticContext) => {
       const { emit } = params;
       if (emit) {
         emit({ type: "thinking", content: "Thinking..." });
@@ -267,7 +269,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
 
     it("should remove worktree on stopAgent explicit call", async () => {
       // Setup a running sub-agent by delaying its execution
-      let resolveLoop: any;
+      let resolveLoop!: (value: unknown) => void;
       const loopPromise = new Promise((resolve) => {
         resolveLoop = resolve;
       });
@@ -335,11 +337,11 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       // Verify loop was run again with the follow-up
       expect(mockRunAgenticLoop).toHaveBeenCalled();
       const callArgs = mockRunAgenticLoop.mock.calls[0][0];
-      expect(callArgs.messages.some((m: any) => m.content && m.content.includes("Here is follow-up instructions"))).toBe(true);
+      expect(callArgs.messages.some((message: { content?: string }) => message.content && message.content.includes("Here is follow-up instructions"))).toBe(true);
     });
 
     it("should queue follow-up messages if the sub-agent is currently running", async () => {
-      let resolveLoop: any;
+      let resolveLoop!: (value: unknown) => void;
       const loopPromise = new Promise((resolve) => {
         resolveLoop = resolve;
       });
@@ -536,8 +538,8 @@ describe("Sub-Agent Intensive Integration Tests", () => {
   // ── 7. Team Deletion Scenarios ──────────────────────────────────
   describe("Team Deletion Scenarios", () => {
     it("should abort running team members, release reservations, clean up worktrees, and delete from active registry", async () => {
-      let resolveFirstLoop: (value: any) => void = () => {};
-      let resolveSecondLoop: (value: any) => void = () => {};
+      let resolveFirstLoop: (value: unknown) => void = () => {};
+      let resolveSecondLoop: (value: unknown) => void = () => {};
 
       const firstLoopPromise = new Promise((resolve) => {
         resolveFirstLoop = resolve;
@@ -603,7 +605,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
   // ── 8. Conversation-level Abort Scenarios ───────────────────────
   describe("Conversation-level Abort Scenarios", () => {
     it("should abort running sub-agents for a specific conversation, clean up worktrees, but keep them in the registry as stopped", async () => {
-      let resolveLoop: (value: any) => void = () => {};
+      let resolveLoop: (value: unknown) => void = () => {};
       const loopPromise = new Promise((resolve) => {
         resolveLoop = resolve;
       });
@@ -646,7 +648,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
   // ── 9. Concurrency Limits ───────────────────────────────────────
   describe("Maximum Concurrency Constraints", () => {
     it("should prevent spawning more than the maximum limit of concurrent sub-agents", async () => {
-      const loopResolvers: Array<(value: any) => void> = [];
+      const loopResolvers: Array<(value: unknown) => void> = [];
 
       mockRunAgenticLoop.mockImplementation(async () => {
         const loopPromise = new Promise((resolve) => {
@@ -706,7 +708,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       expect("error" in nonExistentResult && nonExistentResult.error).toContain("not found");
 
       // 2. Running agent
-      let resolveLoop: (value: any) => void = () => {};
+      let resolveLoop: (value: unknown) => void = () => {};
       const loopPromise = new Promise((resolve) => {
         resolveLoop = resolve;
       });
@@ -764,19 +766,19 @@ describe("Sub-Agent Intensive Integration Tests", () => {
     });
 
     it("should calculate correct active count combining reservations and active sub-agents", () => {
-      const activeSubAgentsMap = new Map<string, any>();
+      const activeSubAgentsMap = new Map() as Map<string, SubAgentState>;
       activeSubAgentsMap.set("agent-one", {
         providerName: "local-gpu-1",
         status: "running",
-      });
+      } as unknown as SubAgentState);
       activeSubAgentsMap.set("agent-two", {
         providerName: "local-gpu-1",
         status: "complete",
-      });
+      } as unknown as SubAgentState);
       activeSubAgentsMap.set("agent-three", {
         providerName: "local-gpu-2",
         status: "running",
-      });
+      } as unknown as SubAgentState);
 
       expect(InstanceLoadBalancer.getActiveOn("local-gpu-1", activeSubAgentsMap)).toBe(1);
       expect(InstanceLoadBalancer.getActiveOn("local-gpu-2", activeSubAgentsMap)).toBe(1);
@@ -789,11 +791,11 @@ describe("Sub-Agent Intensive Integration Tests", () => {
     });
 
     it("should prioritize orchestrator instance and perform fill-first strategy when slots are available", () => {
-      const activeSubAgentsMap = new Map<string, any>();
+      const activeSubAgentsMap = new Map() as Map<string, SubAgentState>;
       const siblingInstances = [
         { id: "local-gpu-1", concurrency: 2 },
         { id: "local-gpu-2", concurrency: 2 },
-      ] as any[];
+      ] as unknown as InstanceEntry[];
 
       const modelOverrides = new Map<string, string>();
 
@@ -831,11 +833,11 @@ describe("Sub-Agent Intensive Integration Tests", () => {
     });
 
     it("should fallback to least-loaded overflow instance when all instances are at capacity", () => {
-      const activeSubAgentsMap = new Map<string, any>();
+      const activeSubAgentsMap = new Map() as Map<string, SubAgentState>;
       const siblingInstances = [
         { id: "local-gpu-1", concurrency: 1 },
         { id: "local-gpu-2", concurrency: 1 },
-      ] as any[];
+      ] as unknown as InstanceEntry[];
 
       const modelOverrides = new Map<string, string>();
 
@@ -843,7 +845,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       activeSubAgentsMap.set("agent-one", {
         providerName: "local-gpu-2",
         status: "running",
-      });
+      } as unknown as SubAgentState);
 
       InstanceLoadBalancer.getReservations().set("local-gpu-1", 2);
 
@@ -860,10 +862,10 @@ describe("Sub-Agent Intensive Integration Tests", () => {
     });
 
     it("should apply model overrides accurately when specified", () => {
-      const activeSubAgentsMap = new Map<string, any>();
+      const activeSubAgentsMap = new Map() as Map<string, SubAgentState>;
       const siblingInstances = [
         { id: "local-gpu-1", concurrency: 2 },
-      ] as any[];
+      ] as unknown as InstanceEntry[];
 
       const modelOverrides = new Map<string, string>([
         ["local-gpu-1", "gemini-3.5-flash-quantized"],
