@@ -1,5 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "./setup.ts";
+import * as fs from "node:fs";
+import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
+
+let mockExistsSyncResult: boolean | undefined = undefined;
+
+vi.mock("node:fs", async (importOriginal) => {
+  const original = await importOriginal<typeof import("node:fs")>();
+  return {
+    ...original,
+    existsSync: (path: string) => {
+      if (mockExistsSyncResult !== undefined) {
+        return mockExistsSyncResult;
+      }
+      return original.existsSync(path);
+    },
+  };
+});
 
 const mockRunAgenticLoop = vi.fn().mockResolvedValue({
   messages: [{ role: "assistant", content: "Mock sub-agent output" }],
@@ -44,6 +61,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     vi.clearAllMocks();
     mockRunAgenticLoop.mockClear();
     AgenticLoopService.runAgenticLoop = mockRunAgenticLoop;
+    mockExistsSyncResult = undefined;
 
     orchestratorContext = {
       project: "test-project",
@@ -202,5 +220,65 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     );
 
     getCollectionSpy.mockRestore();
+  });
+
+  it("should not include workspace constraint when there are no workspaces currently set up", async () => {
+    const getWorkspaceRootsSpy = vi.spyOn(ToolOrchestratorService, "getWorkspaceRoots").mockReturnValue([]);
+    mockExistsSyncResult = undefined;
+
+    await OrchestratorService.spawnFromTool({
+      description: "Test sub-agent prompt without workspace setup",
+      prompt: "Perform task",
+      files: [],
+      orchestratorContext,
+    });
+
+    expect(mockRunAgenticLoop).toHaveBeenCalled();
+    const runArguments = mockRunAgenticLoop.mock.calls[0][0];
+    const userMessageContent = runArguments.messages[0].content;
+
+    expect(userMessageContent).not.toContain("Only modify files within your workspace");
+
+    getWorkspaceRootsSpy.mockRestore();
+  });
+
+  it("should not include workspace constraint when workspace is configured but not available on disk", async () => {
+    const getWorkspaceRootsSpy = vi.spyOn(ToolOrchestratorService, "getWorkspaceRoots").mockReturnValue(["/nonexistent-workspace-path"]);
+    mockExistsSyncResult = false;
+
+    await OrchestratorService.spawnFromTool({
+      description: "Test sub-agent prompt with unavailable workspace",
+      prompt: "Perform task",
+      files: [],
+      orchestratorContext,
+    });
+
+    expect(mockRunAgenticLoop).toHaveBeenCalled();
+    const runArguments = mockRunAgenticLoop.mock.calls[0][0];
+    const userMessageContent = runArguments.messages[0].content;
+
+    expect(userMessageContent).not.toContain("Only modify files within your workspace");
+
+    getWorkspaceRootsSpy.mockRestore();
+  });
+
+  it("should include workspace constraint when workspace is configured and available on disk", async () => {
+    const getWorkspaceRootsSpy = vi.spyOn(ToolOrchestratorService, "getWorkspaceRoots").mockReturnValue(["/existing-workspace-path"]);
+    mockExistsSyncResult = true;
+
+    await OrchestratorService.spawnFromTool({
+      description: "Test sub-agent prompt with available workspace",
+      prompt: "Perform task",
+      files: [],
+      orchestratorContext,
+    });
+
+    expect(mockRunAgenticLoop).toHaveBeenCalled();
+    const runArguments = mockRunAgenticLoop.mock.calls[0][0];
+    const userMessageContent = runArguments.messages[0].content;
+
+    expect(userMessageContent).toContain("Only modify files within your workspace");
+
+    getWorkspaceRootsSpy.mockRestore();
   });
 });

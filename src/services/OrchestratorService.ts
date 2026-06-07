@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import logger from "../utils/logger.ts";
 
 import { getProvider } from "../providers/index.ts";
@@ -804,6 +805,26 @@ export default class OrchestratorService {
     const commitInstructions = subAgent.isolated
       ? `- Commit your changes when done and report what you accomplished`
       : `- Report what you accomplished when done`;
+
+    const workspaceRoots = ToolOrchestratorService.getWorkspaceRoots();
+    const hasWorkspaceSetup = Array.isArray(workspaceRoots) && workspaceRoots.length > 0;
+    
+    let isWorkspaceAvailable = false;
+    if (hasWorkspaceSetup) {
+      isWorkspaceAvailable = workspaceRoots.some((rootPath) => {
+        try {
+          return rootPath && existsSync(rootPath);
+        } catch {
+          return false;
+        }
+      });
+    }
+
+    const showWorkspaceConstraint = hasWorkspaceSetup && isWorkspaceAvailable;
+    const workspaceConstraintInstruction = showWorkspaceConstraint
+      ? `- Only modify files within your workspace\n`
+      : "";
+
     const subAgentMessages: ConversationMessage[] = [
       ...(subAgent.messages || []),
       {
@@ -816,7 +837,7 @@ export default class OrchestratorService {
             : "") +
           `\nTask:\n${prompt}\n\n` +
           `Important:\n` +
-          `- Only modify files within your workspace\n` +
+          workspaceConstraintInstruction +
           `${commitInstructions}\n` +
           `- Focus on the specific task described above`,
       },
