@@ -131,9 +131,13 @@ export class PeerToPeerRouter implements TopologyRouter {
         break;
       }
 
-      // 4. Merge modifications back so other worktrees see them
-      if (spawnResult.status === "completed" && spawnResult.agent_id) {
-        const subAgentId = spawnResult.agent_id;
+      // 4. Merge modifications back so other worktrees see them (only if the agent actually changed files)
+      const hasFileChanges = spawnResult.status === "completed"
+        && spawnResult.agent_id
+        && spawnResult.diff;
+
+      if (hasFileChanges) {
+        const subAgentId = spawnResult.agent_id!;
         const branchName = `orchestrator/${subAgentId}`;
         const workspaceRoot = GitWorktreeHelper.getDefaultWorkspaceRoot(orchestratorContext.workspaceRoot ?? undefined);
         const repositoryPath = GitWorktreeHelper.resolveRepositoryPath(workspaceRoot, member.files || []);
@@ -153,6 +157,8 @@ export class PeerToPeerRouter implements TopologyRouter {
             { error: errorMessage }
           ];
         }
+      } else if (spawnResult.status === "completed") {
+        logger.info(`[PeerToPeerRouter] No file changes from speaker "${speakerName}" — skipping merge step`);
       }
 
       // 5. Append speaker output to shared thread

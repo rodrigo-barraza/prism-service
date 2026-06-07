@@ -124,9 +124,13 @@ export class SequentialRouter implements TopologyRouter {
         break;
       }
 
-      // 4. Merge changes back to main branch so subsequent worktrees inherit them
-      if (spawnResult.status === "completed" && spawnResult.agent_id) {
-        const subAgentId = spawnResult.agent_id;
+      // 4. Merge changes back to main branch so subsequent worktrees inherit them (only if files changed)
+      const hasFileChanges = spawnResult.status === "completed"
+        && spawnResult.agent_id
+        && spawnResult.diff;
+
+      if (hasFileChanges) {
+        const subAgentId = spawnResult.agent_id!;
         const branchName = `orchestrator/${subAgentId}`;
         const workspaceRoot = GitWorktreeHelper.getDefaultWorkspaceRoot(orchestratorContext.workspaceRoot ?? undefined);
         const repositoryPath = GitWorktreeHelper.resolveRepositoryPath(workspaceRoot, member.files || []);
@@ -146,6 +150,8 @@ export class SequentialRouter implements TopologyRouter {
             { error: errorMessage }
           ];
         }
+      } else if (spawnResult.status === "completed") {
+        logger.info(`[SequentialRouter] No file changes from step ${index + 1} — skipping merge step`);
       }
 
       // 5. Accumulate text result for the next agent

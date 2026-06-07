@@ -62,6 +62,11 @@ describe("Topology Routers Test Suite", () => {
         durationMs: 120,
         iterations: 1,
         messages: [],
+        diff: {
+          additions: 1,
+          deletions: 0,
+          files: ["test.txt"],
+        },
       };
     });
   });
@@ -150,6 +155,34 @@ describe("Topology Routers Test Suite", () => {
       expect(results).toHaveLength(2);
       expect("error" in results[1]).toBe(true);
       expect((results[1] as { error: string }).error).toContain("Failed to merge branch");
+    });
+
+    it("should skip git merge and complete successfully for research tasks (no diff)", async () => {
+      const router = new SequentialRouter();
+      const members = [
+        { description: "Step A", prompt: "Do A" },
+        { description: "Step B", prompt: "Do B" },
+      ];
+
+      spawnSubAgentMock.mockImplementation(async (assignment) => {
+        return {
+          agent_id: "agent-mock-research",
+          description: assignment.description || "",
+          status: "completed",
+          result: `Completed task: ${assignment.description}`,
+          summary: "Done",
+          toolUses: 0,
+          durationMs: 50,
+          iterations: 1,
+          messages: [],
+        };
+      });
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(results).toHaveLength(2);
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
+      expect(GitWorktreeHelper.mergeWorktree).not.toHaveBeenCalled();
     });
   });
 
