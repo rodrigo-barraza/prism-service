@@ -32,6 +32,7 @@ export interface ConversationPatchFields {
   modalities?: Record<string, boolean>;
   providers?: string[];
   totalCost?: number;
+  modelNames?: string[];
   systemPrompt?: string;
   settings?: ConversationSettings;
 }
