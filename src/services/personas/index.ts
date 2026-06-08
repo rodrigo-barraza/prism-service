@@ -16,13 +16,13 @@ export * from "./utils.ts";
 
 export const BUILT_IN_PERSONAS = new Map<string, Persona>([
   [AGENT_IDS.CODING, CodingPersona],
-  ["LUPOS", LuposPersona],
-  ["STICKERS", StickersPersona],
-  ["LIGHTS", LightsPersona],
-  ["OOG", OogPersona],
-  ["DIGEST", DigestPersona],
-  ["META", MetaPersona],
-  ["OMNI", OmniPersona],
-  ["IMAGE", ImagePersona],
-  ["MEEPO", MeepoPersona],
+  [AGENT_IDS.LUPOS, LuposPersona],
+  [AGENT_IDS.STICKERS, StickersPersona],
+  [AGENT_IDS.LIGHTS, LightsPersona],
+  [AGENT_IDS.OOG, OogPersona],
+  [AGENT_IDS.DIGEST, DigestPersona],
+  [AGENT_IDS.META, MetaPersona],
+  [AGENT_IDS.OMNI, OmniPersona],
+  [AGENT_IDS.IMAGE, ImagePersona],
+  [AGENT_IDS.MEEPO, MeepoPersona],
 ]);

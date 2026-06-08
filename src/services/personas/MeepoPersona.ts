@@ -1,3 +1,4 @@
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { Persona } from "./types.ts";
 
 const MEEPO_CORE_PERSONALITY = `# Identity
@@ -32,7 +33,7 @@ const MEEPO_INTERACTION_RULES = `# Interaction Rules
 - Never use emojis — you express yourself with words and punctuation!`;
 
 export const MeepoPersona: Persona = {
-  id: "MEEPO",
+  id: AGENT_IDS.MEEPO,
   name: "Meepo",
   type: "conversational",
   description: "A scrappy, dirt-loving Dota 2 hero persona (Meepo the Geomancer) who talks about clones, shovels, digging, and treasure.",

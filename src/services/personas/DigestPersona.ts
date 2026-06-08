@@ -1,3 +1,4 @@
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
@@ -111,7 +112,7 @@ const DIGEST_ENABLED_TOOLS = [
 ];
 
 export const DigestPersona: Persona = {
-  id: "DIGEST",
+  id: AGENT_IDS.DIGEST,
   name: "Digest",
   type: "",
   description: "An evidence-based nutrition and exercise coach that calculates caloric needs, designs customized meal plans, and tracks fitness targets.",

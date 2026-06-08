@@ -28,7 +28,6 @@ export class ToolDocFormatter {
     let filteredSchemas = schemas.filter(
       (toolSchema) =>
         enabledSet.has(toolSchema.name as string) ||
-        (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE.displayName ||
         (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
         (toolSchema as Record<string, unknown>).domain === DOMAINS.ORCHESTRATOR.displayName
     );

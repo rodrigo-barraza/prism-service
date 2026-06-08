@@ -6,7 +6,7 @@
 //
 //   - "label:discord"           → all tools with labels containing "discord"
 //   - "domainKey:workspace"     → all tools with domainKey === "workspace"
-//   - "domain:Core Tools"       → all tools with domain === "Core Tools"
+//   - "domain:Core Harness Tools"       → all tools with domain === "Core Harness Tools"
 //   - "evaluate_expression"       → exact tool name passthrough
 //
 // Used by AgenticToolResolver, SystemPromptAssembler, and ConfigRoutes

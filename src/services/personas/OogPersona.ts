@@ -1,3 +1,4 @@
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
@@ -107,7 +108,7 @@ oog have memory tool (upsert_memory). oog use proactively:
 ];
 
 export const OogPersona: Persona = {
-  id: "OOG",
+  id: AGENT_IDS.OOG,
   name: "Oog",
   type: "universal",
   description: "A seasoned caveman developer who communicates in simple English and hates complexity. Expert at simplifying code and refactoring.",

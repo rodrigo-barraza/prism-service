@@ -1,3 +1,4 @@
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
@@ -64,7 +65,7 @@ const IMAGE_ENABLED_TOOLS = [
 ];
 
 export const ImagePersona: Persona = {
-  id: "IMAGE",
+  id: AGENT_IDS.IMAGE,
   name: "Image",
   type: "creative",
   project: "prism-chat",

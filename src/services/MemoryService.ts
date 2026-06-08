@@ -345,7 +345,7 @@ const MemoryService = {
       project,
       traceId,
       endpoint,
-      agent: "LUPOS",
+      agent: AGENT_IDS.LUPOS,
     });
     if (facts.length === 0) {
       logger.info(
@@ -363,10 +363,10 @@ const MemoryService = {
           project,
           traceId,
           endpoint,
-          agent: "LUPOS",
+          agent: AGENT_IDS.LUPOS,
         });
         const memory = await this.store({
-          agent: "LUPOS",
+          agent: AGENT_IDS.LUPOS,
           project: project || null,
           username: fact.sourceUsername || null,
           type: fact.category || "other",
