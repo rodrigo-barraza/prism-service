@@ -6,7 +6,7 @@ import logger from "../utils/logger.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 
 import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
-import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST, TOOL_NAMES, DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TYPES } from "../config.ts";
 import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
@@ -88,7 +88,7 @@ export default class AgenticToolResolver {
     // was unreachable at boot, this fetches on-demand before proceeding)
     await ToolOrchestratorService.ensureSchemas();
     const settings = await SettingsService.getSection("agents");
-    const defaultTopology = settings?.topology || "hierarchical";
+    const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
     const toolsApiSchemas = ToolOrchestratorService.getToolSchemas(defaultTopology);
 
     // Load custom tools from MongoDB

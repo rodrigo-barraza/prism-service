@@ -7,10 +7,10 @@
 // Adapted from Claude Code's getCoordinatorSystemPrompt() with
 // modifications for our git-worktree-isolated architecture.
 // ────────────────────────────────────────────────────────────
-import { CORE_ORCHESTRATOR_TOOLS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { CORE_ORCHESTRATOR_TOOLS, DEFAULT_TOPOLOGY, TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 export function getOrchestratorPromptAddendum({
   subAgentTools = [],
-  defaultTopology = "hierarchical",
+  defaultTopology = DEFAULT_TOPOLOGY,
 }: {
   subAgentTools?: string[];
   defaultTopology?: string;
@@ -20,9 +20,9 @@ export function getOrchestratorPromptAddendum({
       ? [...subAgentTools].sort().join(", ")
       : "all standard tools (read, write, search, shell, etc.)";
 
-  const defHierarchical = defaultTopology === "hierarchical" ? " (default)" : "";
-  const defSequential = defaultTopology === "sequential" ? " (default)" : "";
-  const defPeerToPeer = (defaultTopology === "peer_to_peer" || defaultTopology === "p2p") ? " (default)" : "";
+  const defHierarchical = defaultTopology === TOPOLOGIES.HIERARCHICAL ? " (default)" : "";
+  const defSequential = defaultTopology === TOPOLOGIES.SEQUENTIAL ? " (default)" : "";
+  const defPeerToPeer = (defaultTopology === TOPOLOGIES.PEER_TO_PEER || defaultTopology === "p2p") ? " (default)" : "";
 
   return `## Orchestrator Mode — Multi-Agent Orchestration
 Base Agentic Loop

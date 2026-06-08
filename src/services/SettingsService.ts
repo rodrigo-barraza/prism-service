@@ -1,3 +1,4 @@
+import { DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { deepMerge } from "@rodrigo-barraza/utilities-library";
 import { MONGO_DB_NAME } from "../../config.ts";
@@ -56,7 +57,7 @@ const DEFAULTS: SettingsData = {
     subAgentProvider: "",
     subAgentModel: "",
     harness: "standard",
-    topology: "hierarchical",
+    topology: DEFAULT_TOPOLOGY,
   },
   security: {
     allowEnvFiles: false,

@@ -1,3 +1,4 @@
+import { DEFAULT_WORKFLOW_TITLE } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
@@ -165,7 +166,7 @@ router.get(
 
         workflows = workflows.map((w: Record<string, unknown>) => ({
           id: (w._id as { toString: () => string }).toString(),
-          name: w.name || "Untitled Workflow",
+          name: w.name || DEFAULT_WORKFLOW_TITLE,
           nodeCount: w.nodeCount || 0,
           edgeCount: w.edgeCount || 0,
           source: w.source || "prism-client",

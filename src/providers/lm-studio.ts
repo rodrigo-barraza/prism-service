@@ -1,3 +1,4 @@
+import { AGENT_IDS, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
 import { sleep } from "@rodrigo-barraza/utilities-library";
 // ─────────────────────────────────────────────────────────────
@@ -784,7 +785,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
               {
                 type: "ephemeral_mcp",
                 server_label: "tools",
-                server_url: `${MCP_SERVER_URL}/mcp/sse?project=${encodeURIComponent(options.project || "default")}&agent=${encodeURIComponent(options.agent || "CODING")}${options.username ? `&username=${encodeURIComponent(String(options.username))}` : ""}`,
+                server_url: `${MCP_SERVER_URL}/mcp/sse?project=${encodeURIComponent(options.project || DEFAULT_PROJECT)}&agent=${encodeURIComponent(options.agent || AGENT_IDS.CODING)}${options.username ? `&username=${encodeURIComponent(String(options.username))}` : ""}`,
                 allowed_tools: toolNames,
               },
             ];

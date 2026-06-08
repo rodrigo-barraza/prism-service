@@ -1,3 +1,4 @@
+import { DEFAULT_CONVERSATION_TITLE } from "@rodrigo-barraza/utilities-library/taxonomy";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
 
@@ -82,7 +83,7 @@ const ConversationService: ConversationServiceInterface = {
     const parentId = conversationMeta?.parentAgentSessionId || null;
 
     const setOnInsertBase: Record<string, unknown> = {
-      title: conversationMeta?.title || "New Conversation",
+      title: conversationMeta?.title || DEFAULT_CONVERSATION_TITLE,
       systemPrompt: metaSysPrompt,
       settings: {
         ...metaSettings,
@@ -155,7 +156,7 @@ const ConversationService: ConversationServiceInterface = {
     };
 
     // Auto-derive a descriptive title from the first user message if the current title is missing or is 'New Conversation'
-    if (!conversation.title || conversation.title === "New Conversation") {
+    if (!conversation.title || conversation.title === DEFAULT_CONVERSATION_TITLE) {
       const firstUserMsg = (conversation.messages as ChatMessage[])?.find(
         (m) => m.role === "user"
       );
@@ -200,7 +201,7 @@ const ConversationService: ConversationServiceInterface = {
         {
           $set: { isGenerating: true, updatedAt: now },
           $setOnInsert: {
-            title: "New Conversation",
+            title: DEFAULT_CONVERSATION_TITLE,
             messages: [],
             systemPrompt: "",
             settings: {},

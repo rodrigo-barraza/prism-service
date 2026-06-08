@@ -4,8 +4,9 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../types/orchestrator.ts";
+import type { TopologyType } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-export type TopologyType = "hierarchical" | "sequential" | "peer_to_peer";
+export type { TopologyType };
 
 export interface TopologyRouter {
   execute(

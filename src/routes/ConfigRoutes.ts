@@ -1,3 +1,4 @@
+import { DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response } from "express";
 import {
@@ -214,7 +215,7 @@ router.get(
     }
 
     const settings = await SettingsService.getSection("agents");
-    const defaultTopology = settings?.topology || "hierarchical";
+    const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
 
     // Build the dynamic Tool Calling system prompt
     const schemas = ToolOrchestratorService.getToolSchemas(defaultTopology) || [];
@@ -334,7 +335,7 @@ router.get(
   asyncHandler(async (_req: Request, res: Response) => {
     await ToolOrchestratorService.ensureSchemas();
     const settings = await SettingsService.getSection("agents");
-    const defaultTopology = settings?.topology || "hierarchical";
+    const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
     const agents = AgentPersonaRegistry.list().map((first) => {
       const persona = AgentPersonaRegistry.get(first.id);
       const resolvedTools = resolveAvailableToolsToSet(persona?.availableTools, defaultTopology);
@@ -397,7 +398,7 @@ router.get(
   asyncHandler(async (_req: Request, res: Response) => {
     await ToolOrchestratorService.ensureSchemas();
     const settings = await SettingsService.getSection("agents");
-    const defaultTopology = settings?.topology || "hierarchical";
+    const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
     const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
     const agentId = _req.query.agent as string | undefined;
 

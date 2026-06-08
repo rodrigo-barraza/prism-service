@@ -1,3 +1,4 @@
+import { AGENT_IDS, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import MemoryService from "../services/MemoryService.ts";
@@ -23,8 +24,8 @@ router.post(
       }
 
       const result = await MemoryService.store({
-        agent: agent || "CODING",
-        project: project || "default",
+        agent: agent || AGENT_IDS.CODING,
+        project: project || DEFAULT_PROJECT,
         username: username || null,
         content,
         type: type || "project",
@@ -151,7 +152,7 @@ router.post(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const project = req.project;
-      const agent = req.body.agent || "CODING";
+      const agent = req.body.agent || AGENT_IDS.CODING;
       const username = req.body.username || "system";
 
       const result = await MemoryConsolidationService.consolidate({

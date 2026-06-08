@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 // ────────────────────────────────────────────────────────────
 // Internal Tool Registry
@@ -84,7 +85,7 @@ export default class InternalToolRegistry {
   static getClientSchemas() {
     return [...registry.values()].map((tool) => ({
             ...tool.schema,
-      domain: tool.domain || "Core Harness Tools",
+      domain: tool.domain || DOMAINS.CORE_HARNESS.displayName,
       labels: tool.labels || ["coding"],
     }));
   }

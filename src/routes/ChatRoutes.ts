@@ -1,6 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { formatCostTag, roundMs } from "@rodrigo-barraza/utilities-library";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES, DEFAULT_TOPOLOGY, DEFAULT_CONVERSATION_TITLE } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response, NextFunction } from "express";
 import {
   finalizeTextGeneration,
@@ -468,7 +468,7 @@ export async function handleConversation(
       ?.filter((m) => m.role === "user")
       .pop();
     const titleSnippet =
-      (firstUserMsg?.content || "").slice(0, 100).trim() || "New Conversation";
+      (firstUserMsg?.content || "").slice(0, 100).trim() || DEFAULT_CONVERSATION_TITLE;
     conversationMeta = conversationMeta || { title: titleSnippet };
   }
   const traceId = incomingTraceId || null;
@@ -503,7 +503,7 @@ export async function handleConversation(
         const useNativeMcp = LocalProviderGateway.isNativeMCP(providerName);
         const { default: SettingsService } = await import("../services/SettingsService.ts");
         const settings = await SettingsService.getSection("agents");
-        const defaultTopology = (options.topology as string) || settings?.topology || "hierarchical";
+        const defaultTopology = (options.topology as string) || settings?.topology || DEFAULT_TOPOLOGY;
         const builtInTools = ToolOrchestratorService.getToolSchemas(defaultTopology);
         let tools = builtInTools;
         if (options.enabledTools && Array.isArray(options.enabledTools)) {

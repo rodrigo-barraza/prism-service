@@ -1,3 +1,4 @@
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
 import MemoryService, { CODING_MEMORY_TYPES } from "./MemoryService.ts";
@@ -338,7 +339,7 @@ export default class MemoryExtractor {
       const extractedMemories = memories as ExtractedMemory[];
 
       // ── Store each memory via MemoryService ─────────────────────
-      const agentId = agent || "CODING";
+      const agentId = agent || AGENT_IDS.CODING;
       const stored: StoredMemory[] = [];
 
       for (const memoryObject of extractedMemories) {
