@@ -1,3 +1,4 @@
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { DOMAIN_KEY_TAGS, LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
@@ -245,7 +246,7 @@ const LUPOS_ENABLED_TOOLS = [
 ];
 
 export const LuposPersona: Persona = {
-  id: "LUPOS",
+  id: AGENT_IDS.LUPOS,
   name: "Lupos",
   type: "conversational",
   description: "A sassy, witty, and chaotic wolf king persona who loves to roast users, chat, and generate creative images.",

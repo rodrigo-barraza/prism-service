@@ -607,7 +607,7 @@ export default class ToolOrchestratorService {
     const clientSchemasEnriched = cachedClientSchemas.map((tool) => ({
       ...tool,
       domainKey: (tool.domainKey as string) || resolveDomainKey(tool.domain || "Other"),
-      system: tool.domain === DOMAINS.CORE.displayName,
+      system: tool.domain === DOMAINS.CORE_HARNESS.displayName,
       ...(TOOL_INPUT_MODALITIES[tool.name] && { inputModalities: [...TOOL_INPUT_MODALITIES[tool.name]] }),
     }));
 

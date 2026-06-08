@@ -1,3 +1,4 @@
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
@@ -78,7 +79,7 @@ You have access to ALL tools in the system — coding, web, health, finance, sma
 ];
 
 export const OmniPersona: Persona = {
-  id: "OMNI",
+  id: AGENT_IDS.OMNI,
   name: "Omni",
   type: "universal",
   description: "A universal, all-domain AI assistant with access to all tools, capable of coding, research, smart home control, calculations, and creative tasks.",

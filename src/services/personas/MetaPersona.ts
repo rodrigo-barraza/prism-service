@@ -1,3 +1,4 @@
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
@@ -88,7 +89,7 @@ const META_ENABLED_TOOLS = [
 ];
 
 export const MetaPersona: Persona = {
-  id: "META",
+  id: AGENT_IDS.META,
   name: "Meta",
   type: "",
   project: "prism-chat",

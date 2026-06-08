@@ -1,4 +1,5 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response, NextFunction } from "express";
 import MemoryService from "../services/MemoryService.ts";
 import logger from "../utils/logger.ts";
@@ -67,7 +68,7 @@ router.post(
       }
 
       const memories = await MemoryService.search({
-        agent: "LUPOS",
+        agent: AGENT_IDS.LUPOS,
         guildId,
         userIds,
         queryText,
@@ -98,7 +99,7 @@ router.get(
       const skip = parseInt(req.query.skip as string) || 0;
 
       const result = await MemoryService.list({
-        agent: "LUPOS",
+        agent: AGENT_IDS.LUPOS,
         guildId,
         userId,
         limit,

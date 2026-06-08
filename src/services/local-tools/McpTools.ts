@@ -1,5 +1,5 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import MCPClientService from "../MCPClientService.ts";
 
 interface ListMcpResourcesArgs {
@@ -35,7 +35,7 @@ const listMcpResources = {
       required: [],
     },
   },
-  domain: "Model Context Protocol",
+  domain: DOMAINS.MCP.displayName,
   labels: ["coding", "meta"],
   async execute(args: Record<string, unknown>) {
     const listArgs = args as unknown as ListMcpResourcesArgs;
@@ -88,7 +88,7 @@ const readMcpResource = {
       required: ["server_name", "uri"],
     },
   },
-  domain: "Model Context Protocol",
+  domain: DOMAINS.MCP.displayName,
   labels: ["coding", "meta"],
   async execute(args: Record<string, unknown>) {
     const readArgs = args as unknown as ReadMcpResourceArgs;
@@ -130,7 +130,7 @@ const mcpAuthenticate = {
       required: ["server_name"],
     },
   },
-  domain: "Model Context Protocol",
+  domain: DOMAINS.MCP.displayName,
   labels: ["coding", "meta"],
   async execute(args: Record<string, unknown>) {
     const authArgs = args as unknown as McpAuthenticateArgs;

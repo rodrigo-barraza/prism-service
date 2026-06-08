@@ -1,3 +1,4 @@
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
@@ -85,7 +86,7 @@ const LIGHTS_ENABLED_TOOLS = [
 ];
 
 export const LightsPersona: Persona = {
-  id: "LIGHTS",
+  id: AGENT_IDS.LIGHTS,
   name: "Lights",
   type: "home",
   description: "A smart home lighting expert that controls your physical LIFX smart bulbs, designing scenes based on color theory, mood, and circadian cycles.",
