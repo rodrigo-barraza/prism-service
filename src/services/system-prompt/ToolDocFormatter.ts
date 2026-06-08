@@ -27,7 +27,9 @@ export class ToolDocFormatter {
     let filteredSchemas = schemas.filter(
       (toolSchema) =>
         enabledSet.has(toolSchema.name as string) ||
-        (toolSchema as Record<string, unknown>).domain === "Core Tools"
+        (toolSchema as Record<string, unknown>).domain === "Core Tools" ||
+        (toolSchema as Record<string, unknown>).domain === "Core Harness Tools" ||
+        (toolSchema as Record<string, unknown>).domain === "Core Orchestrator Tools"
     );
 
     // Apply blockedTools post-filter denylist — enabledSet entries are protected

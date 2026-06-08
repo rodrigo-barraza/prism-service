@@ -25,7 +25,7 @@ export default {
     },
   },
 
-  domain: "Core Tools",
+  domain: "Core Harness Tools",
   labels: ["coding"],
 
   async execute(args: ExitPlanModeArgs) {

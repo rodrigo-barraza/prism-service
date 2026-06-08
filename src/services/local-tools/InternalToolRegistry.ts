@@ -84,7 +84,7 @@ export default class InternalToolRegistry {
   static getClientSchemas() {
     return [...registry.values()].map((tool) => ({
             ...tool.schema,
-      domain: tool.domain || "Core Tools",
+      domain: tool.domain || "Core Harness Tools",
       labels: tool.labels || ["coding"],
     }));
   }

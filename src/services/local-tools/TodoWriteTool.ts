@@ -77,7 +77,7 @@ export default {
     },
   },
 
-  domain: "Core Tools",
+  domain: "Core Harness Tools",
   labels: ["coding"],
 
   async execute(args: Record<string, unknown>, context: Record<string, unknown>) {

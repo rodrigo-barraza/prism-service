@@ -43,7 +43,7 @@ const setTimer = {
       required: ["prompt"],
     },
   },
-  domain: "Core Tools",
+  domain: "Core Harness Tools",
   labels: ["timer", "automation", "scheduler"],
 
   async execute(args: Record<string, unknown>, context: ToolContext) {
@@ -99,7 +99,7 @@ const setTimer = {
       properties: {},
     },
   },
-  domain: "Core Tools",
+  domain: "Core Harness Tools",
   labels: ["timer", "automation", "scheduler"],
 
   async execute(_args: Record<string, unknown>, context: ToolContext) {
@@ -147,7 +147,7 @@ const cancelTimer = {
       required: ["timerId"],
     },
   },
-  domain: "Core Tools",
+  domain: "Core Harness Tools",
   labels: ["timer", "automation", "scheduler"],
 
   async execute(args: Record<string, unknown>, context: ToolContext) {

@@ -580,7 +580,7 @@ export default class ToolOrchestratorService {
 
   /** Client-facing schemas (with domain/domainKey/dataSource/labels, no endpoint) — for Prism Client UI */
   static getClientToolSchemas(defaultTopology?: string) {
-    // Reverse map: display name → domainKey (e.g. "Core Tools" → "core")
+    // Reverse map: display name → domainKey (e.g. "Core Harness Tools" → "core_harness")
     const domainDisplayNameToKey = new Map<string, string>();
     for (const entry of Object.values(DOMAINS)) {
       if (!domainDisplayNameToKey.has(entry.displayName)) {
@@ -592,16 +592,16 @@ export default class ToolOrchestratorService {
     // Orchestrator tools are Prism-local — add domain metadata for UI grouping
     const orchestratorClient = getOrchestratorToolSchemas(defaultTopology).map((tool) => ({
       ...tool,
-      domain: "Core Tools",
-      domainKey: "core",
+      domain: "Core Orchestrator Tools",
+      domainKey: "orchestrator",
       labels: ["coding", "orchestration"],
       system: true,
     }));
 
     const internalClient = InternalToolRegistry.getClientSchemas().map((tool) => ({
       ...tool,
-      domainKey: resolveDomainKey(tool.domain || "Core Tools"),
-      system: tool.domain === "Core Tools",
+      domainKey: resolveDomainKey(tool.domain || "Core Harness Tools"),
+      system: tool.domain === "Core Harness Tools",
     }));
 
     const clientSchemasEnriched = cachedClientSchemas.map((tool) => ({
