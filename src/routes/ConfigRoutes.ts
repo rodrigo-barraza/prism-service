@@ -60,7 +60,7 @@ const AVAILABLE_PROVIDERS = new Set<string>([
 ]);
 
 /**
- * Resolve availableTools entries (may contain "label:X" / "domain:X" prefixes)
+ * Resolve availableTools entries (may contain "domain:X" / "domainKey:X" prefixes)
  * into a flat Set of concrete tool names using client schemas.
  */
 function resolveAvailableToolsToSet(availableTools: string[] | undefined, defaultTopology?: string) {
@@ -70,7 +70,7 @@ function resolveAvailableToolsToSet(availableTools: string[] | undefined, defaul
   if (availableTools.includes("*")) return null;
 
   const hasPrefixed = availableTools.some(
-    (e) => e.startsWith("label:") || e.startsWith("domain:") || e.startsWith("domainKey:"),
+    (e) => e.startsWith("domain:") || e.startsWith("domainKey:"),
   );
   if (!hasPrefixed) return new Set<string>(availableTools);
 

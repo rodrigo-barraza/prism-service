@@ -17,7 +17,6 @@ interface ToolSchema {
   name: string;
   description?: string;
   parameters?: Record<string, unknown>;
-  labels?: string[];
   domain?: string;
   _isCustom?: boolean;
   _mcpServer?: string;
@@ -171,12 +170,7 @@ export default class AgenticToolResolver {
         const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
         const expandedSet = new Set<string>();
         for (const entry of baseTools) {
-          if (entry.startsWith("label:")) {
-            const label = entry.slice(6);
-            for (const tool of clientSchemas) {
-              if (tool.labels?.includes(label)) expandedSet.add(tool.name);
-            }
-          } else if (entry.startsWith("domain:")) {
+        if (entry.startsWith("domain:")) {
             const domain = entry.slice(7);
             for (const tool of clientSchemas) {
               if (tool.domain === domain) expandedSet.add(tool.name);
@@ -221,7 +215,7 @@ export default class AgenticToolResolver {
     let finalTools = dynamicTools;
     if (resolvedEnabledTools && Array.isArray(resolvedEnabledTools)) {
       const hasPrefixed = resolvedEnabledTools.some(
-        (e) => e.startsWith("label:") || e.startsWith("domain:") || e.startsWith("domainKey:"),
+        (e) => e.startsWith("domain:") || e.startsWith("domainKey:"),
       );
 
       let enabledSet: Set<string>;

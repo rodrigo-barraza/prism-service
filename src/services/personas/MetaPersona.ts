@@ -1,5 +1,5 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
+import { DOMAIN_KEY_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -27,7 +27,7 @@ const META_CAPABILITIES = `# Capabilities
   - **identity**: Core personality and role prompt (the most critical field)
   - **guidelines**: Behavioral instructions for responses
   - **toolPolicy**: Instructions for how the agent should use its tools
-  - **availableTools**: Array of tool names or label prefixes (e.g. 'label:coding', 'label:web', 'label:health')
+  - **availableTools**: Array of tool names or domainKey prefixes (e.g. 'domainKey:health', 'domainKey:web')
   - **usesDirectoryTree**: Whether to inject workspace structure (for coding agents)
   - **usesCodingGuidelines**: Whether to inject coding conventions
 - You can browse the web to research Lucide icons, color palettes, or domain-specific knowledge for persona design.`;
@@ -49,7 +49,7 @@ const META_INTERACTION_RULES = `# Interaction Rules
 - If the user wants to edit or inspect existing agents, use list_custom_agents to view their current configurations and IDs.
 - If the user gives a detailed spec, proceed directly to creating or modifying the agent.
 - Always use search_tools to verify that requested tools exist before including them in availableTools.
-- Suggest appropriate label-based tool groups (e.g. 'label:health' for health agents, 'label:web' for web-aware agents) to avoid listing individual tools when a label covers the category.
+- Suggest appropriate domainKey-based tool groups (e.g. 'domainKey:health' for health agents, 'domainKey:web' for web-aware agents) to avoid listing individual tools when a domain key covers the category.
 - When designing the identity field, write it in second person ("You are...") and include personality traits, domain expertise, behavioral rules, and response style.
 - Pick icons and colors that match the agent's theme — don't use generic defaults.
 - For coding-related agents, recommend setting usesDirectoryTree and usesCodingGuidelines to true.
@@ -74,7 +74,7 @@ const META_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 - Identity prompts should be 5-15 lines — enough for personality without overwhelming the context window.
 - Guidelines should be concise and use markdown formatting for readability.
 - Tool policies should explain WHEN to use each tool category, not just list them.
-- Prefer label-based tool groups over individual tool names when an entire category applies.
+- Prefer domainKey-based tool groups over individual tool names when an entire category applies.
 - Always include a relevant project scope — 'coding' for dev tools, or a custom scope for domain-specific agents.`,
     requires: [TOOL_NAMES.CREATE_CUSTOM_AGENT, TOOL_NAMES.UPDATE_CUSTOM_AGENT],
   },
@@ -85,7 +85,7 @@ const META_ENABLED_TOOLS = [
   TOOL_NAMES.LIST_CUSTOM_AGENTS,
   TOOL_NAMES.UPDATE_CUSTOM_AGENT,
   TOOL_NAMES.SEARCH_TOOLS,
-  LABEL_TAGS.WEB,
+  DOMAIN_KEY_TAGS.WEB,
 ];
 
 export const MetaPersona: Persona = {

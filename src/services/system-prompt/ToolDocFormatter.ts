@@ -18,7 +18,7 @@ export class ToolDocFormatter {
     }
 
     const hasPrefixed = enabledTools.some(
-      (enabledTool) => enabledTool.startsWith("label:") || enabledTool.startsWith("domain:") || enabledTool.startsWith("domainKey:"),
+      (enabledTool) => enabledTool.startsWith("domain:") || enabledTool.startsWith("domainKey:"),
     );
 
     const enabledSet = hasPrefixed

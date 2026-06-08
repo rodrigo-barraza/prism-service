@@ -137,7 +137,7 @@ export default class SystemPromptAssembler {
         let count = schemas.length;
         if (context.enabledTools) {
           const hasPrefixed = context.enabledTools.some(
-            (enabledTool) => enabledTool.startsWith("label:") || enabledTool.startsWith("domain:") || enabledTool.startsWith("domainKey:"),
+            (enabledTool) => enabledTool.startsWith("domain:") || enabledTool.startsWith("domainKey:"),
           );
           const enabledSet = hasPrefixed
             ? resolveToolEntriesToSet(context.enabledTools, schemas)
@@ -190,7 +190,7 @@ export default class SystemPromptAssembler {
       const resolvedEnabledSet = (() => {
         if (!context.enabledTools) return null;
         const hasPrefixed = context.enabledTools.some(
-          (entry) => entry.startsWith("label:") || entry.startsWith("domain:") || entry.startsWith("domainKey:"),
+          (entry) => entry.startsWith("domain:") || entry.startsWith("domainKey:"),
         );
         if (hasPrefixed) {
           const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
