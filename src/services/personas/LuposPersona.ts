@@ -1,5 +1,5 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { DOMAIN_KEY_TAGS, LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
+import { DOMAIN_KEY_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -217,9 +217,11 @@ When calling generate_image, the prompt you write depends on whether reference i
 ];
 
 const LUPOS_ENABLED_TOOLS = [
-  LABEL_TAGS.DISCORD,
-  LABEL_TAGS.MEDIA,
-  LABEL_TAGS.WEB,
+  DOMAIN_KEY_TAGS.DISCORD,
+  DOMAIN_KEY_TAGS.MOVIES,
+  DOMAIN_KEY_TAGS.GAMING,
+  DOMAIN_KEY_TAGS.TORRENT,
+  DOMAIN_KEY_TAGS.WEB,
   TOOL_NAMES.GENERATE_IMAGE,
   TOOL_NAMES.GET_TRENDS,
   TOOL_NAMES.GET_HOT_TRENDS,

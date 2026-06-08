@@ -1,5 +1,5 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
+import { DOMAIN_KEY_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -58,9 +58,10 @@ const IMAGE_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 
 const IMAGE_ENABLED_TOOLS = [
   TOOL_NAMES.GENERATE_IMAGE,
-  LABEL_TAGS.CREATIVE,
-  LABEL_TAGS.WEB,
-  LABEL_TAGS.MEDIA,
+  DOMAIN_KEY_TAGS.CREATIVE,
+  DOMAIN_KEY_TAGS.WEB,
+  DOMAIN_KEY_TAGS.MOVIES,
+  DOMAIN_KEY_TAGS.GAMING,
   TOOL_NAMES.UPSERT_MEMORY,
 ];
 

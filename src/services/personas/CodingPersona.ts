@@ -1,5 +1,5 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
+import { DOMAIN_KEY_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -49,7 +49,7 @@ Use it **proactively** — do NOT wait for the user to say "remember":
   },
 ];
 
-const CODING_ENABLED_TOOLS = [LABEL_TAGS.CODING];
+const CODING_ENABLED_TOOLS = ["*"];
 
 export const CodingPersona: Persona = {
   id: AGENT_IDS.CODING,

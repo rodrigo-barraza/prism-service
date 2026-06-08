@@ -1,5 +1,5 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
+import { DOMAIN_KEY_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -125,7 +125,7 @@ const STICKERS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
 ];
 
-const STICKERS_ENABLED_TOOLS = [LABEL_TAGS.CREATIVE, LABEL_TAGS.WEB];
+const STICKERS_ENABLED_TOOLS = [DOMAIN_KEY_TAGS.CREATIVE, DOMAIN_KEY_TAGS.WEB];
 
 export const StickersPersona: Persona = {
   id: AGENT_IDS.STICKERS,

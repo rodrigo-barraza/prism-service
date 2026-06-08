@@ -113,9 +113,9 @@ describe('GET /config/agents', () => {
     
     const codingAgent = res.body.find((a: any) => a.id === 'CODING');
     expect(codingAgent).toBeDefined();
-    // Non-Lupos agent should have core agentic tools like enter_plan_mode
-    expect(codingAgent.enabledToolNames).toContain('enter_plan_mode');
-    expect(codingAgent.toolCount).toBeGreaterThan(0);
+    // Coding agent is wildcard and has all tools enabled
+    expect(codingAgent.enabledToolNames).toContain('*');
+    expect(codingAgent.toolCount).toBe(-1);
 
     const luposAgent = res.body.find((a: any) => a.id === 'LUPOS');
     expect(luposAgent).toBeDefined();

@@ -4,7 +4,6 @@
 // Resolves an array of tool entry strings into a Set of concrete
 // tool names by expanding prefix-based entries:
 //
-//   - "label:discord"           → all tools with labels containing "discord"
 //   - "domainKey:workspace"     → all tools with domainKey === "workspace"
 //   - "domain:Core Harness Tools"       → all tools with domain === "Core Harness Tools"
 //   - "evaluate_expression"       → exact tool name passthrough
@@ -17,7 +16,6 @@ interface ToolSchemaForResolution {
   name: string;
   domain?: string;
   domainKey?: string;
-  labels?: string[];
   [key: string]: unknown;
 }
 
@@ -28,12 +26,7 @@ export function resolveToolEntriesToSet(
   const resolvedSet = new Set<string>();
 
   for (const entry of entries) {
-    if (entry.startsWith("label:")) {
-      const label = entry.slice(6);
-      for (const toolSchema of schemas) {
-        if (toolSchema.labels?.includes(label)) resolvedSet.add(toolSchema.name);
-      }
-    } else if (entry.startsWith("domainKey:")) {
+    if (entry.startsWith("domainKey:")) {
       const domainKey = entry.slice(10);
       for (const toolSchema of schemas) {
         if (toolSchema.domainKey === domainKey) resolvedSet.add(toolSchema.name);

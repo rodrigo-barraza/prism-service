@@ -1,5 +1,5 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { LABEL_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
+import { DOMAIN_KEY_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 
@@ -80,8 +80,8 @@ const LIGHTS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 ];
 
 const LIGHTS_ENABLED_TOOLS = [
-  LABEL_TAGS.SMART_HOME,
-  LABEL_TAGS.WEB,
+  DOMAIN_KEY_TAGS.SMART_HOME,
+  DOMAIN_KEY_TAGS.WEB,
   TOOL_NAMES.GET_WEATHER,
 ];
 

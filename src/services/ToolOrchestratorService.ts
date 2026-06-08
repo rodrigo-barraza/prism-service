@@ -36,7 +36,6 @@ interface ToolSchemaFull {
   endpoint?: ToolEndpoint;
   domain?: string;
   dataSource?: string;
-  labels?: string[];
   [key: string]: unknown;
 }
 
@@ -87,7 +86,7 @@ let cachedSchemas: ToolSchemaFull[] = [];
 /** @type {Array} Clean schemas for LLM (without endpoint metadata) */
 let cachedAISchemas: ToolSchemaFull[] = [];
 
-/** @type {Array} Client-facing schemas (with domain/dataSource/labels, without endpoint) */
+/** @type {Array} Client-facing schemas (with domain/dataSource, without endpoint) */
 let cachedClientSchemas: ToolSchemaFull[] = [];
 
 /** @type {Map<string, ToolSchemaFull>} Tool name → full schema (for routing) */
@@ -142,16 +141,15 @@ async function fetchSchemas() {
 
     cachedSchemas = schemas;
 
-    // Client-facing schemas: keep domain/dataSource/labels for UI grouping, strip only endpoint
+    // Client-facing schemas: keep domain/dataSource for UI grouping, strip only endpoint
     cachedClientSchemas = schemas.map(({ endpoint: _endpoint, ...rest }) => rest);
 
-    // Strip endpoint, dataSource, domain, and labels metadata for LLM consumption
+    // Strip endpoint, dataSource, and domain metadata for LLM consumption
     cachedAISchemas = schemas.map(
       ({
         endpoint: _endpoint,
         dataSource: _dataSource,
         domain: _domain,
-        labels: _labels,
         ...rest
       }) => rest,
     );
@@ -569,7 +567,7 @@ export default class ToolOrchestratorService {
     }
   }
 
-  /** AI-clean schemas (no endpoint/domain/dataSource/labels) — for LLM tool arrays */
+  /** AI-clean schemas (no endpoint/domain/dataSource) — for LLM tool arrays */
   static getToolSchemas(defaultTopology?: string) {
     return [
       ...cachedAISchemas,
@@ -578,7 +576,7 @@ export default class ToolOrchestratorService {
     ];
   }
 
-  /** Client-facing schemas (with domain/domainKey/dataSource/labels, no endpoint) — for Prism Client UI */
+  /** Client-facing schemas (with domain/domainKey/dataSource, no endpoint) — for Prism Client UI */
   static getClientToolSchemas(defaultTopology?: string) {
     // Reverse map: display name → domainKey (e.g. "Core Harness Tools" → "core_harness")
     const domainDisplayNameToKey = new Map<string, string>();
@@ -594,7 +592,6 @@ export default class ToolOrchestratorService {
       ...tool,
       domain: DOMAINS.ORCHESTRATOR.displayName,
       domainKey: "orchestrator",
-      labels: ["coding", "orchestration"],
       system: true,
     }));
 
@@ -617,7 +614,6 @@ export default class ToolOrchestratorService {
       parameters: tool.parameters,
       domain: tool.domain || `Model Context Protocol: ${tool._mcpServer}`,
       domainKey: "mcp",
-      labels: tool.labels || ["mcp", tool._mcpServer],
       system: false,
     }));
 

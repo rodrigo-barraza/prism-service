@@ -134,7 +134,7 @@ const codingPersona = {
   identity: () => "You are a coding agent.",
   guidelines: "## Coding Guidelines\n- Always read before editing",
   toolPolicy: null,
-  availableTools: ["label:coding"],
+  availableTools: ["*"],
   usesDirectoryTree: true,
   usesCodingGuidelines: true,
 };
@@ -146,7 +146,7 @@ const luposPersona = {
   identity: () => "You are Lupos, a conversational AI.",
   guidelines: "## Lupos Guidelines\n- Be friendly",
   toolPolicy: "## Lupos Tool Policy\n- Use tools wisely",
-  availableTools: ["label:weather"],
+  availableTools: ["domainKey:weather"],
   usesDirectoryTree: false,
   usesCodingGuidelines: false,
 };
@@ -297,19 +297,6 @@ describe("SystemPromptAssembler", () => {
   // ──────────────────────────────────────────────────────────
 
   describe("orchestrator mode prompt injection", () => {
-    it("injects orchestrator prompt when enabledTools uses label: prefix that expands to include orchestrator tools", async () => {
-      const assembler = createAssembler();
-      const { prompt } = await assembler.assemble({
-        agent: "CODING",
-        project: "prism-chat",
-        messages: [{ role: "user", content: "Hello" }],
-        enabledTools: ["label:coding"],
-      });
-
-      expect(prompt).toContain("Orchestrator Mode — Multi-Agent Orchestration");
-      expect(getOrchestratorPromptAddendum).toHaveBeenCalled();
-    });
-
     it("injects orchestrator prompt when enabledTools contains explicit orchestrator tool names", async () => {
       const assembler = createAssembler();
       const { prompt } = await assembler.assemble({
@@ -329,7 +316,7 @@ describe("SystemPromptAssembler", () => {
         agent: "CODING",
         project: "prism-chat",
         messages: [{ role: "user", content: "Hello" }],
-        enabledTools: ["label:weather"],
+        enabledTools: ["domainKey:weather"],
       });
 
       expect(prompt).not.toContain("Orchestrator Mode — Multi-Agent Orchestration");
@@ -396,18 +383,18 @@ describe("SystemPromptAssembler", () => {
       expect(prompt).not.toContain("Orchestrator Mode — Multi-Agent Orchestration");
     });
 
-    it("ensures parent and cron job paths produce identical orchestrator behavior for label:coding", async () => {
+    it("ensures parent and cron job paths produce identical orchestrator behavior for domainKey:orchestrator", async () => {
       const assembler = createAssembler();
 
-      // Path 1: Parent request — uses label: prefix (the previously-broken path)
+      // Path 1: Parent request — uses domainKey: prefix
       const parentResult = await assembler.assemble({
         agent: "CODING",
         project: "prism-chat",
         messages: [{ role: "user", content: "Create a cron job" }],
-        enabledTools: ["label:coding"],
+        enabledTools: ["domainKey:orchestrator"],
       });
 
-      // Path 2: Cron job — uses expanded tool names (the previously-working path)
+      // Path 2: Cron job — uses expanded tool names
       const cronResult = await assembler.assemble({
         agent: "CODING",
         project: "prism-chat",
