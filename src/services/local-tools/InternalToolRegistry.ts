@@ -16,7 +16,7 @@ interface InternalTool {
   schema: { name: string; description?: string; parameters?: Record<string, unknown>; [key: string]: unknown };
   domain?: string;
   labels?: string[];
-  execute: (args: Record<string, unknown>, context: Record<string, unknown>) => Promise<unknown>;
+  execute: (args: any, context: any) => Promise<any>;
 }
 
 const registry = new Map<string, InternalTool>();
