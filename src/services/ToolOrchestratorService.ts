@@ -601,13 +601,13 @@ export default class ToolOrchestratorService {
     const internalClient = InternalToolRegistry.getClientSchemas().map((tool) => ({
       ...tool,
       domainKey: resolveDomainKey(tool.domain || DOMAINS.CORE_HARNESS.displayName),
-      system: tool.domain === DOMAINS.CORE_HARNESS.displayName,
+      system: tool.domain === DOMAINS.CORE_HARNESS.displayName || tool.domain === DOMAINS.CORE_WORKSPACE.displayName,
     }));
 
     const clientSchemasEnriched = cachedClientSchemas.map((tool) => ({
       ...tool,
       domainKey: (tool.domainKey as string) || resolveDomainKey(tool.domain || "Other"),
-      system: tool.domain === DOMAINS.CORE_HARNESS.displayName,
+      system: tool.domain === DOMAINS.CORE_HARNESS.displayName || tool.domain === DOMAINS.CORE_WORKSPACE.displayName,
       ...(TOOL_INPUT_MODALITIES[tool.name] && { inputModalities: [...TOOL_INPUT_MODALITIES[tool.name]] }),
     }));
 

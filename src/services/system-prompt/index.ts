@@ -147,6 +147,7 @@ export default class SystemPromptAssembler {
             (toolSchema) =>
               enabledSet.has(toolSchema.name as string) ||
               (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
+              (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_WORKSPACE.displayName ||
               (toolSchema as Record<string, unknown>).domain === DOMAINS.ORCHESTRATOR.displayName
           );
 
