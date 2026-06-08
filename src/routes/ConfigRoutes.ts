@@ -22,6 +22,7 @@ import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import LocalProviderGateway from "../services/local-provider/index.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "../services/OrchestratorPrompt.ts";
 import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
+import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   OPENAI_API_KEY,
   ANTHROPIC_API_KEY,
@@ -378,7 +379,7 @@ router.get(
         toolCount: finalToolsCount,
         enabledToolNames: finalToolNames,
         coreToolsLocked: persona?.coreToolsLocked ?? true,
-        canSpawnSubAgents: ORCHESTRATOR_ONLY_TOOLS.includes("create_team"),
+        canSpawnSubAgents: ORCHESTRATOR_ONLY_TOOLS.includes(TOOL_NAMES.CREATE_TEAM),
         usesDirectoryTree: persona?.usesDirectoryTree || false,
         usesCodingGuidelines: persona?.usesCodingGuidelines || false,
       };

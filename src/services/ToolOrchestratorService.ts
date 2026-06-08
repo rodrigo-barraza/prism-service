@@ -426,7 +426,7 @@ function getOrchestratorToolSchemas(defaultTopology: string = "hierarchical") {
 
   return [
     {
-      name: "create_team",
+      name: TOOL_NAMES.CREATE_TEAM,
       description:
         "Spawn one or more sub-agents, each in an isolated git worktree. " +
         "Sub-agents have access to the full tool suite (read, write, search, shell). " +
@@ -493,7 +493,7 @@ function getOrchestratorToolSchemas(defaultTopology: string = "hierarchical") {
       },
     },
     {
-      name: "send_message",
+      name: TOOL_NAMES.SEND_MESSAGE,
       description:
         "Send a follow-up message to a running or completed sub-agent. Use to continue work, provide corrections, or give new instructions.",
       parameters: {
@@ -509,7 +509,7 @@ function getOrchestratorToolSchemas(defaultTopology: string = "hierarchical") {
       },
     },
     {
-      name: "stop_agent",
+      name: TOOL_NAMES.STOP_AGENT,
       description:
         "Stop a running sub-agent. The sub-agent's worktree is cleaned up.",
       parameters: {
@@ -521,7 +521,7 @@ function getOrchestratorToolSchemas(defaultTopology: string = "hierarchical") {
       },
     },
     {
-      name: "get_task_output",
+      name: TOOL_NAMES.GET_TASK_OUTPUT,
       description:
         "Read the output from a previously spawned sub-agent by its agent ID. " +
         "Use this to check on a sub-agent's result after it has completed, or to read " +
@@ -539,7 +539,7 @@ function getOrchestratorToolSchemas(defaultTopology: string = "hierarchical") {
       },
     },
     {
-      name: "delete_team",
+      name: TOOL_NAMES.DELETE_TEAM,
       description:
         "Stop and remove all sub-agents in a named team. Cleans up worktrees for all members.",
       parameters: {
@@ -1023,23 +1023,23 @@ export default class ToolOrchestratorService {
     };
 
     switch (name) {
-      case "create_team":
+      case TOOL_NAMES.CREATE_TEAM:
         return OrchestratorService.createTeam(args as { name: string; members: TeamMember[]; topology?: string }, orchestratorContext as OrchestratorContext);
 
-      case "send_message":
+      case TOOL_NAMES.SEND_MESSAGE:
         return OrchestratorService.sendMessage(
           args.to as string,
           args.message as string,
           orchestratorContext as OrchestratorContext,
         );
 
-      case "stop_agent":
+      case TOOL_NAMES.STOP_AGENT:
         return OrchestratorService.stopAgent(args.agent_id as string);
 
-      case "get_task_output":
+      case TOOL_NAMES.GET_TASK_OUTPUT:
         return OrchestratorService.getTaskOutput(args.agent_id as string);
 
-      case "delete_team":
+      case TOOL_NAMES.DELETE_TEAM:
         return OrchestratorService.deleteTeam(args.teamName as string, orchestratorContext as OrchestratorContext);
 
       default:

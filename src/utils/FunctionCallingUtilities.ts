@@ -8,6 +8,7 @@
  */
 
 import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
+import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 // ── Array keys whose entries get capped during truncation ─────
 const TRUNCATABLE_ARRAY_KEYS = [
@@ -130,7 +131,7 @@ export function expandMessagesForFC(
         .map((toolCall: ToolCallEntry) => {
           let finalResult = toolCall.result;
           if (
-            (toolCall.name === "create_team" || toolCall.name === "team_create") &&
+            (toolCall.name === TOOL_NAMES.CREATE_TEAM || toolCall.name === "team_create") &&
             Array.isArray(toolCall.result)
           ) {
             finalResult = toolCall.result.map((subAgentResult) => {

@@ -138,7 +138,7 @@ const executeSkill = {
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
     return ToolOrchestratorService.executeOrchestratorTool(
-      "create_team",
+      TOOL_NAMES.CREATE_TEAM,
       {
         name: `skill_${prepared.skillId}`,
         members: [
