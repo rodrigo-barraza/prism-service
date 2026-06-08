@@ -17,7 +17,7 @@ import { COLLECTIONS } from "../../constants.ts";
 import { finalizeTextGeneration, type FinalizerContext } from "./lifecycle/Finalizer.ts";
 import logger from "../../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import WebhookEventBus from "../WebhookEventBus.ts";
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
@@ -747,7 +747,7 @@ export default class BaseAgenticHarness {
 
     // Persist sub-agent snapshots for orchestrator sessions
     if (
-      state.streamedToolCalls.some((toolCall) => toolCall.name === "create_team") &&
+      state.streamedToolCalls.some((toolCall) => toolCall.name === TOOL_NAMES.CREATE_TEAM) &&
       conversationId
     ) {
       try {

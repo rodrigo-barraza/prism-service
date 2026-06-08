@@ -36,17 +36,17 @@ export function emitPostExecutionStatus(
   if (
     toolCalls.some(
       (toolCall) =>
-        toolCall.name === "create_team" ||
+        toolCall.name === TOOL_NAMES.CREATE_TEAM ||
         // TODO(cleanup): Remove "team_create" once historical sessions have aged out
         toolCall.name === "team_create" ||
-        toolCall.name === "stop_agent",
+        toolCall.name === TOOL_NAMES.STOP_AGENT,
     )
   ) {
     emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.SUB_AGENTS_UPDATED });
   }
 
   if (toolCalls.some((toolCall) => toolCall.name === TOOL_NAMES.UPSERT_MEMORY)) {
-    emit({ type: "status", message: "memories_updated" });
+    emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.MEMORIES_UPDATED });
   }
 }
 
