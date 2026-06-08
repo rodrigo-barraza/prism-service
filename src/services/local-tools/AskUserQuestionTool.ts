@@ -118,7 +118,7 @@ export default {
       required: ["questions"],
     },
   },
-  domain: "Core Tools",
+  domain: "Core Harness Tools",
   labels: ["coding"],
 
   async execute(args: AskUserQuestionArgs, context: ToolContext) {

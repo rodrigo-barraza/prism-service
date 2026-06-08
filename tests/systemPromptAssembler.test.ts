@@ -62,24 +62,24 @@ const COORDINATOR_TOOL_SCHEMAS = [
     name: "create_team",
     description: "Spawn worker agents",
     parameters: { type: "object", properties: {} },
-    domain: "Core Tools",
-    domainKey: "core",
+    domain: "Core Orchestrator Tools",
+    domainKey: "orchestrator",
     labels: ["coding", "orchestration"],
   },
   {
     name: "send_message",
     description: "Send message to worker",
     parameters: { type: "object", properties: {} },
-    domain: "Core Tools",
-    domainKey: "core",
+    domain: "Core Orchestrator Tools",
+    domainKey: "orchestrator",
     labels: ["coding", "orchestration"],
   },
   {
     name: "stop_agent",
     description: "Stop a worker agent",
     parameters: { type: "object", properties: {} },
-    domain: "Core Tools",
-    domainKey: "core",
+    domain: "Core Orchestrator Tools",
+    domainKey: "orchestrator",
     labels: ["coding", "orchestration"],
   },
 ];
@@ -89,8 +89,8 @@ const INTERNAL_TOOL_SCHEMAS = [
     name: "think",
     description: "Private reasoning",
     parameters: { type: "object", properties: {} },
-    domain: "Core Tools",
-    domainKey: "core",
+    domain: "Core Harness Tools",
+    domainKey: "core_harness",
     labels: ["coding"],
   },
 ];
@@ -360,25 +360,25 @@ describe("SystemPromptAssembler", () => {
       expect(prompt).not.toContain("Orchestrator Mode — Multi-Agent Orchestration");
     });
 
-    it("injects orchestrator prompt when enabledTools uses domainKey: prefix for core tools", async () => {
+    it("injects orchestrator prompt when enabledTools uses domainKey: prefix for orchestrator tools", async () => {
       const assembler = createAssembler();
       const { prompt } = await assembler.assemble({
         agent: "CODING",
         project: "prism-chat",
         messages: [{ role: "user", content: "Hello" }],
-        enabledTools: ["domainKey:core"],
+        enabledTools: ["domainKey:orchestrator"],
       });
 
       expect(prompt).toContain("Orchestrator Mode — Multi-Agent Orchestration");
     });
 
-    it("injects orchestrator prompt when enabledTools uses domain: prefix for Core Tools", async () => {
+    it("injects orchestrator prompt when enabledTools uses domain: prefix for Core Orchestrator Tools", async () => {
       const assembler = createAssembler();
       const { prompt } = await assembler.assemble({
         agent: "CODING",
         project: "prism-chat",
         messages: [{ role: "user", content: "Hello" }],
-        enabledTools: ["domain:Core Tools"],
+        enabledTools: ["domain:Core Orchestrator Tools"],
       });
 
       expect(prompt).toContain("Orchestrator Mode — Multi-Agent Orchestration");

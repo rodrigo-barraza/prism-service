@@ -145,7 +145,9 @@ export default class SystemPromptAssembler {
           let filteredSchemas = schemas.filter(
             (toolSchema) =>
               enabledSet.has(toolSchema.name as string) ||
-              (toolSchema as Record<string, unknown>).domain === "Core Tools"
+              (toolSchema as Record<string, unknown>).domain === "Core Tools" ||
+              (toolSchema as Record<string, unknown>).domain === "Core Harness Tools" ||
+              (toolSchema as Record<string, unknown>).domain === "Core Orchestrator Tools"
           );
 
           if (agentId) {
