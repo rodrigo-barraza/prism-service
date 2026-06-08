@@ -222,6 +222,18 @@ export function buildConversationPatchFields({
     setFields.modalities = computeModalities(messages);
     setFields.providers = extractProviders(messages, settings || null);
     setFields.totalCost = computeTotalCost(messages);
+
+    const modelNamesSet = new Set<string>();
+    for (const message of messages || []) {
+      if (message.deleted) continue;
+      if (message.role === "assistant" && message.model) {
+        modelNamesSet.add(message.model as string);
+      }
+    }
+    if (modelNamesSet.size === 0 && settings?.model) {
+      modelNamesSet.add(settings.model as string);
+    }
+    setFields.modelNames = Array.from(modelNamesSet);
   }
   if (systemPrompt !== undefined) setFields.systemPrompt = systemPrompt;
   if (settings !== undefined) {
