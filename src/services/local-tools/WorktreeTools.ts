@@ -1,5 +1,5 @@
 import logger from "../../utils/logger.ts";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 // ── Worktree Isolation Tools ────────────────────────────────
 // Allows the agent to self-isolate into a git worktree for
@@ -54,6 +54,7 @@ const enterWorktree = {
       required: [],
     },
   },
+  domain: DOMAINS.CORE_WORKSPACE.displayName,
   labels: ["coding", "git"],
 
   async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
@@ -159,6 +160,7 @@ const exitWorktree = {
       required: ["action"],
     },
   },
+  domain: DOMAINS.CORE_WORKSPACE.displayName,
   labels: ["coding", "git"],
 
   async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
