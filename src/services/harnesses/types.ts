@@ -28,7 +28,6 @@ export interface UsageAccumulator extends TokenUsage {
 export interface ToolSchema {
   name: string;
   description: string;
-  _isCustom?: boolean;
   parameters?: {
     type: string;
     properties: Record<string, unknown>;
@@ -60,7 +59,6 @@ export interface ToolResult {
 
 export interface ResolvedTools {
   finalTools: ToolSchema[];
-  customToolMap: Map<string, Record<string, unknown>>;
   resolvedEnabledTools: string[] | null;
 }
 
