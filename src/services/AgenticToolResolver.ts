@@ -1,7 +1,5 @@
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
 import SettingsService from "./SettingsService.ts";
-import MongoWrapper from "../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 
@@ -9,7 +7,6 @@ import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
 import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST, TOOL_NAMES, DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TYPES } from "../config.ts";
 import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -18,24 +15,8 @@ interface ToolSchema {
   description?: string;
   parameters?: Record<string, unknown>;
   domain?: string;
-  _isCustom?: boolean;
   _mcpServer?: string;
   _mcpOriginalName?: string;
-  [key: string]: unknown;
-}
-
-interface CustomToolParam {
-  name: string;
-  type?: string;
-  description?: string;
-  required?: boolean;
-  enum?: string[];
-}
-
-interface CustomToolDoc {
-  name: string;
-  description: string;
-  parameters?: CustomToolParam[];
   [key: string]: unknown;
 }
 
@@ -78,8 +59,8 @@ const PRISM_LOCAL_TOOL_NAMES = {
 
 export default class AgenticToolResolver {
   /**
-   * Resolves the final set of tools and a map of custom tools for an agentic loop.
-   * Handles MongoDB custom tools, MCP tools, disabledBuiltIns mode, prefix expansion,
+   * Resolves the final set of tools for an agentic loop.
+   * Handles MCP tools, disabledBuiltIns mode, prefix expansion,
    * and native provider tool collision prevention.
    */
   static async resolve({ options, agent, project, username, modelDef }: ResolveParams) {
@@ -90,53 +71,7 @@ export default class AgenticToolResolver {
     const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
     const toolsApiSchemas = ToolOrchestratorService.getToolSchemas(defaultTopology);
 
-    // Load custom tools from MongoDB
-    let customToolsData: CustomToolDoc[] = [];
-    try {
-      const db = MongoWrapper.getDb(MONGO_DB_NAME);
-      if (db) {
-        customToolsData = await db
-          .collection("custom_tools")
-          .find({ project, username, enabled: true })
-          .toArray() as unknown as CustomToolDoc[];
-      }
-      if (customToolsData.length > 0) {
-        logger.info(
-          `[AgenticToolResolver] Loaded ${customToolsData.length} custom tool(s) from MongoDB: [${customToolsData.map((t) => t.name).join(", ")}]`,
-        );
-      }
-    } catch (error: unknown) {
-      logger.warn(`Failed to fetch custom tools for loop: ${getErrorMessage(error)}`);
-    }
-
-    // Build the dynamic tool map
-    const customToolMap = new Map<string, CustomToolDoc>();
     const dynamicTools: ToolSchema[] = [...toolsApiSchemas];
-
-    for (const tool of customToolsData) {
-      customToolMap.set(tool.name, tool);
-      dynamicTools.push({
-        name: tool.name,
-        description: tool.description,
-        _isCustom: true,
-        parameters: {
-          type: "object",
-          properties: Object.fromEntries(
-            (tool.parameters || []).map((provider) => [
-              provider.name,
-              {
-                type: provider.type || "string",
-                description: provider.description || "",
-                ...(provider.enum?.length ? { enum: provider.enum } : {}),
-              },
-            ]),
-          ),
-          required: (tool.parameters || [])
-            .filter((provider) => provider.required)
-            .map((provider) => provider.name),
-        },
-      });
-    }
 
     // Merge MCP tools from connected servers
     const mcpTools = ToolOrchestratorService.getMCPToolSchemas();
@@ -232,14 +167,10 @@ export default class AgenticToolResolver {
       const resolvedPersona = agent ? AgentPersonaRegistry.get(agent) : null;
       const isCoreToolsLocked = resolvedPersona?.coreToolsLocked ?? true;
 
-      const preFilterCustom = finalTools
-        .filter((tool) => tool._isCustom)
-        .map((tool) => tool.name);
       const shouldBypassOrchestratorTools = !options.isSubAgent;
       finalTools = finalTools.filter(
         (tool) =>
           enabledSet.has(tool.name) ||
-          tool._isCustom ||
           tool.name.startsWith("mcp__") ||
           (isCoreToolsLocked && CORE_AGENTIC_TOOLS.has(tool.name)) ||
           (shouldBypassOrchestratorTools && CORE_ORCHESTRATOR_TOOLS.has(tool.name)) ||
@@ -254,15 +185,6 @@ export default class AgenticToolResolver {
         );
         logger.info(
           `[AgenticLoop] Applied blockedTools denylist (${disabledSet.size} tools blocked, enabledSet protects ${enabledSet.size})`,
-        );
-      }
-
-      const postFilterCustom = finalTools
-        .filter((tool) => tool._isCustom)
-        .map((tool) => tool.name);
-      if (preFilterCustom.length > 0) {
-        logger.info(
-          `[AgenticToolResolver] Custom tools: pre-filter=[${preFilterCustom.join(", ")}] post-filter=[${postFilterCustom.join(", ")}] (enabledSet has ${enabledSet.size} entries)`,
         );
       }
     }
@@ -280,10 +202,9 @@ export default class AgenticToolResolver {
       finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.DESCRIBE_IMAGE);
     }
 
-    const finalCustomCount = finalTools.filter((tool) => tool._isCustom).length;
     logger.info(
-      `[AgenticToolResolver] Final: ${finalTools.length} tools (${finalCustomCount} custom, ${customToolMap.size} in map)`,
+      `[AgenticToolResolver] Final: ${finalTools.length} tools`,
     );
-    return { finalTools, customToolMap, resolvedEnabledTools };
+    return { finalTools, resolvedEnabledTools };
   }
 }

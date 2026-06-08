@@ -40,7 +40,6 @@ export const COLLECTIONS = {
   BENCHMARK_RUNS: "benchmark_runs",
   SYNTHESIS: "synthesis",
   FAVORITES: "favorites",
-  CUSTOM_TOOLS: "custom_tools",
   AGENT_SKILLS: "agent_skills",
   AGENT_RULES: "agent_rules",
   MCP_SERVERS: "mcp_servers",

@@ -11,7 +11,6 @@ import {
   trackToolErrors,
 } from "./lifecycle/PostExecutionEmitter.ts";
 import { runExhaustionRecoveryPass } from "./lifecycle/ExhaustionRecovery.ts";
-import { reloadIfCustomToolsMutated } from "./lifecycle/ToolHotReloader.ts";
 import {
   blockUnauthorizedToolCalls,
   handleExitPlanMode,
@@ -379,15 +378,6 @@ export default class ReActHarness extends BaseAgenticHarness {
         );
 
         emitPostExecutionStatus(pass.pendingToolCalls, emit);
-
-        // ── Hot-reload custom tools mid-session ──────────────
-        await reloadIfCustomToolsMutated(
-          pass.pendingToolCalls,
-          this.tools,
-          project,
-          username,
-          emit,
-        );
 
         // ── Validation intercept (linter auto-remediation) ──────
         // Must run BEFORE plan mode toggling — no point entering plan

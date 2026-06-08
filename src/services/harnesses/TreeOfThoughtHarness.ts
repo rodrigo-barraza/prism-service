@@ -11,7 +11,6 @@ import {
   trackToolErrors,
 } from "./lifecycle/PostExecutionEmitter.ts";
 import { runExhaustionRecoveryPass } from "./lifecycle/ExhaustionRecovery.ts";
-import { reloadIfCustomToolsMutated } from "./lifecycle/ToolHotReloader.ts";
 import { validateAfterToolExecution } from "./lifecycle/ValidationInterceptor.ts";
 import {
   isOutputTruncated,
@@ -395,14 +394,6 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
         );
 
         emitPostExecutionStatus(selectedPass.pendingToolCalls, emit);
-
-        await reloadIfCustomToolsMutated(
-          selectedPass.pendingToolCalls,
-          this.tools,
-          project,
-          username,
-          emit,
-        );
 
         // ── Validation + backtracking ─────────────────────────
         const validationFeedback = await validateAfterToolExecution(

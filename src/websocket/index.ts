@@ -82,14 +82,6 @@ interface ToolResult {
   result: Record<string, unknown>;
 }
 
-interface CustomToolParam {
-  name: string;
-  type?: string;
-  description?: string;
-  enum?: string[];
-  required?: boolean;
-}
-
 /**
  * Set up WebSocket handlers on the HTTP server.
  * Routes:
@@ -365,37 +357,6 @@ function handleWsLive(
           const defaultTopology = (clientConfig.topology as string) || settings?.topology || DEFAULT_TOPOLOGY;
           const dynamicTools = [...ToolOrchestratorService.getToolSchemas(defaultTopology)];
 
-          const db = MongoWrapper.getDb(MONGO_DB_NAME);
-          if (db) {
-            const customToolsData = await db
-              .collection("custom_tools")
-              .find({ project, username, enabled: true })
-              .toArray();
-
-            for (const t of customToolsData) {
-              dynamicTools.push({
-                name: t.name,
-                description: t.description,
-                parameters: {
-                  type: "object",
-                  properties: Object.fromEntries(
-                    ((t.parameters || []) as CustomToolParam[]).map((p) => [
-                      p.name,
-                      {
-                        type: p.type || "string",
-                        description: p.description || "",
-                        ...(p.enum?.length ? { enum: p.enum } : {}),
-                      },
-                    ]),
-                  ),
-                  required: ((t.parameters || []) as CustomToolParam[])
-                    .filter((p) => p.required)
-                    .map((p) => p.name),
-                },
-              });
-            }
-          }
-
           const filtered = dynamicTools.filter((t) =>
             enabledSet.has(t.name),
           );
@@ -570,42 +531,10 @@ function handleWsLive(
                     ).default;
                     const { truncateToolResult } =
                       await import("../utils/FunctionCallingUtilities.js");
-                    const MongoWrapper = (
-                      await import("../wrappers/MongoWrapper.js")
-                    ).default;
-                    const { MONGO_DB_NAME } = await import("../../config.js");
-
-                    // Build merged tool map (custom + built-in) for execution
-                    const customToolMap = new Map<string, Record<string, unknown>>();
-                    try {
-                     const db2 = MongoWrapper.getDb(MONGO_DB_NAME);
-                      if (db2) {
-                        const customToolsData = await db2
-                          .collection("custom_tools")
-                          .find({ project, username, enabled: true })
-                          .toArray();
-                        for (const t of customToolsData) {
-                          customToolMap.set(t.name as string, t as Record<string, unknown>);
-                        }
-                      }
-                    } catch (error: unknown) {
-                      logger.warn(
-                        `Failed to fetch custom tools for Live API loop: ${getErrorMessage(error)}`,
-                      );
-                    }
 
                     const results: ToolResult[] = await Promise.all(
                       functionCalls.map(async (toolCall) => {
-                        let result: Record<string, unknown> = {};
-                        const customDef = customToolMap.get(toolCall.name);
-                        if (customDef) {
-                          result =
-                            await ToolOrchestratorService.executeCustomTool(
-                              customDef,
-                              toolCall.args,
-                            ) as Record<string, unknown>;
-                        } else {
-                          result = await ToolOrchestratorService.executeTool(
+                        const result = await ToolOrchestratorService.executeTool(
                             toolCall.name,
                             toolCall.args,
                             {
@@ -618,7 +547,6 @@ function handleWsLive(
                               _resolvedModel: activeModel,
                             },
                           ) as Record<string, unknown>;
-                        }
                         return { id: toolCall.id, name: toolCall.name, result };
                       }),
                     );
