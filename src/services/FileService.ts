@@ -1,3 +1,4 @@
+import { DEFAULT_USERNAME } from "@rodrigo-barraza/utilities-library/taxonomy";
 import crypto from "crypto";
 import type { Readable } from "stream";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
@@ -95,7 +96,7 @@ const FileService: FileServiceInterface = {
       // duplicate directories when the same user is later identified by name.
       const safeUsername =
         /^\d{1,3}(\.\d{1,3}){3}$/.test(username) || username.includes(":")
-          ? "anonymous"
+          ? DEFAULT_USERNAME
           : username;
       key = `projects/${project}/${safeUsername}/${category}/${crypto.randomUUID()}.${fileExtension}`;
     } else {

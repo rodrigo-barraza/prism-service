@@ -1,3 +1,4 @@
+import { DEFAULT_TOPOLOGY, DEFAULT_USERNAME } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { handleConversation } from "../routes/ChatRoutes.ts";
 import { handleVoice } from "../routes/AudioRoutes.ts";
 import {
@@ -112,7 +113,7 @@ export function setupWebSocket(wss: WebSocketServer) {
     const username =
       (req.headers["x-username"] as string) ||
       url.searchParams.get("username") ||
-      "anonymous";
+      DEFAULT_USERNAME;
     const agent = (req.headers["x-agent"] as string) || null;
     logger.info(
       `WebSocket connection on ${pathname} (project: ${project}, user: ${username})`,
@@ -361,7 +362,7 @@ function handleWsLive(
 
           const SettingsService = (await import("../services/SettingsService.js")).default;
           const settings = await SettingsService.getSection("agents");
-          const defaultTopology = (clientConfig.topology as string) || settings?.topology || "hierarchical";
+          const defaultTopology = (clientConfig.topology as string) || settings?.topology || DEFAULT_TOPOLOGY;
           const dynamicTools = [...ToolOrchestratorService.getToolSchemas(defaultTopology)];
 
           const db = MongoWrapper.getDb(MONGO_DB_NAME);

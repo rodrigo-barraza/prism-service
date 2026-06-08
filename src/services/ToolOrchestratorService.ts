@@ -4,7 +4,7 @@ import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "./OrchestratorPrompt.ts";
 import { createAbortController } from "../utils/AbortController.ts";
-import { DOMAINS, TOOL_NAMES, TOOL_INPUT_MODALITIES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { DOMAINS, TOOL_NAMES, TOOL_INPUT_MODALITIES, TOPOLOGIES, DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   TOOL_SCHEMA_FETCH_TIMEOUT_MS,
   TOOL_CONFIG_FETCH_TIMEOUT_MS,
@@ -405,20 +405,20 @@ async function fetchJsonPost(
 // Orchestrator Tool Schemas — Prism-local, not routed to tools-api
 // ────────────────────────────────────────────────────────────
 
-function getOrchestratorToolSchemas(defaultTopology: string = "hierarchical") {
-  const normalizedTopology = (defaultTopology === "peer_to_peer" || defaultTopology === "p2p")
-    ? "peer_to_peer"
-    : defaultTopology === "sequential"
-    ? "sequential"
-    : "hierarchical";
+function getOrchestratorToolSchemas(defaultTopology: string = DEFAULT_TOPOLOGY) {
+  const normalizedTopology = (defaultTopology === TOPOLOGIES.PEER_TO_PEER || defaultTopology === "p2p")
+    ? TOPOLOGIES.PEER_TO_PEER
+    : defaultTopology === TOPOLOGIES.SEQUENTIAL
+    ? TOPOLOGIES.SEQUENTIAL
+    : TOPOLOGIES.HIERARCHICAL;
 
-  const isHierarchical = normalizedTopology === "hierarchical";
-  const isSequential = normalizedTopology === "sequential";
-  const isPeerToPeer = normalizedTopology === "peer_to_peer";
+  const isHierarchical = normalizedTopology === TOPOLOGIES.HIERARCHICAL;
+  const isSequential = normalizedTopology === TOPOLOGIES.SEQUENTIAL;
+  const isPeerToPeer = normalizedTopology === TOPOLOGIES.PEER_TO_PEER;
 
-  const hierarchicalLabel = isHierarchical ? "hierarchical (default)" : "hierarchical";
-  const sequentialLabel = isSequential ? "sequential (default)" : "sequential";
-  const peerToPeerLabel = isPeerToPeer ? "peer_to_peer (default)" : "peer_to_peer";
+  const hierarchicalLabel = isHierarchical ? `${TOPOLOGIES.HIERARCHICAL} (default)` : TOPOLOGIES.HIERARCHICAL;
+  const sequentialLabel = isSequential ? `${TOPOLOGIES.SEQUENTIAL} (default)` : TOPOLOGIES.SEQUENTIAL;
+  const peerToPeerLabel = isPeerToPeer ? `${TOPOLOGIES.PEER_TO_PEER} (default)` : TOPOLOGIES.PEER_TO_PEER;
 
   const hierarchicalDesc = isHierarchical ? "'hierarchical' (default)" : "'hierarchical'";
   const sequentialDesc = isSequential ? "'sequential' (default)" : "'sequential'";
@@ -445,7 +445,7 @@ function getOrchestratorToolSchemas(defaultTopology: string = "hierarchical") {
           },
           topology: {
             type: "string",
-            enum: ["hierarchical", "sequential", "peer_to_peer"],
+            enum: [TOPOLOGIES.HIERARCHICAL, TOPOLOGIES.SEQUENTIAL, TOPOLOGIES.PEER_TO_PEER],
             description:
               `Optional: execution topology. '${hierarchicalLabel}' — all members run in parallel. ` +
               `'${sequentialLabel}' — members run one-at-a-time, each receiving the previous member's output. ` +
@@ -592,7 +592,7 @@ export default class ToolOrchestratorService {
     // Orchestrator tools are Prism-local — add domain metadata for UI grouping
     const orchestratorClient = getOrchestratorToolSchemas(defaultTopology).map((tool) => ({
       ...tool,
-      domain: "Core Orchestrator Tools",
+      domain: DOMAINS.ORCHESTRATOR.displayName,
       domainKey: "orchestrator",
       labels: ["coding", "orchestration"],
       system: true,
@@ -600,14 +600,14 @@ export default class ToolOrchestratorService {
 
     const internalClient = InternalToolRegistry.getClientSchemas().map((tool) => ({
       ...tool,
-      domainKey: resolveDomainKey(tool.domain || "Core Harness Tools"),
-      system: tool.domain === "Core Harness Tools",
+      domainKey: resolveDomainKey(tool.domain || DOMAINS.CORE_HARNESS.displayName),
+      system: tool.domain === DOMAINS.CORE_HARNESS.displayName,
     }));
 
     const clientSchemasEnriched = cachedClientSchemas.map((tool) => ({
       ...tool,
       domainKey: (tool.domainKey as string) || resolveDomainKey(tool.domain || "Other"),
-      system: tool.domain === "Core Tools",
+      system: tool.domain === DOMAINS.CORE.displayName,
       ...(TOOL_INPUT_MODALITIES[tool.name] && { inputModalities: [...TOOL_INPUT_MODALITIES[tool.name]] }),
     }));
 

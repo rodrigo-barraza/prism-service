@@ -1,3 +1,4 @@
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import http from "http";
@@ -337,7 +338,7 @@ setupWebSocket(wss);
       await import("./services/AgentPersonaRegistry.js");
     const mcpDb = MongoWrapper.getDb(MONGO_DB_NAME);
     const codingProject =
-            AgentPersonaRegistryMCP.get("CODING")?.project || "coding";
+            AgentPersonaRegistryMCP.get(AGENT_IDS.CODING)?.project || "coding";
     if (mcpDb) {
       // Seed default MCP servers from environment variable if provided
       if (process.env.DEFAULT_MCP_SERVERS) {

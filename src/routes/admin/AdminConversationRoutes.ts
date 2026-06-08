@@ -1,3 +1,4 @@
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
@@ -76,8 +77,8 @@ router.get(
 
       const sortDir = sortDirection;
 
-      const isDirectOnly = type === "direct" || agent === "NONE";
-      const isAgentOnly = agent && agent !== "NONE" && agent !== "ALL";
+      const isDirectOnly = type === "direct" || agent === AGENT_IDS.NONE;
+      const isAgentOnly = agent && agent !== AGENT_IDS.NONE && agent !== AGENT_IDS.ALL;
 
       const shouldFetchConvs = !isAgentOnly;
       const shouldFetchSessions = !isDirectOnly;

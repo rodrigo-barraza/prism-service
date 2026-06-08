@@ -8,7 +8,7 @@ import {
 } from "../providers/instance-registry.ts";
 
 
-import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES, DEFAULT_TOPOLOGY, TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import localModelQueue from "./LocalModelQueue.ts";
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "./OrchestratorPrompt.ts";
@@ -642,9 +642,9 @@ export default class OrchestratorService {
 
     const settings = await SettingsService.getSection("agents");
     const topology =
-      args.topology || orchestratorContext.topology || settings?.topology || "hierarchical";
+      args.topology || orchestratorContext.topology || settings?.topology || DEFAULT_TOPOLOGY;
 
-    const validTopologies = ["hierarchical", "sequential", "peer_to_peer", "p2p"];
+    const validTopologies = [TOPOLOGIES.HIERARCHICAL, TOPOLOGIES.SEQUENTIAL, TOPOLOGIES.PEER_TO_PEER, "p2p"];
     if (!validTopologies.includes(topology)) {
       const errorMessage = `Invalid topology: "${topology}". Available topologies are: hierarchical, sequential, peer_to_peer.`;
       logger.error(`[Orchestrator] createTeam: ${errorMessage}`);
@@ -707,10 +707,10 @@ export default class OrchestratorService {
     }
 
     let router: TopologyRouter;
-    if (topology === "sequential") {
+    if (topology === TOPOLOGIES.SEQUENTIAL) {
       const { SequentialRouter } = await import("./orchestrator/routers/SequentialRouter.ts");
       router = new SequentialRouter();
-    } else if (topology === "peer_to_peer" || topology === "p2p") {
+    } else if (topology === TOPOLOGIES.PEER_TO_PEER || topology === "p2p") {
       const { PeerToPeerRouter } = await import("./orchestrator/routers/PeerToPeerRouter.ts");
       router = new PeerToPeerRouter();
     } else {
@@ -888,7 +888,7 @@ export default class OrchestratorService {
 
     if (!subAgentEnabledTools) {
       const settings = await SettingsService.getSection("agents");
-      const defaultTopology = orchestratorContext.topology || settings?.topology || "hierarchical";
+      const defaultTopology = orchestratorContext.topology || settings?.topology || DEFAULT_TOPOLOGY;
       const allToolSchemas = ToolOrchestratorService.getToolSchemas(defaultTopology);
       const orchestratorToolNames = new Set(ORCHESTRATOR_ONLY_TOOLS);
       subAgentEnabledTools = allToolSchemas

@@ -1,6 +1,7 @@
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import AgentPersonaRegistry from "../AgentPersonaRegistry.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
+import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 export class ToolDocFormatter {
   /**
@@ -27,9 +28,9 @@ export class ToolDocFormatter {
     let filteredSchemas = schemas.filter(
       (toolSchema) =>
         enabledSet.has(toolSchema.name as string) ||
-        (toolSchema as Record<string, unknown>).domain === "Core Tools" ||
-        (toolSchema as Record<string, unknown>).domain === "Core Harness Tools" ||
-        (toolSchema as Record<string, unknown>).domain === "Core Orchestrator Tools"
+        (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE.displayName ||
+        (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
+        (toolSchema as Record<string, unknown>).domain === DOMAINS.ORCHESTRATOR.displayName
     );
 
     // Apply blockedTools post-filter denylist — enabledSet entries are protected

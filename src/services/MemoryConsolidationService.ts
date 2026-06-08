@@ -1,3 +1,4 @@
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { daysSinceIso } from "@rodrigo-barraza/utilities-library";
 import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import crypto from "crypto";
@@ -322,7 +323,7 @@ const MemoryConsolidationService = {
    * Processes memories in batches to avoid context window overflow.
    */
   async consolidate({
-    agent = "CODING",
+    agent = AGENT_IDS.CODING,
     project,
     username,
     trigger = "manual",
@@ -333,7 +334,7 @@ const MemoryConsolidationService = {
     guildId,
   }: ConsolidateOptions) {
     const startTime = performance.now();
-    const agentId = agent || "CODING";
+    const agentId = agent || AGENT_IDS.CODING;
     const persona = AgentPersonaRegistry.get(agentId);
     const agentType = persona?.type || "";
     const isConversational = agentType === "conversational";
@@ -636,7 +637,7 @@ const MemoryConsolidationService = {
         );
         // Fire-and-forget
         MemoryConsolidationService.consolidate({
-          agent: agent || "CODING",
+          agent: agent || AGENT_IDS.CODING,
           project,
           username,
           trigger: "session_threshold",

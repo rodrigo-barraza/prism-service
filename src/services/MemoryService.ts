@@ -1,3 +1,4 @@
+import { AGENT_IDS, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { daysSinceIso } from "@rodrigo-barraza/utilities-library";
 import crypto from "crypto";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
@@ -269,7 +270,7 @@ const MemoryService = {
       throw new Error("MemoryService.store requires an agent identifier");
     if (!content) throw new Error("MemoryService.store requires content");
     // Validate type for CODING agent
-    if (agent === "CODING") {
+    if (agent === AGENT_IDS.CODING) {
             type = CODING_MEMORY_TYPES.includes(type as string) ? type : "project";
     }
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
@@ -511,8 +512,8 @@ const MemoryService = {
         {
           $project: {
             _id: 0,
-            project: { $ifNull: ["$_id.project", "default"] },
-            agent: { $ifNull: ["$_id.agent", "CODING"] },
+            project: { $ifNull: ["$_id.project", DEFAULT_PROJECT] },
+            agent: { $ifNull: ["$_id.agent", AGENT_IDS.CODING] },
             count: 1,
           },
         },

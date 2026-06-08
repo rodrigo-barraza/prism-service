@@ -54,7 +54,6 @@ const enterWorktree = {
       required: [],
     },
   },
-  domain: "Core Harness Tools",
   labels: ["coding", "git"],
 
   async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
@@ -160,7 +159,6 @@ const exitWorktree = {
       required: ["action"],
     },
   },
-  domain: "Core Harness Tools",
   labels: ["coding", "git"],
 
   async execute(args: Record<string, unknown>, context: Record<string, unknown>) {

@@ -1,3 +1,4 @@
+import { DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
 import AgenticToolResolver from "./AgenticToolResolver.ts";
 import AgenticLoopState from "./AgenticLoopState.ts";
 import HarnessRegistry from "./harnesses/HarnessRegistry.ts";
@@ -60,10 +61,10 @@ export default class AgenticLoopService {
           await import("./SettingsService.js");
         const agentSettings = await SettingsService.getSection("agents");
         if (!harnessId) harnessId = agentSettings?.harness || "standard";
-        if (!topologyId) topologyId = agentSettings?.topology || "hierarchical";
+        if (!topologyId) topologyId = agentSettings?.topology || DEFAULT_TOPOLOGY;
       } catch {
         if (!harnessId) harnessId = "standard";
-        if (!topologyId) topologyId = "hierarchical";
+        if (!topologyId) topologyId = DEFAULT_TOPOLOGY;
       }
     }
     options.harness = harnessId;

@@ -1,3 +1,4 @@
+import { DEFAULT_USERNAME } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import { EventEmitter } from "node:events";
@@ -432,7 +433,7 @@ router.post(
           agentAssertionOperator,
         },
         req.project || null,
-        req.username || "anonymous",
+        req.username || DEFAULT_USERNAME,
       );
 
       res.status(201).json(benchmark);
@@ -583,7 +584,7 @@ router.post(
         benchmark as unknown as Parameters<typeof BenchmarkService.runBenchmark>[0],
         modelTargets,
         req.project || null,
-        req.username || "anonymous",
+        req.username || DEFAULT_USERNAME,
         {
           signal: abortController.signal,
           onRunStart: (info: { totalModels: number }) => {
@@ -833,7 +834,7 @@ router.post(
         benchmark as unknown as Parameters<typeof BenchmarkService.runBenchmark>[0],
         modelTargets,
         req.project || null,
-        req.username || "anonymous",
+        req.username || DEFAULT_USERNAME,
       );
 
       res.json(run);

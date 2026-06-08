@@ -1,5 +1,5 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { TOOL_NAMES, DEFAULT_USERNAME, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
 import ConversationTimerService from "../ConversationTimerService.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
@@ -43,14 +43,13 @@ const setTimer = {
       required: ["prompt"],
     },
   },
-  domain: "Core Harness Tools",
   labels: ["timer", "automation", "scheduler"],
 
   async execute(args: Record<string, unknown>, context: ToolContext) {
     const { prompt, durationSeconds, cronExpression, maxIterations } = args;
     const conversationId = context.conversationId;
-    const project = context.project || "default";
-    const username = context.username || "anonymous";
+    const project = context.project || DEFAULT_PROJECT;
+    const username = context.username || DEFAULT_USERNAME;
 
     if (!conversationId) {
       return { error: "No active agent session / conversation ID in context." };
@@ -99,13 +98,12 @@ const setTimer = {
       properties: {},
     },
   },
-  domain: "Core Harness Tools",
   labels: ["timer", "automation", "scheduler"],
 
   async execute(_args: Record<string, unknown>, context: ToolContext) {
     const conversationId = context.conversationId;
-    const project = context.project || "default";
-    const username = context.username || "anonymous";
+    const project = context.project || DEFAULT_PROJECT;
+    const username = context.username || DEFAULT_USERNAME;
 
     if (!conversationId) {
       return { error: "No active agent session / conversation ID in context." };
@@ -147,13 +145,12 @@ const cancelTimer = {
       required: ["timerId"],
     },
   },
-  domain: "Core Harness Tools",
   labels: ["timer", "automation", "scheduler"],
 
   async execute(args: Record<string, unknown>, context: ToolContext) {
     const { timerId } = args;
-    const project = context.project || "default";
-    const username = context.username || "anonymous";
+    const project = context.project || DEFAULT_PROJECT;
+    const username = context.username || DEFAULT_USERNAME;
 
     if (!timerId || typeof timerId !== "string") {
       return { error: "'timerId' is a required string parameter." };

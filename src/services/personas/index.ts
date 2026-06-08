@@ -1,3 +1,4 @@
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { Persona } from "./types.ts";
 import { CodingPersona } from "./CodingPersona.ts";
 import { LuposPersona } from "./LuposPersona.ts";
@@ -14,7 +15,7 @@ export * from "./types.ts";
 export * from "./utils.ts";
 
 export const BUILT_IN_PERSONAS = new Map<string, Persona>([
-  ["CODING", CodingPersona],
+  [AGENT_IDS.CODING, CodingPersona],
   ["LUPOS", LuposPersona],
   ["STICKERS", StickersPersona],
   ["LIGHTS", LightsPersona],

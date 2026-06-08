@@ -8,6 +8,7 @@ import {
 } from "../OrchestratorPrompt.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import SettingsService from "../SettingsService.ts";
+import { AGENT_IDS, DOMAINS, DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import { DirectoryTreeFormatter } from "./DirectoryTreeFormatter.ts";
 import { ToolDocFormatter } from "./ToolDocFormatter.ts";
@@ -42,14 +43,14 @@ export default class SystemPromptAssembler {
   async assemble(context: AssemblerContext) {
     const sections: string[] = [];
     const isDirectMode = !context.agent;
-    const agentId = context.agent || "CODING";
+    const agentId = context.agent || AGENT_IDS.CODING;
     const persona = isDirectMode ? null : AgentPersonaRegistry.get(agentId);
 
     const codingFallback =
-      !isDirectMode && (!persona || persona.id === "CODING");
+      !isDirectMode && (!persona || persona.id === AGENT_IDS.CODING);
 
     const settings = await SettingsService.getSection("agents");
-    const defaultTopology = settings?.topology || "hierarchical";
+    const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
 
     // ── 1. Agent Identity ────────────────────────────────────────
     if (isDirectMode) {
@@ -145,9 +146,9 @@ export default class SystemPromptAssembler {
           let filteredSchemas = schemas.filter(
             (toolSchema) =>
               enabledSet.has(toolSchema.name as string) ||
-              (toolSchema as Record<string, unknown>).domain === "Core Tools" ||
-              (toolSchema as Record<string, unknown>).domain === "Core Harness Tools" ||
-              (toolSchema as Record<string, unknown>).domain === "Core Orchestrator Tools"
+              (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE.displayName ||
+              (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
+              (toolSchema as Record<string, unknown>).domain === DOMAINS.ORCHESTRATOR.displayName
           );
 
           if (agentId) {
