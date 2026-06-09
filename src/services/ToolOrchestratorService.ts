@@ -656,6 +656,28 @@ export default class ToolOrchestratorService {
         return [...cachedStaticRoots];
   }
 
+  /**
+   * Check if any workspace agent is currently connected to tools-api.
+   * Mirrors the same `/admin/config` → `agents[].roots` check used by
+   * `GET /workspaces` to set `isAgentServed` on the client.
+   */
+  static async isWorkspaceAgentConnected(): Promise<boolean> {
+    try {
+      const configResponse = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!configResponse.ok) return false;
+      const config = await configResponse.json() as ToolsApiConfig & { agents?: { roots?: string[] }[] };
+      const agents = config.agents || [];
+      for (const agent of agents) {
+        if (agent.roots && agent.roots.length > 0) return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
   /** Re-fetch workspace roots from tools-api config */
   static async refreshWorkspaceRoots() {
     try {

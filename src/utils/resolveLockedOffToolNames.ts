@@ -1,16 +1,20 @@
 import SettingsService from "../services/SettingsService.ts";
-import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
+import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 /**
  * Resolves tool names that should be excluded from the system prompt
- * and tool count because their prerequisite settings models are not configured.
+ * and tool count because their prerequisites are not met.
  *
  * This is the server-side equivalent of the client's `lockedOffTools` useMemo
  * in ChatSessionComponent, ensuring both the system prompt "Enabled Tools (N)"
  * count and the sidebar tool count agree.
  *
- * Checks: memory models, image/vision models, TTS/STT models.
- * Does NOT check workspace availability — that's a dynamic runtime concern.
+ * Checks:
+ *   - Memory models (extraction, consolidation, embedding)
+ *   - Image/vision models
+ *   - TTS/STT models
+ *   - Workspace agent connectivity (mirrors client isAgentServed check)
  */
 export async function resolveLockedOffToolNames(): Promise<Set<string>> {
   const lockedOff = new Set<string>();
@@ -37,6 +41,24 @@ export async function resolveLockedOffToolNames(): Promise<Set<string>> {
   if (!hasVisionModel) lockedOff.add(TOOL_NAMES.DESCRIBE_IMAGE);
   if (!hasTextToSpeech) lockedOff.add(TOOL_NAMES.SYNTHESIZE_SPEECH);
   if (!hasSpeechToText) lockedOff.add(TOOL_NAMES.TRANSCRIBE_AUDIO);
+
+  // Workspace agent connectivity — mirrors the client's isAgentServed check.
+  // If no workspace agent is connected, lock off all workspace-domain tools
+  // (the same set the client locks off when currentWorkspace.isAgentServed is false).
+  const isWorkspaceAgentConnected = await ToolOrchestratorService.isWorkspaceAgentConnected();
+  if (!isWorkspaceAgentConnected) {
+    const allSchemas = ToolOrchestratorService.getClientToolSchemas();
+    for (const tool of allSchemas) {
+      const isWorkspaceTool =
+        tool.domain === DOMAINS.CORE_WORKSPACE.displayName ||
+        tool.domainKey === DOMAINS.CORE_WORKSPACE.key ||
+        tool.name === TOOL_NAMES.ENTER_WORKTREE ||
+        tool.name === TOOL_NAMES.EXIT_WORKTREE;
+      if (isWorkspaceTool) {
+        lockedOff.add(tool.name as string);
+      }
+    }
+  }
 
   return lockedOff;
 }
