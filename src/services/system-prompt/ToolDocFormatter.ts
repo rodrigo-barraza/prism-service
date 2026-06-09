@@ -13,19 +13,30 @@ export class ToolDocFormatter {
    *   - Name + first sentence of description (capability summary)
    *   - Full parameter listing with required markers
    */
-  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string, resolvedToolNames?: string[]): string {
+  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string, resolvedToolNames?: string[], lockedOffToolNames?: Set<string>): string {
     const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
 
     if (resolvedToolNames?.length) {
       const resolvedSet = new Set(resolvedToolNames);
-      const filteredSchemas = schemas.filter(
+      let filteredSchemas = schemas.filter(
         (toolSchema) => resolvedSet.has(toolSchema.name as string),
       );
+      if (lockedOffToolNames?.size) {
+        filteredSchemas = filteredSchemas.filter(
+          (toolSchema) => !lockedOffToolNames.has(toolSchema.name as string),
+        );
+      }
       return this._formatToolDescriptions(filteredSchemas);
     }
 
     if (!enabledTools) {
-      return this._formatToolDescriptions(schemas);
+      let allSchemas = schemas;
+      if (lockedOffToolNames?.size) {
+        allSchemas = allSchemas.filter(
+          (toolSchema) => !lockedOffToolNames.has(toolSchema.name as string),
+        );
+      }
+      return this._formatToolDescriptions(allSchemas);
     }
 
     const hasPrefixed = enabledTools.some(
@@ -53,6 +64,12 @@ export class ToolDocFormatter {
           (toolSchema) => !disabledSet.has(toolSchema.name as string) || enabledSet.has(toolSchema.name as string),
         );
       }
+    }
+
+    if (lockedOffToolNames?.size) {
+      filteredSchemas = filteredSchemas.filter(
+        (toolSchema) => !lockedOffToolNames.has(toolSchema.name as string),
+      );
     }
 
     return this._formatToolDescriptions(filteredSchemas);

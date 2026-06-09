@@ -7,6 +7,7 @@ import {
   ORCHESTRATOR_ONLY_TOOLS,
 } from "../OrchestratorPrompt.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
+import { resolveLockedOffToolNames } from "../../utils/resolveLockedOffToolNames.ts";
 import SettingsService from "../SettingsService.ts";
 import { AGENT_IDS, DOMAINS, DEFAULT_TOPOLOGY, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
 
@@ -38,8 +39,8 @@ export default class SystemPromptAssembler {
     return this.directoryFormatter.fetchDirectoryTree();
   }
 
-  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string, resolvedToolNames?: string[]): string {
-    return this.docFormatter.buildToolDescriptions(enabledTools, agentId, defaultTopology, resolvedToolNames);
+  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string, resolvedToolNames?: string[], lockedOffToolNames?: Set<string>): string {
+    return this.docFormatter.buildToolDescriptions(enabledTools, agentId, defaultTopology, resolvedToolNames, lockedOffToolNames);
   }
 
   async assemble(context: AssemblerContext) {
@@ -133,14 +134,19 @@ export default class SystemPromptAssembler {
 
     // ── 4. Enabled Tools (domain-grouped) ──────────────────────
     {
-      const toolDescriptions = this.buildToolDescriptions(context.enabledTools, agentId, defaultTopology, context.resolvedToolNames);
+      const lockedOffToolNames = await resolveLockedOffToolNames();
+      const toolDescriptions = this.buildToolDescriptions(context.enabledTools, agentId, defaultTopology, context.resolvedToolNames, lockedOffToolNames);
       if (toolDescriptions) {
         let count: number;
         if (context.resolvedToolNames?.length) {
-          count = context.resolvedToolNames.length;
+          count = lockedOffToolNames.size > 0
+            ? context.resolvedToolNames.filter((toolName) => !lockedOffToolNames.has(toolName)).length
+            : context.resolvedToolNames.length;
         } else {
           const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
-          count = schemas.length;
+          count = lockedOffToolNames.size > 0
+            ? schemas.filter((toolSchema) => !lockedOffToolNames.has(toolSchema.name as string)).length
+            : schemas.length;
           if (context.enabledTools) {
             const hasPrefixed = context.enabledTools.some(
               (enabledTool) => enabledTool.startsWith("domain:") || enabledTool.startsWith("domainKey:"),
@@ -166,6 +172,12 @@ export default class SystemPromptAssembler {
                   (toolSchema) => !disabledSet.has(toolSchema.name as string) || enabledSet.has(toolSchema.name as string),
                 );
               }
+            }
+
+            if (lockedOffToolNames.size > 0) {
+              filteredSchemas = filteredSchemas.filter(
+                (toolSchema) => !lockedOffToolNames.has(toolSchema.name as string),
+              );
             }
 
             count = filteredSchemas.length;

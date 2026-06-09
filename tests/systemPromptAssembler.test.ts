@@ -15,6 +15,7 @@
 // ────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 // ── Mock tool schemas (simulates tools-api + coordinator tools) ────────
 
@@ -54,6 +55,78 @@ const MOCK_TOOLS_API_SCHEMAS = [
     domainKey: "web",
     labels: ["coding", "web"],
     endpoint: { path: "/web/search" },
+  },
+  {
+    name: TOOL_NAMES.UPSERT_MEMORY,
+    description: "Upsert a memory",
+    parameters: { type: "object", properties: {} },
+    domain: "Memory",
+    domainKey: "memory",
+    labels: ["memory"],
+    endpoint: { method: "POST", path: "/memory/upsert" },
+  },
+  {
+    name: TOOL_NAMES.EXTRACT_MEMORIES,
+    description: "Extract memories from conversation",
+    parameters: { type: "object", properties: {} },
+    domain: "Memory",
+    domainKey: "memory",
+    labels: ["memory"],
+    endpoint: { method: "POST", path: "/memory/extract" },
+  },
+  {
+    name: TOOL_NAMES.CONSOLIDATE_MEMORIES,
+    description: "Consolidate similar memories",
+    parameters: { type: "object", properties: {} },
+    domain: "Memory",
+    domainKey: "memory",
+    labels: ["memory"],
+    endpoint: { method: "POST", path: "/memory/consolidate" },
+  },
+  {
+    name: TOOL_NAMES.SEARCH_MEMORIES,
+    description: "Search memories by similarity",
+    parameters: { type: "object", properties: {} },
+    domain: "Memory",
+    domainKey: "memory",
+    labels: ["memory"],
+    endpoint: { method: "POST", path: "/memory/search" },
+  },
+  {
+    name: TOOL_NAMES.GENERATE_IMAGE,
+    description: "Generate an image from text",
+    parameters: { type: "object", properties: {} },
+    domain: "Creative",
+    domainKey: "creative",
+    labels: ["creative"],
+    endpoint: { method: "POST", path: "/image/generate" },
+  },
+  {
+    name: TOOL_NAMES.DESCRIBE_IMAGE,
+    description: "Describe an image with vision",
+    parameters: { type: "object", properties: {} },
+    domain: "Creative",
+    domainKey: "creative",
+    labels: ["creative"],
+    endpoint: { method: "POST", path: "/image/describe" },
+  },
+  {
+    name: TOOL_NAMES.SYNTHESIZE_SPEECH,
+    description: "Convert text to speech audio",
+    parameters: { type: "object", properties: {} },
+    domain: "Audio",
+    domainKey: "audio",
+    labels: ["audio"],
+    endpoint: { method: "POST", path: "/audio/tts" },
+  },
+  {
+    name: TOOL_NAMES.TRANSCRIBE_AUDIO,
+    description: "Transcribe audio to text",
+    parameters: { type: "object", properties: {} },
+    domain: "Audio",
+    domainKey: "audio",
+    labels: ["audio"],
+    endpoint: { method: "POST", path: "/audio/stt" },
   },
 ];
 
@@ -185,9 +258,33 @@ vi.mock("../src/services/OrchestratorPrompt.ts", () => ({
 
 // ── Mock SettingsService ─────────────────────────────────────────────
 
+const MOCK_SETTINGS_SECTIONS: Record<string, Record<string, unknown>> = {
+  agents: { topology: "hierarchical" },
+  memory: {
+    extractionProvider: "",
+    extractionModel: "",
+    consolidationProvider: "",
+    consolidationModel: "",
+    embeddingProvider: "",
+    embeddingModel: "",
+  },
+  creative: {
+    imageProvider: "",
+    imageModel: "",
+    visionProvider: "",
+    visionModel: "",
+    textToSpeechProvider: "",
+    textToSpeechModel: "",
+    speechToTextProvider: "",
+    speechToTextModel: "",
+  },
+};
+
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
-    getSection: vi.fn().mockResolvedValue({ topology: "hierarchical" }),
+    getSection: vi.fn((section: string) =>
+      Promise.resolve(MOCK_SETTINGS_SECTIONS[section] || {}),
+    ),
   },
 }));
 
@@ -765,6 +862,163 @@ describe("SystemPromptAssembler", () => {
       const userMessage = context.messages.find((message) => message.role === "user");
       const systemContextOccurrences = (userMessage?.content?.match(/\[System Context\]/g) || []).length;
       expect(systemContextOccurrences).toBe(1);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────
+  // Locked-Off Tool Count Parity
+  // ──────────────────────────────────────────────────────────
+
+  describe("locked-off tool exclusion from system prompt", () => {
+    it("excludes unconfigured memory tools from system prompt count when models are not set", async () => {
+      MOCK_SETTINGS_SECTIONS.memory = {
+        extractionProvider: "",
+        extractionModel: "",
+        consolidationProvider: "",
+        consolidationModel: "",
+        embeddingProvider: "",
+        embeddingModel: "",
+      };
+
+      const assembler = createAssembler();
+      const { prompt } = await assembler.assemble({
+        agent: "CODING",
+        project: "prism-chat",
+        messages: [{ role: "user", content: "Hello" }],
+      });
+
+      expect(prompt).not.toContain(`### ${TOOL_NAMES.UPSERT_MEMORY}`);
+      expect(prompt).not.toContain(`### ${TOOL_NAMES.EXTRACT_MEMORIES}`);
+      expect(prompt).not.toContain(`### ${TOOL_NAMES.CONSOLIDATE_MEMORIES}`);
+      expect(prompt).not.toContain(`### ${TOOL_NAMES.SEARCH_MEMORIES}`);
+    });
+
+    it("excludes unconfigured creative tools from system prompt when models are not set", async () => {
+      MOCK_SETTINGS_SECTIONS.creative = {
+        imageProvider: "",
+        imageModel: "",
+        visionProvider: "",
+        visionModel: "",
+        textToSpeechProvider: "",
+        textToSpeechModel: "",
+        speechToTextProvider: "",
+        speechToTextModel: "",
+      };
+
+      const assembler = createAssembler();
+      const { prompt } = await assembler.assemble({
+        agent: "CODING",
+        project: "prism-chat",
+        messages: [{ role: "user", content: "Hello" }],
+      });
+
+      expect(prompt).not.toContain(`### ${TOOL_NAMES.GENERATE_IMAGE}`);
+      expect(prompt).not.toContain(`### ${TOOL_NAMES.DESCRIBE_IMAGE}`);
+      expect(prompt).not.toContain(`### ${TOOL_NAMES.SYNTHESIZE_SPEECH}`);
+      expect(prompt).not.toContain(`### ${TOOL_NAMES.TRANSCRIBE_AUDIO}`);
+    });
+
+    it("includes memory tools in system prompt when all memory models are configured", async () => {
+      MOCK_SETTINGS_SECTIONS.memory = {
+        extractionProvider: "openai",
+        extractionModel: "gpt-4o",
+        consolidationProvider: "openai",
+        consolidationModel: "gpt-4o",
+        embeddingProvider: "openai",
+        embeddingModel: "text-embedding-3-small",
+      };
+
+      const assembler = createAssembler();
+      const { prompt } = await assembler.assemble({
+        agent: "CODING",
+        project: "prism-chat",
+        messages: [{ role: "user", content: "Hello" }],
+      });
+
+      expect(prompt).toContain(`### ${TOOL_NAMES.UPSERT_MEMORY}`);
+    });
+
+    it("includes creative tools in system prompt when image/vision models are configured", async () => {
+      MOCK_SETTINGS_SECTIONS.creative = {
+        imageProvider: "google",
+        imageModel: "gemini-image",
+        visionProvider: "google",
+        visionModel: "gemini-flash",
+        textToSpeechProvider: "elevenlabs",
+        textToSpeechModel: "eleven_turbo_v2",
+        speechToTextProvider: "openai",
+        speechToTextModel: "whisper-1",
+      };
+
+      const assembler = createAssembler();
+      const { prompt } = await assembler.assemble({
+        agent: "CODING",
+        project: "prism-chat",
+        messages: [{ role: "user", content: "Hello" }],
+      });
+
+      expect(prompt).toContain(`### ${TOOL_NAMES.GENERATE_IMAGE}`);
+      expect(prompt).toContain(`### ${TOOL_NAMES.DESCRIBE_IMAGE}`);
+    });
+
+    it("system prompt Enabled Tools count matches actual tool description sections", async () => {
+      MOCK_SETTINGS_SECTIONS.memory = {
+        extractionProvider: "",
+        extractionModel: "",
+        consolidationProvider: "",
+        consolidationModel: "",
+        embeddingProvider: "",
+        embeddingModel: "",
+      };
+      MOCK_SETTINGS_SECTIONS.creative = {
+        imageProvider: "",
+        imageModel: "",
+        visionProvider: "",
+        visionModel: "",
+        textToSpeechProvider: "",
+        textToSpeechModel: "",
+        speechToTextProvider: "",
+        speechToTextModel: "",
+      };
+
+      const assembler = createAssembler();
+      const { prompt } = await assembler.assemble({
+        agent: "CODING",
+        project: "prism-chat",
+        messages: [{ role: "user", content: "Hello" }],
+      });
+
+      const countMatch = prompt.match(/## Enabled Tools \((\d+)\)/);
+      expect(countMatch).toBeTruthy();
+      const declaredCount = parseInt(countMatch![1], 10);
+
+      const toolDescriptionSections = prompt.match(/### [a-z_]+/g) || [];
+      const actualToolCount = toolDescriptionSections.length;
+
+      expect(declaredCount).toBe(actualToolCount);
+    });
+
+    it("partially configured memory: only locks off tools missing their specific model", async () => {
+      MOCK_SETTINGS_SECTIONS.memory = {
+        extractionProvider: "openai",
+        extractionModel: "gpt-4o",
+        consolidationProvider: "",
+        consolidationModel: "",
+        embeddingProvider: "openai",
+        embeddingModel: "text-embedding-3-small",
+      };
+
+      const assembler = createAssembler();
+      const { prompt } = await assembler.assemble({
+        agent: "CODING",
+        project: "prism-chat",
+        messages: [{ role: "user", content: "Hello" }],
+      });
+
+      expect(prompt).not.toContain(`### ${TOOL_NAMES.UPSERT_MEMORY}`);
+      expect(prompt).toContain(`### ${TOOL_NAMES.EXTRACT_MEMORIES}`);
+      expect(prompt).not.toContain(`### ${TOOL_NAMES.CONSOLIDATE_MEMORIES}`);
+      expect(prompt).toContain(`### ${TOOL_NAMES.SEARCH_MEMORIES}`);
     });
   });
 });
