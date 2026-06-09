@@ -191,13 +191,12 @@ export default class AgenticToolResolver {
       finalTools = finalTools.filter(
         (tool) => {
           if (enabledSet.has(tool.name)) return true;
+          if (tool.name.startsWith("mcp__")) return true;
+          if (isCoreToolsLocked && CORE_AGENTIC_TOOLS.has(tool.name)) return true;
+          if (shouldBypassOrchestratorTools && CORE_ORCHESTRATOR_TOOLS.has(tool.name)) return true;
+          if (PRISM_LOCAL_TOOL_NAMES.has(tool.name)) return true;
           if (clientDisabledSet?.has(tool.name)) return false;
-          return (
-            tool.name.startsWith("mcp__") ||
-            (isCoreToolsLocked && CORE_AGENTIC_TOOLS.has(tool.name)) ||
-            (shouldBypassOrchestratorTools && CORE_ORCHESTRATOR_TOOLS.has(tool.name)) ||
-            PRISM_LOCAL_TOOL_NAMES.has(tool.name)
-          );
+          return false;
         },
       );
 
