@@ -123,8 +123,9 @@ export function calculateAudioCost(
 
   // Strategy 1: per-minute pricing
   if (pricing.perMinute && usage.durationSeconds != null) {
+    const durationSeconds = Math.max(0, usage.durationSeconds);
     return parseFloat(
-      ((usage.durationSeconds / 60) * pricing.perMinute).toFixed(8),
+      ((durationSeconds / 60) * pricing.perMinute).toFixed(8),
     );
   }
 

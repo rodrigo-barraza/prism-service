@@ -38,11 +38,13 @@ const enableTools = {
     name: TOOL_NAMES.ENABLE_TOOLS,
     emoji: ["🔓", "🧰"],
     description:
-      "Dynamically enable additional tools for this session. Use after `search_tools` discovers " +
-      "tools you need. Accepts exact tool names (e.g. \"get_weather\") or domain prefixes " +
-      "(e.g. \"domain:Finance\", \"domainKey:health\") to activate an entire domain at once. " +
-      "The newly enabled tools become available on the NEXT iteration — you do not need to call " +
-      "them in the same turn. Core cognitive tools (memory, tasks, planning) are always available.",
+      "REQUIRED after search_tools: Activate tools discovered by search_tools so you can call them. " +
+      "You MUST call this after search_tools returns results where isEnabled is false — without " +
+      "calling enable_tools first, discovered tools CANNOT be used. Accepts exact tool names " +
+      "(e.g. \"get_weather\") or domain prefixes (e.g. \"domain:Finance\", \"domainKey:health\") to " +
+      "activate an entire domain at once. The newly enabled tools become available on the NEXT " +
+      "iteration — you do not need to call them in the same turn. Core cognitive tools (memory, " +
+      "tasks, planning) are always available.",
     parameters: {
       type: "object",
       properties: {
