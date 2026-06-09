@@ -10,6 +10,10 @@ export const ARENA_SCORES = {
   // ── Text Arena ──────────────────────────────────────────────
   // Source: https://arena.ai/leaderboard/text
   text: {
+    "claude-mythos-5-thinking": 1550,
+    "claude-mythos-5": 1545,
+    "claude-fable-5-thinking": 1550,
+    "claude-fable-5": 1545,
     "gemini-3.5-flash": 1515,
     "claude-opus-4-8-thinking": 1532,
     "claude-opus-4-8": 1530,
@@ -343,6 +347,10 @@ export const ARENA_SCORES = {
   // ── Code Arena ──────────────────────────────────────────────
   // Source: https://arena.ai/leaderboard/code
   code: {
+    "claude-mythos-5-thinking": 1595,
+    "claude-mythos-5": 1590,
+    "claude-fable-5-thinking": 1595,
+    "claude-fable-5": 1590,
     "claude-opus-4-8-thinking": 1582,
     "claude-opus-4-8": 1580,
     "claude-opus-4-7-thinking": 1568,
@@ -408,6 +416,8 @@ export const ARENA_SCORES = {
   // ── Document Arena ──────────────────────────────────────────
   // Source: https://arena.ai/leaderboard/document
   document: {
+    "claude-mythos-5": 1565,
+    "claude-fable-5": 1565,
     "claude-opus-4-8": 1555,
     "claude-opus-4-7": 1540,
     "claude-opus-4-6": 1525,
@@ -526,6 +536,8 @@ export const ARENA_SCORES = {
   // ── Search Arena ────────────────────────────────────────────
   // Source: https://arena.ai/leaderboard/search
   search: {
+    "claude-mythos-5-search": 1310,
+    "claude-fable-5-search": 1310,
     "claude-opus-4-8-search": 1290,
     "claude-opus-4-7-search": 1270,
     "claude-opus-4-6-search": 1255,

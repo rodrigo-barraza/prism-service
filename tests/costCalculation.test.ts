@@ -652,6 +652,18 @@ describe("Pricing sanity checks against official published rates", () => {
         expect(m.pricing.outputPerMillion).toBe(25.0);
     });
 
+    it("Fable 5: $10.00 in / $50.00 out", () => {
+        const model = getModelByName("claude-fable-5");
+        expect(model.pricing.inputPerMillion).toBe(10.0);
+        expect(model.pricing.outputPerMillion).toBe(50.0);
+    });
+
+    it("Mythos 5: $10.00 in / $50.00 out", () => {
+        const model = getModelByName("claude-mythos-5");
+        expect(model.pricing.inputPerMillion).toBe(10.0);
+        expect(model.pricing.outputPerMillion).toBe(50.0);
+    });
+
     // ── OpenAI — Embeddings ──────────────────────────────────────
 
     it("text-embedding-3-small: $0.02 in", () => {
