@@ -24,8 +24,8 @@ const MOCK_TOOLS_API_SCHEMAS = [
     name: "read_file",
     description: "Read a file",
     parameters: { type: "object", properties: {} },
-    domain: "Workspace",
-    domainKey: "workspace",
+    domain: "Core Workspace Tools",
+    domainKey: "core_workspace",
     labels: ["coding"],
     endpoint: { method: "POST", path: "/agentic/file/read" },
   },
@@ -33,8 +33,8 @@ const MOCK_TOOLS_API_SCHEMAS = [
     name: "write_file",
     description: "Write a file",
     parameters: { type: "object", properties: {} },
-    domain: "Workspace",
-    domainKey: "workspace",
+    domain: "Core Workspace Tools",
+    domainKey: "core_workspace",
     labels: ["coding"],
     endpoint: { method: "POST", path: "/agentic/file/write" },
   },
@@ -188,6 +188,8 @@ const ALL_AI_SCHEMAS = [
 
 // ── Mock ToolOrchestratorService ──────────────────────────────────────
 
+let mockIsWorkspaceAgentConnected = true;
+
 vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
   default: {
     ensureSchemas: vi.fn().mockResolvedValue(undefined),
@@ -195,6 +197,7 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
     getClientToolSchemas: vi.fn(() => ALL_CLIENT_SCHEMAS),
     getWorkspaceRoot: vi.fn(() => "/home/rodrigo/development"),
     getToolEmoji: vi.fn().mockReturnValue(null),
+    isWorkspaceAgentConnected: vi.fn(() => Promise.resolve(mockIsWorkspaceAgentConnected)),
   },
 }));
 
@@ -1019,6 +1022,33 @@ describe("SystemPromptAssembler", () => {
       expect(prompt).toContain(`### ${TOOL_NAMES.EXTRACT_MEMORIES}`);
       expect(prompt).not.toContain(`### ${TOOL_NAMES.CONSOLIDATE_MEMORIES}`);
       expect(prompt).toContain(`### ${TOOL_NAMES.SEARCH_MEMORIES}`);
+    });
+
+    it("workspace-down: excludes all workspace-domain tools from count and descriptions", async () => {
+      mockIsWorkspaceAgentConnected = false;
+
+      const assembler = createAssembler();
+      const { prompt } = await assembler.assemble({
+        agent: "CODING",
+        project: "prism-chat",
+        messages: [{ role: "user", content: "Hello" }],
+      });
+
+      expect(prompt).not.toContain("### read_file");
+      expect(prompt).not.toContain("### write_file");
+
+      expect(prompt).toContain("### search_web");
+      expect(prompt).toContain("### think");
+
+      const countMatch = prompt.match(/## Enabled Tools \((\d+)\)/);
+      expect(countMatch).toBeTruthy();
+      const declaredCount = parseInt(countMatch![1], 10);
+
+      const toolDescriptionSections = prompt.match(/### [a-z_]+/g) || [];
+      const actualToolCount = toolDescriptionSections.length;
+      expect(declaredCount).toBe(actualToolCount);
+
+      mockIsWorkspaceAgentConnected = true;
     });
   });
 });
