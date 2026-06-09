@@ -1,7 +1,9 @@
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import AgentPersonaRegistry from "../AgentPersonaRegistry.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
-import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { DOMAINS, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
+
+const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 
 export class ToolDocFormatter {
   /**
@@ -39,7 +41,8 @@ export class ToolDocFormatter {
         enabledSet.has(toolSchema.name as string) ||
         (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
         (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_WORKSPACE.displayName ||
-        (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_ORCHESTRATOR.displayName
+        (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_ORCHESTRATOR.displayName ||
+        CORE_AGENTIC_TOOLS.has(toolSchema.name as string)
     );
 
     if (agentId) {
