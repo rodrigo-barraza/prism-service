@@ -397,33 +397,6 @@ describe("AgenticLoopService", () => {
     expect(SessionGenerationTracker.cleanup).toHaveBeenCalledWith("worker-456");
   });
 
-  it("should load custom tools from MongoDB and pass them to the LLM", async () => {
-    // Override Mongo mock for this test
-    const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
-    MongoWrapper.getDb.mockReturnValueOnce({
-      collection: () => ({
-        find: () => ({
-          toArray: async () => [{
-            name: "custom_db_tool",
-            description: "A tool from the database",
-            parameters: [{ name: "param1", type: "string", required: true }]
-          }]
-        })
-      })
-    });
-
-    // Make sure we just use the dynamic tools 
-    mockContext.options.enabledTools = null;
-
-    await AgenticLoopService.runAgenticLoop(mockContext);
-
-    const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
-    const passTools = callArgs.tools;
-    
-    expect(passTools.find(tool => tool.name === "custom_db_tool")).toBeDefined();
-    expect(passTools.find(tool => tool.name === "custom_db_tool").description).toBe("A tool from the database");
-  });
-
   it("should resolve disabledTools mode correctly", async () => {
     mockContext.options.enabledTools = null;
     mockContext.options.disabledTools = ["generate_image"];

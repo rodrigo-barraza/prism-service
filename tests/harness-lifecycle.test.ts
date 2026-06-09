@@ -17,7 +17,6 @@ import {
 // ─── Missing Lifecycle Imports ─────────────────────────────────
 import { runExhaustionRecoveryPass } from "../src/services/harnesses/lifecycle/ExhaustionRecovery.ts";
 import { executeToolBatch, executeToolSingle } from "../src/services/harnesses/lifecycle/ToolExecutor.ts";
-import { reloadIfCustomToolsMutated } from "../src/services/harnesses/lifecycle/ToolHotReloader.ts";
 import { createStandardHooks } from "../src/services/harnesses/lifecycle/HookInitializer.ts";
 
 import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
@@ -603,25 +602,6 @@ describe("ToolExecutor", () => {
     } as unknown as AgenticLoopState;
   });
 
-  it("should run custom tools when found in customToolMap", async () => {
-    const customToolDef = { name: "my_custom_tool" };
-    mockTools.customToolMap.set("my_custom_tool", customToolDef);
-    vi.mocked(ToolOrchestratorService.executeCustomTool).mockResolvedValue({ success: true, content: "custom result" });
-
-    const toolCalls = [{ name: "my_custom_tool", id: "call-1", args: { x: 1 } }];
-    const results = await executeToolBatch(toolCalls, mockContext, mockTools, mockHooks, mockState);
-
-    expect(mockHooks.run).toHaveBeenNthCalledWith(1, "beforeToolCall", toolCalls[0], mockContext);
-    expect(ToolOrchestratorService.executeCustomTool).toHaveBeenCalledWith(customToolDef, { x: 1 });
-    expect(mockHooks.run).toHaveBeenNthCalledWith(2, "afterToolCall", toolCalls[0], { success: true, content: "custom result" }, mockContext);
-    expect(results).toHaveLength(1);
-    expect(results[0]).toEqual({
-      name: "my_custom_tool",
-      id: "call-1",
-      result: { success: true, content: "custom result" },
-      durationMs: expect.any(Number),
-    });
-  });
 
   it("should run streaming tools when they are streamable", async () => {
     vi.mocked(ToolOrchestratorService.isStreamable).mockReturnValueOnce(true);
@@ -672,79 +652,6 @@ describe("ToolExecutor", () => {
   });
 });
 
-describe("ToolHotReloader", () => {
-  it("should return false early if no custom tool mutations are present", async () => {
-    const toolCalls = [{ name: "read_file", id: "call-1", args: {} }];
-    const tools: any = { customToolMap: new Map(), finalTools: [] };
-    const result = await reloadIfCustomToolsMutated(toolCalls, tools, "proj", "user", vi.fn());
-
-    expect(result).toBe(false);
-  });
-
-  it("should reload custom tools when a mutation occurs", async () => {
-    const toolCalls = [{ name: "create_custom_tool", id: "call-1", args: {} }];
-    const tools: any = {
-      customToolMap: new Map([["old_tool", { name: "old_tool" }]]),
-      finalTools: [
-        { name: "read_file", _isCustom: false },
-        { name: "old_tool", _isCustom: true },
-      ],
-    };
-
-    const mockToArray = vi.fn().mockResolvedValue([
-      {
-        name: "new_tool",
-        description: "A fresh tool",
-        parameters: [
-          { name: "param1", type: "string", required: true, description: "p1" },
-          { name: "param2", type: "number", required: false, enum: [1, 2] },
-        ],
-      },
-    ]);
-    const mockFind = vi.fn().mockReturnValue({ toArray: mockToArray });
-    const mockCollection = vi.fn().mockReturnValue({ find: mockFind });
-    const mockDb = { collection: mockCollection };
-
-    (MongoWrapper.getDb as any).mockReturnValue(mockDb as any);
-
-    const emit = vi.fn();
-    const result = await reloadIfCustomToolsMutated(toolCalls, tools, "proj", "user", emit);
-
-    expect(result).toBe(true);
-    expect(MongoWrapper.getDb).toHaveBeenCalled();
-    expect(mockCollection).toHaveBeenCalledWith("custom_tools");
-    expect(mockFind).toHaveBeenCalledWith({ project: "proj", username: "user", enabled: true });
-
-    expect(tools.customToolMap.has("old_tool")).toBe(false);
-    expect(tools.customToolMap.has("new_tool")).toBe(true);
-
-    expect(tools.finalTools).toHaveLength(2);
-    expect(tools.finalTools[0].name).toBe("read_file");
-    expect(tools.finalTools[1].name).toBe("new_tool");
-    expect(tools.finalTools[1].parameters.properties.param1).toEqual({ type: "string", description: "p1" });
-    expect(tools.finalTools[1].parameters.properties.param2).toEqual({ type: "number", description: "", enum: [1, 2] });
-    expect(tools.finalTools[1].parameters.required).toEqual(["param1"]);
-
-    expect(emit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "status",
-        message: "custom_tools_updated",
-      })
-    );
-  });
-
-  it("should handle MongoDB error by returning false", async () => {
-    const toolCalls = [{ name: "create_custom_tool", id: "call-1", args: {} }];
-    const tools: any = { customToolMap: new Map(), finalTools: [] };
-
-    (MongoWrapper.getDb as any).mockImplementationOnce(() => {
-      throw new Error("DB Down");
-    });
-
-    const result = await reloadIfCustomToolsMutated(toolCalls, tools, "proj", "user", vi.fn());
-    expect(result).toBe(false);
-  });
-});
 
 describe("HookInitializer", () => {
   it("should initialize standard hooks with default options", () => {
