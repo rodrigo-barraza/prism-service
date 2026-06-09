@@ -526,12 +526,22 @@ const anthropicProvider = {
         options.thinkingBudget ||
         options.reasoningEffort)
     ) {
-      const budget = options.thinkingBudget
-        ? parseInt(String(options.thinkingBudget))
-        : (options.reasoningEffort ? EFFORT_BUDGET_MAP[options.reasoningEffort] : undefined) || EFFORT_BUDGET_MAP.high;
-      payload.thinking = { type: "enabled", budget_tokens: budget };
-      if ((payload.max_tokens as number) <= budget) {
-        payload.max_tokens = budget + 1024;
+      const isAdaptiveThinking = (modelDefinition as Record<string, unknown> | null)?.adaptiveThinking === true;
+      if (isAdaptiveThinking) {
+        // Fable 5 / Mythos 5: adaptive thinking is always-on, controlled via effort
+        payload.thinking = { type: "adaptive" };
+        if (options.reasoningEffort) {
+          payload.effort = options.reasoningEffort;
+        }
+      } else {
+        // Legacy models (Opus 4.x, Sonnet 4.x): manual extended thinking with budget_tokens
+        const budget = options.thinkingBudget
+          ? parseInt(String(options.thinkingBudget))
+          : (options.reasoningEffort ? EFFORT_BUDGET_MAP[options.reasoningEffort] : undefined) || EFFORT_BUDGET_MAP.high;
+        payload.thinking = { type: "enabled", budget_tokens: budget };
+        if ((payload.max_tokens as number) <= budget) {
+          payload.max_tokens = budget + 1024;
+        }
       }
       // Anthropic requires temperature=1 and top_p/top_k unset when thinking is enabled
       payload.temperature = 1;
@@ -717,12 +727,22 @@ const anthropicProvider = {
           options.thinkingBudget ||
           options.reasoningEffort)
       ) {
-        const budget = options.thinkingBudget
-          ? parseInt(String(options.thinkingBudget))
-          : (options.reasoningEffort ? EFFORT_BUDGET_MAP[options.reasoningEffort] : undefined) || EFFORT_BUDGET_MAP.high;
-        streamPayload.thinking = { type: "enabled", budget_tokens: budget };
-        if ((streamPayload.max_tokens as number) <= budget) {
-          streamPayload.max_tokens = budget + 1024;
+        const isAdaptiveThinking = (modelDefinition as Record<string, unknown> | null)?.adaptiveThinking === true;
+        if (isAdaptiveThinking) {
+          // Fable 5 / Mythos 5: adaptive thinking is always-on, controlled via effort
+          streamPayload.thinking = { type: "adaptive" };
+          if (options.reasoningEffort) {
+            streamPayload.effort = options.reasoningEffort;
+          }
+        } else {
+          // Legacy models (Opus 4.x, Sonnet 4.x): manual extended thinking with budget_tokens
+          const budget = options.thinkingBudget
+            ? parseInt(String(options.thinkingBudget))
+            : (options.reasoningEffort ? EFFORT_BUDGET_MAP[options.reasoningEffort] : undefined) || EFFORT_BUDGET_MAP.high;
+          streamPayload.thinking = { type: "enabled", budget_tokens: budget };
+          if ((streamPayload.max_tokens as number) <= budget) {
+            streamPayload.max_tokens = budget + 1024;
+          }
         }
         // Anthropic requires temperature=1 and top_p/top_k unset when thinking is enabled
         streamPayload.temperature = 1;
