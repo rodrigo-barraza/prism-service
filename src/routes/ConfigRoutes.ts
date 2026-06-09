@@ -1,4 +1,6 @@
-import { DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { DEFAULT_TOPOLOGY, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
+
+const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response } from "express";
 import {
@@ -376,21 +378,26 @@ router.get(
       if (!isWildcard) {
         const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
 
-        // System tools auto-included unless core tools are unlocked
+        // Core tool bypass: system:true tools AND CORE_AGENTIC_TOOLS members
+        // This must match AgenticToolResolver.resolve() bypass logic exactly
         const isCoreToolsLocked = persona?.coreToolsLocked ?? true;
-        let systemToolNames: string[] = isCoreToolsLocked
-          ? clientSchemas.filter((tool) => tool.system === true).map((tool) => tool.name)
+        let coreBypassToolNames: string[] = isCoreToolsLocked
+          ? clientSchemas
+              .filter((tool) =>
+                tool.system === true || CORE_AGENTIC_TOOLS.has(tool.name),
+              )
+              .map((tool) => tool.name)
           : [];
 
-        // Apply persona blockedTools denylist to system tools (enabledSet protects)
+        // Apply persona blockedTools denylist to core bypass tools (enabledSet protects)
         if (persona?.blockedTools?.length) {
           const disabledSet = resolveToolEntriesToSet(persona.blockedTools, clientSchemas);
-          systemToolNames = systemToolNames.filter(
+          coreBypassToolNames = coreBypassToolNames.filter(
             (toolName) => !disabledSet.has(toolName) || resolvedTools.has(toolName),
           );
         }
 
-        const unionSet = new Set([...finalToolNames, ...systemToolNames]);
+        const unionSet = new Set([...finalToolNames, ...coreBypassToolNames]);
         finalToolsCount = unionSet.size;
         finalToolNames = [...unionSet];
       }
@@ -438,7 +445,9 @@ router.get(
         // null = wildcard ("*") → return all schemas unfiltered
         if (enabledSet !== null) {
           let filteredSchemas = schemas.filter(
-            (tool) => enabledSet.has(tool.name) || (isCoreToolsLocked && tool.system === true),
+            (tool) =>
+              enabledSet.has(tool.name) ||
+              (isCoreToolsLocked && (tool.system === true || CORE_AGENTIC_TOOLS.has(tool.name))),
           );
 
           // Apply persona blockedTools denylist (enabledSet protects)

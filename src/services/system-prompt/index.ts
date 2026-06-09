@@ -8,7 +8,9 @@ import {
 } from "../OrchestratorPrompt.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import SettingsService from "../SettingsService.ts";
-import { AGENT_IDS, DOMAINS, DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { AGENT_IDS, DOMAINS, DEFAULT_TOPOLOGY, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
+
+const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 
 import { DirectoryTreeFormatter } from "./DirectoryTreeFormatter.ts";
 import { ToolDocFormatter } from "./ToolDocFormatter.ts";
@@ -152,7 +154,8 @@ export default class SystemPromptAssembler {
                 enabledSet.has(toolSchema.name as string) ||
                 (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
                 (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_WORKSPACE.displayName ||
-                (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_ORCHESTRATOR.displayName
+                (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_ORCHESTRATOR.displayName ||
+                CORE_AGENTIC_TOOLS.has(toolSchema.name as string)
             );
 
             if (agentId) {
