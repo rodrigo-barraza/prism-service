@@ -40,6 +40,7 @@ export default {
 
   schema: {
     name: TOOL_NAMES.WRITE_TODO,
+    emoji: ["📝", "📌"],
     description:
       "Write or update a persistent TODO checklist for the current project. " +
       "Maintains a structured list of items with completion status. " +

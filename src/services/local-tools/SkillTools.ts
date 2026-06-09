@@ -40,6 +40,7 @@ const createSkill = {
   name: TOOL_NAMES.CREATE_SKILL,
   schema: {
     name: TOOL_NAMES.CREATE_SKILL,
+    emoji: ["🪄", "🛠️"],
     description:
       "Create a reusable workflow skill. Skills are stored prompt templates with variable " +
       "interpolation ({{variable}}) that can be invoked by name. Use this to capture " +
@@ -99,6 +100,7 @@ const executeSkill = {
   name: TOOL_NAMES.EXECUTE_SKILL,
   schema: {
     name: TOOL_NAMES.EXECUTE_SKILL,
+    emoji: ["⚡", "🪄"],
     description:
       "Execute a previously created skill by its ID. The skill's prompt template is " +
       "interpolated with the provided variables and executed as an inline agentic task. " +
@@ -156,6 +158,7 @@ const listSkills = {
   name: TOOL_NAMES.LIST_SKILLS,
   schema: {
     name: TOOL_NAMES.LIST_SKILLS,
+    emoji: ["📋", "🪄"],
     description:
       "List all available skills. Skills are reusable workflow templates created with create_skill.",
     parameters: {
@@ -181,6 +184,7 @@ const deleteSkill = {
   name: TOOL_NAMES.DELETE_SKILL,
   schema: {
     name: TOOL_NAMES.DELETE_SKILL,
+    emoji: ["🗑️", "🪄"],
     description: "Delete a skill by its ID.",
     parameters: {
       type: "object",

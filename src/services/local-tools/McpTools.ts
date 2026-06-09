@@ -23,6 +23,7 @@ const listMcpResources = {
   name: TOOL_NAMES.LIST_MCP_RESOURCES,
   schema: {
     name: TOOL_NAMES.LIST_MCP_RESOURCES,
+    emoji: ["🔌", "📋"],
     description: "List available resources from a connected MCP server.",
     parameters: {
       type: "object",
@@ -74,6 +75,7 @@ const readMcpResource = {
   name: TOOL_NAMES.READ_MCP_RESOURCE,
   schema: {
     name: TOOL_NAMES.READ_MCP_RESOURCE,
+    emoji: ["🔌", "📄"],
     description:
       "Read a specific resource from a connected MCP server by its URI.",
     parameters: {
@@ -104,6 +106,7 @@ const mcpAuthenticate = {
   name: TOOL_NAMES.AUTHENTICATE_MCP_SERVER,
   schema: {
     name: TOOL_NAMES.AUTHENTICATE_MCP_SERVER,
+    emoji: ["🔌", "🔐"],
     description:
       "Authenticate with a connected MCP server by providing credentials.",
     parameters: {

@@ -10,6 +10,7 @@ export default {
 
   schema: {
     name: TOOL_NAMES.EXIT_PLAN_MODE,
+    emoji: ["🚀", "🧠"],
     description:
       "Exit planning mode and resume normal tool execution. Call this after you have " +
       "produced your plan and are ready to execute it with tools.",

@@ -10,6 +10,7 @@ export default {
 
   schema: {
     name: TOOL_NAMES.ENTER_PLAN_MODE,
+    emoji: ["📝", "🧠"],
     description:
       "Switch into planning mode. While in plan mode, you will not have access to any tools — " +
       "you can only output text. Use this to produce a structured implementation plan before " +

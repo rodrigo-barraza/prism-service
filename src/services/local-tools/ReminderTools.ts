@@ -16,6 +16,7 @@ const setTimer = {
   name: TOOL_NAMES.SET_TIMER,
   schema: {
     name: TOOL_NAMES.SET_TIMER,
+    emoji: ["⏰", "🔔"],
     description:
       "Set a one-shot timer or a recurring cron within this conversation that fires an instruction or prompt " +
       "back into this conversation after a duration. Use this to wait, sleep, yield, defer execution, " +
@@ -92,6 +93,7 @@ const setTimer = {
   name: TOOL_NAMES.LIST_TIMERS,
   schema: {
     name: TOOL_NAMES.LIST_TIMERS,
+    emoji: ["⏱️", "📋"],
     description: "List all active timers and recurring cron schedules for the current conversation.",
     parameters: {
       type: "object",
@@ -133,6 +135,7 @@ const cancelTimer = {
   name: TOOL_NAMES.CANCEL_TIMER,
   schema: {
     name: TOOL_NAMES.CANCEL_TIMER,
+    emoji: ["⏰", "❌"],
     description: "Cancel an active timer or recurring cron in the current conversation.",
     parameters: {
       type: "object",

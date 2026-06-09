@@ -185,8 +185,11 @@ const LOCAL_PROVIDERS = localInstances.map((inst) => {
 /**
  * GET /config
  * Returns the full catalog of providers, models, voices, and capabilities.
- * Cloud providers resolve instantly; local providers are excluded here
- * and served via GET /config/local-models for progressive loading.
+ *
+ * Query params:
+ *   ?includeLocal=true — Merge local provider models inline (3s timeout per
+ *     provider). Eliminates the need for a separate GET /config-local round-trip.
+ *     The recommendedDefault is re-validated against the merged model set.
  */
 router.get(
   "/",
@@ -203,6 +206,31 @@ router.get(
     // Filter to only available providers
     textToTextModels = filterByAvailableProviders(textToTextModels);
     textToImageModels = filterByAvailableProviders(textToImageModels);
+
+    // Optionally merge local provider models inline
+    const shouldIncludeLocal = _req.query.includeLocal === "true";
+    if (shouldIncludeLocal && localInstances.length > 0) {
+      try {
+        const localModels = (await LocalProviderGateway.discoverModels({
+          timeoutMs: 3000,
+          enrich: true,
+        })) as Record<string, ModelOptionEntry[]>;
+
+        for (const [instanceId, models] of Object.entries(localModels)) {
+          const enriched = { [instanceId]: models };
+          enrichModelsWithArenaScores(enriched);
+          const existing = textToTextModels[instanceId] || [];
+          const existingNames = new Set(existing.map((m) => m.name));
+          const merged = [...existing];
+          for (const model of enriched[instanceId]) {
+            if (!existingNames.has(model.name)) merged.push(model);
+          }
+          textToTextModels[instanceId] = merged;
+        }
+      } catch {
+        // Local providers are optional — fall back to cloud-only
+      }
+    }
 
     const availableProviderList = PROVIDER_LIST.filter((provider) =>
       AVAILABLE_PROVIDERS.has(provider),

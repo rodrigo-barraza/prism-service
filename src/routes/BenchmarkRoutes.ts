@@ -9,6 +9,7 @@ import { registerCleanup } from "../utils/CleanupRegistry.ts";
 import type { WithId, Document } from "mongodb";
 import type { TextAssertion } from "../types/benchmark.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { BENCHMARK_PRESETS } from "../data/benchmarkPresets.ts";
 
 const router = express.Router();
 
@@ -338,6 +339,12 @@ router.get("/models", (_req: Request, res: Response) => {
 router.get("/active-list", (_req: Request, res: Response) => {
   const activeIds = [...runStates.keys()];
   res.json({ activeIds });
+});
+
+// ─── GET /benchmark/presets — Return industry-standard benchmark presets ──
+
+router.get("/presets", (_req: Request, res: Response) => {
+  res.json({ presets: BENCHMARK_PRESETS, count: BENCHMARK_PRESETS.length });
 });
 
 // ─── POST /benchmark — Create a new benchmark test ──────────
