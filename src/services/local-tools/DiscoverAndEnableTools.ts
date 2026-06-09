@@ -4,12 +4,23 @@ import ToolContext from "../ToolContext.ts";
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import SettingsService from "../SettingsService.ts";
 
-interface DiscoverAndEnableContext {
-  agentSessionId?: string;
-  project?: string;
-  username?: string;
-  enabledTools?: string[];
-  [key: string]: unknown;
+import { InternalToolContext } from "./InternalToolRegistry.ts";
+
+export interface ToolMatch {
+  name: string;
+  isEnabled?: boolean;
+  description?: string;
+  emoji?: string[];
+  domain?: string;
+}
+
+export interface SearchToolsResult {
+  matches?: ToolMatch[];
+  total?: number;
+  query?: string | null;
+  domain?: string | null;
+  error?: string;
+  message?: string;
 }
 
 const TOOL_CONTEXT_KEY_DYNAMIC_ENABLED = "dynamicEnabledTools";
@@ -63,14 +74,14 @@ const discoverAndEnableTools = {
   domain: DOMAINS.CORE_HARNESS.displayName,
   labels: ["tools", "discovery", "activation", "meta"],
 
-  async execute(arguments_: Record<string, unknown>, context: DiscoverAndEnableContext) {
+  async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
     const sessionId = context.agentSessionId;
     if (!sessionId) {
       return { error: "No active agent session ID in context." };
     }
 
-    const query = (arguments_.query as string) || "";
-    const domain = arguments_.domain as string | undefined;
+    const query = typeof toolArguments.query === "string" ? toolArguments.query : "";
+    const domain = typeof toolArguments.domain === "string" ? toolArguments.domain : undefined;
 
     if (!query && !domain) {
       return { error: "At least one of 'query' or 'domain' is required." };
@@ -90,7 +101,7 @@ const discoverAndEnableTools = {
       {
         query,
         domain: domain || undefined,
-        limit: arguments_.limit ? Math.min(Number(arguments_.limit), 50) : 20,
+        limit: toolArguments.limit ? Math.min(Number(toolArguments.limit), 50) : 20,
       },
       {
         project: context.project,
@@ -98,14 +109,13 @@ const discoverAndEnableTools = {
         agentSessionId: sessionId,
         enabledTools: context.enabledTools || [],
       },
-    );
+    ) as SearchToolsResult; // Trusting the internal service return shape, but asserting safely
 
-    const searchData = searchResult as Record<string, unknown>;
-    const matches = searchData?.matches as Array<{ name: string; isEnabled?: boolean }> | undefined;
+    const matches = searchResult.matches;
 
     if (!Array.isArray(matches) || matches.length === 0) {
       return {
-        ...searchData,
+        ...searchResult,
         auto_enabled: [],
         message: "No matching tools found.",
       };
@@ -136,7 +146,7 @@ const discoverAndEnableTools = {
         ...matchEntry,
         isEnabled: true,
       })),
-      total: searchData.total || matches.length,
+      total: searchResult.total || matches.length,
       query: query || null,
       domain: domain || null,
       auto_enabled: newlyActivatedTools,

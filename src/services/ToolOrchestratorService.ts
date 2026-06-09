@@ -65,7 +65,9 @@ interface ToolExecutionContext {
   _maxSubAgentIterations?: number;
   _minContextLength?: number;
   enabledTools?: string[];
-  [key: string]: unknown;
+  _topology?: string;
+  clientIp?: string | null;
+  _toolState?: unknown;
 }
 
 /** Worktree session state */
@@ -814,7 +816,12 @@ export default class ToolOrchestratorService {
   static async executeTool(name: string, args: Record<string, unknown> = {}, context: ToolExecutionContext = {}) {
     // ── Internal tools — delegated to InternalToolRegistry ──────
     if (InternalToolRegistry.has(name)) {
-      return InternalToolRegistry.execute(name, args, context);
+      return InternalToolRegistry.execute(name, args, {
+        ...context,
+        agentSessionId: context.agentSessionId || undefined,
+        project: context.project || undefined,
+        username: context.username || undefined,
+      });
     }
 
     // Route orchestrator tools to OrchestratorService (Prism-local)

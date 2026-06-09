@@ -250,7 +250,10 @@ router.get(
     // Build the dynamic Tool Calling system prompt
     const schemas = ToolOrchestratorService.getToolSchemas(defaultTopology) || [];
     const toolNames = schemas
-      .map((s: Record<string, unknown>) => (s.name as string) || (s.function as Record<string, unknown>)?.name)
+      .map((s) => {
+        const schema = s as { name?: string; function?: { name?: string } };
+        return schema.name || schema.function?.name;
+      })
       .filter((name): name is string => typeof name === "string")
       .map((name: string) => {
         return name.replace(/^get_/, "").replace(/_/g, " ");

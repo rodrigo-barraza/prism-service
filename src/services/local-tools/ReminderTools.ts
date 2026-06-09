@@ -3,12 +3,10 @@ import { TOOL_NAMES, DEFAULT_USERNAME, DEFAULT_PROJECT } from "@rodrigo-barraza/
 import ConversationTimerService from "../ConversationTimerService.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
-interface ToolContext {
-  conversationId?: string;
-  project?: string;
-  username?: string;
+import { InternalToolContext } from "./InternalToolRegistry.ts";
+
+interface ReminderContext extends InternalToolContext {
   _emit?: (event: Record<string, unknown>) => void;
-  [key: string]: unknown;
 }
 
 // ── Set Timer Tool ─────────────────────────────────────────
@@ -46,9 +44,12 @@ const setTimer = {
   },
   labels: ["timer", "automation", "scheduler"],
 
-  async execute(args: Record<string, unknown>, context: ToolContext) {
-    const { prompt, durationSeconds, cronExpression, maxIterations } = args;
-    const conversationId = context.conversationId;
+  async execute(toolArguments: Record<string, unknown>, context: ReminderContext) {
+    const prompt = typeof toolArguments.prompt === "string" ? toolArguments.prompt : undefined;
+    const durationSeconds = typeof toolArguments.durationSeconds === "number" || typeof toolArguments.durationSeconds === "string" ? toolArguments.durationSeconds : undefined;
+    const cronExpression = typeof toolArguments.cronExpression === "string" ? toolArguments.cronExpression : undefined;
+    const maxIterations = typeof toolArguments.maxIterations === "number" || typeof toolArguments.maxIterations === "string" ? toolArguments.maxIterations : undefined;
+    const conversationId = context.agentSessionId;
     const project = context.project || DEFAULT_PROJECT;
     const username = context.username || DEFAULT_USERNAME;
 
@@ -102,8 +103,8 @@ const setTimer = {
   },
   labels: ["timer", "automation", "scheduler"],
 
-  async execute(_args: Record<string, unknown>, context: ToolContext) {
-    const conversationId = context.conversationId;
+  async execute(_args: Record<string, unknown>, context: ReminderContext) {
+    const conversationId = context.agentSessionId;
     const project = context.project || DEFAULT_PROJECT;
     const username = context.username || DEFAULT_USERNAME;
 
@@ -150,8 +151,8 @@ const cancelTimer = {
   },
   labels: ["timer", "automation", "scheduler"],
 
-  async execute(args: Record<string, unknown>, context: ToolContext) {
-    const { timerId } = args;
+  async execute(toolArguments: Record<string, unknown>, context: ReminderContext) {
+    const timerId = typeof toolArguments.timerId === "string" ? toolArguments.timerId : undefined;
     const project = context.project || DEFAULT_PROJECT;
     const username = context.username || DEFAULT_USERNAME;
 

@@ -1,5 +1,6 @@
 import logger from "../../utils/logger.ts";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { InternalToolContext } from "./InternalToolRegistry.ts";
 
 interface QuestionOption {
   label: string;
@@ -20,8 +21,7 @@ interface UserQuestionEmitEvent {
   context: string | null;
 }
 
-interface ToolContext {
-  conversationId?: string;
+interface AskUserContext extends InternalToolContext {
   _emit?: (event: UserQuestionEmitEvent) => void;
 }
 
@@ -121,8 +121,9 @@ export default {
   },
   labels: ["coding"],
 
-  async execute(args: AskUserQuestionArgs, context: ToolContext) {
-    const { context: questionContext, questions } = args;
+  async execute(toolArguments: Record<string, unknown>, context: AskUserContext) {
+    const questionContext = typeof toolArguments.context === "string" ? toolArguments.context : undefined;
+    const questions = Array.isArray(toolArguments.questions) ? toolArguments.questions as QuestionInput[] : undefined;
 
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
       return {
@@ -172,7 +173,7 @@ export default {
       multiSelect: !!query.multiSelect,
     }));
 
-    const sessionId = context.conversationId;
+    const sessionId = context.agentSessionId;
     if (!sessionId) {
       return {
         error:

@@ -90,7 +90,6 @@ export async function executeToolBatch(
           conversationId,
           clientIp: context.clientIp || null,
           requestId: context.requestId,
-          agenticIteration: state.iterations,
           iteration: state.iterations,
           _providerName: providerName,
           _resolvedModel: resolvedModel,
@@ -100,7 +99,7 @@ export async function executeToolBatch(
           workspaceRoot,
           _toolState: ToolContext.getStore(agentSessionId),
           enabledTools: tools.finalTools.map((toolSchema) => toolSchema.name),
-          _topology: context.options?.topology,
+          _topology: typeof context.options?.topology === "string" ? context.options.topology : undefined,
         },
       );
       const durationMs = Date.now() - startTime;
