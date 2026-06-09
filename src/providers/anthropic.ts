@@ -516,6 +516,11 @@ const anthropicProvider = {
       delete payload.top_k;
     }
 
+    const isAdaptiveThinking = (modelDefinition as Record<string, unknown> | null)?.adaptiveThinking === true;
+    if (isAdaptiveThinking) {
+      delete payload.top_k;
+    }
+
     // Server tools
     const tools = buildTools(options);
     if (tools) payload.tools = tools;
@@ -714,6 +719,11 @@ const anthropicProvider = {
       if (hasLockedSampling) {
         delete streamPayload.temperature;
         delete streamPayload.top_p;
+        delete streamPayload.top_k;
+      }
+
+      const isAdaptiveThinking = (modelDefinition as Record<string, unknown> | null)?.adaptiveThinking === true;
+      if (isAdaptiveThinking) {
         delete streamPayload.top_k;
       }
 
