@@ -605,3 +605,203 @@ describe('AgenticLoopState concurrent operations — idempotency', () => {
     expect(state.hwmOutputTokens).toBe(200);
   });
 });
+
+// ────────────────────────────────────────────────────────────────
+// 6. Dynamic Tool Activation — System Prompt Documentation Sync
+// ────────────────────────────────────────────────────────────────
+
+import ToolContext from '../src/services/ToolContext.ts';
+
+describe('checkAndApplyToolSetChanges — dynamic tool activation doc sync', () => {
+  let BaseAgenticHarness: any;
+
+  beforeEach(async () => {
+    const module = await import('../src/services/harnesses/BaseAgenticHarness.ts');
+    BaseAgenticHarness = module.default;
+  });
+
+  function createTestHarnessWithTools(initialToolNames: string[] = []) {
+    const state = new AgenticLoopState();
+    const emittedEvents: any[] = [];
+    const sessionId = `test-session-${Date.now()}`;
+    const context: Partial<AgenticContext> = {
+      emit: (event: any) => emittedEvents.push(event),
+      signal: null,
+      resolvedModel: 'test-model',
+      providerName: 'test',
+      project: 'test',
+      username: 'tester',
+      agentSessionId: sessionId,
+      conversationId: 'conv-1',
+    };
+    const tools: ResolvedTools = {
+      finalTools: initialToolNames.map((name) => ({ name, description: `${name} tool`, parameters: { type: 'object', properties: {} } })) as any,
+      resolvedEnabledTools: initialToolNames,
+    };
+
+    const harness = new BaseAgenticHarness(
+      context as AgenticContext,
+      state,
+      tools,
+    );
+
+    return { harness, state, emittedEvents, context, sessionId, tools };
+  }
+
+  it('should return false when toolSetDirty flag is not set', () => {
+    const { harness, sessionId } = createTestHarnessWithTools(['read_file']);
+    // No dirty flag → no mutation
+    const result = harness.checkAndApplyToolSetChanges([]);
+    expect(result).toBe(false);
+
+    ToolContext.cleanupInMemory(sessionId);
+  });
+
+  it('should return false when dirty flag is set but dynamicEnabledTools is not an array', () => {
+    const { harness, sessionId } = createTestHarnessWithTools(['read_file']);
+    const store = ToolContext.getStore(sessionId);
+    store.set('toolSetDirty', true);
+    store.set('dynamicEnabledTools', 'not-an-array'); // malformed
+
+    const result = harness.checkAndApplyToolSetChanges([]);
+    expect(result).toBe(false);
+
+    ToolContext.cleanupInMemory(sessionId);
+  });
+
+  it('should emit TOOL_SET_CHANGED event when tools are mutated', () => {
+    const { harness, sessionId, emittedEvents } = createTestHarnessWithTools(['read_file']);
+    const store = ToolContext.getStore(sessionId);
+    store.set('toolSetDirty', true);
+    store.set('dynamicEnabledTools', ['read_file', 'search_web']);
+
+    const currentMessages: ConversationMessage[] = [
+      { role: 'system', content: 'You are an agent.' },
+      { role: 'user', content: 'Find something.' },
+    ];
+
+    const result = harness.checkAndApplyToolSetChanges(currentMessages);
+    expect(result).toBe(true);
+
+    // Should have emitted a TOOL_SET_CHANGED event
+    const toolSetChangedEvent = emittedEvents.find(
+      (event) => event.message === 'tool_set_changed',
+    );
+    expect(toolSetChangedEvent).toBeDefined();
+    expect(toolSetChangedEvent.dynamicTools).toEqual(['read_file', 'search_web']);
+
+    ToolContext.cleanupInMemory(sessionId);
+  });
+
+  it('should inject [TOOL SET UPDATED] documentation addendum for newly added tools', () => {
+    const { harness, sessionId } = createTestHarnessWithTools(['read_file']);
+    const store = ToolContext.getStore(sessionId);
+    store.set('toolSetDirty', true);
+    store.set('dynamicEnabledTools', ['read_file', 'search_web', 'get_weather']);
+
+    const currentMessages: ConversationMessage[] = [
+      { role: 'system', content: 'You are an agent.' },
+      { role: 'user', content: 'What is the weather?' },
+    ];
+
+    harness.checkAndApplyToolSetChanges(currentMessages);
+
+    // Should have injected a [TOOL SET UPDATED] user message
+    const addendumMessage = currentMessages.find(
+      (message) =>
+        message.role === 'user' &&
+        typeof message.content === 'string' &&
+        message.content.includes('[TOOL SET UPDATED]'),
+    );
+
+    expect(addendumMessage).toBeDefined();
+    expect(addendumMessage!.content as string).toContain('new tool(s) have been dynamically enabled');
+
+    ToolContext.cleanupInMemory(sessionId);
+  });
+
+  it('should NOT inject addendum when no messages array is provided', () => {
+    const { harness, sessionId } = createTestHarnessWithTools(['read_file']);
+    const store = ToolContext.getStore(sessionId);
+    store.set('toolSetDirty', true);
+    store.set('dynamicEnabledTools', ['read_file', 'search_web']);
+
+    // No messages → no addendum injection, but tool set still mutated
+    const result = harness.checkAndApplyToolSetChanges(undefined);
+    expect(result).toBe(true);
+
+    ToolContext.cleanupInMemory(sessionId);
+  });
+
+  it('should clear the dirty flag after processing — no double mutation', () => {
+    const { harness, sessionId } = createTestHarnessWithTools(['read_file']);
+    const store = ToolContext.getStore(sessionId);
+    store.set('toolSetDirty', true);
+    store.set('dynamicEnabledTools', ['read_file', 'search_web']);
+
+    harness.checkAndApplyToolSetChanges([]);
+    expect(store.get('toolSetDirty')).toBeUndefined();
+
+    // Second call should return false — dirty flag is cleared
+    const secondResult = harness.checkAndApplyToolSetChanges([]);
+    expect(secondResult).toBe(false);
+
+    ToolContext.cleanupInMemory(sessionId);
+  });
+
+  it('should update this.tools.resolvedEnabledTools after mutation', () => {
+    const { harness, sessionId, tools } = createTestHarnessWithTools(['read_file']);
+    const store = ToolContext.getStore(sessionId);
+    store.set('toolSetDirty', true);
+    store.set('dynamicEnabledTools', ['read_file', 'get_weather', 'search_web']);
+
+    harness.checkAndApplyToolSetChanges([]);
+
+    // The harness's internal tools should be updated
+    expect(harness.tools.resolvedEnabledTools).toEqual(['read_file', 'get_weather', 'search_web']);
+
+    ToolContext.cleanupInMemory(sessionId);
+  });
+
+  it('BUG: tool disablement triggers spurious addendum — core tools leak as newly added', () => {
+    const { harness, sessionId } = createTestHarnessWithTools(['read_file', 'search_web', 'get_weather']);
+    const store = ToolContext.getStore(sessionId);
+    store.set('toolSetDirty', true);
+    // Only read_file remains enabled (search_web and get_weather disabled)
+    store.set('dynamicEnabledTools', ['read_file']);
+
+    const currentMessages: ConversationMessage[] = [
+      { role: 'system', content: 'You are an agent.' },
+      { role: 'user', content: 'done with weather' },
+    ];
+
+    const result = harness.checkAndApplyToolSetChanges(currentMessages);
+    expect(result).toBe(true);
+
+    const addendumMessage = currentMessages.find(
+      (message) =>
+        message.role === 'user' &&
+        typeof message.content === 'string' &&
+        message.content.includes('[TOOL SET UPDATED]'),
+    );
+    // FIXED: The addendum is NOT injected because core tools are filtered out
+    expect(addendumMessage).toBeUndefined();
+
+    ToolContext.cleanupInMemory(sessionId);
+  });
+
+  it('should handle empty dynamicEnabledTools array — all tools removed except core', () => {
+    const { harness, sessionId } = createTestHarnessWithTools(['read_file']);
+    const store = ToolContext.getStore(sessionId);
+    store.set('toolSetDirty', true);
+    store.set('dynamicEnabledTools', []);
+
+    const result = harness.checkAndApplyToolSetChanges([]);
+    expect(result).toBe(true);
+    // resolvedEnabledTools should be the empty array
+    expect(harness.tools.resolvedEnabledTools).toEqual([]);
+
+    ToolContext.cleanupInMemory(sessionId);
+  });
+});
+

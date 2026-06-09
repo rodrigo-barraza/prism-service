@@ -40,6 +40,7 @@ async function init() {
     import("./EnterPlanModeTool.js"),
     import("./ExitPlanModeTool.js"),
     import("./ToolActivationTools.js"),
+    import("./DiscoverAndEnableTools.js"),
     import("./SkillTools.js"),
     import("./WorktreeTools.js"),
     import("./TodoWriteTool.js"),

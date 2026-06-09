@@ -166,7 +166,11 @@ export default class BaseAgenticHarness {
 
     // Compute newly added tools and inject documentation addendum
     const newlyAddedToolSchemas = (filteredTools as unknown as Array<{ name: string; [key: string]: unknown }>).filter(
-      (tool) => !previousToolNames.has(tool.name),
+      (tool) =>
+        !previousToolNames.has(tool.name) &&
+        !BaseAgenticHarness.CORE_AGENTIC_SET.has(tool.name) &&
+        !BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name) &&
+        !InternalToolRegistry.has(tool.name),
     );
 
     if (currentMessages && newlyAddedToolSchemas.length > 0) {

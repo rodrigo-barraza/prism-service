@@ -158,5 +158,15 @@ function matchMonthlyOrYearlyDayRule(
     return nextDay.getMonth() !== targetDate.getMonth();
   }
 
-  return targetDate.getDate() === dayOfMonthRule;
+  // Clamping logic: if the target month has fewer days than the scheduled day,
+  // clamp the target matching day to the last day of the target month.
+  const lastDayOfTargetMonth = new Date(
+    targetDate.getFullYear(),
+    targetDate.getMonth() + 1,
+    0
+  ).getDate();
+
+  const effectiveDayRule = Math.min(dayOfMonthRule, lastDayOfTargetMonth);
+
+  return targetDate.getDate() === effectiveDayRule;
 }

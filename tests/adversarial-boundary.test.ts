@@ -193,6 +193,12 @@ describe('CostCalculator adversarial', () => {
       // Should use perMinute: (120/60) * 0.006 = 0.012
       expect(result).toBeCloseTo(0.012, 4);
     });
+
+    it('should clamp negative duration to 0 and calculate zero cost', () => {
+      const usage = { inputTokens: 0, outputTokens: 0, durationSeconds: -10 };
+      const pricing = { perMinute: 0.006 };
+      expect(calculateAudioCost(usage, pricing)).toBe(0);
+    });
   });
 
   describe('calculateImageCost — edge cases', () => {
@@ -575,6 +581,20 @@ describe('RecurrenceMatcher adversarial', () => {
     const targetDate = new Date(2025, 0, 2);
     // (1 day difference) % 999999999 = 1, not 0
     expect(matchRecurrenceRule(rule, startDate, targetDate)).toBe(false);
+  });
+
+  it('should handle leap year date — Feb 29 to Feb 28 in non-leap year (yearly recurrence)', () => {
+    const rule: RecurrenceRule = { frequency: 'yearly', interval: 1 };
+    const startDate = new Date(2024, 1, 29); // Feb 29, 2024
+    const targetDate = new Date(2025, 1, 28); // Feb 28, 2025 (clamped)
+    expect(matchRecurrenceRule(rule, startDate, targetDate)).toBe(true);
+  });
+
+  it('should clamp dayOfMonth monthly recurrence to target month\'s last day when target month has fewer days', () => {
+    const rule: RecurrenceRule = { frequency: 'monthly', interval: 1 };
+    const startDate = new Date(2025, 0, 31); // Jan 31
+    const targetDate = new Date(2025, 1, 28); // Feb 28 (clamped)
+    expect(matchRecurrenceRule(rule, startDate, targetDate)).toBe(true);
   });
 });
 
