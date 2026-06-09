@@ -94,6 +94,14 @@ export default class AgenticToolResolver {
       const dynamicTools = ToolContext.get<string[]>(agentSessionId, "dynamicEnabledTools");
       if (Array.isArray(dynamicTools) && dynamicTools.length > 0) {
         resolvedEnabledTools = dynamicTools;
+        // Apply client-side disabledTools to the dynamic set so user UI
+        // toggles are respected even after enable_tools has been called
+        if (options.disabledTools && Array.isArray(options.disabledTools) && options.disabledTools.length > 0) {
+          const clientDisabledSet = new Set(options.disabledTools);
+          resolvedEnabledTools = resolvedEnabledTools.filter(
+            (toolName) => !clientDisabledSet.has(toolName),
+          );
+        }
       }
     }
 

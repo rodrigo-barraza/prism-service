@@ -105,7 +105,7 @@ const enableTools = {
     if (newlyActivatedTools.length === 0) {
       return {
         success: true,
-        message: "All requested tools were already enabled.",
+        message: "All requested tools are already enabled and available — you can call them directly right now.",
         enabledToolCount: mergedToolSet.size,
       };
     }

@@ -91,11 +91,11 @@ function injectToolsIntoSystemPrompt(
     sections.push(`**${domain}**\n${entries.join("\n\n")}`);
   }
 
-  const toolsSection = `\n\n## Available Tools (${tools.length})\n` + sections.join("\n\n");
+  const toolsSection = `\n\n## Enabled Tools (${tools.length})\n` + sections.join("\n\n");
 
   const systemMessage = messages.find((message) => message.role === "system");
   if (systemMessage) {
-    if (typeof systemMessage.content === "string" && !systemMessage.content.includes("## Available Tools")) {
+    if (typeof systemMessage.content === "string" && !systemMessage.content.includes("## Enabled Tools")) {
       systemMessage.content += toolsSection;
     }
   } else {

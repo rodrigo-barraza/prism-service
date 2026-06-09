@@ -129,7 +129,7 @@ export default class SystemPromptAssembler {
       if (policyText) sections.push(policyText);
     }
 
-    // ── 4. Available Tools (domain-grouped) ──────────────────────
+    // ── 4. Enabled Tools (domain-grouped) ──────────────────────
     {
       const toolDescriptions = this.buildToolDescriptions(context.enabledTools, agentId, defaultTopology);
       if (toolDescriptions) {
@@ -163,7 +163,7 @@ export default class SystemPromptAssembler {
 
           count = filteredSchemas.length;
         }
-        sections.push(`## Available Tools (${count})\n` + toolDescriptions);
+        sections.push(`## Enabled Tools (${count})\n` + toolDescriptions);
       }
     }
 

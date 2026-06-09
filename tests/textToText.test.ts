@@ -266,7 +266,7 @@ describe("POST /chat (text-to-text)", () => {
     const calledMessages = MOCK_GENERATE_TEXT_STREAM.mock.calls[0][0];
     const systemMessage = calledMessages.find((m: any) => m.role === "system");
     expect(systemMessage).toBeDefined();
-    expect(systemMessage.content).toMatch(/Available Tools/i);
+    expect(systemMessage.content).toMatch(/Enabled Tools/i);
     expect(systemMessage.content).toMatch(/get_weather/i);
   });
 });
