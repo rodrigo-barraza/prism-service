@@ -37,14 +37,25 @@ export default class AgenticLoopService {
       parentAgentSessionId,
     } = context;
 
-    // 1. Resolve tools
+    // Load any persisted tool state from MongoDB (e.g. after server restart or previous turn)
+    await ToolContext.ensureLoaded(agentSessionId);
+
+    // 1. Resolve tools (passing agentSessionId so dynamicEnabledTools is merged)
     const resolvedTools = await AgenticToolResolver.resolve({
       options,
       agent: agent || undefined,
       project,
       username,
       modelDef: modelDef || undefined,
+      agentSessionId,
     });
+
+    // If dynamicEnabledTools is not in ToolContext, populate it with the resolved tools
+    const toolContextStore = ToolContext.getStore(agentSessionId);
+    if (!toolContextStore.has("dynamicEnabledTools")) {
+      const initialNames = resolvedTools.resolvedEnabledTools || resolvedTools.finalTools.map((tool) => tool.name);
+      ToolContext.set(agentSessionId, "dynamicEnabledTools", initialNames);
+    }
 
     // 2. Initialize shared state
     const state = new AgenticLoopState({
@@ -77,12 +88,10 @@ export default class AgenticLoopService {
     // 4. Instantiate and run
     const harness = new HarnessClass(context, state, resolvedTools);
     try {
-      // Restore any persisted tool state from MongoDB (e.g. after server restart)
-      await ToolContext.ensureLoaded(agentSessionId);
       return await harness.run();
     } finally {
-      // Clean up in-memory state keyed by agentSessionId (per-run)
-      ToolContext.cleanup(agentSessionId);
+      // Clean up in-memory cache keyed by agentSessionId (keeps MongoDB state for next turn)
+      ToolContext.cleanupInMemory(agentSessionId);
 
       // Clean up in-memory state keyed by conversationId (client-facing)
       pendingApprovals.delete(conversationId);

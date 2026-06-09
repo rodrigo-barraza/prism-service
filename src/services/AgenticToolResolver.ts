@@ -2,6 +2,7 @@ import ToolOrchestratorService from "./ToolOrchestratorService.ts";
 import SettingsService from "./SettingsService.ts";
 import logger from "../utils/logger.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
+import ToolContext from "./ToolContext.ts";
 
 import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
 import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST, TOOL_NAMES, DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
@@ -40,6 +41,7 @@ interface ResolveParams {
   project?: string;
   username?: string;
   modelDef?: ModelDef;
+  agentSessionId?: string;
 }
 
 /** Orchestrator tools bypass the enabledTools filter for coordinator agents (excluded for sub-agents to prevent recursive spawning) */
@@ -63,7 +65,7 @@ export default class AgenticToolResolver {
    * Handles MCP tools, disabledBuiltIns mode, prefix expansion,
    * and native provider tool collision prevention.
    */
-  static async resolve({ options, agent, project, username, modelDef }: ResolveParams) {
+  static async resolve({ options, agent, project, username, modelDef, agentSessionId }: ResolveParams) {
     // Ensure tool schemas are loaded from tools-api (lazy init — if tools-api
     // was unreachable at boot, this fetches on-demand before proceeding)
     await ToolOrchestratorService.ensureSchemas();
@@ -88,6 +90,12 @@ export default class AgenticToolResolver {
 
     // ── Tool filtering ────────────────────────────────────────────
     let resolvedEnabledTools: string[] | null = options.enabledTools || null;
+    if (agentSessionId) {
+      const dynamicTools = ToolContext.get<string[]>(agentSessionId, "dynamicEnabledTools");
+      if (Array.isArray(dynamicTools) && dynamicTools.length > 0) {
+        resolvedEnabledTools = dynamicTools;
+      }
+    }
 
     // Mode 2: disabledTools — resolve server-side
     if (

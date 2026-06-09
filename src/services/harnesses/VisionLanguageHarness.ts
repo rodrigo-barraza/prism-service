@@ -496,6 +496,9 @@ Use these images to observe the environment, notice changes, animations, or user
               (!message.toolCalls || message.toolCalls.length === 0)
             ),
         );
+
+        this.checkAndApplyToolSetChanges();
+
         this.logIteration(pass, currentMessages);
         continue;
       }

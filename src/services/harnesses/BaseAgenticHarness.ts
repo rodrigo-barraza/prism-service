@@ -17,7 +17,10 @@ import { COLLECTIONS } from "../../constants.ts";
 import { finalizeTextGeneration, type FinalizerContext } from "./lifecycle/Finalizer.ts";
 import logger from "../../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
+
+import ToolContext from "../ToolContext.ts";
+import InternalToolRegistry from "../local-tools/InternalToolRegistry.ts";
 
 import WebhookEventBus from "../WebhookEventBus.ts";
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
@@ -89,6 +92,71 @@ export default class BaseAgenticHarness {
     throw new Error(
       `${this.constructor.name}.run() is abstract — subclasses must override.`,
     );
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  //  DYNAMIC TOOL SET MUTATION
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  private static readonly CORE_AGENTIC_SET = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
+  private static readonly CORE_ORCHESTRATOR_SET = new Set<string>(CORE_ORCHESTRATOR_TOOLS_LIST);
+
+  /**
+   * Check ToolContext for a dirty flag set by enable_tools / disable_tools.
+   * If set, re-filter `this.tools` from the full schema catalog using the
+   * dynamic enabled set stored in ToolContext.
+   *
+   * Returns true if the tool set was mutated (callers should emit SSE).
+   */
+  protected checkAndApplyToolSetChanges(): boolean {
+    const sessionId = this.context.agentSessionId;
+    const toolContextStore = ToolContext.getStore(sessionId);
+    if (!toolContextStore.get("toolSetDirty")) return false;
+
+    toolContextStore.delete("toolSetDirty");
+
+    const dynamicEnabledArray = toolContextStore.get("dynamicEnabledTools") as string[] | null;
+    if (!Array.isArray(dynamicEnabledArray) || dynamicEnabledArray.length === 0) return false;
+
+    const dynamicEnabledSet = new Set(dynamicEnabledArray);
+
+    const allSchemas = [
+      ...ToolOrchestratorService.getToolSchemas(),
+      ...ToolOrchestratorService.getMCPToolSchemas().map(
+        (mcpTool) => {
+          const { _mcpServer, _mcpOriginalName, ...schema } = mcpTool as unknown as Record<string, unknown>;
+          return schema as { name: string; [key: string]: unknown };
+        },
+      ),
+    ] as Array<{ name: string; [key: string]: unknown }>;
+
+    const isSubAgent = !!this.context.parentAgentSessionId;
+    const filteredTools = allSchemas.filter(
+      (tool) =>
+        dynamicEnabledSet.has(tool.name) ||
+        tool.name.startsWith("mcp__") ||
+        BaseAgenticHarness.CORE_AGENTIC_SET.has(tool.name) ||
+        (!isSubAgent && BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name)) ||
+        InternalToolRegistry.has(tool.name),
+    ) as unknown as ResolvedTools["finalTools"];
+
+    this.tools = {
+      finalTools: filteredTools,
+      resolvedEnabledTools: dynamicEnabledArray,
+    };
+
+    this.context.emit({
+      type: SSE_EVENT_TYPES.STATUS,
+      message: STATUS_MESSAGES.TOOL_SET_CHANGED,
+      enabledCount: filteredTools.length,
+      dynamicTools: dynamicEnabledArray,
+    });
+
+    logger.info(
+      `[BaseAgenticHarness] Tool set mutated: ${filteredTools.length} tools active (${dynamicEnabledArray.length} dynamic)`,
+    );
+
+    return true;
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

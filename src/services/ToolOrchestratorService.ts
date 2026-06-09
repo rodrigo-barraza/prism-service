@@ -213,11 +213,22 @@ function buildUrlFromEndpoint(endpoint: ToolEndpoint, args: Record<string, unkno
     }
   }
 
-  const pathParams = new Set(endpoint.pathParams || []);
-  for (const param of pathParams) {
-    const parameterValue = args[param];
+  const dynamicParams = new Set<string>();
+  const matchResult = path.match(/:[a-zA-Z_][a-zA-Z0-9_]*/g);
+  if (matchResult) {
+    for (const match of matchResult) {
+      dynamicParams.add(match.slice(1));
+    }
+  }
+
+  const pathParams = new Set([
+    ...(endpoint.pathParams || []),
+    ...dynamicParams,
+  ]);
+  for (const parameter of pathParams) {
+    const parameterValue = args[parameter];
     if (parameterValue !== undefined && parameterValue !== null) {
-      path = path.replace(`:${param}`, encodeURIComponent(String(parameterValue)));
+      path = path.replace(`:${parameter}`, encodeURIComponent(String(parameterValue)));
     }
   }
 

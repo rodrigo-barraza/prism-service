@@ -155,9 +155,27 @@ export default class ToolContext {
   }
 
   /**
+   * Clean up only the in-memory cache for a session.
+   * Keeps MongoDB state intact so it can be restored on the next turn.
+   */
+  static cleanupInMemory(sessionId: string): void {
+    const store = sessions.get(sessionId);
+    if (store) {
+      const keyCount = store.size;
+      sessions.delete(sessionId);
+      loadedSessions.delete(sessionId);
+      if (keyCount > 0) {
+        logger.info(
+          `[ToolContext] Cleaned up in-memory cache of ${keyCount} state entries for session ${sessionId}`,
+        );
+      }
+    }
+  }
+
+  /**
    * Clean up all state for a session.
    * Removes from both memory and MongoDB.
-   * Called by AgenticLoopService when the session ends.
+   * Called when the session explicitly ends or is deleted.
    */
   static cleanup(sessionId: string): void {
     const store = sessions.get(sessionId);
@@ -178,7 +196,7 @@ export default class ToolContext {
 
       if (keyCount > 0) {
         logger.info(
-          `[ToolContext] Cleaned up ${keyCount} state entries for session ${sessionId}`,
+          `[ToolContext] Cleaned up ${keyCount} state entries and deleted MongoDB document for session ${sessionId}`,
         );
       }
     }
