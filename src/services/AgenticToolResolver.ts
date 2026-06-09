@@ -183,14 +183,22 @@ export default class AgenticToolResolver {
       const resolvedPersona = agent ? AgentPersonaRegistry.get(agent) : null;
       const isCoreToolsLocked = resolvedPersona?.coreToolsLocked ?? true;
 
+      const clientDisabledSet = options.disabledTools && Array.isArray(options.disabledTools) && options.disabledTools.length > 0
+        ? new Set<string>(options.disabledTools)
+        : null;
+
       const shouldBypassOrchestratorTools = !options.isSubAgent;
       finalTools = finalTools.filter(
-        (tool) =>
-          enabledSet.has(tool.name) ||
-          tool.name.startsWith("mcp__") ||
-          (isCoreToolsLocked && CORE_AGENTIC_TOOLS.has(tool.name)) ||
-          (shouldBypassOrchestratorTools && CORE_ORCHESTRATOR_TOOLS.has(tool.name)) ||
-          PRISM_LOCAL_TOOL_NAMES.has(tool.name),
+        (tool) => {
+          if (enabledSet.has(tool.name)) return true;
+          if (clientDisabledSet?.has(tool.name)) return false;
+          return (
+            tool.name.startsWith("mcp__") ||
+            (isCoreToolsLocked && CORE_AGENTIC_TOOLS.has(tool.name)) ||
+            (shouldBypassOrchestratorTools && CORE_ORCHESTRATOR_TOOLS.has(tool.name)) ||
+            PRISM_LOCAL_TOOL_NAMES.has(tool.name)
+          );
+        },
       );
 
       if (resolvedPersona?.blockedTools?.length) {
