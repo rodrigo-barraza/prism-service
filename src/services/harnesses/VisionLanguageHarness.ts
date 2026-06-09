@@ -499,7 +499,7 @@ Use these images to observe the environment, notice changes, animations, or user
             ),
         );
 
-        this.checkAndApplyToolSetChanges();
+        this.checkAndApplyToolSetChanges(currentMessages);
 
         this.logIteration(pass, currentMessages);
         continue;

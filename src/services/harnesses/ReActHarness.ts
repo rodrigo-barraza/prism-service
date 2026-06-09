@@ -495,7 +495,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             ),
         );
 
-        this.checkAndApplyToolSetChanges();
+        this.checkAndApplyToolSetChanges(currentMessages);
 
         this.logIteration(pass, currentMessages);
         continue;

@@ -24,6 +24,7 @@ import InternalToolRegistry from "../local-tools/InternalToolRegistry.ts";
 
 import WebhookEventBus from "../WebhookEventBus.ts";
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
+import { ToolDocFormatter } from "../system-prompt/ToolDocFormatter.ts";
 import type AgenticLoopState from "../AgenticLoopState.ts";
 import type AgentHooks from "../AgentHooks.ts";
 import type { ChatMessage, TokenUsage } from "../../types/admin.ts";
@@ -101,14 +102,21 @@ export default class BaseAgenticHarness {
   private static readonly CORE_AGENTIC_SET = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
   private static readonly CORE_ORCHESTRATOR_SET = new Set<string>(CORE_ORCHESTRATOR_TOOLS_LIST);
 
+  private static readonly toolDocFormatter = new ToolDocFormatter();
+
   /**
    * Check ToolContext for a dirty flag set by enable_tools / disable_tools.
    * If set, re-filter `this.tools` from the full schema catalog using the
    * dynamic enabled set stored in ToolContext.
    *
-   * Returns true if the tool set was mutated (callers should emit SSE).
+   * When tools are added, injects a documentation addendum into
+   * currentMessages so the model receives human-readable descriptions
+   * and parameter docs for dynamically activated tools (the initial
+   * system prompt is only assembled on iteration 1 and never rebuilt).
+   *
+   * Returns true if the tool set was mutated.
    */
-  protected checkAndApplyToolSetChanges(): boolean {
+  protected checkAndApplyToolSetChanges(currentMessages?: ConversationMessage[]): boolean {
     const sessionId = this.context.agentSessionId;
     const toolContextStore = ToolContext.getStore(sessionId);
     if (!toolContextStore.get("toolSetDirty")) return false;
@@ -116,9 +124,13 @@ export default class BaseAgenticHarness {
     toolContextStore.delete("toolSetDirty");
 
     const dynamicEnabledArray = toolContextStore.get("dynamicEnabledTools") as string[] | null;
-    if (!Array.isArray(dynamicEnabledArray) || dynamicEnabledArray.length === 0) return false;
+    if (!Array.isArray(dynamicEnabledArray)) return false;
 
     const dynamicEnabledSet = new Set(dynamicEnabledArray);
+
+    const previousToolNames = new Set(
+      (this.tools.finalTools as Array<{ name: string }>).map((tool) => tool.name),
+    );
 
     const allSchemas = [
       ...ToolOrchestratorService.getToolSchemas(),
@@ -151,6 +163,35 @@ export default class BaseAgenticHarness {
       enabledCount: filteredTools.length,
       dynamicTools: dynamicEnabledArray,
     });
+
+    // Compute newly added tools and inject documentation addendum
+    const newlyAddedToolSchemas = (filteredTools as unknown as Array<{ name: string; [key: string]: unknown }>).filter(
+      (tool) => !previousToolNames.has(tool.name),
+    );
+
+    if (currentMessages && newlyAddedToolSchemas.length > 0) {
+      const addendumDocumentation = BaseAgenticHarness.toolDocFormatter.buildToolDescriptions(
+        newlyAddedToolSchemas.map((tool) => tool.name),
+        undefined,
+        undefined,
+        newlyAddedToolSchemas.map((tool) => tool.name),
+      );
+
+      if (addendumDocumentation) {
+        const toolNamesList = newlyAddedToolSchemas.map((tool) => tool.name).join(", ");
+        currentMessages.push({
+          role: "user",
+          content:
+            `[TOOL SET UPDATED] ${newlyAddedToolSchemas.length} new tool(s) have been dynamically enabled: ${toolNamesList}\n\n` +
+            `The following tools are now available with full documentation:\n\n` +
+            addendumDocumentation,
+        });
+
+        logger.info(
+          `[BaseAgenticHarness] Injected documentation addendum for ${newlyAddedToolSchemas.length} newly activated tools: [${toolNamesList}]`,
+        );
+      }
+    }
 
     logger.info(
       `[BaseAgenticHarness] Tool set mutated: ${filteredTools.length} tools active (${dynamicEnabledArray.length} dynamic)`,
