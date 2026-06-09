@@ -441,7 +441,7 @@ function getOrchestratorToolSchemas(defaultTopology: string = DEFAULT_TOPOLOGY) 
       emoji: ["👥", "🤖"],
       description:
         "Spawn one or more sub-agents, each in an isolated git worktree. " +
-        "Sub-agents have access to the full tool suite (read, write, search, shell). " +
+        "Sub-agents inherit the currently enabled tools and can dynamically enable more via enable_tools. " +
         `Execution mode depends on topology: ${hierarchicalDesc} runs all members in parallel, ` +
         `${sequentialDesc} runs members one-at-a-time passing each result to the next, ` +
         `${peerToPeerDesc} runs a turn-based discussion where members take turns seeing a shared thread. ` +
