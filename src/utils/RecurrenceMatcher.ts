@@ -80,7 +80,7 @@ export function matchRecurrenceRule(
         return false;
       }
 
-      return matchMonthlyOrYearlyDayRule(rule, targetDate);
+      return matchMonthlyOrYearlyDayRule(rule, targetDate, false, startDate);
     }
 
     case "yearly": {
@@ -97,7 +97,7 @@ export function matchRecurrenceRule(
         return false;
       }
 
-      return matchMonthlyOrYearlyDayRule(rule, targetDate, true);
+      return matchMonthlyOrYearlyDayRule(rule, targetDate, true, startDate);
     }
 
     default:
@@ -111,7 +111,8 @@ export function matchRecurrenceRule(
 function matchMonthlyOrYearlyDayRule(
   rule: RecurrenceRule,
   targetDate: Date,
-  isYearly: boolean = false
+  isYearly: boolean = false,
+  startDate?: Date
 ): boolean {
   const type = isYearly ? rule.yearlyType : rule.monthlyType;
 
@@ -143,8 +144,10 @@ function matchMonthlyOrYearlyDayRule(
     return false;
   }
 
-  // Default is dayOfMonth specific date
-  const dayOfMonthRule = rule.dayOfMonth ?? 1;
+  // Default is dayOfMonth specific date.
+  // When no dayOfMonth is set, infer from the recurrence start date
+  // so that "every year on Feb 29" works without requiring explicit config.
+  const dayOfMonthRule = rule.dayOfMonth ?? (startDate ? startDate.getDate() : 1);
 
   if (dayOfMonthRule === -1) {
     const nextDay = new Date(
