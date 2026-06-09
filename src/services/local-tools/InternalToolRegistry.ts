@@ -12,12 +12,33 @@ import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 // The registry auto-imports everything in this directory on init().
 // ────────────────────────────────────────────────────────────
 
+export interface InternalToolSchemaParameters {
+  type?: string;
+  properties?: Record<string, { type: string; description?: string; items?: { type: string } }>;
+  required?: string[];
+}
+
+export interface InternalToolSchema {
+  name: string;
+  description?: string;
+  parameters?: InternalToolSchemaParameters;
+  emoji?: string[];
+}
+
+export interface InternalToolContext {
+  agentSessionId?: string;
+  project?: string;
+  username?: string;
+  isSubAgent?: boolean;
+  enabledTools?: string[];
+}
+
 interface InternalTool {
   name: string;
-  schema: { name: string; description?: string; parameters?: Record<string, unknown>; [key: string]: unknown };
+  schema: InternalToolSchema;
   domain?: string;
   labels?: string[];
-  execute: (args: any, context: any) => Promise<any>;
+  execute: (args: Record<string, unknown>, context: InternalToolContext) => Promise<unknown>;
 }
 
 const registry = new Map<string, InternalTool>();
@@ -50,11 +71,13 @@ async function init() {
     import("./ReminderTools.js"),
   ]);
 
-    for ( const toolModule of modules) {
+  for (const toolModule of modules) {
     const tools = toolModule.default;
     // Modules can export a single tool or an array of tools
     if (Array.isArray(tools)) {
-            for ( const tool of tools) register(tool);
+      for (const tool of tools) {
+        register(tool);
+      }
     } else {
       register(tools);
     }
@@ -74,7 +97,7 @@ export default class InternalToolRegistry {
   static has(name: string) {
     return registry.has(name);
   }
-  static async execute(name: string, args: Record<string, unknown>, context: Record<string, unknown> = {}) {
+  static async execute(name: string, args: Record<string, unknown>, context: InternalToolContext = {}) {
     const tool = registry.get(name);
     if (!tool) {
       return { error: `Unknown internal tool: ${name}` };

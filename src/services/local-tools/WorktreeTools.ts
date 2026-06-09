@@ -6,11 +6,10 @@ import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES, DOMAINS } from "@rodrigo-
 // speculative or risky changes. The active worktree state is
 // managed by ToolOrchestratorService (activeWorktrees map).
 
-interface ToolContext {
-  agentSessionId?: string;
-  project?: string;
+import { InternalToolContext } from "./InternalToolRegistry.ts";
+
+interface WorktreeContext extends InternalToolContext {
   _emit?: (event: { type: string; [key: string]: unknown }) => void;
-  [key: string]: unknown;
 }
 
 interface WorktreeCreateResult {
@@ -58,16 +57,15 @@ const enterWorktree = {
   domain: DOMAINS.CORE_WORKSPACE.displayName,
   labels: ["coding", "git"],
 
-  async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
-    const enterArgs = args as unknown as EnterWorktreeArgs;
-    const typedContext = context as unknown as ToolContext;
+  async execute(toolArguments: Record<string, unknown>, context: WorktreeContext) {
+    const enterArgs = toolArguments as unknown as EnterWorktreeArgs;
 
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
     const { resolve } = await import("node:path");
     const { existsSync } = await import("node:fs");
 
-    const sessionId = typedContext.agentSessionId;
+    const sessionId = context.agentSessionId;
     if (!sessionId) {
       return {
         error:
@@ -97,7 +95,7 @@ const enterWorktree = {
     const createResult = await ToolOrchestratorService._proxyPost(
       "/agentic/git/worktree/create",
       { path: repoPath, branch: branchName },
-      typedContext,
+      context,
     ) as WorktreeCreateResult;
 
     if (createResult.error) {
@@ -116,8 +114,8 @@ const enterWorktree = {
       `[Worktree] enter: ${branchName} → ${createResult.worktreePath}`,
     );
 
-    if (typedContext._emit) {
-      typedContext._emit({
+    if (context._emit) {
+      context._emit({
         type: SSE_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.WORKTREE_ENTERED,
         branch: branchName,
@@ -165,14 +163,13 @@ const exitWorktree = {
   domain: DOMAINS.CORE_WORKSPACE.displayName,
   labels: ["coding", "git"],
 
-  async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
-    const exitArgs = args as unknown as ExitWorktreeArgs;
-    const typedContext = context as unknown as ToolContext;
+  async execute(toolArguments: Record<string, unknown>, context: WorktreeContext) {
+    const exitArgs = toolArguments as unknown as ExitWorktreeArgs;
 
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
 
-    const sessionId = typedContext.agentSessionId;
+    const sessionId = context.agentSessionId;
     const worktreeState = ToolOrchestratorService.getWorktreeState(sessionId);
     if (!sessionId || !worktreeState) {
       return {
@@ -187,7 +184,7 @@ const exitWorktree = {
       const diffResult = await ToolOrchestratorService._proxyPost(
         "/agentic/git/worktree/diff",
         { path: worktreeState.repoPath, branch: worktreeState.branchName },
-        typedContext,
+        context,
       ) as { error?: string };
 
       mergeResult = await ToolOrchestratorService._proxyPost(
@@ -197,7 +194,7 @@ const exitWorktree = {
           branch: worktreeState.branchName,
           message: commitMessage || `Merge worktree: ${worktreeState.branchName}`,
         },
-        typedContext,
+        context,
       ) as WorktreeMergeResult;
 
       if (mergeResult.error) {
@@ -213,15 +210,15 @@ const exitWorktree = {
     await ToolOrchestratorService._proxyPost(
       "/agentic/git/worktree/remove",
       { path: worktreeState.repoPath, worktreePath: worktreeState.worktreePath, deleteBranch: true },
-      typedContext,
+      context,
     );
 
     ToolOrchestratorService._clearWorktree(sessionId);
 
     logger.info(`[Worktree] exit: ${action} — ${worktreeState.branchName}`);
 
-    if (typedContext._emit) {
-      typedContext._emit({
+    if (context._emit) {
+      context._emit({
         type: SSE_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.WORKTREE_EXITED,
         action,

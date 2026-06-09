@@ -1,5 +1,6 @@
 import logger from "../../utils/logger.ts";
 import { SSE_EVENT_TYPES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { InternalToolContext } from "./InternalToolRegistry.ts";
 
 interface TodoItemInput {
   content: string;
@@ -31,7 +32,7 @@ interface TodoEmitEvent {
   stats: TodoStats;
 }
 
-interface TodoContext {
+interface TodoContext extends InternalToolContext {
   _emit?: (event: TodoEmitEvent) => void;
 }
 
@@ -80,10 +81,8 @@ export default {
 
   labels: ["coding"],
 
-  async execute(args: Record<string, unknown>, context: Record<string, unknown>) {
-    const writeArgs = args as unknown as TodoWriteArgs;
-    const typedContext = context as unknown as TodoContext;
-    const { items } = writeArgs;
+  async execute(toolArguments: Record<string, unknown>, context: TodoContext) {
+    const items = toolArguments.items;
     if (!Array.isArray(items)) {
       return { error: "'items' must be an array of todo objects" };
     }
@@ -97,17 +96,17 @@ export default {
 
     const stats: TodoStats = {
       total: normalized.length,
-      pending: normalized.filter((i) => i.status === "pending").length,
-      in_progress: normalized.filter((i) => i.status === "in_progress").length,
-      completed: normalized.filter((i) => i.status === "completed").length,
+      pending: normalized.filter((todoItem) => todoItem.status === "pending").length,
+      in_progress: normalized.filter((todoItem) => todoItem.status === "in_progress").length,
+      completed: normalized.filter((todoItem) => todoItem.status === "completed").length,
     };
 
     logger.info(
       `[TodoWrite] ${stats.total} items (${stats.completed} done, ${stats.in_progress} in progress, ${stats.pending} pending)`,
     );
 
-    if (typedContext._emit) {
-      typedContext._emit({ type: SSE_EVENT_TYPES.TODO_UPDATE, items: normalized, stats });
+    if (context._emit) {
+      context._emit({ type: SSE_EVENT_TYPES.TODO_UPDATE, items: normalized, stats });
     }
 
     return { acknowledged: true, items: normalized, stats };

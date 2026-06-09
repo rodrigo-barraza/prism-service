@@ -1,5 +1,10 @@
 import logger from "../../utils/logger.ts";
 import { SSE_EVENT_TYPES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { InternalToolContext } from "./InternalToolRegistry.ts";
+
+interface BriefContext extends InternalToolContext {
+  _emit?: (event: { type: string; brief: Record<string, unknown> }) => void;
+}
 
 export default {
   name: TOOL_NAMES.SUMMARIZE_CONVERSATION,
@@ -40,24 +45,27 @@ export default {
 
   labels: ["coding"],
 
-  async execute(args: Record<string, unknown>, context: { _emit?: (event: Record<string, unknown>) => void }) {
-    const { summary, keyFiles, openQuestions } = args;
-    if (!summary || typeof summary !== "string") {
+  async execute(toolArguments: Record<string, unknown>, context: BriefContext) {
+    const summary = typeof toolArguments.summary === "string" ? toolArguments.summary : undefined;
+    const keyFiles = Array.isArray(toolArguments.keyFiles) ? toolArguments.keyFiles : [];
+    const openQuestions = Array.isArray(toolArguments.openQuestions) ? toolArguments.openQuestions : [];
+
+    if (!summary) {
       return { error: "'summary' is required and must be a non-empty string" };
     }
 
-    const keyFilesArr = (keyFiles || []) as string[];
-    const openQuestionsArr = (openQuestions || []) as string[];
+    const keyFileItems = keyFiles.filter(item => typeof item === "string") as string[];
+    const openQuestionItems = openQuestions.filter(item => typeof item === "string") as string[];
 
     const brief = {
       summary,
-      keyFiles: keyFilesArr,
-      openQuestions: openQuestionsArr,
+      keyFiles: keyFileItems,
+      openQuestions: openQuestionItems,
       timestamp: new Date().toISOString(),
     };
 
     logger.info(
-      `[Brief] ${summary.length} chars, ${keyFilesArr.length} files, ${openQuestionsArr.length} questions`,
+      `[Brief] ${summary.length} chars, ${keyFileItems.length} files, ${openQuestionItems.length} questions`,
     );
 
     if (context._emit) {

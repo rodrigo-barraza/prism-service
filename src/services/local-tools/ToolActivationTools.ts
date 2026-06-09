@@ -4,14 +4,9 @@ import ToolContext from "../ToolContext.ts";
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import SettingsService from "../SettingsService.ts";
+import { InternalToolContext } from "./InternalToolRegistry.ts";
 
-interface ToolActivationContext {
-  agentSessionId?: string;
-  project?: string;
-  username?: string;
-  isSubAgent?: boolean;
-  [key: string]: unknown;
-}
+interface ToolActivationContext extends InternalToolContext {}
 
 const PROTECTED_TOOL_NAMES = new Set<string>([
   ...CORE_AGENTIC_TOOLS,
@@ -61,7 +56,7 @@ const enableTools = {
   },
   labels: ["tools", "activation", "meta"],
 
-  async execute(arguments_: Record<string, unknown>, context: ToolActivationContext) {
+  async execute(toolArguments: Record<string, unknown>, context: ToolActivationContext) {
     const sessionId = context.agentSessionId;
     if (!sessionId) {
       return { error: "No active agent session ID in context." };
@@ -75,7 +70,7 @@ const enableTools = {
       };
     }
 
-    const requestedToolEntries = arguments_.tools;
+    const requestedToolEntries = toolArguments.tools;
     if (!Array.isArray(requestedToolEntries) || requestedToolEntries.length === 0) {
       return { error: "'tools' must be a non-empty array of tool names or domain prefixes." };
     }
@@ -153,7 +148,7 @@ const disableTools = {
   },
   labels: ["tools", "activation", "meta"],
 
-  async execute(arguments_: Record<string, unknown>, context: ToolActivationContext) {
+  async execute(toolArguments: Record<string, unknown>, context: ToolActivationContext) {
     const sessionId = context.agentSessionId;
     if (!sessionId) {
       return { error: "No active agent session ID in context." };
@@ -167,7 +162,7 @@ const disableTools = {
       };
     }
 
-    const requestedToolEntries = arguments_.tools;
+    const requestedToolEntries = toolArguments.tools;
     if (!Array.isArray(requestedToolEntries) || requestedToolEntries.length === 0) {
       return { error: "'tools' must be a non-empty array of tool names or domain prefixes." };
     }

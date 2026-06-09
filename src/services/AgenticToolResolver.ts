@@ -14,11 +14,10 @@ import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
 interface ToolSchema {
   name: string;
   description?: string;
-  parameters?: Record<string, unknown>;
+  parameters?: unknown;
   domain?: string;
   _mcpServer?: string;
   _mcpOriginalName?: string;
-  [key: string]: unknown;
 }
 
 interface ModelDef {
