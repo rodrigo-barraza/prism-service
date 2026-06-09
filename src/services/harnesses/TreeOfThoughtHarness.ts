@@ -491,6 +491,9 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
               (!message.toolCalls || message.toolCalls.length === 0)
             ),
         );
+
+        this.checkAndApplyToolSetChanges();
+
         continue;
       }
 

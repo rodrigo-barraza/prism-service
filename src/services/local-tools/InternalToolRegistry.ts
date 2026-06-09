@@ -39,6 +39,7 @@ async function init() {
   const modules = await Promise.all([
     import("./EnterPlanModeTool.js"),
     import("./ExitPlanModeTool.js"),
+    import("./ToolActivationTools.js"),
     import("./SkillTools.js"),
     import("./WorktreeTools.js"),
     import("./TodoWriteTool.js"),

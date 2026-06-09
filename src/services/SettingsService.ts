@@ -24,7 +24,8 @@ interface SettingsData {
     subAgentModel: string;
     harness: string;
     topology: string;
-    [key: string]: string;
+    dynamicToolActivation: boolean;
+    [key: string]: string | boolean;
   };
   security: {
     allowEnvFiles: boolean;
@@ -58,6 +59,7 @@ const DEFAULTS: SettingsData = {
     subAgentModel: "",
     harness: "standard",
     topology: DEFAULT_TOPOLOGY,
+    dynamicToolActivation: true,
   },
   security: {
     allowEnvFiles: false,
