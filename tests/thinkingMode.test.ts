@@ -601,6 +601,22 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       expect(args.stop_sequences).toEqual(["STOP1", "STOP2"]);
       expect(args.service_tier).toBe("standard_only");
     });
+
+    it("omits top_k for adaptive thinking models (like Fable 5) to prevent deprecated parameter errors", async () => {
+      mockMessagesCreate.mockReturnValueOnce({
+        content: [{ type: "text", text: "Finished" }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      });
+
+      const messages = [{ role: "user", content: "hello" }];
+      await anthropicProvider.generateText(messages, MODELS.FABLE_5.name, {
+        topK: 25,
+      });
+
+      expect(mockMessagesCreate).toHaveBeenCalledTimes(1);
+      const args = mockMessagesCreate.mock.calls[0][0];
+      expect(args.top_k).toBeUndefined();
+    });
   });
 
   // ── Section 2: Thinking Chunk Parsing in Streams ─────────────────────
