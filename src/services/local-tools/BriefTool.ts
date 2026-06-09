@@ -6,6 +6,7 @@ export default {
 
   schema: {
     name: TOOL_NAMES.SUMMARIZE_CONVERSATION,
+    emoji: ["💬", "📝"],
     description:
       "Produce a compressed summary of the current conversation context. " +
       "Use this tool when the conversation is getting long and you need to " +

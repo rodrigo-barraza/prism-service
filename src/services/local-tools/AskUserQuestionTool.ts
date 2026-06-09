@@ -53,6 +53,7 @@ export default {
   name: TOOL_NAMES.ASK_USER,
   schema: {
     name: TOOL_NAMES.ASK_USER,
+    emoji: ["💬", "❓"],
     description:
       "Ask the user one or more questions and wait for their responses before continuing. " +
       "Use this when you need clarification, a decision between options, or explicit " +

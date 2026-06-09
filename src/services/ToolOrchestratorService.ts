@@ -425,6 +425,7 @@ function getOrchestratorToolSchemas(defaultTopology: string = DEFAULT_TOPOLOGY) 
   return [
     {
       name: TOOL_NAMES.CREATE_TEAM,
+      emoji: ["👥", "🤖"],
       description:
         "Spawn one or more sub-agents, each in an isolated git worktree. " +
         "Sub-agents have access to the full tool suite (read, write, search, shell). " +
@@ -492,6 +493,7 @@ function getOrchestratorToolSchemas(defaultTopology: string = DEFAULT_TOPOLOGY) 
     },
     {
       name: TOOL_NAMES.SEND_MESSAGE,
+      emoji: ["💬", "📤"],
       description:
         "Send a follow-up message to a running or completed sub-agent. Use to continue work, provide corrections, or give new instructions.",
       parameters: {
@@ -508,6 +510,7 @@ function getOrchestratorToolSchemas(defaultTopology: string = DEFAULT_TOPOLOGY) 
     },
     {
       name: TOOL_NAMES.STOP_AGENT,
+      emoji: ["⏹️", "🤖"],
       description:
         "Stop a running sub-agent. The sub-agent's worktree is cleaned up.",
       parameters: {
@@ -520,6 +523,7 @@ function getOrchestratorToolSchemas(defaultTopology: string = DEFAULT_TOPOLOGY) 
     },
     {
       name: TOOL_NAMES.GET_TASK_OUTPUT,
+      emoji: ["📥", "🤖"],
       description:
         "Read the output from a previously spawned sub-agent by its agent ID. " +
         "Use this to check on a sub-agent's result after it has completed, or to read " +
@@ -538,6 +542,7 @@ function getOrchestratorToolSchemas(defaultTopology: string = DEFAULT_TOPOLOGY) 
     },
     {
       name: TOOL_NAMES.DELETE_TEAM,
+      emoji: ["🗑️", "👥"],
       description:
         "Stop and remove all sub-agents in a named team. Cleans up worktrees for all members.",
       parameters: {
@@ -714,7 +719,18 @@ export default class ToolOrchestratorService {
 
   static getToolEmoji(toolName: string): string | null {
     const schema = toolMap.get(toolName);
-    return (schema?.emoji as string) ?? null;
+    if (schema?.emoji) return schema.emoji as string;
+    
+    // Check internal / orchestrator tools
+    const localEmojis: Record<string, string | [string, string]> = {"enter_plan_mode":["📝","🧠"],"exit_plan_mode":["🚀","🧠"],"create_skill":["🪄","🛠️"],"execute_skill":["⚡","🪄"],"list_skills":["📋","🪄"],"delete_skill":["🗑️","🪄"],"enter_worktree":["🌳","💻"],"exit_worktree":["🚪","🌳"],"write_todo":["📝","📌"],"summarize_conversation":["💬","📝"],"ask_user":["💬","❓"],"list_mcp_resources":["🔌","📋"],"read_mcp_resource":["🔌","📄"],"authenticate_mcp_server":["🔌","🔐"],"set_timer":["⏰","🔔"],"list_timers":["⏱️","📋"],"cancel_timer":["⏰","❌"],"create_team":["👥","🤖"],"send_message":["💬","📤"],"stop_agent":["⏹️","🤖"],"get_task_output":["📥","🤖"],"delete_team":["🗑️","👥"]};
+    const emojiVal = localEmojis[toolName];
+    if (emojiVal) {
+      if (Array.isArray(emojiVal)) {
+        return emojiVal[0];
+      }
+      return emojiVal;
+    }
+    return null;
   }
 
   static getToolFields(toolName: string) {

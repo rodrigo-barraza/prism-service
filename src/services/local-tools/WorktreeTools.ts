@@ -36,6 +36,7 @@ const enterWorktree = {
   name: TOOL_NAMES.ENTER_WORKTREE,
   schema: {
     name: TOOL_NAMES.ENTER_WORKTREE,
+    emoji: ["🌳", "💻"],
     description:
       "Enter an isolated git worktree for the current conversation. Creates a new branch " +
       "and redirects all file/git/shell tool calls to the worktree directory. " +
@@ -138,6 +139,7 @@ const exitWorktree = {
   name: TOOL_NAMES.EXIT_WORKTREE,
   schema: {
     name: TOOL_NAMES.EXIT_WORKTREE,
+    emoji: ["🚪", "🌳"],
     description:
       "Exit the current isolated worktree and return to the main workspace. " +
       "Choose to 'merge' changes back to the main branch or 'discard' them entirely. " +
