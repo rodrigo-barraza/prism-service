@@ -230,4 +230,58 @@ describe("AgenticToolResolver — tool resolution", () => {
     expect(toolNames).toContain("delete_team");
     expect(toolNames).toContain("read_file");
   });
+
+  it("disabledTools prevents prism-local tools from being re-included by bypass", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {
+        disabledTools: ["think", "sleep"],
+      },
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDef: undefined,
+    });
+
+    const toolNames = finalTools.map((tool: Record<string, unknown>) => tool.name);
+
+    expect(toolNames).not.toContain("think");
+    expect(toolNames).not.toContain("sleep");
+    expect(toolNames).toContain("read_file");
+  });
+
+  it("disabledTools prevents CORE_AGENTIC_TOOLS from being re-included by bypass", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {
+        disabledTools: ["evaluate_expression"],
+      },
+      agent: "CODING",
+      project: "coding",
+      username: "anonymous",
+      modelDef: undefined,
+    });
+
+    const toolNames = finalTools.map((tool: Record<string, unknown>) => tool.name);
+
+    expect(toolNames).not.toContain("evaluate_expression");
+    expect(toolNames).toContain("read_file");
+  });
+
+  it("disabledTools prevents CORE_ORCHESTRATOR_TOOLS from being re-included by bypass", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {
+        disabledTools: ["create_team", "send_message"],
+      },
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDef: undefined,
+    });
+
+    const toolNames = finalTools.map((tool: Record<string, unknown>) => tool.name);
+
+    expect(toolNames).not.toContain("create_team");
+    expect(toolNames).not.toContain("send_message");
+    expect(toolNames).toContain("stop_agent");
+    expect(toolNames).toContain("read_file");
+  });
 });
