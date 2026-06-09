@@ -586,7 +586,7 @@ describe("SystemPromptAssembler", () => {
         enabledTools: ["read_file", "write_file"],
       });
 
-      expect(prompt).toContain("## Available Tools");
+      expect(prompt).toContain("## Enabled Tools");
     });
 
     it("filters tools by enabledTools when specified", async () => {
