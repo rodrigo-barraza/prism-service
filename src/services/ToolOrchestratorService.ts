@@ -606,8 +606,8 @@ export default class ToolOrchestratorService {
     // Orchestrator tools are Prism-local — add domain metadata for UI grouping
     const orchestratorClient = getOrchestratorToolSchemas(defaultTopology).map((tool) => ({
       ...tool,
-      domain: DOMAINS.ORCHESTRATOR.displayName,
-      domainKey: "orchestrator",
+      domain: DOMAINS.CORE_ORCHESTRATOR.displayName,
+      domainKey: "core_orchestrator",
       system: true,
     }));
 
