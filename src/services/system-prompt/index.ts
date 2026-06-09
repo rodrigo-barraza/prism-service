@@ -225,9 +225,35 @@ export default class SystemPromptAssembler {
       if (orchestratorAvailable) {
         const allSchemas = ToolOrchestratorService.getToolSchemas(defaultTopology);
         const orchestratorSet = new Set(ORCHESTRATOR_ONLY_TOOLS);
-        const subAgentTools = allSchemas
-          .map((tool) => tool.name as string)
-          .filter((toolName: string) => !orchestratorSet.has(toolName));
+        const lockedOffSet = await resolveLockedOffToolNames();
+
+        // Build the sub-agent tool list from only the enabled tools
+        // (not the full catalog). Sub-agents inherit the parent's
+        // enabled set minus orchestrator-only tools.
+        let enabledToolNames: string[];
+        if (context.resolvedToolNames?.length) {
+          enabledToolNames = context.resolvedToolNames;
+        } else if (context.enabledTools?.length) {
+          const hasPrefixed = context.enabledTools.some(
+            (entry) => entry.startsWith("domain:") || entry.startsWith("domainKey:"),
+          );
+          const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+          const enabledSet = hasPrefixed
+            ? resolveToolEntriesToSet(context.enabledTools, clientSchemas)
+            : new Set(context.enabledTools);
+          enabledToolNames = allSchemas
+            .map((tool) => tool.name as string)
+            .filter((toolName) =>
+              enabledSet.has(toolName) ||
+              CORE_AGENTIC_TOOLS.has(toolName),
+            );
+        } else {
+          enabledToolNames = allSchemas.map((tool) => tool.name as string);
+        }
+
+        const subAgentTools = enabledToolNames.filter(
+          (toolName) => !orchestratorSet.has(toolName) && !lockedOffSet.has(toolName),
+        );
         sections.push(getOrchestratorPromptAddendum({ subAgentTools, defaultTopology }));
       }
     }

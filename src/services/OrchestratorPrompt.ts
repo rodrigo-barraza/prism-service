@@ -18,7 +18,7 @@ export function getOrchestratorPromptAddendum({
   const subAgentToolList =
     subAgentTools.length > 0
       ? [...subAgentTools].sort().join(", ")
-      : "all standard tools (read, write, search, shell, etc.)";
+      : "the currently enabled tools (sub-agents can also enable additional tools dynamically via enable_tools)";
 
   const defHierarchical = defaultTopology === TOPOLOGIES.HIERARCHICAL ? " (default)" : "";
   const defSequential = defaultTopology === TOPOLOGIES.SEQUENTIAL ? " (default)" : "";
