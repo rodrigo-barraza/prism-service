@@ -702,7 +702,7 @@ const MODELS = {
       outputPerMillion: 50.0,
     },
     maxInputTokens: 200_000,
-    maxOutputTokens: 64_000,
+    maxOutputTokens: 128_000,
     inputTypes: [TYPES.TEXT, TYPES.IMAGE],
     outputTypes: [TYPES.TEXT],
     mediaLimits: {
@@ -711,6 +711,7 @@ const MODELS = {
     },
     streaming: true,
     thinking: true,
+    adaptiveThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     assistantImages: false,
     webSearch: true,
@@ -740,7 +741,7 @@ const MODELS = {
       outputPerMillion: 50.0,
     },
     maxInputTokens: 200_000,
-    maxOutputTokens: 64_000,
+    maxOutputTokens: 128_000,
     inputTypes: [TYPES.TEXT, TYPES.IMAGE],
     outputTypes: [TYPES.TEXT],
     mediaLimits: {
@@ -749,6 +750,7 @@ const MODELS = {
     },
     streaming: true,
     thinking: true,
+    adaptiveThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     assistantImages: false,
     webSearch: true,
@@ -1405,6 +1407,7 @@ export interface ModelOptionEntry {
   year?: number;
   supportsSystemPrompt?: boolean;
   lockedSampling?: boolean;
+  adaptiveThinking?: boolean;
 }
 
 // ─── derive defaults, options, pricing from MODELS ──────────
@@ -1468,6 +1471,7 @@ function getModelOptions(inputType: string, outputType: string): Record<string, 
       if (modelRecord.mediaLimits) entry.mediaLimits = modelRecord.mediaLimits as Record<string, unknown>;
       if (modelRecord.year) entry.year = modelRecord.year as number;
       if (modelRecord.lockedSampling) entry.lockedSampling = true;
+      if (modelRecord.adaptiveThinking) entry.adaptiveThinking = true;
       // System prompt support: true for chat models, false for image-only/TTS/embedding APIs
       entry.supportsSystemPrompt =
         modelRecord.supportsSystemPrompt !== undefined

@@ -34,7 +34,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.95.1",
+    "@anthropic-ai/sdk": "^0.103.0",
     "@google/genai": "^2.4.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@rodrigo-barraza/service-library": "github:rodrigo-barraza/service-library",
