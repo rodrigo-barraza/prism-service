@@ -63,7 +63,7 @@ const COORDINATOR_TOOL_SCHEMAS = [
     description: "Spawn worker agents",
     parameters: { type: "object", properties: {} },
     domain: "Core Orchestrator Tools",
-    domainKey: "orchestrator",
+    domainKey: "core_orchestrator",
     labels: ["coding", "orchestration"],
   },
   {
@@ -71,7 +71,7 @@ const COORDINATOR_TOOL_SCHEMAS = [
     description: "Send message to worker",
     parameters: { type: "object", properties: {} },
     domain: "Core Orchestrator Tools",
-    domainKey: "orchestrator",
+    domainKey: "core_orchestrator",
     labels: ["coding", "orchestration"],
   },
   {
@@ -79,7 +79,7 @@ const COORDINATOR_TOOL_SCHEMAS = [
     description: "Stop a worker agent",
     parameters: { type: "object", properties: {} },
     domain: "Core Orchestrator Tools",
-    domainKey: "orchestrator",
+    domainKey: "core_orchestrator",
     labels: ["coding", "orchestration"],
   },
 ];
@@ -353,7 +353,7 @@ describe("SystemPromptAssembler", () => {
         agent: "CODING",
         project: "prism-chat",
         messages: [{ role: "user", content: "Hello" }],
-        enabledTools: ["domainKey:orchestrator"],
+        enabledTools: ["domainKey:core_orchestrator"],
       });
 
       expect(prompt).toContain("Orchestrator Mode — Multi-Agent Orchestration");
@@ -391,7 +391,7 @@ describe("SystemPromptAssembler", () => {
         agent: "CODING",
         project: "prism-chat",
         messages: [{ role: "user", content: "Create a cron job" }],
-        enabledTools: ["domainKey:orchestrator"],
+        enabledTools: ["domainKey:core_orchestrator"],
       });
 
       // Path 2: Cron job — uses expanded tool names

@@ -46,6 +46,7 @@ interface BeforePromptHookContext {
   agentSessionId: string;
   agentContext?: unknown;
   enabledTools: string[] | null;
+  resolvedToolNames: string[];
   workspaceRoot?: string;
   _injectedSkills?: string[];
   [key: string]: unknown;
@@ -160,6 +161,7 @@ Use these images to observe the environment, notice changes, animations, or user
           agentSessionId,
           agentContext: options.agentContext,
           enabledTools: this.tools.resolvedEnabledTools,
+          resolvedToolNames: this.tools.finalTools.map((tool: ToolSchema) => tool.name),
           workspaceRoot: workspaceRoot || undefined,
         };
         await hooks.run("beforePrompt", hookContext);

@@ -22,6 +22,7 @@ export interface AssemblerContext {
   username?: string;
   messages?: Array<{ role: string; content?: string; [key: string]: unknown }>;
   enabledTools?: string[];
+  resolvedToolNames?: string[];
   agentContext?: Record<string, unknown>;
   traceId?: string | null;
   agentSessionId?: string | null;

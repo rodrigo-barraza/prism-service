@@ -36,8 +36,8 @@ export default class SystemPromptAssembler {
     return this.directoryFormatter.fetchDirectoryTree();
   }
 
-  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string): string {
-    return this.docFormatter.buildToolDescriptions(enabledTools, agentId, defaultTopology);
+  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string, resolvedToolNames?: string[]): string {
+    return this.docFormatter.buildToolDescriptions(enabledTools, agentId, defaultTopology, resolvedToolNames);
   }
 
   async assemble(context: AssemblerContext) {
@@ -131,37 +131,42 @@ export default class SystemPromptAssembler {
 
     // ── 4. Enabled Tools (domain-grouped) ──────────────────────
     {
-      const toolDescriptions = this.buildToolDescriptions(context.enabledTools, agentId, defaultTopology);
+      const toolDescriptions = this.buildToolDescriptions(context.enabledTools, agentId, defaultTopology, context.resolvedToolNames);
       if (toolDescriptions) {
-        const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
-        let count = schemas.length;
-        if (context.enabledTools) {
-          const hasPrefixed = context.enabledTools.some(
-            (enabledTool) => enabledTool.startsWith("domain:") || enabledTool.startsWith("domainKey:"),
-          );
-          const enabledSet = hasPrefixed
-            ? resolveToolEntriesToSet(context.enabledTools, schemas)
-            : new Set(context.enabledTools);
+        let count: number;
+        if (context.resolvedToolNames?.length) {
+          count = context.resolvedToolNames.length;
+        } else {
+          const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+          count = schemas.length;
+          if (context.enabledTools) {
+            const hasPrefixed = context.enabledTools.some(
+              (enabledTool) => enabledTool.startsWith("domain:") || enabledTool.startsWith("domainKey:"),
+            );
+            const enabledSet = hasPrefixed
+              ? resolveToolEntriesToSet(context.enabledTools, schemas)
+              : new Set(context.enabledTools);
 
-          let filteredSchemas = schemas.filter(
-            (toolSchema) =>
-              enabledSet.has(toolSchema.name as string) ||
-              (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
-              (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_WORKSPACE.displayName ||
-              (toolSchema as Record<string, unknown>).domain === DOMAINS.ORCHESTRATOR.displayName
-          );
+            let filteredSchemas = schemas.filter(
+              (toolSchema) =>
+                enabledSet.has(toolSchema.name as string) ||
+                (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
+                (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_WORKSPACE.displayName ||
+                (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_ORCHESTRATOR.displayName
+            );
 
-          if (agentId) {
-            const assemblerPersona = AgentPersonaRegistry.get(agentId);
-            if (assemblerPersona?.blockedTools?.length) {
-              const disabledSet = resolveToolEntriesToSet(assemblerPersona.blockedTools, schemas);
-              filteredSchemas = filteredSchemas.filter(
-                (toolSchema) => !disabledSet.has(toolSchema.name as string) || enabledSet.has(toolSchema.name as string),
-              );
+            if (agentId) {
+              const assemblerPersona = AgentPersonaRegistry.get(agentId);
+              if (assemblerPersona?.blockedTools?.length) {
+                const disabledSet = resolveToolEntriesToSet(assemblerPersona.blockedTools, schemas);
+                filteredSchemas = filteredSchemas.filter(
+                  (toolSchema) => !disabledSet.has(toolSchema.name as string) || enabledSet.has(toolSchema.name as string),
+                );
+              }
             }
-          }
 
-          count = filteredSchemas.length;
+            count = filteredSchemas.length;
+          }
         }
         sections.push(`## Enabled Tools (${count})\n` + toolDescriptions);
       }

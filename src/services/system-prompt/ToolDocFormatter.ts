@@ -11,8 +11,17 @@ export class ToolDocFormatter {
    *   - Name + first sentence of description (capability summary)
    *   - Full parameter listing with required markers
    */
-  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string): string {
+  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string, resolvedToolNames?: string[]): string {
     const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+
+    if (resolvedToolNames?.length) {
+      const resolvedSet = new Set(resolvedToolNames);
+      const filteredSchemas = schemas.filter(
+        (toolSchema) => resolvedSet.has(toolSchema.name as string),
+      );
+      return this._formatToolDescriptions(filteredSchemas);
+    }
+
     if (!enabledTools) {
       return this._formatToolDescriptions(schemas);
     }
@@ -30,10 +39,9 @@ export class ToolDocFormatter {
         enabledSet.has(toolSchema.name as string) ||
         (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
         (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_WORKSPACE.displayName ||
-        (toolSchema as Record<string, unknown>).domain === DOMAINS.ORCHESTRATOR.displayName
+        (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_ORCHESTRATOR.displayName
     );
 
-    // Apply blockedTools post-filter denylist — enabledSet entries are protected
     if (agentId) {
       const persona = AgentPersonaRegistry.get(agentId);
       if (persona?.blockedTools?.length) {
