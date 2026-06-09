@@ -65,7 +65,7 @@ export default class AgenticToolResolver {
    * Handles MCP tools, disabledBuiltIns mode, prefix expansion,
    * and native provider tool collision prevention.
    */
-  static async resolve({ options, agent, project, username, modelDef, agentSessionId }: ResolveParams) {
+  static async resolve({ options, agent, project: _project, username: _username, modelDef, agentSessionId }: ResolveParams) {
     // Ensure tool schemas are loaded from tools-api (lazy init — if tools-api
     // was unreachable at boot, this fetches on-demand before proceeding)
     await ToolOrchestratorService.ensureSchemas();
@@ -90,6 +90,7 @@ export default class AgenticToolResolver {
 
     // ── Tool filtering ────────────────────────────────────────────
     let resolvedEnabledTools: string[] | null = options.enabledTools || null;
+    let shouldApplyDisabledFilter = false;
     if (agentSessionId) {
       const dynamicTools = ToolContext.get<string[]>(agentSessionId, "dynamicEnabledTools");
       if (Array.isArray(dynamicTools) && dynamicTools.length > 0) {
@@ -101,6 +102,7 @@ export default class AgenticToolResolver {
           resolvedEnabledTools = resolvedEnabledTools.filter(
             (toolName) => !clientDisabledSet.has(toolName),
           );
+          shouldApplyDisabledFilter = true;
         }
       }
     }
@@ -111,6 +113,7 @@ export default class AgenticToolResolver {
       options.disabledTools &&
       Array.isArray(options.disabledTools)
     ) {
+      shouldApplyDisabledFilter = true;
       const disabledSet = new Set(options.disabledTools);
       const persona = agent ? AgentPersonaRegistry.get(agent) : null;
       const rawBaseTools = persona?.availableTools || null;
@@ -183,19 +186,19 @@ export default class AgenticToolResolver {
       const resolvedPersona = agent ? AgentPersonaRegistry.get(agent) : null;
       const isCoreToolsLocked = resolvedPersona?.coreToolsLocked ?? true;
 
-      const clientDisabledSet = options.disabledTools && Array.isArray(options.disabledTools) && options.disabledTools.length > 0
+      const clientDisabledSet = shouldApplyDisabledFilter && options.disabledTools && Array.isArray(options.disabledTools) && options.disabledTools.length > 0
         ? new Set<string>(options.disabledTools)
         : null;
 
       const shouldBypassOrchestratorTools = !options.isSubAgent;
       finalTools = finalTools.filter(
         (tool) => {
+          if (clientDisabledSet?.has(tool.name)) return false;
           if (enabledSet.has(tool.name)) return true;
           if (tool.name.startsWith("mcp__")) return true;
           if (isCoreToolsLocked && CORE_AGENTIC_TOOLS.has(tool.name)) return true;
           if (shouldBypassOrchestratorTools && CORE_ORCHESTRATOR_TOOLS.has(tool.name)) return true;
           if (PRISM_LOCAL_TOOL_NAMES.has(tool.name)) return true;
-          if (clientDisabledSet?.has(tool.name)) return false;
           return false;
         },
       );
