@@ -7,6 +7,7 @@
  */
 
 import rateLimitStore from "../services/RateLimitStore.ts";
+import { PROVIDERS } from "../constants.ts";
 
 /**
  * Extract rate-limit headers from an OpenAI HTTP response.
@@ -35,7 +36,7 @@ export function extractOpenAIRateLimits(response: HttpResponseWithHeaders | null
   if (!limitRequests && !limitTokens) return null;
 
   const result = {
-    provider: "openai",
+    provider: PROVIDERS.OPENAI,
     requests: {
       limit: safeInt(limitRequests),
       remaining: safeInt(headers.get("x-ratelimit-remaining-requests")),
@@ -49,7 +50,7 @@ export function extractOpenAIRateLimits(response: HttpResponseWithHeaders | null
   };
 
   // Update the global store with the latest per-model snapshot
-  rateLimitStore.update("openai", model, result);
+  rateLimitStore.update(PROVIDERS.OPENAI, model, result);
 
   return result;
 }
@@ -79,7 +80,7 @@ export function extractAnthropicRateLimits(response: HttpResponseWithHeaders | n
   if (!limitRequests && !limitTokens) return null;
 
   const result = {
-    provider: "anthropic",
+    provider: PROVIDERS.ANTHROPIC,
     requests: {
       limit: safeInt(limitRequests),
       remaining: safeInt(headers.get("anthropic-ratelimit-requests-remaining")),
@@ -103,7 +104,7 @@ export function extractAnthropicRateLimits(response: HttpResponseWithHeaders | n
   };
 
   // Update the global store with the latest per-model snapshot
-  rateLimitStore.update("anthropic", model, result);
+  rateLimitStore.update(PROVIDERS.ANTHROPIC, model, result);
 
   return result;
 }

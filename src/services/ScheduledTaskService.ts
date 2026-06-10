@@ -365,7 +365,7 @@ const ScheduledTaskService = {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!project || !db) return true;
 
-    const workspaceExists = await db.collection("workspaces").findOne({ name: project });
+    const workspaceExists = await db.collection(COLLECTIONS.WORKSPACES).findOne({ name: project });
     if (workspaceExists) return false;
 
     const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.ts");

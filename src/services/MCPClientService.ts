@@ -6,6 +6,7 @@ import logger from "../utils/logger.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
 import type { Db } from "mongodb";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { COLLECTIONS } from "../constants.ts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -571,7 +572,7 @@ const MCPClientService = {
 
     try {
       const servers = await db
-        .collection("mcp_servers")
+        .collection(COLLECTIONS.MCP_SERVERS)
         .find({ project, username, enabled: true })
         .toArray() as unknown as MCPServerConfig[];
 

@@ -2,6 +2,7 @@ import MemoryService from "../MemoryService.ts";
 import EmbeddingService from "../EmbeddingService.ts";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
+import { COLLECTIONS } from "../../constants.ts";
 import logger from "../../utils/logger.ts";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
@@ -60,7 +61,7 @@ export class SkillMemoryScorer {
       if (!db) return [];
 
       const skills = await db
-        .collection("agent_skills")
+        .collection(COLLECTIONS.AGENT_SKILLS)
         .find({ project, username, enabled: true })
         .project({ name: 1, content: 1, description: 1, embedding: 1 })
         .toArray();
