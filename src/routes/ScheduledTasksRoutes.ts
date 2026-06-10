@@ -3,6 +3,7 @@ import express, { Request, Response } from "express";
 import ScheduledTaskService from "../services/ScheduledTaskService.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { PROVIDERS } from "../constants.ts";
 
 const router = express.Router();
 
@@ -55,7 +56,7 @@ router.post(
     const username: string = typeof req.username === "string" ? req.username : "system";
     let { name, prompt, agent, provider, model, scheduleType, scheduleTime, scheduleDay, scheduleDate, cronExpression, recurrenceRule, toolConfig } = req.body;
 
-    provider = provider || "anthropic";
+    provider = provider || PROVIDERS.ANTHROPIC;
     model = model || "claude-sonnet-4-5-20250929";
 
     if (!name || !prompt || !provider || !model || !scheduleType) {

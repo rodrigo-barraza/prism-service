@@ -10,7 +10,8 @@ import {
   TOOL_CONFIG_FETCH_TIMEOUT_MS,
   TOOL_WORKSPACE_UPDATE_TIMEOUT_MS,
   TOOL_WORKSPACE_VALIDATE_TIMEOUT_MS,
-  TOOL_API_HEALTH_TIMEOUT_MS
+  TOOL_API_HEALTH_TIMEOUT_MS,
+  FILE_CATEGORIES,
 } from "../constants.ts";
 import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
 import type { OrchestratorContext, TeamMember } from "../types/orchestrator.ts";
@@ -1002,7 +1003,7 @@ export default class ToolOrchestratorService {
         const dataUrl = `data:${image.mimeType || "image/png"};base64,${image.data}`;
         const { ref } = await FileService.uploadFile(
           dataUrl,
-          "generations",
+          FILE_CATEGORIES.GENERATIONS,
           context.project || null,
           context.username || null,
         );
@@ -1022,7 +1023,7 @@ export default class ToolOrchestratorService {
         const dataUrl = `data:${resultObj.mimeType || "image/png"};base64,${resultObj.screenshot}`;
         const { ref } = await FileService.uploadFile(
           dataUrl,
-          "screenshots",
+          FILE_CATEGORIES.SCREENSHOTS,
           context.project || null,
           context.username || null,
         );

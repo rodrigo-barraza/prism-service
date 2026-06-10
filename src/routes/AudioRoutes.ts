@@ -10,6 +10,7 @@ import ConversationService from "../services/ConversationService.ts";
 import FileService from "../services/FileService.ts";
 import logger from "../utils/logger.ts";
 import RequestLogger from "../services/RequestLogger.ts";
+import { FILE_CATEGORIES } from "../constants.ts";
 
 import type { ChatMessage } from "../types/admin.ts";
 
@@ -165,7 +166,7 @@ export async function handleVoice(
         const dataUrl = `data:${contentType};base64,${audioBuffer.toString("base64")}`;
         const { ref } = await FileService.uploadFile(
           dataUrl,
-          "generations",
+          FILE_CATEGORIES.GENERATIONS,
           project,
           username,
         );
@@ -442,7 +443,7 @@ router.post(
         try {
           const { ref } = await FileService.uploadFile(
             audio,
-            "uploads",
+            FILE_CATEGORIES.UPLOADS,
             req.project,
             req.username,
           );

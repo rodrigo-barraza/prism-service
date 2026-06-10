@@ -19,7 +19,7 @@ import { MS_PER_DAY, hours } from "@rodrigo-barraza/utilities-library";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS, FILE_CATEGORIES } from "../constants.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
@@ -156,7 +156,7 @@ async function pruneOldRequestLogs(): Promise<number> {
  * Objects under these prefixes are NOT conversation-scoped and must never be
  * treated as orphans based on conversation ID matching.
  */
-const STRUCTURAL_PREFIXES = new Set(["projects", "uploads", "generations"]);
+const STRUCTURAL_PREFIXES: Set<string> = new Set([FILE_CATEGORIES.PROJECTS, FILE_CATEGORIES.UPLOADS, FILE_CATEGORIES.GENERATIONS]);
 
 /**
  * Find MinIO objects that no longer have matching MongoDB references.

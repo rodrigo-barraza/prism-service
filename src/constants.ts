@@ -134,3 +134,10 @@ export const WORKFLOW_ENDPOINTS = {
   TEXT_TO_SPEECH: "textToSpeech",
   MODALITY_TO_EMBEDDING: "modalityToEmbedding",
 } as const;
+
+export const FILE_CATEGORIES = {
+  GENERATIONS: "generations",
+  UPLOADS: "uploads",
+  SCREENSHOTS: "screenshots",
+  PROJECTS: "projects",
+} as const;

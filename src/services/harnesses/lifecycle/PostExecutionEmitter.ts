@@ -7,6 +7,7 @@ import type { ToolCall, ToolResult, PassState, EmitFunction, AgenticContext } fr
 import FileService from "../../FileService.ts";
 import WebhookEventBus from "../../WebhookEventBus.ts";
 import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
+import { FILE_CATEGORIES } from "../../../constants.ts";
 
 /**
  * PostExecutionEmitter — status notifications emitted after tool execution.
@@ -72,7 +73,7 @@ export async function processToolResultMedia(
       const mimeType = audioResult.mimeType || "audio/wav";
       const dataUrl = `data:${mimeType};base64,${audioResult.data}`;
       try {
-        const uploadResult = await FileService.uploadFile(dataUrl, "generations");
+        const uploadResult = await FileService.uploadFile(dataUrl, FILE_CATEGORIES.GENERATIONS);
         if (resultObject) {
           resultObject.audioRef = uploadResult.ref;
           delete resultObject.audio;

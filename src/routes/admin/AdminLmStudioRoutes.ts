@@ -2,6 +2,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { getProvider } from "../../providers/index.ts";
+import { PROVIDERS } from "../../constants.ts";
 import { resolveArchParams, estimateMemory } from "../../utils/gguf-arch.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
@@ -13,7 +14,7 @@ router.get(
   "/models",
   asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      const provider = getProvider("lm-studio");
+      const provider = getProvider(PROVIDERS.LM_STUDIO);
       const data = await provider.listModels();
       res.json(data);
     } catch (error: unknown) {
@@ -40,7 +41,7 @@ router.post(
           .json({ error: "Missing 'model' in request body" });
       }
 
-      const provider = getProvider("lm-studio");
+      const provider = getProvider(PROVIDERS.LM_STUDIO);
 
       const loadOptions: Record<string, unknown> = {};
       if (context_length != null) loadOptions.context_length = context_length;
@@ -79,7 +80,7 @@ router.post(
         });
       }
 
-      const provider = getProvider("lm-studio");
+      const provider = getProvider(PROVIDERS.LM_STUDIO);
       const data = await provider.unloadModel(instance_id);
       res.json(data);
     } catch (error: unknown) {
@@ -107,7 +108,7 @@ router.post(
           .json({ error: "Missing 'model' in request body" });
       }
 
-      const provider = getProvider("lm-studio");
+      const provider = getProvider(PROVIDERS.LM_STUDIO);
       const result = await provider.listModels();
       const allModels = result?.data || result?.models || [];
       const modelData = allModels.find(

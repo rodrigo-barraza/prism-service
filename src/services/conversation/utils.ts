@@ -2,6 +2,7 @@ import FileService from "../FileService.ts";
 import logger from "../../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
+import { FILE_CATEGORIES } from "../../constants.ts";
 import type { ChatMessage } from "../../types/admin.ts";
 import type { MessagePayload, ConversationSettings, ConversationPatchInput, ConversationPatchFields } from "./types.ts";
 
@@ -22,7 +23,7 @@ export async function extractFiles(
 
     // Handle images
     if (message.images && message.images.length > 0) {
-      const category = message.role === "assistant" ? "generations" : "uploads";
+      const category = message.role === "assistant" ? FILE_CATEGORIES.GENERATIONS : FILE_CATEGORIES.UPLOADS;
       const newImages: string[] = [];
       for (const rawImage of message.images) {
         if (typeof rawImage !== "string") {
@@ -60,7 +61,7 @@ export async function extractFiles(
       typeof updated.audio === "string" &&
       updated.audio.startsWith("data:")
     ) {
-      const category = updated.role === "assistant" ? "generations" : "uploads";
+      const category = updated.role === "assistant" ? FILE_CATEGORIES.GENERATIONS : FILE_CATEGORIES.UPLOADS;
       try {
         const { ref } = await FileService.uploadFile(
           updated.audio,

@@ -12,6 +12,7 @@ import {
 
 import type { ConversationMessage } from "./harnesses/types.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { FILE_CATEGORIES } from "../constants.ts";
 
 // ─── Compress oversized data URLs ───────────────────────────
 /**
@@ -91,7 +92,7 @@ export async function resolveMediaReference(
     try {
       const { ref: minioRef } = await FileService.uploadFile(
         reference, // Upload original to MinIO
-        "uploads",
+        FILE_CATEGORIES.UPLOADS,
         project,
         username,
       );
