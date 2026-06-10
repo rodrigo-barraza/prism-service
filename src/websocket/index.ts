@@ -15,6 +15,7 @@ import RequestLogger from "../services/RequestLogger.ts";
 import ConversationService from "../services/ConversationService.ts";
 import { calculateLiveCost } from "../utils/CostCalculator.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { FILE_CATEGORIES } from "../constants.ts";
 import { getModelByName } from "../config.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";
 import type { WebSocket } from "ws";
@@ -290,7 +291,7 @@ function handleWsLive(
       const FileService = (await import("../services/FileService.js")).default;
       const { ref } = await FileService.uploadFile(
         dataUrl,
-        "generations",
+        FILE_CATEGORIES.GENERATIONS,
         project,
         username,
       );

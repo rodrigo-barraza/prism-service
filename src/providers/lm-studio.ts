@@ -33,6 +33,7 @@ import {
 } from "../utils/openai-compat.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "../services/OrchestratorPrompt.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { PROVIDERS } from "../constants.ts";
 // ── Native /api/v1/chat SSE stream parser ────────────────────
 // The native endpoint emits named SSE events: reasoning.start/delta/end,
 // message.start/delta/end, content.start/delta/end, chat.end.
@@ -294,7 +295,7 @@ function buildNativeInput(messages: PreparedMessage[]) {
     typeof lastUser.content === "string" ? lastUser.content : "";
   return historyPrefix ? historyPrefix + currentText : currentText;
 }
-export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm-studio") {
+export function createLmStudioProvider(baseUrl: string, instanceId: string = PROVIDERS.LM_STUDIO) {
   const getBaseUrl = () => baseUrl;
   const MCP_SERVER_URL = DEFAULT_MCP_SERVER_URL;
   // ── Per-instance model load mutex (singleflight) ──────────
@@ -307,7 +308,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
     name: instanceId,
     async generateText(
       messages: ChatMessage[],
-            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["lm-studio"],
+            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)[PROVIDERS.LM_STUDIO],
       options: ProviderOptions = {},
     ) {
       const baseUrl = getBaseUrl();
@@ -349,13 +350,13 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         return result;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
+                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
       }
     },
     // ── Streaming Text Generation (SSE) ──────────────────────
     async *generateTextStream(
       messages: ChatMessage[],
-            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["lm-studio"],
+            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)[PROVIDERS.LM_STUDIO],
       options: ProviderOptions = {},
     ) {
       const baseUrl = getBaseUrl();
@@ -841,7 +842,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
       } catch (error: unknown) {
                 if ((error instanceof Error && error.name === "AbortError")) return; // Client disconnected
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
+                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
       }
     },
     /**
@@ -904,7 +905,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
       if (!response.ok) {
         const errorText = await response.text();
         throw new ProviderError(
-          "lm-studio",
+          PROVIDERS.LM_STUDIO,
           `API error: ${response.status} ${errorText}`,
           response.status,
         );
@@ -966,13 +967,13 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         return { embedding: firstEmbedding, dimensions: firstEmbedding.length };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
+                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
       }
     },
     async captionImage(
       images: string[],
       prompt: string = "Describe this image.",
-            model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["lm-studio"],
+            model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)[PROVIDERS.LM_STUDIO],
       systemPrompt?: string,
     ) {
       const baseUrl = getBaseUrl();
@@ -1014,7 +1015,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         return { text: textContent, usage };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
+                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
       }
     },
     // ── Model Management ─────────────────────────────────────
@@ -1106,7 +1107,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         return data as Record<string, unknown>;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
+                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
       }
     },
     async loadModel(model: string, options: ProviderOptions = {}, signal?: AbortSignal) {
@@ -1136,7 +1137,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
       } catch (error: unknown) {
                 if ((error instanceof Error && error.name === "AbortError")) throw error; // Let AbortError propagate
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
+                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
       }
     },
     /**
@@ -1177,7 +1178,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = "lm
         return response.json();
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("lm-studio", getErrorMessage(error), 500, error);
+                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
       }
     },
   };

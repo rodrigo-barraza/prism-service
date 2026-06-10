@@ -7,7 +7,7 @@ import FileService from "../services/FileService.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { WORKFLOW_ENDPOINTS } from "../constants.ts";
+import { WORKFLOW_ENDPOINTS, FILE_CATEGORIES } from "../constants.ts";
 import type { SseEvent } from "../types/SseTypes.ts";
 
 // ── Types ────────────────────────────────────────────────────
@@ -582,7 +582,7 @@ async function executeModelNode(
       const dataUrl = `data:${contentType};base64,${audioBuffer.toString("base64")}`;
       const { ref } = await FileService.uploadFile(
         dataUrl,
-        "generations",
+        FILE_CATEGORIES.GENERATIONS,
         context.project,
         context.username,
       );

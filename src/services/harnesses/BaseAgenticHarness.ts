@@ -13,7 +13,7 @@ import RequestLogger from "../RequestLogger.ts";
 import FileService from "../FileService.ts";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
-import { COLLECTIONS } from "../../constants.ts";
+import { COLLECTIONS, FILE_CATEGORIES } from "../../constants.ts";
 import { finalizeTextGeneration, type FinalizerContext } from "./lifecycle/Finalizer.ts";
 import logger from "../../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
@@ -987,7 +987,7 @@ export default class BaseAgenticHarness {
         const dataUrl = `data:${mimeType};base64,${chunk.data}`;
         const { ref } = await FileService.uploadFile(
           dataUrl,
-          "generations",
+          FILE_CATEGORIES.GENERATIONS,
           project,
           username,
         );

@@ -47,6 +47,7 @@ import { SseEvent } from "../types/SseTypes.ts";
 import { ChatRequestSchema } from "../types/index.ts";
 import type { ConversationMessage, EmitFunction, ToolSchema } from "../services/harnesses/types.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { PROVIDERS, FILE_CATEGORIES } from "../constants.ts";
 
 interface ToolSchemaWithDomain extends ToolSchema {
   domain?: string;
@@ -762,7 +763,7 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
   const imgPricing =
     getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel as string] || (modelDef as Record<string, unknown> | null)?.pricing;
   const outputImgTokens =
-    (modelDef as Record<string, unknown> | null)?.imageTokensPerImage as number || (providerName === "openai" ? 1056 : 1120);
+    (modelDef as Record<string, unknown> | null)?.imageTokensPerImage as number || (providerName === PROVIDERS.OPENAI ? 1056 : 1120);
   const estimatedCost = calculateImageCost(
     prompt,
     imgPricing,
@@ -785,7 +786,7 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
       const dataUrl = `data:${mimeType};base64,${result.imageData}`;
       const { ref } = await FileService.uploadFile(
         dataUrl,
-        "generations",
+        FILE_CATEGORIES.GENERATIONS,
         project,
         username,
       );
@@ -1224,7 +1225,7 @@ async function handleNonStreamingText(context: GenerationContext) {
           const dataUrl = `data:${mimeType};base64,${image.data}`;
           const { ref } = await FileService.uploadFile(
             dataUrl,
-            "generations",
+            FILE_CATEGORIES.GENERATIONS,
             project,
             username,
           );

@@ -10,7 +10,7 @@ import { assembleGraph } from "../services/WorkflowAssembler.ts";
 import WorkflowExecutionService from "../services/WorkflowExecutionService.ts";
 import { createAbortController } from "../utils/AbortController.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS, FILE_CATEGORIES } from "../constants.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 
@@ -34,7 +34,7 @@ const MEDIA_FIELDS = ["images", "audio", "video", "pdf"];
  */
 async function uploadIfDataUrl(
   value: unknown,
-  category = "uploads",
+  category = FILE_CATEGORIES.UPLOADS,
   project: string | null = null,
   username: string | null = null,
 ) {
@@ -78,7 +78,7 @@ async function extractWorkflowFiles(
     ) {
       updated.content = await uploadIfDataUrl(
         updated.content,
-        "uploads",
+        FILE_CATEGORIES.UPLOADS,
         project,
         username,
       );
@@ -95,12 +95,12 @@ async function extractWorkflowFiles(
             const array: string[] = [];
             for (const item of value) {
               array.push(
-                await uploadIfDataUrl(item, "uploads", project, username) as string,
+                await uploadIfDataUrl(item, FILE_CATEGORIES.UPLOADS, project, username) as string,
               );
             }
             sanitizedMessage[field] = array;
           } else if (typeof value === "string" && value.startsWith("data:")) {
-            sanitizedMessage[field] = await uploadIfDataUrl(value, "uploads", project, username);
+            sanitizedMessage[field] = await uploadIfDataUrl(value, FILE_CATEGORIES.UPLOADS, project, username);
           }
         }
         newMessages.push(sanitizedMessage);
@@ -117,7 +117,7 @@ async function extractWorkflowFiles(
       for (const [modality, data] of Object.entries(updated.receivedOutputs)) {
         newReceived[modality] = await uploadIfDataUrl(
           data,
-          "uploads",
+          FILE_CATEGORIES.UPLOADS,
           project,
           username,
         );
@@ -166,14 +166,14 @@ async function extractNodeResultFiles(
               const array: string[] = [];
               for (const item of value) {
                 array.push(
-                  await uploadIfDataUrl(item, "uploads", project, username) as string,
+                  await uploadIfDataUrl(item, FILE_CATEGORIES.UPLOADS, project, username) as string,
                 );
               }
               sanitizedMessage[field] = array;
             } else if (typeof value === "string" && value.startsWith("data:")) {
               sanitizedMessage[field] = await uploadIfDataUrl(
                 value,
-                "uploads",
+                FILE_CATEGORIES.UPLOADS,
                 project,
                 username,
               );
@@ -185,7 +185,7 @@ async function extractNodeResultFiles(
       } else {
         newOutputs[modality] = await uploadIfDataUrl(
           data,
-          "uploads",
+          FILE_CATEGORIES.UPLOADS,
           project,
           username,
         );

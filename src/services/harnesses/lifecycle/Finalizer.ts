@@ -14,7 +14,7 @@ import { resolveToolEntriesToSet } from "../../../utils/resolveToolEntriesToSet.
 import {
   appendAndFinalize,
 } from "../../../utils/ConversationUtilities.ts";
-import { COLLECTIONS } from "../../../constants.ts";
+import { COLLECTIONS, FILE_CATEGORIES } from "../../../constants.ts";
 import logger from "../../../utils/logger.ts";
 import { TokenUsage, MessagePayload, ToolCallPayload, LlmOptions } from "../../RequestLogger.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
@@ -282,7 +282,7 @@ function swapMessageContent(message: MessagePayload) {
       const dataUrl = `data:audio/wav;base64,${wavBuffer.toString("base64")}`;
       const { ref } = await FileService.uploadFile(
         dataUrl,
-        "generations",
+        FILE_CATEGORIES.GENERATIONS,
                 project as string,
         username || "system",
       );

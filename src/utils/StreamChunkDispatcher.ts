@@ -10,6 +10,7 @@ import logger from "./logger.ts";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { TokenUsage, ToolCallEntry } from "../types/admin.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { FILE_CATEGORIES } from "../constants.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ export async function uploadImageChunk(
     const dataUrl = `data:${mimeType};base64,${chunk.data}`;
     const { ref } = await FileService.uploadFile(
       dataUrl,
-      "generations",
+      FILE_CATEGORIES.GENERATIONS,
       project,
       username,
     );

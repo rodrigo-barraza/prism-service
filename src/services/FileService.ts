@@ -3,6 +3,7 @@ import crypto from "crypto";
 import type { Readable } from "stream";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import logger from "../utils/logger.ts";
+import { FILE_CATEGORIES } from "../constants.ts";
 const MIME_TO_EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
@@ -66,7 +67,7 @@ const FileService: FileServiceInterface = {
   },
   async uploadFile(
     dataUrl: string,
-    category = "uploads",
+    category = FILE_CATEGORIES.UPLOADS,
     project: string | null = null,
     username: string | null = null,
   ): Promise<{ ref: string; size: number; contentType: string }> {
