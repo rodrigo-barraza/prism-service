@@ -7,6 +7,7 @@ import FileService from "../services/FileService.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { WORKFLOW_ENDPOINTS } from "../constants.ts";
 import type { SseEvent } from "../types/SseTypes.ts";
 
 // ── Types ────────────────────────────────────────────────────
@@ -147,11 +148,11 @@ function resolveEndpoint(
   const outputsAudio = (node.outputTypes || []).includes("audio");
   const outputsEmbedding = (node.outputTypes || []).includes("embedding");
 
-  if (outputsEmbedding) return "modalityToEmbedding";
-  if (outputsImage) return "textToImage";
-  if (hasAudioInput && !outputsAudio) return "audioToText";
-  if (outputsAudio) return "textToSpeech";
-  return "textToText";
+  if (outputsEmbedding) return WORKFLOW_ENDPOINTS.MODALITY_TO_EMBEDDING;
+  if (outputsImage) return WORKFLOW_ENDPOINTS.TEXT_TO_IMAGE;
+  if (hasAudioInput && !outputsAudio) return WORKFLOW_ENDPOINTS.AUDIO_TO_TEXT;
+  if (outputsAudio) return WORKFLOW_ENDPOINTS.TEXT_TO_SPEECH;
+  return WORKFLOW_ENDPOINTS.TEXT_TO_TEXT;
 }
 
 // ── Topological Sort ─────────────────────────────────────────
@@ -217,7 +218,7 @@ async function executeModelNode(
     systemPrompt: node.systemPrompt || "",
   };
 
-  if (endpoint === "textToText") {
+  if (endpoint === WORKFLOW_ENDPOINTS.TEXT_TO_TEXT) {
     const textParts = inputData.filter((datum) => datum.type === "text").map((datum) => datum.data);
     const imageParts = inputData.filter((datum) => datum.type === "image").map((datum) => datum.data);
     const audioParts = inputData.filter((datum) => datum.type === "audio").map((datum) => datum.data);
@@ -389,7 +390,7 @@ async function executeModelNode(
         outputs.image = `data:${mime};base64,${imageEvent.data}`;
       }
     }
-  } else if (endpoint === "textToImage") {
+  } else if (endpoint === WORKFLOW_ENDPOINTS.TEXT_TO_IMAGE) {
     const pipedPrompt =
       (inputData.find((datum) => datum.type === "text")?.data as string) || "";
     const rawImages = inputData
@@ -506,7 +507,7 @@ async function executeModelNode(
     if (textResponse) {
       outputs.text = textResponse;
     }
-  } else if (endpoint === "audioToText") {
+  } else if (endpoint === WORKFLOW_ENDPOINTS.AUDIO_TO_TEXT) {
     const audioData =
       (inputData.find((datum) => datum.type === "audio")?.data as string) || "";
 
@@ -544,7 +545,7 @@ async function executeModelNode(
     );
 
     outputs.text = result.text || "";
-  } else if (endpoint === "textToSpeech") {
+  } else if (endpoint === WORKFLOW_ENDPOINTS.TEXT_TO_SPEECH) {
     const textData =
       (inputData.find((datum) => datum.type === "text")?.data as string) || "";
 
@@ -591,7 +592,7 @@ async function executeModelNode(
     }
 
     outputs.audio = audioUrl;
-  } else if (endpoint === "modalityToEmbedding") {
+  } else if (endpoint === WORKFLOW_ENDPOINTS.MODALITY_TO_EMBEDDING) {
     const textParts = inputData.filter((datum) => datum.type === "text").map((datum) => datum.data);
     const imageParts = inputData.filter((datum) => datum.type === "image").map((datum) => datum.data);
     const audioPart = inputData.find((datum) => datum.type === "audio")?.data;

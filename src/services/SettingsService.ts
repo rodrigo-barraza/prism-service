@@ -2,7 +2,7 @@ import { DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { deepMerge } from "@rodrigo-barraza/utilities-library";
 import { MONGO_DB_NAME } from "../../config.ts";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS, PROVIDERS } from "../constants.ts";
 import logger from "../utils/logger.ts";
 
 // ─── In-memory cache ──────────────────────────────────────────────────────────
@@ -65,13 +65,13 @@ const DEFAULTS: SettingsData = {
     allowEnvFiles: false,
   },
   creative: {
-    imageProvider: "google",
+    imageProvider: PROVIDERS.GOOGLE,
     imageModel: "gemini-3-pro-image-preview",
-    visionProvider: "google",
+    visionProvider: PROVIDERS.GOOGLE,
     visionModel: "gemini-3.5-flash",
-    textToSpeechProvider: "elevenlabs",
+    textToSpeechProvider: PROVIDERS.ELEVENLABS,
     textToSpeechModel: "",
-    speechToTextProvider: "openai",
+    speechToTextProvider: PROVIDERS.OPENAI,
     speechToTextModel: "",
   },
 };

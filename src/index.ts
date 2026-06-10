@@ -12,7 +12,7 @@ import { TYPES } from "./config.ts";
 import { setupWebSocket } from "./websocket/index.ts";
 import { authMiddleware } from "./middleware/AuthMiddleware.ts";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.ts";
-import { CORS_MAX_AGE_SECONDS } from "./constants.ts";
+import { COLLECTIONS, CORS_MAX_AGE_SECONDS } from "./constants.ts";
 import {
   PRISM_SERVICE_PORT as PORT,
   MONGO_URI,
@@ -208,74 +208,74 @@ setupWebSocket(wss);
       await Promise.all([
         // requests — primary lookup by requestId (admin detail view)
         db
-          .collection("requests")
+          .collection(COLLECTIONS.REQUESTS)
           .createIndex({ requestId: 1 }, { unique: true }),
         // requests — used by $lookup from conversations and session joins
-        db.collection("requests").createIndex({ conversationId: 1 }),
-        db.collection("requests").createIndex({ traceId: 1 }),
-        db.collection("requests").createIndex({ timestamp: -1 }),
-        db.collection("requests").createIndex({ project: 1, timestamp: -1 }),
+        db.collection(COLLECTIONS.REQUESTS).createIndex({ conversationId: 1 }),
+        db.collection(COLLECTIONS.REQUESTS).createIndex({ traceId: 1 }),
+        db.collection(COLLECTIONS.REQUESTS).createIndex({ timestamp: -1 }),
+        db.collection(COLLECTIONS.REQUESTS).createIndex({ project: 1, timestamp: -1 }),
         // requests — agent session joins (admin traces, session detail)
-        db.collection("requests").createIndex({ agentSessionId: 1 }),
+        db.collection(COLLECTIONS.REQUESTS).createIndex({ agentSessionId: 1 }),
         // requests — tool stats aggregation (multikey on array field)
-        db.collection("requests").createIndex({ toolApiNames: 1 }),
+        db.collection(COLLECTIONS.REQUESTS).createIndex({ toolApiNames: 1 }),
         // requests — model/provider breakdown aggregation
-        db.collection("requests").createIndex({ model: 1, provider: 1 }),
+        db.collection(COLLECTIONS.REQUESTS).createIndex({ model: 1, provider: 1 }),
         // requests — endpoint breakdown aggregation
-        db.collection("requests").createIndex({ endpoint: 1 }),
+        db.collection(COLLECTIONS.REQUESTS).createIndex({ endpoint: 1 }),
         // requests — success/failure filtering with time range
-        db.collection("requests").createIndex({ success: 1, timestamp: -1 }),
+        db.collection(COLLECTIONS.REQUESTS).createIndex({ success: 1, timestamp: -1 }),
         // conversations — used by findOne lookups and list queries
-        db.collection("model_conversations").createIndex({ id: 1 }, { unique: true }),
-        db.collection("model_conversations").createIndex({ updatedAt: -1 }),
+        db.collection(COLLECTIONS.MODEL_CONVERSATIONS).createIndex({ id: 1 }, { unique: true }),
+        db.collection(COLLECTIONS.MODEL_CONVERSATIONS).createIndex({ updatedAt: -1 }),
         db
-          .collection("model_conversations")
+          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
           .createIndex({ project: 1, username: 1, updatedAt: -1 }),
-        db.collection("model_conversations").createIndex({ traceId: 1 }),
+        db.collection(COLLECTIONS.MODEL_CONVERSATIONS).createIndex({ traceId: 1 }),
 
         // agent_sessions — same indexes as conversations
         db
-          .collection("agent_conversations")
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .createIndex({ id: 1 }, { unique: true }),
-        db.collection("agent_conversations").createIndex({ updatedAt: -1 }),
+        db.collection(COLLECTIONS.AGENT_CONVERSATIONS).createIndex({ updatedAt: -1 }),
         db
-          .collection("agent_conversations")
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .createIndex({ project: 1, username: 1, updatedAt: -1 }),
 
         // workflows — used by conversationIds lookup
-        db.collection("workflows").createIndex({ id: 1 }, { unique: true }),
+        db.collection(COLLECTIONS.WORKFLOWS).createIndex({ id: 1 }, { unique: true }),
         // benchmarks
-        db.collection("benchmarks").createIndex({ id: 1 }, { unique: true }),
-        db.collection("benchmarks").createIndex({ project: 1, updatedAt: -1 }),
+        db.collection(COLLECTIONS.BENCHMARKS).createIndex({ id: 1 }, { unique: true }),
+        db.collection(COLLECTIONS.BENCHMARKS).createIndex({ project: 1, updatedAt: -1 }),
         db
-          .collection("benchmark_runs")
+          .collection(COLLECTIONS.BENCHMARK_RUNS)
           .createIndex({ id: 1 }, { unique: true }),
         db
-          .collection("benchmark_runs")
+          .collection(COLLECTIONS.BENCHMARK_RUNS)
           .createIndex({ benchmarkId: 1, project: 1, startedAt: -1 }),
         // synthesis
-        db.collection("synthesis").createIndex({ id: 1 }, { unique: true }),
+        db.collection(COLLECTIONS.SYNTHESIS).createIndex({ id: 1 }, { unique: true }),
         db
-          .collection("synthesis")
+          .collection(COLLECTIONS.SYNTHESIS)
           .createIndex({ project: 1, username: 1, updatedAt: -1 }),
-        db.collection("agent_skills").createIndex({ project: 1, username: 1 }),
+        db.collection(COLLECTIONS.AGENT_SKILLS).createIndex({ project: 1, username: 1 }),
         // agent_rules
-        db.collection("agent_rules").createIndex({ project: 1, username: 1, agent: 1 }),
+        db.collection(COLLECTIONS.AGENT_RULES).createIndex({ project: 1, username: 1, agent: 1 }),
         // mcp_servers
-        db.collection("mcp_servers").createIndex({ project: 1, username: 1 }),
+        db.collection(COLLECTIONS.MCP_SERVERS).createIndex({ project: 1, username: 1 }),
         // mcp_servers — compound for enabled filter (5+ query sites)
         db
-          .collection("mcp_servers")
+          .collection(COLLECTIONS.MCP_SERVERS)
           .createIndex({ project: 1, username: 1, enabled: 1 }),
         // workspaces
-        db.collection("workspaces").createIndex({ project: 1, username: 1 }),
-        db.collection("workspaces").createIndex({ id: 1 }, { unique: true }),
+        db.collection(COLLECTIONS.WORKSPACES).createIndex({ project: 1, username: 1 }),
+        db.collection(COLLECTIONS.WORKSPACES).createIndex({ id: 1 }, { unique: true }),
         // prompts
-        db.collection("prompts").createIndex({ project: 1, username: 1, updatedAt: -1 }),
-        db.collection("prompts").createIndex({ id: 1 }, { unique: true }),
+        db.collection(COLLECTIONS.PROMPTS).createIndex({ project: 1, username: 1, updatedAt: -1 }),
+        db.collection(COLLECTIONS.PROMPTS).createIndex({ id: 1 }, { unique: true }),
         // webhook_subscriptions
-        db.collection("webhook_subscriptions").createIndex({ id: 1 }, { unique: true }),
-        db.collection("webhook_subscriptions").createIndex({ enabled: 1 }),
+        db.collection(COLLECTIONS.WEBHOOK_SUBSCRIPTIONS).createIndex({ id: 1 }, { unique: true }),
+        db.collection(COLLECTIONS.WEBHOOK_SUBSCRIPTIONS).createIndex({ enabled: 1 }),
       ]);
       logger.success("Database indexes ensured");
     }
@@ -288,7 +288,7 @@ setupWebSocket(wss);
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (db) {
       const { modifiedCount } = await db
-        .collection("model_conversations")
+        .collection(COLLECTIONS.MODEL_CONVERSATIONS)
         .updateMany({ isGenerating: true }, { $set: { isGenerating: false } });
       if (modifiedCount > 0) {
         logger.info(
@@ -297,7 +297,7 @@ setupWebSocket(wss);
       }
       // Also clear in agent_sessions
       const { modifiedCount: agentCleared } = await db
-        .collection("agent_conversations")
+        .collection(COLLECTIONS.AGENT_CONVERSATIONS)
         .updateMany({ isGenerating: true }, { $set: { isGenerating: false } });
       if (agentCleared > 0) {
         logger.info(
@@ -342,7 +342,7 @@ setupWebSocket(wss);
               const { name, displayName, transport, url, command, args, env, headers, enabled } = serverConfig;
               if (!name || !transport) continue;
 
-              await mcpDb.collection("mcp_servers").updateOne(
+              await mcpDb.collection(COLLECTIONS.MCP_SERVERS).updateOne(
                 { project: codingProject, username: "admin", name },
                 {
                   $setOnInsert: {
@@ -386,7 +386,7 @@ setupWebSocket(wss);
       if (!db) return;
 
       // Find all distinct projects with at least some memories
-      const projects = await db.collection("memories").distinct("project");
+      const projects = await db.collection(COLLECTIONS.MEMORIES).distinct("project");
 
       // Process projects sequentially — each consolidation loads the full
       // memory corpus with embeddings (~12KB/memory). Running them concurrently
@@ -394,13 +394,13 @@ setupWebSocket(wss);
             for ( const project of projects) {
         // Find all distinct agents within this project
         const agents = await db
-          .collection("memories")
+          .collection(COLLECTIONS.MEMORIES)
           .distinct("agent", { project });
         if (!agents.length) continue;
 
                 for ( const agent of agents) {
           const count = await db
-            .collection("memories")
+            .collection(COLLECTIONS.MEMORIES)
             .countDocuments({ project, agent });
           if (count < 10) continue; // Skip agent/project combos with few memories
 

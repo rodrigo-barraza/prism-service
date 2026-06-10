@@ -126,3 +126,11 @@ export const MODEL_TYPES = {
   AUDIO: "audio",
   EMBED: "embed",
 };
+
+export const WORKFLOW_ENDPOINTS = {
+  TEXT_TO_TEXT: "textToText",
+  TEXT_TO_IMAGE: "textToImage",
+  AUDIO_TO_TEXT: "audioToText",
+  TEXT_TO_SPEECH: "textToSpeech",
+  MODALITY_TO_EMBEDDING: "modalityToEmbedding",
+} as const;
