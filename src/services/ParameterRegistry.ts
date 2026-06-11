@@ -447,6 +447,10 @@ function getAgentDefaults(): Record<string, number | string | boolean> {
       defaults[descriptor.key] = descriptor.agentDefault;
     }
   }
+  // Thinking is always on by default for agent sessions — models that don't
+  // support thinking silently ignore this at the provider level.
+  // The client can explicitly send thinkingEnabled=false to disable it.
+  defaults.thinkingEnabled = true;
   return defaults;
 }
 
