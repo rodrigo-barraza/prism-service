@@ -3,6 +3,7 @@ import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy
 import ToolContext from "../ToolContext.ts";
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import SettingsService from "../SettingsService.ts";
+import { extractDiscoverableDomains, extractDomainKeywords } from "../personas/utils.ts";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
@@ -36,16 +37,33 @@ function persistDynamicTools(sessionId: string, toolNames: string[]): void {
   ToolContext.set(sessionId, TOOL_CONTEXT_KEY_DIRTY_FLAG, true);
 }
 
-const discoverAndEnableTools = {
-  name: "discover_and_enable_tools",
-  schema: {
+/**
+ * Build the discover_and_enable_tools schema with dynamic descriptions
+ * derived from the live tool catalog. Domain lists, query examples,
+ * and the tool count are never hardcoded.
+ */
+function buildDiscoverAndEnableSchema() {
+  const totalToolCount = ToolOrchestratorService.getClientToolSchemas().length;
+  const discoverableDomains = extractDiscoverableDomains();
+  const domainListLowercase = discoverableDomains.map((domain) => domain.toLowerCase()).join(", ");
+  const domainListQuoted = discoverableDomains.map((domain) => `'${domain}'`).join(", ");
+
+  const domainKeywords = extractDomainKeywords(2);
+  const sampleKeywords = [...domainKeywords.values()]
+    .flat()
+    .slice(0, 25)
+    .map((keyword) => `'${keyword}'`)
+    .join(", ");
+
+  return {
     name: "discover_and_enable_tools",
     emoji: ["🔍", "🧰"],
     description:
-      "Search for tools AND automatically enable them in one step. Combines search_tools and " +
-      "enable_tools into a single call — after calling this, discovered tools are immediately " +
+      `Search the FULL tool catalog (${totalToolCount} tools) AND automatically enable matches in one step. ` +
+      "Combines search_tools and enable_tools — after calling this, discovered tools are immediately " +
       "available on the next iteration without a separate enable_tools call. " +
       "Use this when you know you want to use discovered tools right away. " +
+      `Covers all domains: ${domainListLowercase}. ` +
       "Accepts the same parameters as search_tools (query, domain, limit).",
     parameters: {
       type: "object",
@@ -54,14 +72,13 @@ const discoverAndEnableTools = {
           type: "string",
           description:
             "Search keyword(s) to match against tool names and descriptions. " +
-            "Example: 'weather', 'file read', 'stock price', 'image generation'.",
+            "Use capability-specific terms for best results. " +
+            `Examples: ${sampleKeywords}.`,
         },
         domain: {
           type: "string",
           description:
-            "Filter by tool domain. Known domains include: 'Weather & Environment', " +
-            "'Finance & Markets', 'Health & Nutrition', 'Knowledge & Reference', " +
-            "'Workspace', 'Web', 'Browser', 'Task Management', 'Communication', 'Creative', etc.",
+            `Filter by tool domain. Known domains: ${domainListQuoted}.`,
         },
         limit: {
           type: "number",
@@ -70,6 +87,13 @@ const discoverAndEnableTools = {
       },
       required: [],
     },
+  };
+}
+
+const discoverAndEnableTools = {
+  name: "discover_and_enable_tools",
+  get schema() {
+    return buildDiscoverAndEnableSchema();
   },
   domain: DOMAINS.CORE_HARNESS.displayName,
   labels: ["tools", "discovery", "activation", "meta"],
