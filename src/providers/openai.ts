@@ -145,7 +145,12 @@ function sanitizeSchemaForOpenAI(schema: unknown, isInsidePropertiesMap = false)
     // property schema. At all other levels, strip unrecognized keywords.
     if (!isInsidePropertiesMap && !OPENAI_ALLOWED_SCHEMA_KEYWORDS.has(key)) continue;
 
-    if (key === "properties" && value && typeof value === "object" && !Array.isArray(value)) {
+    // When we encounter the schema keyword "properties" at the SCHEMA level (not inside
+    // a properties map), its value is a map of field-name → schema. We recurse with
+    // isInsidePropertiesMap = true so field names aren't filtered by the allowlist.
+    // If we're ALREADY inside a properties map and a field is named "properties",
+    // it's just a regular field name whose value is a schema — recurse normally.
+    if (!isInsidePropertiesMap && key === "properties" && value && typeof value === "object" && !Array.isArray(value)) {
       cleaned[key] = sanitizeSchemaForOpenAI(value, true);
     } else {
       cleaned[key] = sanitizeSchemaForOpenAI(value);
@@ -159,8 +164,11 @@ function sanitizeSchemaForOpenAI(schema: unknown, isInsidePropertiesMap = false)
     );
   }
 
-  // Handle type:"object" — enforce strict mode properties/required/additionalProperties
-  if (cleaned.type === "object" || cleaned.properties !== undefined) {
+  // Handle type:"object" — enforce strict mode properties/required/additionalProperties.
+  // Only apply at the schema level, NOT when processing a properties map (where keys are
+  // field names). A field named "properties" would trigger `cleaned.properties !== undefined`
+  // and corrupt the map with injected additionalProperties/required keys.
+  if (!isInsidePropertiesMap && (cleaned.type === "object" || cleaned.properties !== undefined)) {
     cleaned.additionalProperties = false;
 
     if (!cleaned.properties || typeof cleaned.properties !== "object") {
