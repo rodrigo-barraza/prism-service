@@ -104,6 +104,9 @@ let cachedStaticRoots: string[] = [];
 /** @type {boolean} Whether initial fetch has completed */
 let initialized = false;
 
+/** Recursion guard for client-facing schema resolution */
+let isResolvingClientSchemas = false;
+
 /**
  * Active worktree sessions — keyed by agentSessionId.
  * When the main agent calls enter_worktree, its session's workspace root
@@ -596,52 +599,62 @@ export default class ToolOrchestratorService {
   }
 
   /** Client-facing schemas (with domain/domainKey/dataSource, no endpoint) — for Prism Client UI */
-  static getClientToolSchemas(defaultTopology?: string) {
-    // Reverse map: display name → domainKey (e.g. "Core Harness Tools" → "core_harness")
-    const domainDisplayNameToKey = new Map<string, string>();
-    for (const entry of Object.values(DOMAINS)) {
-      if (!domainDisplayNameToKey.has(entry.displayName)) {
-        domainDisplayNameToKey.set(entry.displayName, entry.key);
-      }
+  static getClientToolSchemas(defaultTopology?: string): any[] {
+    if (isResolvingClientSchemas) {
+      // Break recursion cycle when internal tool getters (e.g. discover_and_enable_tools)
+      // fetch schemas dynamically from this same catalog.
+      return cachedClientSchemas;
     }
-    const resolveDomainKey = (domain: string) => domainDisplayNameToKey.get(domain) || domain.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    isResolvingClientSchemas = true;
+    try {
+      // Reverse map: display name → domainKey (e.g. "Core Harness Tools" → "core_harness")
+      const domainDisplayNameToKey = new Map<string, string>();
+      for (const entry of Object.values(DOMAINS)) {
+        if (!domainDisplayNameToKey.has(entry.displayName)) {
+          domainDisplayNameToKey.set(entry.displayName, entry.key);
+        }
+      }
+      const resolveDomainKey = (domain: string) => domainDisplayNameToKey.get(domain) || domain.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 
-    // Orchestrator tools are Prism-local — add domain metadata for UI grouping
-    const orchestratorClient = getOrchestratorToolSchemas(defaultTopology).map((tool) => ({
-      ...tool,
-      domain: DOMAINS.CORE_ORCHESTRATOR.displayName,
-      domainKey: "core_orchestrator",
-      system: true,
-    }));
+      // Orchestrator tools are Prism-local — add domain metadata for UI grouping
+      const orchestratorClient = getOrchestratorToolSchemas(defaultTopology).map((tool) => ({
+        ...tool,
+        domain: DOMAINS.CORE_ORCHESTRATOR.displayName,
+        domainKey: "core_orchestrator",
+        system: true,
+      }));
 
-    const internalClient = InternalToolRegistry.getClientSchemas().map((tool) => ({
-      ...tool,
-      domainKey: resolveDomainKey(tool.domain || DOMAINS.CORE_HARNESS.displayName),
-      system: tool.domain === DOMAINS.CORE_HARNESS.displayName || tool.domain === DOMAINS.CORE_WORKSPACE.displayName,
-    }));
+      const internalClient = InternalToolRegistry.getClientSchemas().map((tool) => ({
+        ...tool,
+        domainKey: resolveDomainKey(tool.domain || DOMAINS.CORE_HARNESS.displayName),
+        system: tool.domain === DOMAINS.CORE_HARNESS.displayName || tool.domain === DOMAINS.CORE_WORKSPACE.displayName,
+      }));
 
-    const clientSchemasEnriched = cachedClientSchemas.map((tool) => ({
-      ...tool,
-      domainKey: (tool.domainKey as string) || resolveDomainKey(tool.domain || "Other"),
-      system: tool.domain === DOMAINS.CORE_HARNESS.displayName || tool.domain === DOMAINS.CORE_WORKSPACE.displayName,
-      ...(TOOL_INPUT_MODALITIES[tool.name] && { inputModalities: [...TOOL_INPUT_MODALITIES[tool.name]] }),
-    }));
+      const clientSchemasEnriched = cachedClientSchemas.map((tool) => ({
+        ...tool,
+        domainKey: (tool.domainKey as string) || resolveDomainKey(tool.domain || "Other"),
+        system: tool.domain === DOMAINS.CORE_HARNESS.displayName || tool.domain === DOMAINS.CORE_WORKSPACE.displayName,
+        ...(TOOL_INPUT_MODALITIES[tool.name] && { inputModalities: [...TOOL_INPUT_MODALITIES[tool.name]] }),
+      }));
 
-    const mcpClient = ToolOrchestratorService.getMCPToolSchemas().map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters,
-      domain: tool.domain || `Model Context Protocol: ${tool._mcpServer}`,
-      domainKey: "mcp",
-      system: false,
-    }));
+      const mcpClient = ToolOrchestratorService.getMCPToolSchemas().map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters,
+        domain: tool.domain || `Model Context Protocol: ${tool._mcpServer}`,
+        domainKey: "mcp",
+        system: false,
+      }));
 
-    return [
-      ...clientSchemasEnriched,
-      ...internalClient,
-      ...orchestratorClient,
-      ...mcpClient,
-    ];
+      return [
+        ...clientSchemasEnriched,
+        ...internalClient,
+        ...orchestratorClient,
+        ...mcpClient,
+      ];
+    } finally {
+      isResolvingClientSchemas = false;
+    }
   }
 
   /** Workspace root paths from tools-api (single source of truth) */
