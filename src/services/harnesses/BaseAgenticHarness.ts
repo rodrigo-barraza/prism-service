@@ -184,11 +184,13 @@ export default class BaseAgenticHarness {
       if (addendumDocumentation) {
         const toolNamesList = newlyAddedToolSchemas.map((tool) => tool.name).join(", ");
         currentMessages.push({
-          role: "user",
+          role: "system",
           content:
+            `<tool-update>\n` +
             `[TOOL SET UPDATED] ${newlyAddedToolSchemas.length} new tool(s) have been dynamically enabled: ${toolNamesList}\n\n` +
             `The following tools are now available with full documentation:\n\n` +
-            addendumDocumentation,
+            addendumDocumentation +
+            `\n</tool-update>`,
         });
 
         logger.info(
