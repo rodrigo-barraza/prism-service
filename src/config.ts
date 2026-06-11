@@ -9,7 +9,8 @@ import { PROVIDERS, PROVIDER_LIST, TYPES, MODEL_TYPES } from "./constants.ts";
 const MODELS = {
   // ----- OpenAI — Text Generation -----
   GPT_5_2: {
-    description: "OpenAI's state-of-the-art GPT-5.2 reasoning model, featuring advanced multi-step planning, high-accuracy coding, and deep context analysis.",
+    description:
+      "OpenAI's state-of-the-art GPT-5.2 reasoning model, featuring advanced multi-step planning, high-accuracy coding, and deep context analysis.",
     name: "gpt-5.2",
     label: "GPT 5.2",
     provider: PROVIDERS.OPENAI,
@@ -44,7 +45,8 @@ const MODELS = {
     tools: ["Thinking", "Web Search", "Tool Calling", "File Search"],
   },
   GPT_5_MINI: {
-    description: "A fast, lightweight, and cost-efficient version of GPT-5, optimized for everyday tasks, basic tool calling, and high-speed execution.",
+    description:
+      "A fast, lightweight, and cost-efficient version of GPT-5, optimized for everyday tasks, basic tool calling, and high-speed execution.",
     name: "gpt-5-mini",
     label: "GPT 5 Mini",
     provider: PROVIDERS.OPENAI,
@@ -69,7 +71,8 @@ const MODELS = {
     tools: ["Thinking", "Web Search", "Tool Calling", "File Search"],
   },
   GPT_5_NANO: {
-    description: "An ultra-lightweight, low-latency version of GPT-5, designed for simple text tasks and high-volume operations at minimal cost.",
+    description:
+      "An ultra-lightweight, low-latency version of GPT-5, designed for simple text tasks and high-volume operations at minimal cost.",
     name: "gpt-5-nano",
     label: "GPT 5 Nano",
     provider: PROVIDERS.OPENAI,
@@ -94,7 +97,8 @@ const MODELS = {
   },
   // ----- Unlisted OpenAI Models (retained for historical cost tracking) -----
   GPT_41_MINI: {
-    description: "Historical cost-tracking placeholder for GPT-4.1 Mini, retaining base tokens and performance characteristics.",
+    description:
+      "Historical cost-tracking placeholder for GPT-4.1 Mini, retaining base tokens and performance characteristics.",
     name: "gpt-4.1-mini",
     label: "GPT 4.1 Mini",
     provider: PROVIDERS.OPENAI,
@@ -114,7 +118,8 @@ const MODELS = {
     streaming: true,
   },
   GPT_41_NANO: {
-    description: "Historical cost-tracking placeholder for GPT-4.1 Nano, retaining base tokens and performance characteristics.",
+    description:
+      "Historical cost-tracking placeholder for GPT-4.1 Nano, retaining base tokens and performance characteristics.",
     name: "gpt-4.1-nano",
     label: "GPT 4.1 Nano",
     provider: PROVIDERS.OPENAI,
@@ -134,7 +139,8 @@ const MODELS = {
     streaming: true,
   },
   GPT_4O: {
-    description: "Flagship GPT-4o multimodal model, balanced for high speed, reasoning capabilities, and versatile tool use.",
+    description:
+      "Flagship GPT-4o multimodal model, balanced for high speed, reasoning capabilities, and versatile tool use.",
     name: "gpt-4o",
     label: "GPT 4o",
     provider: PROVIDERS.OPENAI,
@@ -154,7 +160,8 @@ const MODELS = {
     streaming: true,
   },
   GPT_4: {
-    description: "Legacy GPT-4 model, retained for backward compatibility and historical cost tracking.",
+    description:
+      "Legacy GPT-4 model, retained for backward compatibility and historical cost tracking.",
     name: "gpt-4",
     label: "GPT 4",
     provider: PROVIDERS.OPENAI,
@@ -169,7 +176,8 @@ const MODELS = {
     streaming: true,
   },
   GPT_53_CHAT: {
-    description: "OpenAI's GPT-5.3 Chat model, optimized for conversation, web search, and tool orchestration.",
+    description:
+      "OpenAI's GPT-5.3 Chat model, optimized for conversation, web search, and tool orchestration.",
     name: "gpt-5.3-chat-latest",
     label: "GPT 5.3 Chat",
     provider: PROVIDERS.OPENAI,
@@ -194,7 +202,8 @@ const MODELS = {
     tools: ["Thinking", "Web Search", "Tool Calling", "File Search"],
   },
   GPT_53_CODEX: {
-    description: "Specialized GPT-5.3 Codex model, fine-tuned for high-performance software engineering, logic tasks, and code generation.",
+    description:
+      "Specialized GPT-5.3 Codex model, fine-tuned for high-performance software engineering, logic tasks, and code generation.",
     name: "gpt-5.3-codex",
     label: "GPT 5.3 Codex",
     provider: PROVIDERS.OPENAI,
@@ -220,7 +229,8 @@ const MODELS = {
     tools: ["Thinking", "Web Search", "Tool Calling", "File Search"],
   },
   GPT_54: {
-    description: "Advanced GPT-5.4 model, supporting thinking levels, reasoning summaries, and computer-use agent capabilities.",
+    description:
+      "Advanced GPT-5.4 model, supporting thinking levels, reasoning summaries, and computer-use agent capabilities.",
     name: "gpt-5.4",
     label: "GPT 5.4",
     provider: PROVIDERS.OPENAI,
@@ -257,7 +267,8 @@ const MODELS = {
     ],
   },
   GPT_54_PRO: {
-    description: "High-tier GPT-5.4 Pro model, offering maximum intelligence, large context windows, and advanced thinking capabilities for complex reasoning.",
+    description:
+      "High-tier GPT-5.4 Pro model, offering maximum intelligence, large context windows, and advanced thinking capabilities for complex reasoning.",
     name: "gpt-5.4-pro",
     label: "GPT 5.4 Pro",
     provider: PROVIDERS.OPENAI,
@@ -292,7 +303,8 @@ const MODELS = {
     ],
   },
   GPT_54_MINI: {
-    description: "Efficient GPT-5.4 Mini model, combining thinking/reasoning capabilities with low costs and high throughput.",
+    description:
+      "Efficient GPT-5.4 Mini model, combining thinking/reasoning capabilities with low costs and high throughput.",
     name: "gpt-5.4-mini",
     label: "GPT 5.4 Mini",
     provider: PROVIDERS.OPENAI,
@@ -326,7 +338,8 @@ const MODELS = {
     ],
   },
   GPT_54_NANO: {
-    description: "Compact GPT-5.4 Nano model, optimized for lightweight chat tasks, high-speed execution, and low costs.",
+    description:
+      "Compact GPT-5.4 Nano model, optimized for lightweight chat tasks, high-speed execution, and low costs.",
     name: "gpt-5.4-nano",
     label: "GPT 5.4 Nano",
     provider: PROVIDERS.OPENAI,
@@ -351,7 +364,8 @@ const MODELS = {
     tools: ["Web Search", "Tool Calling", "File Search"],
   },
   GPT_55: {
-    description: "OpenAI's default GPT-5.5 model, providing state-of-the-art multimodal reasoning, tool calling, and computer control.",
+    description:
+      "OpenAI's default GPT-5.5 model, providing state-of-the-art multimodal reasoning, tool calling, and computer control.",
     name: "gpt-5.5",
     label: "GPT 5.5",
     provider: PROVIDERS.OPENAI,
@@ -388,7 +402,8 @@ const MODELS = {
     ],
   },
   GPT_55_PRO: {
-    description: "Premium GPT-5.5 Pro model, offering maximum capacity, reasoning capabilities, and advanced agentic tool use.",
+    description:
+      "Premium GPT-5.5 Pro model, offering maximum capacity, reasoning capabilities, and advanced agentic tool use.",
     name: "gpt-5.5-pro",
     label: "GPT 5.5 Pro",
     provider: PROVIDERS.OPENAI,
@@ -425,7 +440,8 @@ const MODELS = {
 
   // ----- Anthropic — Text Generation -----
   HAIKU_45: {
-    description: "Anthropic's Claude 4.5 Haiku, a high-speed, cost-efficient model optimized for rapid classification, data extraction, and quick responses.",
+    description:
+      "Anthropic's Claude 4.5 Haiku, a high-speed, cost-efficient model optimized for rapid classification, data extraction, and quick responses.",
     name: "claude-haiku-4-5-20251001",
     label: "Haiku 4.5",
     provider: PROVIDERS.ANTHROPIC,
@@ -456,7 +472,8 @@ const MODELS = {
     tools: ["Thinking", "Web Search", "Tool Calling", "Code Execution"],
   },
   SONNET_45: {
-    description: "Anthropic's Claude 4.5 Sonnet, a state-of-the-art multimodal model with exceptional coding, logical reasoning, and agentic capabilities.",
+    description:
+      "Anthropic's Claude 4.5 Sonnet, a state-of-the-art multimodal model with exceptional coding, logical reasoning, and agentic capabilities.",
     name: "claude-sonnet-4-5-20250929",
     label: "Sonnet 4.5",
     provider: PROVIDERS.ANTHROPIC,
@@ -495,7 +512,8 @@ const MODELS = {
     ],
   },
   SONNET_46: {
-    description: "Anthropic's Claude 4.6 Sonnet, featuring improved coding capabilities, extended reasoning/thinking levels, and computer-use support.",
+    description:
+      "Anthropic's Claude 4.6 Sonnet, featuring improved coding capabilities, extended reasoning/thinking levels, and computer-use support.",
     name: "claude-sonnet-4-6",
     label: "Sonnet 4.6",
     provider: PROVIDERS.ANTHROPIC,
@@ -533,7 +551,8 @@ const MODELS = {
     ],
   },
   OPUS_45: {
-    description: "Anthropic's flagship Claude 4.5 Opus model, delivering deep analysis, math, coding, and comprehension capabilities.",
+    description:
+      "Anthropic's flagship Claude 4.5 Opus model, delivering deep analysis, math, coding, and comprehension capabilities.",
     name: "claude-opus-4-5-20251101",
     label: "Opus 4.5",
     provider: PROVIDERS.ANTHROPIC,
@@ -571,7 +590,8 @@ const MODELS = {
     ],
   },
   OPUS_46: {
-    description: "Anthropic's Claude 4.6 Opus model, representing the highest intelligence tier with maximum thinking budget and reasoning capabilities.",
+    description:
+      "Anthropic's Claude 4.6 Opus model, representing the highest intelligence tier with maximum thinking budget and reasoning capabilities.",
     name: "claude-opus-4-6",
     label: "Opus 4.6",
     provider: PROVIDERS.ANTHROPIC,
@@ -609,7 +629,8 @@ const MODELS = {
     ],
   },
   OPUS_47: {
-    description: "Anthropic's Claude 4.7 Opus, featuring locked sampling and state-of-the-art cognitive performance for the most complex tasks.",
+    description:
+      "Anthropic's Claude 4.7 Opus, featuring locked sampling and state-of-the-art cognitive performance for the most complex tasks.",
     name: "claude-opus-4-7",
     label: "Opus 4.7",
     provider: PROVIDERS.ANTHROPIC,
@@ -634,6 +655,7 @@ const MODELS = {
     },
     streaming: true,
     thinking: true,
+    adaptiveThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     assistantImages: false,
     webSearch: true,
@@ -648,7 +670,8 @@ const MODELS = {
     ],
   },
   OPUS_48: {
-    description: "Anthropic's Claude 4.8 Opus, representing the absolute peak of Anthropic reasoning and multimodal comprehension capabilities.",
+    description:
+      "Anthropic's Claude 4.8 Opus, representing the absolute peak of Anthropic reasoning and multimodal comprehension capabilities.",
     name: "claude-opus-4-8",
     label: "Opus 4.8",
     provider: PROVIDERS.ANTHROPIC,
@@ -673,6 +696,7 @@ const MODELS = {
     },
     streaming: true,
     thinking: true,
+    adaptiveThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     assistantImages: false,
     webSearch: true,
@@ -687,7 +711,8 @@ const MODELS = {
     ],
   },
   FABLE_5: {
-    description: "Anthropic's Claude Fable 5: a Mythos-class model made safe for general use, delivering state-of-the-art software engineering, knowledge work, and vision performance.",
+    description:
+      "Anthropic's Claude Fable 5: a Mythos-class model made safe for general use, delivering state-of-the-art software engineering, knowledge work, and vision performance.",
     name: "claude-fable-5",
     label: "Fable 5",
     provider: PROVIDERS.ANTHROPIC,
@@ -726,7 +751,8 @@ const MODELS = {
     ],
   },
   MYTHOS_5: {
-    description: "Anthropic's Claude Mythos 5: an unrestricted Mythos-class model featuring elite reasoning and cybersecurity capabilities.",
+    description:
+      "Anthropic's Claude Mythos 5: an unrestricted Mythos-class model featuring elite reasoning and cybersecurity capabilities.",
     name: "claude-mythos-5",
     label: "Mythos 5",
     provider: PROVIDERS.ANTHROPIC,
@@ -767,7 +793,8 @@ const MODELS = {
 
   // ----- Google — Text Generation -----
   GEMINI_3_FLASH: {
-    description: "Google's Gemini 3 Flash, a highly efficient, low-latency multimodal model with a massive 1M token context window and code execution.",
+    description:
+      "Google's Gemini 3 Flash, a highly efficient, low-latency multimodal model with a massive 1M token context window and code execution.",
     name: "gemini-3-flash-preview",
     label: "Gemini 3 Flash",
     provider: PROVIDERS.GOOGLE,
@@ -812,7 +839,8 @@ const MODELS = {
     ],
   },
   GEMINI_3_PRO: {
-    description: "Google's Gemini 3 Pro, a premium multimodal model optimized for complex reasoning, planning, and coding within a large context.",
+    description:
+      "Google's Gemini 3 Pro, a premium multimodal model optimized for complex reasoning, planning, and coding within a large context.",
     name: "gemini-3-pro-preview",
     label: "Gemini 3 Pro",
     provider: PROVIDERS.GOOGLE,
@@ -856,7 +884,8 @@ const MODELS = {
     ],
   },
   GEMINI_31_PRO: {
-    description: "Google's Gemini 3.1 Pro, offering enhanced logic, multi-turn instruction following, and a 1M token context window.",
+    description:
+      "Google's Gemini 3.1 Pro, offering enhanced logic, multi-turn instruction following, and a 1M token context window.",
     name: "gemini-3.1-pro-preview",
     label: "Gemini 3.1 Pro",
     provider: PROVIDERS.GOOGLE,
@@ -897,7 +926,8 @@ const MODELS = {
   },
 
   GEMINI_31_FLASH_LIVE: {
-    description: "Low-latency Gemini 3.1 Flash Live model, optimized for real-time audio/video streaming, live API sessions, and instant feedback.",
+    description:
+      "Low-latency Gemini 3.1 Flash Live model, optimized for real-time audio/video streaming, live API sessions, and instant feedback.",
     name: "gemini-3.1-flash-live-preview",
     label: "Gemini 3.1 Flash Live",
     provider: PROVIDERS.GOOGLE,
@@ -928,7 +958,8 @@ const MODELS = {
   },
 
   GEMINI_35_FLASH: {
-    description: "Google's Gemini 3.5 Flash, bringing higher reasoning scores, visual understanding, and rapid multimodal performance.",
+    description:
+      "Google's Gemini 3.5 Flash, bringing higher reasoning scores, visual understanding, and rapid multimodal performance.",
     name: "gemini-3.5-flash",
     label: "Gemini 3.5 Flash",
     provider: PROVIDERS.GOOGLE,
@@ -974,7 +1005,8 @@ const MODELS = {
   },
 
   GEMINI_31_FLASH_LITE: {
-    description: "Google's Gemini 3.1 Flash-Lite, designed for low-resource operations, high-speed classification, and highly cost-efficient tasks.",
+    description:
+      "Google's Gemini 3.1 Flash-Lite, designed for low-resource operations, high-speed classification, and highly cost-efficient tasks.",
     name: "gemini-3.1-flash-lite",
     label: "Gemini 3.1 Flash-Lite",
     provider: PROVIDERS.GOOGLE,
@@ -1012,7 +1044,8 @@ const MODELS = {
 
   // ----- Text-to-Speech -----
   GPT_4O_MINI_TTS: {
-    description: "OpenAI's Text-to-Speech model, generating natural-sounding speech from text input with high speed.",
+    description:
+      "OpenAI's Text-to-Speech model, generating natural-sounding speech from text input with high speed.",
     name: "gpt-4o-mini-tts",
     label: "GPT 4o Mini TTS",
     provider: PROVIDERS.OPENAI,
@@ -1029,7 +1062,8 @@ const MODELS = {
     streaming: true,
   },
   GEMINI_2_FLASH_LITE_PREVIEW_TTS: {
-    description: "Google's preview Text-to-Speech model, offering fast voice synthesis from text input.",
+    description:
+      "Google's preview Text-to-Speech model, offering fast voice synthesis from text input.",
     name: "gemini-2.0-flash-lite-preview-tts",
     label: "Gemini 2.0 Flash Lite TTS",
     provider: PROVIDERS.GOOGLE,
@@ -1041,7 +1075,8 @@ const MODELS = {
     streaming: true,
   },
   GEMINI_25_FLASH_LITE_TTS: {
-    description: "Google's Gemini 2.5 Flash Lite Text-to-Speech model, balancing voice quality with low latency.",
+    description:
+      "Google's Gemini 2.5 Flash Lite Text-to-Speech model, balancing voice quality with low latency.",
     name: "gemini-2.5-flash-lite-preview-tts",
     label: "Gemini 2.5 Flash Lite TTS",
     provider: PROVIDERS.GOOGLE,
@@ -1053,7 +1088,8 @@ const MODELS = {
     streaming: true,
   },
   GEMINI_25_FLASH_TTS: {
-    description: "Google's Gemini 2.5 Flash Text-to-Speech model, providing standard audio generation capabilities.",
+    description:
+      "Google's Gemini 2.5 Flash Text-to-Speech model, providing standard audio generation capabilities.",
     name: "gemini-2.5-flash-preview-tts",
     label: "Gemini 2.5 Flash TTS",
     provider: PROVIDERS.GOOGLE,
@@ -1065,7 +1101,8 @@ const MODELS = {
     streaming: true,
   },
   GEMINI_25_PRO_TTS: {
-    description: "Google's Gemini 2.5 Pro Text-to-Speech model, delivering premium high-fidelity voice generation.",
+    description:
+      "Google's Gemini 2.5 Pro Text-to-Speech model, delivering premium high-fidelity voice generation.",
     name: "gemini-2.5-pro-preview-tts",
     label: "Gemini 2.5 Pro TTS",
     provider: PROVIDERS.GOOGLE,
@@ -1078,7 +1115,8 @@ const MODELS = {
     streaming: true,
   },
   GEMINI_31_FLASH_TTS: {
-    description: "Google's Gemini 3.1 Flash Text-to-Speech preview model, offering natural and high-fidelity vocal synthesis.",
+    description:
+      "Google's Gemini 3.1 Flash Text-to-Speech preview model, offering natural and high-fidelity vocal synthesis.",
     name: "gemini-3.1-flash-tts-preview",
     label: "Gemini 3.1 Flash TTS",
     provider: PROVIDERS.GOOGLE,
@@ -1090,7 +1128,8 @@ const MODELS = {
     streaming: true,
   },
   ESPEAKNG: {
-    description: "eSpeak NG open-source speech synthesizer, offering multi-lingual phonetic text-to-speech.",
+    description:
+      "eSpeak NG open-source speech synthesizer, offering multi-lingual phonetic text-to-speech.",
     name: "espeak-ng",
     label: "eSpeak NG",
     provider: PROVIDERS.GOOGLE,
@@ -1102,7 +1141,8 @@ const MODELS = {
     streaming: false,
   },
   ELEVEN_TURBO_V2: {
-    description: "ElevenLabs' high-speed voice synthesis model, providing natural and expressive vocal output.",
+    description:
+      "ElevenLabs' high-speed voice synthesis model, providing natural and expressive vocal output.",
     name: "eleven_turbo_v2",
     label: "Eleven Turbo v2",
     provider: PROVIDERS.ELEVENLABS,
@@ -1115,7 +1155,8 @@ const MODELS = {
     streaming: true,
   },
   INWORLD_TTS_1_5_MAX: {
-    description: "Inworld's premium Text-to-Speech engine, generating highly expressive, game-ready character voices.",
+    description:
+      "Inworld's premium Text-to-Speech engine, generating highly expressive, game-ready character voices.",
     name: "inworld-tts-1.5-max",
     label: "Inworld TTS 1.5 Max",
     provider: PROVIDERS.INWORLD,
@@ -1128,7 +1169,8 @@ const MODELS = {
     streaming: true,
   },
   INWORLD_TTS_1_5_MINI: {
-    description: "Inworld's lightweight Text-to-Speech engine, optimized for low-latency conversational audio.",
+    description:
+      "Inworld's lightweight Text-to-Speech engine, optimized for low-latency conversational audio.",
     name: "inworld-tts-1.5-mini",
     label: "Inworld TTS 1.5 Mini",
     provider: PROVIDERS.INWORLD,
@@ -1142,7 +1184,8 @@ const MODELS = {
 
   // ----- Text-to-Image -----
   GPT_IMAGE_15: {
-    description: "OpenAI's DALL-E based image model, capable of high-fidelity image generation and editing from natural language prompts.",
+    description:
+      "OpenAI's DALL-E based image model, capable of high-fidelity image generation and editing from natural language prompts.",
     name: "gpt-image-1.5",
     label: "GPT Image 1.5",
     provider: PROVIDERS.OPENAI,
@@ -1168,7 +1211,8 @@ const MODELS = {
     tools: ["Image Generation"],
   },
   GEMINI_3_PRO_IMAGE: {
-    description: "Google's Gemini 3 Pro Image model, optimized for generating high-quality visual art and editing images from text.",
+    description:
+      "Google's Gemini 3 Pro Image model, optimized for generating high-quality visual art and editing images from text.",
     name: "gemini-3-pro-image-preview",
     label: "Gemini 3 Pro Image",
     provider: PROVIDERS.GOOGLE,
@@ -1195,7 +1239,8 @@ const MODELS = {
     tools: ["Thinking", "Image Generation", "Web Search"],
   },
   GEMINI_31_FLASH_IMAGE: {
-    description: "Google's Gemini 3.1 Flash Image model, delivering high-speed image generation and editing capabilities.",
+    description:
+      "Google's Gemini 3.1 Flash Image model, delivering high-speed image generation and editing capabilities.",
     name: "gemini-3.1-flash-image-preview",
     label: "Gemini 3.1 Flash Image",
     provider: PROVIDERS.GOOGLE,
@@ -1223,7 +1268,8 @@ const MODELS = {
 
   // ----- Embeddings -----
   TEXT_EMBEDDING_3_SMALL: {
-    description: "OpenAI's efficient text embedding model, generating 1536-dimensional vectors for semantic search and retrieval.",
+    description:
+      "OpenAI's efficient text embedding model, generating 1536-dimensional vectors for semantic search and retrieval.",
     name: "text-embedding-3-small",
     label: "Embedding 3 Small",
     provider: PROVIDERS.OPENAI,
@@ -1237,7 +1283,8 @@ const MODELS = {
     outputTypes: [TYPES.EMBEDDING],
   },
   TEXT_EMBEDDING_3_LARGE: {
-    description: "OpenAI's high-resolution embedding model, producing 3072-dimensional vectors for precise semantic comparisons.",
+    description:
+      "OpenAI's high-resolution embedding model, producing 3072-dimensional vectors for precise semantic comparisons.",
     name: "text-embedding-3-large",
     label: "Embedding 3 Large",
     provider: PROVIDERS.OPENAI,
@@ -1250,7 +1297,8 @@ const MODELS = {
     outputTypes: [TYPES.EMBEDDING],
   },
   TEXT_EMBEDDING_ADA_002: {
-    description: "OpenAI's legacy Ada-002 embedding model, generating 1536-dimensional vector representations.",
+    description:
+      "OpenAI's legacy Ada-002 embedding model, generating 1536-dimensional vector representations.",
     name: "text-embedding-ada-002",
     label: "Ada 002",
     provider: PROVIDERS.OPENAI,
@@ -1263,7 +1311,8 @@ const MODELS = {
     outputTypes: [TYPES.EMBEDDING],
   },
   GEMINI_EMBEDDING_2: {
-    description: "Google's Gemini Embedding 2 model, supporting text, image, audio, and video inputs for unified vector representations.",
+    description:
+      "Google's Gemini Embedding 2 model, supporting text, image, audio, and video inputs for unified vector representations.",
     name: "gemini-embedding-2-preview",
     label: "Gemini Embedding 2",
     provider: PROVIDERS.GOOGLE,
@@ -1277,7 +1326,8 @@ const MODELS = {
     outputTypes: [TYPES.EMBEDDING],
   },
   GEMINI_EMBEDDING_001: {
-    description: "Google's standard text embedding model, producing 3072-dimensional semantic vectors.",
+    description:
+      "Google's standard text embedding model, producing 3072-dimensional semantic vectors.",
     name: "gemini-embedding-001",
     label: "Gemini Embedding",
     provider: PROVIDERS.GOOGLE,
@@ -1292,7 +1342,8 @@ const MODELS = {
 
   // ----- Speech-to-Text (Audio → Text) -----
   GPT_4O_TRANSCRIBE: {
-    description: "OpenAI's flagship audio transcription model, converting high-fidelity audio to text with precise timestamps.",
+    description:
+      "OpenAI's flagship audio transcription model, converting high-fidelity audio to text with precise timestamps.",
     name: "gpt-4o-transcribe",
     label: "GPT-4o Transcribe",
     provider: PROVIDERS.OPENAI,
@@ -1308,7 +1359,8 @@ const MODELS = {
     outputTypes: [TYPES.TEXT],
   },
   GPT_4O_MINI_TRANSCRIBE: {
-    description: "OpenAI's compact and cost-efficient transcription model, optimizing audio-to-text speed and cost.",
+    description:
+      "OpenAI's compact and cost-efficient transcription model, optimizing audio-to-text speed and cost.",
     name: "gpt-4o-mini-transcribe",
     label: "GPT-4o Mini Transcribe",
     provider: PROVIDERS.OPENAI,
@@ -1323,7 +1375,8 @@ const MODELS = {
     outputTypes: [TYPES.TEXT],
   },
   WHISPER_1: {
-    description: "OpenAI's Whisper v2 model, delivering highly robust multilingual speech-to-text recognition and transcription.",
+    description:
+      "OpenAI's Whisper v2 model, delivering highly robust multilingual speech-to-text recognition and transcription.",
     name: "whisper-1",
     label: "Whisper V2",
     provider: PROVIDERS.OPENAI,
@@ -1334,7 +1387,8 @@ const MODELS = {
     outputTypes: [TYPES.TEXT],
   },
   GEMINI_3_FLASH_STT: {
-    description: "Google's Gemini 3 Flash Speech-to-Text model, providing fast and accurate voice transcription.",
+    description:
+      "Google's Gemini 3 Flash Speech-to-Text model, providing fast and accurate voice transcription.",
     name: "gemini-3-flash-preview",
     label: "Gemini 3 Flash",
     provider: PROVIDERS.GOOGLE,
@@ -1346,7 +1400,8 @@ const MODELS = {
     outputTypes: [TYPES.TEXT],
   },
   GEMINI_3_PRO_STT: {
-    description: "Google's Gemini 3 Pro Speech-to-Text model, delivering high-accuracy audio transcription under noisy environments.",
+    description:
+      "Google's Gemini 3 Pro Speech-to-Text model, delivering high-accuracy audio transcription under noisy environments.",
     name: "gemini-3-pro-preview",
     label: "Gemini 3 Pro",
     provider: PROVIDERS.GOOGLE,
@@ -1357,7 +1412,8 @@ const MODELS = {
     outputTypes: [TYPES.TEXT],
   },
   GEMINI_35_FLASH_STT: {
-    description: "Google's Gemini 3.5 Flash Speech-to-Text model, offering state-of-the-art multilingual transcription and fast execution.",
+    description:
+      "Google's Gemini 3.5 Flash Speech-to-Text model, offering state-of-the-art multilingual transcription and fast execution.",
     name: "gemini-3.5-flash",
     label: "Gemini 3.5 Flash",
     provider: PROVIDERS.GOOGLE,
@@ -1417,13 +1473,13 @@ export interface ModelOptionEntry {
  * and whose outputTypes includes `outputType`.
  */
 function getModels(inputType: string, outputType: string): ModelDefinition[] {
-  return Object.values(MODELS).filter(
-    (model) => {
-      const modelRecord = model as ModelDefinition & Record<string, unknown>;
-      return (modelRecord.inputTypes as string[])?.includes(inputType) &&
-        (modelRecord.outputTypes as string[])?.includes(outputType);
-    },
-  );
+  return Object.values(MODELS).filter((model) => {
+    const modelRecord = model as ModelDefinition & Record<string, unknown>;
+    return (
+      (modelRecord.inputTypes as string[])?.includes(inputType) &&
+      (modelRecord.outputTypes as string[])?.includes(outputType)
+    );
+  });
 }
 
 /**
@@ -1431,23 +1487,32 @@ function getModels(inputType: string, outputType: string): ModelDefinition[] {
  * for a given input→output type combination.
  * Returns: { [provider]: [{ name, label, ... }, ...] }
  */
-function getModelOptions(inputType: string, outputType: string): Record<string, ModelOptionEntry[]> {
+function getModelOptions(
+  inputType: string,
+  outputType: string,
+): Record<string, ModelOptionEntry[]> {
   const optionsMap: Record<string, ModelOptionEntry[]> = {};
   for (const model of getModels(inputType, outputType)) {
     const modelRecord = model as ModelDefinition & Record<string, unknown>;
     if (modelRecord.listed !== false) {
       const entry: ModelOptionEntry = { name: model.name, label: model.label };
-      if (modelRecord.description) entry.description = modelRecord.description as string;
+      if (modelRecord.description)
+        entry.description = modelRecord.description as string;
       if (modelRecord.thinking) entry.thinking = true;
       if (model.inputTypes?.includes(TYPES.IMAGE)) entry.vision = true;
-      if (modelRecord.webSearch) entry.webSearch = modelRecord.webSearch as boolean | string;
+      if (modelRecord.webSearch)
+        entry.webSearch = modelRecord.webSearch as boolean | string;
       if (model.inputTypes) entry.inputTypes = model.inputTypes;
       if (model.outputTypes) entry.outputTypes = model.outputTypes;
       if (modelRecord.tools) entry.tools = modelRecord.tools as string[];
-      if (modelRecord.pricing) entry.pricing = modelRecord.pricing as Record<string, number>;
-      if (modelRecord.arena) entry.arena = modelRecord.arena as Record<string, number>;
-      if (modelRecord.maxInputTokens) entry.contextLength = modelRecord.maxInputTokens as number;
-      if (modelRecord.maxOutputTokens) entry.maxOutputTokens = modelRecord.maxOutputTokens as number;
+      if (modelRecord.pricing)
+        entry.pricing = modelRecord.pricing as Record<string, number>;
+      if (modelRecord.arena)
+        entry.arena = modelRecord.arena as Record<string, number>;
+      if (modelRecord.maxInputTokens)
+        entry.contextLength = modelRecord.maxInputTokens as number;
+      if (modelRecord.maxOutputTokens)
+        entry.maxOutputTokens = modelRecord.maxOutputTokens as number;
       if (modelRecord.assistantImages === false) entry.assistantImages = false;
       // JSON mode: OpenAI + Google support response_format / responseMimeType
       if (
@@ -1467,15 +1532,17 @@ function getModelOptions(inputType: string, outputType: string): Record<string, 
       if (modelRecord.size) entry.size = modelRecord.size as string;
       if (model.modelType) entry.modelType = model.modelType;
       if (modelRecord.liveAPI) entry.liveAPI = true;
-      if (modelRecord.thinkingLevels) entry.thinkingLevels = modelRecord.thinkingLevels as string[];
-      if (modelRecord.mediaLimits) entry.mediaLimits = modelRecord.mediaLimits as Record<string, unknown>;
+      if (modelRecord.thinkingLevels)
+        entry.thinkingLevels = modelRecord.thinkingLevels as string[];
+      if (modelRecord.mediaLimits)
+        entry.mediaLimits = modelRecord.mediaLimits as Record<string, unknown>;
       if (modelRecord.year) entry.year = modelRecord.year as number;
       if (modelRecord.lockedSampling) entry.lockedSampling = true;
       if (modelRecord.adaptiveThinking) entry.adaptiveThinking = true;
       // System prompt support: true for chat models, false for image-only/TTS/embedding APIs
       entry.supportsSystemPrompt =
         modelRecord.supportsSystemPrompt !== undefined
-          ? modelRecord.supportsSystemPrompt as boolean
+          ? (modelRecord.supportsSystemPrompt as boolean)
           : model.outputTypes.includes(TYPES.TEXT);
       (optionsMap[model.provider] ??= []).push(entry);
     }
@@ -1488,7 +1555,10 @@ function getModelOptions(inputType: string, outputType: string): Record<string, 
  * for a given input→output type combination.
  * Returns: { [provider]: modelName }
  */
-function getDefaultModels(inputType: string, outputType: string): Record<string, string> {
+function getDefaultModels(
+  inputType: string,
+  outputType: string,
+): Record<string, string> {
   const defaults: Record<string, string> = {};
   for (const model of getModels(inputType, outputType)) {
     const modelRecord = model as ModelDefinition & Record<string, unknown>;
@@ -1503,7 +1573,10 @@ function getDefaultModels(inputType: string, outputType: string): Record<string,
  * Get pricing map for a given input→output type combination.
  * Returns: { [modelName]: pricingObject }
  */
-function getPricing(inputType: string, outputType: string): Record<string, Record<string, number>> {
+function getPricing(
+  inputType: string,
+  outputType: string,
+): Record<string, Record<string, number>> {
   const pricing: Record<string, Record<string, number>> = {};
   for (const model of getModels(inputType, outputType)) {
     const modelRecord = model as ModelDefinition & Record<string, unknown>;
@@ -1519,7 +1592,11 @@ function getPricing(inputType: string, outputType: string): Record<string, Recor
  * Returns the model object or null.
  */
 function getModelByName(name: string): ModelDefinition | null {
-  return Object.values(MODELS).find((model) => (model as ModelDefinition).name === name) as ModelDefinition | null ?? null;
+  return (
+    (Object.values(MODELS).find(
+      (model) => (model as ModelDefinition).name === name,
+    ) as ModelDefinition | null) ?? null
+  );
 }
 
 /**
@@ -1593,7 +1670,8 @@ function resolveRecommendedDefault(
   if (availableProviders.has("anthropic")) {
     const anthropicModels = modelOptions["anthropic"] || [];
     const haikuMatch = anthropicModels.find(
-      (model) => model.name.toLowerCase().includes("haiku") && isEligible(model),
+      (model) =>
+        model.name.toLowerCase().includes("haiku") && isEligible(model),
     );
     if (haikuMatch) {
       return {
@@ -1838,7 +1916,10 @@ const DEFAULT_VOICES = {
 
 // ─── Parameter Registry ─────────────────────────────────────
 
-import { getParameterDescriptors, getAgentDefaults } from "./services/ParameterRegistry.ts";
+import {
+  getParameterDescriptors,
+  getAgentDefaults,
+} from "./services/ParameterRegistry.ts";
 import type { ParameterDescriptor } from "./services/ParameterRegistry.ts";
 
 // ─── EXPORTS ────────────────────────────────────────────────
