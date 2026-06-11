@@ -21,9 +21,59 @@ import {
 } from "../utils/media.ts";
 
 import type { ToolSchema } from "../services/harnesses/types.ts";
+
+/**
+ * OpenAI Chat Completions API enforces a hard maximum of 128 tools.
+ * When the Omni agent sends all tools (currently 276+), this limit
+ * is exceeded. We truncate to 128, prioritizing tool-discovery tools
+ * so the agent can still dynamically enable any tool it needs.
+ */
+const OPENAI_CHAT_COMPLETIONS_MAX_TOOLS = 128;
+
+const PRIORITY_TOOL_NAMES = new Set([
+  "discover_and_enable_tools",
+  "search_tools",
+  "enable_tools",
+]);
+
 function useResponsesAPI(model: string): boolean {
   const modelDefinition = getModelByName(model);
   return modelDefinition !== null && "responsesAPI" in modelDefinition && (modelDefinition as { responsesAPI?: boolean }).responsesAPI === true;
+}
+
+/**
+ * Truncate a tool array to the Chat Completions API maximum (128).
+ * Tool-discovery tools (discover_and_enable_tools, search_tools, enable_tools)
+ * are prioritized to the front so the agent can always dynamically discover
+ * and enable additional tools even when the full catalog exceeds the limit.
+ */
+function truncateToolsForChatCompletions<T extends { type: string; function?: { name: string } }>(
+  tools: T[],
+): T[] {
+  if (tools.length <= OPENAI_CHAT_COMPLETIONS_MAX_TOOLS) return tools;
+
+  const priorityTools: T[] = [];
+  const remainingTools: T[] = [];
+
+  for (const tool of tools) {
+    const toolName = tool.function?.name ?? "";
+    if (PRIORITY_TOOL_NAMES.has(toolName)) {
+      priorityTools.push(tool);
+    } else {
+      remainingTools.push(tool);
+    }
+  }
+
+  const slotsForRemaining = OPENAI_CHAT_COMPLETIONS_MAX_TOOLS - priorityTools.length;
+  const truncated = [...priorityTools, ...remainingTools.slice(0, slotsForRemaining)];
+
+  logger.warn(
+    `[OpenAI] Truncated tool count from ${tools.length} to ${truncated.length} ` +
+    `(Chat Completions API max: ${OPENAI_CHAT_COMPLETIONS_MAX_TOOLS}). ` +
+    `Priority tools preserved: ${priorityTools.map((tool) => tool.function?.name).join(", ") || "none"}`,
+  );
+
+  return truncated;
 }
 
 let client: OpenAI | null = null;
@@ -74,7 +124,14 @@ function sanitizeSchemaForOpenAI(schema: unknown): unknown {
   if (cleaned.type === "object" || cleaned.properties !== undefined) {
     cleaned.additionalProperties = false;
 
-    if (cleaned.properties && typeof cleaned.properties === "object") {
+    // OpenAI strict mode requires every type:"object" to have a `properties`
+    // field. Schemas like transform_json's `data` param declare type:"object"
+    // without properties (accepting arbitrary JSON). Inject an empty
+    // properties + required so the schema passes strict validation.
+    if (!cleaned.properties || typeof cleaned.properties !== "object") {
+      cleaned.properties = {};
+      cleaned.required = [];
+    } else {
       const propertiesMap = cleaned.properties as Record<string, unknown>;
       const propertyKeys = Object.keys(propertiesMap);
       const originalRequired = Array.isArray(cleaned.required) ? cleaned.required : [];
@@ -695,10 +752,11 @@ const openaiProvider = {
       payload.tools = [{ type: "web_search" } as unknown as OpenAI.Chat.ChatCompletionTool];
     }
 
-    // Custom function calling tools
+    // Custom function calling tools — truncate to 128 max for Chat Completions API
     const customTools = convertToolsToOpenAI(options.tools as ToolSchema[] | null | undefined) as OpenAI.Chat.ChatCompletionTool[] | null;
     if (customTools) {
-      payload.tools = [...((payload.tools as OpenAI.Chat.ChatCompletionTool[]) || []), ...customTools];
+      const allTools = [...((payload.tools as OpenAI.Chat.ChatCompletionTool[]) || []), ...customTools];
+      payload.tools = truncateToolsForChatCompletions(allTools);
     }
 
     try {
@@ -1077,10 +1135,11 @@ const openaiProvider = {
       payload.tools = [{ type: "web_search" } as unknown as OpenAI.Chat.ChatCompletionTool];
     }
 
-    // Custom function calling tools
+    // Custom function calling tools — truncate to 128 max for Chat Completions API
     const customTools = convertToolsToOpenAI(options.tools as ToolSchema[] | null | undefined) as OpenAI.Chat.ChatCompletionTool[] | null;
     if (customTools) {
-      payload.tools = [...((payload.tools as OpenAI.Chat.ChatCompletionTool[]) || []), ...customTools];
+      const allTools = [...((payload.tools as OpenAI.Chat.ChatCompletionTool[]) || []), ...customTools];
+      payload.tools = truncateToolsForChatCompletions(allTools);
     }
 
     let stream: Stream<OpenAI.Chat.ChatCompletionChunk>;
