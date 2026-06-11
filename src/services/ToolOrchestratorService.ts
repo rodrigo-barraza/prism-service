@@ -285,9 +285,10 @@ async function executeToolGeneric(name: string, args: Record<string, unknown> = 
   // Build caller-context headers for tools-api telemetry
   const contextHeaders = buildContextHeaders(context);
 
-  // POST-method tools send args as JSON body
-  if (schema.endpoint.method === "POST") {
-    const url = `${TOOLS_SERVICE_URL}${schema.endpoint.path}`;
+  // Body-carrying methods send args as JSON body
+  const bodyMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+  if (schema.endpoint.method && bodyMethods.has(schema.endpoint.method)) {
+    const url = buildUrlFromEndpoint(schema.endpoint, resolvedArgs).split("?")[0];
     // Inject trusted session context into body — the model's args never
     // include these fields (they're stripped from schemas), so they can
     // only come from the orchestrator's session context.
@@ -320,7 +321,7 @@ async function executeToolGeneric(name: string, args: Record<string, unknown> = 
       contextHeaders["X-Workspace-Override"] = worktreeState.worktreePath;
     }
 
-    return fetchJsonPost(url, body, contextHeaders, context.signal);
+    return fetchJsonWithBody(url, schema.endpoint.method, body, contextHeaders, context.signal);
   }
 
   const url = buildUrlFromEndpoint(schema.endpoint, resolvedArgs);
@@ -379,15 +380,16 @@ async function fetchJson(url: string, extraHeaders: Record<string, string> = {},
   }
 }
 
-async function fetchJsonPost(
+async function fetchJsonWithBody(
   url: string,
+  method: string,
   body: Record<string, unknown>,
   extraHeaders: Record<string, string> = {},
   signal?: AbortSignal,
 ) {
   try {
     const response = await fetch(url, {
-      method: "POST",
+      method,
       headers: { "Content-Type": "application/json", ...extraHeaders },
       body: JSON.stringify(body),
       ...(signal && { signal }),
@@ -1298,8 +1300,9 @@ export default class ToolOrchestratorService {
     activeWorktrees.delete(sessionId);
   }
   /** @internal */ static async _proxyPost(path: string, body: Record<string, unknown>, context: ToolExecutionContext) {
-    return fetchJsonPost(
+    return fetchJsonWithBody(
       `${TOOLS_SERVICE_URL}${path}`,
+      "POST",
       body,
       buildContextHeaders(context),
       context.signal,
