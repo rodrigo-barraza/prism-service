@@ -108,15 +108,16 @@ export interface OpenAIMessage {
 }
 
 /**
- * OpenAI strict-mode JSON Schema keywords that are NOT supported
- * and must be stripped before submission.
+ * OpenAI strict-mode supported JSON Schema keywords (allowlist).
+ * Only these keywords survive sanitization — everything else is stripped.
+ * This is safer than a denylist: unknown/future keywords are auto-rejected.
+ *
+ * @see https://platform.openai.com/docs/guides/structured-outputs
  */
-const OPENAI_FORBIDDEN_SCHEMA_KEYWORDS = new Set([
-  "pattern", "minimum", "maximum", "minLength", "maxLength",
-  "minItems", "maxItems", "minProperties", "maxProperties",
-  "exclusiveMinimum", "exclusiveMaximum", "multipleOf",
-  "if", "then", "else", "default", "format",
-  "oneOf", "allOf", "not",
+const OPENAI_ALLOWED_SCHEMA_KEYWORDS = new Set([
+  "type", "properties", "required", "additionalProperties",
+  "items", "enum", "const", "description",
+  "anyOf", "$defs", "$ref",
 ]);
 
 /**
@@ -128,7 +129,7 @@ const OPENAI_FORBIDDEN_SCHEMA_KEYWORDS = new Set([
  * - Forbidden keywords (pattern, minimum, maximum, default, etc.) must be stripped
  * - `anyOf` branches must each be independently valid
  */
-function sanitizeSchemaForOpenAI(schema: unknown): unknown {
+function sanitizeSchemaForOpenAI(schema: unknown, isInsidePropertiesMap = false): unknown {
   if (!schema || typeof schema !== "object") return schema;
 
   if (Array.isArray(schema)) {
@@ -139,8 +140,16 @@ function sanitizeSchemaForOpenAI(schema: unknown): unknown {
   const cleaned: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(source)) {
-    if (OPENAI_FORBIDDEN_SCHEMA_KEYWORDS.has(key)) continue;
-    cleaned[key] = sanitizeSchemaForOpenAI(value);
+    // Inside a `properties` map, keys are user-defined field names (e.g. "count", "name"),
+    // NOT JSON Schema keywords — so we skip the allowlist filter and recurse into each
+    // property schema. At all other levels, strip unrecognized keywords.
+    if (!isInsidePropertiesMap && !OPENAI_ALLOWED_SCHEMA_KEYWORDS.has(key)) continue;
+
+    if (key === "properties" && value && typeof value === "object" && !Array.isArray(value)) {
+      cleaned[key] = sanitizeSchemaForOpenAI(value, true);
+    } else {
+      cleaned[key] = sanitizeSchemaForOpenAI(value);
+    }
   }
 
   // Sanitize anyOf branches (each must be a valid strict-mode schema)
@@ -175,7 +184,6 @@ function sanitizeSchemaForOpenAI(schema: unknown): unknown {
             // Skip if it already has anyOf (it's already a union type)
             if (!typedPropertySchema.anyOf) {
               if (typeof typedPropertySchema.type === "string") {
-                // Convert { type: "string" } → { anyOf: [{ type: "string", ...rest }, { type: "null" }] }
                 const { type: originalType, ...restProperties } = typedPropertySchema;
                 propertiesMap[propertyKey] = {
                   anyOf: [
@@ -213,7 +221,6 @@ function sanitizeSchemaForOpenAI(schema: unknown): unknown {
   }
 
   // Fix array type values anywhere else (not just in properties)
-  // e.g. a top-level type: ["string", "null"] → anyOf
   if (Array.isArray(cleaned.type) && !cleaned.anyOf) {
     const types = cleaned.type as string[];
     const { type: _discardedType, ...restProperties } = cleaned;
