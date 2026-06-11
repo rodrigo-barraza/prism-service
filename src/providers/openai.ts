@@ -107,6 +107,27 @@ export interface OpenAIMessage {
   [key: string]: unknown;
 }
 
+/**
+ * OpenAI strict-mode JSON Schema keywords that are NOT supported
+ * and must be stripped before submission.
+ */
+const OPENAI_FORBIDDEN_SCHEMA_KEYWORDS = new Set([
+  "pattern", "minimum", "maximum", "minLength", "maxLength",
+  "minItems", "maxItems", "minProperties", "maxProperties",
+  "exclusiveMinimum", "exclusiveMaximum", "multipleOf",
+  "if", "then", "else", "default", "format",
+  "oneOf", "allOf", "not",
+]);
+
+/**
+ * Recursively sanitize a JSON Schema for OpenAI strict mode (Responses API).
+ *
+ * OpenAI strict mode requires:
+ * - Every type:"object" must have `properties`, `required` (all keys), and `additionalProperties: false`
+ * - Nullable types must use `anyOf: [{type:"T"}, {type:"null"}]`, NOT `type: ["T", "null"]`
+ * - Forbidden keywords (pattern, minimum, maximum, default, etc.) must be stripped
+ * - `anyOf` branches must each be independently valid
+ */
 function sanitizeSchemaForOpenAI(schema: unknown): unknown {
   if (!schema || typeof schema !== "object") return schema;
 
@@ -118,37 +139,67 @@ function sanitizeSchemaForOpenAI(schema: unknown): unknown {
   const cleaned: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(source)) {
+    if (OPENAI_FORBIDDEN_SCHEMA_KEYWORDS.has(key)) continue;
     cleaned[key] = sanitizeSchemaForOpenAI(value);
   }
 
+  // Sanitize anyOf branches (each must be a valid strict-mode schema)
+  if (Array.isArray(cleaned.anyOf)) {
+    cleaned.anyOf = (cleaned.anyOf as unknown[]).map(
+      (branch: unknown) => sanitizeSchemaForOpenAI(branch),
+    );
+  }
+
+  // Handle type:"object" — enforce strict mode properties/required/additionalProperties
   if (cleaned.type === "object" || cleaned.properties !== undefined) {
     cleaned.additionalProperties = false;
 
-    // OpenAI strict mode requires every type:"object" to have a `properties`
-    // field. Schemas like transform_json's `data` param declare type:"object"
-    // without properties (accepting arbitrary JSON). Inject an empty
-    // properties + required so the schema passes strict validation.
     if (!cleaned.properties || typeof cleaned.properties !== "object") {
       cleaned.properties = {};
       cleaned.required = [];
     } else {
       const propertiesMap = cleaned.properties as Record<string, unknown>;
       const propertyKeys = Object.keys(propertiesMap);
-      const originalRequired = Array.isArray(cleaned.required) ? cleaned.required : [];
+      const originalRequired = Array.isArray(cleaned.required) ? cleaned.required as string[] : [];
       const newRequired = [...originalRequired];
 
       for (const propertyKey of propertyKeys) {
         if (!newRequired.includes(propertyKey)) {
           newRequired.push(propertyKey);
 
+          // Make newly-required properties nullable via anyOf (not array type)
           const propertySchema = propertiesMap[propertyKey];
-          if (propertySchema && typeof propertySchema === "object") {
+          if (propertySchema && typeof propertySchema === "object" && !Array.isArray(propertySchema)) {
             const typedPropertySchema = propertySchema as Record<string, unknown>;
-            if (typeof typedPropertySchema.type === "string") {
-              typedPropertySchema.type = [typedPropertySchema.type, "null"];
-            } else if (Array.isArray(typedPropertySchema.type)) {
-              if (!typedPropertySchema.type.includes("null")) {
-                typedPropertySchema.type = [...typedPropertySchema.type, "null"];
+
+            // Skip if it already has anyOf (it's already a union type)
+            if (!typedPropertySchema.anyOf) {
+              if (typeof typedPropertySchema.type === "string") {
+                // Convert { type: "string" } → { anyOf: [{ type: "string", ...rest }, { type: "null" }] }
+                const { type: originalType, ...restProperties } = typedPropertySchema;
+                propertiesMap[propertyKey] = {
+                  anyOf: [
+                    { type: originalType, ...restProperties },
+                    { type: "null" },
+                  ],
+                };
+              }
+              // If type is already an array (from source schema), convert to anyOf
+              else if (Array.isArray(typedPropertySchema.type)) {
+                const types = typedPropertySchema.type as string[];
+                const { type: _discardedType, ...restProperties } = typedPropertySchema;
+                if (!types.includes("null")) {
+                  propertiesMap[propertyKey] = {
+                    anyOf: [
+                      ...types.map((typeValue: string) => ({ type: typeValue, ...restProperties })),
+                      { type: "null" },
+                    ],
+                  };
+                } else {
+                  propertiesMap[propertyKey] = {
+                    anyOf: types.map((typeValue: string) => ({ type: typeValue, ...(typeValue !== "null" ? restProperties : {}) })),
+                  };
+                }
               }
             }
           }
@@ -159,6 +210,16 @@ function sanitizeSchemaForOpenAI(schema: unknown): unknown {
         cleaned.required = newRequired;
       }
     }
+  }
+
+  // Fix array type values anywhere else (not just in properties)
+  // e.g. a top-level type: ["string", "null"] → anyOf
+  if (Array.isArray(cleaned.type) && !cleaned.anyOf) {
+    const types = cleaned.type as string[];
+    const { type: _discardedType, ...restProperties } = cleaned;
+    return {
+      anyOf: types.map((typeValue: string) => ({ type: typeValue, ...(typeValue !== "null" ? restProperties : {}) })),
+    };
   }
 
   return cleaned;
