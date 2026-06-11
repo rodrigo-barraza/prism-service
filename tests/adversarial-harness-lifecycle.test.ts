@@ -706,16 +706,18 @@ describe('checkAndApplyToolSetChanges — dynamic tool activation doc sync', () 
 
     harness.checkAndApplyToolSetChanges(currentMessages);
 
-    // Should have injected a [TOOL SET UPDATED] user message
+    // Should have injected a [TOOL SET UPDATED] system message
     const addendumMessage = currentMessages.find(
       (message) =>
-        message.role === 'user' &&
+        message.role === 'system' &&
         typeof message.content === 'string' &&
         message.content.includes('[TOOL SET UPDATED]'),
     );
 
     expect(addendumMessage).toBeDefined();
     expect(addendumMessage!.content as string).toContain('new tool(s) have been dynamically enabled');
+    expect(addendumMessage!.content as string).toContain('<tool-update>');
+    expect(addendumMessage!.content as string).toContain('</tool-update>');
 
     ToolContext.cleanupInMemory(sessionId);
   });
@@ -780,7 +782,7 @@ describe('checkAndApplyToolSetChanges — dynamic tool activation doc sync', () 
 
     const addendumMessage = currentMessages.find(
       (message) =>
-        message.role === 'user' &&
+        message.role === 'system' &&
         typeof message.content === 'string' &&
         message.content.includes('[TOOL SET UPDATED]'),
     );

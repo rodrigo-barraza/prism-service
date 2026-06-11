@@ -312,6 +312,20 @@ async function convertMessages(messages: ConversationMessage[]): Promise<Content
       }
     }
 
+    // Mid-conversation system messages (e.g. dynamic tool updates from the
+    // harness) — Gemini does not support role: "system" mid-conversation,
+    // so convert to "user" role. The harness already wraps these in
+    // <tool-update> XML tags for semantic clarity.
+    if (item.role === "system") {
+      if (item.content) {
+        result.push({
+          role: "user",
+          parts: [{ text: item.content }],
+        });
+      }
+      continue;
+    }
+
     if (item.content) {
       parts.push({ text: item.content });
     }

@@ -145,13 +145,19 @@ async function prepareMessages(messages: ChatMessage[]) {
   // Whitelist approach: explicitly construct each output object instead of
   // destructuring + ...rest, which leaks any new internal fields (e.g.
   // _ttftSamples, _liveGenProgress, _workerTokens) into the API payload.
+  //
+  // Mid-conversation system messages (e.g. dynamic tool updates) are
+  // converted to user role with XML scaffolding. Anthropic Opus 4.8+
+  // natively supports role: "system" mid-conversation, but converting
+  // to user ensures compatibility across all Claude model versions.
   const cleaned = await Promise.all(
     conversation
       .filter(
         (chatMessage: ChatMessage) =>
           chatMessage.role === "user" ||
           chatMessage.role === "assistant" ||
-          chatMessage.role === "tool",
+          chatMessage.role === "tool" ||
+          chatMessage.role === "system",
       )
       .map(async (message: ChatMessage) => {
         // Convert tool role messages to tool_result user messages for Anthropic
@@ -172,6 +178,19 @@ async function prepareMessages(messages: ChatMessage[]) {
                     : JSON.stringify(message.content),
               },
             ],
+          };
+        }
+
+        // Mid-conversation system messages (e.g. dynamic tool updates from
+        // the harness) — convert to user role for Anthropic API compatibility.
+        // The harness wraps these in <tool-update> XML tags, so the model
+        // can distinguish them from actual user messages.
+        if (message.role === "system") {
+          return {
+            role: "user",
+            content: typeof message.content === "string"
+              ? message.content
+              : JSON.stringify(message.content),
           };
         }
 

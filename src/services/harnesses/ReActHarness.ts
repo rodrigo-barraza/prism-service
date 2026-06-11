@@ -533,23 +533,27 @@ export default class ReActHarness extends BaseAgenticHarness {
             toolContextStore.set("toolSetDirty", true);
 
             currentMessages.push({
-              role: "user",
+              role: "system",
               content:
-                `[SYSTEM] Your search found ${disabledToolNames.length} tool(s): ` +
+                `<tool-update>\n` +
+                `Your search found ${disabledToolNames.length} tool(s): ` +
                 `${disabledToolNames.join(", ")}. ` +
-                `They have been automatically enabled and are available now — call them directly.`,
+                `They have been automatically enabled and are available now — call them directly.` +
+                `\n</tool-update>`,
             });
             logger.info(
               `[ReActHarness] Auto-enabled ${disabledToolNames.length} tools for lower-tier model "${context.resolvedModel}": [${disabledToolNames.join(", ")}]`,
             );
           } else {
             currentMessages.push({
-              role: "user",
+              role: "system",
               content:
-                `[SYSTEM] Your search found ${disabledToolNames.length} tool(s) that are not yet enabled: ` +
+                `<tool-update>\n` +
+                `Your search found ${disabledToolNames.length} tool(s) that are not yet enabled: ` +
                 `${disabledToolNames.join(", ")}. ` +
                 `To use them, call enable_tools with these tool names now. ` +
-                `After enabling, you can call them on the next iteration.`,
+                `After enabling, you can call them on the next iteration.` +
+                `\n</tool-update>`,
             });
             logger.info(
               `[ReActHarness] Injected post-search nudge for ${disabledToolNames.length} disabled tools: [${disabledToolNames.join(", ")}]`,
