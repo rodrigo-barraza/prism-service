@@ -47,23 +47,25 @@ export class ToolDocFormatter {
       ? resolveToolEntriesToSet(enabledTools, schemas)
       : new Set(enabledTools);
 
+    const persona = agentId ? AgentPersonaRegistry.get(agentId) : null;
+    const isCoreToolsLocked = persona?.coreToolsLocked ?? true;
+
     let filteredSchemas = schemas.filter(
       (toolSchema) =>
         enabledSet.has(toolSchema.name as string) ||
-        (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
-        (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_WORKSPACE.displayName ||
-        (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_ORCHESTRATOR.displayName ||
-        CORE_AGENTIC_TOOLS.has(toolSchema.name as string)
+        (isCoreToolsLocked && (
+          (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
+          (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_WORKSPACE.displayName ||
+          (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_ORCHESTRATOR.displayName ||
+          CORE_AGENTIC_TOOLS.has(toolSchema.name as string)
+        ))
     );
 
-    if (agentId) {
-      const persona = AgentPersonaRegistry.get(agentId);
-      if (persona?.blockedTools?.length) {
-        const disabledSet = resolveToolEntriesToSet(persona.blockedTools, schemas);
-        filteredSchemas = filteredSchemas.filter(
-          (toolSchema) => !disabledSet.has(toolSchema.name as string) || enabledSet.has(toolSchema.name as string),
-        );
-      }
+    if (persona?.blockedTools?.length) {
+      const disabledSet = resolveToolEntriesToSet(persona.blockedTools, schemas);
+      filteredSchemas = filteredSchemas.filter(
+        (toolSchema) => !disabledSet.has(toolSchema.name as string) || enabledSet.has(toolSchema.name as string),
+      );
     }
 
     if (lockedOffToolNames?.size) {

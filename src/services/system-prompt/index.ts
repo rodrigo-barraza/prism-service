@@ -155,13 +155,18 @@ export default class SystemPromptAssembler {
               ? resolveToolEntriesToSet(context.enabledTools, schemas)
               : new Set(context.enabledTools);
 
+            const countPersona = agentId ? AgentPersonaRegistry.get(agentId) : null;
+            const isCoreToolsLockedForCount = countPersona?.coreToolsLocked ?? true;
+
             let filteredSchemas = schemas.filter(
               (toolSchema) =>
                 enabledSet.has(toolSchema.name as string) ||
-                (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
-                (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_WORKSPACE.displayName ||
-                (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_ORCHESTRATOR.displayName ||
-                CORE_AGENTIC_TOOLS.has(toolSchema.name as string)
+                (isCoreToolsLockedForCount && (
+                  (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
+                  (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_WORKSPACE.displayName ||
+                  (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_ORCHESTRATOR.displayName ||
+                  CORE_AGENTIC_TOOLS.has(toolSchema.name as string)
+                ))
             );
 
             if (agentId) {

@@ -119,9 +119,8 @@ describe('GET /config/agents', () => {
 
     const luposAgent = res.body.find((a: any) => a.id === 'LUPOS');
     expect(luposAgent).toBeDefined();
-    // Lupos agent should NOT have core agentic tools like enter_plan_mode
-    expect(luposAgent.enabledToolNames).not.toContain('enter_plan_mode');
-    // But Lupos agent SHOULD have explicitly whitelisted agentic tools like upsert_memory
+    // Lupos agent explicitly enables core agentic tools in its persona
+    expect(luposAgent.enabledToolNames).toContain('enter_plan_mode');
     expect(luposAgent.enabledToolNames).toContain('upsert_memory');
   });
 });
@@ -146,15 +145,15 @@ describe('GET /config/tools', () => {
     expect(res.body.some((t: any) => t.name === 'enter_plan_mode')).toBe(true);
   });
 
-  it('does NOT include non-whitelisted core agentic tools when filtered by LUPOS, but includes whitelisted ones', async () => {
+  it('includes explicitly enabled core agentic tools when filtered by LUPOS', async () => {
     const res = await request(app)
       .get('/config/tools?agent=LUPOS')
       .expect(200);
 
     expect(Array.isArray(res.body)).toBe(true);
-    // Lupos does not have enter_plan_mode
-    expect(res.body.some((t: any) => t.name === 'enter_plan_mode')).toBe(false);
-    // But Lupos has upsert_memory since we whitelisted it
+    // Lupos explicitly enables enter_plan_mode in its persona
+    expect(res.body.some((t: any) => t.name === 'enter_plan_mode')).toBe(true);
+    // Lupos also has upsert_memory
     expect(res.body.some((t: any) => t.name === 'upsert_memory')).toBe(true);
   });
 
