@@ -185,6 +185,13 @@ export default class AgenticToolResolver {
       const resolvedPersona = agent ? AgentPersonaRegistry.get(agent) : null;
       const isCoreToolsLocked = resolvedPersona?.coreToolsLocked ?? true;
 
+      const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
+      const systemTools = new Set<string>(
+        clientSchemas
+          .filter((toolSchema) => toolSchema.system === true && !CORE_ORCHESTRATOR_TOOLS.has(toolSchema.name as string))
+          .map((toolSchema) => toolSchema.name as string)
+      );
+
       const clientDisabledSet = shouldApplyDisabledFilter && options.disabledTools && Array.isArray(options.disabledTools) && options.disabledTools.length > 0
         ? new Set<string>(options.disabledTools)
         : null;
@@ -195,7 +202,7 @@ export default class AgenticToolResolver {
           if (clientDisabledSet?.has(tool.name)) return false;
           if (enabledSet.has(tool.name)) return true;
           if (tool.name.startsWith("mcp__")) return true;
-          if (isCoreToolsLocked && CORE_AGENTIC_TOOLS.has(tool.name)) return true;
+          if (isCoreToolsLocked && (CORE_AGENTIC_TOOLS.has(tool.name) || systemTools.has(tool.name))) return true;
           if (shouldBypassOrchestratorTools && CORE_ORCHESTRATOR_TOOLS.has(tool.name)) return true;
           if (PRISM_LOCAL_TOOL_NAMES.has(tool.name)) return true;
           return false;
@@ -203,7 +210,6 @@ export default class AgenticToolResolver {
       );
 
       if (resolvedPersona?.blockedTools?.length) {
-        const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
         const disabledSet = resolveToolEntriesToSet(resolvedPersona.blockedTools, clientSchemas);
         finalTools = finalTools.filter(
           (tool) => !disabledSet.has(tool.name) || enabledSet.has(tool.name),
