@@ -28,7 +28,7 @@ function isUsageRecord(value: unknown): value is Record<string, number> {
     return false;
   }
   const candidate = value as Record<string, unknown>;
-  return Object.values(candidate).every((val) => typeof val === "number");
+  return Object.values(candidate).every((value) => typeof value === "number");
 }
 
 /**
@@ -162,9 +162,9 @@ export class SubAgentTelemetryEmitter {
   createEmitFunction(): EmitFunction {
     return (event) => {
       if (event.type === "chunk") {
-        const contentStr = typeof event.content === "string" ? event.content : "";
-        this.output += contentStr;
-        const chunkCharacters = contentStr.length;
+        const contentString = typeof event.content === "string" ? event.content : "";
+        this.output += contentString;
+        const chunkCharacters = contentString.length;
 
         // Reset burst counters on phase transition (thinking → generating)
         if (this.lastPhase === "thinking" && this.burstOutputCharacters > 0) {
@@ -189,8 +189,8 @@ export class SubAgentTelemetryEmitter {
           this.emitAggregateProgress();
         }
       } else if (event.type === "thinking") {
-        const contentStr = typeof event.content === "string" ? event.content : "";
-        const thinkingCharacters = contentStr.length;
+        const contentString = typeof event.content === "string" ? event.content : "";
+        const thinkingCharacters = contentString.length;
 
         // Reset burst counters on phase transition (generating → thinking)
         if (this.lastPhase === "generating" && this.burstOutputCharacters > 0) {

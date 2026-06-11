@@ -51,14 +51,14 @@ export class ThinkTagParser {
 
     while (this.buffer.length > 0) {
       if (this.insideThink) {
-        const closeIdx = this.buffer.indexOf("</think>");
-        if (closeIdx !== -1) {
+        const closeIndex = this.buffer.indexOf("</think>");
+        if (closeIndex !== -1) {
           // Found closing tag — emit thinking content up to it
-          const thinkContent = this.buffer.slice(0, closeIdx);
+          const thinkContent = this.buffer.slice(0, closeIndex);
           if (thinkContent) {
             results.push({ type: "thinking", content: thinkContent });
           }
-          this.buffer = this.buffer.slice(closeIdx + "</think>".length);
+          this.buffer = this.buffer.slice(closeIndex + "</think>".length);
           this.insideThink = false;
         } else {
           // No closing tag yet — check if buffer might end with a partial </think>
@@ -78,14 +78,14 @@ export class ThinkTagParser {
           break;
         }
       } else {
-        const openIdx = this.buffer.indexOf("<think>");
-        if (openIdx !== -1) {
+        const openIndex = this.buffer.indexOf("<think>");
+        if (openIndex !== -1) {
           // Found opening tag — emit text before it
-          const textBefore = this.buffer.slice(0, openIdx);
+          const textBefore = this.buffer.slice(0, openIndex);
           if (textBefore) {
             results.push({ type: "text", content: textBefore });
           }
-          this.buffer = this.buffer.slice(openIdx + "<think>".length);
+          this.buffer = this.buffer.slice(openIndex + "<think>".length);
           this.insideThink = true;
         } else {
           // No opening tag — check for partial <think> at end

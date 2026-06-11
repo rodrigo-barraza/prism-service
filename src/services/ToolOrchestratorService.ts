@@ -174,11 +174,11 @@ async function fetchSchemas() {
 
     // Fetch workspace config from tools-api (single source of truth)
     try {
-      const configRes = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
+      const configResponse = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
         signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MS),
       });
-      if (configRes.ok) {
-        const config = await configRes.json() as ToolsApiConfig;
+      if (configResponse.ok) {
+        const config = await configResponse.json() as ToolsApiConfig;
         if (Array.isArray(config.workspaceRoots)) {
           cachedWorkspaceRoots = config.workspaceRoots;
           logger.info(
@@ -301,12 +301,12 @@ async function executeToolGeneric(name: string, args: Record<string, unknown> = 
     // when the session has an active worktree.
     if (context.agentSessionId && activeWorktrees.has(context.agentSessionId)) {
       const worktreeState = activeWorktrees.get(context.agentSessionId)!;
-      const rewritePath = (p: unknown): unknown => {
-        if (typeof p !== "string") return p;
-        if (p.startsWith(worktreeState.originalRoot)) {
-          return worktreeState.worktreePath + p.slice(worktreeState.originalRoot.length);
+      const rewritePath = (provider: unknown): unknown => {
+        if (typeof provider !== "string") return provider;
+        if (provider.startsWith(worktreeState.originalRoot)) {
+          return worktreeState.worktreePath + provider.slice(worktreeState.originalRoot.length);
         }
-        return p;
+        return provider;
       };
 
       // Rewrite common path fields used by file/git/shell tools
@@ -699,11 +699,11 @@ export default class ToolOrchestratorService {
   /** Re-fetch workspace roots from tools-api config */
   static async refreshWorkspaceRoots() {
     try {
-      const configRes = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
+      const configResponse = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
         signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MS),
       });
-      if (configRes.ok) {
-        const config = await configRes.json() as ToolsApiConfig;
+      if (configResponse.ok) {
+        const config = await configResponse.json() as ToolsApiConfig;
         if (Array.isArray(config.workspaceRoots)) {
           cachedWorkspaceRoots = config.workspaceRoots;
         }
@@ -774,12 +774,12 @@ export default class ToolOrchestratorService {
     
     // Check internal / orchestrator tools
     const localEmojis: Record<string, string | [string, string]> = {"enter_plan_mode":["📝","🧠"],"exit_plan_mode":["🚀","🧠"],"create_skill":["🪄","🛠️"],"execute_skill":["⚡","🪄"],"list_skills":["📋","🪄"],"delete_skill":["🗑️","🪄"],"enter_worktree":["🌳","💻"],"exit_worktree":["🚪","🌳"],"write_todo":["📝","📌"],"summarize_conversation":["💬","📝"],"ask_user":["💬","❓"],"list_mcp_resources":["🔌","📋"],"read_mcp_resource":["🔌","📄"],"authenticate_mcp_server":["🔌","🔐"],"set_timer":["⏰","🔔"],"list_timers":["⏱️","📋"],"cancel_timer":["⏰","❌"],"create_team":["👥","🤖"],"send_message":["💬","📤"],"stop_agent":["⏹️","🤖"],"get_task_output":["📥","🤖"],"delete_team":["🗑️","👥"]};
-    const emojiVal = localEmojis[toolName];
-    if (emojiVal) {
-      if (Array.isArray(emojiVal)) {
-        return emojiVal[0];
+    const emojiValue = localEmojis[toolName];
+    if (emojiValue) {
+      if (Array.isArray(emojiValue)) {
+        return emojiValue[0];
       }
-      return emojiVal;
+      return emojiValue;
     }
     return null;
   }
@@ -1034,16 +1034,16 @@ export default class ToolOrchestratorService {
     if (name === TOOL_NAMES.BROWSER_ACTION && (result as Record<string, unknown>).screenshot && !(result as Record<string, unknown>).error) {
       try {
         const FileService = (await import("./FileService.js")).default;
-        const resultObj = result as Record<string, unknown>;
-        const dataUrl = `data:${resultObj.mimeType || "image/png"};base64,${resultObj.screenshot}`;
+        const resultObject = result as Record<string, unknown>;
+        const dataUrl = `data:${resultObject.mimeType || "image/png"};base64,${resultObject.screenshot}`;
         const { ref } = await FileService.uploadFile(
           dataUrl,
           FILE_CATEGORIES.SCREENSHOTS,
           context.project || null,
           context.username || null,
         );
-        resultObj.screenshotRef = ref;
-        delete resultObj.screenshot; // Don't send base64 downstream
+        resultObject.screenshotRef = ref;
+        delete resultObject.screenshot; // Don't send base64 downstream
       } catch (error: unknown) {
         logger.warn(
                     `[ToolOrchestrator] Screenshot MinIO upload failed: ${getErrorMessage(error)}`,

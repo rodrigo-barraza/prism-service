@@ -13,8 +13,8 @@ import { MS_PER_MINUTE } from "@rodrigo-barraza/utilities-library";
 
 const router = express.Router();
 const {
-  REQUESTS: REQUESTS_COL,
-  MODEL_CONVERSATIONS: CONVERSATIONS_COL,
+  REQUESTS: REQUESTS_COLLECTION,
+  MODEL_CONVERSATIONS: CONVERSATIONS_COLLECTION,
 } = COLLECTIONS;
 
 // ─── GET /health — system health ──────────────────────
@@ -28,8 +28,8 @@ router.get(
     if (db) {
       try {
         const [requestCount, conversationCount] = await Promise.all([
-          db.collection(REQUESTS_COL).estimatedDocumentCount(),
-          db.collection(CONVERSATIONS_COL).estimatedDocumentCount(),
+          db.collection(REQUESTS_COLLECTION).estimatedDocumentCount(),
+          db.collection(CONVERSATIONS_COLLECTION).estimatedDocumentCount(),
         ]);
         dbStats = { requestCount, conversationCount };
       } catch {
@@ -123,7 +123,7 @@ router.get(
 
       const [rawConversations, recentRequests] = await Promise.all([
         req.db
-          .collection(CONVERSATIONS_COL)
+          .collection(CONVERSATIONS_COLLECTION)
           .find({ updatedAt: { $gte: since } })
           .project({
             id: 1,
@@ -139,47 +139,47 @@ router.get(
           .sort({ updatedAt: -1 })
           .toArray(),
         req.db
-          .collection(REQUESTS_COL)
+          .collection(REQUESTS_COLLECTION)
           .find({ timestamp: { $gte: since } })
           .sort({ timestamp: -1 })
           .limit(20)
           .toArray(),
       ]);
 
-      const conversations = rawConversations.map((c: Record<string, unknown>) => {
-        const msgs = (c.messages || []) as Record<string, unknown>[];
-        const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+      const conversations = rawConversations.map((record: Record<string, unknown>) => {
+        const msgs = (record.messages || []) as Record<string, unknown>[];
+        const lastMessage = msgs.length > 0 ? msgs[msgs.length - 1] : null;
         let lastMessageText = null;
-        if (lastMsg) {
-          const content = lastMsg.content;
+        if (lastMessage) {
+          const content = lastMessage.content;
           if (typeof content === "string") {
             lastMessageText = content;
           } else if (Array.isArray(content)) {
-            const textPart = content.find((p: Record<string, unknown>) => p.type === "text");
+            const textPart = content.find((record: Record<string, unknown>) => record.type === "text");
             lastMessageText = textPart?.text || null;
           }
         }
         const totalCost =
-          c.totalCost ||
-          msgs.reduce((sum: number, m: Record<string, unknown>) => sum + ((m.estimatedCost as number) || 0), 0);
+          record.totalCost ||
+          msgs.reduce((sum: number, record: Record<string, unknown>) => sum + ((record.estimatedCost as number) || 0), 0);
         return {
-          id: c.id,
-          project: c.project,
-          username: c.username,
-          title: c.title,
-          lastActivity: c.updatedAt,
+          id: record.id,
+          project: record.project,
+          username: record.username,
+          title: record.title,
+          lastActivity: record.updatedAt,
           messageCount: msgs.length,
           lastMessage: lastMessageText,
-          lastMessageRole: lastMsg?.role || null,
-          isGenerating: c.isGenerating || false,
-          modalities: c.modalities || null,
-          providers: c.providers || [],
+          lastMessageRole: lastMessage?.role || null,
+          isGenerating: record.isGenerating || false,
+          modalities: record.modalities || null,
+          providers: record.providers || [],
           totalCost,
         };
       });
 
       const totalRecent = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .countDocuments({ timestamp: { $gte: since } });
       const requestsPerMinute = totalRecent / parseInt(minParam as string, 10);
 

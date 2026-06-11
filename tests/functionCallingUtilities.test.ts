@@ -1,7 +1,7 @@
 /**
- * FunctionCallingUtilities — tests for expandMessagesForFC and truncateToolResult.
+ * FunctionCallingUtilities — tests for expandMessagesForFunctionCall and truncateToolResult.
  *
- * expandMessagesForFC is called on every agentic loop iteration to convert
+ * expandMessagesForFunctionCall is called on every agentic loop iteration to convert
  * the stored message format into the OpenAI Chat Completions spec format.
  * truncateToolResult prevents massive tool outputs from blowing up context windows.
  *
@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  expandMessagesForFC,
+  expandMessagesForFunctionCall,
   truncateToolResult,
 } from "../src/utils/FunctionCallingUtilities.ts";
 
@@ -83,13 +83,13 @@ describe("truncateToolResult", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-describe("expandMessagesForFC", () => {
+describe("expandMessagesForFunctionCall", () => {
   it("should pass through simple user messages unchanged", () => {
     const messages: TestMessage[] = [
       { role: "user", content: "Hello" },
     ];
 
-    const expanded = expandMessagesForFC(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages as any);
 
     expect(expanded).toHaveLength(1);
     expect(expanded[0].role).toBe("user");
@@ -112,7 +112,7 @@ describe("expandMessagesForFC", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages as any);
 
     // Should produce: [assistant(with toolCalls), tool(result)]
     expect(expanded).toHaveLength(2);
@@ -140,7 +140,7 @@ describe("expandMessagesForFC", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages as any);
     const toolMessage = expanded.find((message) => message.role === "tool");
 
     // The content should be truncated JSON
@@ -156,7 +156,7 @@ describe("expandMessagesForFC", () => {
       { role: "user", content: "How are you?" },
     ];
 
-    const expanded = expandMessagesForFC(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages as any);
 
     expect(expanded).toHaveLength(2);
     expect(expanded[0].content).toBe("Hello");
@@ -169,7 +169,7 @@ describe("expandMessagesForFC", () => {
       { role: "assistant", content: "Hi", deleted: true },
     ];
 
-    const expanded = expandMessagesForFC(messages as any, {
+    const expanded = expandMessagesForFunctionCall(messages as any, {
       filterDeleted: false,
     });
 
@@ -183,7 +183,7 @@ describe("expandMessagesForFC", () => {
       { role: "user", content: "Continue" },
     ];
 
-    const expanded = expandMessagesForFC(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages as any);
 
     expect(expanded).toHaveLength(2);
   });
@@ -199,7 +199,7 @@ describe("expandMessagesForFC", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages as any);
 
     expect(expanded).toHaveLength(1);
     expect(expanded[0].role).toBe("assistant");
@@ -216,7 +216,7 @@ describe("expandMessagesForFC", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages as any);
 
     expect(expanded[0].thinking).toBe("Let me reason...");
     expect(expanded[0].thinkingSignature).toBe("sig-abc");
@@ -231,7 +231,7 @@ describe("expandMessagesForFC", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages as any);
 
     expect(expanded[0].images).toEqual(["data:image/png;base64,abc"]);
   });
@@ -241,7 +241,7 @@ describe("expandMessagesForFC", () => {
       { role: "user", content: "" },
     ];
 
-    const expanded = expandMessagesForFC(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages as any);
 
     expect(expanded[0].content).toBe(" ");
   });
@@ -257,7 +257,7 @@ describe("expandMessagesForFC", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages as any);
 
     // Only assistant message, no tool message (result undefined = pending)
     expect(expanded).toHaveLength(1);
@@ -276,7 +276,7 @@ describe("expandMessagesForFC", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages as any);
 
     // assistant + tool1 + tool2 = 3
     expect(expanded).toHaveLength(3);

@@ -40,7 +40,7 @@ interface ModelResolutionResult {
  * Regex to match GGUF quantization suffixes.
  * Captures the quant tag (e.g. "Q8_0", "IQ4_XS", "F16", "BF16").
  */
-const GGUF_QUANT_SUFFIX_RE =
+const GGUF_QUANT_SUFFIX_REGEX =
   /[-_]((?:I?Q[0-9]+(?:_[A-Z0-9]+)*|[BF](?:16|32)))(?:\.gguf)?$/i;
 
 /**
@@ -61,7 +61,7 @@ export function parseModelQuant(modelKey: string): ParsedQuant {
 
   // Handle GGUF path-style keys — strip .gguf, then match the quant suffix via regex
   const stripped = modelKey.replace(/\.gguf$/i, "");
-  const match = stripped.match(GGUF_QUANT_SUFFIX_RE);
+  const match = stripped.match(GGUF_QUANT_SUFFIX_REGEX);
   if (match) {
     const quant = match[1].toUpperCase();
     const base = stripped.slice(0, match.index);

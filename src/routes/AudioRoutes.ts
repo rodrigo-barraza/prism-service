@@ -412,13 +412,13 @@ router.post(
         null;
       const estimatedCost = calculateAudioCost(result.usage, pricing as Record<string, number> | null);
       // ── Logging ────────────────────────────────────────────────
-      const costStr = formatCostTag(estimatedCost);
+      const costString = formatCostTag(estimatedCost);
       logger.request(
         req.project || "any",
         req.username || "any",
         req.clientIp || null,
         `[audio/transcribe] ${providerName} model=${model || "default"} — ` +
-          `total: ${totalSec.toFixed(2)}s${costStr}`,
+          `total: ${totalSec.toFixed(2)}s${costString}`,
       );
       RequestLogger.log({
         requestId,

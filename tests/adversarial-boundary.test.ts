@@ -36,7 +36,7 @@ import type { RecurrenceRule } from '../src/utils/RecurrenceMatcher.ts';
 
 import {
   truncateToolResult,
-  expandMessagesForFC,
+  expandMessagesForFunctionCall,
 } from '../src/utils/FunctionCallingUtilities.ts';
 
 import PolicyEngine, {
@@ -670,15 +670,15 @@ describe('FunctionCallingUtilities adversarial', () => {
     });
   });
 
-  describe('expandMessagesForFC — malformed messages', () => {
+  describe('expandMessagesForFunctionCall — malformed messages', () => {
     it('should handle empty messages array', () => {
-      const result = expandMessagesForFC([]);
+      const result = expandMessagesForFunctionCall([]);
       expect(result).toEqual([]);
     });
 
     it('should handle message with null content', () => {
       const messages = [{ role: 'user', content: null }] as any;
-      const result = expandMessagesForFC(messages);
+      const result = expandMessagesForFunctionCall(messages);
       expect(result.length).toBe(1);
       // Should convert null content to " " (space fallback)
       expect(result[0].content).toBe(' ');
@@ -688,7 +688,7 @@ describe('FunctionCallingUtilities adversarial', () => {
       const messages = [
         { role: 'assistant', content: 'text', toolCalls: [] },
       ] as any;
-      const result = expandMessagesForFC(messages);
+      const result = expandMessagesForFunctionCall(messages);
       // Empty toolCalls = no expansion needed, but content is valid
       expect(result.length).toBe(1);
     });
@@ -704,7 +704,7 @@ describe('FunctionCallingUtilities adversarial', () => {
           ],
         },
       ] as any;
-      const result = expandMessagesForFC(messages);
+      const result = expandMessagesForFunctionCall(messages);
       // Should produce assistant + 0 tool messages (result is undefined)
       const toolMessages = result.filter((message) => message.role === 'tool');
       expect(toolMessages.length).toBe(0);
@@ -716,7 +716,7 @@ describe('FunctionCallingUtilities adversarial', () => {
         { role: 'assistant', content: 'bye', deleted: true },
         { role: 'user', content: 'still here' },
       ] as any;
-      const result = expandMessagesForFC(messages, { filterDeleted: true });
+      const result = expandMessagesForFunctionCall(messages, { filterDeleted: true });
       expect(result.length).toBe(2); // deleted message removed
     });
 
@@ -725,7 +725,7 @@ describe('FunctionCallingUtilities adversarial', () => {
         { role: 'user', content: 'hello' },
         { role: 'assistant', content: 'bye', deleted: true },
       ] as any;
-      const result = expandMessagesForFC(messages, { filterDeleted: false });
+      const result = expandMessagesForFunctionCall(messages, { filterDeleted: false });
       expect(result.length).toBe(2);
     });
   });

@@ -93,9 +93,9 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
       try {
         // Single-model enforcement: unload any other loaded models
         try {
-          const psRes = await fetch(`${baseUrl}/api/ps`);
-          if (psRes.ok) {
-            const psData = await psRes.json();
+          const psResponse = await fetch(`${baseUrl}/api/ps`);
+          if (psResponse.ok) {
+            const psData = await psResponse.json();
             const running = (psData as Record<string, unknown[]>).models || [];
             for (const runningModel of running as Record<string, string>[]) {
               const runningName = runningModel.model || runningModel.name;

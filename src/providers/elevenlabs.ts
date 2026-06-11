@@ -70,18 +70,18 @@ const elevenlabsProvider = ({
             options.modelId || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).elevenlabs;
     const websocketUrl = `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input?model_id=${modelId}`;
 
-    const ws = new WebSocket(websocketUrl, {
+    const websocket = new WebSocket(websocketUrl, {
       headers: { "xi-api-key": apiKey },
     });
 
     // Wait for connection
     await new Promise<void>((resolve, reject) => {
-      ws.on("open", resolve);
-      ws.on("error", reject);
+      websocket.on("open", resolve);
+      websocket.on("error", reject);
     });
 
     // Send initial config
-    ws.send(
+    websocket.send(
       JSON.stringify({
         text: " ",
         voice_settings: {
@@ -98,7 +98,7 @@ const elevenlabsProvider = ({
     let ended = false;
     let error = null;
 
-    ws.on("message", (data: WebSocket.RawData) => {
+    websocket.on("message", (data: WebSocket.RawData) => {
       const response = JSON.parse(data.toString());
       messageQueue.push(response);
             if (resolveMessage) {
@@ -108,13 +108,13 @@ const elevenlabsProvider = ({
       }
     });
 
-    ws.on("close", () => {
+    websocket.on("close", () => {
       ended = true;
             if (resolveMessage) resolveMessage();
     });
 
-    ws.on("error", (wsError: Error) => {
-      error = wsError;
+    websocket.on("error", (websocketError: Error) => {
+      error = websocketError;
             if (resolveMessage) resolveMessage();
     });
 
@@ -129,8 +129,8 @@ const elevenlabsProvider = ({
             const cutIndex = match.index! + match[0].length;
             const sentence = buffer.slice(0, cutIndex);
             buffer = buffer.slice(cutIndex);
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.send(
+            if (websocket.readyState === WebSocket.OPEN) {
+              websocket.send(
                 JSON.stringify({
                   text: sentence,
                   try_trigger_generation: true,
@@ -141,19 +141,19 @@ const elevenlabsProvider = ({
         }
 
         // Flush remaining
-        if (buffer.length > 0 && ws.readyState === WebSocket.OPEN) {
-          ws.send(
+        if (buffer.length > 0 && websocket.readyState === WebSocket.OPEN) {
+          websocket.send(
             JSON.stringify({ text: buffer, try_trigger_generation: true }),
           );
         }
 
         // Send EOS
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ text: "" }));
+        if (websocket.readyState === WebSocket.OPEN) {
+          websocket.send(JSON.stringify({ text: "" }));
         }
       } catch (error: unknown) {
         logger.error("Error sending to ElevenLabs WS:", error);
-        ws.close();
+        websocket.close();
       }
     })();
 
@@ -176,8 +176,8 @@ const elevenlabsProvider = ({
         }
       }
     } finally {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
+      if (websocket.readyState === WebSocket.OPEN) {
+        websocket.close();
       }
     }
   },

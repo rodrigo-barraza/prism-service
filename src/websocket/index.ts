@@ -91,7 +91,7 @@ interface ToolResult {
  *   /ws/live   — Persistent Live API session (audio/text bidirectional)
  */
 export function setupWebSocket(wss: WebSocketServer) {
-  wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+  wss.on("connection", (websocket: WebSocket, req: IncomingMessage) => {
     const url = new URL(req.url || "/", `http://${req.headers.host}`);
     const pathname = url.pathname;
 
@@ -113,43 +113,43 @@ export function setupWebSocket(wss: WebSocketServer) {
     );
 
     if (pathname === "/ws/chat") {
-      handleWsChat(ws, project, username, clientIp || "unknown", agent);
+      handleWebsocketChat(websocket, project, username, clientIp || "unknown", agent);
     } else if (pathname === "/ws/text-to-audio") {
-      handleWsVoice(ws, project, username, clientIp || "unknown", agent);
+      handleWebsocketVoice(websocket, project, username, clientIp || "unknown", agent);
     } else if (pathname === "/ws/live") {
-      handleWsLive(ws, project, username, clientIp || "unknown", agent);
+      handleWebsocketLive(websocket, project, username, clientIp || "unknown", agent);
     } else {
-      ws.send(
+      websocket.send(
         JSON.stringify({
           type: "error",
           message: `Unknown WebSocket path: ${pathname}`,
         }),
       );
-      ws.close();
+      websocket.close();
     }
   });
 }
-function handleWsChat(
-  ws: WebSocket,
+function handleWebsocketChat(
+  websocket: WebSocket,
   project: string,
   username: string,
   clientIp: string,
   agent: string | null,
 ) {
-  ws.on("message", async (rawData: Buffer | string) => {
+  websocket.on("message", async (rawData: Buffer | string) => {
     let data: Record<string, unknown>;
     try {
       data = JSON.parse(rawData.toString());
     } catch {
-      ws.send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
+      websocket.send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
       return;
     }
 
     await handleConversation(
       { ...data, project, username, clientIp, agent },
       (event: Record<string, unknown>) => {
-        if (ws.readyState === ws.OPEN) {
-          ws.send(JSON.stringify(event));
+        if (websocket.readyState === websocket.OPEN) {
+          websocket.send(JSON.stringify(event));
         }
       },
     );
@@ -160,19 +160,19 @@ function handleWsChat(
  * WebSocket voice handler — delegates to shared handleVoice() from voice.js.
  * Sends binary audio frames for audio data, JSON for control events.
  */
-function handleWsVoice(
-  ws: WebSocket,
+function handleWebsocketVoice(
+  websocket: WebSocket,
   project: string,
   username: string,
   clientIp: string,
   _agent: string | null,
 ) {
-  ws.on("message", async (rawData: Buffer | string) => {
+  websocket.on("message", async (rawData: Buffer | string) => {
     let data: Record<string, unknown>;
     try {
       data = JSON.parse(rawData.toString());
     } catch {
-      ws.send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
+      websocket.send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
       return;
     }
 
@@ -180,13 +180,13 @@ function handleWsVoice(
       await handleVoice(
         { ...data, project, username, clientIp } as Parameters<typeof handleVoice>[0],
         (chunk: Buffer | Uint8Array) => {
-          if (ws.readyState === ws.OPEN) {
-            ws.send(chunk); // Binary audio frame
+          if (websocket.readyState === websocket.OPEN) {
+            websocket.send(chunk); // Binary audio frame
           }
         },
         (event: Record<string, unknown>) => {
-          if (ws.readyState === ws.OPEN) {
-            ws.send(JSON.stringify(event));
+          if (websocket.readyState === websocket.OPEN) {
+            websocket.send(JSON.stringify(event));
           }
         },
       );
@@ -220,8 +220,8 @@ function handleWsVoice(
  *   { type: "interrupted" }                — Model was interrupted
  *   { type: "error", message }             — Error
  */
-function handleWsLive(
-  ws: WebSocket,
+function handleWebsocketLive(
+  websocket: WebSocket,
   project: string,
   username: string,
   _clientIp: string,
@@ -253,8 +253,8 @@ function handleWsLive(
   let turnUserAudioRef: string | null = null;
 
   function emit(event: Record<string, unknown>) {
-    if (ws.readyState === ws.OPEN) {
-      ws.send(JSON.stringify(event));
+    if (websocket.readyState === websocket.OPEN) {
+      websocket.send(JSON.stringify(event));
     }
   }
   async function buildAndUploadAudio(
@@ -266,10 +266,10 @@ function handleWsLive(
       const pcmBuffers = chunks.map((b64) => Buffer.from(b64, "base64"));
       const pcmData = Buffer.concat(pcmBuffers);
 
-      const numChannels = 1;
+      const numberChannels = 1;
       const bitsPerSample = 16;
-      const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
-      const blockAlign = numChannels * (bitsPerSample / 8);
+      const byteRate = sampleRate * numberChannels * (bitsPerSample / 8);
+      const blockAlign = numberChannels * (bitsPerSample / 8);
       const wavHeader = Buffer.alloc(44);
       wavHeader.write("RIFF", 0);
       wavHeader.writeUInt32LE(36 + pcmData.length, 4);
@@ -277,7 +277,7 @@ function handleWsLive(
       wavHeader.write("fmt ", 12);
       wavHeader.writeUInt32LE(16, 16);
       wavHeader.writeUInt16LE(1, 20);
-      wavHeader.writeUInt16LE(numChannels, 22);
+      wavHeader.writeUInt16LE(numberChannels, 22);
       wavHeader.writeUInt32LE(sampleRate, 24);
       wavHeader.writeUInt32LE(byteRate, 28);
       wavHeader.writeUInt16LE(blockAlign, 32);
@@ -302,7 +302,7 @@ function handleWsLive(
     }
   }
 
-  ws.on("message", async (rawData: Buffer | string) => {
+  websocket.on("message", async (rawData: Buffer | string) => {
     let data: Record<string, unknown>;
     try {
       data = JSON.parse(rawData.toString());
@@ -358,8 +358,8 @@ function handleWsLive(
           const defaultTopology = (clientConfig.topology as string) || settings?.topology || DEFAULT_TOPOLOGY;
           const dynamicTools = [...ToolOrchestratorService.getToolSchemas(defaultTopology)];
 
-          const filtered = dynamicTools.filter((t) =>
-            enabledSet.has(t.name),
+          const filtered = dynamicTools.filter((dynamicTool) =>
+            enabledSet.has(dynamicTool.name),
           );
           const googleFormats = convertToolsToGoogle(filtered as { name: string; description?: string; parameters?: Record<string, unknown> }[]);
           if (googleFormats) {
@@ -434,8 +434,8 @@ function handleWsLive(
               }
               emit({ type: "setupComplete" });
             },
-            onmessage: (msgRaw: unknown) => {
-              const serverMessage = msgRaw as LiveServerMessage;
+            onmessage: (messageRaw: unknown) => {
+              const serverMessage = messageRaw as LiveServerMessage;
               // Model turn parts (audio data, text, function calls)
               if (serverMessage.serverContent?.modelTurn?.parts) {
                 if (!passFirstTokenTime) {
@@ -507,19 +507,19 @@ function handleWsLive(
               // Top-level tool calls
               if (serverMessage.toolCall?.functionCalls) {
                 const functionCalls: FunctionCallRef[] = serverMessage.toolCall.functionCalls.map(
-                  (fc: Record<string, unknown>) => ({
-                    id: (fc.id as string) || `live-toolCall-${crypto.randomUUID()}`,
-                    name: fc.name as string,
-                    args: (fc.args as Record<string, unknown>) || {},
+                  (functionCall: Record<string, unknown>) => ({
+                    id: (functionCall.id as string) || `live-toolCall-${crypto.randomUUID()}`,
+                    name: functionCall.name as string,
+                    args: (functionCall.args as Record<string, unknown>) || {},
                   }),
                 );
                 turnToolCalls.push(...functionCalls);
 
                 // Emit calling status to the client
-                for (const fc of functionCalls) {
+                for (const functionCall of functionCalls) {
                   emit({
                     type: "tool_execution",
-                    tool: { name: fc.name, args: fc.args, id: fc.id },
+                    tool: { name: functionCall.name, args: functionCall.args, id: functionCall.id },
                     status: "calling",
                   });
                 }
@@ -861,7 +861,7 @@ function handleWsLive(
   });
 
   // Clean up on client disconnect
-  ws.on("close", () => {
+  websocket.on("close", () => {
     if (liveSession) {
       try {
         liveSession.close();

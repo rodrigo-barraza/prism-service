@@ -23,7 +23,7 @@ interface CustomRequest extends Request {
 const router = Router();
 router.use(requireDb);
 
-const WORKFLOWS_COL = COLLECTIONS.WORKFLOWS;
+const WORKFLOWS_COLLECTION = COLLECTIONS.WORKFLOWS;
 
 /** Media fields on messages that may contain base64 data URLs. */
 const MEDIA_FIELDS = ["images", "audio", "video", "pdf"];
@@ -293,18 +293,18 @@ function computeWorkflowMeta(nodes: Record<string, unknown>[]) {
   const providers = [
     ...new Set(
       (nodes || [])
-        .filter((n: Record<string, unknown>) => !n.nodeType && n.provider)
-        .map((n: Record<string, unknown>) => n.provider as string),
+        .filter((record: Record<string, unknown>) => !record.nodeType && record.provider)
+        .map((record: Record<string, unknown>) => record.provider as string),
     ),
   ];
   const modalities: Record<string, boolean> = {};
-  for (const n of nodes || []) {
+  for (const record of nodes || []) {
     // Only include boundary nodes: input assets define workflow inputs,
     // viewer nodes define workflow outputs
-    if (n.nodeType === "input") {
-      for (const t of (n.outputTypes as string[]) || []) modalities[`${t}In`] = true;
-    } else if (n.nodeType === "viewer") {
-      for (const t of (n.inputTypes as string[]) || []) modalities[`${t}Out`] = true;
+    if (record.nodeType === "input") {
+      for (const tool of (record.outputTypes as string[]) || []) modalities[`${tool}In`] = true;
+    } else if (record.nodeType === "viewer") {
+      for (const tool of (record.inputTypes as string[]) || []) modalities[`${tool}Out`] = true;
     }
   }
   return { providers, modalities };
@@ -324,7 +324,7 @@ router.get(
       const query = source === "all" ? {} : { source };
 
       const workflows = await db
-        .collection(WORKFLOWS_COL)
+        .collection(WORKFLOWS_COLLECTION)
         .find(query)
         .sort({ updatedAt: -1 })
         .project({ nodes: 0, edges: 0, nodeResults: 0, nodeStatuses: 0 })
@@ -355,7 +355,7 @@ router.get(
         filter = { workflowId: req.params.id };
       }
 
-      const workflow = await db.collection(WORKFLOWS_COL).findOne(filter);
+      const workflow = await db.collection(WORKFLOWS_COLLECTION).findOne(filter);
       if (!workflow)
         return res.status(404).json({ error: "Workflow not found" });
 
@@ -429,7 +429,7 @@ router.post(
           .project({ totalCost: 1 })
           .toArray();
         totalCost = conversations.reduce(
-                    (sum: number, c: Record<string, unknown>) => sum + ((c.totalCost as number) || 0),
+                    (sum: number, record: Record<string, unknown>) => sum + ((record.totalCost as number) || 0),
           0,
         );
       }
@@ -448,7 +448,7 @@ router.post(
         updatedAt: now,
       };
 
-      const result = await db.collection(WORKFLOWS_COL).insertOne(workflow);
+      const result = await db.collection(WORKFLOWS_COLLECTION).insertOne(workflow);
       res.json({ success: true, id: result.insertedId.toString() });
     } catch (error: unknown) {
             logger.error(`POST /workflows error: ${getErrorMessage(error)}`);
@@ -501,7 +501,7 @@ router.put(
       delete update.$set._id; // prevent overwriting _id
 
       const result = await db
-        .collection(WORKFLOWS_COL)
+        .collection(WORKFLOWS_COLLECTION)
         .updateOne(filter, update);
       if (result.matchedCount === 0)
         return res.status(404).json({ error: "Workflow not found" });
@@ -539,7 +539,7 @@ router.patch(
           .json({ error: "conversationIds array required" });
       }
 
-      const result = await db.collection(WORKFLOWS_COL).updateOne(filter, {
+      const result = await db.collection(WORKFLOWS_COLLECTION).updateOne(filter, {
         // MongoDB PushOperator typing is overly strict for dynamic schemas — cast to Document
         $push: { conversationIds: { $each: conversationIds } } as Document,
         $set: { updatedAt: new Date().toISOString() },
@@ -550,7 +550,7 @@ router.patch(
 
       // Recompute totalCost from all linked conversations
       // Conversations are the source of truth for cost (they track estimatedCost per message)
-      const workflow = await db.collection(WORKFLOWS_COL).findOne(filter);
+      const workflow = await db.collection(WORKFLOWS_COLLECTION).findOne(filter);
       const allConvIds = workflow?.conversationIds || [];
       if (allConvIds.length > 0) {
         const conversations = await db
@@ -559,10 +559,10 @@ router.patch(
           .project({ totalCost: 1 })
           .toArray();
         const totalCost = conversations.reduce(
-                    (sum: number, c: Record<string, unknown>) => sum + ((c.totalCost as number) || 0),
+                    (sum: number, record: Record<string, unknown>) => sum + ((record.totalCost as number) || 0),
           0,
         );
-        await db.collection(WORKFLOWS_COL).updateOne(filter, {
+        await db.collection(WORKFLOWS_COLLECTION).updateOne(filter, {
           $set: { totalCost },
         });
       }
@@ -594,7 +594,7 @@ router.delete(
         filter = { workflowId: req.params.id };
       }
 
-      await db.collection(WORKFLOWS_COL).deleteOne(filter);
+      await db.collection(WORKFLOWS_COLLECTION).deleteOne(filter);
       res.json({ success: true });
     } catch (error: unknown) {
       logger.error(`DELETE /workflows/:id error: ${getErrorMessage(error)}`);
@@ -651,7 +651,7 @@ router.post(
         filter = { workflowId: req.params.id };
       }
 
-      const workflow = await db.collection(WORKFLOWS_COL).findOne(filter);
+      const workflow = await db.collection(WORKFLOWS_COLLECTION).findOne(filter);
       if (!workflow) {
         return res.status(404).json({ error: "Workflow not found" });
       }
@@ -808,7 +808,7 @@ router.post(
           );
         }
 
-        await db.collection(WORKFLOWS_COL).updateOne(filter, {
+        await db.collection(WORKFLOWS_COLLECTION).updateOne(filter, {
           $set: updatePayload,
         });
       } catch (persistError: unknown) {

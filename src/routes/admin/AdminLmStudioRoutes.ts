@@ -112,7 +112,7 @@ router.post(
       const result = await provider.listModels();
       const allModels = result?.data || result?.models || [];
       const modelData = allModels.find(
-        (m: Record<string, unknown>) => m.id === model || m.path === model || m.key === model,
+        (record: Record<string, unknown>) => record.id === model || record.path === model || record.key === model,
       );
 
       if (!modelData) {

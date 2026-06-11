@@ -114,7 +114,7 @@ function assembleGraph(steps: WorkflowStep[]): AssembledGraph {
   const nodeResults: NodeResultMap = {};
 
   // Track the last non-utility model ID for chain edges
-  let prevOutputModelId: string | null = null;
+  let previousOutputModelId: string | null = null;
 
   steps.forEach((step: WorkflowStep, i: number) => {
     const baseX = 80 + i * STEP_WIDTH;
@@ -141,10 +141,10 @@ function assembleGraph(steps: WorkflowStep[]): AssembledGraph {
     }
 
     // ── 2. Text Input: User Message ──
-    const userMsgId = `${stepPrefix}_user`;
+    const userMessageId = `${stepPrefix}_user`;
     if (step.input) {
       allNodes.push({
-        id: userMsgId,
+        id: userMessageId,
         nodeType: "input",
         modality: "text",
         content: step.input,
@@ -160,17 +160,17 @@ function assembleGraph(steps: WorkflowStep[]): AssembledGraph {
     const messages: WorkflowMessage[] = [];
     if (step.systemPrompt)
       messages.push({ role: "system", content: step.systemPrompt });
-    const userMsg: WorkflowMessage = { role: "user", content: step.input || "" };
-    messages.push(userMsg);
+    const userMessage: WorkflowMessage = { role: "user", content: step.input || "" };
+    messages.push(userMessage);
     if (step.output) {
-      const assistantMsg: WorkflowMessage & { images?: string[] } = { role: "assistant", content: step.output };
-      if (step.outputImageRef) assistantMsg.images = [step.outputImageRef];
-      messages.push(assistantMsg);
+      const assistantMessage: WorkflowMessage & { images?: string[] } = { role: "assistant", content: step.output };
+      if (step.outputImageRef) assistantMessage.images = [step.outputImageRef];
+      messages.push(assistantMessage);
     }
 
     // Derive conversation supported modalities from the model's raw input types
     const supportedModalities = (modalities.rawInputTypes || ["text"]).filter(
-      (t: string) => t !== "conversation",
+      (tool: string) => tool !== "conversation",
     );
     const convInputTypes = buildConversationPorts(
       messages,
@@ -190,8 +190,8 @@ function assembleGraph(steps: WorkflowStep[]): AssembledGraph {
     } as InputNode);
 
     // Wire inputs → conversation node
-    const sysIdx = 0;
-    const userIdx = step.systemPrompt ? 1 : 0;
+    const sysIndex = 0;
+    const userIndex = step.systemPrompt ? 1 : 0;
 
     if (step.systemPrompt) {
       allEdges.push({
@@ -199,16 +199,16 @@ function assembleGraph(steps: WorkflowStep[]): AssembledGraph {
         sourceNodeId: sysId,
         targetNodeId: convId,
         sourceModality: "text",
-        targetModality: `${sysIdx}.text`,
+        targetModality: `${sysIndex}.text`,
       });
     }
     if (step.input) {
       allEdges.push({
         id: `${stepPrefix}_user_to_conv`,
-        sourceNodeId: userMsgId,
+        sourceNodeId: userMessageId,
         targetNodeId: convId,
         sourceModality: "text",
-        targetModality: `${userIdx}.text`,
+        targetModality: `${userIndex}.text`,
       });
     }
 
@@ -297,10 +297,10 @@ function assembleGraph(steps: WorkflowStep[]): AssembledGraph {
     }
 
     // ── 6. Chain edge from previous output model → this model (non-utility only) ──
-    if (!utility && prevOutputModelId) {
+    if (!utility && previousOutputModelId) {
       allEdges.push({
-        id: `chain_${prevOutputModelId}_to_${modelId}`,
-        sourceNodeId: prevOutputModelId,
+        id: `chain_${previousOutputModelId}_to_${modelId}`,
+        sourceNodeId: previousOutputModelId,
         targetNodeId: modelId,
         sourceModality: "text",
         targetModality: "text",
@@ -309,7 +309,7 @@ function assembleGraph(steps: WorkflowStep[]): AssembledGraph {
 
     // Track last non-utility model for chains
     if (!utility) {
-      prevOutputModelId = modelId;
+      previousOutputModelId = modelId;
     }
   });
 

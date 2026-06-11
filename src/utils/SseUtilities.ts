@@ -41,9 +41,9 @@ export function createSseEmitter(res: Response, signal: AbortSignal) {
       // Node flushes pending writes to the socket immediately. Critical
       // for events emitted before an await block (plan_proposal,
       // approval_required) where no further writes push the buffer.
-      const resWithFlush = res as Response & { flush?: () => void };
-      if (typeof resWithFlush.flush === "function") {
-        resWithFlush.flush();
+      const responseWithFlush = res as Response & { flush?: () => void };
+      if (typeof responseWithFlush.flush === "function") {
+        responseWithFlush.flush();
       } else if (res.socket && !res.socket.destroyed) {
         res.socket.uncork?.();
         res.socket.cork?.();
@@ -57,7 +57,7 @@ export function createSseEmitter(res: Response, signal: AbortSignal) {
  * Build a flat JSON response from collected SSE events.
  * Used by non-streaming callers (?stream=false).
  */
-export function buildJsonResponseFromEvents(events: SseEvent[], reqBody: ChatRequest) {
+export function buildJsonResponseFromEvents(events: SseEvent[], requestBody: ChatRequest) {
   const errorEvent = events.find((e: SseEvent) => e.type === "error");
   if (errorEvent) {
     return { error: new ProviderError("server", errorEvent.message || "Unknown error", 500) };
@@ -93,8 +93,8 @@ export function buildJsonResponseFromEvents(events: SseEvent[], reqBody: ChatReq
       thinking: thinking || null,
       images: images.length > 0 ? images : undefined,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-      provider: doneEvent.provider || reqBody.provider,
-      model: doneEvent.model || reqBody.model,
+      provider: doneEvent.provider || requestBody.provider,
+      model: doneEvent.model || requestBody.model,
       usage: doneEvent.usage || null,
       estimatedCost: doneEvent.estimatedCost ?? null,
       ...(doneEvent.traceId && { traceId: doneEvent.traceId }),

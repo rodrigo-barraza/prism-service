@@ -166,12 +166,12 @@ export interface BenchmarkStreamEvent {
 
 // ── Comparator Function ─────────────────────────────────────
 
-export type ComparatorFn = (a: number, b: number) => boolean;
+export type ComparatorFn = (agent: number, b: number) => boolean;
 
 export const COMPARATORS: Record<ComparisonOperator, ComparatorFn> = {
-  gte: (a, b) => a >= b,
-  lte: (a, b) => a <= b,
-  gt: (a, b) => a > b,
-  lt: (a, b) => a < b,
-  eq: (a, b) => a === b,
+  gte: (agent, b) => agent >= b,
+  lte: (agent, b) => agent <= b,
+  gt: (agent, b) => agent > b,
+  lt: (agent, b) => agent < b,
+  eq: (agent, b) => agent === b,
 };

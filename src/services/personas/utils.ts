@@ -133,14 +133,14 @@ export function buildToolPolicy(
 ): string {
   const allSections = [TOOL_DISCOVERY_POLICY_SECTION, ...sections];
   const enabled = new Set(context.enabledTools || []);
-  const enabledArr = [...enabled];
+  const enabledArray = [...enabled];
 
   const filtered = allSections.filter((section) => {
     if (!section.requires || section.requires.length === 0) return true;
     return section.requires.some((requirement) => {
       if (requirement.endsWith("*")) {
         const prefix = requirement.slice(0, -1);
-        return enabledArr.some((toolName) => toolName.startsWith(prefix));
+        return enabledArray.some((toolName) => toolName.startsWith(prefix));
       }
       return enabled.has(requirement);
     });

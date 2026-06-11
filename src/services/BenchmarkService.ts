@@ -13,8 +13,8 @@ import { COLLECTIONS } from "../constants.ts";
 import type { SseEvent } from "../types/SseTypes.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
-const BENCHMARKS_COL = COLLECTIONS.BENCHMARKS;
-const RUNS_COL = COLLECTIONS.BENCHMARK_RUNS;
+const BENCHMARKS_COLLECTION = COLLECTIONS.BENCHMARKS;
+const RUNS_COLLECTION = COLLECTIONS.BENCHMARK_RUNS;
 
 // In-memory counter: how many benchmark model calls are actively generating
 let activeGenerationCount = 0;
@@ -716,7 +716,7 @@ const BenchmarkService = {
     if (results.length > 0) {
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
       if (db) {
-        await db.collection(RUNS_COL).insertOne(run);
+        await db.collection(RUNS_COLLECTION).insertOne(run);
       }
     }
     logger.success(
@@ -750,14 +750,14 @@ const BenchmarkService = {
       createdAt: now,
       updatedAt: now,
     };
-    await db.collection(BENCHMARKS_COL).insertOne(document);
+    await db.collection(BENCHMARKS_COLLECTION).insertOne(document);
     return document;
   },
   async list(project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
     return db
-      .collection(BENCHMARKS_COL)
+      .collection(BENCHMARKS_COLLECTION)
       .find({ project })
       .sort({ updatedAt: -1 })
       .toArray();
@@ -765,19 +765,19 @@ const BenchmarkService = {
   async getById(id: string, project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
-    return db.collection(BENCHMARKS_COL).findOne({ id, project });
+    return db.collection(BENCHMARKS_COLLECTION).findOne({ id, project });
   },
   async remove(id: string, project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
-    await db.collection(BENCHMARKS_COL).deleteOne({ id, project });
-    await db.collection(RUNS_COL).deleteMany({ benchmarkId: id, project });
+    await db.collection(BENCHMARKS_COLLECTION).deleteOne({ id, project });
+    await db.collection(RUNS_COLLECTION).deleteMany({ benchmarkId: id, project });
   },
   async getRuns(benchmarkId: string, project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
     return db
-      .collection(RUNS_COL)
+      .collection(RUNS_COLLECTION)
       .find({ benchmarkId, project })
       .sort({ startedAt: -1 })
       .toArray();
@@ -785,13 +785,13 @@ const BenchmarkService = {
   async getRunById(runId: string, project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
-    return db.collection(RUNS_COL).findOne({ id: runId, project });
+    return db.collection(RUNS_COLLECTION).findOne({ id: runId, project });
   },
   async getLatestRun(benchmarkId: string, project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
     return db
-      .collection(RUNS_COL)
+      .collection(RUNS_COLLECTION)
       .findOne({ benchmarkId, project }, { sort: { startedAt: -1 } });
   },
 };

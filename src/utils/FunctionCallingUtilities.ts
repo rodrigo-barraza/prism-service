@@ -87,7 +87,7 @@ interface ExpandedMessage {
  * [assistant(tool_calls), tool(result1), tool(result2), ...] per the
  * OpenAI Chat Completions spec.
  */
-export function expandMessagesForFC(
+export function expandMessagesForFunctionCall(
   messages: ChatMessage[],
   { filterDeleted = true }: ExpandOptions = {},
 ): ExpandedMessage[] {

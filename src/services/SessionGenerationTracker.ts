@@ -259,7 +259,7 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
       const totalIn = completedInputTokens;
       const avgTtft =
         ttftSamples.length > 0
-          ? ttftSamples.reduce((a: number, b: number) => a + b, 0) /
+          ? ttftSamples.reduce((ttftSample: number, b: number) => ttftSample + b, 0) /
             ttftSamples.length
           : null;
       // Use the most recent completed tok/s (last iteration's rate)
@@ -286,14 +286,14 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
     let activeTtftCount = 0;
 
     for (const rid of requestIds) {
-      const req = activeRequests.get(rid);
-      if (!req) continue;
+      const request = activeRequests.get(rid);
+      if (!request) continue;
 
-      activeOutputTokens += req.outputTokens;
-      activeInputTokens += req.inputTokens;
+      activeOutputTokens += request.outputTokens;
+      activeInputTokens += request.inputTokens;
 
-      if (req.ttft != null) {
-        activeTtftSum += req.ttft;
+      if (request.ttft != null) {
+        activeTtftSum += request.ttft;
         activeTtftCount++;
       }
 
@@ -308,17 +308,17 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
       // more accurate than raw chunkCount for providers like Anthropic
       // that send large thinking deltas as single chunks.
       const estimatedFromChars =
-        req.outputCharacters > 0
-          ? Math.ceil(req.outputCharacters / 4)
-          : req.chunkCount;
+        request.outputCharacters > 0
+          ? Math.ceil(request.outputCharacters / 4)
+          : request.chunkCount;
       const effectiveTokens =
-        req.outputTokens > 0 ? req.outputTokens : estimatedFromChars;
+        request.outputTokens > 0 ? request.outputTokens : estimatedFromChars;
       if (
-        req.firstTokenTime &&
-        req.lastTokenTime &&
+        request.firstTokenTime &&
+        request.lastTokenTime &&
         effectiveTokens >= MIN_TOKENS_FOR_RATE
       ) {
-        const elapsed = (req.lastTokenTime - req.firstTokenTime) / 1000;
+        const elapsed = (request.lastTokenTime - request.firstTokenTime) / 1000;
         if (elapsed >= MIN_ELAPSED_SEC) {
           totalTokPerSec += effectiveTokens / elapsed;
           generatingCount++;
@@ -331,7 +331,7 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
 
     // Average TTFT across completed + active samples
     const allTtftSum =
-      ttftSamples.reduce((a: number, b: number) => a + b, 0) + activeTtftSum;
+      ttftSamples.reduce((ttftSample: number, b: number) => ttftSample + b, 0) + activeTtftSum;
     const allTtftCount = ttftSamples.length + activeTtftCount;
     const avgTtft = allTtftCount > 0 ? allTtftSum / allTtftCount : null;
 

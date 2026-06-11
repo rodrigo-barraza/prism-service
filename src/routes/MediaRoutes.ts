@@ -8,8 +8,8 @@ import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
 router.use(requireDb);
-const CONVERSATIONS_COL = COLLECTIONS.MODEL_CONVERSATIONS;
-const REQUESTS_COL = COLLECTIONS.REQUESTS;
+const CONVERSATIONS_COLLECTION = COLLECTIONS.MODEL_CONVERSATIONS;
+const REQUESTS_COLLECTION = COLLECTIONS.REQUESTS;
 
 interface AggregateMediaItem {
   url: string;
@@ -187,7 +187,7 @@ router.get(
 
       // ── Conversation-based media ──────────────────────────────
       const convItems = await db
-        .collection(CONVERSATIONS_COL)
+        .collection(CONVERSATIONS_COLLECTION)
         .aggregate<AggregateMediaItem>(pipeline)
         .toArray();
 
@@ -200,7 +200,7 @@ router.get(
         // Only fetch if we're not filtering to audio-only
         if (origin !== "user") {
           // Agent-generated images are always origin=ai
-          const reqMatch: Record<string, unknown> = {
+          const requestMatch: Record<string, unknown> = {
             project: req.project,
             operation: { $in: ["agent:image", "agent:iteration"] },
             success: true,
@@ -210,19 +210,19 @@ router.get(
             const timestampFilter: Record<string, unknown> = {};
             if (from) timestampFilter.$gte = from;
             if (to) timestampFilter.$lte = to;
-            reqMatch.timestamp = timestampFilter;
+            requestMatch.timestamp = timestampFilter;
           }
-          if (provider) reqMatch.provider = provider;
-          if (model) reqMatch.model = model;
+          if (provider) requestMatch.provider = provider;
+          if (model) requestMatch.model = model;
           if (search) {
-            reqMatch["requestPayload.messages.content"] = {
+            requestMatch["requestPayload.messages.content"] = {
               $regex: search,
               $options: "i",
             };
           }
 
-          const reqPipeline: Record<string, unknown>[] = [
-            { $match: reqMatch },
+          const requestPipeline: Record<string, unknown>[] = [
+            { $match: requestMatch },
             { $unwind: "$responsePayload.images" },
             // Only include actual refs (MinIO refs or URLs), skip placeholder "[generated]"
             {
@@ -251,8 +251,8 @@ router.get(
           ];
 
           requestGenItems = await db
-            .collection(REQUESTS_COL)
-            .aggregate<AggregateMediaItem>(reqPipeline)
+            .collection(REQUESTS_COLLECTION)
+            .aggregate<AggregateMediaItem>(requestPipeline)
             .toArray();
         }
       }
@@ -270,8 +270,8 @@ router.get(
       }
 
       // Re-sort merged results by timestamp descending
-      mergedItems.sort((a, b) => {
-        const timestampA = a.timestamp || "";
+      mergedItems.sort((aggregateMediaItem, b) => {
+        const timestampA = aggregateMediaItem.timestamp || "";
         const timestampB = b.timestamp || "";
         return timestampA < timestampB ? 1 : timestampA > timestampB ? -1 : 0;
       });

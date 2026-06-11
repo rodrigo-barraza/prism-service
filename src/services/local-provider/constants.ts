@@ -44,7 +44,7 @@ export const THINKING_PATTERNS = [
  * Models trained for function calling / tool use.
  * Matched against the lowercased model key.
  */
-export const FC_PATTERNS = [
+export const FUNCTION_CALL_PATTERNS = [
   "qwen",
   "deepseek",
   "llama",

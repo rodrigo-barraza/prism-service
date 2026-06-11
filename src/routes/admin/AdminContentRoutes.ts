@@ -9,9 +9,9 @@ import requireDb from "../../middleware/RequireDbMiddleware.ts";
 
 const router = express.Router();
 const {
-  REQUESTS: REQUESTS_COL,
-  MODEL_CONVERSATIONS: CONVERSATIONS_COL,
-  WORKFLOWS: WORKFLOWS_COL,
+  REQUESTS: REQUESTS_COLLECTION,
+  MODEL_CONVERSATIONS: CONVERSATIONS_COLLECTION,
+  WORKFLOWS: WORKFLOWS_COLLECTION,
 } = COLLECTIONS;
 
 router.use(requireDb);
@@ -47,14 +47,14 @@ router.get(
         if (provider) convFilter.providers = provider;
         if (model) convFilter["messages.model"] = model;
         const convIds = await req.db
-          .collection(CONVERSATIONS_COL)
+          .collection(CONVERSATIONS_COLLECTION)
           .distinct("id", convFilter);
         filter.conversationIds = { $elemMatch: { $in: convIds } };
       }
 
       const [docs, total] = await Promise.all([
         req.db
-          .collection(WORKFLOWS_COL)
+          .collection(WORKFLOWS_COLLECTION)
           .find(filter)
           .project({
             _id: 1,
@@ -80,7 +80,7 @@ router.get(
           .skip(skip)
           .limit(limit)
           .toArray(),
-        req.db.collection(WORKFLOWS_COL).countDocuments(filter),
+        req.db.collection(WORKFLOWS_COLLECTION).countDocuments(filter),
       ]);
 
       res.json({ data: docs, total, page, limit });
@@ -104,7 +104,7 @@ router.get(
         return res.status(400).json({ error: "Invalid workflow ID" });
       }
 
-      const document = await req.db.collection(WORKFLOWS_COL).findOne({ _id: objectId });
+      const document = await req.db.collection(WORKFLOWS_COLLECTION).findOne({ _id: objectId });
       if (!document) return res.status(404).json({ error: "Workflow not found" });
 
       res.json(document);
@@ -132,25 +132,25 @@ router.get(
 
       const { skip, limit, page } = parsePaginationParams(req.query);
 
-      const [convProjects, convUsernames, reqProjects, reqUsernames] =
+      const [convProjects, convUsernames, requestProjects, requestUsernames] =
         await Promise.all([
-          req.db.collection(CONVERSATIONS_COL).distinct("project"),
-          req.db.collection(CONVERSATIONS_COL).distinct("username"),
-          req.db.collection(REQUESTS_COL).distinct("project", {
+          req.db.collection(CONVERSATIONS_COLLECTION).distinct("project"),
+          req.db.collection(CONVERSATIONS_COLLECTION).distinct("username"),
+          req.db.collection(REQUESTS_COLLECTION).distinct("project", {
             operation: { $in: ["agent:image", "agent:iteration"] },
             success: true,
             "responsePayload.images": { $exists: true, $ne: [] },
           }),
-          req.db.collection(REQUESTS_COL).distinct("username", {
+          req.db.collection(REQUESTS_COLLECTION).distinct("username", {
             operation: { $in: ["agent:image", "agent:iteration"] },
             success: true,
             "responsePayload.images": { $exists: true, $ne: [] },
           }),
         ]);
-      const allProjects = [...new Set([...convProjects, ...reqProjects])]
+      const allProjects = [...new Set([...convProjects, ...requestProjects])]
         .filter(Boolean)
         .sort();
-      const allUsernames = [...new Set([...convUsernames, ...reqUsernames])]
+      const allUsernames = [...new Set([...convUsernames, ...requestUsernames])]
         .filter(Boolean)
         .sort();
 
@@ -271,30 +271,30 @@ router.get(
       }
 
       const convItems = await req.db
-        .collection(CONVERSATIONS_COL)
+        .collection(CONVERSATIONS_COLLECTION)
         .aggregate(pipeline)
         .toArray();
 
       let requestGenItems: Record<string, unknown>[] = [];
       if (!type || type === "image") {
         if (origin !== "user") {
-          const reqMatch: Record<string, unknown> = {
+          const requestMatch: Record<string, unknown> = {
             operation: { $in: ["agent:image", "agent:iteration"] },
             success: true,
             "responsePayload.images": { $exists: true, $ne: [] },
           };
-          if (project) reqMatch.project = project;
-          if (username) reqMatch.username = username;
-          applyDateRangeFilter(reqMatch, from as string, to as string);
+          if (project) requestMatch.project = project;
+          if (username) requestMatch.username = username;
+          applyDateRangeFilter(requestMatch, from as string, to as string);
           if (search) {
-            reqMatch["requestPayload.messages.content"] = {
+            requestMatch["requestPayload.messages.content"] = {
               $regex: search,
               $options: "i",
             };
           }
 
-          const reqPipeline: Record<string, unknown>[] = [
-            { $match: reqMatch },
+          const requestPipeline: Record<string, unknown>[] = [
+            { $match: requestMatch },
             { $unwind: "$responsePayload.images" },
             {
               $match: {
@@ -321,8 +321,8 @@ router.get(
           ];
 
           requestGenItems = await req.db
-            .collection(REQUESTS_COL)
-            .aggregate(reqPipeline)
+            .collection(REQUESTS_COLLECTION)
+            .aggregate(requestPipeline)
             .toArray();
         }
       }
@@ -430,7 +430,7 @@ router.get(
 
       const countPipeline: Record<string, unknown>[] = [...pipeline, { $count: "total" }];
       const [countResult] = await req.db
-        .collection(CONVERSATIONS_COL)
+        .collection(CONVERSATIONS_COLLECTION)
         .aggregate(countPipeline)
         .toArray();
       const total = countResult?.total || 0;
@@ -438,7 +438,7 @@ router.get(
       pipeline.push({ $skip: skip }, { $limit: limit });
 
       const items = await req.db
-        .collection(CONVERSATIONS_COL)
+        .collection(CONVERSATIONS_COLLECTION)
         .aggregate(pipeline)
         .toArray();
 

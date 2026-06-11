@@ -8,7 +8,7 @@ import { applyDateRangeFilter, parsePaginationParams } from "../../utils/QueryBu
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
 
 const router = express.Router();
-const { REQUESTS: REQUESTS_COL } = COLLECTIONS;
+const { REQUESTS: REQUESTS_COLLECTION } = COLLECTIONS;
 
 router.use(requireDb);
 
@@ -77,8 +77,8 @@ router.get(
             .project({ id: 1 })
             .toArray(),
         ]);
-        const convIds = convDocs.map((d) => d.id);
-        const agentSessionIds = agentConvDocs.map((d) => d.id);
+        const convIds = convDocs.map((document) => document.id);
+        const agentSessionIds = agentConvDocs.map((document) => document.id);
         match.$or = [
           { conversationId: { $in: convIds } },
           { agentSessionId: { $in: agentSessionIds } },
@@ -222,8 +222,8 @@ router.get(
       pipeline.push({ $skip: skip }, { $limit: limit });
 
       const [docs, countResult] = await Promise.all([
-        req.db.collection(REQUESTS_COL).aggregate(pipeline).toArray(),
-        req.db.collection(REQUESTS_COL).aggregate(countPipeline).toArray(),
+        req.db.collection(REQUESTS_COLLECTION).aggregate(pipeline).toArray(),
+        req.db.collection(REQUESTS_COLLECTION).aggregate(countPipeline).toArray(),
       ]);
       const total = countResult[0]?.total || 0;
 
@@ -241,7 +241,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const requests = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .find({ traceId: req.params.id })
         .toArray();
 

@@ -129,7 +129,7 @@ export interface LogBackgroundLlmCallParams extends LogParams {
   extraResponsePayload?: Record<string, unknown>;
 }
 
-function sanitizeMsg(message: MessagePayload) {
+function sanitizeMessage(message: MessagePayload) {
   const sanitizeString = (s: unknown) =>
         typeof s === "string" && s.startsWith("data:") ? `[base64 data]` : s;
   const sanitizeMedia = (value: unknown) => {
@@ -368,9 +368,9 @@ const RequestLogger = {
       generationTime: generationSec !== null ? roundMs(generationSec) : null,
       totalTime: totalSec !== null ? roundMs(totalSec) : null,
       requestPayload: {
-                messages: messages?.map(sanitizeMsg) ?? [],
+                messages: messages?.map(sanitizeMessage) ?? [],
                 ...(options?.tools
-                    ? { tools: options.tools.map((t: { name?: string; function?: { name: string } }) => t.name || t.function?.name) }
+                    ? { tools: options.tools.map((tool: { name?: string; function?: { name: string } }) => tool.name || tool.function?.name) }
           : {}),
         ...(agenticIteration !== null ? { agenticIteration } : {}),
       },
