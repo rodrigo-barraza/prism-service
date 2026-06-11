@@ -22,7 +22,7 @@ import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 export interface FinalizerContext {
   providerName: string;
   resolvedModel: string;
-  modelDef?: Record<string, unknown> | null;
+  modelDefinition?: Record<string, unknown> | null;
   messages: MessagePayload[];
   originalMessages?: MessagePayload[];
   options: LlmOptions;
@@ -114,7 +114,7 @@ export async function finalizeTextGeneration(
   const {
     providerName,
     resolvedModel,
-    modelDef,
+    modelDefinition,
     messages,
     originalMessages,
     options,
@@ -196,7 +196,7 @@ function swapMessageContent(message: MessagePayload) {
         const imageCount = images.length;
     if (imageCount > 0) {
       const imgPricing =
-                getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel] || (modelDef?.pricing as Record<string, number>);
+                getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel] || (modelDefinition?.pricing as Record<string, number>);
       if (imgPricing?.imageOutputPerMillion) {
         // Derive image tokens dynamically from the API-reported total.
         // The API's outputTokens already includes both text and image tokens,
@@ -300,8 +300,8 @@ function swapMessageContent(message: MessagePayload) {
     if (!options.agenticLoopEnabled) {
     RequestLogger.logChatGeneration({
       requestId,
-            endpoint: modelDef?.liveAPI ? "/live" : "/chat",
-            operation: modelDef?.liveAPI ? "live" : "chat",
+            endpoint: modelDefinition?.liveAPI ? "/live" : "/chat",
+            operation: modelDefinition?.liveAPI ? "live" : "chat",
       project,
       username,
       clientIp,

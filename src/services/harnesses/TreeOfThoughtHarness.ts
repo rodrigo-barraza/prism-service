@@ -201,7 +201,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       };
 
       // ── Auto-compaction trigger ─────────────────────────────
-      const contextWindowSize = context.modelDef?.maxInputTokens || 128_000;
+      const contextWindowSize = context.modelDefinition?.maxInputTokens || 128_000;
       const maxOutputTokens = options.maxTokens || 8192;
       const preEnforceTokenEstimate = ContextWindowManager.estimateTokens(
         currentMessages as ChatMessage[],

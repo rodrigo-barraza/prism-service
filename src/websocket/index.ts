@@ -636,10 +636,10 @@ function handleWebsocketLive(
               function finalizeTurn(eventType: string) {
                 finalizeUsage();
                 buildAndUploadAudio().then((audioRef) => {
-                  const modelDef = getModelByName(model);
+                  const modelDefinition = getModelByName(model);
                   const estimatedCost = calculateLiveCost(
                     turnUsage,
-                    (((modelDef as Record<string, unknown>)?.pricing as Record<string, number>) ?? null),
+                    (((modelDefinition as Record<string, unknown>)?.pricing as Record<string, number>) ?? null),
                   );
 
                   const totalSec = (performance.now() - turnStart) / 1000;

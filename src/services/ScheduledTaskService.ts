@@ -295,7 +295,7 @@ const ScheduledTaskService = {
 
     // 2. Resolve provider and model definitions
     const provider = getProvider(task.provider);
-    const modelDef = getModelByName(task.model);
+    const modelDefinition = getModelByName(task.model);
 
     if (!provider) {
       throw new Error(`Provider not found: ${task.provider}`);
@@ -307,7 +307,7 @@ const ScheduledTaskService = {
         provider: provider as unknown as import("./harnesses/types.ts").LLMProvider,
         providerName: task.provider,
         resolvedModel: task.model,
-        modelDef,
+        modelDefinition,
         messages: [userTriggerMessage as ConversationMessage],
         originalMessages: [userTriggerMessage as ConversationMessage],
         options: {

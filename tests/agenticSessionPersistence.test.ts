@@ -96,7 +96,7 @@ function makeCtx(overrides = {}) {
   return {
     providerName: "test-provider",
     resolvedModel: "test-model",
-    modelDef: { maxInputTokens: 128000 },
+    modelDefinition: { maxInputTokens: 128000 },
     messages: [],
     originalMessages: [],
     options: { temperature: 0.7, maxTokens: 8192, thinkingEnabled: false },

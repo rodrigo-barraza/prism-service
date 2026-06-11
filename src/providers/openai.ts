@@ -22,8 +22,8 @@ import {
 
 import type { ToolSchema } from "../services/harnesses/types.ts";
 function useResponsesAPI(model: string): boolean {
-  const modelDef = getModelByName(model);
-  return modelDef !== null && "responsesAPI" in modelDef && (modelDef as { responsesAPI?: boolean }).responsesAPI === true;
+  const modelDefinition = getModelByName(model);
+  return modelDefinition !== null && "responsesAPI" in modelDefinition && (modelDefinition as { responsesAPI?: boolean }).responsesAPI === true;
 }
 
 let client: OpenAI | null = null;
@@ -650,9 +650,9 @@ const openaiProvider = {
     return result;
   },
   async _generateTextChatCompletions(messages: OpenAIMessage[], model: string, options: ProviderOptions) {
-    const modelDef = getModelByName(model);
+    const modelDefinition = getModelByName(model);
     const isReasoning =
-      (modelDef && "thinking" in modelDef && (modelDef as { thinking?: boolean }).thinking === true) || model.includes("o1") || model.includes("o3");
+      (modelDefinition && "thinking" in modelDefinition && (modelDefinition as { thinking?: boolean }).thinking === true) || model.includes("o1") || model.includes("o3");
     const prepared = prepareOpenAIMessages(messages);
     const payload: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
       model,
@@ -1030,9 +1030,9 @@ const openaiProvider = {
     }
   },
   async *_streamChatCompletions(messages: OpenAIMessage[], model: string, options: ProviderOptions) {
-    const modelDef = getModelByName(model);
+    const modelDefinition = getModelByName(model);
     const isReasoning =
-      (modelDef && "thinking" in modelDef && (modelDef as { thinking?: boolean }).thinking === true) || model.includes("o1") || model.includes("o3");
+      (modelDefinition && "thinking" in modelDefinition && (modelDefinition as { thinking?: boolean }).thinking === true) || model.includes("o1") || model.includes("o3");
     const prepared = prepareOpenAIMessages(messages);
     const payload: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
       model,

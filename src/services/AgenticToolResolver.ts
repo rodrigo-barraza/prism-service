@@ -20,7 +20,7 @@ interface ToolSchema {
   _mcpOriginalName?: string;
 }
 
-interface ModelDef {
+interface ModelDefinition {
   outputTypes?: string[];
   inputTypes?: string[];
   [key: string]: unknown;
@@ -39,7 +39,7 @@ interface ResolveParams {
   agent?: string;
   project?: string;
   username?: string;
-  modelDef?: ModelDef;
+  modelDefinition?: ModelDefinition;
   agentSessionId?: string;
 }
 
@@ -64,7 +64,7 @@ export default class AgenticToolResolver {
    * Handles MCP tools, disabledBuiltIns mode, prefix expansion,
    * and native provider tool collision prevention.
    */
-  static async resolve({ options, agent, project: _project, username: _username, modelDef, agentSessionId }: ResolveParams) {
+  static async resolve({ options, agent, project: _project, username: _username, modelDefinition, agentSessionId }: ResolveParams) {
     // Ensure tool schemas are loaded from tools-api (lazy init — if tools-api
     // was unreachable at boot, this fetches on-demand before proceeding)
     await ToolOrchestratorService.ensureSchemas();
@@ -168,7 +168,7 @@ export default class AgenticToolResolver {
     let finalTools = dynamicTools;
     if (resolvedEnabledTools && Array.isArray(resolvedEnabledTools)) {
       const hasPrefixed = resolvedEnabledTools.some(
-        (e) => e.startsWith("domain:") || e.startsWith("domainKey:"),
+        (entry) => entry.startsWith("domain:") || entry.startsWith("domainKey:"),
       );
 
       let enabledSet: Set<string>;
@@ -225,11 +225,11 @@ export default class AgenticToolResolver {
       finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.SEARCH_WEB);
     }
 
-    if (modelDef?.outputTypes?.includes(TYPES.IMAGE)) {
+    if (modelDefinition?.outputTypes?.includes(TYPES.IMAGE)) {
       finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.GENERATE_IMAGE);
     }
 
-    if (modelDef?.inputTypes?.includes(TYPES.IMAGE)) {
+    if (modelDefinition?.inputTypes?.includes(TYPES.IMAGE)) {
       finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.DESCRIBE_IMAGE);
     }
 

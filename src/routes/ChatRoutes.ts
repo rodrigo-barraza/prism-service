@@ -375,8 +375,8 @@ async function prepareGenerationContext(
   // ── Resolve model ─────────────────────────────────────────
   // resolvedModel is set earlier (before load balancing) and may have
   // been updated to a quant variant by the model availability check.
-  const modelDef = getModelByName(resolvedModel);
-  const isImageAPIModel = (modelDef as Record<string, unknown> | null)?.imageAPI && provider.generateImage;
+  const modelDefinition = getModelByName(resolvedModel);
+  const isImageAPIModel = (modelDefinition as Record<string, unknown> | null)?.imageAPI && provider.generateImage;
   // ── Local GPU mutex ──────────────────────────────────────
   let localRelease: (() => void) | null = null;
   if (localModelQueue.isLocal(providerName)) {
@@ -396,7 +396,7 @@ async function prepareGenerationContext(
     providerName,
     resolvedModel,
     requestedModel,
-    modelDef,
+    modelDefinition,
     isImageAPIModel,
     messages: providerMessages,
     originalMessages: activeMessages,
@@ -457,7 +457,7 @@ export async function handleConversation(
     clientIp,
     requestStart,
     requestId,
-    modelDef,
+    modelDefinition,
     localRelease,
   } = context;
   // ── Conversation identity ──────────────────────────────────
@@ -522,8 +522,8 @@ export async function handleConversation(
         // Inject tool descriptions into the system prompt
         injectToolsIntoSystemPrompt(fullContext.messages as Array<{ role: string; content?: string; [key: string]: unknown }>, tools as ToolSchemaWithDomain[]);
 
-        if (useNativeMcp && (modelDef as Record<string, unknown> | null)?.contextLength) {
-          options.contextLength = (modelDef as Record<string, unknown>).contextLength;
+        if (useNativeMcp && (modelDefinition as Record<string, unknown> | null)?.contextLength) {
+          options.contextLength = (modelDefinition as Record<string, unknown>).contextLength;
         }
 
         logger.info(
@@ -532,7 +532,7 @@ export async function handleConversation(
       }
 
       const useStreaming =
-        context.provider.generateTextStream && (modelDef as Record<string, unknown> | null)?.streaming !== false;
+        context.provider.generateTextStream && (modelDefinition as Record<string, unknown> | null)?.streaming !== false;
       if (useStreaming) {
         await handleStreamingText(fullContext);
       } else {
@@ -649,7 +649,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
         provider: context.provider as import("../services/harnesses/types.ts").LLMProvider,
         providerName,
         resolvedModel,
-        modelDef: context.modelDef,
+        modelDefinition: context.modelDefinition,
         messages: context.messages,
         originalMessages: context.originalMessages as ConversationMessage[],
         options,
@@ -721,7 +721,7 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
     provider,
     providerName,
     resolvedModel,
-    modelDef,
+    modelDefinition,
     messages,
     options,
     conversationId,
@@ -761,9 +761,9 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
   const totalSec = (performance.now() - requestStart) / 1000;
   // Cost calculation
   const imgPricing =
-    getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel as string] || (modelDef as Record<string, unknown> | null)?.pricing;
+    getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel as string] || (modelDefinition as Record<string, unknown> | null)?.pricing;
   const outputImgTokens =
-    (modelDef as Record<string, unknown> | null)?.imageTokensPerImage as number || (providerName === PROVIDERS.OPENAI ? 1056 : 1120);
+    (modelDefinition as Record<string, unknown> | null)?.imageTokensPerImage as number || (providerName === PROVIDERS.OPENAI ? 1056 : 1120);
   const estimatedCost = calculateImageCost(
     prompt,
     imgPricing,
@@ -800,7 +800,7 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
   // Estimate token counts for tracking
   const estimatedInputTokens =
     estimateTokens(prompt) +
-    allImages.length * ((modelDef as Record<string, unknown> | null)?.imageTokensPerImage as number || 1120);
+    allImages.length * ((modelDefinition as Record<string, unknown> | null)?.imageTokensPerImage as number || 1120);
   RequestLogger.log({
     requestId,
     endpoint: "/chat",
@@ -894,7 +894,7 @@ async function handleStreamingText(context: GenerationContext) {
     provider,
     providerName,
     resolvedModel,
-    modelDef,
+    modelDefinition,
     messages,
     options,
     conversationId,
@@ -917,7 +917,7 @@ async function handleStreamingText(context: GenerationContext) {
     getCollectionOpts(project),
   );
   const stream =
-    (modelDef as Record<string, unknown> | null)?.liveAPI && provider.generateTextStreamLive
+    (modelDefinition as Record<string, unknown> | null)?.liveAPI && provider.generateTextStreamLive
       ? provider.generateTextStreamLive(messages, resolvedModel, {
           ...options,
           signal,

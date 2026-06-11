@@ -356,7 +356,7 @@ describe("Compaction Integration with Harness and WindowManager", () => {
     });
 
     const context: any = {
-      modelDef: { maxInputTokens: 15_000 },
+      modelDefinition: { maxInputTokens: 15_000 },
       options: { maxTokens: 1000 },
       emit: vi.fn(),
     };

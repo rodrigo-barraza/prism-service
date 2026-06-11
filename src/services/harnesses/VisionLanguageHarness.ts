@@ -218,7 +218,7 @@ Use these images to observe the environment, notice changes, animations, or user
       );
 
       // ── Auto-compaction trigger ─────────────────────────────
-      const contextWindowSize = context.modelDef?.maxInputTokens || 128_000;
+      const contextWindowSize = context.modelDefinition?.maxInputTokens || 128_000;
       const maxOutputTokens = options.maxTokens || 8192;
       const preEnforceTokenEstimate = ContextWindowManager.estimateTokens(
         currentMessages as ChatMessage[],

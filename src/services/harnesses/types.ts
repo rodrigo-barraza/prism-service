@@ -126,7 +126,7 @@ export interface LLMProvider {
 
 // ── Model Definition ────────────────────────────────────────
 
-export interface ModelDef {
+export interface ModelDefinition {
   maxInputTokens?: number;
   liveAPI?: boolean;
   pricing?: Record<string, number>;
@@ -181,7 +181,7 @@ export interface AgenticContext {
   agent?: string | null;
   project: string;
   username: string;
-  modelDef?: ModelDef | null;
+  modelDefinition?: ModelDefinition | null;
   messages: ConversationMessage[];
   agentSessionId: string;
   parentAgentSessionId?: string | null;
