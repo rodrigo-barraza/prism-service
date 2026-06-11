@@ -617,6 +617,40 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       const args = mockMessagesCreate.mock.calls[0][0];
       expect(args.top_k).toBeUndefined();
     });
+
+    it("defaults to adaptive thinking for adaptive thinking models (like Fable 5) when thinkingEnabled is undefined", async () => {
+      mockMessagesCreate.mockReturnValueOnce({
+        content: [{ type: "text", text: "Finished" }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      });
+
+      const messages = [{ role: "user", content: "hello" }];
+      await anthropicProvider.generateText(messages, MODELS.FABLE_5.name, {});
+
+      expect(mockMessagesCreate).toHaveBeenCalledTimes(1);
+      const args = mockMessagesCreate.mock.calls[0][0];
+      expect(args.thinking).toBeDefined();
+      expect(args.thinking.type).toBe("adaptive");
+      expect(args.temperature).toBe(1);
+      expect(args.top_p).toBeUndefined();
+      expect(args.top_k).toBeUndefined();
+    });
+
+    it("does not configure thinking for adaptive thinking models (like Fable 5) when thinkingEnabled is explicitly false", async () => {
+      mockMessagesCreate.mockReturnValueOnce({
+        content: [{ type: "text", text: "Finished" }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      });
+
+      const messages = [{ role: "user", content: "hello" }];
+      await anthropicProvider.generateText(messages, MODELS.FABLE_5.name, {
+        thinkingEnabled: false,
+      });
+
+      expect(mockMessagesCreate).toHaveBeenCalledTimes(1);
+      const args = mockMessagesCreate.mock.calls[0][0];
+      expect(args.thinking).toBeUndefined();
+    });
   });
 
   // ── Section 2: Thinking Chunk Parsing in Streams ─────────────────────

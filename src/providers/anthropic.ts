@@ -596,11 +596,7 @@ const anthropicProvider = {
 
     // Adaptive thinking models (Fable 5, Mythos 5, Opus 4.7+): thinking is
     // inherent to the model — enable by default unless explicitly disabled.
-    if (
-      options.thinkingEnabled !== false &&
-      (modelDefinition as Record<string, unknown> | null)?.adaptiveThinking ===
-        true
-    ) {
+    if (options.thinkingEnabled !== false && isAdaptiveThinking) {
       payload.thinking = { type: "adaptive" };
       if (options.reasoningEffort) {
         payload.output_config = {
@@ -831,11 +827,7 @@ const anthropicProvider = {
 
       // Adaptive thinking models (Fable 5, Mythos 5, Opus 4.7+): thinking is
       // inherent to the model — enable by default unless explicitly disabled.
-      if (
-        options.thinkingEnabled !== false &&
-        (modelDefinition as Record<string, unknown> | null)
-          ?.adaptiveThinking === true
-      ) {
+      if (options.thinkingEnabled !== false && isAdaptiveThinking) {
         streamPayload.thinking = { type: "adaptive" };
         if (options.reasoningEffort) {
           streamPayload.output_config = {
