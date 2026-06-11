@@ -23,7 +23,12 @@ export interface AnthropicBlock {
   input?: Record<string, unknown>;
   tool_use_id?: string;
   content?: string | AnthropicBlock[];
-  citations?: Array<{ type: string; url?: string; title?: string; cited_text?: string }>;
+  citations?: Array<{
+    type: string;
+    url?: string;
+    title?: string;
+    cited_text?: string;
+  }>;
   url?: string;
   title?: string;
   page_age?: string;
@@ -43,7 +48,11 @@ export interface AnthropicGenerateResult {
   thinking?: string | null;
   thinkingSignature?: string | null;
   citations?: Array<{ url?: string; title?: string; citedText?: string }>;
-  toolCalls?: Array<{ id?: string; name?: string; args: Record<string, unknown> }>;
+  toolCalls?: Array<{
+    id?: string;
+    name?: string;
+    args: Record<string, unknown>;
+  }>;
   rateLimits?: ReturnType<typeof extractAnthropicRateLimits>;
   stopReason?: string;
   stopDetails?: Record<string, unknown>;
@@ -88,9 +97,9 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
  * base64 image that exceeds 5 MB. Mutates the messages array in-place.
  */
 async function enforceImageSizeLimits(messages: ChatMessage[]) {
-    for ( const message of messages) {
+  for (const message of messages) {
     if (!Array.isArray(message.content)) continue;
-        for ( const block of message.content as AnthropicBlock[]) {
+    for (const block of message.content as AnthropicBlock[]) {
       if (block.type !== "image" || block.source?.type !== "base64") continue;
       const data = block.source.data;
       if (!data) continue;
@@ -125,7 +134,9 @@ async function prepareMessages(messages: ChatMessage[]) {
   let systemMessage: string | undefined;
 
   // Extract system message
-  const conversation = messages.map((chatMessage: ChatMessage) => ({ ...chatMessage }));
+  const conversation = messages.map((chatMessage: ChatMessage) => ({
+    ...chatMessage,
+  }));
   if (conversation.length > 0 && conversation[0].role === "system") {
     systemMessage = conversation.shift()?.content as string | undefined;
   }
@@ -138,7 +149,9 @@ async function prepareMessages(messages: ChatMessage[]) {
     conversation
       .filter(
         (chatMessage: ChatMessage) =>
-          chatMessage.role === "user" || chatMessage.role === "assistant" || chatMessage.role === "tool",
+          chatMessage.role === "user" ||
+          chatMessage.role === "assistant" ||
+          chatMessage.role === "tool",
       )
       .map(async (message: ChatMessage) => {
         // Convert tool role messages to tool_result user messages for Anthropic
@@ -148,7 +161,11 @@ async function prepareMessages(messages: ChatMessage[]) {
             content: [
               {
                 type: "tool_result",
-                tool_use_id: message.tool_call_id || message.id || message.name || "unknown",
+                tool_use_id:
+                  message.tool_call_id ||
+                  message.id ||
+                  message.name ||
+                  "unknown",
                 content:
                   typeof message.content === "string"
                     ? message.content
@@ -159,7 +176,11 @@ async function prepareMessages(messages: ChatMessage[]) {
         }
 
         // Convert assistant messages with toolCalls to multi-part content
-        if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
+        if (
+          message.role === "assistant" &&
+          message.toolCalls &&
+          message.toolCalls.length > 0
+        ) {
           const contentBlocks: AnthropicBlock[] = [];
           // Preserve thinking blocks for multi-step reasoning continuity.
           // The signature field is REQUIRED by Anthropic's API for multi-turn
@@ -194,7 +215,7 @@ async function prepareMessages(messages: ChatMessage[]) {
         const images = message.images;
         if (images && images.length > 0) {
           const contentBlocks: AnthropicBlock[] = [];
-                    for ( const dataUrl of images) {
+          for (const dataUrl of images) {
             const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
             if (!match) continue;
             const mimeType = match[1];
@@ -254,7 +275,8 @@ async function prepareMessages(messages: ChatMessage[]) {
             }
             // Other MIME types (audio, video) are not supported by Anthropic — skip
           }
-          const textContent = typeof message.content === "string" ? message.content : "";
+          const textContent =
+            typeof message.content === "string" ? message.content : "";
           if (textContent) {
             contentBlocks.push({ type: "text", text: textContent });
           }
@@ -269,7 +291,11 @@ async function prepareMessages(messages: ChatMessage[]) {
         // not top-level fields — convert them into the proper format.
         // Only include thinking when we have the signature; conversations
         // without it must omit the block to avoid API 400 errors.
-        if (message.role === "assistant" && message.thinking && !message.toolCalls?.length) {
+        if (
+          message.role === "assistant" &&
+          message.thinking &&
+          !message.toolCalls?.length
+        ) {
           const contentBlocks: AnthropicBlock[] = [];
           if (message.thinkingSignature) {
             contentBlocks.push({
@@ -288,12 +314,18 @@ async function prepareMessages(messages: ChatMessage[]) {
             content:
               contentBlocks.length > 1
                 ? contentBlocks
-                : (typeof message.content === "string" ? message.content.trim() : "") || " ",
+                : (typeof message.content === "string"
+                    ? message.content.trim()
+                    : "") || " ",
           };
         }
 
         // Ensure assistant messages never have empty content
-        if (message.role === "assistant" && (!message.content || (typeof message.content === "string" && !message.content.trim()))) {
+        if (
+          message.role === "assistant" &&
+          (!message.content ||
+            (typeof message.content === "string" && !message.content.trim()))
+        ) {
           return { role: "assistant", content: " " };
         }
 
@@ -307,7 +339,10 @@ async function prepareMessages(messages: ChatMessage[]) {
     if (acc.length && acc[acc.length - 1].role === current.role) {
       const previous = acc[acc.length - 1];
       // Handle merging when content might be string or array
-      if (typeof previous.content === "string" && typeof current.content === "string") {
+      if (
+        typeof previous.content === "string" &&
+        typeof current.content === "string"
+      ) {
         previous.content += `\n\n${current.content}`;
       } else {
         // Convert both to arrays and concat
@@ -332,15 +367,17 @@ async function prepareMessages(messages: ChatMessage[]) {
   // The frontend may send both inline results (from assistant.toolCalls
   // expansion) and standalone tool-role messages with the same ID,
   // which after merging creates duplicate tool_result blocks.
-    for ( const message of merged) {
+  for (const message of merged) {
     if (message.role !== "user" || !Array.isArray(message.content)) continue;
     const seenToolResultIds = new Set();
-    message.content = (message.content as AnthropicBlock[]).filter((block: AnthropicBlock) => {
-      if (block.type !== "tool_result") return true;
-      if (seenToolResultIds.has(block.tool_use_id)) return false;
-      seenToolResultIds.add(block.tool_use_id);
-      return true;
-    });
+    message.content = (message.content as AnthropicBlock[]).filter(
+      (block: AnthropicBlock) => {
+        if (block.type !== "tool_result") return true;
+        if (seenToolResultIds.has(block.tool_use_id)) return false;
+        seenToolResultIds.add(block.tool_use_id);
+        return true;
+      },
+    );
   }
 
   // Ensure conversation starts with a user message
@@ -353,9 +390,12 @@ async function prepareMessages(messages: ChatMessage[]) {
   // This handles stale conversation history loaded from the database.
   for (let i = 0; i < merged.length; i++) {
     const message = merged[i];
-    if (message.role !== "assistant" || !Array.isArray(message.content)) continue;
+    if (message.role !== "assistant" || !Array.isArray(message.content))
+      continue;
 
-    const hasToolUse = (message.content as AnthropicBlock[]).some((b: AnthropicBlock) => b.type === "tool_use");
+    const hasToolUse = (message.content as AnthropicBlock[]).some(
+      (b: AnthropicBlock) => b.type === "tool_use",
+    );
     if (!hasToolUse) continue;
 
     const next = merged[i + 1];
@@ -366,7 +406,9 @@ async function prepareMessages(messages: ChatMessage[]) {
 
     if (!nextHasToolResult) {
       // Strip tool_use blocks, keep only text
-      message.content = (message.content as AnthropicBlock[]).filter((b: AnthropicBlock) => b.type !== "tool_use");
+      message.content = (message.content as AnthropicBlock[]).filter(
+        (b: AnthropicBlock) => b.type !== "tool_use",
+      );
       if (message.content.length === 0) {
         message.content = " ";
       }
@@ -376,12 +418,12 @@ async function prepareMessages(messages: ChatMessage[]) {
   // Anthropic rejects requests where the final assistant message content ends
   // with trailing whitespace (400: "final assistant content cannot end with
   // trailing whitespace"). Sanitize all assistant text blocks to be safe.
-    for ( const message of merged) {
+  for (const message of merged) {
     if (message.role !== "assistant") continue;
     if (typeof message.content === "string") {
       message.content = message.content.trimEnd() || " ";
     } else if (Array.isArray(message.content)) {
-            for ( const block of message.content) {
+      for (const block of message.content) {
         if (block.type === "text" && typeof block.text === "string") {
           block.text = block.text.trimEnd() || " ";
         }
@@ -415,7 +457,7 @@ function buildTools(options: ProviderOptions) {
   }
   // Custom function calling tools
   if (options.tools && Array.isArray(options.tools)) {
-        for ( const tool of options.tools) {
+    for (const tool of options.tools) {
       tools.push({
         name: tool.name,
         description: tool.description || "",
@@ -429,15 +471,20 @@ function extractResponseContent(contentBlocks: AnthropicBlock[]) {
   let text = "";
   let thinking = null;
   let thinkingSignature = null;
-  const citations: Array<{ url?: string; title?: string; citedText?: string }> = [];
-  const toolCalls: Array<{ id?: string; name?: string; args: Record<string, unknown> }> = [];
+  const citations: Array<{ url?: string; title?: string; citedText?: string }> =
+    [];
+  const toolCalls: Array<{
+    id?: string;
+    name?: string;
+    args: Record<string, unknown>;
+  }> = [];
 
-    for ( const block of contentBlocks || []) {
+  for (const block of contentBlocks || []) {
     if (block.type === "text") {
       text += block.text || "";
       // Collect inline citations from this text block
       if (block.citations) {
-                for ( const cite of block.citations) {
+        for (const cite of block.citations) {
           if (cite.type === "web_search_result_location") {
             citations.push({
               url: cite.url,
@@ -462,7 +509,17 @@ function extractResponseContent(contentBlocks: AnthropicBlock[]) {
 
   return { text, thinking, thinkingSignature, citations, toolCalls };
 }
-function buildUsage(responseUsage: { input_tokens?: number | null; output_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null } | null | undefined): TokenUsage {
+function buildUsage(
+  responseUsage:
+    | {
+        input_tokens?: number | null;
+        output_tokens?: number | null;
+        cache_read_input_tokens?: number | null;
+        cache_creation_input_tokens?: number | null;
+      }
+    | null
+    | undefined,
+): TokenUsage {
   return {
     inputTokens: responseUsage?.input_tokens ?? 0,
     outputTokens: responseUsage?.output_tokens ?? 0,
@@ -498,25 +555,37 @@ const anthropicProvider = {
           : undefined,
       top_k: options.topK !== undefined ? options.topK : undefined,
       stop_sequences:
-        options.stopSequences !== undefined
-          ? options.stopSequences
-          : undefined,
-      ...(options.serviceTier && { service_tier: options.serviceTier === "standard" ? "standard_only" : options.serviceTier }),
+        options.stopSequences !== undefined ? options.stopSequences : undefined,
+      ...(options.serviceTier && {
+        service_tier:
+          options.serviceTier === "standard"
+            ? "standard_only"
+            : options.serviceTier,
+      }),
       ...(options.responseFormat === "json_object" && {
-        output_config: { format: { type: "json_schema" as const, schema: { type: "object", additionalProperties: false } } },
+        output_config: {
+          format: {
+            type: "json_schema" as const,
+            schema: { type: "object", additionalProperties: false },
+          },
+        },
       }),
     };
 
     // Opus 4.7+ lock sampling parameters — API rejects non-default values
     const modelDefinition = getModelByName(model);
-    const hasLockedSampling = (modelDefinition as Record<string, unknown> | null)?.lockedSampling === true;
+    const hasLockedSampling =
+      (modelDefinition as Record<string, unknown> | null)?.lockedSampling ===
+      true;
     if (hasLockedSampling) {
       delete payload.temperature;
       delete payload.top_p;
       delete payload.top_k;
     }
 
-    const isAdaptiveThinking = (modelDefinition as Record<string, unknown> | null)?.adaptiveThinking === true;
+    const isAdaptiveThinking =
+      (modelDefinition as Record<string, unknown> | null)?.adaptiveThinking ===
+      true;
     if (isAdaptiveThinking) {
       delete payload.top_k;
     }
@@ -531,18 +600,25 @@ const anthropicProvider = {
         options.thinkingBudget ||
         options.reasoningEffort)
     ) {
-      const isAdaptiveThinking = (modelDefinition as Record<string, unknown> | null)?.adaptiveThinking === true;
+      const isAdaptiveThinking =
+        (modelDefinition as Record<string, unknown> | null)
+          ?.adaptiveThinking === true;
       if (isAdaptiveThinking) {
         // Fable 5 / Mythos 5: adaptive thinking is always-on, controlled via effort
         payload.thinking = { type: "adaptive" };
         if (options.reasoningEffort) {
-          payload.effort = options.reasoningEffort;
+          payload.output_config = {
+            ...((payload.output_config as Record<string, unknown>) || {}),
+            effort: options.reasoningEffort,
+          };
         }
       } else {
         // Legacy models (Opus 4.x, Sonnet 4.x): manual extended thinking with budget_tokens
         const budget = options.thinkingBudget
           ? parseInt(String(options.thinkingBudget))
-          : (options.reasoningEffort ? EFFORT_BUDGET_MAP[options.reasoningEffort] : undefined) || EFFORT_BUDGET_MAP.high;
+          : (options.reasoningEffort
+              ? EFFORT_BUDGET_MAP[options.reasoningEffort]
+              : undefined) || EFFORT_BUDGET_MAP.high;
         payload.thinking = { type: "enabled", budget_tokens: budget };
         if ((payload.max_tokens as number) <= budget) {
           payload.max_tokens = budget + 1024;
@@ -558,7 +634,9 @@ const anthropicProvider = {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         const { data: response, response: rawResponse } = await getClient()
-          .messages.create(payload as unknown as Anthropic.MessageCreateParamsNonStreaming)
+          .messages.create(
+            payload as unknown as Anthropic.MessageCreateParamsNonStreaming,
+          )
           .withResponse();
         const rateLimits = extractAnthropicRateLimits(rawResponse, model);
         const message = response as Anthropic.Messages.Message;
@@ -576,7 +654,8 @@ const anthropicProvider = {
         if (rateLimits) result.rateLimits = rateLimits;
         // Forward structured stop details for observability (SDK 0.82+)
         if (message.stop_reason) result.stopReason = message.stop_reason;
-        if ("stop_details" in message && message.stop_details) result.stopDetails = { ...message.stop_details };
+        if ("stop_details" in message && message.stop_details)
+          result.stopDetails = { ...message.stop_details };
         return result;
       } catch (error: unknown) {
         lastError = error;
@@ -660,11 +739,13 @@ const anthropicProvider = {
         payload.system = systemPrompt;
       }
 
-      const response = await getClient().messages.create(
+      const response = (await getClient().messages.create(
         payload as unknown as Anthropic.MessageCreateParamsNonStreaming,
-      ) as Anthropic.Messages.Message;
+      )) as Anthropic.Messages.Message;
 
-      const { text } = extractResponseContent(response.content as AnthropicBlock[]);
+      const { text } = extractResponseContent(
+        response.content as AnthropicBlock[],
+      );
       return {
         text,
         usage: buildUsage(response.usage),
@@ -707,22 +788,36 @@ const anthropicProvider = {
           options.stopSequences !== undefined
             ? options.stopSequences
             : undefined,
-        ...(options.serviceTier && { service_tier: options.serviceTier === "standard" ? "standard_only" : options.serviceTier }),
+        ...(options.serviceTier && {
+          service_tier:
+            options.serviceTier === "standard"
+              ? "standard_only"
+              : options.serviceTier,
+        }),
         ...(options.responseFormat === "json_object" && {
-          output_config: { format: { type: "json_schema" as const, schema: { type: "object", additionalProperties: false } } },
+          output_config: {
+            format: {
+              type: "json_schema" as const,
+              schema: { type: "object", additionalProperties: false },
+            },
+          },
         }),
       };
 
       // Opus 4.7+ lock sampling parameters — API rejects non-default values
       const modelDefinition = getModelByName(model);
-      const hasLockedSampling = (modelDefinition as Record<string, unknown> | null)?.lockedSampling === true;
+      const hasLockedSampling =
+        (modelDefinition as Record<string, unknown> | null)?.lockedSampling ===
+        true;
       if (hasLockedSampling) {
         delete streamPayload.temperature;
         delete streamPayload.top_p;
         delete streamPayload.top_k;
       }
 
-      const isAdaptiveThinking = (modelDefinition as Record<string, unknown> | null)?.adaptiveThinking === true;
+      const isAdaptiveThinking =
+        (modelDefinition as Record<string, unknown> | null)
+          ?.adaptiveThinking === true;
       if (isAdaptiveThinking) {
         delete streamPayload.top_k;
       }
@@ -737,18 +832,26 @@ const anthropicProvider = {
           options.thinkingBudget ||
           options.reasoningEffort)
       ) {
-        const isAdaptiveThinking = (modelDefinition as Record<string, unknown> | null)?.adaptiveThinking === true;
+        const isAdaptiveThinking =
+          (modelDefinition as Record<string, unknown> | null)
+            ?.adaptiveThinking === true;
         if (isAdaptiveThinking) {
           // Fable 5 / Mythos 5: adaptive thinking is always-on, controlled via effort
           streamPayload.thinking = { type: "adaptive" };
           if (options.reasoningEffort) {
-            streamPayload.effort = options.reasoningEffort;
+            streamPayload.output_config = {
+              ...((streamPayload.output_config as Record<string, unknown>) ||
+                {}),
+              effort: options.reasoningEffort,
+            };
           }
         } else {
           // Legacy models (Opus 4.x, Sonnet 4.x): manual extended thinking with budget_tokens
           const budget = options.thinkingBudget
             ? parseInt(String(options.thinkingBudget))
-            : (options.reasoningEffort ? EFFORT_BUDGET_MAP[options.reasoningEffort] : undefined) || EFFORT_BUDGET_MAP.high;
+            : (options.reasoningEffort
+                ? EFFORT_BUDGET_MAP[options.reasoningEffort]
+                : undefined) || EFFORT_BUDGET_MAP.high;
           streamPayload.thinking = { type: "enabled", budget_tokens: budget };
           if ((streamPayload.max_tokens as number) <= budget) {
             streamPayload.max_tokens = budget + 1024;
@@ -775,8 +878,14 @@ const anthropicProvider = {
       let currentToolUseId: string | null = null;
       let codeInput = "";
       let usage: TokenUsage | null = null;
-      let messageStartUsage: { input_tokens?: number | null; output_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null } | null = null;
-      let rateLimits: ReturnType<typeof extractAnthropicRateLimits> | null = null;
+      let messageStartUsage: {
+        input_tokens?: number | null;
+        output_tokens?: number | null;
+        cache_read_input_tokens?: number | null;
+        cache_creation_input_tokens?: number | null;
+      } | null = null;
+      let rateLimits: ReturnType<typeof extractAnthropicRateLimits> | null =
+        null;
 
       for await (const chunk of stream) {
         if (options.signal?.aborted) {
@@ -798,21 +907,32 @@ const anthropicProvider = {
         if (chunk.type === "content_block_start") {
           const block = chunk.content_block;
           currentBlockType = block?.type || null;
-          currentBlockName = ("name" in block ? block.name : null) as string | null;
+          currentBlockName = ("name" in block ? block.name : null) as
+            | string
+            | null;
           currentToolUseId = ("id" in block ? block.id : null) as string | null;
           codeInput = "";
 
           // Server tool use start — yield the tool name being invoked
           if (
             block?.type === "server_tool_use" &&
-            "name" in block && block.name === "code_execution"
+            "name" in block &&
+            block.name === "code_execution"
           ) {
             // Code execution starting — we'll accumulate the input
           }
 
           // Code execution tool result
           if (block?.type === "code_execution_tool_result") {
-            const result = (block as { content?: { stdout?: string; stderr?: string; return_code?: number } }).content;
+            const result = (
+              block as {
+                content?: {
+                  stdout?: string;
+                  stderr?: string;
+                  return_code?: number;
+                };
+              }
+            ).content;
             if (result) {
               yield {
                 type: "codeExecutionResult",
@@ -977,7 +1097,7 @@ const anthropicProvider = {
         yield { type: "rateLimits", rateLimits };
       }
     } catch (error: unknown) {
-      if ((error instanceof Error && error.name === "AbortError")) return;
+      if (error instanceof Error && error.name === "AbortError") return;
       // For streaming, retry overloaded errors with the same delay/attempts policy
       if (isRetryableError(error)) {
         // Recursive retry with attempt tracking via options._retryAttempt
