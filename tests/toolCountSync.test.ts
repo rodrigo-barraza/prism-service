@@ -318,7 +318,7 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
       agent: "CODING",
       project: "coding",
       username: "anonymous",
-      modelDef: undefined,
+      modelDefinition: undefined,
     });
 
     const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
@@ -345,7 +345,7 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
       agent: "RESTRICTED",
       project: "coding",
       username: "anonymous",
-      modelDef: undefined,
+      modelDefinition: undefined,
     });
 
     const CORE_AGENTIC_SET = new Set<string>(CORE_AGENTIC_TOOLS);
@@ -386,7 +386,7 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
       agent: "LUPOS",
       project: "coding",
       username: "anonymous",
-      modelDef: undefined,
+      modelDefinition: undefined,
     });
 
     const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
@@ -437,7 +437,7 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
       agent: undefined,
       project: "coding",
       username: "anonymous",
-      modelDef: undefined,
+      modelDefinition: undefined,
     });
 
     const resolverNames = new Set(finalTools.map((tool: Record<string, unknown>) => tool.name));

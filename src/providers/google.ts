@@ -14,7 +14,7 @@ import { TYPES, MODELS, DEFAULT_VOICES, getDefaultModels } from "../config.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 /** Shape of a model definition from the MODELS catalog. */
-interface ModelDef {
+interface ModelDefinition {
   name: string;
   thinking?: boolean;
   thinkingLevels?: string[];
@@ -179,7 +179,7 @@ export function convertToolsToGoogle(
  * Centralizes the repeated config-building pattern across generateText,
  * generateTextStream, and generateTextStreamLive.
  */
-function buildGenerateConfig(options: ProviderOptions, modelDefinition: ModelDef | null | undefined): GenerateContentConfig {
+function buildGenerateConfig(options: ProviderOptions, modelDefinition: ModelDefinition | null | undefined): GenerateContentConfig {
   const config: GenerateContentConfig = {};
 
   if (options.temperature !== undefined) config.temperature = options.temperature;
@@ -349,7 +349,7 @@ const googleProvider = {
     logger.provider("Google", `generateText model=${model}`);
     try {
       const contents = await convertMessages(messages);
-      const modelDefinition = Object.values(MODELS).find((modelDefinitionItem) => modelDefinitionItem.name === model) as ModelDef | undefined;
+      const modelDefinition = Object.values(MODELS).find((modelDefinitionItem) => modelDefinitionItem.name === model) as ModelDefinition | undefined;
       const config = buildGenerateConfig(options, modelDefinition);
 
       // Web search
@@ -439,7 +439,7 @@ const googleProvider = {
     logger.provider("Google", `generateTextStream model=${model}`);
     try {
       const contents = await convertMessages(messages);
-      const modelDefinition = Object.values(MODELS).find((modelDefinitionItem) => modelDefinitionItem.name === model) as ModelDef | undefined;
+      const modelDefinition = Object.values(MODELS).find((modelDefinitionItem) => modelDefinitionItem.name === model) as ModelDefinition | undefined;
       const config = buildGenerateConfig(options, modelDefinition);
 
       // Build tools array based on enabled options
@@ -563,7 +563,7 @@ const googleProvider = {
    */
   async *generateTextStreamLive(messages: ConversationMessage[], model: string, options: ProviderOptions = {}) {
     logger.provider("Google", `generateTextStreamLive (Live API) model=${model}`);
-    const modelDefinition = Object.values(MODELS).find((modelDefinitionItem) => modelDefinitionItem.name === model) as ModelDef | undefined;
+    const modelDefinition = Object.values(MODELS).find((modelDefinitionItem) => modelDefinitionItem.name === model) as ModelDefinition | undefined;
     let session: Awaited<ReturnType<GoogleGenAI["live"]["connect"]>> | null = null;
     try {
       // ── Build Live API config ────────────────────────────────────

@@ -405,9 +405,9 @@ router.post(
       );
       const totalSec = (performance.now() - requestStart) / 1000;
       // ── Cost estimation ─────────────────────────────────────────
-      const modelDef = getModelByName(model) as Record<string, unknown> | null;
+      const modelDefinition = getModelByName(model) as Record<string, unknown> | null;
       const pricing =
-        modelDef?.pricing ||
+        modelDefinition?.pricing ||
         getPricing(TYPES.AUDIO, TYPES.TEXT)[model] ||
         null;
       const estimatedCost = calculateAudioCost(result.usage, pricing as Record<string, number> | null);

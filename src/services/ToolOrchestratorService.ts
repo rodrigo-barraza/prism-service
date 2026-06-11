@@ -33,7 +33,7 @@ interface ToolEndpoint {
 interface ToolSchemaFull {
   name: string;
   description?: string;
-  parameters?: Record<string, unknown>;
+  parameters?: unknown;
   endpoint?: ToolEndpoint;
   domain?: string;
   dataSource?: string;
@@ -601,7 +601,7 @@ export default class ToolOrchestratorService {
   }
 
   /** Client-facing schemas (with domain/domainKey/dataSource, no endpoint) — for Prism Client UI */
-  static getClientToolSchemas(defaultTopology?: string): any[] {
+  static getClientToolSchemas(defaultTopology?: string): ToolSchemaFull[] {
     if (isResolvingClientSchemas) {
       // Break recursion cycle when internal tool getters (e.g. discover_and_enable_tools)
       // fetch schemas dynamically from this same catalog.

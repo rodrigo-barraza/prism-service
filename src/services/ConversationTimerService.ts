@@ -32,6 +32,17 @@ export interface ConversationTimer {
   updatedAt: string;
 }
 
+interface ConversationSettings {
+  provider?: string;
+  model?: string;
+  agent?: string | null;
+  workspaceRoot?: string | null;
+  toolConfig?: {
+    enabledTools?: string[];
+    disabledTools?: string[];
+  };
+}
+
 let tickerInterval: ReturnType<typeof setInterval> | null = null;
 let isTickInProgress = false;
 
@@ -346,18 +357,18 @@ const ConversationTimerService = {
 
     logger.info(`[ConversationTimers] Spawning background agent loop for session: ${timer.conversationId}`);
 
-    const settings = (conversation.settings || {}) as Record<string, any>;
-    const providerName = settings.provider;
-    const resolvedModel = settings.model;
-    const agent = (settings.agent as string | null) || null;
-    const workspaceRoot = (settings.workspaceRoot as string | null) || null;
+    const settings = (conversation.settings || {}) as ConversationSettings;
+    const providerName = settings.provider || "";
+    const resolvedModel = settings.model || "";
+    const agent = settings.agent || null;
+    const workspaceRoot = settings.workspaceRoot || null;
 
     if (!providerName || !resolvedModel) {
       throw new Error(`Invalid model/provider settings on conversation: ${timer.conversationId}`);
     }
 
     const provider = getProvider(providerName);
-    const modelDef = getModelByName(resolvedModel);
+    const modelDefinition = getModelByName(resolvedModel);
 
     if (!provider) {
       throw new Error(`LLM provider ${providerName} is unavailable`);
@@ -391,7 +402,7 @@ const ConversationTimerService = {
         provider: provider as unknown as import("./harnesses/types.ts").LLMProvider,
         providerName,
         resolvedModel,
-        modelDef,
+        modelDefinition,
         messages: contextMessages,
         originalMessages: contextMessages,
         options: {

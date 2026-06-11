@@ -290,10 +290,10 @@ export default class BaseAgenticHarness {
     messages: ConversationMessage[],
     toolCount: number,
   ): ConversationMessage[] {
-    const { modelDef, options, emit } = this.context;
+    const { modelDefinition, options, emit } = this.context;
     const preEnforceCount = messages.length;
     const contextResult = ContextWindowManager.enforce(messages as ChatMessage[], {
-      maxInputTokens: modelDef?.maxInputTokens || 128_000,
+      maxInputTokens: modelDefinition?.maxInputTokens || 128_000,
       maxOutputTokens: options.maxTokens || 8192,
       toolCount,
     });
@@ -330,11 +330,11 @@ export default class BaseAgenticHarness {
     messages: ConversationMessage[],
     passOptions: AgenticOptions,
   ): AsyncIterable<unknown> {
-    const { provider, resolvedModel, modelDef, signal } = this.context;
+    const { provider, resolvedModel, modelDefinition, signal } = this.context;
     const expandedMessages = expandMessagesForFunctionCall(messages as ChatMessage[], {
       filterDeleted: false,
     });
-    return modelDef?.liveAPI && provider.generateTextStreamLive
+    return modelDefinition?.liveAPI && provider.generateTextStreamLive
       ? provider.generateTextStreamLive(expandedMessages, resolvedModel, {
           ...passOptions,
           signal,

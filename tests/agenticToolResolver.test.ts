@@ -157,7 +157,7 @@ describe("AgenticToolResolver — tool resolution", () => {
       agent: "CODING",
       project: "coding",
       username: "anonymous",
-      modelDef: undefined,
+      modelDefinition: undefined,
     });
 
     const toolNames = finalTools.map((tool) => tool.name);
@@ -172,7 +172,7 @@ describe("AgenticToolResolver — tool resolution", () => {
       agent: "LUPOS",
       project: "coding",
       username: "anonymous",
-      modelDef: undefined,
+      modelDefinition: undefined,
     });
 
     const toolNames = finalTools.map((tool) => tool.name);
@@ -192,7 +192,7 @@ describe("AgenticToolResolver — tool resolution", () => {
       agent: undefined,
       project: "coding",
       username: "anonymous",
-      modelDef: undefined,
+      modelDefinition: undefined,
     });
 
     const toolNames = finalTools.map((tool) => tool.name);
@@ -217,7 +217,7 @@ describe("AgenticToolResolver — tool resolution", () => {
       agent: undefined,
       project: "coding",
       username: "anonymous",
-      modelDef: undefined,
+      modelDefinition: undefined,
     });
 
     const toolNames = finalTools.map((tool) => tool.name);
@@ -239,7 +239,7 @@ describe("AgenticToolResolver — tool resolution", () => {
       agent: undefined,
       project: "coding",
       username: "anonymous",
-      modelDef: undefined,
+      modelDefinition: undefined,
     });
 
     const toolNames = finalTools.map((tool: Record<string, unknown>) => tool.name);
@@ -257,7 +257,7 @@ describe("AgenticToolResolver — tool resolution", () => {
       agent: "CODING",
       project: "coding",
       username: "anonymous",
-      modelDef: undefined,
+      modelDefinition: undefined,
     });
 
     const toolNames = finalTools.map((tool: Record<string, unknown>) => tool.name);
@@ -274,7 +274,7 @@ describe("AgenticToolResolver — tool resolution", () => {
       agent: undefined,
       project: "coding",
       username: "anonymous",
-      modelDef: undefined,
+      modelDefinition: undefined,
     });
 
     const toolNames = finalTools.map((tool: Record<string, unknown>) => tool.name);

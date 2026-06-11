@@ -368,7 +368,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       const mockContext: any = {
         providerName: "google",
         resolvedModel: MODELS.GEMINI_35_FLASH.name,
-        modelDef: MODELS.GEMINI_35_FLASH,
+        modelDefinition: MODELS.GEMINI_35_FLASH,
         messages: [{ role: "user", content: "Solve math: 2+2" }],
         options: {
           maxIterations: 1,
@@ -742,7 +742,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       const mockContext: any = {
         providerName: "anthropic",
         resolvedModel: MODELS.SONNET_46.name,
-        modelDef: MODELS.SONNET_46,
+        modelDefinition: MODELS.SONNET_46,
         messages: [{ role: "user", content: "Identify prime factors of 96" }],
         options: {
           maxIterations: 1,

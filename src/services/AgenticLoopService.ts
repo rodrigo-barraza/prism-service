@@ -30,7 +30,7 @@ export default class AgenticLoopService {
       agent,
       project,
       username,
-      modelDef,
+      modelDefinition,
       messages,
       agentSessionId,
       conversationId,
@@ -46,7 +46,7 @@ export default class AgenticLoopService {
       agent: agent || undefined,
       project,
       username,
-      modelDef: modelDef || undefined,
+      modelDefinition: modelDefinition || undefined,
       agentSessionId,
     });
 

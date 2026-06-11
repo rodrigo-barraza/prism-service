@@ -60,7 +60,7 @@ function createMockContext(overrides: Partial<AgenticContext> = {}): AgenticCont
     agent: null,
     project: "test-project",
     username: "test-user",
-    modelDef: null,
+    modelDefinition: null,
     messages: [],
     agentSessionId: "test-session",
     provider: {

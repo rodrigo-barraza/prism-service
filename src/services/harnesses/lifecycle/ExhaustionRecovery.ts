@@ -28,7 +28,7 @@ export async function runExhaustionRecoveryPass(
   state: AgenticLoopState,
   currentMessages: ConversationMessage[],
 ): Promise<void> {
-  const { emit, signal, options, resolvedModel, modelDef, provider } = context;
+  const { emit, signal, options, resolvedModel, modelDefinition, provider } = context;
 
   emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.ITERATION_LIMIT_REACHED });
 
@@ -60,7 +60,7 @@ export async function runExhaustionRecoveryPass(
   harness.registerTrackerRequest(exhaustionRequestId);
 
   const exhaustionStream =
-    modelDef?.liveAPI && provider.generateTextStreamLive
+    modelDefinition?.liveAPI && provider.generateTextStreamLive
       ? provider.generateTextStreamLive(expandedMessages, resolvedModel, {
           ...augmentedOptions,
           signal,

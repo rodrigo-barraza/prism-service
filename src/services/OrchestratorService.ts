@@ -909,7 +909,7 @@ export default class OrchestratorService {
         provider: subAgentProviderInstance as LLMProvider,
         providerName: subAgent.providerName,
         resolvedModel: subAgent.resolvedModel,
-        modelDef: subAgentModelDef,
+        modelDefinition: subAgentModelDef,
         messages: subAgentMessages,
         options: {
           autoApprove: true,

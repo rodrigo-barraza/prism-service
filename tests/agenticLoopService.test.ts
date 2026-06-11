@@ -153,7 +153,7 @@ describe("AgenticLoopService", () => {
       provider: mockProvider,
       providerName: "test-provider",
       resolvedModel: "test-model",
-      modelDef: {
+      modelDefinition: {
         maxInputTokens: 10000,
         inputTypes: [TYPES.TEXT],
         outputTypes: [TYPES.TEXT],
@@ -198,7 +198,7 @@ describe("AgenticLoopService", () => {
   });
 
   it("should filter out generate_image if model natively outputs images", async () => {
-    mockContext.modelDef.outputTypes = [TYPES.TEXT, TYPES.IMAGE];
+    mockContext.modelDefinition.outputTypes = [TYPES.TEXT, TYPES.IMAGE];
     mockContext.options.enabledTools = ["generate_image", "read_file"];
 
     await AgenticLoopService.runAgenticLoop(mockContext);
@@ -211,7 +211,7 @@ describe("AgenticLoopService", () => {
   });
 
   it("should filter out describe_image if model natively inputs images", async () => {
-    mockContext.modelDef.inputTypes = [TYPES.TEXT, TYPES.IMAGE];
+    mockContext.modelDefinition.inputTypes = [TYPES.TEXT, TYPES.IMAGE];
     mockContext.options.enabledTools = ["describe_image", "read_file"];
 
     await AgenticLoopService.runAgenticLoop(mockContext);

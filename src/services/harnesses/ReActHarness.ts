@@ -227,7 +227,7 @@ export default class ReActHarness extends BaseAgenticHarness {
       // Before mechanical truncation, check if we should run LLM-powered
       // compaction. This produces an intelligent summary instead of
       // just dropping messages. Modeled after Claude Code's autoCompact.ts.
-      const contextWindowSize = context.modelDef?.maxInputTokens || 128_000;
+      const contextWindowSize = context.modelDefinition?.maxInputTokens || 128_000;
       const maxOutputTokens = options.maxTokens || 8192;
       const preEnforceTokenEstimate = ContextWindowManager.estimateTokens(
         currentMessages as ChatMessage[],

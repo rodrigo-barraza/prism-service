@@ -817,7 +817,7 @@ describe("Tool Availability & Enablement", () => {
         agent: "CODING",
         project: "test",
         username: "rodrigo",
-        modelDef: { outputTypes: ["image"] },
+        modelDefinition: { outputTypes: ["image"] },
       });
 
       const toolNames = extractToolNames(finalTools);
@@ -831,7 +831,7 @@ describe("Tool Availability & Enablement", () => {
         agent: "CODING",
         project: "test",
         username: "rodrigo",
-        modelDef: { inputTypes: ["image"] },
+        modelDefinition: { inputTypes: ["image"] },
       });
 
       const toolNames = extractToolNames(finalTools);
