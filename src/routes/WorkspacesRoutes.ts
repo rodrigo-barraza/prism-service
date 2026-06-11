@@ -97,11 +97,11 @@ router.get(
       // Fetch full config from tools-api to get agent metadata
       let agents: WorkspaceAgent[] = [];
       try {
-        const configRes = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
+        const configResponse = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
           signal: AbortSignal.timeout(3000),
         });
-        if (configRes.ok) {
-          const config = (await configRes.json()) as WorkspaceConfig;
+        if (configResponse.ok) {
+          const config = (await configResponse.json()) as WorkspaceConfig;
           agents = config.agents || [];
         }
       } catch (agentError: unknown) {
@@ -208,7 +208,7 @@ router.get(
     }
 
     try {
-      const toolsRes = await fetch(
+      const toolsResponse = await fetch(
         `${TOOLS_SERVICE_URL}/agentic/project/summary`,
         {
           method: "POST",
@@ -221,14 +221,14 @@ router.get(
         },
       );
 
-      if (!toolsRes.ok) {
-        const errorBody = (await toolsRes.json().catch(() => ({}))) as { error?: string };
-        return res.status(toolsRes.status).json({
-          error: errorBody.error || `tools-service returned ${toolsRes.status}`,
+      if (!toolsResponse.ok) {
+        const errorBody = (await toolsResponse.json().catch(() => ({}))) as { error?: string };
+        return res.status(toolsResponse.status).json({
+          error: errorBody.error || `tools-service returned ${toolsResponse.status}`,
         });
       }
 
-      const result = await toolsRes.json();
+      const result = await toolsResponse.json();
       res.json(result);
     } catch (error: unknown) {
       logger.error(`GET /workspaces/tree error: ${getErrorMessage(error)}`);

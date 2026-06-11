@@ -68,7 +68,7 @@ function wrapProvider(provider: Provider): Provider {
         ActiveGenerationTracker.increment();
         let result: unknown;
         try {
-          result = (value as (...a: unknown[]) => unknown).apply(target, args);
+          result = (value as (...agent: unknown[]) => unknown).apply(target, args);
         } catch (error: unknown) {
           // Synchronous throw (rare but possible)
           ActiveGenerationTracker.decrement();

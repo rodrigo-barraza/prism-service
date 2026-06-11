@@ -19,9 +19,9 @@ import {
 
 const router = express.Router();
 const {
-  REQUESTS: REQUESTS_COL,
-  MODEL_CONVERSATIONS: CONVERSATIONS_COL,
-  WORKFLOWS: WORKFLOWS_COL,
+  REQUESTS: REQUESTS_COLLECTION,
+  MODEL_CONVERSATIONS: CONVERSATIONS_COLLECTION,
+  WORKFLOWS: WORKFLOWS_COLLECTION,
 } = COLLECTIONS;
 
 router.use(requireDb);
@@ -76,8 +76,8 @@ async function buildMatchFilter(req: Request): Promise<Record<string, unknown>> 
         .project({ id: 1 })
         .toArray(),
     ]);
-    const convIds = convDocs.map((d) => d.id);
-    const agentSessionIds = agentConvDocs.map((d) => d.id);
+    const convIds = convDocs.map((document) => document.id);
+    const agentSessionIds = agentConvDocs.map((document) => document.id);
     match.$or = [
       { conversationId: { $in: convIds } },
       { agentSessionId: { $in: agentSessionIds } },
@@ -153,10 +153,10 @@ router.get(
 
       const [resultDocs, toolCallResult, traceResult, conversationCount] =
         await Promise.all([
-          req.db.collection(REQUESTS_COL).aggregate(pipeline).toArray(),
-          req.db.collection(REQUESTS_COL).aggregate(toolCallPipeline).toArray(),
-          req.db.collection(REQUESTS_COL).aggregate(traceCountPipeline).toArray(),
-          req.db.collection(CONVERSATIONS_COL).countDocuments(convMatch),
+          req.db.collection(REQUESTS_COLLECTION).aggregate(pipeline).toArray(),
+          req.db.collection(REQUESTS_COLLECTION).aggregate(toolCallPipeline).toArray(),
+          req.db.collection(REQUESTS_COLLECTION).aggregate(traceCountPipeline).toArray(),
+          req.db.collection(CONVERSATIONS_COLLECTION).countDocuments(convMatch),
         ]);
       const result = (resultDocs[0] || {}) as Record<string, unknown>;
       const traceCount = traceResult[0]?.total || 0;
@@ -224,7 +224,7 @@ router.get(
         { $match: { conversationIds: { $exists: true, $ne: [] } } },
         {
           $lookup: {
-            from: CONVERSATIONS_COL,
+            from: CONVERSATIONS_COLLECTION,
             localField: "conversationIds",
             foreignField: "id",
             as: "_convs",
@@ -270,10 +270,10 @@ router.get(
 
       const [results, workflowCounts, convCounts, traceCounts] =
         await Promise.all([
-          req.db.collection(REQUESTS_COL).aggregate(pipeline).toArray(),
-          req.db.collection(WORKFLOWS_COL).aggregate(workflowPipeline).toArray(),
-          req.db.collection(CONVERSATIONS_COL).aggregate(convPipeline).toArray(),
-          req.db.collection(REQUESTS_COL).aggregate(tracePipeline).toArray(),
+          req.db.collection(REQUESTS_COLLECTION).aggregate(pipeline).toArray(),
+          req.db.collection(WORKFLOWS_COLLECTION).aggregate(workflowPipeline).toArray(),
+          req.db.collection(CONVERSATIONS_COLLECTION).aggregate(convPipeline).toArray(),
+          req.db.collection(REQUESTS_COLLECTION).aggregate(tracePipeline).toArray(),
         ]);
 
       const wfMap: Record<string, number> = {};
@@ -340,7 +340,7 @@ router.get(
       ];
 
       const results = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .aggregate(pipeline)
         .toArray();
 
@@ -390,7 +390,7 @@ router.get(
       ];
 
       const results = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .aggregate(pipeline)
         .toArray();
 
@@ -404,7 +404,7 @@ router.get(
       const wfByConv: Record<string, number> = {};
       if (allConvIds.size > 0) {
         const wfResults = await req.db
-          .collection(WORKFLOWS_COL)
+          .collection(WORKFLOWS_COLLECTION)
           .aggregate([
             {
               $match: {
@@ -427,7 +427,7 @@ router.get(
       const traceByConv: Record<string, string> = {};
       if (allConvIds.size > 0) {
         const convDocs = await req.db
-          .collection(CONVERSATIONS_COL)
+          .collection(CONVERSATIONS_COLLECTION)
           .find({
             id: { $in: [...allConvIds] },
             traceId: { $exists: true, $ne: null },
@@ -546,7 +546,7 @@ router.get(
       ];
 
       const results = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .aggregate(pipeline)
         .toArray();
 
@@ -620,7 +620,7 @@ router.get(
       ];
 
       const results = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .aggregate(pipeline)
         .toArray();
 
@@ -658,7 +658,7 @@ router.get(
       };
 
       const [result] = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .aggregate([
           ...matchStage,
           {
@@ -1062,7 +1062,7 @@ router.get(
       ];
 
       const results = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .aggregate(pipeline)
         .toArray();
 
@@ -1124,7 +1124,7 @@ router.get(
       ];
 
       const results = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .aggregate(pipeline)
         .toArray();
 

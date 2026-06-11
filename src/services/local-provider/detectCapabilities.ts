@@ -1,7 +1,7 @@
 import { TYPES } from "../../config.ts";
 import {
   THINKING_PATTERNS,
-  FC_PATTERNS,
+  FUNCTION_CALL_PATTERNS,
   VISION_PATTERNS,
   VIDEO_PATTERNS,
   AUDIO_PATTERNS,
@@ -27,7 +27,7 @@ export function detectCapabilities(
   // Function calling / tool use
   const supportsFunctionCalling =
     !!capabilities.trained_for_tool_use ||
-    matchesAny(nameLower, FC_PATTERNS);
+    matchesAny(nameLower, FUNCTION_CALL_PATTERNS);
 
   // Vision (images)
   const supportsVision =

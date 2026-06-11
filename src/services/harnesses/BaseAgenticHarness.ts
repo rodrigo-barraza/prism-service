@@ -1,4 +1,4 @@
-import { expandMessagesForFC } from "../../utils/FunctionCallingUtilities.ts";
+import { expandMessagesForFunctionCall } from "../../utils/FunctionCallingUtilities.ts";
 import {
   mergeUsage,
   createUsageAccumulator,
@@ -331,7 +331,7 @@ export default class BaseAgenticHarness {
     passOptions: AgenticOptions,
   ): AsyncIterable<unknown> {
     const { provider, resolvedModel, modelDef, signal } = this.context;
-    const expandedMessages = expandMessagesForFC(messages as ChatMessage[], {
+    const expandedMessages = expandMessagesForFunctionCall(messages as ChatMessage[], {
       filterDeleted: false,
     });
     return modelDef?.liveAPI && provider.generateTextStreamLive
@@ -828,7 +828,7 @@ export default class BaseAgenticHarness {
       `[AgenticLoop] finalize: session=${agentSessionId} conversation=${conversationId} project=${project} ` +
         `originalMsgCount=${state.originalMessageCount} currentMsgs=${currentMessages.length} ` +
         `newTurnMsgs=${newTurnMessages.length} ` +
-        `roles=[${newTurnMessages.map((m) => m.role).join(",")}] ` +
+        `roles=[${newTurnMessages.map((conversationMessage) => conversationMessage.role).join(",")}] ` +
         `text=${(state.finalStreamedText || "").length}chars`,
     );
 

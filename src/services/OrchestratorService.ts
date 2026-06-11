@@ -681,9 +681,9 @@ export default class OrchestratorService {
     if (orchestratorContext.conversationId) {
       try {
         const { MONGO_DB_NAME: dbName } = await import("../../config.ts");
-        const { COLLECTIONS: colNames } = await import("../constants.ts");
+        const { COLLECTIONS: collectionNames } = await import("../constants.ts");
         const MongoWrapper = (await import("../wrappers/MongoWrapper.ts")).default;
-        const dbCollection = MongoWrapper.getCollection(dbName, colNames.AGENT_CONVERSATIONS);
+        const dbCollection = MongoWrapper.getCollection(dbName, collectionNames.AGENT_CONVERSATIONS);
         
         if (dbCollection) {
           await dbCollection.updateOne(

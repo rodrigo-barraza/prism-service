@@ -1,4 +1,4 @@
-import { expandMessagesForFC } from "../../../utils/FunctionCallingUtilities.ts";
+import { expandMessagesForFunctionCall } from "../../../utils/FunctionCallingUtilities.ts";
 import SessionGenerationTracker from "../../SessionGenerationTracker.ts";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
@@ -45,7 +45,7 @@ export async function runExhaustionRecoveryPass(
   delete exhaustionOptions.tools;
 
   const enforcedMessages = harness.enforceContextWindow(currentMessages, 0);
-  const expandedMessages = expandMessagesForFC(enforcedMessages, {
+  const expandedMessages = expandMessagesForFunctionCall(enforcedMessages, {
     filterDeleted: false,
   });
 

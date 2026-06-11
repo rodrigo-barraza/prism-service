@@ -239,7 +239,7 @@ const MCPClientService = {
     });
 
     logger.info(
-      `[MCP] Connected to "${serverName}" — ${schemas.length} tools: ${mcpTools.map((t) => t.name).join(", ")}`,
+      `[MCP] Connected to "${serverName}" — ${schemas.length} tools: ${mcpTools.map((mCPRawTool) => mCPRawTool.name).join(", ")}`,
     );
 
     return { tools: schemas, serverName };

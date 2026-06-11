@@ -1620,12 +1620,12 @@ function resolveRecommendedDefault(
   inputType: string,
   outputType: string,
   availableProviders: Set<string>,
-  fcOnly = false,
+  functionCallOnly = false,
 ): { provider: string; model: string; temperature: number } | null {
   const modelOptions = getModelOptions(inputType, outputType);
 
   const isEligible = (model: ModelOptionEntry): boolean => {
-    if (!fcOnly) return true;
+    if (!functionCallOnly) return true;
     return (model.tools || []).includes("Tool Calling");
   };
 

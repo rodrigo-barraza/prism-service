@@ -801,7 +801,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         const makeRequest = async (payload: Record<string, unknown>) => {
           const payloadString = JSON.stringify(payload, null, 2);
           const inputShape = Array.isArray(payload.input)
-            ? `array[${payload.input.length}]: ${payload.input.map((p: Record<string, unknown>) => p.type).join(", ")}`
+            ? `array[${payload.input.length}]: ${payload.input.map((record: Record<string, unknown>) => record.type).join(", ")}`
             : `string[${((payload.input || "") as string).length}]`;
           logger.info(
             `[LM-Studio] Native API: reasoning=${payload.reasoning || "default"}, tools=${payload.integrations ? "mcp" : "none"}, input=${inputShape}, ${payloadString.length} chars`,

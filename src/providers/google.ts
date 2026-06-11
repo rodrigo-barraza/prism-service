@@ -698,12 +698,12 @@ const googleProvider = {
 
             // Tool calls from the server
             if (message.toolCall?.functionCalls) {
-              for (const fc of message.toolCall.functionCalls) {
+              for (const functionCall of message.toolCall.functionCalls) {
                 enqueue({
                   type: "toolCall",
                   id: `google-toolCall-${crypto.randomUUID()}`,
-                  name: fc.name || "any",
-                  args: (fc.args || {}) as Record<string, unknown>,
+                  name: functionCall.name || "any",
+                  args: (functionCall.args || {}) as Record<string, unknown>,
                 });
               }
             }

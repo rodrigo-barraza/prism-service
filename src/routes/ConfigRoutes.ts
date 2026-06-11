@@ -222,7 +222,7 @@ router.get(
           const enriched = { [instanceId]: models };
           enrichModelsWithArenaScores(enriched);
           const existing = textToTextModels[instanceId] || [];
-          const existingNames = new Set(existing.map((m) => m.name));
+          const existingNames = new Set(existing.map((modelOptionEntry) => modelOptionEntry.name));
           const merged = [...existing];
           for (const model of enriched[instanceId]) {
             if (!existingNames.has(model.name)) merged.push(model);
@@ -263,7 +263,7 @@ router.get(
         ? toolNames.join(", ")
         : "general web search and computation";
 
-    const fcSystemPrompt = `You are a helpful AI assistant with access to real-time data APIs. You have tools for ${toolList}.
+    const functionCallSystemPrompt = `You are a helpful AI assistant with access to real-time data APIs. You have tools for ${toolList}.
 
 Guidelines:
 - When asked about weather, events, prices, trends, or similar data, ALWAYS use the appropriate tool to fetch real-time data. Never guess or make up data.
@@ -279,7 +279,7 @@ Guidelines:
       // Direct MinIO URL for resolving minio:// file refs on the client
       // e.g. "http://<host>:9000/prism"
       fileBaseUrl: MinioWrapper.getBucketUrl() || null,
-      fcSystemPrompt,
+      fcSystemPrompt: functionCallSystemPrompt,
       providers: availableProviderMap,
       providerList: availableProviderList,
       availableProviders: availableProviderList,

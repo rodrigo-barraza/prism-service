@@ -101,29 +101,29 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
   const WEB_SEARCH_NAMES: Set<string> = new Set([TOOL_NAMES.SEARCH_WEB, TOOL_NAMES.SEARCH_WEB_PREVIEW]);
   const CODE_EXEC_NAMES: Set<string> = new Set([TOOL_NAMES.CODE_EXECUTION]);
 
-  for (const m of messages || []) {
-    if (m.deleted) continue;
-    const isUser = m.role === "user";
-    const isAssistant = m.role === "assistant";
-    if (m.content && (isUser || isAssistant)) {
-      if (isUser && !(m as Record<string, unknown>).liveTranscription) modalities.textIn = true;
+  for (const chatMessage of messages || []) {
+    if (chatMessage.deleted) continue;
+    const isUser = chatMessage.role === "user";
+    const isAssistant = chatMessage.role === "assistant";
+    if (chatMessage.content && (isUser || isAssistant)) {
+      if (isUser && !(chatMessage as Record<string, unknown>).liveTranscription) modalities.textIn = true;
       if (isAssistant) modalities.textOut = true;
     }
     // Tool calls are structured text output
-    if (isAssistant && m.toolCalls && m.toolCalls.length > 0) {
+    if (isAssistant && chatMessage.toolCalls && chatMessage.toolCalls.length > 0) {
       modalities.textOut = true;
     }
-    if ((m.images && m.images.length > 0) || (m as Record<string, unknown>).image) {
+    if ((chatMessage.images && chatMessage.images.length > 0) || (chatMessage as Record<string, unknown>).image) {
       if (isUser) modalities.imageIn = true;
       if (isAssistant) modalities.imageOut = true;
     }
-    if (m.audio) {
+    if (chatMessage.audio) {
       if (isUser) modalities.audioIn = true;
       if (isAssistant) modalities.audioOut = true;
     }
     if (
-      ((m as Record<string, unknown>).documents as string[] | undefined)?.length ||
-      m.images?.some(
+      ((chatMessage as Record<string, unknown>).documents as string[] | undefined)?.length ||
+      chatMessage.images?.some(
         (ref: string) =>
           typeof ref === "string" &&
           (ref.endsWith(".pdf") || ref.endsWith(".txt")),
@@ -133,8 +133,8 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
     }
 
     // Classify tool calls by type
-    if (m.toolCalls && m.toolCalls.length > 0) {
-      for (const toolCall of m.toolCalls) {
+    if (chatMessage.toolCalls && chatMessage.toolCalls.length > 0) {
+      for (const toolCall of chatMessage.toolCalls) {
         const name = (toolCall.name || "").toLowerCase();
         if (WEB_SEARCH_NAMES.has(name)) {
           modalities.webSearch = true;
@@ -149,8 +149,8 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
     // Detect inline web search results (from streaming)
     if (
       isAssistant &&
-      typeof m.content === "string" &&
-      m.content.includes("> **Sources:**")
+      typeof chatMessage.content === "string" &&
+      chatMessage.content.includes("> **Sources:**")
     ) {
       modalities.webSearch = true;
     }
@@ -158,20 +158,20 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
     // Detect inline code execution blocks (from streaming)
     if (
       isAssistant &&
-      typeof m.content === "string" &&
-      m.content.includes("```exec-")
+      typeof chatMessage.content === "string" &&
+      chatMessage.content.includes("```exec-")
     ) {
       modalities.codeExecution = true;
     }
 
     // Tool result messages — mark as function calling
     // (provider-native web_search and code_execution results are inlined, not stored as role:"tool")
-    if (m.role === "tool") {
+    if (chatMessage.role === "tool") {
       modalities.functionCalling = true;
     }
 
     // Detect thinking / reasoning
-    if (isAssistant && m.thinking) {
+    if (isAssistant && chatMessage.thinking) {
       modalities.thinking = true;
     }
   }
@@ -183,10 +183,10 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
  */
 export function extractProviders(messages: ChatMessage[], settings: ConversationSettings | null): string[] {
   const providers = new Set<string>();
-  for (const m of messages || []) {
-    if (m.deleted) continue;
-    if ((m as Record<string, unknown>).provider) {
-      providers.add(((m as Record<string, unknown>).provider as string).toLowerCase());
+  for (const chatMessage of messages || []) {
+    if (chatMessage.deleted) continue;
+    if ((chatMessage as Record<string, unknown>).provider) {
+      providers.add(((chatMessage as Record<string, unknown>).provider as string).toLowerCase());
     }
   }
   if (settings?.provider) providers.add(settings.provider.toLowerCase());
@@ -198,9 +198,9 @@ export function extractProviders(messages: ChatMessage[], settings: Conversation
  */
 export function computeTotalCost(messages: ChatMessage[]): number {
   let total = 0;
-  for (const m of messages || []) {
-    if (m.deleted) continue;
-    const cost = (m as Record<string, unknown>).estimatedCost;
+  for (const chatMessage of messages || []) {
+    if (chatMessage.deleted) continue;
+    const cost = (chatMessage as Record<string, unknown>).estimatedCost;
     if (typeof cost === "number") total += cost;
   }
   return total;

@@ -1,5 +1,5 @@
 /**
- * Tests for expandMessagesForFC — the function that converts the internal
+ * Tests for expandMessagesForFunctionCall — the function that converts the internal
  * message format into the OpenAI Chat Completions format expected by LLM
  * providers. This is the last transformation before messages hit the model.
  *
@@ -78,9 +78,9 @@ function truncateToolResult(
   return serialized.slice(0, maximumCharacters) + "…}";
 }
 
-// ── Reimplementation of expandMessagesForFC ───────────────────
+// ── Reimplementation of expandMessagesForFunctionCall ───────────────────
 
-function expandMessagesForFC(
+function expandMessagesForFunctionCall(
   messages: ChatMessage[],
   { filterDeleted = true }: { filterDeleted?: boolean } = {},
 ): ExpandedMessage[] {
@@ -163,10 +163,10 @@ function expandMessagesForFC(
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  expandMessagesForFC tests
+//  expandMessagesForFunctionCall tests
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-describe("expandMessagesForFC — basic expansion", () => {
+describe("expandMessagesForFunctionCall — basic expansion", () => {
   it("expands assistant with toolCalls into assistant + tool messages", () => {
     const messages: ChatMessage[] = [
       { role: "system", content: "You are helpful." },
@@ -185,7 +185,7 @@ describe("expandMessagesForFC — basic expansion", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages, { filterDeleted: false });
+    const expanded = expandMessagesForFunctionCall(messages, { filterDeleted: false });
 
     expect(expanded).toHaveLength(4); // system, user, assistant, tool
     expect(expanded[2].role).toBe("assistant");
@@ -217,7 +217,7 @@ describe("expandMessagesForFC — basic expansion", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages, { filterDeleted: false });
+    const expanded = expandMessagesForFunctionCall(messages, { filterDeleted: false });
     const toolMessage = expanded.find((message) => message.role === "tool");
 
     expect(toolMessage).toBeDefined();
@@ -243,7 +243,7 @@ describe("expandMessagesForFC — basic expansion", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages, { filterDeleted: false });
+    const expanded = expandMessagesForFunctionCall(messages, { filterDeleted: false });
 
     // No tool message emitted when result is undefined
     const toolMessages = expanded.filter(
@@ -272,7 +272,7 @@ describe("expandMessagesForFC — basic expansion", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages, { filterDeleted: false });
+    const expanded = expandMessagesForFunctionCall(messages, { filterDeleted: false });
 
     // null is NOT undefined — tool message SHOULD be emitted
     const toolMessages = expanded.filter(
@@ -304,7 +304,7 @@ describe("expandMessagesForFC — basic expansion", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages, { filterDeleted: false });
+    const expanded = expandMessagesForFunctionCall(messages, { filterDeleted: false });
 
     // Only 1 tool message (search_web has result, generate_audio doesn't)
     const toolMessages = expanded.filter(
@@ -315,7 +315,7 @@ describe("expandMessagesForFC — basic expansion", () => {
   });
 });
 
-describe("expandMessagesForFC — iteration 2 context", () => {
+describe("expandMessagesForFunctionCall — iteration 2 context", () => {
   it("simulates the exact iteration 2 message expansion for generate_audio flow", () => {
     // After iteration 1 (tool call) and tool execution,
     // currentMessages = [system, user1, assistant1, user2, assistant2_with_tools]
@@ -352,7 +352,7 @@ describe("expandMessagesForFC — iteration 2 context", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(currentMessages, {
+    const expanded = expandMessagesForFunctionCall(currentMessages, {
       filterDeleted: false,
     });
 
@@ -405,7 +405,7 @@ describe("expandMessagesForFC — iteration 2 context", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages, { filterDeleted: false });
+    const expanded = expandMessagesForFunctionCall(messages, { filterDeleted: false });
     const toolMessage = expanded.find((message) => message.role === "tool");
 
     // Verify the model receives meaningful tool result
@@ -416,7 +416,7 @@ describe("expandMessagesForFC — iteration 2 context", () => {
   });
 });
 
-describe("expandMessagesForFC — deleted message filtering", () => {
+describe("expandMessagesForFunctionCall — deleted message filtering", () => {
   it("filters out deleted messages when filterDeleted is true (default)", () => {
     const messages: ChatMessage[] = [
       { role: "user", content: "hey" },
@@ -428,7 +428,7 @@ describe("expandMessagesForFC — deleted message filtering", () => {
       { role: "assistant", content: "Correct response" },
     ];
 
-    const expanded = expandMessagesForFC(messages);
+    const expanded = expandMessagesForFunctionCall(messages);
     expect(expanded).toHaveLength(2);
     expect(expanded[1].content).toBe("Correct response");
   });
@@ -440,7 +440,7 @@ describe("expandMessagesForFC — deleted message filtering", () => {
       { role: "assistant", content: "Real response" },
     ];
 
-    const expanded = expandMessagesForFC(messages);
+    const expanded = expandMessagesForFunctionCall(messages);
     expect(expanded).toHaveLength(2);
     expect(expanded[1].content).toBe("Real response");
   });
@@ -462,7 +462,7 @@ describe("expandMessagesForFC — deleted message filtering", () => {
       },
     ];
 
-    const expanded = expandMessagesForFC(messages);
+    const expanded = expandMessagesForFunctionCall(messages);
     expect(expanded).toHaveLength(3); // user, assistant(tools), tool
     expect(expanded[1].content).toBeNull(); // content is null (empty string trimmed)
     expect(expanded[1].toolCalls).toHaveLength(1);
@@ -498,7 +498,7 @@ describe("End-to-end: model's iteration 2 input after generate_audio", () => {
       },
     ];
 
-    const expandedMessages = expandMessagesForFC(currentMessages, {
+    const expandedMessages = expandMessagesForFunctionCall(currentMessages, {
       filterDeleted: false,
     });
 

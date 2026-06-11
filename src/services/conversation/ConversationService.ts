@@ -157,11 +157,11 @@ const ConversationService: ConversationServiceInterface = {
 
     // Auto-derive a descriptive title from the first user message if the current title is missing or is 'New Conversation'
     if (!conversation.title || conversation.title === DEFAULT_CONVERSATION_TITLE) {
-      const firstUserMsg = (conversation.messages as ChatMessage[])?.find(
-        (m) => m.role === "user"
+      const firstUserMessage = (conversation.messages as ChatMessage[])?.find(
+        (chatMessage) => chatMessage.role === "user"
       );
-      if (firstUserMsg?.content) {
-        const titleSnippet = firstUserMsg.content.slice(0, 100).trim();
+      if (firstUserMessage?.content) {
+        const titleSnippet = firstUserMessage.content.slice(0, 100).trim();
         if (titleSnippet) {
           derived.title = titleSnippet;
           conversation.title = titleSnippet; // Update local memory representation

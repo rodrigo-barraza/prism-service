@@ -303,7 +303,7 @@ async function prepareGenerationContext(
   });
 
   // ── Strip soft-deleted messages ──────────────────────────────
-  const activeMessages = messages.filter((m) => !m.deleted);
+  const activeMessages = messages.filter((message) => !message.deleted);
   // ── Resolve image refs ─────────────────────────────────────
   const providerMessages = await resolveMessageMediaReferences(
     activeMessages as ConversationMessage[],
@@ -390,7 +390,7 @@ async function prepareGenerationContext(
   }
   // Derive userMessage from the last user message
   const userMessage =
-    messages?.filter((m) => m.role === "user").pop() || null;
+    messages?.filter((message) => message.role === "user").pop() || null;
   return {
     provider,
     providerName,
@@ -465,11 +465,11 @@ export async function handleConversation(
   let conversationMeta = skipConversation ? null : incomingConversationMeta;
   if (!skipConversation && !conversationId) {
     conversationId = crypto.randomUUID();
-    const firstUserMsg = (context.rawMessages as ConversationMessage[])
-      ?.filter((m) => m.role === "user")
+    const firstUserMessage = (context.rawMessages as ConversationMessage[])
+      ?.filter((conversationMessage) => conversationMessage.role === "user")
       .pop();
     const titleSnippet =
-      (firstUserMsg?.content || "").slice(0, 100).trim() || DEFAULT_CONVERSATION_TITLE;
+      (firstUserMessage?.content || "").slice(0, 100).trim() || DEFAULT_CONVERSATION_TITLE;
     conversationMeta = conversationMeta || { title: titleSnippet };
   }
   const traceId = incomingTraceId || null;
@@ -479,7 +479,7 @@ export async function handleConversation(
     conversationMeta = { traceId };
   }
   // Merge conversation identity into ctx for sub-handlers
-  const fullCtx = {
+  const fullContext = {
     ...context,
     conversationId: conversationId || null,
     agentSessionId: null as string | null,
@@ -489,7 +489,7 @@ export async function handleConversation(
   try {
     try {
       if (context.isImageAPIModel) {
-        await handleImageAPIModel(fullCtx);
+        await handleImageAPIModel(fullContext);
         return;
       }
       if (!context.provider.generateTextStream && !context.provider.generateText) {
@@ -520,7 +520,7 @@ export async function handleConversation(
         options.tools = tools;
 
         // Inject tool descriptions into the system prompt
-        injectToolsIntoSystemPrompt(fullCtx.messages as Array<{ role: string; content?: string; [key: string]: unknown }>, tools as ToolSchemaWithDomain[]);
+        injectToolsIntoSystemPrompt(fullContext.messages as Array<{ role: string; content?: string; [key: string]: unknown }>, tools as ToolSchemaWithDomain[]);
 
         if (useNativeMcp && (modelDef as Record<string, unknown> | null)?.contextLength) {
           options.contextLength = (modelDef as Record<string, unknown>).contextLength;
@@ -534,9 +534,9 @@ export async function handleConversation(
       const useStreaming =
         context.provider.generateTextStream && (modelDef as Record<string, unknown> | null)?.streaming !== false;
       if (useStreaming) {
-        await handleStreamingText(fullCtx);
+        await handleStreamingText(fullContext);
       } else {
-        await handleNonStreamingText(fullCtx);
+        await handleNonStreamingText(fullContext);
       }
     } finally {
       if (localRelease) {
@@ -743,8 +743,8 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
     true,
     getCollectionOpts(project),
   );
-  const lastUserMsg = (messages as ConversationMessage[]).filter((m) => m.role === "user").pop();
-  const prompt = lastUserMsg?.content || "";
+  const lastUserMessage = (messages as ConversationMessage[]).filter((conversationMessage) => conversationMessage.role === "user").pop();
+  const prompt = lastUserMessage?.content || "";
   // Collect all images from the conversation
   const allImages: string[] = [];
   for (const message of messages as ConversationMessage[]) {
@@ -949,24 +949,24 @@ async function handleStreamingText(context: GenerationContext) {
   // execute returned tool calls via ToolOrchestratorService and re-call
   // the provider with tool results. Lightweight loop — no approval
   // engine, no context manager, just direct execution.
-  const MAX_FC_ITERATIONS = 10;
-  let fcIteration = 0;
+  const MAX_FUNCTIONCALL_ITERATIONS = 10;
+  let functionCallIteration = 0;
   while (
     options.functionCallingEnabled &&
     streamState.toolCalls.length > 0 &&
     streamState.toolCalls.some(
       (toolCall) => !toolCall.result && toolCall.status !== "done" && toolCall.status !== "error",
     ) &&
-    fcIteration < MAX_FC_ITERATIONS &&
+    functionCallIteration < MAX_FUNCTIONCALL_ITERATIONS &&
     !signal?.aborted
   ) {
-    fcIteration++;
+    functionCallIteration++;
     const pendingCalls = streamState.toolCalls.filter(
       (toolCall) => !toolCall.result && toolCall.status !== "done" && toolCall.status !== "error",
     );
     if (pendingCalls.length === 0) break;
     logger.info(
-      `[chat/FC] Iteration ${fcIteration}: executing ${pendingCalls.length} tool call(s)`,
+      `[chat/FC] Iteration ${functionCallIteration}: executing ${pendingCalls.length} tool call(s)`,
     );
     // Execute all pending tool calls
     for (const toolCall of pendingCalls) {
@@ -990,7 +990,7 @@ async function handleStreamingText(context: GenerationContext) {
             conversationId: conversationId || null,
             traceId: traceId || null,
             clientIp: clientIp || null,
-            iteration: fcIteration,
+            iteration: functionCallIteration,
             _providerName: providerName,
             _resolvedModel: resolvedModel,
           },
@@ -1025,7 +1025,7 @@ async function handleStreamingText(context: GenerationContext) {
       }
     }
     // Build tool result messages for the provider
-    const assistantToolMsg = {
+    const assistantToolMessage = {
       role: "assistant",
       content: streamState.text || "",
       toolCalls: streamState.toolCalls.map((toolCall) => ({
@@ -1051,7 +1051,7 @@ async function handleStreamingText(context: GenerationContext) {
           typeof toolCall.result === "string" ? toolCall.result : JSON.stringify(toolCall.result),
       }));
     // Re-call provider with tool results appended
-    const updatedMessages = [...messages, assistantToolMsg, ...toolResultMsgs];
+    const updatedMessages = [...messages, assistantToolMessage, ...toolResultMsgs];
     // Reset accumulators for the follow-up stream
     streamState.text = "";
     streamState.thinking = "";
@@ -1091,11 +1091,11 @@ async function handleStreamingText(context: GenerationContext) {
     if (streamState.usage) {
       emit({
         type: SSE_EVENT_TYPES.USAGE_UPDATE,
-        usage: { ...(streamState.usage as Record<string, unknown>), requests: fcIteration + 1 },
+        usage: { ...(streamState.usage as Record<string, unknown>), requests: functionCallIteration + 1 },
       });
     }
     // Update messages ref for potential next iteration
-    (messages as Record<string, unknown>[]).push(assistantToolMsg, ...toolResultMsgs);
+    (messages as Record<string, unknown>[]).push(assistantToolMessage, ...toolResultMsgs);
   }
   // Surface max_tokens truncation if the model produced no useful output
   const isChatTruncated =

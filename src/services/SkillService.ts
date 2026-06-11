@@ -178,7 +178,7 @@ const SkillService = {
     // Warn about unresolved variables
     const unresolvedMatch = prompt.match(/\{\{(\w+)\}\}/g);
     const unresolved = unresolvedMatch
-      ? [...new Set(unresolvedMatch.map((m: string) => m.slice(2, -2)))]
+      ? [...new Set(unresolvedMatch.map((message: string) => message.slice(2, -2)))]
       : [];
 
     // Increment usage counter

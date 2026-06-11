@@ -17,8 +17,8 @@ import { MS_PER_MINUTE, MS_PER_HOUR, minutes } from "@rodrigo-barraza/utilities-
 
 const router = express.Router();
 const {
-  REQUESTS: REQUESTS_COL,
-  MODEL_CONVERSATIONS: CONVERSATIONS_COL,
+  REQUESTS: REQUESTS_COLLECTION,
+  MODEL_CONVERSATIONS: CONVERSATIONS_COLLECTION,
 } = COLLECTIONS;
 
 router.use(requireDb);
@@ -62,7 +62,7 @@ router.get(
 
         if (/^[\d.:a-f]+$/i.test((search as string).trim())) {
           const matchingConvIds = await req.db
-            .collection(REQUESTS_COL)
+            .collection(REQUESTS_COLLECTION)
             .distinct("conversationId", { clientIp: regex });
           if (matchingConvIds.length > 0) {
             orClauses.push({ id: { $in: matchingConvIds } });
@@ -96,7 +96,7 @@ router.get(
       if (shouldFetchConvs) {
         queryPromises.push(
           req.db
-            .collection(CONVERSATIONS_COL)
+            .collection(CONVERSATIONS_COLLECTION)
             .find(filter)
             .project({
               id: 1,
@@ -155,7 +155,7 @@ router.get(
       if (shouldFetchConvs) {
         countPromises.push(
           req.db
-            .collection(CONVERSATIONS_COL)
+            .collection(CONVERSATIONS_COLLECTION)
             .countDocuments(filter)
             .then((result) => {
               totalConvs = result;
@@ -196,7 +196,7 @@ router.get(
         .filter(Boolean);
 
       const requests = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .find({
           $or: [
             { conversationId: { $in: paginatedDocumentIds } },
@@ -321,15 +321,15 @@ router.get(
   "/filters",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const [convProjects, reqProjects, usernames, models, providers] = await Promise.all([
-        req.db.collection(CONVERSATIONS_COL).distinct("project"),
-        req.db.collection(REQUESTS_COL).distinct("project"),
-        req.db.collection(CONVERSATIONS_COL).distinct("username"),
-        req.db.collection(REQUESTS_COL).distinct("model"),
-        req.db.collection(REQUESTS_COL).distinct("provider"),
+      const [convProjects, requestProjects, usernames, models, providers] = await Promise.all([
+        req.db.collection(CONVERSATIONS_COLLECTION).distinct("project"),
+        req.db.collection(REQUESTS_COLLECTION).distinct("project"),
+        req.db.collection(CONVERSATIONS_COLLECTION).distinct("username"),
+        req.db.collection(REQUESTS_COLLECTION).distinct("model"),
+        req.db.collection(REQUESTS_COLLECTION).distinct("provider"),
       ]);
 
-      const projects = [...new Set([...convProjects, ...reqProjects])];
+      const projects = [...new Set([...convProjects, ...requestProjects])];
       const workspaceRoots = ToolOrchestratorService.getWorkspaceRoots() as string[];
       const agentPersonas = AgentPersonaRegistry.list().map((persona) => ({
         id: persona.id,
@@ -362,13 +362,13 @@ router.get(
       const fiveMinAgo = new Date(Date.now() - minutes(5)).toISOString();
 
       const [generatingCount, recentCount] = await Promise.all([
-        req.db.collection(CONVERSATIONS_COL).countDocuments({
+        req.db.collection(CONVERSATIONS_COLLECTION).countDocuments({
           ...filter,
           isGenerating: true,
           updatedAt: { $gte: fiveMinAgo },
         }),
         req.db
-          .collection(CONVERSATIONS_COL)
+          .collection(CONVERSATIONS_COLLECTION)
           .countDocuments({ ...filter, updatedAt: { $gte: oneHourAgo } }),
       ]);
 
@@ -408,17 +408,17 @@ router.get(
         const fiveMinAgo = new Date(Date.now() - minutes(5)).toISOString();
 
         const [generatingCount, recentCount] = await Promise.all([
-          req.db.collection(CONVERSATIONS_COL).countDocuments({
+          req.db.collection(CONVERSATIONS_COLLECTION).countDocuments({
             ...filter,
             isGenerating: true,
             updatedAt: { $gte: fiveMinAgo },
           }),
           req.db
-            .collection(CONVERSATIONS_COL)
+            .collection(CONVERSATIONS_COLLECTION)
             .countDocuments({ ...filter, updatedAt: { $gte: oneHourAgo } }),
         ]);
 
-        req.db.collection(CONVERSATIONS_COL)
+        req.db.collection(CONVERSATIONS_COLLECTION)
           .updateMany(
             { isGenerating: true, updatedAt: { $lt: fiveMinAgo } },
             { $set: { isGenerating: false } },
@@ -451,7 +451,7 @@ router.get(
 
     if (ChangeStreamService.available) {
       const onEvent = (event: import("../../services/ChangeStreamService.ts").ChangeStreamEventPayload) => {
-        if (event.collection === CONVERSATIONS_COL || event.collection === COLLECTIONS.AGENT_CONVERSATIONS) {
+        if (event.collection === CONVERSATIONS_COLLECTION || event.collection === COLLECTIONS.AGENT_CONVERSATIONS) {
           sendStats();
         }
       };
@@ -499,7 +499,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       let conversationDocument = await req.db
-        .collection(CONVERSATIONS_COL)
+        .collection(CONVERSATIONS_COLLECTION)
         .findOne({ id: req.params.id });
       if (conversationDocument) {
         return res.json({ ...conversationDocument, type: "direct" });

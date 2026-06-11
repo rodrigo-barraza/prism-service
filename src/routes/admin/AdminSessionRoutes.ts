@@ -10,7 +10,7 @@ import requireDb from "../../middleware/RequireDbMiddleware.ts";
 
 const sessionRouter = express.Router();
 const agentSessionRouter = express.Router();
-const { REQUESTS: REQUESTS_COL } = COLLECTIONS;
+const { REQUESTS: REQUESTS_COLLECTION } = COLLECTIONS;
 
 sessionRouter.use(requireDb);
 agentSessionRouter.use(requireDb);
@@ -24,7 +24,7 @@ sessionRouter.get(
       const allSessionIds = await discoverDescendantSessionIds(req.db, sessionId);
 
       const requests = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .find({ agentSessionId: { $in: [...allSessionIds] } })
         .project({
           estimatedCost: 1,
@@ -145,7 +145,7 @@ sessionRouter.get(
       const allSessionIds = await discoverDescendantSessionIds(req.db, rootSessionId);
 
       const requests = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .find({ agentSessionId: { $in: [...allSessionIds] } })
         .project({
           requestId: 1,

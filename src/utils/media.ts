@@ -387,13 +387,13 @@ export async function extractVideoFrames(videoDataUrl: string, options: { fps?: 
     // Decode video data URL to a temp file.
     // Use string ops instead of regex — regex (.+) on multi-MB base64 causes OOM.
     const b64Marker = ";base64,";
-    const markerIdx = videoDataUrl.indexOf(b64Marker);
-    if (markerIdx === -1 || !videoDataUrl.startsWith("data:")) {
+    const markerIndex = videoDataUrl.indexOf(b64Marker);
+    if (markerIndex === -1 || !videoDataUrl.startsWith("data:")) {
       throw new Error("Invalid video data URL format");
     }
 
-    const mime = videoDataUrl.slice(5, markerIdx); // "data:" is 5 chars
-    const base64Data = videoDataUrl.slice(markerIdx + b64Marker.length);
+    const mime = videoDataUrl.slice(5, markerIndex); // "data:" is 5 chars
+    const base64Data = videoDataUrl.slice(markerIndex + b64Marker.length);
     const ext = mime.split("/")[1]?.split(";")[0] || "mp4";
 
     temporaryDirectory = await mkdtemp(join(tmpdir(), "prism-frames-"));

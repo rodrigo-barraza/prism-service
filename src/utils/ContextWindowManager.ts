@@ -146,15 +146,15 @@ function truncateToolResults(
     truncated.toolCalls = message.toolCalls.map((toolCall: ToolCallEntry) => {
       if (!toolCall.result) return toolCall;
 
-      const resultStr =
+      const resultString =
         typeof toolCall.result === "string" ? toolCall.result : JSON.stringify(toolCall.result);
-      if (resultStr.length <= AGGRESSIVE_TOOL_RESULT_CAP) return toolCall;
+      if (resultString.length <= AGGRESSIVE_TOOL_RESULT_CAP) return toolCall;
 
       return {
         ...toolCall,
         result:
-          resultStr.slice(0, AGGRESSIVE_TOOL_RESULT_CAP) +
-          `\n...[truncated ${resultStr.length - AGGRESSIVE_TOOL_RESULT_CAP} chars]`,
+          resultString.slice(0, AGGRESSIVE_TOOL_RESULT_CAP) +
+          `\n...[truncated ${resultString.length - AGGRESSIVE_TOOL_RESULT_CAP} chars]`,
       };
     });
     return truncated;
@@ -197,8 +197,8 @@ function compressOldAssistantMessages(
       // Keep a short summary of what the assistant did
       const toolNames =
         message.toolCalls?.map((toolCall: ToolCallEntry) => toolCall.name).join(", ") || "";
-      const contentStr = typeof message.content === "string" ? message.content : "";
-      const contentPreview = contentStr.slice(0, 200);
+      const contentString = typeof message.content === "string" ? message.content : "";
+      const contentPreview = contentString.slice(0, 200);
 
       compressed.content = `[Earlier response${toolNames ? ` — used: ${toolNames}` : ""}]${contentPreview ? `\n${contentPreview}...` : ""}`;
       compressed.thinking = undefined;

@@ -201,14 +201,14 @@ export default class AutoApprovalEngine {
 
     if (needsApproval.length > 0) {
       logger.info(
-        `[AutoApproval] ${autoApproved.length} auto-approved, ${needsApproval.length} need approval: ${needsApproval.map((t) => t.name).join(", ")}`,
+        `[AutoApproval] ${autoApproved.length} auto-approved, ${needsApproval.length} need approval: ${needsApproval.map((approvedToolCall) => approvedToolCall.name).join(", ")}`,
       );
     }
 
     return { autoApproved, needsApproval };
   }
   createHook() {
-    return async (toolCall: ToolCall, _ctx: AgenticContext) => {
+    return async (toolCall: ToolCall, context: AgenticContext) => {
       return this.check(toolCall);
     };
   }

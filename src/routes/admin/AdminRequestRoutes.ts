@@ -10,9 +10,9 @@ import requireDb from "../../middleware/RequireDbMiddleware.ts";
 
 const router = express.Router();
 const {
-  REQUESTS: REQUESTS_COL,
-  MODEL_CONVERSATIONS: CONVERSATIONS_COL,
-  WORKFLOWS: WORKFLOWS_COL,
+  REQUESTS: REQUESTS_COLLECTION,
+  MODEL_CONVERSATIONS: CONVERSATIONS_COLLECTION,
+  WORKFLOWS: WORKFLOWS_COLLECTION,
 } = COLLECTIONS;
 
 router.use(requireDb);
@@ -57,8 +57,8 @@ router.get(
             .project({ id: 1 })
             .toArray(),
         ]);
-        const convIds = convDocs.map((d) => d.id);
-        const agentSessionIds = agentConvDocs.map((d) => d.id);
+        const convIds = convDocs.map((document) => document.id);
+        const agentSessionIds = agentConvDocs.map((document) => document.id);
         filter.$or = [
           { conversationId: { $in: convIds } },
           { agentSessionId: { $in: agentSessionIds } },
@@ -88,7 +88,7 @@ router.get(
 
       const [docs, total] = await Promise.all([
         req.db
-          .collection(REQUESTS_COL)
+          .collection(REQUESTS_COLLECTION)
           .find(filter, {
             projection: { requestPayload: 0, responsePayload: 0 },
           })
@@ -96,7 +96,7 @@ router.get(
           .skip(skip)
           .limit(limit)
           .toArray(),
-        req.db.collection(REQUESTS_COL).countDocuments(filter),
+        req.db.collection(REQUESTS_COLLECTION).countDocuments(filter),
       ]);
 
       res.json({ data: docs, total, page, limit });
@@ -113,7 +113,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const document = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .findOne({ requestId: req.params.id });
       if (!document) return res.status(404).json({ error: "Request not found" });
 
@@ -131,7 +131,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const request = await req.db
-        .collection(REQUESTS_COL)
+        .collection(REQUESTS_COLLECTION)
         .findOne({ requestId: req.params.id });
       if (!request) return res.status(404).json({ error: "Request not found" });
 
@@ -141,7 +141,7 @@ router.get(
 
       if (request.conversationId) {
         conversations = await req.db
-          .collection(CONVERSATIONS_COL)
+          .collection(CONVERSATIONS_COLLECTION)
           .find({ id: request.conversationId })
           .project({
             id: 1,
@@ -159,17 +159,17 @@ router.get(
           .toArray();
 
         workflows = await req.db
-          .collection(WORKFLOWS_COL)
+          .collection(WORKFLOWS_COLLECTION)
           .find({ conversationIds: request.conversationId })
           .project({ _id: 1, name: 1, nodeCount: 1, edgeCount: 1, source: 1 })
           .toArray();
 
-        workflows = workflows.map((w: Record<string, unknown>) => ({
-          id: (w._id as { toString: () => string }).toString(),
-          name: w.name || DEFAULT_WORKFLOW_TITLE,
-          nodeCount: w.nodeCount || 0,
-          edgeCount: w.edgeCount || 0,
-          source: w.source || "prism-client",
+        workflows = workflows.map((record: Record<string, unknown>) => ({
+          id: (record._id as { toString: () => string }).toString(),
+          name: record.name || DEFAULT_WORKFLOW_TITLE,
+          nodeCount: record.nodeCount || 0,
+          edgeCount: record.edgeCount || 0,
+          source: record.source || "prism-client",
         }));
 
         const traceIds = new Set();
@@ -178,7 +178,7 @@ router.get(
         }
         if (traceIds.size > 0) {
           const traceAgg = await req.db
-            .collection(REQUESTS_COL)
+            .collection(REQUESTS_COLLECTION)
             .aggregate([
               { $match: { traceId: { $in: [...traceIds] } } },
               {
