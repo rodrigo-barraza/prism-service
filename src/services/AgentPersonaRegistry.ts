@@ -113,6 +113,7 @@ const AgentPersonaRegistry = {
         return buildToolPolicy(sections, personaContext);
       },
       availableTools: Array.isArray(doc.availableTools) ? (doc.availableTools as string[]) : Array.isArray(doc.enabledTools) ? (doc.enabledTools as string[]) : [],
+      enabledByDefaultTools: Array.isArray(doc.enabledByDefaultTools) ? (doc.enabledByDefaultTools as string[]) : undefined,
       policies: policies.length > 0 ? policies : undefined,
       capabilities: "",
       usesDirectoryTree: (doc.usesDirectoryTree as boolean) || false,

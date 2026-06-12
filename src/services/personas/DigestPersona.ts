@@ -102,7 +102,7 @@ const DIGEST_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
 ];
 
-const DIGEST_ENABLED_TOOLS = [
+const DIGEST_AVAILABLE_TOOLS = [
   DOMAIN_KEY_TAGS.HEALTH,
   DOMAIN_KEY_TAGS.WEB,
   TOOL_NAMES.CALCULATE_PRECISE,
@@ -130,7 +130,7 @@ export const DigestPersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(DIGEST_TOOL_POLICY_SECTIONS, context),
-  availableTools: DIGEST_ENABLED_TOOLS,
+  availableTools: DIGEST_AVAILABLE_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
   usesCodingGuidelines: false,

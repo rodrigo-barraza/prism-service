@@ -125,7 +125,7 @@ const STICKERS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
 ];
 
-const STICKERS_ENABLED_TOOLS = [DOMAIN_KEY_TAGS.CREATIVE, DOMAIN_KEY_TAGS.WEB];
+const STICKERS_AVAILABLE_TOOLS = [DOMAIN_KEY_TAGS.CREATIVE, DOMAIN_KEY_TAGS.WEB];
 
 export const StickersPersona: Persona = {
   id: AGENT_IDS.STICKERS,
@@ -152,7 +152,7 @@ export const StickersPersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(STICKERS_TOOL_POLICY_SECTIONS, context),
-  availableTools: STICKERS_ENABLED_TOOLS,
+  availableTools: STICKERS_AVAILABLE_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
   usesCodingGuidelines: false,

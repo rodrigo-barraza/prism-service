@@ -56,7 +56,7 @@ const IMAGE_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
 ];
 
-const IMAGE_ENABLED_TOOLS = [
+const IMAGE_AVAILABLE_TOOLS = [
   TOOL_NAMES.GENERATE_IMAGE,
   DOMAIN_KEY_TAGS.CREATIVE,
   DOMAIN_KEY_TAGS.WEB,
@@ -85,7 +85,7 @@ export const ImagePersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(IMAGE_TOOL_POLICY_SECTIONS, context),
-  availableTools: IMAGE_ENABLED_TOOLS,
+  availableTools: IMAGE_AVAILABLE_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
   usesCodingGuidelines: false,

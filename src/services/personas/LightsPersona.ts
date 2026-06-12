@@ -79,7 +79,7 @@ const LIGHTS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
 ];
 
-const LIGHTS_ENABLED_TOOLS = [
+const LIGHTS_AVAILABLE_TOOLS = [
   DOMAIN_KEY_TAGS.SMART_HOME,
   DOMAIN_KEY_TAGS.WEB,
   TOOL_NAMES.GET_WEATHER,
@@ -103,7 +103,7 @@ export const LightsPersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(LIGHTS_TOOL_POLICY_SECTIONS, context),
-  availableTools: LIGHTS_ENABLED_TOOLS,
+  availableTools: LIGHTS_AVAILABLE_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
   usesCodingGuidelines: false,
