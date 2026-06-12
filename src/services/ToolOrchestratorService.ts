@@ -773,7 +773,7 @@ export default class ToolOrchestratorService {
     if (schema?.emoji) return schema.emoji as string;
     
     // Check internal / orchestrator tools
-    const localEmojis: Record<string, string | [string, string]> = {"enter_plan_mode":["📝","🧠"],"exit_plan_mode":["🚀","🧠"],"create_skill":["🪄","🛠️"],"execute_skill":["⚡","🪄"],"list_skills":["📋","🪄"],"delete_skill":["🗑️","🪄"],"enter_worktree":["🌳","💻"],"exit_worktree":["🚪","🌳"],"write_todo":["📝","📌"],"summarize_conversation":["💬","📝"],"ask_user":["💬","❓"],"list_mcp_resources":["🔌","📋"],"read_mcp_resource":["🔌","📄"],"authenticate_mcp_server":["🔌","🔐"],"set_timer":["⏰","🔔"],"list_timers":["⏱️","📋"],"cancel_timer":["⏰","❌"],"create_team":["👥","🤖"],"send_message":["💬","📤"],"stop_agent":["⏹️","🤖"],"get_task_output":["📥","🤖"],"delete_team":["🗑️","👥"]};
+    const localEmojis: Record<string, string | [string, string]> = {"enter_plan_mode":["📝","🧠"],"exit_plan_mode":["🚀","🧠"],"create_skill":["🪄","🛠️"],"execute_skill":["⚡","🪄"],"list_skills":["📋","🪄"],"delete_skill":["🗑️","🪄"],"enter_worktree":["🌳","💻"],"exit_worktree":["🚪","🌳"],"write_todo":["📝","📌"],"summarize_conversation":["💬","📝"],"ask_user":["💬","❓"],"list_mcp_resources":["🔌","📋"],"read_mcp_resource":["🔌","📄"],"authenticate_mcp_server":["🔌","🔐"],"set_timer":["⏰","⏳"],"list_timers":["⏱️","📋"],"cancel_timer":["⏰","❌"],"create_cron_job":["📅","🔔"],"list_cron_jobs":["📅","📋"],"delete_cron_job":["📅","❌"],"create_team":["👥","🤖"],"send_message":["💬","📤"],"stop_agent":["⏹️","🤖"],"get_task_output":["📥","🤖"],"delete_team":["🗑️","👥"]};
     const emojiValue = localEmojis[toolName];
     if (emojiValue) {
       if (Array.isArray(emojiValue)) {

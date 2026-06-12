@@ -25,6 +25,7 @@ import {
   CORE_ORCHESTRATOR_TOOLS,
   TOOL_NAMES,
   DOMAINS,
+  isCoreDomain,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 // ── Comprehensive mock data ─────────────────────────────────
@@ -78,9 +79,13 @@ const MOCK_INTERNAL_TOOL_SCHEMAS = [
   { name: TOOL_NAMES.LIST_MCP_RESOURCES, schema: { name: TOOL_NAMES.LIST_MCP_RESOURCES, description: "List MCP resources" }, domain: DOMAINS.CORE_HARNESS.displayName, labels: ["coding"] },
   { name: TOOL_NAMES.READ_MCP_RESOURCE, schema: { name: TOOL_NAMES.READ_MCP_RESOURCE, description: "Read MCP resource" }, domain: DOMAINS.CORE_HARNESS.displayName, labels: ["coding"] },
   { name: TOOL_NAMES.AUTHENTICATE_MCP_SERVER, schema: { name: TOOL_NAMES.AUTHENTICATE_MCP_SERVER, description: "Auth MCP server" }, domain: DOMAINS.CORE_HARNESS.displayName, labels: ["coding"] },
-  { name: TOOL_NAMES.SET_TIMER, schema: { name: TOOL_NAMES.SET_TIMER, description: "Set timer" }, domain: DOMAINS.CORE_HARNESS.displayName, labels: ["coding"] },
-  { name: TOOL_NAMES.LIST_TIMERS, schema: { name: TOOL_NAMES.LIST_TIMERS, description: "List timers" }, domain: DOMAINS.CORE_HARNESS.displayName, labels: ["coding"] },
-  { name: TOOL_NAMES.CANCEL_TIMER, schema: { name: TOOL_NAMES.CANCEL_TIMER, description: "Cancel timer" }, domain: DOMAINS.CORE_HARNESS.displayName, labels: ["coding"] },
+  { name: TOOL_NAMES.SET_TIMER, schema: { name: TOOL_NAMES.SET_TIMER, description: "Set timer" }, domain: DOMAINS.CORE_SCHEDULE.displayName, labels: ["timer", "wait", "defer"] },
+  { name: TOOL_NAMES.LIST_TIMERS, schema: { name: TOOL_NAMES.LIST_TIMERS, description: "List timers" }, domain: DOMAINS.CORE_SCHEDULE.displayName, labels: ["timer", "wait"] },
+  { name: TOOL_NAMES.CANCEL_TIMER, schema: { name: TOOL_NAMES.CANCEL_TIMER, description: "Cancel timer" }, domain: DOMAINS.CORE_SCHEDULE.displayName, labels: ["timer", "wait"] },
+  { name: TOOL_NAMES.CREATE_CRON_JOB, schema: { name: TOOL_NAMES.CREATE_CRON_JOB, description: "Create cron job" }, domain: DOMAINS.CORE_SCHEDULE.displayName, labels: ["schedule", "reminder", "alarm", "cron"] },
+  { name: TOOL_NAMES.LIST_CRON_JOBS, schema: { name: TOOL_NAMES.LIST_CRON_JOBS, description: "List cron jobs" }, domain: DOMAINS.CORE_SCHEDULE.displayName, labels: ["schedule", "reminder", "alarm", "cron"] },
+  { name: TOOL_NAMES.DELETE_CRON_JOB, schema: { name: TOOL_NAMES.DELETE_CRON_JOB, description: "Delete cron job" }, domain: DOMAINS.CORE_SCHEDULE.displayName, labels: ["schedule", "reminder", "alarm", "cron"] },
+
 ];
 
 const MOCK_INTERNAL_SCHEMAS = MOCK_INTERNAL_TOOL_SCHEMAS.map((tool) => tool.schema);
@@ -128,15 +133,13 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
         domain: tool.domain,
         domainKey: resolveDomainKey(tool.domain),
         labels: tool.labels,
-        system: tool.domain === DOMAINS.CORE_HARNESS.displayName ||
-                tool.domain === DOMAINS.CORE_WORKSPACE.displayName,
+        system: isCoreDomain(tool.domain),
       }));
 
       const internalClient = MOCK_INTERNAL_CLIENT_SCHEMAS.map((tool) => ({
         ...tool,
         domainKey: resolveDomainKey(tool.domain || DOMAINS.CORE_HARNESS.displayName),
-        system: tool.domain === DOMAINS.CORE_HARNESS.displayName ||
-                tool.domain === DOMAINS.CORE_WORKSPACE.displayName,
+        system: isCoreDomain(tool.domain || DOMAINS.CORE_HARNESS.displayName),
       }));
 
       const orchestratorClient = MOCK_ORCHESTRATOR_SCHEMAS.map((tool) => ({
