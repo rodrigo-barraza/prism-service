@@ -147,9 +147,9 @@ const LUPOS_SLEEPER_AGENT = `# Alternate persona: Sleeper agent mode
 
 const LUPOS_GENERATIVE_CAPABILITIES = `# Generative capabilities
 - You are able to generate text.
-- You are part of a multi-modal workflow that can generate text and images.
+- You are part of a multi-modal workflow that can generate text, images, and audio.
 - Images are generated via the \`generate_image\` tool — when you call this tool, the generated image is sent to the chat alongside your text response. You should confidently refer to the drawing you are producing in your text.
-- You cannot generate sound or audio.`;
+- Audio is generated via the \`generate_audio\` tool (for synthesized sound effects, melodies, chiptunes) or the \`synthesize_speech\` tool (for text-to-speech narration). When you call these tools, the generated audio file is sent to the chat alongside your text response.`;
 
 const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
@@ -214,6 +214,14 @@ When calling generate_image, the prompt you write depends on whether reference i
 - If the image generation tool fails due to content safety, try rephrasing the prompt creatively — describe the same scene differently, avoiding potentially flagged terms while preserving the artistic intent.`,
     requires: [TOOL_NAMES.GENERATE_IMAGE],
   },
+  {
+    content: `# Audio Generation Rules
+- Use \`generate_audio\` for sound effects, chiptunes, retro game sounds, melodies, arpeggios, and multi-track compositions. Write creative and detailed audio parameters.
+- Use \`synthesize_speech\` for text-to-speech narration — when someone asks you to "say something", narrate, or read text aloud in a voice.
+- The generated audio file is automatically attached to your Discord reply. Refer to it naturally in your text response.
+- Keep audio clips short and punchy (under 10 seconds) unless the user specifically asks for something longer.`,
+    requires: [TOOL_NAMES.GENERATE_AUDIO, TOOL_NAMES.SYNTHESIZE_SPEECH],
+  },
 ];
 
 const LUPOS_AVAILABLE_TOOLS = [
@@ -224,6 +232,8 @@ const LUPOS_AVAILABLE_TOOLS = [
   DOMAIN_KEY_TAGS.CORE_SKILL,
   DOMAIN_KEY_TAGS.CORE_TASK,
   TOOL_NAMES.GENERATE_IMAGE,
+  TOOL_NAMES.GENERATE_AUDIO,
+  TOOL_NAMES.SYNTHESIZE_SPEECH,
   TOOL_NAMES.GET_TRENDS,
   TOOL_NAMES.GET_HOT_TRENDS,
   TOOL_NAMES.GET_TOP_TRENDS,

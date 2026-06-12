@@ -8,12 +8,14 @@ export interface SseEvent {
   tool?: {
     name: string;
     args: Record<string, unknown>;
+    result?: unknown;
   };
   status?: string;
   provider?: string;
   model?: string;
   usage?: Record<string, unknown>;
   estimatedCost?: number;
+  audioRef?: string;
   traceId?: string;
   conversationId?: string;
 }
