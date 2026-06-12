@@ -1,5 +1,5 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 interface ExitPlanModeArgs {
   summary?: string;
@@ -27,6 +27,7 @@ export default {
   },
 
   labels: ["coding"],
+  domain: DOMAINS.CORE_PLAN.displayName,
 
   async execute(args: ExitPlanModeArgs) {
     logger.info(`[ExitPlanMode] ${args.summary || "(no summary)"}`);
