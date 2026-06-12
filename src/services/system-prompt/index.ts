@@ -9,7 +9,7 @@ import {
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import { resolveLockedOffToolNames } from "../../utils/resolveLockedOffToolNames.ts";
 import SettingsService from "../SettingsService.ts";
-import { AGENT_IDS, DOMAINS, DEFAULT_TOPOLOGY, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { AGENT_IDS, DOMAINS, DEFAULT_TOPOLOGY, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, isCoreDomain } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 
@@ -162,9 +162,7 @@ export default class SystemPromptAssembler {
               (toolSchema) =>
                 enabledSet.has(toolSchema.name as string) ||
                 (isCoreToolsLockedForCount && (
-                  (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_HARNESS.displayName ||
-                  (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_WORKSPACE.displayName ||
-                  (toolSchema as Record<string, unknown>).domain === DOMAINS.CORE_ORCHESTRATOR.displayName ||
+                  isCoreDomain((toolSchema as Record<string, unknown>).domain as string || "") ||
                   CORE_AGENTIC_TOOLS.has(toolSchema.name as string)
                 ))
             );

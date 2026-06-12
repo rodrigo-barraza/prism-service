@@ -95,7 +95,7 @@ const discoverAndEnableTools = {
   get schema() {
     return buildDiscoverAndEnableSchema();
   },
-  domain: DOMAINS.CORE_HARNESS.displayName,
+  domain: DOMAINS.CORE_DISCOVER.displayName,
   labels: ["tools", "discovery", "activation", "meta"],
 
   async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {

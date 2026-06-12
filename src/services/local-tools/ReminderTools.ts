@@ -1,5 +1,5 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES, DEFAULT_USERNAME, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { TOOL_NAMES, DOMAINS, DEFAULT_USERNAME, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
 import ConversationTimerService from "../ConversationTimerService.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
@@ -43,6 +43,7 @@ const setTimer = {
     },
   },
   labels: ["timer", "automation", "scheduler"],
+  domain: DOMAINS.CORE_TIMER.displayName,
 
   async execute(toolArguments: Record<string, unknown>, context: ReminderContext) {
     const prompt = typeof toolArguments.prompt === "string" ? toolArguments.prompt : undefined;
@@ -102,6 +103,7 @@ const setTimer = {
     },
   },
   labels: ["timer", "automation", "scheduler"],
+  domain: DOMAINS.CORE_TIMER.displayName,
 
   async execute(_args: Record<string, unknown>, context: ReminderContext) {
     const conversationId = context.agentSessionId;
@@ -150,6 +152,7 @@ const cancelTimer = {
     },
   },
   labels: ["timer", "automation", "scheduler"],
+  domain: DOMAINS.CORE_TIMER.displayName,
 
   async execute(toolArguments: Record<string, unknown>, context: ReminderContext) {
     const timerId = typeof toolArguments.timerId === "string" ? toolArguments.timerId : undefined;

@@ -1,5 +1,5 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES, CORE_AGENTIC_TOOLS, CORE_ORCHESTRATOR_TOOLS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { TOOL_NAMES, DOMAINS, CORE_AGENTIC_TOOLS, CORE_ORCHESTRATOR_TOOLS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import ToolContext from "../ToolContext.ts";
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
@@ -55,6 +55,7 @@ const enableTools = {
     },
   },
   labels: ["tools", "activation", "meta"],
+  domain: DOMAINS.CORE_DISCOVER.displayName,
 
   async execute(toolArguments: Record<string, unknown>, context: ToolActivationContext) {
     const sessionId = context.agentSessionId;
@@ -147,6 +148,7 @@ const disableTools = {
     },
   },
   labels: ["tools", "activation", "meta"],
+  domain: DOMAINS.CORE_DISCOVER.displayName,
 
   async execute(toolArguments: Record<string, unknown>, context: ToolActivationContext) {
     const sessionId = context.agentSessionId;
