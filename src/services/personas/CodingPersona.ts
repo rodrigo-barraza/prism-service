@@ -49,7 +49,7 @@ Use it **proactively** — do NOT wait for the user to say "remember":
   },
 ];
 
-const CODING_ENABLED_TOOLS = ["*"];
+const CODING_AVAILABLE_TOOLS = ["*"];
 
 export const CodingPersona: Persona = {
   id: AGENT_IDS.CODING,
@@ -68,7 +68,7 @@ export const CodingPersona: Persona = {
 - Keep your explanations concise and technical`,
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(CODING_TOOL_POLICY_SECTIONS, context),
-  availableTools: CODING_ENABLED_TOOLS,
+  availableTools: CODING_AVAILABLE_TOOLS,
   capabilities: "",
   usesDirectoryTree: true,
   usesCodingGuidelines: true,

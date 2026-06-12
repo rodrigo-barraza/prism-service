@@ -147,19 +147,32 @@ export default class AgenticToolResolver {
       }
     }
 
-    // Mode 3: fallback to persona's availableTools
+    // Mode 3: fallback to persona's availableTools (or enabledByDefaultTools subset)
     if (!resolvedEnabledTools && agent) {
       const persona = AgentPersonaRegistry.get(agent);
       if (persona?.availableTools) {
         // "*" wildcard means "all tools" — skip filtering entirely
         if (persona.availableTools.includes("*")) {
-          logger.info(
-            `[AgenticLoop] Persona "${agent}" uses wildcard availableTools — all tools enabled`,
-          );
+          // Even with wildcard availableTools, if enabledByDefaultTools is set,
+          // use it as the initial subset (agent can still enable_tools to get more)
+          if (persona.enabledByDefaultTools && persona.enabledByDefaultTools.length > 0) {
+            resolvedEnabledTools = persona.enabledByDefaultTools;
+            logger.info(
+              `[AgenticLoop] Persona "${agent}" uses wildcard availableTools with ${resolvedEnabledTools!.length} enabledByDefaultTools`,
+            );
+          } else {
+            logger.info(
+              `[AgenticLoop] Persona "${agent}" uses wildcard availableTools — all tools enabled`,
+            );
+          }
         } else {
-          resolvedEnabledTools = persona.availableTools;
+          // Use enabledByDefaultTools as the initial set when defined;
+          // otherwise fall back to the full availableTools (backward-compatible)
+          resolvedEnabledTools = (persona.enabledByDefaultTools && persona.enabledByDefaultTools.length > 0)
+            ? persona.enabledByDefaultTools
+            : persona.availableTools;
           logger.info(
-            `[AgenticLoop] Using persona "${agent}" availableTools: [${resolvedEnabledTools!.join(", ")}]`,
+            `[AgenticLoop] Using persona "${agent}" ${persona.enabledByDefaultTools?.length ? 'enabledByDefaultTools' : 'availableTools'}: [${resolvedEnabledTools!.join(", ")}]`,
           );
         }
       }

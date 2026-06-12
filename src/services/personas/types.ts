@@ -55,6 +55,8 @@ export interface Persona {
   interactionRules: string;
   toolPolicy: string | ((context: PersonaContext) => string);
   availableTools: string[];
+  /** Subset of availableTools that are active on the first iteration. When empty/undefined, all availableTools are enabled by default (backward-compatible). */
+  enabledByDefaultTools?: string[];
   /** Post-filter denylist — strips tools after all resolution (supports domainKey:, domain:, label:, exact names). Tools explicitly in availableTools are protected. */
   blockedTools?: string[];
   /** Controls whether core tools are locked (always-on, non-toggleable) in the client UI. Default: true. */

@@ -80,7 +80,7 @@ const META_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
 ];
 
-const META_ENABLED_TOOLS = [
+const META_AVAILABLE_TOOLS = [
   TOOL_NAMES.CREATE_CUSTOM_AGENT,
   TOOL_NAMES.LIST_CUSTOM_AGENTS,
   TOOL_NAMES.UPDATE_CUSTOM_AGENT,
@@ -110,7 +110,7 @@ export const MetaPersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(META_TOOL_POLICY_SECTIONS, context),
-  availableTools: META_ENABLED_TOOLS,
+  availableTools: META_AVAILABLE_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,
   usesCodingGuidelines: false,

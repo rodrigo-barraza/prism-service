@@ -216,7 +216,7 @@ When calling generate_image, the prompt you write depends on whether reference i
   },
 ];
 
-const LUPOS_ENABLED_TOOLS = [
+const LUPOS_AVAILABLE_TOOLS = [
   DOMAIN_KEY_TAGS.DISCORD,
   DOMAIN_KEY_TAGS.MOVIES,
   DOMAIN_KEY_TAGS.GAMING,
@@ -297,7 +297,7 @@ export const LuposPersona: Persona = {
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(LUPOS_TOOL_POLICY_SECTIONS, context),
-  availableTools: LUPOS_ENABLED_TOOLS,
+  availableTools: LUPOS_AVAILABLE_TOOLS,
   blockedTools: [
     DOMAIN_KEY_TAGS.CORE_ORCHESTRATOR,
     DOMAIN_KEY_TAGS.CORE_WORKSPACE,
