@@ -87,16 +87,36 @@ export function buildJsonResponseFromEvents(events: SseEvent[], requestBody: Cha
       args: e.tool?.args,
     }));
 
+  const toolResults = events
+    .filter((e: SseEvent) => e.type === "tool_execution" && (e.status === "done" || e.status === "error"))
+    .map((e: SseEvent) => ({
+      name: e.tool?.name,
+      args: e.tool?.args,
+      result: e.tool?.result,
+      status: e.status,
+    }));
+
+  const audioEvents = events
+    .filter((e: SseEvent) => e.type === "audio")
+    .map((e: SseEvent) => ({
+      data: e.data,
+      mimeType: e.mimeType,
+      minioRef: e.minioRef || null,
+    }));
+
   return {
     response: {
       text: text || null,
       thinking: thinking || null,
       images: images.length > 0 ? images : undefined,
+      audio: audioEvents.length > 0 ? audioEvents : undefined,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      toolResults: toolResults.length > 0 ? toolResults : undefined,
       provider: doneEvent.provider || requestBody.provider,
       model: doneEvent.model || requestBody.model,
       usage: doneEvent.usage || null,
       estimatedCost: doneEvent.estimatedCost ?? null,
+      ...(doneEvent.audioRef && { audioRef: doneEvent.audioRef }),
       ...(doneEvent.traceId && { traceId: doneEvent.traceId }),
       ...(doneEvent.conversationId && {
         conversationId: doneEvent.conversationId,
