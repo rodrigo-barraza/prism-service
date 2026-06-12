@@ -299,4 +299,79 @@ describe("buildJsonResponseFromEvents", () => {
 
     expect(result.response!.estimatedCost).toBeNull();
   });
+
+  it("should collect toolResults from done/error tool_execution events", () => {
+    const events: TestEvent[] = [
+      {
+        type: "tool_execution",
+        status: "calling",
+        tool: { name: "generate_audio", args: { prompt: "chirp" } },
+      },
+      {
+        type: "tool_execution",
+        status: "done",
+        tool: {
+          name: "generate_audio",
+          args: { prompt: "chirp" },
+          result: { audioRef: "audio-ref-123" },
+        },
+      },
+      {
+        type: "tool_execution",
+        status: "error",
+        tool: {
+          name: "generate_audio",
+          args: { prompt: "chirp" },
+          result: "Something went wrong",
+        },
+      },
+      { type: "done", provider: "google" },
+    ];
+
+    const result = buildJsonResponseFromEvents(events as any, {
+      provider: "google",
+    } as any);
+
+    expect(result.response!.toolResults).toHaveLength(2);
+    expect(result.response!.toolResults![0]).toEqual({
+      name: "generate_audio",
+      args: { prompt: "chirp" },
+      result: { audioRef: "audio-ref-123" },
+      status: "done",
+    });
+    expect(result.response!.toolResults![1]).toEqual({
+      name: "generate_audio",
+      args: { prompt: "chirp" },
+      result: "Something went wrong",
+      status: "error",
+    });
+  });
+
+  it("should collect audio events and extract audioRef from done event", () => {
+    const events: TestEvent[] = [
+      {
+        type: "audio",
+        data: "audioBase64",
+        mimeType: "audio/wav",
+        minioRef: "minio://audio/1.wav",
+      },
+      {
+        type: "done",
+        provider: "google",
+        audioRef: "audio-ref-789",
+      },
+    ];
+
+    const result = buildJsonResponseFromEvents(events as any, {
+      provider: "google",
+    } as any);
+
+    expect(result.response!.audio).toHaveLength(1);
+    expect(result.response!.audio![0]).toEqual({
+      data: "audioBase64",
+      mimeType: "audio/wav",
+      minioRef: "minio://audio/1.wav",
+    });
+    expect(result.response!.audioRef).toBe("audio-ref-789");
+  });
 });
