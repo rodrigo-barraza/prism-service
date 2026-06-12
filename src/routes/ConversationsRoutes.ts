@@ -6,7 +6,7 @@ import ConversationService, {
   buildConversationPatchFields,
   type ConversationPatchInput,
 } from "../services/ConversationService.ts";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS, COST_SUM_EXPR } from "../constants.ts";
 import logger from "../utils/logger.ts";
 import ConversationTimerService from "../services/ConversationTimerService.ts";
 import AgenticLoopService from "../services/AgenticLoopService.ts";
@@ -192,7 +192,7 @@ router.get(
               {
                 $group: {
                   _id: groupId,
-                  totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },
+                  totalCost: COST_SUM_EXPR,
                 },
               },
             ])
@@ -262,7 +262,7 @@ router.get(
       const conversationId = req.params.id as string;
 
       // Check conversations first
-      let chat = await db
+      const chat = await db
         .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
         .findOne({ id: conversationId, project, username });
 
@@ -280,7 +280,7 @@ router.get(
               {
                 $group: {
                   _id: "$conversationId",
-                  totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },
+                  totalCost: COST_SUM_EXPR,
                 },
               },
             ])
