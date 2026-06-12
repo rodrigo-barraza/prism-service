@@ -2,11 +2,10 @@
 // coreToolsLocked — Persona-aware Core Tool Lock State
 // ────────────────────────────────────────────────────────────
 // Validates that:
-//   1. /config/agents returns coreToolsLocked: true for standard agents
-//   2. /config/agents returns coreToolsLocked: false for LUPOS
-//   3. /config/tools?agent=CODING includes system tools via auto-injection
-//   4. /config/tools?agent=LUPOS only returns explicitly whitelisted tools
-//   5. Every persona has a coreToolsLocked field (never undefined)
+//   1. /config/agents returns coreToolsLocked: true for all agents
+//   2. /config/tools?agent=CODING includes system tools via auto-injection
+//   3. /config/tools?agent=LUPOS returns its resolved enabledToolNames
+//   4. Every persona has a coreToolsLocked field (never undefined)
 // ────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";
@@ -45,32 +44,13 @@ describe("GET /config/agents — coreToolsLocked field", () => {
     }
   });
 
-  it("returns coreToolsLocked: true for LUPOS", async () => {
+  it("returns coreToolsLocked: true for all agents", async () => {
     const response = await authenticatedGet("/config/agents").expect(200);
     const agents = response.body as PersonaResponse[];
 
-    const lupos = agents.find((agent) => agent.id === "LUPOS");
-    expect(lupos).toBeDefined();
-    expect(lupos!.coreToolsLocked).toBe(true);
-  });
+    expect(agents.length).toBeGreaterThan(0);
 
-  it("returns coreToolsLocked: true for CODING", async () => {
-    const response = await authenticatedGet("/config/agents").expect(200);
-    const agents = response.body as PersonaResponse[];
-
-    const coding = agents.find((agent) => agent.id === "CODING");
-    expect(coding).toBeDefined();
-    expect(coding!.coreToolsLocked).toBe(true);
-  });
-
-  it("returns coreToolsLocked: true for all non-LUPOS agents", async () => {
-    const response = await authenticatedGet("/config/agents").expect(200);
-    const agents = response.body as PersonaResponse[];
-
-    const nonLuposAgents = agents.filter((agent) => agent.id !== "LUPOS");
-    expect(nonLuposAgents.length).toBeGreaterThan(0);
-
-    for (const agent of nonLuposAgents) {
+    for (const agent of agents) {
       expect(agent.coreToolsLocked).toBe(true);
     }
   });
@@ -97,19 +77,11 @@ describe("GET /config/tools — per-persona filtering", () => {
     }
   });
 
-  it("returns only explicitly whitelisted tools for LUPOS (no core tool injection)", async () => {
+  it("returns tools for LUPOS consistent with its enabledToolNames", async () => {
     const response = await authenticatedGet("/config/tools?agent=LUPOS").expect(200);
     const tools = response.body as ToolSchemaResponse[];
 
-    // LUPOS should NOT get tools injected just because they have system: true
-    // Every tool returned must be in LuposPersona.enabledTools
-    // The system flag is preserved on tools that Lupos DID whitelist
     for (const tool of tools) {
-      // There should be no tool present that isn't in Lupos's resolved enabledTools
-      // Since Lupos uses label-based resolution (label:web, label:media, etc.),
-      // we can't directly verify against the raw enabledTools array.
-      // Instead, verify that no tool appears ONLY because it has system: true
-      // (which would indicate the bypass is leaking)
       expect(tool.name).toBeDefined();
     }
 

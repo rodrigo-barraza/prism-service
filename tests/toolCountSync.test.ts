@@ -188,9 +188,16 @@ const mockRestrictedPersona = {
   coreToolsLocked: true,
 };
 
-// Unlocked persona (no core tool injection)
+// Lupos persona (enabledByDefaultTools wildcard, coreToolsLocked defaults to true)
 const mockLuposPersona = {
   id: "LUPOS",
+  availableTools: ["read_file", "search_web"],
+  enabledByDefaultTools: ["*"],
+};
+
+// Unlocked persona (coreToolsLocked: false, no core tool injection)
+const mockUnlockedPersona = {
+  id: "UNLOCKED",
   availableTools: ["read_file", "search_web"],
   coreToolsLocked: false,
 };
@@ -201,6 +208,7 @@ vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
       if (agentId === "CODING") return mockCodingPersona;
       if (agentId === "RESTRICTED") return mockRestrictedPersona;
       if (agentId === "LUPOS") return mockLuposPersona;
+      if (agentId === "UNLOCKED") return mockUnlockedPersona;
       return null;
     }),
   },
@@ -386,7 +394,7 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
   it("unlocked persona (coreToolsLocked:false): resolver and sidebar agree on which tools are included", async () => {
     const { finalTools } = await AgenticToolResolver.resolve({
       options: {},
-      agent: "LUPOS",
+      agent: "UNLOCKED",
       project: "coding",
       username: "anonymous",
       modelDefinition: undefined,
@@ -408,7 +416,7 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
     // BUT the sidebar still shows orchestrator tools because they have system:true.
     // The difference is prism-local tools that are NOT in CORE_AGENTIC_TOOLS.
     //
-    // For Lupos (coreToolsLocked: false), the resolver skips CORE_AGENTIC_TOOLS bypass
+    // For UNLOCKED (coreToolsLocked: false), the resolver skips CORE_AGENTIC_TOOLS bypass
     // but still includes CORE_ORCHESTRATOR_TOOLS and InternalToolRegistry tools.
 
     const inResolverNotSidebar = [...resolverNames].filter((name) => !sidebarNames.has(name));
