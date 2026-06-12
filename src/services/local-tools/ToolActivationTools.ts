@@ -1,30 +1,15 @@
 import logger from "../../utils/logger.ts";
 import { TOOL_NAMES, DOMAINS, CORE_AGENTIC_TOOLS, CORE_ORCHESTRATOR_TOOLS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import ToolContext from "../ToolContext.ts";
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import SettingsService from "../SettingsService.ts";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
-
-interface ToolActivationContext extends InternalToolContext {}
+import { getCurrentDynamicTools, persistDynamicTools } from "./utils/DynamicToolHelpers.ts";
 
 const PROTECTED_TOOL_NAMES = new Set<string>([
   ...CORE_AGENTIC_TOOLS,
   ...CORE_ORCHESTRATOR_TOOLS,
 ]);
-
-const TOOL_CONTEXT_KEY_DYNAMIC_ENABLED = "dynamicEnabledTools";
-const TOOL_CONTEXT_KEY_DIRTY_FLAG = "toolSetDirty";
-
-function getCurrentDynamicTools(sessionId: string): string[] {
-  const stored = ToolContext.get<string[]>(sessionId, TOOL_CONTEXT_KEY_DYNAMIC_ENABLED);
-  return Array.isArray(stored) ? stored : [];
-}
-
-function persistDynamicTools(sessionId: string, toolNames: string[]): void {
-  ToolContext.set(sessionId, TOOL_CONTEXT_KEY_DYNAMIC_ENABLED, toolNames);
-  ToolContext.set(sessionId, TOOL_CONTEXT_KEY_DIRTY_FLAG, true);
-}
 
 // ── enable_tools ─────────────────────────────────────────────
 const enableTools = {
@@ -57,7 +42,7 @@ const enableTools = {
   labels: ["tools", "activation", "meta"],
   domain: DOMAINS.CORE_DISCOVER.displayName,
 
-  async execute(toolArguments: Record<string, unknown>, context: ToolActivationContext) {
+  async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
     const sessionId = context.agentSessionId;
     if (!sessionId) {
       return { error: "No active agent session ID in context." };
@@ -150,7 +135,7 @@ const disableTools = {
   labels: ["tools", "activation", "meta"],
   domain: DOMAINS.CORE_DISCOVER.displayName,
 
-  async execute(toolArguments: Record<string, unknown>, context: ToolActivationContext) {
+  async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
     const sessionId = context.agentSessionId;
     if (!sessionId) {
       return { error: "No active agent session ID in context." };

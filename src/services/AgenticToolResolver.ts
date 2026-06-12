@@ -155,10 +155,10 @@ export default class AgenticToolResolver {
         if (persona.availableTools.includes("*")) {
           // Even with wildcard availableTools, if enabledByDefaultTools is set,
           // use it as the initial subset (agent can still enable_tools to get more)
-          if (persona.enabledByDefaultTools && persona.enabledByDefaultTools.length > 0) {
+          if (persona.enabledByDefaultTools !== undefined) {
             resolvedEnabledTools = persona.enabledByDefaultTools;
             logger.info(
-              `[AgenticLoop] Persona "${agent}" uses wildcard availableTools with ${resolvedEnabledTools!.length} enabledByDefaultTools`,
+              `[AgenticLoop] Persona "${agent}" uses wildcard availableTools with ${resolvedEnabledTools.length} enabledByDefaultTools`,
             );
           } else {
             logger.info(
@@ -168,11 +168,11 @@ export default class AgenticToolResolver {
         } else {
           // Use enabledByDefaultTools as the initial set when defined;
           // otherwise fall back to the full availableTools (backward-compatible)
-          resolvedEnabledTools = (persona.enabledByDefaultTools && persona.enabledByDefaultTools.length > 0)
+          resolvedEnabledTools = (persona.enabledByDefaultTools !== undefined)
             ? persona.enabledByDefaultTools
             : persona.availableTools;
           logger.info(
-            `[AgenticLoop] Using persona "${agent}" ${persona.enabledByDefaultTools?.length ? 'enabledByDefaultTools' : 'availableTools'}: [${resolvedEnabledTools!.join(", ")}]`,
+            `[AgenticLoop] Using persona "${agent}" ${persona.enabledByDefaultTools !== undefined ? 'enabledByDefaultTools' : 'availableTools'}: [${resolvedEnabledTools.join(", ")}]`,
           );
         }
       }

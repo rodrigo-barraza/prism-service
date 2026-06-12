@@ -41,8 +41,7 @@ export async function runExhaustionRecoveryPass(
     ].join(" "),
   });
 
-  const exhaustionOptions: Record<string, unknown> = { ...options };
-  delete exhaustionOptions.tools;
+  const { tools: _tools, ...exhaustionOptions } = options;
 
   const enforcedMessages = harness.enforceContextWindow(currentMessages, 0);
   const expandedMessages = expandMessagesForFunctionCall(enforcedMessages, {

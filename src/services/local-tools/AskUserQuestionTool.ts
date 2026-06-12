@@ -1,18 +1,18 @@
 import logger from "../../utils/logger.ts";
 import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
+import type { QuestionDefinition } from "../ApprovalRegistry.ts";
 
 interface QuestionOption {
   label: string;
   preview: string | null;
 }
 
-interface NormalizedQuestion {
+interface NormalizedQuestion extends QuestionDefinition {
   question: string;
   header: string | null;
   options: QuestionOption[];
   multiSelect: boolean;
-  [key: string]: unknown;
 }
 
 interface UserQuestionEmitEvent {
@@ -134,44 +134,44 @@ export default {
 
     // ── Normalize into questions array ─────────────────
     const seen = new Set<string>();
-    for (const query of questions) {
-      if (!query.question || typeof query.question !== "string") {
+    for (const questionInput of questions) {
+      if (!questionInput.question || typeof questionInput.question !== "string") {
         return {
           error:
             "Each question in the 'questions' array must have a non-empty 'question' string",
         };
       }
-      if (seen.has(query.question)) {
+      if (seen.has(questionInput.question)) {
         return {
-          error: `Duplicate question text: "${query.question.slice(0, 60)}"`,
+          error: `Duplicate question text: "${questionInput.question.slice(0, 60)}"`,
         };
       }
-      seen.add(query.question);
+      seen.add(questionInput.question);
       // Validate option label uniqueness within each question
-      const qOptions = query.options;
-      if (qOptions && qOptions.length > 0) {
+      const questionOptions = questionInput.options;
+      if (questionOptions && questionOptions.length > 0) {
         const labelsSeen = new Set<string>();
-        for (const opt of qOptions) {
-          if (labelsSeen.has(opt.label)) {
+        for (const option of questionOptions) {
+          if (labelsSeen.has(option.label)) {
             return {
-              error: `Duplicate option label "${opt.label}" in question "${query.question.slice(0, 40)}"`,
+              error: `Duplicate option label "${option.label}" in question "${questionInput.question.slice(0, 40)}"`,
             };
           }
-          labelsSeen.add(opt.label);
+          labelsSeen.add(option.label);
         }
       }
     }
     if (questions.length > 4) {
       return { error: "Maximum 4 questions per call" };
     }
-    const normalizedQuestions: NormalizedQuestion[] = questions.map((query) => ({
-      question: query.question,
-      header: (query.header || "").slice(0, 16) || null,
-      options: (query.options || []).slice(0, 6).map((item) => ({
+    const normalizedQuestions: NormalizedQuestion[] = questions.map((questionInput) => ({
+      question: questionInput.question,
+      header: (questionInput.header || "").slice(0, 16) || null,
+      options: (questionInput.options || []).slice(0, 6).map((item) => ({
         label: item.label,
         preview: item.preview || null,
       })),
-      multiSelect: !!query.multiSelect,
+      multiSelect: !!questionInput.multiSelect,
     }));
 
     const sessionId = context.agentSessionId;

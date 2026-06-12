@@ -75,6 +75,46 @@ function getCollectionOpts(project: string | null | undefined) {
 }
 
 /**
+ * Swap content and rawContent if present to ensure the database and caller get clean text.
+ * Fallback to regex parsing for legacy/unmigrated messages to populate rawContent and clean content.
+ */
+function swapMessageContent(message: MessagePayload) {
+  if (message.role === "user" && typeof message.content === "string") {
+    if (message.rawContent?.startsWith("[System Context]") || message.rawContent?.startsWith("[System Context - Local Time:")) {
+      return;
+    }
+    if (message.rawContent) {
+      const dirty = message.content;
+      message.content = message.rawContent;
+      message.rawContent = dirty;
+    } else if (message.content.startsWith("[System Context]")) {
+      const dirty = message.content;
+      let clean = message.content;
+      const splitIndex = message.content.indexOf("\n\n[User Message]\n");
+      if (splitIndex !== -1) {
+        clean = message.content.substring(splitIndex + "\n\n[User Message]\n".length);
+      } else {
+        const altSplit = message.content.indexOf("[User Message]\n");
+        if (altSplit !== -1) {
+          clean = message.content.substring(altSplit + "[User Message]\n".length);
+        }
+      }
+      message.content = clean;
+      message.rawContent = dirty;
+    } else if (message.content.startsWith("[System Context - Local Time:")) {
+      const dirty = message.content;
+      let clean = message.content;
+      const index = message.content.indexOf("]\n\n");
+      if (index !== -1) {
+        clean = message.content.slice(index + 3);
+      }
+      message.content = clean;
+      message.rawContent = dirty;
+    }
+  }
+}
+
+/**
  * Finalizer — shared generation finalization logic extracted from ChatRoutes.
  *
  * Handles:
@@ -135,45 +175,7 @@ export async function finalizeTextGeneration(
     signal,
   } = context;
 
-/**
- * Swap content and rawContent if present to ensure the database and caller get clean text.
- * Fallback to regex parsing for legacy/unmigrated messages to populate rawContent and clean content.
- */
-function swapMessageContent(message: MessagePayload) {
-  if (message.role === "user" && typeof message.content === "string") {
-    if (message.rawContent?.startsWith("[System Context]") || message.rawContent?.startsWith("[System Context - Local Time:")) {
-      return;
-    }
-    if (message.rawContent) {
-      const dirty = message.content;
-      message.content = message.rawContent;
-      message.rawContent = dirty;
-    } else if (message.content.startsWith("[System Context]")) {
-      const dirty = message.content;
-      let clean = message.content;
-      const splitIndex = message.content.indexOf("\n\n[User Message]\n");
-      if (splitIndex !== -1) {
-        clean = message.content.substring(splitIndex + "\n\n[User Message]\n".length);
-      } else {
-        const altSplit = message.content.indexOf("[User Message]\n");
-        if (altSplit !== -1) {
-          clean = message.content.substring(altSplit + "[User Message]\n".length);
-        }
-      }
-      message.content = clean;
-      message.rawContent = dirty;
-    } else if (message.content.startsWith("[System Context - Local Time:")) {
-      const dirty = message.content;
-      let clean = message.content;
-      const index = message.content.indexOf("]\n\n");
-      if (index !== -1) {
-        clean = message.content.slice(index + 3);
-      }
-      message.content = clean;
-      message.rawContent = dirty;
-    }
-  }
-}
+
 
   // Swap content and rawContent if present to ensure the database and caller get clean text
   if (messages) {
@@ -442,9 +444,11 @@ function swapMessageContent(message: MessagePayload) {
     }
     let toolConfig: Record<string, unknown> | undefined = undefined;
     if (resolvedEnabledTools) {
-      const disabledTools =
-        (options.disabledTools as string[]) ||
-        ((conversationMeta?.settings as Record<string, unknown> | undefined)?.toolConfig as Record<string, unknown> | undefined)?.disabledTools as string[] ||
+      const existingSettings = conversationMeta?.settings as Record<string, unknown> | undefined;
+      const existingToolConfig = existingSettings?.toolConfig as Record<string, unknown> | undefined;
+      const disabledTools: string[] =
+        (Array.isArray(options.disabledTools) ? options.disabledTools : null) ||
+        (Array.isArray(existingToolConfig?.disabledTools) ? existingToolConfig.disabledTools as string[] : null) ||
         [];
       let availableTools: string[] = [];
       if (agent) {
@@ -507,13 +511,13 @@ function swapMessageContent(message: MessagePayload) {
         if (message.role === "user" && typeof message.content === "string") {
           if (message.content.startsWith("[CONTEXT NOTE:")) return false;
           if (message.content.startsWith("[Conversation Summary")) return false;
-          if ((message as Record<string, unknown>).isCompactSummary === true) return false;
+          if (message.isCompactSummary === true) return false;
         }
         // Strip ephemeral planning injection messages (cache-stable planning mode)
-        if ((message as Record<string, unknown>)._isPlanningInjection === true) return false;
+        if (message._isPlanningInjection === true) return false;
         // Strip eagerly-persisted messages (timer reminders, scheduled task triggers)
         // that were already appended to MongoDB before the agentic loop ran
-        if ((message as Record<string, unknown>)._alreadyPersisted === true) return false;
+        if (message._alreadyPersisted === true) return false;
         return true;
       });
 

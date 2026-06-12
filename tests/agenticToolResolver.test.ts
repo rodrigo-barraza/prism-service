@@ -111,11 +111,23 @@ const mockLuposPersona = {
   availableTools: ["read_file"],
   coreToolsLocked: false,
 };
+const mockCustomAgent = {
+  availableTools: ["read_file", "write_file"],
+  enabledByDefaultTools: ["read_file"],
+  coreToolsLocked: false,
+};
+const mockCustomAgentEmpty = {
+  availableTools: ["read_file", "write_file"],
+  enabledByDefaultTools: [],
+  coreToolsLocked: false,
+};
 vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
   default: {
     get: vi.fn((agent) => {
       if (agent === "CODING") return mockPersona;
       if (agent === "LUPOS") return mockLuposPersona;
+      if (agent === "CUSTOM_AGENT") return mockCustomAgent;
+      if (agent === "CUSTOM_AGENT_EMPTY") return mockCustomAgentEmpty;
       return null;
     }),
   },
@@ -242,7 +254,7 @@ describe("AgenticToolResolver — tool resolution", () => {
       modelDefinition: undefined,
     });
 
-    const toolNames = finalTools.map((tool: Record<string, unknown>) => tool.name);
+    const toolNames = finalTools.map((tool) => tool.name);
 
     expect(toolNames).not.toContain("think");
     expect(toolNames).not.toContain("sleep");
@@ -260,7 +272,7 @@ describe("AgenticToolResolver — tool resolution", () => {
       modelDefinition: undefined,
     });
 
-    const toolNames = finalTools.map((tool: Record<string, unknown>) => tool.name);
+    const toolNames = finalTools.map((tool) => tool.name);
 
     expect(toolNames).not.toContain("evaluate_expression");
     expect(toolNames).toContain("read_file");
@@ -277,11 +289,41 @@ describe("AgenticToolResolver — tool resolution", () => {
       modelDefinition: undefined,
     });
 
-    const toolNames = finalTools.map((tool: Record<string, unknown>) => tool.name);
+    const toolNames = finalTools.map((tool) => tool.name);
 
     expect(toolNames).not.toContain("create_team");
     expect(toolNames).not.toContain("send_message");
     expect(toolNames).toContain("stop_agent");
     expect(toolNames).toContain("read_file");
+  });
+
+  it("resolves only tools in enabledByDefaultTools for custom agents when defined", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: "CUSTOM_AGENT",
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).toContain("read_file");
+    expect(toolNames).not.toContain("write_file");
+  });
+
+  it("resolves NO non-core tools when enabledByDefaultTools is empty for custom agents", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: "CUSTOM_AGENT_EMPTY",
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).not.toContain("read_file");
+    expect(toolNames).not.toContain("write_file");
   });
 });

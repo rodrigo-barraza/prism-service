@@ -6,7 +6,7 @@ import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
 interface ReminderContext extends InternalToolContext {
-  _emit?: (event: Record<string, unknown>) => void;
+  _emit?: (event: { type: string; [key: string]: unknown }) => void;
 }
 
 // ── Set Timer Tool ─────────────────────────────────────────
