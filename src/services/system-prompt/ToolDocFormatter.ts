@@ -5,6 +5,24 @@ import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, isCoreDomain } from "@ro
 
 const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 
+interface ToolParameterDescriptor {
+  description?: string;
+  type?: string;
+  [key: string]: unknown;
+}
+
+interface ToolSchemaDescriptor {
+  name: string;
+  description?: string;
+  domain?: string;
+  parameters?: {
+    type?: string;
+    properties?: Record<string, ToolParameterDescriptor>;
+    required?: string[];
+  };
+  [key: string]: unknown;
+}
+
 export class ToolDocFormatter {
   /**
    * Build domain-grouped tool descriptions from current schemas.
@@ -14,16 +32,16 @@ export class ToolDocFormatter {
    *   - Full parameter listing with required markers
    */
   buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string, resolvedToolNames?: string[], lockedOffToolNames?: Set<string>): string {
-    const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+    const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology) as ToolSchemaDescriptor[];
 
     if (resolvedToolNames?.length) {
       const resolvedSet = new Set(resolvedToolNames);
       let filteredSchemas = schemas.filter(
-        (toolSchema) => resolvedSet.has(toolSchema.name as string),
+        (toolSchema) => resolvedSet.has(toolSchema.name),
       );
       if (lockedOffToolNames?.size) {
         filteredSchemas = filteredSchemas.filter(
-          (toolSchema) => !lockedOffToolNames.has(toolSchema.name as string),
+          (toolSchema) => !lockedOffToolNames.has(toolSchema.name),
         );
       }
       return this._formatToolDescriptions(filteredSchemas);
@@ -33,7 +51,7 @@ export class ToolDocFormatter {
       let allSchemas = schemas;
       if (lockedOffToolNames?.size) {
         allSchemas = allSchemas.filter(
-          (toolSchema) => !lockedOffToolNames.has(toolSchema.name as string),
+          (toolSchema) => !lockedOffToolNames.has(toolSchema.name),
         );
       }
       return this._formatToolDescriptions(allSchemas);
@@ -52,36 +70,36 @@ export class ToolDocFormatter {
 
     let filteredSchemas = schemas.filter(
       (toolSchema) =>
-        enabledSet.has(toolSchema.name as string) ||
+        enabledSet.has(toolSchema.name) ||
         (isCoreToolsLocked && (
-          isCoreDomain((toolSchema as Record<string, unknown>).domain as string || "") ||
-          CORE_AGENTIC_TOOLS.has(toolSchema.name as string)
+          isCoreDomain(toolSchema.domain || "") ||
+          CORE_AGENTIC_TOOLS.has(toolSchema.name)
         ))
     );
 
     if (persona?.blockedTools?.length) {
       const disabledSet = resolveToolEntriesToSet(persona.blockedTools, schemas);
       filteredSchemas = filteredSchemas.filter(
-        (toolSchema) => !disabledSet.has(toolSchema.name as string) || enabledSet.has(toolSchema.name as string),
+        (toolSchema) => !disabledSet.has(toolSchema.name) || enabledSet.has(toolSchema.name),
       );
     }
 
     if (lockedOffToolNames?.size) {
       filteredSchemas = filteredSchemas.filter(
-        (toolSchema) => !lockedOffToolNames.has(toolSchema.name as string),
+        (toolSchema) => !lockedOffToolNames.has(toolSchema.name),
       );
     }
 
     return this._formatToolDescriptions(filteredSchemas);
   }
 
-  private _formatToolDescriptions(filteredSchemas: Record<string, unknown>[]): string {
+  private _formatToolDescriptions(filteredSchemas: ToolSchemaDescriptor[]): string {
     if (filteredSchemas.length === 0) return "";
 
     // Group by domain
-    const groups = new Map<string, Record<string, unknown>[]>();
+    const groups = new Map<string, ToolSchemaDescriptor[]>();
     for (const tool of filteredSchemas) {
-      const domain = ((tool.domain as string) || "Other").replace(/^Agentic:\s*/i, "");
+      const domain = (tool.domain || "Other").replace(/^Agentic:\s*/i, "");
       if (!groups.has(domain)) groups.set(domain, []);
       groups.get(domain)!.push(tool);
     }
@@ -90,15 +108,15 @@ export class ToolDocFormatter {
     const sections: string[] = [];
     for (const [domain, domainTools] of groups) {
       const entries = domainTools.map((tool) => {
-        const description = (tool.description as string) || "";
+        const description = tool.description || "";
 
-        const parameters = (tool.parameters as Record<string, unknown>)?.properties as Record<string, Record<string, unknown>> || {};
+        const parameters = tool.parameters?.properties || {};
         const parameterNames = Object.keys(parameters);
-        const required = ((tool.parameters as Record<string, unknown>)?.required || []) as string[];
+        const required = tool.parameters?.required || [];
         const parameterString = parameterNames
           .map((parameterName) => {
             const isRequired = required.includes(parameterName);
-            const parameterDescription = (parameters[parameterName].description as string) || "";
+            const parameterDescription = parameters[parameterName].description || "";
             return `  - ${parameterName}${isRequired ? " (required)" : ""}: ${parameterDescription}`;
           })
           .join("\n");

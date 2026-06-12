@@ -55,6 +55,9 @@ export interface MessagePayload {
   pdf?: string | unknown[];
   toolCalls?: ToolCallPayload[];
   thinking?: string;
+  isCompactSummary?: boolean;
+  _isPlanningInjection?: boolean;
+  _alreadyPersisted?: boolean;
   [key: string]: unknown;
 }
 

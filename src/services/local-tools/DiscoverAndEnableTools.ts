@@ -1,11 +1,11 @@
 import logger from "../../utils/logger.ts";
 import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import ToolContext from "../ToolContext.ts";
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import SettingsService from "../SettingsService.ts";
 import { extractDiscoverableDomains, extractDomainKeywords } from "../personas/utils.ts";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
+import { getCurrentDynamicTools, persistDynamicTools } from "./utils/DynamicToolHelpers.ts";
 
 export interface ToolMatch {
   name: string;
@@ -24,18 +24,6 @@ export interface SearchToolsResult {
   message?: string;
 }
 
-const TOOL_CONTEXT_KEY_DYNAMIC_ENABLED = "dynamicEnabledTools";
-const TOOL_CONTEXT_KEY_DIRTY_FLAG = "toolSetDirty";
-
-function getCurrentDynamicTools(sessionId: string): string[] {
-  const stored = ToolContext.get<string[]>(sessionId, TOOL_CONTEXT_KEY_DYNAMIC_ENABLED);
-  return Array.isArray(stored) ? stored : [];
-}
-
-function persistDynamicTools(sessionId: string, toolNames: string[]): void {
-  ToolContext.set(sessionId, TOOL_CONTEXT_KEY_DYNAMIC_ENABLED, toolNames);
-  ToolContext.set(sessionId, TOOL_CONTEXT_KEY_DIRTY_FLAG, true);
-}
 
 /**
  * Build the discover_and_enable_tools schema with dynamic descriptions

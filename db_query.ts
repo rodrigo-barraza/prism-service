@@ -16,12 +16,12 @@ async function run() {
       console.log(`  - ${dbInfo.name}`);
       const db = client.db(dbInfo.name);
       const collections = await db.listCollections().toArray();
-      for (const col of collections) {
-        console.log(`    * ${col.name}`);
+      for (const collection of collections) {
+        console.log(`    * ${collection.name}`);
       }
     }
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error(error);
   } finally {
     await client.close();
   }

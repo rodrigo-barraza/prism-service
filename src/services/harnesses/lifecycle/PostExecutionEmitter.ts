@@ -9,6 +9,15 @@ import WebhookEventBus from "../../WebhookEventBus.ts";
 import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
 import { FILE_CATEGORIES } from "../../../constants.ts";
 
+interface ToolResultPayload {
+  error?: string;
+  screenshotRef?: string;
+  audioRef?: string;
+  audio?: { data: string; mimeType?: string };
+  image?: { data: string; mimeType?: string; minioRef?: string };
+  [key: string]: unknown;
+}
+
 /**
  * PostExecutionEmitter — status notifications emitted after tool execution.
  *
@@ -64,11 +73,11 @@ export async function processToolResultMedia(
     const toolResult = results.find(
       (result) => result.id === toolCall.id || (!result.id && result.name === toolCall.name),
     );
-    const resultObject = toolResult?.result as Record<string, unknown> | null;
+    const resultObject = toolResult?.result as ToolResultPayload | null;
     const hasError = !!resultObject?.error;
 
     // Check if result has raw audio data, upload it if so
-    const audioResult = resultObject?.audio as Record<string, string> | undefined;
+    const audioResult = resultObject?.audio;
     if (audioResult?.data) {
       const mimeType = audioResult.mimeType || "audio/wav";
       const dataUrl = `data:${mimeType};base64,${audioResult.data}`;
@@ -124,7 +133,7 @@ export async function processToolResultMedia(
       pass.streamedImages.push(resultObject.screenshotRef as string);
     }
 
-    const imageResult = resultObject?.image as Record<string, string> | undefined;
+    const imageResult = resultObject?.image;
     if (imageResult?.data) {
       const toolImgRef =
         imageResult.minioRef || `data:${imageResult.mimeType};base64,${imageResult.data}`;
@@ -153,7 +162,7 @@ export function trackToolErrors(
     const toolResult = results.find(
       (result) => result.id === toolCall.id || (!result.id && result.name === toolCall.name),
     );
-    const hasError = !!(toolResult?.result as Record<string, unknown>)?.error;
+    const hasError = !!(toolResult?.result as ToolResultPayload)?.error;
 
     if (hasError) {
       const count = (state.toolErrorCounts.get(toolCall.name) || 0) + 1;
