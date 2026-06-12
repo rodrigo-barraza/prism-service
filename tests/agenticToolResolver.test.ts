@@ -109,7 +109,7 @@ const mockPersona = {
 };
 const mockLuposPersona = {
   availableTools: ["read_file"],
-  coreToolsLocked: false,
+  enabledByDefaultTools: ["*"],
 };
 const mockCustomAgent = {
   availableTools: ["read_file", "write_file"],
@@ -178,7 +178,7 @@ describe("AgenticToolResolver — tool resolution", () => {
     expect(toolNames).toContain("evaluate_expression");
   });
 
-  it("does NOT automatically enable core agentic tools for LUPOS unless they are explicitly whitelisted", async () => {
+  it("includes core agentic tools for LUPOS (enabledByDefaultTools wildcard)", async () => {
     const { finalTools } = await AgenticToolResolver.resolve({
       options: {},
       agent: "LUPOS",
@@ -189,9 +189,9 @@ describe("AgenticToolResolver — tool resolution", () => {
 
     const toolNames = finalTools.map((tool) => tool.name);
 
-    // calculate_precise is a core agentic tool and should NOT be present for LUPOS because LUPOS is restricted
-    expect(toolNames).not.toContain("evaluate_expression");
-    // Only explicitly enabled tool 'read_file' should be present
+    // enabledByDefaultTools: ["*"] means all tools are enabled,
+    // and coreToolsLocked defaults to true so core tools are injected
+    expect(toolNames).toContain("evaluate_expression");
     expect(toolNames).toContain("read_file");
   });
 

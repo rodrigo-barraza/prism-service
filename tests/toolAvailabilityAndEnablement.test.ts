@@ -12,7 +12,7 @@
 //   3.  enabledTools from client narrows the available set to enabled
 //   4.  disabledTools from client removes specific tools from all available
 //   5.  Core agentic tools auto-inject when coreToolsLocked = true
-//   6.  Core agentic tools do NOT auto-inject when coreToolsLocked = false
+//   6.  Core agentic tools do NOT auto-inject when coreToolsLocked = false (UNLOCKED_AGENT)
 //   7.  Prism-local tools (think, sleep) always present regardless of enabledTools
 //   8.  Orchestrator tools bypass enabledTools for non-sub-agents
 //   9.  Orchestrator tools excluded for sub-agents (isSubAgent = true)
@@ -201,7 +201,7 @@ const wildcardPersona = {
 };
 
 const restrictedPersona = {
-  id: "LUPOS",
+  id: "UNLOCKED_AGENT",
   availableTools: ["domainKey:weather", "read_url"],
   coreToolsLocked: false,
   blockedTools: ["get_weather_forecast"],
@@ -225,7 +225,7 @@ vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
   default: {
     get: vi.fn((agentId: string) => {
       if (agentId === "CODING") return wildcardPersona;
-      if (agentId === "LUPOS") return restrictedPersona;
+      if (agentId === "UNLOCKED_AGENT") return restrictedPersona;
       if (agentId === "DOMAIN_AGENT") return domainPersona;
       if (agentId === "SAFE_AGENT") return blockedToolsPersona;
       return null;
@@ -280,7 +280,7 @@ describe("Tool Availability & Enablement", () => {
     (SettingsService.getSection as ReturnType<typeof vi.fn>).mockResolvedValue({ topology: "hierarchical" });
     (AgentPersonaRegistry.get as ReturnType<typeof vi.fn>).mockImplementation((agentId: string) => {
       if (agentId === "CODING") return wildcardPersona;
-      if (agentId === "LUPOS") return restrictedPersona;
+      if (agentId === "UNLOCKED_AGENT") return restrictedPersona;
       if (agentId === "DOMAIN_AGENT") return domainPersona;
       if (agentId === "SAFE_AGENT") return blockedToolsPersona;
       return null;
@@ -337,11 +337,11 @@ describe("Tool Availability & Enablement", () => {
   // 2. Restricted Persona — Limited Available Set
   // ────────────────────────────────────────────────────────────
 
-  describe("restricted persona (LUPOS — explicit availableTools)", () => {
+  describe("restricted persona (UNLOCKED_AGENT — explicit availableTools, coreToolsLocked: false)", () => {
     it("only includes tools matching persona availableTools entries", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
         options: {},
-        agent: "LUPOS",
+        agent: "UNLOCKED_AGENT",
         project: "test",
         username: "rodrigo",
       });
@@ -361,7 +361,7 @@ describe("Tool Availability & Enablement", () => {
     it("does NOT auto-inject core agentic tools when coreToolsLocked is false", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
         options: {},
-        agent: "LUPOS",
+        agent: "UNLOCKED_AGENT",
         project: "test",
         username: "rodrigo",
       });
@@ -379,7 +379,7 @@ describe("Tool Availability & Enablement", () => {
       // is NOT in the enabledSet — this allows blockedTools to remove it
       const { finalTools } = await AgenticToolResolver.resolve({
         options: { enabledTools: ["get_weather", "get_weather_forecast", "read_url"] },
-        agent: "LUPOS",
+        agent: "UNLOCKED_AGENT",
         project: "test",
         username: "rodrigo",
       });
@@ -396,7 +396,7 @@ describe("Tool Availability & Enablement", () => {
     it("blockedTools removes tool when it is NOT in the explicit enabledSet", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
         options: { enabledTools: ["get_weather", "read_url"] },
-        agent: "LUPOS",
+        agent: "UNLOCKED_AGENT",
         project: "test",
         username: "rodrigo",
       });
@@ -439,7 +439,7 @@ describe("Tool Availability & Enablement", () => {
     it("does NOT auto-inject core agentic tools when coreToolsLocked = false", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
         options: { enabledTools: ["get_weather"] },
-        agent: "LUPOS",
+        agent: "UNLOCKED_AGENT",
         project: "test",
         username: "rodrigo",
       });
@@ -964,7 +964,7 @@ describe("Tool Availability & Enablement", () => {
     it("returns persona availableTools when no client filter is applied to restricted persona", async () => {
       const { resolvedEnabledTools } = await AgenticToolResolver.resolve({
         options: {},
-        agent: "LUPOS",
+        agent: "UNLOCKED_AGENT",
         project: "test",
         username: "rodrigo",
       });
@@ -1033,14 +1033,14 @@ describe("Tool Availability & Enablement", () => {
     it("restricted persona finalTools count reflects actual usable tools", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
         options: {},
-        agent: "LUPOS",
+        agent: "UNLOCKED_AGENT",
         project: "test",
         username: "rodrigo",
       });
 
       const resolvedToolNamesForPrompt = finalTools.map((tool: { name: string }) => tool.name);
 
-      // LUPOS should have a significantly smaller tool count than CODING
+      // UNLOCKED_AGENT should have a significantly smaller tool count than CODING
       // The system prompt should reflect this exact count
       expect(resolvedToolNamesForPrompt.length).toBeLessThan(MOCK_TOOLS_API_SCHEMAS.length);
 
