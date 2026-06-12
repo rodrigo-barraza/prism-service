@@ -1,5 +1,5 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
@@ -84,6 +84,7 @@ const createSkill = {
     },
   },
   labels: ["coding", "automation"],
+  domain: DOMAINS.CORE_SKILL.displayName,
   async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
     const createArgs: SkillCreateArgs = {
       name: typeof toolArguments.name === "string" ? toolArguments.name : "",
@@ -126,6 +127,7 @@ const executeSkill = {
     },
   },
   labels: ["coding", "automation"],
+  domain: DOMAINS.CORE_SKILL.displayName,
   async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
     const skillId = typeof toolArguments.skillId === "string" ? toolArguments.skillId : "";
     const variables = toolArguments.variables && typeof toolArguments.variables === "object" ? toolArguments.variables as Record<string, unknown> : {};
@@ -180,6 +182,7 @@ const listSkills = {
     },
   },
   labels: ["coding", "automation"],
+  domain: DOMAINS.CORE_SKILL.displayName,
   async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
     const project = typeof toolArguments.project === "string" ? toolArguments.project : context.project;
     const { default: SkillService } = await import("../SkillService.js");
@@ -202,6 +205,7 @@ const deleteSkill = {
     },
   },
   labels: ["coding", "automation"],
+  domain: DOMAINS.CORE_SKILL.displayName,
   async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
     const skillId = typeof toolArguments.skillId === "string" ? toolArguments.skillId : "";
     if (!skillId) return { error: "skillId is required" };

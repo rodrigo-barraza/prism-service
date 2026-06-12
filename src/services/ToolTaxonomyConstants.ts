@@ -13,6 +13,7 @@ export {
   DEFAULT_WORKFLOW_TITLE,
   DEFAULT_USERNAME,
   DEFAULT_PROJECT,
+  isCoreDomain,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 export type {

@@ -1,5 +1,5 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
 interface QuestionOption {
@@ -120,6 +120,7 @@ export default {
     },
   },
   labels: ["coding"],
+  domain: DOMAINS.CORE_USER.displayName,
 
   async execute(toolArguments: Record<string, unknown>, context: AskUserContext) {
     const questionContext = typeof toolArguments.context === "string" ? toolArguments.context : undefined;

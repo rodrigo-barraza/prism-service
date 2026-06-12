@@ -137,71 +137,93 @@ router.get(
         agentConversations = await fetchAgentConversations();
       }
 
-      // Enrich agent sessions with authoritative totalCost from request logs.
+      // Enrich conversations with authoritative totalCost from request logs.
       // The document-level totalCost (from message estimatedCost sums) can be
       // stale or incomplete — the requests collection is the source of truth.
-      if (agentConversations.length > 0) {
-        const sessionIds = agentConversations
-          .map((s) => (s as Record<string, unknown>).id as string)
+      // Background operations (memory extraction, embedding, consolidation)
+      // log costs to the requests collection but never update the conversation
+      // document, causing the sidebar cost badge to show stale values.
+      const enrichConversationsWithRequestCosts = async (
+        conversations: Document[],
+        isAgentType: boolean,
+      ) => {
+        if (conversations.length === 0) return;
+        const conversationIds = conversations
+          .map((session) => (session as Record<string, unknown>).id as string)
           .filter(Boolean);
+        if (conversationIds.length === 0) return;
 
-        if (sessionIds.length > 0) {
-          try {
-            const costAgg = await db
-              .collection(COLLECTIONS.REQUESTS)
-              .aggregate<{ _id: string; totalCost: number }>([
-                {
-                  $match: {
-                    $or: [
-                      { agentSessionId: { $in: sessionIds } },
-                      { conversationId: { $in: sessionIds } },
-                      { parentAgentSessionId: { $in: sessionIds } },
+        try {
+          const matchCondition = isAgentType
+            ? {
+                $or: [
+                  { agentSessionId: { $in: conversationIds } },
+                  { conversationId: { $in: conversationIds } },
+                  { parentAgentSessionId: { $in: conversationIds } },
+                ],
+              }
+            : { conversationId: { $in: conversationIds } };
+
+          const groupId = isAgentType
+            ? {
+                $cond: [
+                  {
+                    $and: [
+                      { $ne: ["$parentAgentSessionId", null] },
+                      { $in: ["$parentAgentSessionId", conversationIds] },
                     ],
-                    project,
-                    username,
                   },
-                },
-                {
-                  // Group under the parent session when present, otherwise
-                  // use the request's own conversationId (the document persistence key).
-                  $group: {
-                    _id: {
-                      $cond: [
-                        {
-                          $and: [
-                            { $ne: ["$parentAgentSessionId", null] },
-                            { $in: ["$parentAgentSessionId", sessionIds] },
-                          ],
-                        },
-                        "$parentAgentSessionId",
-                        { $ifNull: ["$conversationId", "$agentSessionId"] },
-                      ],
-                    },
-                    totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },
-                  },
-                },
-              ])
-              .toArray();
+                  "$parentAgentSessionId",
+                  { $ifNull: ["$conversationId", "$agentSessionId"] },
+                ],
+              }
+            : "$conversationId";
 
-            if (costAgg.length > 0) {
-              const costMap = new Map(costAgg.map((costEntry) => [costEntry._id, costEntry.totalCost]));
-              for (const session of agentConversations) {
-                const sessionId = (session as Record<string, unknown>).id as string;
-                const requestLogCost = costMap.get(sessionId);
-                if (requestLogCost !== undefined && requestLogCost > 0) {
-                  (session as Record<string, unknown>).totalCost = Math.max(
-                    (session.totalCost as number) || 0,
-                    requestLogCost,
-                  );
-                }
+          const costAggregation = await db
+            .collection(COLLECTIONS.REQUESTS)
+            .aggregate<{ _id: string; totalCost: number }>([
+              {
+                $match: {
+                  ...matchCondition,
+                  project,
+                  username,
+                },
+              },
+              {
+                $group: {
+                  _id: groupId,
+                  totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },
+                },
+              },
+            ])
+            .toArray();
+
+          if (costAggregation.length > 0) {
+            const costMap = new Map(
+              costAggregation.map((costEntry) => [costEntry._id, costEntry.totalCost]),
+            );
+            for (const conversation of conversations) {
+              const conversationId = (conversation as Record<string, unknown>).id as string;
+              const requestLogCost = costMap.get(conversationId);
+              if (requestLogCost !== undefined && requestLogCost > 0) {
+                (conversation as Record<string, unknown>).totalCost = Math.max(
+                  (conversation.totalCost as number) || 0,
+                  requestLogCost,
+                );
               }
             }
-          } catch (costError: unknown) {
-            // Non-fatal — fall back to document-level totalCost
-            logger.warn(`Failed to enrich agent session costs: ${costError instanceof Error ? costError.message : String(costError)}`);
           }
+        } catch (costError: unknown) {
+          logger.warn(
+            `Failed to enrich ${isAgentType ? "agent session" : "conversation"} costs: ${costError instanceof Error ? costError.message : String(costError)}`,
+          );
         }
-      }
+      };
+
+      await Promise.all([
+        enrichConversationsWithRequestCosts(modelConversations, false),
+        enrichConversationsWithRequestCosts(agentConversations, true),
+      ]);
 
       // Merge and sort in memory by updatedAt descending
       const merged = [

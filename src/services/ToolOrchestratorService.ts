@@ -4,7 +4,7 @@ import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "./OrchestratorPrompt.ts";
 import { createAbortController } from "../utils/AbortController.ts";
-import { DOMAINS, TOOL_NAMES, TOOL_INPUT_MODALITIES, TOPOLOGIES, DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { DOMAINS, TOOL_NAMES, TOOL_INPUT_MODALITIES, TOPOLOGIES, DEFAULT_TOPOLOGY, isCoreDomain } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   TOOL_SCHEMA_FETCH_TIMEOUT_MS,
   TOOL_CONFIG_FETCH_TIMEOUT_MS,
@@ -629,13 +629,13 @@ export default class ToolOrchestratorService {
       const internalClient = InternalToolRegistry.getClientSchemas().map((tool) => ({
         ...tool,
         domainKey: resolveDomainKey(tool.domain || DOMAINS.CORE_HARNESS.displayName),
-        system: tool.domain === DOMAINS.CORE_HARNESS.displayName || tool.domain === DOMAINS.CORE_WORKSPACE.displayName,
+        system: isCoreDomain(tool.domain || DOMAINS.CORE_HARNESS.displayName),
       }));
 
       const clientSchemasEnriched = cachedClientSchemas.map((tool) => ({
         ...tool,
         domainKey: (tool.domainKey as string) || resolveDomainKey(tool.domain || "Other"),
-        system: tool.domain === DOMAINS.CORE_HARNESS.displayName || tool.domain === DOMAINS.CORE_WORKSPACE.displayName,
+        system: isCoreDomain(tool.domain || ""),
         ...(TOOL_INPUT_MODALITIES[tool.name] && { inputModalities: [...TOOL_INPUT_MODALITIES[tool.name]] }),
       }));
 
