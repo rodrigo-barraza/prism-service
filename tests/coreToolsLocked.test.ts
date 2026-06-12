@@ -45,13 +45,13 @@ describe("GET /config/agents — coreToolsLocked field", () => {
     }
   });
 
-  it("returns coreToolsLocked: false only for LUPOS", async () => {
+  it("returns coreToolsLocked: true for LUPOS", async () => {
     const response = await authenticatedGet("/config/agents").expect(200);
     const agents = response.body as PersonaResponse[];
 
     const lupos = agents.find((agent) => agent.id === "LUPOS");
     expect(lupos).toBeDefined();
-    expect(lupos!.coreToolsLocked).toBe(false);
+    expect(lupos!.coreToolsLocked).toBe(true);
   });
 
   it("returns coreToolsLocked: true for CODING", async () => {

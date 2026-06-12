@@ -74,7 +74,7 @@ You have access to ALL tools in the system — coding, web, health, finance, sma
     content: `## Task & Memory Tools
 - Use task tools to track multi-step work
 - Use memory tools to persist important information across sessions`,
-    requires: [TOOL_NAMES.CREATE_TASK, TOOL_NAMES.LIST_TASKS, TOOL_NAMES.UPDATE_TASK, TOOL_NAMES.UPSERT_MEMORY],
+    requires: [TOOL_NAMES.CREATE_TASK, TOOL_NAMES.LIST_TASKS, TOOL_NAMES.UPDATE_TASK, TOOL_NAMES.SAVE_MEMORY],
   },
 ];
 
@@ -119,7 +119,7 @@ Use them proactively:
       },
       {
         content: `## Proactive Memory
-You have a persistent memory tool (upsert_memory) that stores facts across sessions.
+You have a persistent memory tool (save_memory) that stores facts across sessions.
 Use it **proactively** — do NOT wait for the user to say "remember":
 - When the user states a preference: "I like X", "I hate Y", "I prefer Z", "I always do W"
 - When the user reveals personal info: allergies, habits, identity traits, opinions
@@ -127,7 +127,7 @@ Use it **proactively** — do NOT wait for the user to say "remember":
 - When you learn a project convention or workflow pattern worth preserving
 - **When in doubt, save it** — over-remembering is better than forgetting
 - Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`,
-        requires: [TOOL_NAMES.UPSERT_MEMORY],
+        requires: [TOOL_NAMES.SAVE_MEMORY],
       },
     ];
     return buildToolPolicy(omniSections, context);

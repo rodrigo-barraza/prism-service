@@ -50,7 +50,7 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   [TOOL_NAMES.STOP_AGENT]: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — memory management (non-destructive upsert)
-  [TOOL_NAMES.UPSERT_MEMORY]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.SAVE_MEMORY]: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — control flow (no side effects)
   [TOOL_NAMES.SLEEP]: APPROVAL_TIERS.AUTO,

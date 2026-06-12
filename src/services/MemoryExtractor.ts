@@ -144,7 +144,7 @@ interface AfterResponseOutput {
  * Architecture: Single-store, CC-style.
  * - 4-type taxonomy: user, feedback, project, reference
  * - All memories stored in the unified `memories` collection via MemoryService
- * - Mutual exclusion: skips extraction when the main agent used upsert_memory
+ * - Mutual exclusion: skips extraction when the main agent used save_memory
  * - Configurable extraction model via Settings → Memory Models
  *
  * Registered as an `afterResponse` hook in AgentHooks.
@@ -171,13 +171,13 @@ export default class MemoryExtractor {
     }
 
     // ── Mutual Exclusion ──────────────────────────────────────────
-    // If the main agent already wrote memories this turn via upsert_memory,
+    // If the main agent already wrote memories this turn via save_memory,
     // skip extraction — the agent's explicit memory writes take precedence.
     // This prevents duplicate or conflicting memories from the extraction
     // pipeline when the agent has already decided what to remember.
-    if (toolCalls?.some((toolCall) => toolCall.name === TOOL_NAMES.UPSERT_MEMORY)) {
+    if (toolCalls?.some((toolCall) => toolCall.name === TOOL_NAMES.SAVE_MEMORY)) {
       logger.info(
-        `[MemoryExtractor] Skipping — main agent used upsert_memory this turn (mutual exclusion)`,
+        `[MemoryExtractor] Skipping — main agent used save_memory this turn (mutual exclusion)`,
       );
       return [];
     }

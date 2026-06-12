@@ -11,7 +11,7 @@ const router = express.Router();
 /**
  * POST /agent-memories
  * Create a new memory via MemoryService.store() (embedding + dedup).
- * Called by tools-api's upsert_memory route.
+ * Called by tools-api's save_memory route.
  */
 router.post(
   "/",

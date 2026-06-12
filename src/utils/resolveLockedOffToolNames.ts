@@ -27,7 +27,7 @@ export async function resolveLockedOffToolNames(): Promise<Set<string>> {
   const hasEmbedding = Boolean(memorySettings?.embeddingProvider && memorySettings?.embeddingModel);
   const hasAllMemoryModels = hasExtraction && hasConsolidation && hasEmbedding;
 
-  if (!hasAllMemoryModels) lockedOff.add(TOOL_NAMES.UPSERT_MEMORY);
+  if (!hasAllMemoryModels) lockedOff.add(TOOL_NAMES.SAVE_MEMORY);
   if (!hasExtraction) lockedOff.add(TOOL_NAMES.EXTRACT_MEMORIES);
   if (!hasConsolidation) lockedOff.add(TOOL_NAMES.CONSOLIDATE_MEMORIES);
   if (!hasEmbedding) lockedOff.add(TOOL_NAMES.SEARCH_MEMORIES);

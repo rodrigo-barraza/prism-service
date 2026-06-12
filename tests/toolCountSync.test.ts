@@ -38,7 +38,7 @@ const MOCK_TOOLS_API_SCHEMAS = [
   { name: "search_file_contents", description: "Search files", parameters: { type: "object", properties: {} }, endpoint: { method: "POST", path: "/agentic/file/search" }, domain: DOMAINS.CORE_WORKSPACE.displayName, labels: ["coding"] },
 
   // CORE_AGENTIC_TOOLS entries served by tools-api
-  { name: "upsert_memory", description: "Upsert memory", parameters: { type: "object", properties: {} }, endpoint: { method: "POST", path: "/memory/upsert" }, domain: "Memory", labels: ["memory"] },
+  { name: "save_memory", description: "Save memory", parameters: { type: "object", properties: {} }, endpoint: { method: "POST", path: "/agentic/memory/save" }, domain: DOMAINS.CORE_HARNESS.displayName, labels: ["memory"] },
   { name: "create_task", description: "Create task", parameters: { type: "object", properties: {} }, endpoint: { method: "POST", path: "/task/create" }, domain: "Task Management", labels: ["task"] },
   { name: "list_tasks", description: "List tasks", parameters: { type: "object", properties: {} }, endpoint: { method: "POST", path: "/task/list" }, domain: "Task Management", labels: ["task"] },
   { name: "update_task", description: "Update task", parameters: { type: "object", properties: {} }, endpoint: { method: "POST", path: "/task/update" }, domain: "Task Management", labels: ["task"] },

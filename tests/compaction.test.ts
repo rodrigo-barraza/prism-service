@@ -146,7 +146,7 @@ describe("MicroCompactionService", () => {
       {
         role: "assistant",
         content: "First turn",
-        toolCalls: [{ id: "toolCall-old", name: "upsert_memory", args: {}, result: largeResult }],
+        toolCalls: [{ id: "toolCall-old", name: "save_memory", args: {}, result: largeResult }],
       },
       { role: "user", content: "Q1" },
       { role: "user", content: "Q2" },

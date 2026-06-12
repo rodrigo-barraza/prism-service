@@ -265,7 +265,7 @@ describe("Background Cost Propagation", () => {
       expect(embedEvent).toBeUndefined();
     });
 
-    it("should skip extraction when upsert_memory was used (mutual exclusion)", async () => {
+    it("should skip extraction when save_memory was used (mutual exclusion)", async () => {
       const emittedEvents = [];
       const emit = (event) => emittedEvents.push(event);
 
@@ -276,7 +276,7 @@ describe("Background Cost Propagation", () => {
         agentSessionId: "session-1",
         endpoint: "/agent",
         agent: "CODING",
-        toolCalls: [{ name: "upsert_memory", args: {} }],
+        toolCalls: [{ name: "save_memory", args: {} }],
         emit,
       });
 

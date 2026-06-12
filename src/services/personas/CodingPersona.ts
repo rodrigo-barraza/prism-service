@@ -37,7 +37,7 @@ Use them proactively:
   },
   {
     content: `## Proactive Memory
-You have a persistent memory tool (upsert_memory) that stores facts across sessions.
+You have a persistent memory tool (save_memory) that stores facts across sessions.
 Use it **proactively** — do NOT wait for the user to say "remember":
 - When the user states a preference: "I like X", "I hate Y", "I prefer Z", "I always do W"
 - When the user reveals personal info: allergies, habits, identity traits, opinions
@@ -45,7 +45,7 @@ Use it **proactively** — do NOT wait for the user to say "remember":
 - When you learn a project convention or workflow pattern worth preserving
 - **When in doubt, save it** — over-remembering is better than forgetting
 - Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`,
-    requires: [TOOL_NAMES.UPSERT_MEMORY],
+    requires: [TOOL_NAMES.SAVE_MEMORY],
   },
 ];
 
