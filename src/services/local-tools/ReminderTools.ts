@@ -43,7 +43,7 @@ const setTimer = {
     },
   },
   labels: ["timer", "automation", "scheduler"],
-  domain: DOMAINS.CORE_TIMER.displayName,
+  domain: DOMAINS.CORE_SCHEDULE.displayName,
 
   async execute(toolArguments: Record<string, unknown>, context: ReminderContext) {
     const prompt = typeof toolArguments.prompt === "string" ? toolArguments.prompt : undefined;
@@ -103,7 +103,7 @@ const setTimer = {
     },
   },
   labels: ["timer", "automation", "scheduler"],
-  domain: DOMAINS.CORE_TIMER.displayName,
+  domain: DOMAINS.CORE_SCHEDULE.displayName,
 
   async execute(_args: Record<string, unknown>, context: ReminderContext) {
     const conversationId = context.agentSessionId;
@@ -152,7 +152,7 @@ const cancelTimer = {
     },
   },
   labels: ["timer", "automation", "scheduler"],
-  domain: DOMAINS.CORE_TIMER.displayName,
+  domain: DOMAINS.CORE_SCHEDULE.displayName,
 
   async execute(toolArguments: Record<string, unknown>, context: ReminderContext) {
     const timerId = typeof toolArguments.timerId === "string" ? toolArguments.timerId : undefined;
