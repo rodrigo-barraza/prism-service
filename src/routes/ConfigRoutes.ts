@@ -1,4 +1,4 @@
-import { DEFAULT_TOPOLOGY, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, isCoreDomain } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { DEFAULT_TOPOLOGY, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
@@ -405,6 +405,21 @@ router.get(
         finalToolNames = [...unionSet];
       }
 
+      let finalEnabledByDefaultToolNames: string[];
+      if (persona?.enabledByDefaultTools) {
+        const resolvedEnabledByDefaultSet = resolveAvailableToolsToSet(
+          persona.enabledByDefaultTools,
+          defaultTopology,
+        );
+        if (resolvedEnabledByDefaultSet === null) {
+          finalEnabledByDefaultToolNames = isWildcard ? ["*"] : [...(resolvedTools || [])];
+        } else {
+          finalEnabledByDefaultToolNames = [...resolvedEnabledByDefaultSet];
+        }
+      } else {
+        finalEnabledByDefaultToolNames = isWildcard ? ["*"] : [...(resolvedTools || [])];
+      }
+
       return {
         id: first.id,
         name: first.name,
@@ -417,7 +432,7 @@ router.get(
         project: persona?.project,
         toolCount: finalToolsCount,
         enabledToolNames: finalToolNames,
-        enabledByDefaultToolNames: persona?.enabledByDefaultTools || [],
+        enabledByDefaultToolNames: finalEnabledByDefaultToolNames,
         coreToolsLocked: persona?.coreToolsLocked ?? true,
         canSpawnSubAgents: ORCHESTRATOR_ONLY_TOOLS.includes(TOOL_NAMES.CREATE_TEAM),
         usesDirectoryTree: persona?.usesDirectoryTree || false,

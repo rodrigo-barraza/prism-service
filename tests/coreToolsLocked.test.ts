@@ -18,6 +18,7 @@ interface PersonaResponse {
   coreToolsLocked: boolean;
   toolCount: number;
   enabledToolNames: string[];
+  enabledByDefaultToolNames: string[];
 }
 
 interface ToolSchemaResponse {
@@ -52,6 +53,22 @@ describe("GET /config/agents — coreToolsLocked field", () => {
 
     for (const agent of agents) {
       expect(agent.coreToolsLocked).toBe(true);
+    }
+  });
+
+  it("returns resolved enabledByDefaultToolNames for LUPOS without '*' wildcard", async () => {
+    const response = await authenticatedGet("/config/agents").expect(200);
+    const agents = response.body as PersonaResponse[];
+
+    const lupos = agents.find((agent) => agent.id === "LUPOS");
+    expect(lupos).toBeDefined();
+    expect(lupos!.enabledByDefaultToolNames).toBeDefined();
+    expect(lupos!.enabledByDefaultToolNames).not.toContain("*");
+    expect(lupos!.enabledByDefaultToolNames.length).toBeGreaterThan(0);
+
+    const enabledSet = new Set(lupos!.enabledToolNames);
+    for (const toolName of lupos!.enabledByDefaultToolNames) {
+      expect(enabledSet.has(toolName)).toBe(true);
     }
   });
 });
