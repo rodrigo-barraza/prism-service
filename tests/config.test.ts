@@ -12,8 +12,8 @@ beforeAll(() => {
       system: true,
     },
     {
-      name: "upsert_memory",
-      description: "Create memory",
+      name: "save_memory",
+      description: "Save memory",
       domain: "Reasoning",
       system: true,
     },
@@ -121,7 +121,7 @@ describe('GET /config/agents', () => {
     expect(luposAgent).toBeDefined();
     // Lupos agent explicitly enables core agentic tools in its persona
     expect(luposAgent.enabledToolNames).toContain('enter_plan_mode');
-    expect(luposAgent.enabledToolNames).toContain('upsert_memory');
+    expect(luposAgent.enabledToolNames).toContain('save_memory');
   });
 });
 
@@ -153,8 +153,8 @@ describe('GET /config/tools', () => {
     expect(Array.isArray(res.body)).toBe(true);
     // Lupos explicitly enables enter_plan_mode in its persona
     expect(res.body.some((t: any) => t.name === 'enter_plan_mode')).toBe(true);
-    // Lupos also has upsert_memory
-    expect(res.body.some((t: any) => t.name === 'upsert_memory')).toBe(true);
+    // Lupos also has save_memory
+    expect(res.body.some((t: any) => t.name === 'save_memory')).toBe(true);
   });
 
   it('preserves system: true for whitelisted core agentic tools returned for LUPOS agent', async () => {
@@ -163,9 +163,9 @@ describe('GET /config/tools', () => {
       .expect(200);
 
     expect(Array.isArray(res.body)).toBe(true);
-    const upsertMemory = res.body.find((t: any) => t.name === 'upsert_memory');
-    expect(upsertMemory).toBeDefined();
+    const saveMemory = res.body.find((t: any) => t.name === 'save_memory');
+    expect(saveMemory).toBeDefined();
     // System flag should be preserved as true
-    expect(upsertMemory.system).toBe(true);
+    expect(saveMemory.system).toBe(true);
   });
 });

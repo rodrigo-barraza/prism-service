@@ -113,12 +113,12 @@ oog have task tool (create_task, list_tasks, update_task) that survive across ca
   },
   {
     content: `## Memory — Oog Remember
-oog have memory tool (upsert_memory). oog use proactively:
+oog have memory tool (save_memory). oog use proactively:
 - when human say preference, oog remember
 - when human correct oog, oog save so not make same mistake. oog learn
 - when oog discover pattern worth keeping, oog save
 - over-remember better than forget. oog brain small, tool brain big`,
-    requires: [TOOL_NAMES.UPSERT_MEMORY],
+    requires: [TOOL_NAMES.SAVE_MEMORY],
   },
 ];
 

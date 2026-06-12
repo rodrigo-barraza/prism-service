@@ -82,8 +82,8 @@ const DIGEST_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
     requires: [TOOL_NAMES.SEARCH_WEB],
   },
   {
-    content: `- Use upsert_memory to save user stats, allergies, preferences, and goals for cross-session continuity.`,
-    requires: [TOOL_NAMES.UPSERT_MEMORY],
+    content: `- Use save_memory to save user stats, allergies, preferences, and goals for cross-session continuity.`,
+    requires: [TOOL_NAMES.SAVE_MEMORY],
   },
   {
     content: `- When the user asks about exercises, use search_gym_exercises with appropriate filters.`,
@@ -108,7 +108,7 @@ const DIGEST_ENABLED_TOOLS = [
   TOOL_NAMES.CALCULATE_PRECISE,
   TOOL_NAMES.EXECUTE_JAVASCRIPT,
   TOOL_NAMES.GET_WEATHER,
-  TOOL_NAMES.UPSERT_MEMORY,
+  TOOL_NAMES.SAVE_MEMORY,
 ];
 
 export const DigestPersona: Persona = {

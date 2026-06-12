@@ -88,9 +88,9 @@ describe("PostExecutionEmitter", () => {
       });
     });
 
-    it("should emit memories_updated when upsert_memory was called", () => {
+    it("should emit memories_updated when save_memory was called", () => {
       const executedToolCalls = [
-        { name: "upsert_memory", id: "1", args: {} },
+        { name: "save_memory", id: "1", args: {} },
       ];
 
       emitPostExecutionStatus(executedToolCalls, mockEmit);
@@ -115,7 +115,7 @@ describe("PostExecutionEmitter", () => {
     it("should emit multiple statuses when multiple matching tools are called", () => {
       const executedToolCalls = [
         { name: "update_task", id: "1", args: {} },
-        { name: "upsert_memory", id: "2", args: {} },
+        { name: "save_memory", id: "2", args: {} },
       ];
 
       emitPostExecutionStatus(executedToolCalls, mockEmit);

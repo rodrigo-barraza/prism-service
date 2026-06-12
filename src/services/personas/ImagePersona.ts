@@ -51,8 +51,8 @@ const IMAGE_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
     requires: [TOOL_NAMES.CONVERT_IMAGE_TO_ASCII],
   },
   {
-    content: `- Use \`upsert_memory\` to save user brand colors, favorite aesthetics, or recurring characters for future sessions.`,
-    requires: [TOOL_NAMES.UPSERT_MEMORY],
+    content: `- Use \`save_memory\` to save user brand colors, favorite aesthetics, or recurring characters for future sessions.`,
+    requires: [TOOL_NAMES.SAVE_MEMORY],
   },
 ];
 
@@ -62,7 +62,7 @@ const IMAGE_ENABLED_TOOLS = [
   DOMAIN_KEY_TAGS.WEB,
   DOMAIN_KEY_TAGS.MOVIES,
   DOMAIN_KEY_TAGS.GAMING,
-  TOOL_NAMES.UPSERT_MEMORY,
+  TOOL_NAMES.SAVE_MEMORY,
 ];
 
 export const ImagePersona: Persona = {

@@ -46,7 +46,7 @@ export function emitPostExecutionStatus(
     emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.SUB_AGENTS_UPDATED });
   }
 
-  if (toolCalls.some((toolCall) => toolCall.name === TOOL_NAMES.UPSERT_MEMORY)) {
+  if (toolCalls.some((toolCall) => toolCall.name === TOOL_NAMES.SAVE_MEMORY)) {
     emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.MEMORIES_UPDATED });
   }
 }

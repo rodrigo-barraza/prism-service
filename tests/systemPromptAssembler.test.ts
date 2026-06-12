@@ -57,13 +57,13 @@ const MOCK_TOOLS_API_SCHEMAS = [
     endpoint: { path: "/web/search" },
   },
   {
-    name: TOOL_NAMES.UPSERT_MEMORY,
-    description: "Upsert a memory",
+    name: TOOL_NAMES.SAVE_MEMORY,
+    description: "Save a memory",
     parameters: { type: "object", properties: {} },
     domain: "Memory",
     domainKey: "memory",
     labels: ["memory"],
-    endpoint: { method: "POST", path: "/memory/upsert" },
+    endpoint: { method: "POST", path: "/agentic/memory/save" },
   },
   {
     name: TOOL_NAMES.EXTRACT_MEMORIES,
@@ -890,7 +890,7 @@ describe("SystemPromptAssembler", () => {
         messages: [{ role: "user", content: "Hello" }],
       });
 
-      expect(prompt).not.toContain(`### ${TOOL_NAMES.UPSERT_MEMORY}`);
+      expect(prompt).not.toContain(`### ${TOOL_NAMES.SAVE_MEMORY}`);
       expect(prompt).not.toContain(`### ${TOOL_NAMES.EXTRACT_MEMORIES}`);
       expect(prompt).not.toContain(`### ${TOOL_NAMES.CONSOLIDATE_MEMORIES}`);
       expect(prompt).not.toContain(`### ${TOOL_NAMES.SEARCH_MEMORIES}`);
@@ -938,7 +938,7 @@ describe("SystemPromptAssembler", () => {
         messages: [{ role: "user", content: "Hello" }],
       });
 
-      expect(prompt).toContain(`### ${TOOL_NAMES.UPSERT_MEMORY}`);
+      expect(prompt).toContain(`### ${TOOL_NAMES.SAVE_MEMORY}`);
     });
 
     it("includes creative tools in system prompt when image/vision models are configured", async () => {
@@ -1018,7 +1018,7 @@ describe("SystemPromptAssembler", () => {
         messages: [{ role: "user", content: "Hello" }],
       });
 
-      expect(prompt).not.toContain(`### ${TOOL_NAMES.UPSERT_MEMORY}`);
+      expect(prompt).not.toContain(`### ${TOOL_NAMES.SAVE_MEMORY}`);
       expect(prompt).toContain(`### ${TOOL_NAMES.EXTRACT_MEMORIES}`);
       expect(prompt).not.toContain(`### ${TOOL_NAMES.CONSOLIDATE_MEMORIES}`);
       expect(prompt).toContain(`### ${TOOL_NAMES.SEARCH_MEMORIES}`);
