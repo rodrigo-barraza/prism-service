@@ -267,6 +267,35 @@ router.get(
         .findOne({ id: conversationId, project, username });
 
       if (chat) {
+        // Enrich totalCost from the requests collection (source of truth).
+        // Background operations (memory extraction, embedding) log their
+        // costs to requests but never update the conversation document.
+        try {
+          const costAggregation = await db
+            .collection(COLLECTIONS.REQUESTS)
+            .aggregate<{ _id: string; totalCost: number }>([
+              {
+                $match: { conversationId, project, username },
+              },
+              {
+                $group: {
+                  _id: "$conversationId",
+                  totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },
+                },
+              },
+            ])
+            .toArray();
+
+          if (costAggregation.length > 0 && costAggregation[0].totalCost > 0) {
+            (chat as Record<string, unknown>).totalCost = Math.max(
+              (chat.totalCost as number) || 0,
+              costAggregation[0].totalCost,
+            );
+          }
+        } catch {
+          // Non-fatal — fall back to document-level totalCost
+        }
+
         const pendingApproval = AgenticLoopService.getPendingApproval(conversationId);
         const pendingQuestion = AgenticLoopService.getPendingQuestion(conversationId);
         return res.json({
