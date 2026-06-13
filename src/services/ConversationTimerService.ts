@@ -410,7 +410,7 @@ const ConversationTimerService = {
           functionCallingEnabled: true,
           planFirst: false,
           autoApprove: true,
-          minContextLength: 65_000,
+          minContextLength: 120_000,
           ...(settings.toolConfig?.enabledTools && { enabledTools: settings.toolConfig.enabledTools }),
           ...(settings.toolConfig?.disabledTools && { disabledTools: settings.toolConfig.disabledTools }),
         },
