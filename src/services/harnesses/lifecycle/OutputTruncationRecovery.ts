@@ -73,7 +73,7 @@ export function injectContinuationContext(
     currentMessages.push({
       role: "assistant",
       content: truncatedContent,
-      ...(pass.streamedThinking && { thinking: pass.streamedThinking }),
+      ...(pass.streamedThinking.trim() && { thinking: pass.streamedThinking.trim() }),
       ...(pass.thinkingSignature && { thinkingSignature: pass.thinkingSignature }),
     });
   }

@@ -406,7 +406,7 @@ Use these images to observe the environment, notice changes, animations, or user
           currentMessages.push({
             role: "assistant",
             content: pass.streamedText || "",
-            ...(pass.streamedThinking && { thinking: pass.streamedThinking }),
+            ...(pass.streamedThinking.trim() && { thinking: pass.streamedThinking.trim() }),
             ...(pass.thinkingSignature && {
               thinkingSignature: pass.thinkingSignature,
             }),
@@ -468,7 +468,7 @@ Use these images to observe the environment, notice changes, animations, or user
         const assistantMessage: ConversationMessage = {
           role: "assistant",
           content: pass.streamedText || "",
-          ...(pass.streamedThinking && { thinking: pass.streamedThinking }),
+          ...(pass.streamedThinking.trim() && { thinking: pass.streamedThinking.trim() }),
           ...(pass.thinkingSignature && {
             thinkingSignature: pass.thinkingSignature,
           }),
@@ -506,12 +506,12 @@ Use these images to observe the environment, notice changes, animations, or user
       }
 
       // ── No tools — check if we should break ─────────────────
-      if (pass.streamedText || pass.streamedThinking) {
+      if (pass.streamedText || pass.streamedThinking.trim()) {
         if (state.planModeActive) {
           currentMessages.push({
             role: "assistant",
             content: pass.streamedText,
-            ...(pass.streamedThinking && { thinking: pass.streamedThinking }),
+            ...(pass.streamedThinking.trim() && { thinking: pass.streamedThinking.trim() }),
             ...(pass.thinkingSignature && {
               thinkingSignature: pass.thinkingSignature,
             }),
