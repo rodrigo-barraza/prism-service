@@ -430,7 +430,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
           currentMessages.push({
             role: "assistant",
             content: selectedPass.streamedText || "",
-            ...(selectedPass.streamedThinking && { thinking: selectedPass.streamedThinking }),
+            ...(selectedPass.streamedThinking.trim() && { thinking: selectedPass.streamedThinking.trim() }),
             toolCalls: selectedPass.pendingToolCalls.map((toolCall: ToolCall) => {
               const matchingResult = results.find((result) => result.id === toolCall.id);
               return {
@@ -461,8 +461,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
         const assistantMessage: ConversationMessage = {
           role: "assistant",
           content: selectedPass.streamedText || "",
-          ...(selectedPass.streamedThinking && {
-            thinking: selectedPass.streamedThinking,
+          ...(selectedPass.streamedThinking.trim() && {
+            thinking: selectedPass.streamedThinking.trim(),
           }),
           ...(selectedPass.thinkingSignature && {
             thinkingSignature: selectedPass.thinkingSignature,
@@ -500,7 +500,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       }
 
       // ── No tools — final text response ──────────────────────
-      if (selectedPass.streamedText || selectedPass.streamedThinking) {
+      if (selectedPass.streamedText || selectedPass.streamedThinking.trim()) {
         this.logIteration(selectedPass, currentMessages);
         hasCleanTextBreak = true;
         break;

@@ -403,7 +403,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           currentMessages.push({
             role: "assistant",
             content: pass.streamedText || "",
-            ...(pass.streamedThinking && { thinking: pass.streamedThinking }),
+            ...(pass.streamedThinking.trim() && { thinking: pass.streamedThinking.trim() }),
             ...(pass.thinkingSignature && {
               thinkingSignature: pass.thinkingSignature,
             }),
@@ -465,7 +465,7 @@ export default class ReActHarness extends BaseAgenticHarness {
         const assistantMessage: ConversationMessage = {
           role: "assistant",
           content: pass.streamedText || "",
-          ...(pass.streamedThinking && { thinking: pass.streamedThinking }),
+          ...(pass.streamedThinking.trim() && { thinking: pass.streamedThinking.trim() }),
           ...(pass.thinkingSignature && {
             thinkingSignature: pass.thinkingSignature,
           }),
@@ -568,12 +568,12 @@ export default class ReActHarness extends BaseAgenticHarness {
       }
 
       // ── No tools — check if we should break ─────────────────
-      if (pass.streamedText || pass.streamedThinking) {
+      if (pass.streamedText || pass.streamedThinking.trim()) {
         if (state.planModeActive) {
           currentMessages.push({
             role: "assistant",
             content: pass.streamedText,
-            ...(pass.streamedThinking && { thinking: pass.streamedThinking }),
+            ...(pass.streamedThinking.trim() && { thinking: pass.streamedThinking.trim() }),
             ...(pass.thinkingSignature && {
               thinkingSignature: pass.thinkingSignature,
             }),
@@ -600,7 +600,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             currentMessages.push({
               role: "assistant",
               content: pass.streamedText,
-              ...(pass.streamedThinking && { thinking: pass.streamedThinking }),
+              ...(pass.streamedThinking.trim() && { thinking: pass.streamedThinking.trim() }),
             });
             currentMessages.push({
               role: "user",
