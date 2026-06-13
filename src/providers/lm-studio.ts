@@ -602,6 +602,43 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                     );
                     return;
                   }
+                  // ── Context-length fallback ─────────────────────────────
+                  // If the load failed and we requested a specific context_length
+                  // (e.g. 120K), it may have exceeded available VRAM. Retry with
+                  // progressively lower context tiers before giving up entirely.
+                  if (loadError && (loadOpts as Record<string, unknown>).context_length) {
+                    const requestedContextLength = (loadOpts as Record<string, unknown>).context_length as number;
+                    const contextFallbackTiers = [65_000];
+
+                    for (const fallbackContextLength of contextFallbackTiers) {
+                      if (fallbackContextLength >= requestedContextLength) continue;
+                      if (options.signal?.aborted) return;
+
+                      logger.warn(
+                        `[LM-Studio] Load failed at ctx=${requestedContextLength} — retrying with ctx=${fallbackContextLength}`,
+                      );
+                      yield {
+                        type: "status",
+                        message: `Load failed — retrying with ${Math.round(fallbackContextLength / 1000)}k context…`,
+                        phase: "loading",
+                      };
+
+                      try {
+                        (loadOpts as Record<string, unknown>).context_length = fallbackContextLength;
+                        await this.loadModel(model, loadOpts, options.signal);
+                        loadError = null;
+                        logger.info(
+                          `[LM-Studio] Fallback load succeeded at ctx=${fallbackContextLength}`,
+                        );
+                        break;
+                      } catch (fallbackLoadError: unknown) {
+                        if (fallbackLoadError instanceof Error && fallbackLoadError.name === "AbortError") return;
+                        logger.warn(
+                          `[LM-Studio] Fallback load at ctx=${fallbackContextLength} also failed: ${getErrorMessage(fallbackLoadError)}`,
+                        );
+                      }
+                    }
+                  }
                   if (loadError) {
                     rejectInflight!(loadError);
                     throw loadError;

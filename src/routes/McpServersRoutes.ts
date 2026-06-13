@@ -251,7 +251,7 @@ router.post(
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`MCP connect failed for ${serverId}: ${errorMessage}`);
       logger.error(`MCP connection failed: ${errorMessage}`);
-      res.status(502).json({ error: "MCP server connection failed" });
+      res.status(502).json({ error: `MCP server connection failed: ${errorMessage}` });
     }
   }),
 );
