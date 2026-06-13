@@ -91,6 +91,10 @@ export function normalizeOllamaModel(raw: OllamaRawModel): ModelEntry {
   if (details.parameter_size) entry.params = details.parameter_size;
   if (details.family) entry.architecture = details.family;
   if (raw.size) entry.size = formatBytes(raw.size);
+  if ((raw as Record<string, unknown>).loaded_instances && ((raw as Record<string, unknown>).loaded_instances as unknown[]).length > 0) {
+    entry.loaded = true;
+  }
+  entry._raw = raw;
 
   return entry;
 }

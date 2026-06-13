@@ -24,6 +24,32 @@ function prepareOllamaMessages(messages: ChatMessage[]) {
     return message;
   });
 }
+
+/**
+ * Build parameters options for Ollama native API options.
+ */
+function buildOllamaOptions(options: ProviderOptions) {
+  const ollamaOptions: Record<string, unknown> = {};
+
+  if (options.temperature !== undefined) ollamaOptions.temperature = options.temperature;
+  if (options.topP !== undefined) ollamaOptions.top_p = options.topP;
+  if (options.topK !== undefined) ollamaOptions.top_k = options.topK;
+  if (options.minP !== undefined) ollamaOptions.min_p = options.minP;
+  if (options.maxTokens !== undefined) ollamaOptions.num_predict = options.maxTokens;
+  if (options.stopSequences !== undefined) ollamaOptions.stop = options.stopSequences;
+  if (options.seed !== undefined) {
+    const seedValue = typeof options.seed === "string" ? parseInt(options.seed, 10) : options.seed;
+    if (!isNaN(seedValue)) {
+      ollamaOptions.seed = seedValue;
+    }
+  }
+  if (options.frequencyPenalty !== undefined) ollamaOptions.frequency_penalty = options.frequencyPenalty;
+  if (options.presencePenalty !== undefined) ollamaOptions.presence_penalty = options.presencePenalty;
+  if (options.repeatPenalty !== undefined) ollamaOptions.repeat_penalty = options.repeatPenalty;
+
+  return ollamaOptions;
+}
+
 export function createOllamaProvider(baseUrl: string, instanceId: string = "ollama") {
   const getBaseUrl = () => baseUrl;
 
@@ -49,7 +75,8 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
           model,
           messages: prepared,
           stream: false,
-                    ...(options.thinkingEnabled ? { think: true } : {}),
+          ...(options.thinkingEnabled ? { think: true } : {}),
+          options: buildOllamaOptions(options),
         };
 
         const response = await fetch(`${baseUrl}/api/chat`, {
@@ -74,7 +101,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
         };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("ollama", getErrorMessage(error), 500, error);
+        throw new ProviderError("ollama", getErrorMessage(error), 500, error);
       }
     },
 
@@ -82,7 +109,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
 
     async *generateTextStream(
       messages: ChatMessage[],
-            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["ollama"],
+      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["ollama"],
       options: ProviderOptions = {},
     ) {
       const baseUrl = getBaseUrl();
@@ -114,7 +141,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
           }
         } catch (unloadError: unknown) {
           logger.warn(
-                        `Ollama: could not check/unload models: ${getErrorMessage(unloadError)}`,
+            `Ollama: could not check/unload models: ${getErrorMessage(unloadError)}`,
           );
         }
 
@@ -124,14 +151,15 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
           model,
           messages: prepared,
           stream: true,
-                    ...(options.thinkingEnabled ? { think: true } : {}),
+          ...(options.thinkingEnabled ? { think: true } : {}),
+          options: buildOllamaOptions(options),
         };
 
         const response = await fetch(`${baseUrl}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
-                    ...(options.signal && { signal: options.signal }),
+          ...(options.signal && { signal: options.signal }),
         });
 
         if (!response.ok) {
@@ -293,11 +321,50 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
         }
 
         const data = await response.json();
-        // Ollama returns { models: [{ name, model, size, ... }] }
-        return { models: (data as Record<string, unknown[]>).models || [] };
+        const models = (data as Record<string, unknown[]>).models || [];
+
+        let running: Record<string, unknown>[] = [];
+        try {
+          const psResponse = await fetch(`${baseUrl}/api/ps`);
+          if (psResponse.ok) {
+            const psData = await psResponse.json();
+            running = (psData as Record<string, Record<string, unknown>[]>).models || [];
+          }
+        } catch (error: unknown) {
+          logger.warn(`Ollama listModels: could not query active models: ${getErrorMessage(error)}`);
+        }
+
+        const mappedModels = models.map((value: unknown) => {
+          const modelItem = value as Record<string, unknown>;
+          const matchedRunning = running.find((runningModel) => {
+            const runningName = (runningModel.model || runningModel.name || "") as string;
+            const tagName = (modelItem.model || modelItem.name || "") as string;
+            if (runningName === tagName) return true;
+            const cleanTag = tagName.endsWith(":latest") ? tagName.slice(0, -7) : tagName;
+            const cleanRunning = runningName.endsWith(":latest") ? runningName.slice(0, -7) : runningName;
+            return cleanTag === cleanRunning;
+          });
+
+          if (matchedRunning) {
+            return {
+              ...modelItem,
+              loaded_instances: [{
+                id: matchedRunning.model || matchedRunning.name,
+                config: {
+                  context_length: null,
+                  size_vram: matchedRunning.size_vram ?? null,
+                  expires_at: matchedRunning.expires_at ?? null,
+                }
+              }]
+            };
+          }
+          return modelItem;
+        });
+
+        return { models: mappedModels };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("ollama", getErrorMessage(error), 500, error);
+        throw new ProviderError("ollama", getErrorMessage(error), 500, error);
       }
     },
   };
