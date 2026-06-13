@@ -47,6 +47,7 @@ import workflowsRouter from "./routes/WorkflowsRoutes.ts";
 import mediaRouter from "./routes/MediaRoutes.ts";
 import textRouter from "./routes/TextRoutes.ts";
 import lmStudioRouter from "./routes/LmStudioRoutes.ts";
+import ollamaRouter from "./routes/OllamaRoutes.ts";
 import skillsRouter from "./routes/SkillsRoutes.ts";
 import rulesRouter from "./routes/RulesRoutes.ts";
 import agentMemoriesRouter from "./routes/AgentMemoriesRoutes.ts";
@@ -105,6 +106,7 @@ const ENDPOINTS = {
     "/media",
     "/text",
     "/lm-studio",
+    "/ollama",
     "/skills",
     "/rules",
     "/agent-memories",
@@ -166,6 +168,7 @@ app.use("/workflows", workflowsRouter);
 app.use("/media", mediaRouter);
 app.use("/text", textRouter);
 app.use("/lm-studio", lmStudioRouter);
+app.use("/ollama", ollamaRouter);
 app.use("/skills", skillsRouter);
 app.use("/rules", rulesRouter);
 app.use("/agent-memories", agentMemoriesRouter);
