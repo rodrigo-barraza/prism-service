@@ -196,7 +196,7 @@ export const DeleteFavoritesQuerySchema = z.object({
 export const PostMcpServerSchema = z.object({
   name: z.string().min(1, "name is required"),
   displayName: z.string().optional(),
-  transport: z.enum(["stdio", "sse"]).optional().default("stdio"),
+  transport: z.enum(["stdio", "sse", "streamable-http"]).optional().default("stdio"),
   command: z.string().optional().default(""),
   args: z.array(z.string()).optional().default([]),
   env: z.record(z.string(), z.string()).optional().default({}),
@@ -208,7 +208,7 @@ export const PostMcpServerSchema = z.object({
 export const PutMcpServerSchema = z.object({
   name: z.string().min(1).optional(),
   displayName: z.string().optional(),
-  transport: z.enum(["stdio", "sse"]).optional(),
+  transport: z.enum(["stdio", "sse", "streamable-http"]).optional(),
   command: z.string().optional(),
   args: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
