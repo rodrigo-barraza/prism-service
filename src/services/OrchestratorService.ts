@@ -602,6 +602,10 @@ export default class OrchestratorService {
     durationMs: number;
     toolUses: number;
     hasChanges: boolean;
+    totalCost?: number | null;
+    branchName?: string | null;
+    files?: string[];
+    toolCallCount?: number;
   }> {
     let list = Array.from(activeSubAgents.values());
     if (parentConversationId) {
@@ -617,6 +621,10 @@ export default class OrchestratorService {
         subAgent.status === "running" ? Date.now() - subAgent.startedAt : subAgent.durationMs,
       toolUses: subAgent.toolCalls?.length || 0,
       hasChanges: subAgent.diff?.hasChanges || false,
+      totalCost: subAgent.totalCost,
+      branchName: subAgent.branchName,
+      files: subAgent.files,
+      toolCallCount: subAgent.toolCalls?.length || 0,
     }));
   }
 

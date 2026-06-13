@@ -13,6 +13,10 @@ interface SubAgentSummary {
   durationMs: number;
   toolUses: number;
   hasChanges: boolean;
+  totalCost?: number | null;
+  branchName?: string | null;
+  files?: string[];
+  toolCallCount?: number;
 }
 
 const router = Router();
