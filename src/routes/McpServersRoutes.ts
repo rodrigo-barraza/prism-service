@@ -19,7 +19,7 @@ interface McpServerDocument {
   username: string;
   name: string;
   displayName: string;
-  transport: "stdio" | "sse";
+  transport: "stdio" | "sse" | "streamable-http";
   command?: string;
   args?: string[];
   env?: Record<string, string>;
@@ -116,7 +116,7 @@ router.post(
         username,
         name,
         displayName: displayName || name,
-        transport: transport as "stdio" | "sse",
+        transport: transport as "stdio" | "sse" | "streamable-http",
         command,
         args,
         env,
