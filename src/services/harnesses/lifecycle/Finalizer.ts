@@ -357,10 +357,22 @@ export async function finalizeTextGeneration(
                 (message) => message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0,
       );
       // Append the final LLM response block (contains telemetry and final text step)
+      // When intermediate assistant messages already carry their own thinking,
+      // only include genuinely NEW thinking on the final message (thinking
+      // that wasn't already persisted on an earlier iteration's message).
+      // Without this, the same thinking renders twice on page refresh.
+      let finalThinking = thinking || "";
+      if (hasIntermediateToolMessages && finalThinking) {
+        for (const message of overrideMessagesToAppend) {
+          if (message.role === "assistant" && message.thinking && finalThinking.startsWith(message.thinking)) {
+            finalThinking = finalThinking.slice(message.thinking.length).trim();
+          }
+        }
+      }
             messagesToAppend.push({
         role: "assistant",
         content: text,
-                ...(thinking && { thinking }),
+                ...(finalThinking && { thinking: finalThinking }),
                 ...(thinkingSignature && { thinkingSignature }),
                 ...(images.length > 0 && { images }),
         ...(audioRef && { audio: audioRef }),

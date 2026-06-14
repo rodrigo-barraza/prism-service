@@ -131,12 +131,11 @@ export default class AgenticLoopState {
     this.chunksSinceLastProgress = 0;
   }
 
-  /** Get clean display segments (trimmed, empty-filtered, deduped) for DB persistence. */
+  /** Get clean display segments (trimmed, empty-filtered) for DB persistence. */
   getCleanDisplayData() {
     const cleanSegments: DisplaySegment[] = [];
     const cleanTextFragments: string[] = [];
     const cleanThinkingFragments: string[] = [];
-    const seenThinkingContent = new Set<string>();
 
     for (const segment of this.displaySegments) {
       if (segment.type === "text") {
@@ -151,8 +150,6 @@ export default class AgenticLoopState {
         const trimmed =
           this.displayThinkingFragments[segment.fragmentIndex]?.trim();
         if (!trimmed) continue;
-        if (seenThinkingContent.has(trimmed)) continue;
-        seenThinkingContent.add(trimmed);
         cleanSegments.push({
           type: "thinking",
           fragmentIndex: cleanThinkingFragments.length,
