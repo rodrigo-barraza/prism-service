@@ -541,7 +541,6 @@ export async function handleConversation(
     } finally {
       if (localRelease) {
         localRelease();
-        localRelease();
         logger.info(`[chat] 🔓 Released local GPU lock for ${resolvedModel}`);
       }
     }
