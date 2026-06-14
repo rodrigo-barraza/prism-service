@@ -58,6 +58,8 @@ export interface LmStudioModelMeta {
   repeatPenalty?: number;
   minContextLength?: number;
   _loadedContextLength?: number;
+  _loadedEvalBatchSize?: number;
+  _loadedPhysicalBatchSize?: number;
   contextLength?: number;
   context_length?: number;
   signal?: AbortSignal;

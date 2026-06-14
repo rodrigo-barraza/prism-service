@@ -77,6 +77,9 @@ export interface LogParams {
   responsePayload?: Record<string, unknown> | null;
   modalities?: Record<string, unknown> | null;
   rateLimits?: Record<string, unknown> | null;
+  contextLength?: number | null;
+  evalBatchSize?: number | null;
+  physicalBatchSize?: number | null;
 }
 
 export interface TokenUsage {
@@ -193,6 +196,9 @@ const RequestLogger = {
     responsePayload = null,
     modalities = null,
     rateLimits = null,
+    contextLength = null,
+    evalBatchSize = null,
+    physicalBatchSize = null,
   }: LogParams) {
     try {
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
@@ -242,6 +248,9 @@ const RequestLogger = {
         responsePayload,
         modalities,
         rateLimits,
+        ...(contextLength != null && { contextLength }),
+        ...(evalBatchSize != null && { evalBatchSize }),
+        ...(physicalBatchSize != null && { physicalBatchSize }),
       };
       await db.collection(COLLECTION).insertOne(document);
 
@@ -391,6 +400,9 @@ const RequestLogger = {
       },
       modalities,
       rateLimits,
+      contextLength: (options?._loadedContextLength as number) ?? (options?.contextLength as number) ?? null,
+      evalBatchSize: (options?._loadedEvalBatchSize as number) ?? (options?.eval_batch_size as number) ?? null,
+      physicalBatchSize: (options?._loadedPhysicalBatchSize as number) ?? (options?.n_batch as number) ?? null,
     });
   },
   /**
