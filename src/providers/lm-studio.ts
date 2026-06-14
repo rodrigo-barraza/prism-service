@@ -43,8 +43,13 @@ async function* parseNativeSSEStream(reader: ReadableStreamDefaultReader<Uint8Ar
   const decoder = new TextDecoder();
   let buffer = "";
   let usage = null;
+  // Track partial output tokens from content/reasoning deltas as a fallback
+  // when the stream terminates before chat.end delivers final stats.
+  let partialOutputCharacters = 0;
+  let partialReasoningCharacters = 0;
   // Accumulate tool call arguments for streaming tool events
   let currentToolCall = null;
+  let usageYielded = false;
   try {
     while (true) {
             if (options.signal?.aborted) {
@@ -69,6 +74,7 @@ async function* parseNativeSSEStream(reader: ReadableStreamDefaultReader<Uint8Ar
           }
           // ── Reasoning events ──
           else if (type === "reasoning.delta" && json.content) {
+            partialReasoningCharacters += (json.content as string).length;
             yield { type: "thinking", content: json.content };
           }
           // ── Message content events ──
@@ -76,6 +82,7 @@ async function* parseNativeSSEStream(reader: ReadableStreamDefaultReader<Uint8Ar
             (type === "content.delta" || type === "message.delta") &&
             json.content
           ) {
+            partialOutputCharacters += (json.content as string).length;
             yield json.content;
           }
           // ── Model loading events ──
@@ -216,13 +223,38 @@ async function* parseNativeSSEStream(reader: ReadableStreamDefaultReader<Uint8Ar
         }
       }
     }
-    if (usage) {
-      yield { type: "usage", usage };
-    } else {
-      yield { type: "usage", usage: { inputTokens: 0, outputTokens: 0 } };
+  } catch (streamError) {
+    // Yield partial usage BEFORE re-throwing — the for-await consumer
+    // won't see yields from `finally` after a throw, so we must yield
+    // the partial usage event here while the generator is still active.
+    if (!usageYielded) {
+      usageYielded = true;
+      if (usage) {
+        yield { type: "usage", usage };
+      } else if (partialOutputCharacters > 0 || partialReasoningCharacters > 0) {
+        const estimatedOutputTokens = Math.ceil(partialOutputCharacters / 4);
+        const estimatedReasoningTokens = Math.ceil(partialReasoningCharacters / 4);
+        yield {
+          type: "usage",
+          usage: {
+            inputTokens: 0,
+            outputTokens: estimatedOutputTokens + estimatedReasoningTokens,
+            ...(estimatedReasoningTokens > 0 && { reasoningOutputTokens: estimatedReasoningTokens }),
+          },
+        };
+      }
     }
+    throw streamError;
   } finally {
-    // reader released
+    // Happy path: yield usage if the stream completed normally without error.
+    if (!usageYielded) {
+      usageYielded = true;
+      if (usage) {
+        yield { type: "usage", usage };
+      } else {
+        yield { type: "usage", usage: { inputTokens: 0, outputTokens: 0 } };
+      }
+    }
   }
 }
 function safeParseJSON(serializedString: unknown) {
@@ -921,7 +953,18 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
       } catch (error: unknown) {
         if (error instanceof Error && error.name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
+        // Enrich generic network errors (e.g. Node.js undici "terminated" for
+        // premature connection close) with LM Studio-specific diagnostic context.
+        const rawMessage = getErrorMessage(error);
+        const errorCode = (error instanceof Error && (error as NodeJS.ErrnoException).code) || null;
+        const errorCause = (error instanceof Error && error.cause) ? getErrorMessage(error.cause) : null;
+        const diagnosticParts = [
+          `LM Studio (${instanceId}) stream error: ${rawMessage}`,
+          `model=${model}`,
+          errorCode && `code=${errorCode}`,
+          errorCause && errorCause !== rawMessage && `cause=${errorCause}`,
+        ].filter(Boolean);
+        throw new ProviderError(PROVIDERS.LM_STUDIO, diagnosticParts.join(', '), 500, error);
       } finally {
         if (isRequestActive) {
           const activeCount = _activeRequestsCount.get(model) || 0;
@@ -988,6 +1031,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        // @ts-expect-error -- dispatcher is a valid undici option accepted by Node.js fetch
+        dispatcher: STREAMING_DISPATCHER,
         ...(options.signal && { signal: options.signal }),
       });
       if (!response.ok) {
