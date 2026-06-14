@@ -1257,33 +1257,55 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
       }
     },
     async loadModel(model: string, options: ProviderOptions = {}, signal?: AbortSignal) {
+      // ── Singleflight: coalesce concurrent loads of the same model ──
+      // LM Studio creates a NEW instance every time /api/v1/models/load
+      // is called, even if the model is already loading. This gate ensures
+      // only the first caller actually POSTs — all others await the same
+      // inflight promise.
+      if (_loadInflight.has(model)) {
+        logger.info(
+          `[LM-Studio:${instanceId}] loadModel("${model}") — singleflight: already loading, waiting…`,
+        );
+        return _loadInflight.get(model);
+      }
+
       const baseUrl = getBaseUrl();
       logger.provider("LM Studio", `loadModel model=${model}`);
-      try {
-        const payload = { model, echo_load_config: true };
-        if (options.context_length != null)
-          (payload as Record<string, unknown>).context_length = options.context_length;
-        if (options.flash_attention != null)
-          (payload as Record<string, unknown>).flash_attention = options.flash_attention;
-        if (options.offload_kv_cache_to_gpu != null)
-          (payload as Record<string, unknown>).offload_kv_cache_to_gpu = options.offload_kv_cache_to_gpu;
-        if (options.eval_batch_size != null)
-          (payload as Record<string, unknown>).eval_batch_size = options.eval_batch_size;
-        const response = await fetch(`${baseUrl}/api/v1/models/load`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          ...(signal && { signal }),
-        });
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`API error: ${response.status} ${errorText}`);
+
+      const loadWork = (async () => {
+        try {
+          const payload = { model, echo_load_config: true };
+          if (options.context_length != null)
+            (payload as Record<string, unknown>).context_length = options.context_length;
+          if (options.flash_attention != null)
+            (payload as Record<string, unknown>).flash_attention = options.flash_attention;
+          if (options.offload_kv_cache_to_gpu != null)
+            (payload as Record<string, unknown>).offload_kv_cache_to_gpu = options.offload_kv_cache_to_gpu;
+          if (options.eval_batch_size != null)
+            (payload as Record<string, unknown>).eval_batch_size = options.eval_batch_size;
+          const response = await fetch(`${baseUrl}/api/v1/models/load`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            ...(signal && { signal }),
+          });
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`API error: ${response.status} ${errorText}`);
+          }
+          return response.json();
+        } catch (error: unknown) {
+          if ((error instanceof Error && error.name === "AbortError")) throw error;
+          if (error instanceof ProviderError) throw error;
+          throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
         }
-        return response.json();
-      } catch (error: unknown) {
-                if ((error instanceof Error && error.name === "AbortError")) throw error; // Let AbortError propagate
-        if (error instanceof ProviderError) throw error;
-                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
+      })();
+
+      _loadInflight.set(model, loadWork);
+      try {
+        return await loadWork;
+      } finally {
+        _loadInflight.delete(model);
       }
     },
     /**
