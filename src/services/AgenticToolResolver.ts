@@ -247,6 +247,12 @@ export default class AgenticToolResolver {
       finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.DESCRIBE_IMAGE);
     }
 
+    // When the model has native thinking as a built-in capability, the think
+    // tool is redundant — the model reasons natively before each response/tool call.
+    if (modelDefinition?.thinking) {
+      finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.THINK);
+    }
+
     logger.info(
       `[AgenticToolResolver] Final: ${finalTools.length} tools`,
     );

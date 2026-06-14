@@ -29,15 +29,47 @@ export const MODEL_MANAGEMENT_TYPES = new Set(["lm-studio"]);
 
 /**
  * Models that support extended thinking / chain-of-thought reasoning.
- * Matched against the lowercased model key.
+ * Matched against the lowercased model key via substring inclusion.
+ * Only include models whose GGUF/local variants emit native &lt;think&gt;
+ * tags or structured reasoning traces before the final answer.
  */
 export const THINKING_PATTERNS = [
+  // Alibaba — Qwen family
   "qwen3",
+  "qwq",
+  // DeepSeek
   "deepseek-r1",
   "deepseek-v3",
+  // OpenAI open-weight
   "gpt-oss",
+  // Google
   "gemma-4",
+  // MiniMax
   "minimax",
+  // Microsoft — Phi-4 reasoning variants
+  "phi4-reasoning",
+  "phi-4-reasoning",
+  // Alibaba — Marco-o1
+  "marco-o1",
+  // Skywork
+  "skywork-o1",
+  // LG AI Research — EXAONE Deep
+  "exaone-deep",
+  // Zhipu AI — GLM series (4+)
+  "glm-4",
+  "glm4",
+  "glm-5",
+  "glm5",
+  // Deep Cogito — hybrid reasoning
+  "cogito",
+  // IBM — Granite reasoning variants
+  "granite-reasoning",
+  // Cognitive Computations — Dolphin R1 (reasoning-trained)
+  "dolphin-r1",
+  // Shanghai AI Lab — InternLM3 (deep thinking mode)
+  "internlm3",
+  // Moonshot AI — Kimi K2
+  "kimi-k2",
 ] as const;
 
 /**
