@@ -15,6 +15,53 @@ import {
   MEDIA_STRATEGIES,
   type OpenAICompletionResponse,
 } from "../utils/openai-compat.ts";
+import type { InputMessage } from "../utils/openai-compat.ts";
+
+// ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+// ┃  TEMPORARY PATCH — Remove when vLLM fixes Qwen3.6 chat     ┃
+// ┃  template system message positioning bug.                   ┃
+// ┃                                                             ┃
+// ┃  TODO(vllm-qwen3.6): Remove this entire block once vLLM    ┃
+// ┃  supports mid-conversation system messages for Qwen3.6.    ┃
+// ┃                                                             ┃
+// ┃  Bug: vLLM's Qwen3.6 chat template enforces that system    ┃
+// ┃  messages must only appear at the very beginning. The       ┃
+// ┃  agentic harness injects mid-conversation system messages   ┃
+// ┃  (tool doc addendums) which triggers:                       ┃
+// ┃  "System message must be at the beginning."                 ┃
+// ┃                                                             ┃
+// ┃  Workaround: rewrite non-leading system → user role.        ┃
+// ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+// FIXME(vllm-qwen3.6): Temporary model list — delete with the patch above
+const MODELS_REQUIRING_SYSTEM_REWRITE_TEMP_PATCH = ["qwen3.6"];
+
+function requiresSystemMessageRewriteTempPatch(modelName: string): boolean {
+  const normalizedModelName = modelName.toLowerCase();
+  return MODELS_REQUIRING_SYSTEM_REWRITE_TEMP_PATCH.some(
+    (pattern) => normalizedModelName.includes(pattern),
+  );
+}
+
+// FIXME(vllm-qwen3.6): Temporary rewriter — delete with the patch above
+function rewriteNonLeadingSystemMessages(messages: InputMessage[], modelName: string): InputMessage[] {
+  if (!requiresSystemMessageRewriteTempPatch(modelName)) return messages;
+
+  let hasPassedLeadingSystemBlock = false;
+  return messages.map((message) => {
+    if (message.role === "system") {
+      if (!hasPassedLeadingSystemBlock) {
+        return message;
+      }
+      logger.warn(
+        `[vLLM] TEMP PATCH: Rewriting mid-conversation system message to user role for ${modelName} (vllm-qwen3.6 workaround)`,
+      );
+      return { ...message, role: "user" };
+    }
+    hasPassedLeadingSystemBlock = true;
+    return message;
+  });
+}
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -49,7 +96,8 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
       const baseUrl = getBaseUrl();
             logger.provider("vLLM", `generateText model=${model} baseUrl=${baseUrl}`);
       try {
-        const prepared = prepareOpenAICompatMessages(messages, {
+        const rewrittenMessages = rewriteNonLeadingSystemMessages(messages as InputMessage[], model);
+        const prepared = prepareOpenAICompatMessages(rewrittenMessages, {
           mediaStrategy: MEDIA_STRATEGIES.FULL_MULTIMODAL,
         });
 
@@ -114,7 +162,8 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         `generateTextStream model=${model} baseUrl=${baseUrl}`,
       );
       try {
-        const prepared = prepareOpenAICompatMessages(messages, {
+        const rewrittenMessages = rewriteNonLeadingSystemMessages(messages as InputMessage[], model);
+        const prepared = prepareOpenAICompatMessages(rewrittenMessages, {
           mediaStrategy: MEDIA_STRATEGIES.FULL_MULTIMODAL,
         });
 

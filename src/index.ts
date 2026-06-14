@@ -69,6 +69,13 @@ import webhookRouter from "./routes/WebhookRoutes.ts";
 const app = express();
 const server = http.createServer(app);
 
+// Disable the default 5-minute request timeout for long-lived SSE connections.
+// Node.js 18+ defaults `requestTimeout` to 300,000ms which kills ANY response
+// cycle exceeding 5 minutes — including active SSE streams where data is flowing
+// continuously. SSE lifecycle is managed by AbortController + client disconnect,
+// so the server-level timeout is redundant and harmful for streaming workloads.
+server.requestTimeout = 0;
+
 // Middleware
 app.use(
   cors({
