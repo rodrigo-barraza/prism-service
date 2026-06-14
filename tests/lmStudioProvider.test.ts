@@ -592,9 +592,13 @@ describe("LM Studio advanced integration & edge cases", () => {
     await consumeStream(firstStream);
 
     const firstLoadCalls = fetchCalls.filter((call) => call.url.includes("/models/load"));
-    expect(firstLoadCalls).toHaveLength(2);
+    expect(firstLoadCalls).toHaveLength(3);
     expect((firstLoadCalls[0].body as Record<string, unknown>).context_length).toBe(120000);
-    expect((firstLoadCalls[1].body as Record<string, unknown>).context_length).toBe(65000);
+    expect((firstLoadCalls[0].body as Record<string, unknown>).eval_batch_size).toBe(4096);
+    expect((firstLoadCalls[1].body as Record<string, unknown>).context_length).toBe(120000);
+    expect((firstLoadCalls[1].body as Record<string, unknown>).eval_batch_size).toBe(512);
+    expect((firstLoadCalls[2].body as Record<string, unknown>).context_length).toBe(65000);
+    expect((firstLoadCalls[2].body as Record<string, unknown>).eval_batch_size).toBe(4096);
 
     const lengthBeforeSecondIteration = fetchCalls.length;
 
