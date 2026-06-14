@@ -1,5 +1,6 @@
 import { ProviderOptions, ChatMessage, Provider, GenerateTextResult, StreamChunk } from "../types/provider.ts";
 import { ProviderError } from "../utils/errors.ts";
+import { STREAMING_DISPATCHER } from "../utils/openai-compat.ts";
 import logger from "../utils/logger.ts";
 
 import { TYPES, getDefaultModels } from "../config.ts";
@@ -121,6 +122,8 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
         "Ollama",
         `generateTextStream model=${model} baseUrl=${baseUrl}`,
       );
+      let partialOutputCharacters = 0;
+      let partialThinkingCharacters = 0;
       try {
         // Single-model enforcement: unload any other loaded models
         try {
@@ -163,6 +166,8 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody),
+          // @ts-expect-error -- dispatcher is a valid undici option accepted by Node.js fetch
+          dispatcher: STREAMING_DISPATCHER,
           ...(options.signal && { signal: options.signal }),
         });
 
@@ -198,11 +203,13 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
 
               // Thinking content comes in message.thinking
               if (parsedJson.message?.thinking) {
+                partialThinkingCharacters += (parsedJson.message.thinking as string).length;
                 yield { type: "thinking", content: parsedJson.message.thinking };
               }
 
               // Text content comes in message.content
               if (parsedJson.message?.content) {
+                partialOutputCharacters += (parsedJson.message.content as string).length;
                 yield parsedJson.message.content;
               }
 
@@ -245,6 +252,19 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
         }
       } catch (error: unknown) {
         if (error instanceof Error && error.name === "AbortError") return; // Client disconnected
+        // Yield partial usage before re-throwing so the consumer captures
+        // whatever tokens were generated before the stream terminated.
+        if (partialOutputCharacters > 0 || partialThinkingCharacters > 0) {
+          const estimatedOutputTokens = Math.ceil(partialOutputCharacters / 4);
+          const estimatedThinkingTokens = Math.ceil(partialThinkingCharacters / 4);
+          yield {
+            type: "usage",
+            usage: {
+              inputTokens: 0,
+              outputTokens: estimatedOutputTokens + estimatedThinkingTokens,
+            },
+          };
+        }
         if (error instanceof ProviderError) throw error;
         throw new ProviderError("ollama", getErrorMessage(error), 500, error);
       }
