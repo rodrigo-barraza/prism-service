@@ -671,8 +671,9 @@ describe("HookInitializer", () => {
     expect(internalHooks.get("beforeToolCall")[0].name).toBe("AutoApprovalEngine");
 
     expect(internalHooks.get("afterResponse")).toBeDefined();
-    expect(internalHooks.get("afterResponse")).toHaveLength(1);
+    expect(internalHooks.get("afterResponse")).toHaveLength(2);
     expect(internalHooks.get("afterResponse")[0].name).toBe("MemoryExtractor");
+    expect(internalHooks.get("afterResponse")[1].name).toBe("ConversationEmbedding");
   });
 
   it("should register CriticGate when enableCriticGate is true", () => {
