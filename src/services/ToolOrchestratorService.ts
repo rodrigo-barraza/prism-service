@@ -14,6 +14,8 @@ import {
   FILE_CATEGORIES,
 } from "../constants.ts";
 import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
+import SettingsService from "./SettingsService.ts";
+import { injectVoiceCatalog, TTS_VOICE_CATALOG_PLACEHOLDER } from "../utils/VoiceCatalog.ts";
 import type { OrchestratorContext, TeamMember } from "../types/orchestrator.ts";
 
 // ────────────────────────────────────────────────────────────
@@ -593,8 +595,37 @@ export default class ToolOrchestratorService {
 
   /** AI-clean schemas (no endpoint/domain/dataSource) — for LLM tool arrays */
   static getToolSchemas(defaultTopology?: string) {
+    const creativeSettings = SettingsService.getCached().creative;
+    const textToSpeechProvider = creativeSettings?.textToSpeechProvider || "elevenlabs";
+
+    const resolvedSchemas = cachedAISchemas.map((schema) => {
+      if (schema.name !== "synthesize_speech") return schema;
+
+      const parameters = schema.parameters as Record<string, unknown> | undefined;
+      const properties = parameters?.properties as Record<string, Record<string, unknown>> | undefined;
+      const voiceDescription = properties?.voice?.description as string | undefined;
+
+      if (!voiceDescription || !voiceDescription.includes(TTS_VOICE_CATALOG_PLACEHOLDER)) {
+        return schema;
+      }
+
+      return {
+        ...schema,
+        parameters: {
+          ...parameters,
+          properties: {
+            ...properties,
+            voice: {
+              ...properties!.voice,
+              description: injectVoiceCatalog(voiceDescription, textToSpeechProvider),
+            },
+          },
+        },
+      };
+    });
+
     return [
-      ...cachedAISchemas,
+      ...resolvedSchemas,
       ...InternalToolRegistry.getSchemas(),
       ...getOrchestratorToolSchemas(defaultTopology),
     ];
