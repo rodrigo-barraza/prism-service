@@ -53,7 +53,7 @@ const searchConversations = {
     },
   },
   labels: ["coding", "memory"],
-  domain: DOMAINS.MEMORY.displayName,
+  domain: DOMAINS.CORE_HARNESS.displayName,
   async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
     const query = typeof toolArguments.query === "string" ? toolArguments.query : "";
     const limit = typeof toolArguments.limit === "number"
