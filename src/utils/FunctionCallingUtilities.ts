@@ -21,13 +21,17 @@ const TRUNCATABLE_ARRAY_KEYS = [
   "commodities",
 ];
 
+function isTruncatableResult(value: unknown): value is object | string | number | boolean | null | undefined {
+  return typeof value !== "function" && typeof value !== "symbol";
+}
+
 /**
  * Truncate a tool result to avoid blowing up the model's context window.
  * Caps arrays at 10 items and the serialized JSON at ~maxChars.
  * The full result is still stored in the DB and shown in the UI;
  * this only affects what gets re-sent to the model.
  */
-export function truncateToolResult(result: unknown, maxChars = 8000): unknown {
+export function truncateToolResult(result: object | string | number | boolean | null | undefined, maxChars = 8000): object | string | number | boolean | null | undefined {
   if (!result || typeof result !== "object") return result;
 
   // Also handle top-level arrays (e.g. tides, earthquakes)
@@ -39,7 +43,8 @@ export function truncateToolResult(result: unknown, maxChars = 8000): unknown {
   }
 
   // If result has a known array wrapper, cap items at 10
-  const trimmed = { ...(result as Record<string, unknown>) };
+  const resultRecord = result as Record<string, unknown>;
+  const trimmed = { ...resultRecord };
   for (const key of TRUNCATABLE_ARRAY_KEYS) {
     const items = trimmed[key];
     if (Array.isArray(items) && items.length > 10) {
@@ -94,7 +99,7 @@ export function expandMessagesForFunctionCall(
   const filtered = filterDeleted
     ? messages.filter(
         (messageItem) =>
-          !(messageItem as ChatMessage & { deleted?: boolean }).deleted &&
+          !messageItem.deleted &&
           (messageItem.role !== "assistant" || messageItem.content?.toString().trim() || messageItem.toolCalls?.length),
       )
     : messages;
@@ -108,8 +113,8 @@ export function expandMessagesForFunctionCall(
         content: message.content?.toString().trim() || null,
         // Preserve thinking + signature for Anthropic multi-turn round-trips
         ...(message.thinking && { thinking: message.thinking }),
-        ...((message as ChatMessage & { thinkingSignature?: string }).thinkingSignature && {
-          thinkingSignature: (message as ChatMessage & { thinkingSignature?: string }).thinkingSignature,
+        ...(message.thinkingSignature && {
+          thinkingSignature: message.thinkingSignature,
         }),
         toolCalls: message.toolCalls.map((toolCall: ToolCallEntry) => ({
           id: toolCall.id,
@@ -143,6 +148,8 @@ export function expandMessagesForFunctionCall(
             });
           }
 
+          const truncatableResult = isTruncatableResult(finalResult) ? finalResult : undefined;
+
           return {
             role: "tool",
             name: toolCall.name,
@@ -150,7 +157,7 @@ export function expandMessagesForFunctionCall(
             content:
               typeof finalResult === "string"
                 ? finalResult
-                : JSON.stringify(truncateToolResult(finalResult)),
+                : JSON.stringify(truncateToolResult(truncatableResult)),
           };
         });
       return [assistantMessage, ...toolMessages];
@@ -161,7 +168,7 @@ export function expandMessagesForFunctionCall(
       return [
         {
           role: "tool",
-          tool_call_id: (message as ChatMessage & { tool_call_id?: string }).tool_call_id,
+          tool_call_id: message.tool_call_id,
           name: message.name,
           content: message.content,
         },
