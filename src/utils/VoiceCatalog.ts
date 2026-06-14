@@ -1,4 +1,4 @@
-import { VOICES, DEFAULT_VOICES } from "../config.ts";
+import { VOICES, DEFAULT_VOICES, getDefaultModels, TYPES } from "../config.ts";
 import { PROVIDERS } from "../constants.ts";
 
 type VoiceEntry = { name: string; gender: string; description: string };
@@ -6,7 +6,7 @@ type VoiceEntry = { name: string; gender: string; description: string };
 const TTS_VOICE_CATALOG_PLACEHOLDER = "{{TTS_VOICE_CATALOG}}";
 
 const VOICE_CATALOGS: Record<string, string> = {
-  [PROVIDERS.INWORLD]: buildInworldCatalog(),
+  [PROVIDERS.INWORLD]: "",
   [PROVIDERS.OPENAI]: buildOpenAICatalog(),
   [PROVIDERS.GOOGLE]: buildGoogleCatalog(),
   [PROVIDERS.ELEVENLABS]: buildElevenLabsCatalog(),
@@ -16,7 +16,7 @@ function genderLabel(gender: string): string {
   return gender === "Male" ? "M" : "F";
 }
 
-function buildInworldCatalog(): string {
+function buildInworldCatalog(model?: string): string {
   const voices = (VOICES[PROVIDERS.INWORLD] || []) as VoiceEntry[];
   const defaultVoice = DEFAULT_VOICES[PROVIDERS.INWORLD] || "Dennis";
   const entries = voices
@@ -28,6 +28,13 @@ function buildInworldCatalog(): string {
         .trim();
       return `${voice.name} (${shortDescription}, ${genderLabel(voice.gender)}${isDefault ? " — DEFAULT" : ""})`;
     });
+
+  const activeModel = model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld || "inworld-tts-2";
+  const isTtsTwo = activeModel.startsWith("inworld-tts-2");
+
+  if (!isTtsTwo) {
+    return `Available Inworld voices (${entries.length}): ${entries.join(", ")}.`;
+  }
 
   const steeringInstructions = [
     "This provider uses inworld-tts-2 which supports instruction tags — natural language directions in square brackets placed before the text they apply to.",
@@ -109,18 +116,22 @@ function buildElevenLabsCatalog(): string {
   return `Available ElevenLabs voices: ${entries.join(", ")}.`;
 }
 
-export function getVoiceCatalogForProvider(provider: string): string {
+export function getVoiceCatalogForProvider(provider: string, model?: string): string {
+  if (provider === PROVIDERS.INWORLD) {
+    return buildInworldCatalog(model);
+  }
   return VOICE_CATALOGS[provider] || VOICE_CATALOGS[PROVIDERS.ELEVENLABS];
 }
 
 export function injectVoiceCatalog(
   description: string,
   provider: string,
+  model?: string,
 ): string {
   if (!description.includes(TTS_VOICE_CATALOG_PLACEHOLDER)) return description;
   return description.replace(
     TTS_VOICE_CATALOG_PLACEHOLDER,
-    getVoiceCatalogForProvider(provider),
+    getVoiceCatalogForProvider(provider, model),
   );
 }
 

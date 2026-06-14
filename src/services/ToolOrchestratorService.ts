@@ -597,6 +597,7 @@ export default class ToolOrchestratorService {
   static getToolSchemas(defaultTopology?: string) {
     const creativeSettings = SettingsService.getCached().creative;
     const textToSpeechProvider = creativeSettings?.textToSpeechProvider || "elevenlabs";
+    const textToSpeechModel = creativeSettings?.textToSpeechModel || "";
 
     const resolvedSchemas = cachedAISchemas.map((schema) => {
       if (schema.name !== "synthesize_speech") return schema;
@@ -617,7 +618,11 @@ export default class ToolOrchestratorService {
             ...properties,
             voice: {
               ...properties!.voice,
-              description: injectVoiceCatalog(voiceDescription, textToSpeechProvider),
+              description: injectVoiceCatalog(
+                voiceDescription,
+                textToSpeechProvider,
+                textToSpeechModel,
+              ),
             },
           },
         },
