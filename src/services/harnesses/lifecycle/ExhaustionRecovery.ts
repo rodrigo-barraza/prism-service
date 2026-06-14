@@ -33,9 +33,9 @@ export async function runExhaustionRecoveryPass(
   emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.ITERATION_LIMIT_REACHED });
 
   currentMessages.push({
-    role: "user",
+    role: "system",
     content: [
-      "[SYSTEM] You have reached the maximum number of tool-call iterations for this turn.",
+      "You have reached the maximum number of tool-call iterations for this turn.",
       "Summarize the progress you have made so far, report any partial results,",
       "and clearly state what remains to be done so the user knows where things stand.",
     ].join(" "),

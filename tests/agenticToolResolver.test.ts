@@ -39,6 +39,27 @@ const MOCK_TOOLS_API_SCHEMAS = [
   },
 ];
 
+const MOCK_MCP_TOOL_SCHEMAS = [
+  {
+    name: "mcp__localserver__list_todos",
+    description: "List all TODO items",
+    parameters: { type: "object", properties: {} },
+    _mcpServer: "localserver",
+    _mcpOriginalName: "list_todos",
+    domain: "Model Context Protocol: localserver",
+  },
+  {
+    name: "mcp__localserver__create_todo",
+    description: "Create a TODO item",
+    parameters: { type: "object", properties: {} },
+    _mcpServer: "localserver",
+    _mcpOriginalName: "create_todo",
+    domain: "Model Context Protocol: localserver",
+  },
+];
+
+let mockMCPToolSchemas = [...MOCK_MCP_TOOL_SCHEMAS];
+
 const MOCK_ORCHESTRATOR_TOOL_SCHEMAS = [
   {
     name: "create_team",
@@ -72,7 +93,7 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
   default: {
     ensureSchemas: vi.fn().mockResolvedValue(undefined),
     getToolSchemas: vi.fn(() => [...MOCK_TOOLS_API_SCHEMAS, ...MOCK_ORCHESTRATOR_TOOL_SCHEMAS]),
-    getMCPToolSchemas: vi.fn(() => []),
+    getMCPToolSchemas: vi.fn(() => mockMCPToolSchemas),
     getClientToolSchemas: vi.fn(() =>
       MOCK_TOOLS_API_SCHEMAS.map((tool) => ({
         ...tool,
@@ -121,6 +142,9 @@ const mockCustomAgentEmpty = {
   enabledByDefaultTools: [],
   coreToolsLocked: false,
 };
+const mockWildcardPersona = {
+  availableTools: ["*"],
+};
 vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
   default: {
     get: vi.fn((agent) => {
@@ -128,6 +152,7 @@ vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
       if (agent === "LUPOS") return mockLuposPersona;
       if (agent === "CUSTOM_AGENT") return mockCustomAgent;
       if (agent === "CUSTOM_AGENT_EMPTY") return mockCustomAgentEmpty;
+      if (agent === "WILDCARD_AGENT") return mockWildcardPersona;
       return null;
     }),
   },
@@ -161,6 +186,7 @@ const { default: AgenticToolResolver } = await import(
 describe("AgenticToolResolver — tool resolution", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMCPToolSchemas = [...MOCK_MCP_TOOL_SCHEMAS];
   });
 
   it("automatically enables core agentic tools for other agents like CODING even if not explicitly whitelisted", async () => {
@@ -325,5 +351,115 @@ describe("AgenticToolResolver — tool resolution", () => {
 
     expect(toolNames).not.toContain("read_file");
     expect(toolNames).not.toContain("write_file");
+  });
+
+  // ── MCP tool lifecycle (no bypass) ──────────────────────────
+
+  it("includes MCP tools by default in disabledTools mode when not explicitly disabled", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {
+        disabledTools: ["get_weather"],
+      },
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).toContain("mcp__localserver__list_todos");
+    expect(toolNames).toContain("mcp__localserver__create_todo");
+    expect(toolNames).not.toContain("get_weather");
+  });
+
+  it("excludes MCP tools when explicitly added to disabledTools", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {
+        disabledTools: ["mcp__localserver__list_todos"],
+      },
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).not.toContain("mcp__localserver__list_todos");
+    expect(toolNames).toContain("mcp__localserver__create_todo");
+    expect(toolNames).toContain("read_file");
+  });
+
+  it("excludes MCP tools from restricted persona that does not list them", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {
+        disabledTools: [],
+      },
+      agent: "CODING",
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).not.toContain("mcp__localserver__list_todos");
+    expect(toolNames).not.toContain("mcp__localserver__create_todo");
+    expect(toolNames).toContain("read_file");
+  });
+
+  it("includes MCP tools for wildcard persona (availableTools: *)", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {
+        disabledTools: [],
+      },
+      agent: "WILDCARD_AGENT",
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).toContain("mcp__localserver__list_todos");
+    expect(toolNames).toContain("mcp__localserver__create_todo");
+  });
+
+  it("excludes MCP tools for LUPOS persona with restrictive availableTools list", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {
+        disabledTools: [],
+      },
+      agent: "LUPOS",
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).toContain("read_file");
+    expect(toolNames).not.toContain("mcp__localserver__list_todos");
+    expect(toolNames).not.toContain("mcp__localserver__create_todo");
+  });
+
+  it("resolves correctly when no MCP servers are connected", async () => {
+    mockMCPToolSchemas = [];
+
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {
+        disabledTools: [],
+      },
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).toContain("read_file");
+    expect(toolNames).not.toContain("mcp__localserver__list_todos");
   });
 });

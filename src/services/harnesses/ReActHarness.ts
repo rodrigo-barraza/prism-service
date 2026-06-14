@@ -422,7 +422,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           });
 
           currentMessages.push({
-            role: "user",
+            role: "system",
             content:
               `[VALIDATION ERROR] Your recent edit(s) introduced ${validationFeedback.length} error(s):\n\n` +
               `${errorBlock}\n\n` +
@@ -589,7 +589,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           const lastMessage = currentMessages[currentMessages.length - 1];
           const isAlreadyPrompted =
             lastMessage &&
-            lastMessage.role === "user" &&
+            lastMessage.role === "system" &&
             typeof lastMessage.content === "string" &&
             lastMessage.content.includes("If you have fully completed");
 
@@ -603,8 +603,8 @@ export default class ReActHarness extends BaseAgenticHarness {
               ...(pass.streamedThinking.trim() && { thinking: pass.streamedThinking.trim() }),
             });
             currentMessages.push({
-              role: "user",
-              content: "[System Context: Please proceed with the next step using the appropriate tools to implement your plan. If you have fully completed the user's request, please output a final message stating that you are done without calling any tools.]",
+              role: "system",
+              content: "Please proceed with the next step using the appropriate tools to implement your plan. If you have fully completed the user's request, please output a final message stating that you are done without calling any tools.",
             });
             this.logIteration(pass, currentMessages);
             continue;

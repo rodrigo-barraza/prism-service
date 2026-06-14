@@ -75,8 +75,8 @@ export function blockUnauthorizedToolCalls(
     }
 
     currentMessages.push({
-      role: "user",
-      content: `[SYSTEM] You are in PLANNING MODE. Your tool call(s) [${blockedToolNames}] were blocked because only exit_plan_mode is available during planning. You MUST call exit_plan_mode to present your plan for approval before any other tools can be used.`,
+      role: "system",
+      content: `You are in PLANNING MODE. Your tool call(s) [${blockedToolNames}] were blocked because only exit_plan_mode is available during planning. You MUST call exit_plan_mode to present your plan for approval before any other tools can be used.`,
     });
 
     return { allBlocked: true };

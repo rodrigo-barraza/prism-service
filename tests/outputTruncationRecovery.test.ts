@@ -170,7 +170,7 @@ describe("OutputTruncationRecovery", () => {
       injectContinuationContext(currentMessages, pass, mockContext, 1);
 
       const lastMessage = currentMessages[currentMessages.length - 1];
-      expect(lastMessage.role).toBe("user");
+      expect(lastMessage.role).toBe("system");
       expect(lastMessage.content).toContain("cut short");
       expect(lastMessage.content).toContain("continue exactly where you left off");
     });
@@ -251,7 +251,7 @@ describe("OutputTruncationRecovery", () => {
 
       // Should only have the original 2 messages + continuation prompt (no empty assistant)
       expect(currentMessages).toHaveLength(3);
-      expect(currentMessages[2].role).toBe("user");
+      expect(currentMessages[2].role).toBe("system");
     });
   });
 
@@ -396,14 +396,14 @@ describe("Recovery Flow Sequence", () => {
     // 1 original user + (3 assistant + 3 continuation user) = 7 messages
     expect(currentMessages).toHaveLength(7);
 
-    // Verify the message sequence: user, assistant, user, assistant, user, assistant, user
+    // Verify the message sequence: user, assistant, system, assistant, system, assistant, system
     expect(currentMessages[0].role).toBe("user");
     expect(currentMessages[1].role).toBe("assistant");
-    expect(currentMessages[2].role).toBe("user"); // continuation
+    expect(currentMessages[2].role).toBe("system"); // continuation
     expect(currentMessages[3].role).toBe("assistant");
-    expect(currentMessages[4].role).toBe("user"); // continuation
+    expect(currentMessages[4].role).toBe("system"); // continuation
     expect(currentMessages[5].role).toBe("assistant");
-    expect(currentMessages[6].role).toBe("user"); // continuation
+    expect(currentMessages[6].role).toBe("system"); // continuation
   });
 
   it("should inject error-as-context after recovery exhaustion", () => {

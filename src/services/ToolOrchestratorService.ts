@@ -850,6 +850,13 @@ export default class ToolOrchestratorService {
       return ToolOrchestratorService.executeMCPTool(name, args);
     }
 
+    // Intercept search_tools to merge MCP tool results from connected servers.
+    // Tools-api only knows about its own catalog — MCP tools live in Prism's
+    // MCPClientService memory and must be merged locally.
+    if (name === TOOL_NAMES.SEARCH_TOOLS) {
+      return ToolOrchestratorService.executeSearchToolsWithMCP(args, context);
+    }
+
     // Inject reference images from conversation context into generate_image args.
     // The tools-api endpoint needs these as explicit args since it doesn't have
     // access to Prism's conversation messages.
@@ -1128,6 +1135,103 @@ export default class ToolOrchestratorService {
   }
   static getMCPToolSchemas() {
     return MCPClientService.getToolSchemas();
+  }
+
+  /**
+   * Execute search_tools with MCP tool merging.
+   * Calls tools-api for the built-in catalog search, then scores connected
+   * MCP server tools locally using the same heuristics as AgenticToolSearchService
+   * and merges them into a unified result set.
+   */
+  static async executeSearchToolsWithMCP(
+    args: Record<string, unknown>,
+    context: ToolExecutionContext,
+  ): Promise<Record<string, unknown>> {
+    const toolsApiResult = await executeToolGeneric(TOOL_NAMES.SEARCH_TOOLS, args, context) as Record<string, unknown>;
+
+    const mcpSchemas = MCPClientService.getToolSchemas();
+    if (mcpSchemas.length === 0) return toolsApiResult;
+
+    const queryTextLowercase = typeof args.query === "string" ? args.query.toLowerCase().trim() : "";
+    const domainFilter = typeof args.domain === "string" ? args.domain.toLowerCase() : null;
+    const limit = typeof args.limit === "number" ? Math.min(Math.max(1, args.limit), 50) : 20;
+
+    if (!queryTextLowercase && !domainFilter) return toolsApiResult;
+
+    // Filter MCP schemas by domain when a domain filter is specified
+    let candidateSchemas = mcpSchemas;
+    if (domainFilter) {
+      candidateSchemas = mcpSchemas.filter((schema) => {
+        const schemaDomain = (schema.domain || `Model Context Protocol: ${schema._mcpServer}`).toLowerCase();
+        return schemaDomain === domainFilter || schemaDomain.includes(domainFilter);
+      });
+    }
+
+    // Score matches using same heuristics as AgenticToolSearchService
+    const scoredMatches = candidateSchemas
+      .map((schema) => {
+        if (!queryTextLowercase) return { schema, score: 1 };
+
+        const originalNameLowercase = (schema._mcpOriginalName || "").toLowerCase();
+        const namespacedNameLowercase = schema.name.toLowerCase();
+        const descriptionLowercase = (schema.description || "").toLowerCase();
+
+        let score = 0;
+        if (originalNameLowercase === queryTextLowercase) score += 100;
+        else if (originalNameLowercase.includes(queryTextLowercase)) score += 50;
+        if (namespacedNameLowercase.includes(queryTextLowercase)) score += 30;
+        if (descriptionLowercase.includes(queryTextLowercase)) score += 20;
+
+        const queryWords = queryTextLowercase.split(/\s+/);
+        for (const word of queryWords) {
+          if (word.length < 2) continue;
+          if (originalNameLowercase.includes(word) || namespacedNameLowercase.includes(word)) score += 10;
+          if (descriptionLowercase.includes(word)) score += 5;
+        }
+
+        return { schema, score };
+      })
+      .filter((matchEntry) => matchEntry.score > 0)
+      .sort((firstMatch, secondMatch) => secondMatch.score - firstMatch.score);
+
+    if (scoredMatches.length === 0) return toolsApiResult;
+
+    // Build enabled set for isEnabled annotation (mirrors AgenticToolSearchService)
+    const enabledToolsArray = context.enabledTools;
+    const hasEnabledContext =
+      Array.isArray(enabledToolsArray) &&
+      enabledToolsArray.length > 0 &&
+      !enabledToolsArray.includes("*");
+    const enabledToolsSet = hasEnabledContext ? new Set(enabledToolsArray) : null;
+
+    const mcpMatches = scoredMatches.map((matchEntry) => ({
+      name: matchEntry.schema.name,
+      description: matchEntry.schema.description,
+      domain: matchEntry.schema.domain || `Model Context Protocol: ${matchEntry.schema._mcpServer}`,
+      parameters: matchEntry.schema.parameters || null,
+      ...(enabledToolsSet && { isEnabled: enabledToolsSet.has(matchEntry.schema.name) }),
+    }));
+
+    // Merge with tools-api results
+    const existingMatches = Array.isArray(toolsApiResult.matches) ? toolsApiResult.matches as Record<string, unknown>[] : [];
+    const existingTotal = typeof toolsApiResult.total === "number" ? toolsApiResult.total : existingMatches.length;
+    const mergedMatches = [...existingMatches, ...mcpMatches].slice(0, limit);
+
+    const hasDisabledMcpMatches = enabledToolsSet && mcpMatches.some(
+      (matchEntry) => !enabledToolsSet.has(matchEntry.name),
+    );
+
+    return {
+      ...toolsApiResult,
+      matches: mergedMatches,
+      total: existingTotal + scoredMatches.length,
+      ...(hasDisabledMcpMatches && !toolsApiResult.action_required && {
+        action_required:
+          "IMPORTANT: Some discovered tools are NOT currently enabled (isEnabled: false). " +
+          "You MUST call enable_tools with the tool names you need before you can use them. " +
+          "After enabling, the tools become available on your next iteration.",
+      }),
+    };
   }
 
   /**
