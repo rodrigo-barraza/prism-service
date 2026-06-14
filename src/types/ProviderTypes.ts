@@ -1,3 +1,5 @@
+import type { Provider } from "./provider.ts";
+
 export interface ProviderInstanceConfig {
   url: string;
   concurrency?: number;
@@ -11,7 +13,7 @@ export interface InstanceEntry {
   concurrency: number;
   instanceNumber: number;
   nickname?: string;
-  provider: unknown; // Replace with concrete Provider interface later
+  provider: Provider;
 }
 
 // Basic interfaces for chat structures

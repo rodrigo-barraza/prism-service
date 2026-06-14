@@ -1,4 +1,4 @@
-import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
+import { ProviderOptions, ChatMessage, Provider, GenerateTextResult, StreamChunk } from "../types/provider.ts";
 // ─────────────────────────────────────────────────────────────
 // llama.cpp Provider (llama-server)
 // ─────────────────────────────────────────────────────────────
@@ -76,7 +76,7 @@ interface HealthResponse {
 }
 
 // ── Provider ─────────────────────────────────────────────────
-export function createLlamaCppProvider(baseUrl: string, instanceId: string = "llama-cpp") {
+export function createLlamaCppProvider(baseUrl: string, instanceId: string = "llama-cpp"): Provider {
   const getBaseUrl = () => baseUrl;
 
   return {
@@ -89,7 +89,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
       messages: ChatMessage[],
       model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["llama-cpp"],
       options: ProviderOptions = {},
-    ) {
+    ): Promise<GenerateTextResult> {
       const baseUrl = getBaseUrl();
       logger.provider("llama.cpp", `generateText model=${model} baseUrl=${baseUrl}`);
       try {
@@ -140,9 +140,22 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
           );
         }
 
-        const result: { text: string; thinking: string | null; usage: TokenUsage; toolCalls?: typeof toolCalls } =
-          { text, thinking, usage };
-        if (toolCalls) result.toolCalls = toolCalls;
+        const result: GenerateTextResult = {
+          text,
+          usage: {
+            inputTokens: usage.inputTokens || 0,
+            outputTokens: usage.outputTokens || 0,
+          },
+        };
+        if (thinking) result.thinking = thinking;
+        if (toolCalls) {
+          result.toolCalls = toolCalls.map((toolCall) => ({
+            id: toolCall.id || "",
+            name: toolCall.name,
+            args: typeof toolCall.args === "object" && toolCall.args !== null ? (toolCall.args as Record<string, unknown>) : {},
+            thoughtSignature: toolCall.thoughtSignature || undefined,
+          }));
+        }
         return result;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
@@ -156,7 +169,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
       messages: ChatMessage[],
       model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["llama-cpp"],
       options: ProviderOptions = {},
-    ) {
+    ): AsyncGenerator<StreamChunk, void, unknown> {
       const baseUrl = getBaseUrl();
       logger.provider("llama.cpp", `generateTextStream model=${model} baseUrl=${baseUrl}`);
       try {
@@ -199,7 +212,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
         );
 
         const reader = response.body!.getReader();
-        yield* parseSSEStream(reader, {
+        for await (const chunk of parseSSEStream(reader, {
           signal: options.signal,
           thinkingEnabled: options.thinkingEnabled,
           // llama.cpp extension: extract timings for tok/s
@@ -211,9 +224,30 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
               );
             }
           },
-        });
+        })) {
+          if (typeof chunk === "object") {
+            if (chunk.type === "usage") {
+              yield {
+                type: "usage",
+                usage: {
+                  inputTokens: chunk.usage.inputTokens || 0,
+                  outputTokens: chunk.usage.outputTokens || 0,
+                },
+              };
+            } else if (chunk.type === "toolCall") {
+              yield {
+                ...chunk,
+                id: chunk.id || "",
+              };
+            } else {
+              yield chunk as StreamChunk;
+            }
+          } else {
+            yield chunk;
+          }
+        }
       } catch (error: unknown) {
-        if ((error instanceof Error && error.name === "AbortError")) return; // Client disconnected
+        if (error instanceof Error && error.name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
         throw new ProviderError("llama-cpp", getErrorMessage(error), 500, error);
       }
@@ -228,7 +262,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
       prompt: string = "Describe this image.",
       model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["llama-cpp"],
       systemPrompt?: string,
-    ) {
+    ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }> {
       const baseUrl = getBaseUrl();
       logger.provider("llama.cpp", `captionImage model=${model} baseUrl=${baseUrl}`);
       try {
@@ -262,7 +296,13 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
           inputTokens: data.usage?.prompt_tokens || 0,
           outputTokens: data.usage?.completion_tokens || 0,
         };
-        return { text, usage };
+        return {
+          text,
+          usage: {
+            inputTokens: usage.inputTokens || 0,
+            outputTokens: usage.outputTokens || 0,
+          },
+        };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
         throw new ProviderError("llama-cpp", getErrorMessage(error), 500, error);
@@ -272,7 +312,14 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
     // ── Model Listing ────────────────────────────────────────
     // GET /v1/models
 
-    async listModels() {
+    async listModels(): Promise<{
+      models: Array<{
+        key: string;
+        display_name: string;
+        type: string;
+        loaded_instances?: Array<{ id: string }>;
+      }>;
+    }> {
       const baseUrl = getBaseUrl();
       logger.provider("llama.cpp", "listModels");
       try {

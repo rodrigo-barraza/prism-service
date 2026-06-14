@@ -1,4 +1,4 @@
-import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
+import { ProviderOptions, ChatMessage, Provider, GenerateTextResult, StreamChunk } from "../types/provider.ts";
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 
@@ -50,7 +50,7 @@ function buildOllamaOptions(options: ProviderOptions) {
   return ollamaOptions;
 }
 
-export function createOllamaProvider(baseUrl: string, instanceId: string = "ollama") {
+export function createOllamaProvider(baseUrl: string, instanceId: string = "ollama"): Provider {
   const getBaseUrl = () => baseUrl;
 
   return {
@@ -60,20 +60,20 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
 
     async generateText(
       messages: ChatMessage[],
-            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["ollama"],
+      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["ollama"],
       options: ProviderOptions = {},
-    ) {
+    ): Promise<GenerateTextResult> {
       const baseUrl = getBaseUrl();
       logger.provider(
         "Ollama",
         `generateText model=${model} baseUrl=${baseUrl}`,
       );
       try {
-        const prepared = prepareOllamaMessages(messages);
+        const preparedMessages = prepareOllamaMessages(messages);
 
-        const body = {
+        const requestBody = {
           model,
-          messages: prepared,
+          messages: preparedMessages,
           stream: false,
           ...(options.thinkingEnabled ? { think: true } : {}),
           options: buildOllamaOptions(options),
@@ -82,7 +82,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
         const response = await fetch(`${baseUrl}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {
@@ -90,15 +90,19 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
           throw new Error(`API error: ${response.status} ${errorText}`);
         }
 
-        const data = await response.json();
-        return {
-          text: (data as Record<string, Record<string, string>>).message?.content || "",
-          thinking: (data as Record<string, Record<string, string>>).message?.thinking || null,
+        const responseData = await response.json();
+        const thinking = (responseData as Record<string, Record<string, string>>).message?.thinking || undefined;
+        const result: GenerateTextResult = {
+          text: (responseData as Record<string, Record<string, string>>).message?.content || "",
           usage: {
-            inputTokens: (data as Record<string, number>).prompt_eval_count ?? 0,
-            outputTokens: (data as Record<string, number>).eval_count ?? 0,
+            inputTokens: (responseData as Record<string, number>).prompt_eval_count ?? 0,
+            outputTokens: (responseData as Record<string, number>).eval_count ?? 0,
           },
         };
+        if (thinking) {
+          result.thinking = thinking;
+        }
+        return result;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
         throw new ProviderError("ollama", getErrorMessage(error), 500, error);
@@ -111,7 +115,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
       messages: ChatMessage[],
       model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["ollama"],
       options: ProviderOptions = {},
-    ) {
+    ): AsyncGenerator<StreamChunk, void, unknown> {
       const baseUrl = getBaseUrl();
       logger.provider(
         "Ollama",
@@ -120,12 +124,12 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
       try {
         // Single-model enforcement: unload any other loaded models
         try {
-          const psResponse = await fetch(`${baseUrl}/api/ps`);
-          if (psResponse.ok) {
-            const psData = await psResponse.json();
-            const running = (psData as Record<string, unknown[]>).models || [];
-            for (const runningModel of running as Record<string, string>[]) {
-              const runningName = runningModel.model || runningModel.name;
+          const processStatusResponse = await fetch(`${baseUrl}/api/ps`);
+          if (processStatusResponse.ok) {
+            const processStatusData = await processStatusResponse.json();
+            const runningModels = (processStatusData as Record<string, unknown[]>).models || [];
+            for (const runningModelInstance of runningModels as Record<string, string>[]) {
+              const runningName = runningModelInstance.model || runningModelInstance.name;
               if (runningName && runningName !== model) {
                 yield { type: "status", message: `Unloading ${runningName}…` };
                 logger.info(
@@ -145,11 +149,11 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
           );
         }
 
-        const prepared = prepareOllamaMessages(messages);
+        const preparedMessages = prepareOllamaMessages(messages);
 
-        const body = {
+        const requestBody = {
           model,
-          messages: prepared,
+          messages: preparedMessages,
           stream: true,
           ...(options.thinkingEnabled ? { think: true } : {}),
           options: buildOllamaOptions(options),
@@ -158,7 +162,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
         const response = await fetch(`${baseUrl}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify(requestBody),
           ...(options.signal && { signal: options.signal }),
         });
 
@@ -174,7 +178,7 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
         let usage = null;
 
         while (true) {
-                    if (options.signal?.aborted) {
+          if (options.signal?.aborted) {
             reader.cancel();
             break;
           }
@@ -185,31 +189,31 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
           const lines = buffer.split("\n");
           buffer = lines.pop()!; // keep incomplete line in buffer
 
-                    for ( const line of lines) {
+          for (const line of lines) {
             const trimmed = line.trim();
             if (!trimmed) continue;
 
             try {
-              const json = JSON.parse(trimmed);
+              const parsedJson = JSON.parse(trimmed);
 
               // Thinking content comes in message.thinking
-              if (json.message?.thinking) {
-                yield { type: "thinking", content: json.message.thinking };
+              if (parsedJson.message?.thinking) {
+                yield { type: "thinking", content: parsedJson.message.thinking };
               }
 
               // Text content comes in message.content
-              if (json.message?.content) {
-                yield json.message.content;
+              if (parsedJson.message?.content) {
+                yield parsedJson.message.content;
               }
 
               // Final chunk has done: true with usage stats
-              if (json.done) {
-                const evalDurationSec = json.eval_duration
-                  ? json.eval_duration / 1_000_000_000
+              if (parsedJson.done) {
+                const evalDurationSec = parsedJson.eval_duration
+                  ? parsedJson.eval_duration / 1_000_000_000
                   : null;
                 usage = {
-                  inputTokens: json.prompt_eval_count ?? 0,
-                  outputTokens: json.eval_count ?? 0,
+                  inputTokens: parsedJson.prompt_eval_count ?? 0,
+                  outputTokens: parsedJson.eval_count ?? 0,
                 };
                 // Ollama reports precise eval_duration — use it for tok/s
                 if (
@@ -229,14 +233,20 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
         }
 
         if (usage) {
-          yield { type: "usage", usage };
+          yield {
+            type: "usage",
+            usage: {
+              inputTokens: usage.inputTokens || 0,
+              outputTokens: usage.outputTokens || 0,
+            },
+          };
         } else {
           yield { type: "usage", usage: { inputTokens: 0, outputTokens: 0 } };
         }
       } catch (error: unknown) {
-                if ((error instanceof Error && error.name === "AbortError")) return; // Client disconnected
+        if (error instanceof Error && error.name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("ollama", getErrorMessage(error), 500, error);
+        throw new ProviderError("ollama", getErrorMessage(error), 500, error);
       }
     },
 
@@ -245,9 +255,9 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
     async captionImage(
       images: string[],
       prompt: string = "Describe this image.",
-            model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["ollama"],
+      model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["ollama"],
       systemPrompt?: string,
-    ) {
+    ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }> {
       const baseUrl = getBaseUrl();
       logger.provider(
         "Ollama",
@@ -287,16 +297,16 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
           throw new Error(`API error: ${response.status} ${errorText}`);
         }
 
-        const data = await response.json();
-        const text = (data as Record<string, Record<string, string>>).message?.content || "";
+        const responseData = await response.json();
+        const text = (responseData as Record<string, Record<string, string>>).message?.content || "";
         const usage = {
-          inputTokens: (data as Record<string, number>).prompt_eval_count || 0,
-          outputTokens: (data as Record<string, number>).eval_count || 0,
+          inputTokens: (responseData as Record<string, number>).prompt_eval_count || 0,
+          outputTokens: (responseData as Record<string, number>).eval_count || 0,
         };
         return { text, usage };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("ollama", getErrorMessage(error), 500, error);
+        throw new ProviderError("ollama", getErrorMessage(error), 500, error);
       }
     },
 
@@ -306,7 +316,14 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
      * List all models available in Ollama.
      * GET /api/tags
      */
-    async listModels() {
+    async listModels(): Promise<{
+      models: Array<{
+        key: string;
+        display_name: string;
+        type: string;
+        loaded_instances?: Array<{ id: string }>;
+      }>;
+    }> {
       const baseUrl = getBaseUrl();
       logger.provider("Ollama", "listModels");
       try {
@@ -320,48 +337,53 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
           throw new Error(`API error: ${response.status} ${errorText}`);
         }
 
-        const data = await response.json();
-        const models = (data as Record<string, unknown[]>).models || [];
+        const responseData = await response.json();
+        const models = (responseData as Record<string, unknown[]>).models || [];
 
         let running: Record<string, unknown>[] = [];
         try {
-          const psResponse = await fetch(`${baseUrl}/api/ps`);
-          if (psResponse.ok) {
-            const psData = await psResponse.json();
-            running = (psData as Record<string, Record<string, unknown>[]>).models || [];
+          const processStatusResponse = await fetch(`${baseUrl}/api/ps`);
+          if (processStatusResponse.ok) {
+            const processStatusData = await processStatusResponse.json();
+            running = (processStatusData as Record<string, Record<string, unknown>[]>).models || [];
           }
         } catch (error: unknown) {
           logger.warn(`Ollama listModels: could not query active models: ${getErrorMessage(error)}`);
         }
 
-        const mappedModels = models.map((value: unknown) => {
+        const mappedModelsList = models.map((value: unknown) => {
           const modelItem = value as Record<string, unknown>;
-          const matchedRunning = running.find((runningModel) => {
+          const tagName = (modelItem.model || modelItem.name || "") as string;
+          const matchedRunningModel = running.find((runningModel) => {
             const runningName = (runningModel.model || runningModel.name || "") as string;
-            const tagName = (modelItem.model || modelItem.name || "") as string;
             if (runningName === tagName) return true;
-            const cleanTag = tagName.endsWith(":latest") ? tagName.slice(0, -7) : tagName;
-            const cleanRunning = runningName.endsWith(":latest") ? runningName.slice(0, -7) : runningName;
-            return cleanTag === cleanRunning;
+            const cleanTagName = tagName.endsWith(":latest") ? tagName.slice(0, -7) : tagName;
+            const cleanRunningName = runningName.endsWith(":latest") ? runningName.slice(0, -7) : runningName;
+            return cleanTagName === cleanRunningName;
           });
 
-          if (matchedRunning) {
-            return {
-              ...modelItem,
-              loaded_instances: [{
-                id: matchedRunning.model || matchedRunning.name,
-                config: {
-                  context_length: null,
-                  size_vram: matchedRunning.size_vram ?? null,
-                  expires_at: matchedRunning.expires_at ?? null,
-                }
-              }]
-            };
-          }
-          return modelItem;
+          const loadedInstances = matchedRunningModel
+            ? [
+                {
+                  id: String(matchedRunningModel.model || matchedRunningModel.name),
+                  config: {
+                    context_length: null,
+                    size_vram: matchedRunningModel.size_vram ?? null,
+                    expires_at: matchedRunningModel.expires_at ?? null,
+                  },
+                },
+              ]
+            : undefined;
+
+          return {
+            key: tagName,
+            display_name: tagName,
+            type: "llm",
+            loaded_instances: loadedInstances,
+          };
         });
 
-        return { models: mappedModels };
+        return { models: mappedModelsList };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
         throw new ProviderError("ollama", getErrorMessage(error), 500, error);

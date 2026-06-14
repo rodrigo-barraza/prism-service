@@ -1261,7 +1261,11 @@ export default class ToolOrchestratorService {
       ...toolsApiResult,
       matches: mergedMatches,
       total: existingTotal + scoredMatches.length,
-      ...(hasDisabledMcpMatches && !toolsApiResult.action_required && {
+      ...(hasDisabledMcpMatches && !toolsApiResult.action_required && !toolsApiResult.actionRequired && {
+        actionRequired:
+          "IMPORTANT: Some discovered tools are NOT currently enabled (isEnabled: false). " +
+          "You MUST call enable_tools with the tool names you need before you can use them. " +
+          "After enabling, the tools become available on your next iteration.",
         action_required:
           "IMPORTANT: Some discovered tools are NOT currently enabled (isEnabled: false). " +
           "You MUST call enable_tools with the tool names you need before you can use them. " +

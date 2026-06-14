@@ -7,6 +7,9 @@
  */
 
 import type { ToolSchema } from "../services/harnesses/types.ts";
+import type { ChatMessage, ProviderOptions } from "./ProviderTypes.ts";
+
+export type { ChatMessage, ProviderOptions };
 
 // ── Provider Generation Options ─────────────────────────────
 
@@ -14,86 +17,6 @@ import type { ToolSchema } from "../services/harnesses/types.ts";
  * Unified options object passed to all provider generateText / generateTextStream methods.
  * Each provider picks the fields it supports and ignores the rest.
  */
-export interface ProviderOptions {
-  // ── Sampling Parameters ──────────────────────────────────
-  temperature?: number;
-  topP?: number;
-  topK?: number;
-  presencePenalty?: number;
-  frequencyPenalty?: number;
-  repeatPenalty?: number;
-  stopSequences?: string[];
-  maxTokens?: number;
-  seed?: number | string;
-
-  // ── Response Format ──────────────────────────────────────
-  responseFormat?: string;
-
-  // ── Thinking / Reasoning ─────────────────────────────────
-  thinkingEnabled?: boolean;
-  thinkingLevel?: string;
-  thinkingBudget?: number | string;
-  reasoningEffort?: string;
-
-  // ── Tool Calling ─────────────────────────────────────────
-  tools?: ToolSchema[];
-
-  // ── Web Search / Code Execution ──────────────────────────
-  webSearch?: boolean | string;
-  codeExecution?: boolean;
-  urlContext?: boolean;
-
-  // ── Image Generation ─────────────────────────────────────
-  forceImageGeneration?: boolean;
-  imageCount?: number;
-
-  // ── System Prompt (for providers that support injection) ─
-  systemPrompt?: string;
-
-  // ── Abort Signal ─────────────────────────────────────────
-  signal?: AbortSignal;
-
-  // ── Context Length ───────────────────────────────────────
-  minContextLength?: number;
-  contextLength?: number;
-  _loadedContextLength?: number;
-
-  // ── OpenAI Responses API ─────────────────────────────────
-  responsesAPI?: boolean;
-  reasoningSummary?: string;
-  serviceTier?: string;
-  verbosity?: string;
-  responseSchema?: Record<string, unknown>;
-
-  // ── Audio / TTS ──────────────────────────────────────────
-  model?: string;
-  prompt?: string | number;
-  format?: string;
-  instructions?: string;
-  language?: string;
-  deliveryMode?: "STABLE" | "BALANCED" | "CREATIVE";
-
-  // ── Embedding ────────────────────────────────────────────
-  dimensions?: number;
-
-  // ── Extended Sampling ────────────────────────────────────
-  minP?: number;
-
-  // ── LM Studio Load Config ───────────────────────────────
-  context_length?: number;
-  flash_attention?: boolean;
-  offload_kv_cache_to_gpu?: boolean;
-  eval_batch_size?: number;
-
-  // ── Provider Routing / Metadata ─────────────────────────
-  agent?: string;
-  username?: string;
-  project?: string;
-  _retryAttempt?: number;
-
-  // ── Extensible ───────────────────────────────────────────
-  [key: string]: unknown;
-}
 
 // ── Google GenAI Config ─────────────────────────────────────
 
@@ -167,9 +90,12 @@ export interface StreamThinkingChunk {
 
 export interface StreamToolCallChunk {
   type: "toolCall";
-  id: string;
+  id: string | null;
   name: string;
   args: Record<string, unknown>;
+  result?: unknown;
+  status?: "calling" | "done" | "error";
+  native?: boolean;
   thoughtSignature?: string;
 }
 
@@ -197,6 +123,29 @@ export interface StreamCodeExecutionResultChunk {
   outcome: string;
 }
 
+export interface StreamToolCallStartChunk {
+  type: "toolCallStart";
+  id: string;
+  name: string;
+}
+
+export interface StreamToolCallDeltaChunk {
+  type: "toolCallDelta";
+  characters: number;
+}
+
+export interface StreamStopReasonChunk {
+  type: "stopReason";
+  stopReason: string;
+}
+
+export interface StreamStatusChunk {
+  type: "status";
+  message: string;
+  phase?: string;
+  progress?: number;
+}
+
 export type StreamChunk =
   | string
   | StreamThinkingChunk
@@ -204,12 +153,17 @@ export type StreamChunk =
   | StreamUsageChunk
   | StreamImageChunk
   | StreamExecutableCodeChunk
-  | StreamCodeExecutionResultChunk;
+  | StreamCodeExecutionResultChunk
+  | StreamToolCallStartChunk
+  | StreamToolCallDeltaChunk
+  | StreamStopReasonChunk
+  | StreamStatusChunk;
 
 // ── Provider Result Types ───────────────────────────────────
 
 export interface GenerateTextResult {
   text: string;
+  thinking?: string;
   usage: { inputTokens: number; outputTokens: number };
   toolCalls?: Array<{
     id: string;
@@ -219,4 +173,52 @@ export interface GenerateTextResult {
   }>;
   images?: Array<{ data: string; mimeType: string }>;
   safetyBlock?: boolean;
+}
+
+export interface Provider {
+  name: string;
+  generateText(
+    messages: ChatMessage[],
+    model?: string,
+    options?: ProviderOptions
+  ): Promise<GenerateTextResult>;
+  generateTextStream(
+    messages: ChatMessage[],
+    model?: string,
+    options?: ProviderOptions
+  ): AsyncGenerator<StreamChunk, void, unknown>;
+  captionImage?(
+    images: string[],
+    prompt?: string,
+    model?: string,
+    systemPrompt?: string
+  ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }>;
+  generateEmbedding?(
+    content: string | string[],
+    model: string,
+    options?: ProviderOptions
+  ): Promise<{ embedding: number[]; dimensions: number }>;
+  listModels?(): Promise<{
+    models?: Array<{
+      key: string;
+      display_name?: string;
+      type: string;
+      loaded_instances?: Array<{ id: string; [key: string]: unknown }>;
+      [key: string]: unknown;
+    }>;
+    data?: Array<{
+      key: string;
+      display_name?: string;
+      type: string;
+      loaded_instances?: Array<{ id: string; [key: string]: unknown }>;
+      [key: string]: unknown;
+    }>;
+  }>;
+  checkHealth?(): Promise<{
+    ok: boolean;
+    status: string;
+    slotsIdle?: number | null;
+    slotsProcessing?: number | null;
+    error?: string;
+  }>;
 }

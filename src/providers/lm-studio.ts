@@ -1,5 +1,4 @@
-import { AGENT_IDS, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
+import { ProviderOptions, ChatMessage, Provider, GenerateTextResult, StreamChunk } from "../types/provider.ts";
 import { sleep } from "@rodrigo-barraza/utilities-library";
 // ─────────────────────────────────────────────────────────────
 // LM Studio provider — Fully native /api/v1/chat
@@ -296,7 +295,33 @@ function buildNativeInput(messages: PreparedMessage[]) {
     typeof lastUser.content === "string" ? lastUser.content : "";
   return historyPrefix ? historyPrefix + currentText : currentText;
 }
-export function createLmStudioProvider(baseUrl: string, instanceId: string = PROVIDERS.LM_STUDIO) {
+import { AGENT_IDS, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
+
+interface LmStudioProvider extends Provider {
+  listModels(): Promise<{
+    models: Array<{
+      key: string;
+      display_name: string;
+      type: string;
+      loaded_instances?: Array<{ id: string; [key: string]: unknown }>;
+      [key: string]: unknown;
+    }>;
+    data: Array<{
+      key: string;
+      display_name: string;
+      type: string;
+      loaded_instances?: Array<{ id: string; [key: string]: unknown }>;
+      [key: string]: unknown;
+    }>;
+  }>;
+  loadModel(model: string, options?: ProviderOptions, signal?: AbortSignal): Promise<unknown>;
+  unloadModel(instanceId: string): Promise<unknown>;
+  unloadModelByKey(modelKey: string): Promise<unknown>;
+  ensureModelLoaded(modelKey: string, options?: Record<string, unknown>, signal?: AbortSignal, onStatus?: (status: unknown) => void): Promise<unknown>;
+  _streamOpenAICompat(prepared: PreparedMessage[], model: string, options: ProviderOptions, baseUrl: string): AsyncGenerator<StreamChunk, void, unknown>;
+}
+
+export function createLmStudioProvider(baseUrl: string, instanceId: string = PROVIDERS.LM_STUDIO): LmStudioProvider {
   const getBaseUrl = () => baseUrl;
   const MCP_SERVER_URL = DEFAULT_MCP_SERVER_URL;
   // ── Per-instance model load mutex (singleflight) ──────────
@@ -309,9 +334,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
     name: instanceId,
     async generateText(
       messages: ChatMessage[],
-            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)[PROVIDERS.LM_STUDIO],
+      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)[PROVIDERS.LM_STUDIO],
       options: ProviderOptions = {},
-    ) {
+    ): Promise<GenerateTextResult> {
       const baseUrl = getBaseUrl();
       logger.provider(
         "LM Studio",
@@ -346,20 +371,34 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         const data = (await response.json()) as OpenAICompletionResponse;
         const { text, thinking, usage, toolCalls } =
           processNonStreamingResponse(data);
-        const result: Record<string, unknown> = { text, thinking, usage };
-        if (toolCalls) result.toolCalls = toolCalls;
+        const result: GenerateTextResult = {
+          text,
+          usage: {
+            inputTokens: usage.inputTokens || 0,
+            outputTokens: usage.outputTokens || 0,
+          },
+        };
+        if (thinking) result.thinking = thinking;
+        if (toolCalls) {
+          result.toolCalls = toolCalls.map((toolCall) => ({
+            id: toolCall.id || "",
+            name: toolCall.name,
+            args: typeof toolCall.args === "object" && toolCall.args !== null ? (toolCall.args as Record<string, unknown>) : {},
+            thoughtSignature: toolCall.thoughtSignature || undefined,
+          }));
+        }
         return result;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
+        throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
       }
     },
     // ── Streaming Text Generation (SSE) ──────────────────────
     async *generateTextStream(
       messages: ChatMessage[],
-            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)[PROVIDERS.LM_STUDIO],
+      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)[PROVIDERS.LM_STUDIO],
       options: ProviderOptions = {},
-    ) {
+    ): AsyncGenerator<StreamChunk, void, unknown> {
       const baseUrl = getBaseUrl();
       logger.provider(
         "LM Studio",
@@ -878,11 +917,32 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         }
         if (!nativeResponse.body) throw new Error("No response body");
         const nativeReader = nativeResponse.body.getReader();
-        yield* parseNativeSSEStream(nativeReader, { signal: options.signal });
+        for await (const chunk of parseNativeSSEStream(nativeReader, { signal: options.signal })) {
+          if (typeof chunk === "object") {
+            if (chunk.type === "usage") {
+              yield {
+                type: "usage",
+                usage: {
+                  inputTokens: chunk.usage.inputTokens || 0,
+                  outputTokens: chunk.usage.outputTokens || 0,
+                },
+              };
+            } else if (chunk.type === "toolCall") {
+              yield {
+                ...chunk,
+                id: chunk.id || "",
+              };
+            } else {
+              yield chunk as StreamChunk;
+            }
+          } else {
+            yield chunk;
+          }
+        }
       } catch (error: unknown) {
-                if ((error instanceof Error && error.name === "AbortError")) return; // Client disconnected
+        if (error instanceof Error && error.name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
+        throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
       }
     },
     /**
@@ -898,7 +958,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
       model: string,
       options: ProviderOptions,
       baseUrl: string,
-    ) {
+    ): AsyncGenerator<StreamChunk, void, unknown> {
       const payload = {
         messages: prepared,
         model,
@@ -976,7 +1036,26 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
             phase: isThinking ? "thinking" : "generating",
           };
         }
-        yield chunk;
+        if (typeof chunk === "object") {
+          if (chunk.type === "usage") {
+            yield {
+              type: "usage",
+              usage: {
+                inputTokens: chunk.usage.inputTokens || 0,
+                outputTokens: chunk.usage.outputTokens || 0,
+              },
+            };
+          } else if (chunk.type === "toolCall") {
+            yield {
+              ...chunk,
+              id: chunk.id || "",
+            };
+          } else {
+            yield chunk as StreamChunk;
+          }
+        } else {
+          yield chunk;
+        }
       }
     },
     // ── Embedding Generation ─────────────────────────────────
@@ -1013,9 +1092,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
     async captionImage(
       images: string[],
       prompt: string = "Describe this image.",
-            model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)[PROVIDERS.LM_STUDIO],
+      model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)[PROVIDERS.LM_STUDIO],
       systemPrompt?: string,
-    ) {
+    ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }> {
       const baseUrl = getBaseUrl();
       logger.provider(
         "LM Studio",
@@ -1048,14 +1127,16 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         const text = (data as Record<string, unknown>).choices ? ((data as Record<string, unknown>).choices as Array<Record<string, unknown>>)?.[0]?.message as Record<string, unknown> : undefined;
         const textContent = (text?.content as string) || "";
         const rawUsage = (data as Record<string, unknown>).usage as Record<string, number> | undefined;
-        const usage = {
-          inputTokens: rawUsage?.prompt_tokens || 0,
-          outputTokens: rawUsage?.completion_tokens || 0,
+        return {
+          text: textContent,
+          usage: {
+            inputTokens: rawUsage?.prompt_tokens || 0,
+            outputTokens: rawUsage?.completion_tokens || 0,
+          },
         };
-        return { text: textContent, usage };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
+        throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
       }
     },
     // ── Model Management ─────────────────────────────────────
@@ -1121,7 +1202,22 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
      * List all models available in LM Studio.
      * Uses the proprietary GET /api/v1/models endpoint.
      */
-    async listModels(): Promise<Record<string, unknown>> {
+    async listModels(): Promise<{
+      models: Array<{
+        key: string;
+        display_name: string;
+        type: string;
+        loaded_instances?: Array<{ id: string; [key: string]: unknown }>;
+        [key: string]: unknown;
+      }>;
+      data: Array<{
+        key: string;
+        display_name: string;
+        type: string;
+        loaded_instances?: Array<{ id: string; [key: string]: unknown }>;
+        [key: string]: unknown;
+      }>;
+    }> {
       const baseUrl = getBaseUrl();
       logger.provider("LM Studio", "listModels");
       try {
@@ -1142,12 +1238,22 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
             const sizeBytes = (model.size_bytes as number) || 0;
             const bitsPerWeight = (model.quantization as Record<string, unknown>)?.bits_per_weight as number || 4;
             model.archParams = resolveArchParams(arch ?? null, params ?? null, sizeBytes, bitsPerWeight);
+            model.key = String(model.id);
+            model.display_name = String(model.display_name || model.id);
+            model.type = "llm";
           }
         }
-        return data as Record<string, unknown>;
+        const models = ((data as Record<string, unknown>).data as Array<{
+          key: string;
+          display_name: string;
+          type: string;
+          loaded_instances?: Array<{ id: string; [key: string]: unknown }>;
+          [key: string]: unknown;
+        }>) || [];
+        return { models, data: models };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
+        throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
       }
     },
     async loadModel(model: string, options: ProviderOptions = {}, signal?: AbortSignal) {

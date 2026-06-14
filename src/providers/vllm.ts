@@ -1,4 +1,4 @@
-import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
+import { ProviderOptions, ChatMessage, Provider, GenerateTextResult, StreamChunk } from "../types/provider.ts";
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 import type { TokenUsage } from "../types/admin.ts";
@@ -34,18 +34,18 @@ import type { InputMessage } from "../utils/openai-compat.ts";
 // ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
 // FIXME(vllm-qwen3.6): Temporary model list — delete with the patch above
-const MODELS_REQUIRING_SYSTEM_REWRITE_TEMP_PATCH = ["qwen3.6"];
+const MODELS_REQUIRING_SYSTEM_REWRITE_TEMPORARY_PATCH = ["qwen3.6"];
 
-function requiresSystemMessageRewriteTempPatch(modelName: string): boolean {
+function requiresSystemMessageRewriteTemporaryPatch(modelName: string): boolean {
   const normalizedModelName = modelName.toLowerCase();
-  return MODELS_REQUIRING_SYSTEM_REWRITE_TEMP_PATCH.some(
+  return MODELS_REQUIRING_SYSTEM_REWRITE_TEMPORARY_PATCH.some(
     (pattern) => normalizedModelName.includes(pattern),
   );
 }
 
 // FIXME(vllm-qwen3.6): Temporary rewriter — delete with the patch above
 function rewriteNonLeadingSystemMessages(messages: InputMessage[], modelName: string): InputMessage[] {
-  if (!requiresSystemMessageRewriteTempPatch(modelName)) return messages;
+  if (!requiresSystemMessageRewriteTemporaryPatch(modelName)) return messages;
 
   let hasPassedLeadingSystemBlock = false;
   return messages.map((message) => {
@@ -82,7 +82,7 @@ interface VllmModelsResponse {
 }
 
 // ── Provider ─────────────────────────────────────────────────
-export function createVllmProvider(baseUrl: string, instanceId: string = "vllm") {
+export function createVllmProvider(baseUrl: string, instanceId: string = "vllm"): Provider {
   const getBaseUrl = () => baseUrl;
 
   return {
@@ -90,11 +90,11 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
 
     async generateText(
       messages: ChatMessage[],
-            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
+      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
       options: ProviderOptions = {},
-    ) {
+    ): Promise<GenerateTextResult> {
       const baseUrl = getBaseUrl();
-            logger.provider("vLLM", `generateText model=${model} baseUrl=${baseUrl}`);
+      logger.provider("vLLM", `generateText model=${model} baseUrl=${baseUrl}`);
       try {
         const rewrittenMessages = rewriteNonLeadingSystemMessages(messages as InputMessage[], model);
         const prepared = prepareOpenAICompatMessages(rewrittenMessages, {
@@ -140,12 +140,26 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
             thinkingEnabled: options.thinkingEnabled,
           });
 
-        const result: Record<string, unknown> = { text, thinking, usage };
-        if (toolCalls) result.toolCalls = toolCalls;
+        const result: GenerateTextResult = {
+          text,
+          usage: {
+            inputTokens: usage.inputTokens || 0,
+            outputTokens: usage.outputTokens || 0,
+          },
+        };
+        if (thinking) result.thinking = thinking;
+        if (toolCalls) {
+          result.toolCalls = toolCalls.map((toolCall) => ({
+            id: toolCall.id || "",
+            name: toolCall.name,
+            args: typeof toolCall.args === "object" && toolCall.args !== null ? (toolCall.args as Record<string, unknown>) : {},
+            thoughtSignature: toolCall.thoughtSignature || undefined,
+          }));
+        }
         return result;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("vllm", getErrorMessage(error), 500, error);
+        throw new ProviderError("vllm", getErrorMessage(error), 500, error);
       }
     },
 
@@ -153,9 +167,9 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
 
     async *generateTextStream(
       messages: ChatMessage[],
-            model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
+      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
       options: ProviderOptions = {},
-    ) {
+    ): AsyncGenerator<StreamChunk, void, unknown> {
       const baseUrl = getBaseUrl();
       logger.provider(
         "vLLM",
@@ -199,18 +213,39 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         const response = await fetchOpenAICompat(
           `${baseUrl}/v1/chat/completions`,
           payload,
-                    { signal: options.signal },
+          { signal: options.signal },
         );
 
         const reader = response.body!.getReader();
-        yield* parseSSEStream(reader, {
-                    signal: options.signal,
-                    thinkingEnabled: options.thinkingEnabled,
-        });
+        for await (const chunk of parseSSEStream(reader, {
+          signal: options.signal,
+          thinkingEnabled: options.thinkingEnabled,
+        })) {
+          if (typeof chunk === "object") {
+            if (chunk.type === "usage") {
+              yield {
+                type: "usage",
+                usage: {
+                  inputTokens: chunk.usage.inputTokens || 0,
+                  outputTokens: chunk.usage.outputTokens || 0,
+                },
+              };
+            } else if (chunk.type === "toolCall") {
+              yield {
+                ...chunk,
+                id: chunk.id || "",
+              };
+            } else {
+              yield chunk as StreamChunk;
+            }
+          } else {
+            yield chunk;
+          }
+        }
       } catch (error: unknown) {
-                if ((error instanceof Error && error.name === "AbortError")) return; // Client disconnected
+        if ((error instanceof Error && error.name === "AbortError")) return; // Client disconnected
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError("vllm", getErrorMessage(error), 500, error);
+        throw new ProviderError("vllm", getErrorMessage(error), 500, error);
       }
     },
 
@@ -219,7 +254,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
       prompt: string = "Describe this image.",
       model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["vllm"],
       systemPrompt?: string,
-    ) {
+    ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }> {
       const baseUrl = getBaseUrl();
       logger.provider("vLLM", `captionImage model=${model} baseUrl=${baseUrl}`);
       try {
@@ -253,7 +288,13 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           inputTokens: data.usage?.prompt_tokens || 0,
           outputTokens: data.usage?.completion_tokens || 0,
         };
-        return { text, usage };
+        return {
+          text,
+          usage: {
+            inputTokens: usage.inputTokens || 0,
+            outputTokens: usage.outputTokens || 0,
+          },
+        };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
         throw new ProviderError("vllm", getErrorMessage(error), 500, error);
