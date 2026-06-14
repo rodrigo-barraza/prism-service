@@ -546,6 +546,10 @@ export async function* parseSSEStream(
   const thinkParser = suppressThinking ? null : new ThinkTagParser();
   const pendingToolCalls: Record<number, PendingToolCall> = {};
   let lastFinishReason: string | null = null;
+  // Track partial output for fallback usage estimation on premature termination
+  let partialOutputCharacters = 0;
+  let partialReasoningCharacters = 0;
+  let usageYielded = false;
 
   try {
     while (true) {
@@ -584,6 +588,7 @@ export async function* parseSSEStream(
           // Native reasoning fields (Qwen3.5, DeepSeek, etc.)
           const reasoning = delta?.reasoning_content || delta?.reasoning || "";
           if (reasoning) {
+            partialReasoningCharacters += reasoning.length;
             if (suppressThinking) {
               yield reasoning; // Emit as plain text
             } else {
@@ -593,6 +598,7 @@ export async function* parseSSEStream(
 
           const content = delta?.content || "";
           if (content) {
+            partialOutputCharacters += content.length;
             if (suppressThinking) {
               // Pass through raw content without <think> tag parsing
               yield content;
@@ -685,15 +691,37 @@ export async function* parseSSEStream(
     if (lastFinishReason === "length") {
       yield { type: "stopReason", stopReason: "length" };
     }
-
-    // Yield final usage
-    if (usage) {
-      yield { type: "usage", usage };
-    } else {
-      yield { type: "usage", usage: EMPTY_USAGE };
+  } catch (streamError) {
+    // Yield partial usage BEFORE re-throwing so the consumer captures
+    // whatever tokens were generated before the stream terminated.
+    if (!usageYielded) {
+      usageYielded = true;
+      if (usage) {
+        yield { type: "usage", usage };
+      } else if (partialOutputCharacters > 0 || partialReasoningCharacters > 0) {
+        const estimatedOutputTokens = Math.ceil(partialOutputCharacters / 4);
+        const estimatedReasoningTokens = Math.ceil(partialReasoningCharacters / 4);
+        yield {
+          type: "usage",
+          usage: {
+            inputTokens: 0,
+            outputTokens: estimatedOutputTokens + estimatedReasoningTokens,
+            ...(estimatedReasoningTokens > 0 && { reasoningOutputTokens: estimatedReasoningTokens }),
+          },
+        };
+      }
     }
+    throw streamError;
   } finally {
-    // Ensure reader is released
+    // Happy path: yield final usage if stream completed normally
+    if (!usageYielded) {
+      usageYielded = true;
+      if (usage) {
+        yield { type: "usage", usage };
+      } else {
+        yield { type: "usage", usage: EMPTY_USAGE };
+      }
+    }
   }
 }
 
