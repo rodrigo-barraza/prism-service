@@ -140,3 +140,65 @@ describe("ReActHarness — static metadata", () => {
     expect(HarnessClass.description).toContain("exhaustion recovery");
   });
 });
+
+// ── Adversarial Boundary Tests (merged from adversarial-boundary.test.ts) ──
+
+describe('ReActHarness maxIterations resolution (unit-level)', () => {
+  /**
+   * The harness resolves maxIterations with:
+   *   clientMaxIterations === 0 → Infinity
+   *   clientMaxIterations ? Math.min(100, Math.max(1, clientMaxIterations)) : 25
+   *
+   * We test the same logic inline to verify boundary handling.
+   */
+  function resolveMaxIterations(clientMaxIterations: number | undefined | null): number {
+    const MAX_TOOL_ITERATIONS = 25;
+    return clientMaxIterations === 0
+      ? Infinity
+      : clientMaxIterations
+        ? Math.min(100, Math.max(1, clientMaxIterations))
+        : MAX_TOOL_ITERATIONS;
+  }
+
+  it('should resolve 0 to Infinity (unlimited mode)', () => {
+    expect(resolveMaxIterations(0)).toBe(Infinity);
+  });
+
+  it('should resolve undefined to default 25', () => {
+    expect(resolveMaxIterations(undefined)).toBe(25);
+  });
+
+  it('should resolve null to default 25', () => {
+    expect(resolveMaxIterations(null)).toBe(25);
+  });
+
+  it('should clamp negative values to 1', () => {
+    expect(resolveMaxIterations(-10)).toBe(1);
+  });
+
+  it('should clamp values above 100 to 100', () => {
+    expect(resolveMaxIterations(999)).toBe(100);
+  });
+
+  it('should pass through values in valid range', () => {
+    expect(resolveMaxIterations(50)).toBe(50);
+  });
+
+  it('should handle NaN — NaN is falsy for ternary, should resolve to default 25', () => {
+    expect(resolveMaxIterations(NaN)).toBe(25);
+  });
+
+  it('should handle Infinity — clamped to 100', () => {
+    expect(resolveMaxIterations(Infinity)).toBe(100);
+  });
+
+  it('should handle -Infinity — clamped to 1', () => {
+    expect(resolveMaxIterations(-Infinity)).toBe(1);
+  });
+
+  it('should handle fractional values — Math.min/max preserve floats', () => {
+    // 0.5 is truthy, so it enters the clamp branch
+    expect(resolveMaxIterations(0.5)).toBe(1);
+    expect(resolveMaxIterations(50.7)).toBe(50.7);
+  });
+});

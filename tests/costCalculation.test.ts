@@ -4,7 +4,11 @@ import {
     calculateImageCost,
     calculateLiveCost,
     getTotalInputTokens,
+    estimateTokens,
+    mergeUsage,
+    createUsageAccumulator,
 } from "../src/utils/CostCalculator.ts";
+import ContextWindowManager from "../src/utils/ContextWindowManager.ts";
 import { normalizeUsage } from "../src/utils/openai-compat.ts";
 import { normalizeResponsesUsage } from "../src/providers/openai.ts";
 import { TYPES, getPricing, getModelByName } from "../src/config.ts";
@@ -907,4 +911,239 @@ describe("normalizeResponsesUsage", () => {
         expect(usage.reasoningOutputTokens).toBe(350);
     });
 });
+});
+
+// ── Adversarial Boundary Tests (merged from adversarial-boundary.test.ts) ──
+
+describe('CostCalculator adversarial', () => {
+  describe('estimateTokens — boundary inputs', () => {
+    it('should return 0 for null input without throwing', () => {
+      expect(estimateTokens(null)).toBe(0);
+    });
+
+    it('should return 0 for undefined input without throwing', () => {
+      expect(estimateTokens(undefined)).toBe(0);
+    });
+
+    it('should return 0 for empty string', () => {
+      expect(estimateTokens('')).toBe(0);
+    });
+
+    it('should handle a 100K-character string without OOM or timeout', () => {
+      const giantString = 'x'.repeat(100_000);
+      const result = estimateTokens(giantString);
+      expect(result).toBe(25_000);
+    });
+
+    it('should handle string of all null bytes (\\0) — the estimate should still count bytes', () => {
+      const nullByteString = '\0'.repeat(100);
+      const result = estimateTokens(nullByteString);
+      expect(result).toBe(25);
+    });
+
+    it('should handle unicode combining characters — emoji sequences inflate char count but not token count', () => {
+      // Emoji family: 👨‍👩‍👧‍👦 is 7 code points but renders as 1 glyph
+      const emojiFamily = '👨‍👩‍👧‍👦';
+      const result = estimateTokens(emojiFamily);
+      // The estimate is chars/4 — at minimum it should be a positive integer
+      expect(result).toBeGreaterThan(0);
+      expect(Number.isFinite(result)).toBe(true);
+    });
+  });
+
+  describe('mergeUsage — type coercion attacks', () => {
+    it('should survive merging with null source', () => {
+      const accumulator = createUsageAccumulator();
+      accumulator.inputTokens = 100;
+      const result = mergeUsage(accumulator, null);
+      expect(result.inputTokens).toBe(100);
+    });
+
+    it('should survive merging with undefined source', () => {
+      const accumulator = createUsageAccumulator();
+      accumulator.outputTokens = 50;
+      const result = mergeUsage(accumulator, undefined);
+      expect(result.outputTokens).toBe(50);
+    });
+
+    it('should handle NaN in source fields — silently coerced to 0 by || operator', () => {
+      const accumulator = createUsageAccumulator();
+      accumulator.inputTokens = 100;
+      // NaN || 0 → 0 in JavaScript because NaN is falsy
+      const poisonSource = { inputTokens: NaN, outputTokens: 0 };
+      mergeUsage(accumulator, poisonSource);
+      // Defensive: NaN is silently converted to 0, so no poisoning occurs
+      expect(accumulator.inputTokens).toBe(100);
+    });
+
+    it('should handle negative token counts — negative usage should not produce negative costs', () => {
+      const accumulator = createUsageAccumulator();
+      const negativeSource = { inputTokens: -500, outputTokens: -200 };
+      mergeUsage(accumulator, negativeSource);
+      expect(accumulator.inputTokens).toBe(-500);
+      // This is a design question: should negative usage be rejected?
+      // The test documents the current behavior.
+    });
+
+    it('should handle Infinity in token counts', () => {
+      const accumulator = createUsageAccumulator();
+      const infinitySource = { inputTokens: Infinity, outputTokens: 0 };
+      mergeUsage(accumulator, infinitySource);
+      expect(accumulator.inputTokens).toBe(Infinity);
+    });
+
+    it('should handle Number.MAX_SAFE_INTEGER overflow — repeated accumulation', () => {
+      const accumulator = createUsageAccumulator();
+      accumulator.inputTokens = Number.MAX_SAFE_INTEGER;
+      const source = { inputTokens: 1, outputTokens: 0 };
+      mergeUsage(accumulator, source);
+      // JavaScript silently loses precision past MAX_SAFE_INTEGER
+      expect(accumulator.inputTokens).toBeGreaterThan(Number.MAX_SAFE_INTEGER);
+    });
+  });
+
+  describe('calculateTextCost — null/edge pricing', () => {
+    it('should return null when pricing is null', () => {
+      expect(calculateTextCost({ inputTokens: 100, outputTokens: 50 }, null)).toBeNull();
+    });
+
+    it('should return null when usage is null', () => {
+      expect(calculateTextCost(null, { inputPerMillion: 1 })).toBeNull();
+    });
+
+    it('should return null when both are null', () => {
+      expect(calculateTextCost(null, null)).toBeNull();
+    });
+
+    it('should return 0 when all pricing rates are 0', () => {
+      const usage = { inputTokens: 1_000_000, outputTokens: 500_000 };
+      const pricing = { inputPerMillion: 0, outputPerMillion: 0 };
+      expect(calculateTextCost(usage, pricing)).toBe(0);
+    });
+
+    it('should handle cache tokens with no cache pricing gracefully', () => {
+      const usage = {
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheReadInputTokens: 5000,
+        cacheCreationInputTokens: 2000,
+      };
+      const pricing = { inputPerMillion: 3, outputPerMillion: 15 };
+      // No cachedInputPerMillion or cacheWriteInputPerMillion — these should be silently skipped
+      const result = calculateTextCost(usage, pricing);
+      expect(result).not.toBeNull();
+      expect(result).toBeGreaterThan(0);
+    });
+  });
+
+  describe('calculateAudioCost — empty/missing fields', () => {
+    it('should return 0 when duration is 0 — zero-duration audio costs nothing', () => {
+      const usage = { inputTokens: 0, outputTokens: 0, durationSeconds: 0 };
+      const pricing = { perMinute: 0.006 };
+      // Fixed: `durationSeconds != null` guard allows 0 through Strategy 1
+      expect(calculateAudioCost(usage, pricing)).toBe(0);
+    });
+
+    it('should prefer per-minute pricing over per-token when both exist', () => {
+      const usage = { inputTokens: 100_000, outputTokens: 50_000, durationSeconds: 120 };
+      const pricing = {
+        perMinute: 0.006,
+        audioInputPerMillion: 100,
+        outputPerMillion: 50,
+      };
+      const result = calculateAudioCost(usage, pricing);
+      // Should use perMinute: (120/60) * 0.006 = 0.012
+      expect(result).toBeCloseTo(0.012, 4);
+    });
+
+    it('should clamp negative duration to 0 and calculate zero cost', () => {
+      const usage = { inputTokens: 0, outputTokens: 0, durationSeconds: -10 };
+      const pricing = { perMinute: 0.006 };
+      expect(calculateAudioCost(usage, pricing)).toBe(0);
+    });
+  });
+
+  describe('calculateImageCost — edge cases', () => {
+    it('should return null for empty prompt', () => {
+      expect(calculateImageCost('', { inputPerMillion: 1 })).toBeNull();
+    });
+
+    it('should return null for null prompt', () => {
+      expect(calculateImageCost(null, { inputPerMillion: 1 })).toBeNull();
+    });
+
+    it('should handle 0 input images without crashing', () => {
+      const result = calculateImageCost('a cat', { inputPerMillion: 1, imageOutputPerMillion: 10 }, 0);
+      expect(result).not.toBeNull();
+    });
+  });
+
+  describe('getTotalInputTokens — null safety', () => {
+    it('should return 0 for null usage', () => {
+      expect(getTotalInputTokens(null)).toBe(0);
+    });
+
+    it('should return 0 for undefined usage', () => {
+      expect(getTotalInputTokens(undefined)).toBe(0);
+    });
+
+    it('should sum all three input token fields', () => {
+      const usage = {
+        inputTokens: 100,
+        cacheReadInputTokens: 200,
+        cacheCreationInputTokens: 300,
+        outputTokens: 0,
+      };
+      expect(getTotalInputTokens(usage)).toBe(600);
+    });
+  });
+});
+
+// ── Cross-Module Integration Tests (merged from adversarial-boundary.test.ts) ──
+
+describe('CostCalculator × ContextWindowManager integration seam', () => {
+  it('should return untouched when budget is negative (maxInput < outputReserve)', () => {
+    const messages: any[] = [
+      { role: 'system', content: 'system prompt' },
+      { role: 'user', content: 'hello' },
+    ];
+    const result = ContextWindowManager.enforce(messages, {
+      maxInputTokens: 1000,
+      maxOutputTokens: 50_000,
+    });
+    // Negative budget → returns as-is, truncated=false
+    expect(result.truncated).toBe(false);
+    expect(result.messages.length).toBe(2);
+  });
+
+  it('should maintain non-negative token estimates after aggressive truncation', () => {
+    const messages: any[] = [
+      { role: 'system', content: 'system prompt' },
+    ];
+    for (let index = 0; index < 50; index++) {
+      messages.push({
+        role: 'assistant',
+        content: 'x'.repeat(2000),
+        toolCalls: [
+          {
+            name: 'read_file',
+            args: { path: '/tmp/test' },
+            result: 'x'.repeat(20000),
+          },
+        ],
+      });
+      messages.push({ role: 'user', content: 'x'.repeat(500) });
+    }
+
+    const result = ContextWindowManager.enforce(messages, {
+      maxInputTokens: 200_000,
+      maxOutputTokens: 8192,
+      toolCount: 5,
+    });
+
+    // Token estimate should always be non-negative
+    expect(result.estimatedTokens).toBeGreaterThanOrEqual(0);
+    // With 281K estimated tokens and ~153K budget, truncation should fire
+    expect(result.truncated).toBe(true);
+  });
 });

@@ -1,4 +1,4 @@
-import { vi, describe, it, expect } from "vitest";
+import { vi, describe, it, expect, afterEach } from "vitest";
 
 // Suppress logger output during tests
 vi.mock("../src/utils/logger.ts", () => ({
@@ -14,6 +14,19 @@ vi.mock("../src/utils/logger.ts", () => ({
 import AutoApprovalEngine, {
   APPROVAL_TIERS,
 } from "../src/services/AutoApprovalEngine.ts";
+import {
+  pendingApprovals,
+  pendingQuestions,
+} from "../src/services/ApprovalRegistry.ts";
+import type {
+  ApprovalResolution,
+  PendingToolApprovalEntry,
+  QuestionResolution,
+} from "../src/services/ApprovalRegistry.ts";
+import {
+  allow,
+  deny,
+} from "../src/services/PolicyEngine.ts";
 
 // ═══════════════════════════════════════════════════════════════
 // Tier Constants
@@ -570,3 +583,219 @@ describe("check — policy integration", () => {
     expect(needsApproval[0].name).toBe("write_file");
   });
 });
+
+// ── Adversarial Tests (merged from adversarial-qa-flows.test.ts) ──
+
+describe('AutoApprovalEngine adversarial', () => {
+  it('should default unknown tools to Tier 2 (WRITE) — not auto-approved', () => {
+    const engine = new AutoApprovalEngine();
+    const result = engine.check({ name: 'completely_unknown_tool', args: {}, id: 'tc-1' });
+    expect(result.approved).toBe(false);
+    expect(result.tier).toBe(APPROVAL_TIERS.WRITE);
+    expect(result.tierLabel).toBe('write');
+  });
+
+  it('should auto-approve all tools in fullAuto mode — including DANGER tier', () => {
+    const engine = new AutoApprovalEngine({ fullAuto: true });
+    const result = engine.check({ name: 'execute_shell', args: { command: 'rm -rf /' }, id: 'tc-1' });
+    expect(result.approved).toBe(true);
+    expect(result.reason).toBe('full_auto');
+  });
+
+  it('should allow tier override to promote a DANGER tool to AUTO', () => {
+    const engine = new AutoApprovalEngine({
+      tierOverrides: { execute_shell: APPROVAL_TIERS.AUTO },
+    });
+    const result = engine.check({ name: 'execute_shell', args: {}, id: 'tc-1' });
+    expect(result.approved).toBe(true);
+    expect(result.tier).toBe(APPROVAL_TIERS.AUTO);
+  });
+
+  it('should allow tier override to demote a read-only tool to DANGER', () => {
+    const engine = new AutoApprovalEngine({
+      tierOverrides: { read_file: APPROVAL_TIERS.DANGER },
+    });
+    const result = engine.check({ name: 'read_file', args: {}, id: 'tc-1' });
+    expect(result.approved).toBe(false);
+    expect(result.tier).toBe(APPROVAL_TIERS.DANGER);
+  });
+
+  it('should prioritize policy DENY over fullAuto — policies evaluated only when NOT fullAuto', () => {
+    const engine = new AutoApprovalEngine({
+      fullAuto: true,
+      policies: [deny('execute_shell')],
+    });
+    const result = engine.check({ name: 'execute_shell', args: {}, id: 'tc-1' });
+    // fullAuto returns immediately — policies are not checked
+    expect(result.approved).toBe(true);
+    expect(result.reason).toBe('full_auto');
+  });
+
+  it('should apply policy DENY before tier system when NOT fullAuto', () => {
+    const engine = new AutoApprovalEngine({
+      policies: [deny('read_file')],
+    });
+    const result = engine.check({ name: 'read_file', args: {}, id: 'tc-1' });
+    // Policy denies it even though read_file is Tier 1 AUTO
+    expect(result.approved).toBe(false);
+    expect(result.reason).toContain('Denied by policy');
+  });
+
+  it('should apply policy APPROVE for a normally-blocked WRITE tool', () => {
+    const engine = new AutoApprovalEngine({
+      policies: [allow('write_file')],
+    });
+    const result = engine.check({ name: 'write_file', args: {}, id: 'tc-1' });
+    expect(result.approved).toBe(true);
+    expect(result.reason).toContain('Approved by policy');
+  });
+
+  it('should split batch correctly between auto-approved and needs-approval', () => {
+    const engine = new AutoApprovalEngine();
+    const { autoApproved, needsApproval } = engine.checkBatch([
+      { name: 'read_file', args: {}, id: 'tc-1' },
+      { name: 'write_file', args: {}, id: 'tc-2' },
+      { name: 'execute_shell', args: {}, id: 'tc-3' },
+      { name: 'list_directory', args: {}, id: 'tc-4' },
+    ]);
+    expect(autoApproved.length).toBe(2); // read_file + list_directory
+    expect(needsApproval.length).toBe(2); // write_file + execute_shell
+  });
+
+  it('should handle empty toolCalls batch — no crash', () => {
+    const engine = new AutoApprovalEngine();
+    const { autoApproved, needsApproval } = engine.checkBatch([]);
+    expect(autoApproved).toEqual([]);
+    expect(needsApproval).toEqual([]);
+  });
+
+  it('should handle tool with empty string name — defaults to WRITE tier', () => {
+    const engine = new AutoApprovalEngine();
+    const result = engine.check({ name: '', args: {}, id: 'tc-1' });
+    expect(result.tier).toBe(APPROVAL_TIERS.WRITE);
+  });
+
+  it('should handle policy with conditional when predicate', () => {
+    const engine = new AutoApprovalEngine({
+      policies: [
+        deny('execute_shell', {
+          when: (args) => /rm\s+-rf/.test(String(args.command)),
+        }),
+        allow('execute_shell'),
+      ],
+    });
+    const safeResult = engine.check({
+      name: 'execute_shell',
+      args: { command: 'git status' },
+      id: 'tc-1',
+    });
+    expect(safeResult.approved).toBe(true);
+
+    const dangerousResult = engine.check({
+      name: 'execute_shell',
+      args: { command: 'rm -rf /' },
+      id: 'tc-2',
+    });
+    expect(dangerousResult.approved).toBe(false);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// 6. ApprovalRegistry — Dangling Promise & Double-Resolve
+// ────────────────────────────────────────────────────────────────
+
+// ── ApprovalRegistry Adversarial Tests (merged from adversarial-qa-flows.test.ts) ──
+
+describe('ApprovalRegistry adversarial', () => {
+  afterEach(() => {
+    pendingApprovals.clear();
+    pendingQuestions.clear();
+  });
+
+  it('should handle double-resolve of approval — second call is no-op', async () => {
+    let resolveCount = 0;
+    const approvalPromise = new Promise<ApprovalResolution>((resolve) => {
+      pendingApprovals.set('conv-1', {
+        resolve: (value: ApprovalResolution) => {
+          resolveCount++;
+          resolve(value);
+        },
+        type: 'tool',
+        tools: ['execute_shell'],
+        toolCalls: [{ id: 'tc-1', name: 'execute_shell', args: {} }],
+      });
+    });
+
+    const entry = pendingApprovals.get('conv-1')! as PendingToolApprovalEntry;
+    entry.resolve({ approved: true });
+    entry.resolve({ approved: false }); // Double resolve
+
+    const result = await approvalPromise;
+    expect(result.approved).toBe(true);
+    // The promise resolved with the first value; second is ignored by Promise semantics
+    expect(resolveCount).toBe(2); // Both calls execute but only first matters
+  });
+
+  it('should handle approval for non-existent conversationId — map.get returns undefined', () => {
+    const entry = pendingApprovals.get('nonexistent-conv');
+    expect(entry).toBeUndefined();
+  });
+
+  it('should handle concurrent approvals for different conversations', () => {
+    const results: Array<{ conversationId: string; approved: boolean }> = [];
+
+    pendingApprovals.set('conv-a', {
+      resolve: (value: ApprovalResolution) => results.push({ conversationId: 'conv-a', ...value }),
+      type: 'tool',
+      tools: ['tool1'],
+      toolCalls: [],
+    });
+
+    pendingApprovals.set('conv-b', {
+      resolve: (value: ApprovalResolution) => results.push({ conversationId: 'conv-b', ...value }),
+      type: 'tool',
+      tools: ['tool2'],
+      toolCalls: [],
+    });
+
+    // Resolve in reverse order
+    const entryB = pendingApprovals.get('conv-b')! as PendingToolApprovalEntry;
+    const entryA = pendingApprovals.get('conv-a')! as PendingToolApprovalEntry;
+    entryB.resolve({ approved: false });
+    entryA.resolve({ approved: true });
+
+    expect(results.length).toBe(2);
+    expect(results[0].conversationId).toBe('conv-b');
+    expect(results[1].conversationId).toBe('conv-a');
+  });
+
+  it('should handle question resolution with null answers', () => {
+    let receivedResolution: QuestionResolution | null = null;
+    pendingQuestions.set('conv-q', {
+      resolve: (value: QuestionResolution) => {
+        receivedResolution = value;
+      },
+      question: 'What color?',
+    });
+
+    pendingQuestions.get('conv-q')!.resolve({ answers: null });
+    expect(receivedResolution).not.toBeNull();
+    expect(receivedResolution!.answers).toBeNull();
+  });
+
+  it('should clean up stale entries — Map.delete removes dangling resolvers', () => {
+    pendingApprovals.set('stale-conv', {
+      resolve: () => {},
+      type: 'plan',
+    } as unknown as import('../src/services/ApprovalRegistry.ts').PendingToolApprovalEntry);
+
+    expect(pendingApprovals.has('stale-conv')).toBe(true);
+    pendingApprovals.delete('stale-conv');
+    expect(pendingApprovals.has('stale-conv')).toBe(false);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// 7. RateLimitStore — Key Injection & Cache Poisoning
+// ────────────────────────────────────────────────────────────────
+

@@ -286,3 +286,134 @@ describe("expandMessagesForFunctionCall", () => {
     expect(expanded[2].content).toBe("content-b");
   });
 });
+
+// ── Adversarial Boundary Tests (merged from adversarial-boundary.test.ts) ──
+
+describe('FunctionCallingUtilities adversarial', () => {
+  describe('truncateToolResult — edge cases', () => {
+    it('should return null for null input', () => {
+      expect(truncateToolResult(null)).toBeNull();
+    });
+
+    it('should return undefined for undefined input', () => {
+      expect(truncateToolResult(undefined)).toBeUndefined();
+    });
+
+    it('should return primitive numbers as-is', () => {
+      expect(truncateToolResult(42)).toBe(42);
+    });
+
+    it('should return primitive strings as-is', () => {
+      expect(truncateToolResult('hello')).toBe('hello');
+    });
+
+    it('should truncate a top-level array with 1000 items to 10 + truncation marker', () => {
+      const hugeArray = Array.from({ length: 1000 }, (_, index) => ({ id: index, data: 'x'.repeat(50) }));
+      const result = truncateToolResult(hugeArray);
+      if (Array.isArray(result)) {
+        expect(result.length).toBe(11); // 10 items + truncation marker
+        expect(result[10]._truncated).toContain('1000');
+      } else {
+        // If the result was further truncated to a string, it should be capped
+        expect(typeof result).toBe('string');
+        expect((result as string).length).toBeLessThanOrEqual(8001); // maxChars + "…}"
+      }
+    });
+
+    it('should handle object with known truncatable array keys', () => {
+      const result = truncateToolResult({
+        events: Array.from({ length: 50 }, (_, index) => ({ id: index })),
+        products: Array.from({ length: 100 }, (_, index) => ({ sku: `SKU-${index}` })),
+      }) as Record<string, unknown>;
+      expect(Array.isArray(result.events)).toBe(true);
+      expect((result.events as unknown[]).length).toBe(10);
+      expect(result._eventsTruncated).toContain('50');
+      expect((result.products as unknown[]).length).toBe(10);
+    });
+
+    it('should handle deeply nested circular-like structures gracefully (non-circular but very deep)', () => {
+      let deepObject: Record<string, unknown> = { leaf: true };
+      for (let depth = 0; depth < 200; depth++) {
+        deepObject = { child: deepObject };
+      }
+      // Should not throw — JSON.stringify handles deep objects
+      const result = truncateToolResult(deepObject);
+      expect(result).toBeDefined();
+    });
+
+    it('should handle custom maxChars of 0 — everything truncated', () => {
+      const result = truncateToolResult({ key: 'value' }, 0);
+      // JSON.stringify({key:'value'}) = 15 chars > 0
+      expect(typeof result).toBe('string');
+      expect((result as string).endsWith('…}')).toBe(true);
+    });
+
+    it('should handle prototype pollution attempt in result object', () => {
+      const maliciousResult = JSON.parse('{"__proto__": {"isAdmin": true}, "data": "safe"}');
+      const result = truncateToolResult(maliciousResult) as Record<string, unknown>;
+      // Spread operator should NOT have polluted Object.prototype
+      expect(({} as any).isAdmin).toBeUndefined();
+      expect(result.data).toBe('safe');
+    });
+  });
+
+  describe('expandMessagesForFunctionCall — malformed messages', () => {
+    it('should handle empty messages array', () => {
+      const result = expandMessagesForFunctionCall([]);
+      expect(result).toEqual([]);
+    });
+
+    it('should handle message with null content', () => {
+      const messages = [{ role: 'user', content: null }] as any;
+      const result = expandMessagesForFunctionCall(messages);
+      expect(result.length).toBe(1);
+      // Should convert null content to " " (space fallback)
+      expect(result[0].content).toBe(' ');
+    });
+
+    it('should handle assistant message with empty toolCalls array', () => {
+      const messages = [
+        { role: 'assistant', content: 'text', toolCalls: [] },
+      ] as any;
+      const result = expandMessagesForFunctionCall(messages);
+      // Empty toolCalls = no expansion needed, but content is valid
+      expect(result.length).toBe(1);
+    });
+
+    it('should handle assistant message with toolCalls but undefined result', () => {
+      const messages = [
+        {
+          role: 'assistant',
+          content: 'thinking...',
+          toolCalls: [
+            { id: 'tc1', name: 'search', args: { query: 'test' } },
+            // result is undefined — should be filtered out from tool messages
+          ],
+        },
+      ] as any;
+      const result = expandMessagesForFunctionCall(messages);
+      // Should produce assistant + 0 tool messages (result is undefined)
+      const toolMessages = result.filter((message) => message.role === 'tool');
+      expect(toolMessages.length).toBe(0);
+    });
+
+    it('should filter deleted messages when filterDeleted is true', () => {
+      const messages = [
+        { role: 'user', content: 'hello' },
+        { role: 'assistant', content: 'bye', deleted: true },
+        { role: 'user', content: 'still here' },
+      ] as any;
+      const result = expandMessagesForFunctionCall(messages, { filterDeleted: true });
+      expect(result.length).toBe(2); // deleted message removed
+    });
+
+    it('should keep deleted messages when filterDeleted is false', () => {
+      const messages = [
+        { role: 'user', content: 'hello' },
+        { role: 'assistant', content: 'bye', deleted: true },
+      ] as any;
+      const result = expandMessagesForFunctionCall(messages, { filterDeleted: false });
+      expect(result.length).toBe(2);
+    });
+  });
+});

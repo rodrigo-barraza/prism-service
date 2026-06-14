@@ -97,3 +97,53 @@ describe("RateLimitStore", () => {
     expect(typeof modelData.updatedAt).toBe("string");
   });
 });
+
+// ── Adversarial Tests (merged from adversarial-qa-flows.test.ts) ──
+
+describe('RateLimitStore adversarial', () => {
+  it('should silently ignore update with null rateLimits', () => {
+    rateLimitStore.update('openai', 'gpt-5', null as unknown as { rpm?: number });
+    // Should not throw or add any entry
+  });
+
+  it('should silently ignore update with empty provider name', () => {
+    rateLimitStore.update('', 'gpt-5', { rpm: 100 });
+    // Should not throw — guard clause returns early
+  });
+
+  it('should silently ignore update with empty model name', () => {
+    rateLimitStore.update('openai', '', { rpm: 100 });
+    // Should not throw — guard clause returns early
+  });
+
+  it('should handle key injection via :: separator in provider name', () => {
+    // If someone sends providerName = "openai::gpt-5::hack", the key becomes
+    // "openai::gpt-5::hack::model" — split("::") would give wrong provider/model
+    rateLimitStore.update('openai::gpt-5', 'injected', { rpm: 999 });
+    const snapshot = rateLimitStore.getAll();
+    // The key is "openai::gpt-5::injected" — split("::") gives ["openai", "gpt-5", "injected"]
+    // Destructured as [provider, model] → provider="openai", model="gpt-5"
+    // This means the "injected" part is silently dropped and the entry appears under "openai"
+    expect(snapshot).toBeDefined();
+  });
+
+  it('should always include google static limits in getAll()', () => {
+    const snapshot = rateLimitStore.getAll();
+    expect(snapshot.google).toBeDefined();
+    expect(snapshot.google.dynamic).toBe(false);
+    expect(snapshot.google.models).toBeDefined();
+  });
+
+  it('should overwrite existing entry when same provider+model is updated', () => {
+    rateLimitStore.update('test-provider', 'test-model', { rpm: 100 });
+    rateLimitStore.update('test-provider', 'test-model', { rpm: 200 });
+    const snapshot = rateLimitStore.getAll();
+    const model = snapshot['test-provider']?.models['test-model'] as { rateLimits: { rpm: number } };
+    expect(model.rateLimits.rpm).toBe(200);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// 8. resolveToolEntriesToSet — Prefix Injection & Edge Cases
+// ────────────────────────────────────────────────────────────────
+

@@ -448,3 +448,227 @@ describe("createStreamState", () => {
     expect(state.stopReason).toBeUndefined();
   });
 });
+
+// ── Adversarial Tests (merged from adversarial-qa-flows.test.ts) ──
+
+describe('StreamChunkDispatcher adversarial', () => {
+  let emittedEvents: Array<Record<string, unknown>>;
+  let streamState: ReturnType<typeof createStreamState>;
+  let streamContext: { emit: (event: Record<string, unknown>) => void; project: string; username: string };
+
+  beforeEach(() => {
+    emittedEvents = [];
+    streamState = createStreamState();
+    streamContext = {
+      emit: (event: Record<string, unknown>) => emittedEvents.push(event),
+      project: 'test',
+      username: 'adversarial',
+    };
+  });
+
+  it('should handle null chunk gracefully — treated as empty text', async () => {
+    const result = await dispatchChunk(null, streamState, streamContext);
+    expect(result).toBe(true);
+    // null → typeof chunk !== 'object' after !chunk check → empty string
+    expect(streamState.text).toBe('');
+  });
+
+  it('should handle undefined chunk gracefully', async () => {
+    const result = await dispatchChunk(undefined, streamState, streamContext);
+    expect(result).toBe(true);
+    expect(streamState.text).toBe('');
+  });
+
+  it('should handle raw string chunk — treated as text content', async () => {
+    await dispatchChunk('hello world', streamState, streamContext);
+    expect(streamState.text).toBe('hello world');
+    expect(emittedEvents.some((event) => event.type === 'chunk')).toBe(true);
+  });
+
+  it('should handle empty string chunk — no content emitted', async () => {
+    await dispatchChunk('', streamState, streamContext);
+    expect(streamState.text).toBe('');
+    // Empty string is falsy → early return, no emit
+  });
+
+  it('should handle chunk with unknown type — treated as text fallback', async () => {
+    await dispatchChunk({ type: 'aliens_from_mars', content: 'surprise' }, streamState, streamContext);
+    // Unknown type → default branch → treated as text but chunk is object not string → empty
+    expect(streamState.text).toBe('');
+  });
+
+  it('should handle thinking chunk with null content', async () => {
+    await dispatchChunk({ type: 'thinking', content: null } as any, streamState, streamContext);
+    expect(streamState.thinking).toBe('');
+  });
+
+  it('should handle usage chunk with null usage — sets state to null', async () => {
+    await dispatchChunk({ type: 'usage', usage: null } as any, streamState, streamContext);
+    expect(streamState.usage).toBeNull();
+  });
+
+  it('should handle toolCall chunk with missing name — defaults to empty string', async () => {
+    await dispatchChunk(
+      { type: 'toolCall', id: 'tc-1', args: { query: 'test' } },
+      streamState,
+      streamContext,
+    );
+    expect(streamState.toolCalls.length).toBe(1);
+    expect(streamState.toolCalls[0].name).toBe('');
+  });
+
+  it('should handle toolCall done status for non-existent id — silent no-op', async () => {
+    await dispatchChunk(
+      { type: 'toolCall', id: 'nonexistent', status: 'done', result: { data: 'test' } },
+      streamState,
+      streamContext,
+    );
+    // No matching tool call to update — nothing added
+    expect(streamState.toolCalls.length).toBe(0);
+  });
+
+  it('should handle image chunk with no data — MinIO upload skipped', async () => {
+    await dispatchChunk(
+      { type: 'image', data: undefined, mimeType: 'image/png' },
+      streamState,
+      streamContext,
+    );
+    // No image pushed to state since data is undefined
+    expect(streamState.images.length).toBe(0);
+  });
+
+  it('should handle audio chunk and extract sample rate from mimeType', async () => {
+    await dispatchChunk(
+      { type: 'audio', data: 'base64audio', mimeType: 'audio/pcm;rate=48000' },
+      streamState,
+      streamContext,
+    );
+    expect(streamState.audioSampleRate).toBe(48000);
+    expect(streamState.audioChunks.length).toBe(1);
+  });
+
+  it('should handle consecutive text chunks accumulating correctly', async () => {
+    await dispatchChunk('first ', streamState, streamContext);
+    await dispatchChunk('second ', streamState, streamContext);
+    await dispatchChunk('third', streamState, streamContext);
+    expect(streamState.text).toBe('first second third');
+    expect(streamState.outputCharacters).toBe(18);
+  });
+
+  it('should set firstTokenTime only once across multiple chunks', async () => {
+    streamState.requestStart = performance.now();
+    await dispatchChunk('first', streamState, streamContext);
+    const firstTokenTimeValue = streamState.firstTokenTime;
+    expect(firstTokenTimeValue).not.toBeNull();
+
+    await dispatchChunk('second', streamState, streamContext);
+    // Should not have changed
+    expect(streamState.firstTokenTime).toBe(firstTokenTimeValue);
+  });
+});
+
+describe('stripToolCallMarkup adversarial', () => {
+  it('should strip complete tool_call XML tags', () => {
+    const input = 'Hello <tool_call>{"name":"test"}</tool_call> world';
+    expect(stripToolCallMarkup(input)).toBe('Hello  world');
+  });
+
+  it('should strip pipe-delimited tool call tags from Gemma 4 — BUG: trailing text consumed by incomplete-tag fallback regex', () => {
+    const input = 'text <|tool_call|>call_data<|/tool_call|> more text';
+    // DISCOVERED BUG: The completed-tag regex matches <|tool_call|>call_data<|/tool_call|>
+    // but then the trailing-tag regex <|tool_call|>[\s\S]*$ matches the remaining ' more text'
+    // because the pipe-delimited opening pattern <|tool_call|> is a substring of <|/tool_call|>.
+    // This causes the trailing fallback to consume everything after the closing tag.
+    expect(stripToolCallMarkup(input)).toBe('text ');
+  });
+
+  it('should strip incomplete trailing tool_call tags', () => {
+    const input = 'Hello <tool_call>this is trailing';
+    expect(stripToolCallMarkup(input)).toBe('Hello ');
+  });
+
+  it('should handle empty string', () => {
+    expect(stripToolCallMarkup('')).toBe('');
+  });
+
+  it('should handle text with no tool call markup — returned as-is', () => {
+    const clean = 'This is perfectly normal text with no markup.';
+    expect(stripToolCallMarkup(clean)).toBe(clean);
+  });
+
+  it('should handle nested tool_call tags — BUG: non-greedy regex leaves inner content on second pass', () => {
+    const input = '<tool_call><tool_call>inner</tool_call></tool_call>';
+    const result = stripToolCallMarkup(input);
+    // DISCOVERED BUG: Non-greedy regex matches the first <tool_call>...<first /tool_call> pair,
+    // stripping '<tool_call><tool_call>inner</tool_call>' and leaving '</tool_call>'.
+    // But the incomplete-tag regex then matches nothing since the remaining '</tool_call>'
+    // doesn't start with an opening tag. Result: 'inner' leaks through.
+    expect(result).toContain('inner');
+  });
+
+  it('should handle case-insensitive tags', () => {
+    const input = 'text <TOOL_CALL>data</TOOL_CALL> more';
+    expect(stripToolCallMarkup(input)).toBe('text  more');
+  });
+
+  it('should strip END_TOOL_REQUEST marker', () => {
+    const input = 'response text [END_TOOL_REQUEST] trailing';
+    expect(stripToolCallMarkup(input)).toBe('response text  trailing');
+  });
+
+  it('should handle multiple different tag types in same string', () => {
+    const input = '<tool_call>a</tool_call> <tool_response>b</tool_response> <result>c</result> text';
+    expect(stripToolCallMarkup(input)).toBe('   text');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// 5. AutoApprovalEngine — Tier Escalation & FullAuto Bypass
+// ────────────────────────────────────────────────────────────────
+
+describe('StreamState concurrent mutation', () => {
+  it('should handle parallel dispatchChunk calls without data corruption', async () => {
+    const emittedEvents: Array<Record<string, unknown>> = [];
+    const streamState = createStreamState();
+    const streamContext = {
+      emit: (event: Record<string, unknown>) => emittedEvents.push(event),
+      project: 'test',
+      username: 'concurrent',
+    };
+
+    // Fire 50 concurrent chunk dispatches
+    const promises = Array.from({ length: 50 }, (_, index) =>
+      dispatchChunk(`chunk-${index} `, streamState, streamContext),
+    );
+
+    await Promise.all(promises);
+
+    // All chunks should have been accumulated
+    expect(streamState.text.length).toBeGreaterThan(0);
+    // Output characters should reflect the accumulated text
+    expect(streamState.outputCharacters).toBeGreaterThan(0);
+  });
+
+  it('should handle interleaved text and thinking chunks', async () => {
+    const emittedEvents: Array<Record<string, unknown>> = [];
+    const streamState = createStreamState();
+    const streamContext = {
+      emit: (event: Record<string, unknown>) => emittedEvents.push(event),
+      project: 'test',
+      username: 'concurrent',
+    };
+
+    await dispatchChunk({ type: 'thinking', content: 'reasoning...' }, streamState, streamContext);
+    await dispatchChunk('visible text', streamState, streamContext);
+    await dispatchChunk({ type: 'thinking', content: 'more reasoning' }, streamState, streamContext);
+    await dispatchChunk(' and more text', streamState, streamContext);
+
+    expect(streamState.thinking).toBe('reasoning...more reasoning');
+    expect(streamState.text).toBe('visible text and more text');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// 13. Policy Engine — Predicate Error Isolation & Priority Edges
+// ────────────────────────────────────────────────────────────────
+

@@ -10,6 +10,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Request, Response, NextFunction } from "express";
 import { requestContext } from "../src/utils/RequestContext.ts";
+import supertest from "supertest";
+import { app } from "./setup.ts";
 
 // Import the middleware under test
 import { authMiddleware } from "../src/middleware/AuthMiddleware.ts";
@@ -272,3 +274,66 @@ describe("AuthMiddleware — always calls next()", () => {
     expect(nextFn).toHaveBeenCalledTimes(1);
   });
 });
+
+// ── Adversarial Tests (merged from adversarial-qa-flows.test.ts) ──
+
+describe('AuthMiddleware adversarial — header injection', () => {
+  const agent = supertest(app as any);
+
+  it('should normalize IPv4-mapped IPv6 address in x-forwarded-for', async () => {
+    const response = await agent
+      .get('/')
+      .set('x-forwarded-for', '::ffff:192.168.1.1');
+    expect(response.status).toBe(200);
+  });
+
+  it('should use first IP from comma-separated x-forwarded-for', async () => {
+    const response = await agent
+      .get('/')
+      .set('x-forwarded-for', '1.2.3.4, 5.6.7.8, 9.10.11.12');
+    expect(response.status).toBe(200);
+  });
+
+  it('should handle empty x-username — falls back to default', async () => {
+    const response = await agent
+      .get('/')
+      .set('x-username', '');
+    expect(response.status).toBe(200);
+  });
+
+  it('should handle x-username with path traversal characters', async () => {
+    const response = await agent
+      .get('/')
+      .set('x-username', '../../../etc/passwd');
+    expect(response.status).toBe(200);
+    // The response should work — AuthMiddleware doesn't validate username format
+    // The risk is downstream MinIO path construction
+  });
+
+  it('should handle x-project with null bytes — superagent rejects at transport layer', async () => {
+    // HTTP spec forbids null bytes in header values.
+    // Superagent raises TypeError before the request even reaches the server.
+    // This is correct behavior — the attack is blocked at the transport layer.
+    await expect(
+      agent.get('/').set('x-project', 'test\0injected'),
+    ).rejects.toThrow();
+  });
+
+  it('should reject very long header values — HTTP 431 Request Header Fields Too Large', async () => {
+    const response = await agent
+      .get('/')
+      .set('x-username', 'x'.repeat(10_000))
+      .set('x-project', 'y'.repeat(10_000));
+    // Node.js rejects headers exceeding ~16KB combined by default (431)
+    expect(response.status).toBe(431);
+  });
+
+  it('should handle x-workspace-root with path traversal', async () => {
+    const response = await agent
+      .get('/')
+      .set('x-workspace-root', '/../../../etc');
+    expect(response.status).toBe(200);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
