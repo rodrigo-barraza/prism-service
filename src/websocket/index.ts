@@ -242,6 +242,7 @@ function handleWebsocketLive(
   // Variables for Request Logging
   let activeModel = LIVE_AUDIO_MODEL;
   let activeConversationId: string | null = null;
+  let activeConversationTitle: string | undefined = undefined;
   let activeConfig = {};
 
   let turnStart = performance.now();
@@ -330,6 +331,13 @@ function handleWebsocketLive(
       activeModel = model;
       activeConversationId =
         (data.conversationId as string) || clientConfig.conversationId || null;
+      const conversationMeta =
+        (data.conversationMeta as Record<string, unknown> | undefined) ||
+        (clientConfig.conversationMeta as Record<string, unknown> | undefined);
+      activeConversationTitle =
+        (data.title as string) ||
+        (conversationMeta?.title as string) ||
+        undefined;
 
       // Tools setup
       const tools: Record<string, unknown>[] = [];
@@ -426,6 +434,7 @@ function handleWebsocketLive(
                   project,
                   username,
                   true,
+                  { title: activeConversationTitle },
                 ).catch((error: Error) =>
                   logger.error(
                     `[Live API] Failed to set isGenerating: ${error.message}`,
@@ -447,6 +456,7 @@ function handleWebsocketLive(
                       project,
                       username,
                       true,
+                      { title: activeConversationTitle },
                     ).catch(() => {});
                   }
                 }

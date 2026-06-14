@@ -187,7 +187,7 @@ const ConversationService: ConversationServiceInterface = {
     project: string,
     username: string,
     generating: boolean,
-    { collection = DEFAULT_COLLECTION, agent }: { collection?: string; agent?: string } = {},
+    { collection = DEFAULT_COLLECTION, agent, title }: { collection?: string; agent?: string; title?: string } = {},
   ): Promise<void> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return;
@@ -201,7 +201,7 @@ const ConversationService: ConversationServiceInterface = {
         {
           $set: { isGenerating: true, updatedAt: now },
           $setOnInsert: {
-            title: DEFAULT_CONVERSATION_TITLE,
+            title: title || DEFAULT_CONVERSATION_TITLE,
             messages: [],
             systemPrompt: "",
             settings: {},

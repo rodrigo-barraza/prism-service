@@ -75,7 +75,7 @@ export interface ConversationServiceInterface {
     project: string,
     username: string,
     generating: boolean,
-    options?: { collection?: string; agent?: string },
+    options?: { collection?: string; agent?: string; title?: string },
   ): Promise<void>;
   getSessionStats(
     sessionId: string,
