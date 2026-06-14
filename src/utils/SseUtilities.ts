@@ -1,6 +1,7 @@
 import { handleConversation } from "../routes/ChatRoutes.ts";
 import { ProviderError } from "./errors.ts";
 import { createAbortController } from "./AbortController.ts";
+import logger from "./logger.ts";
 import { Request, Response, NextFunction } from "express";
 import { SseEvent } from "../types/SseTypes.ts";
 import type { ChatRequest } from "../types/schemas.ts";
@@ -137,8 +138,23 @@ export async function handleSseRequest(
 ) {
   initSseResponse(res);
 
+  // Disable socket-level timeouts for long-lived SSE streams.
+  // Even with server.requestTimeout = 0, the underlying socket can
+  // inherit a default timeout from Node.js or Express.
+  if (req.socket) {
+    req.socket.setTimeout(0);
+    req.socket.setKeepAlive(true, 30_000);
+  }
+
+  const connectionStartTime = Date.now();
   const controller = createAbortController();
   res.on("close", () => {
+    const durationSeconds = ((Date.now() - connectionStartTime) / 1000).toFixed(1);
+    logger.warn(
+      `[SSE] Connection closed after ${durationSeconds}s — ` +
+      `writableFinished=${res.writableFinished}, destroyed=${res.destroyed}, ` +
+      `socket.destroyed=${req.socket?.destroyed}`,
+    );
     if (!res.writableFinished) controller.abort();
   });
 
