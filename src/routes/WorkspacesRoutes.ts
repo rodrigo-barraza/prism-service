@@ -244,11 +244,16 @@ router.get(
  */
 router.get(
   "/download/agent",
-  asyncHandler(async (_req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
     try {
+      const platform = req.query.platform;
+      const toolsUrl = platform
+        ? `${TOOLS_SERVICE_URL}/agents/download/agent?platform=${encodeURIComponent(String(platform))}`
+        : `${TOOLS_SERVICE_URL}/agents/download/agent`;
+
       const toolsResponse = await fetch(
-        `${TOOLS_SERVICE_URL}/agents/download/agent`,
-        { signal: AbortSignal.timeout(10_000) },
+        toolsUrl,
+        { signal: AbortSignal.timeout(60_000) },
       );
 
       if (!toolsResponse.ok) {
@@ -264,11 +269,12 @@ router.get(
       res.setHeader(
         "Content-Type",
         toolsResponse.headers.get("Content-Type") ||
-          "application/javascript; charset=utf-8",
+          "application/octet-stream",
       );
       res.setHeader(
         "Content-Disposition",
-        'attachment; filename="workspace-agent.mjs"',
+        toolsResponse.headers.get("Content-Disposition") ||
+          'attachment; filename="workspace-agent.mjs"',
       );
       const contentLength = toolsResponse.headers.get("Content-Length");
       if (contentLength) {

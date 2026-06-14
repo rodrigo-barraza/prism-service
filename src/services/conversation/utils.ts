@@ -242,3 +242,41 @@ export function buildConversationPatchFields({
   }
   return setFields;
 }
+
+/**
+ * Enrich conversations list with authoritative totalCost from request logs.
+ */
+export function enrichConversationsWithRequestCosts(
+  conversations: Array<Record<string, any>>,
+  requestLogCosts: Array<{ _id: string; totalCost: number }>,
+): void {
+  if (conversations.length === 0) return;
+  const costMap = new Map(
+    requestLogCosts.map((costEntry) => [costEntry._id, costEntry.totalCost]),
+  );
+  for (const conversation of conversations) {
+    const conversationId = conversation.id;
+    const requestLogCost = costMap.get(conversationId);
+    if (requestLogCost !== undefined && requestLogCost > 0) {
+      conversation.totalCost = Math.max(
+        (conversation.totalCost as number) || 0,
+        requestLogCost,
+      );
+    }
+  }
+}
+
+/**
+ * Enrich a single conversation's totalCost with request logs.
+ */
+export function enrichSingleConversationCost(
+  conversation: Record<string, any>,
+  requestLogAggregation: Array<{ _id: string; totalCost: number }>,
+): void {
+  if (requestLogAggregation.length > 0 && requestLogAggregation[0].totalCost > 0) {
+    conversation.totalCost = Math.max(
+      (conversation.totalCost as number) || 0,
+      requestLogAggregation[0].totalCost,
+    );
+  }
+}

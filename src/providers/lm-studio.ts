@@ -13,7 +13,6 @@ import { resolveArchParams } from "../utils/gguf-arch.ts";
 import {
   TOOLS_SERVICE_URL,
   LM_STUDIO_EVAL_BATCH_SIZE,
-  LM_STUDIO_PHYSICAL_BATCH_SIZE,
   LM_STUDIO_DEFAULT_MAX_CONTEXT,
 } from "../../config.ts";
 import { TYPES, getDefaultModels } from "../config.ts";
@@ -500,7 +499,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                   (entry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
                 if (loadedContext?.context_length) options._loadedContextLength = loadedContext.context_length as number;
                 if (loadedContext?.eval_batch_size) options._loadedEvalBatchSize = loadedContext.eval_batch_size as number;
-                if (loadedContext?.n_batch) options._loadedPhysicalBatchSize = loadedContext.n_batch as number;
+                if (loadedContext?.physical_batch_size) options._loadedPhysicalBatchSize = loadedContext.physical_batch_size as number;
               }
 
               // If minContextLength is requested (e.g. agentic mode) and model is loaded
@@ -589,7 +588,6 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
               };
               const loadOpts: ProviderOptions = {
                 eval_batch_size: LM_STUDIO_EVAL_BATCH_SIZE,
-                n_batch: LM_STUDIO_PHYSICAL_BATCH_SIZE,
               };
               if (options.minContextLength) {
                 const maxContextLength =
@@ -712,7 +710,6 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                   try {
                     loadOpts.context_length = tier.contextLength;
                     loadOpts.eval_batch_size = tier.batchSize;
-                    loadOpts.n_batch = tier.batchSize;
                     await this.loadModel(model, loadOpts, options.signal);
                     loadError = null;
                     // Record the GPU-constrained ceiling so subsequent
@@ -751,7 +748,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                   ((entryAfterLoad?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown>) || undefined;
                 if (context?.context_length) options._loadedContextLength = context.context_length as number;
                 if (context?.eval_batch_size) options._loadedEvalBatchSize = context.eval_batch_size as number;
-                if (context?.n_batch) options._loadedPhysicalBatchSize = context.n_batch as number;
+                if (context?.physical_batch_size) options._loadedPhysicalBatchSize = context.physical_batch_size as number;
               } catch {
                 /* ignore */
               }
@@ -1414,8 +1411,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
             (payload as Record<string, unknown>).offload_kv_cache_to_gpu = options.offload_kv_cache_to_gpu;
           if (options.eval_batch_size != null)
             (payload as Record<string, unknown>).eval_batch_size = options.eval_batch_size;
-          if (options.n_batch != null)
-            (payload as Record<string, unknown>).n_batch = options.n_batch;
+
           const response = await fetch(`${baseUrl}/api/v1/models/load`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
