@@ -110,6 +110,7 @@ vi.mock("../src/services/system-prompt/index.ts", () => ({
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
     get: vi.fn().mockResolvedValue({ agents: { harness: "standard" } }),
     getSection: vi.fn().mockResolvedValue({ harness: "standard" }),
   },

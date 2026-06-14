@@ -47,6 +47,7 @@ vi.mock("../src/services/RequestLogger.ts", () => ({
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
     get: vi.fn().mockResolvedValue({}),
     getSection: vi.fn().mockResolvedValue({}),
     getMemoryModelConfig: vi.fn().mockResolvedValue({ provider: "google", model: "test" }),

@@ -165,6 +165,7 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
     getSection: vi.fn().mockResolvedValue({ topology: "hierarchical" }),
   },
 }));

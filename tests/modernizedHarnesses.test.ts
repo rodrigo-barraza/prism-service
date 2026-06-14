@@ -40,6 +40,7 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
     get: vi.fn().mockResolvedValue({}),
     getSection: vi.fn().mockResolvedValue({}),
     getMemoryModelConfig: vi.fn().mockResolvedValue({

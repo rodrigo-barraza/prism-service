@@ -44,6 +44,8 @@ function buildOpenAICatalog(): string {
     sage: "calm thoughtful F — meditation/instructional",
     shimmer: "soft intimate cheerful F",
     verse: "versatile expressive M",
+    marin: "warm relaxed F",
+    cedar: "bright energetic M",
   };
   const entries = Object.entries(voiceDescriptions).map(
     ([name, description]) => `${name} (${description})`,
