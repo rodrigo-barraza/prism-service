@@ -471,6 +471,19 @@ export default class BaseAgenticHarness {
       return { action: "continue" };
     }
 
+    // ── Tool call start (early disclosure) ─────────────────
+    if (streamChunk?.type === "toolCallStart") {
+      this._recordFirstToken(pass);
+      this._recordTiming(pass);
+      emit({
+        type: SSE_EVENT_TYPES.TOOL_EXECUTION,
+        tool: { name: streamChunk.name || "", args: {}, id: streamChunk.id || "" },
+        status: "streaming",
+      });
+      this.maybeEmitProgress();
+      return { action: "continue" };
+    }
+
     // ── Tool call argument delta ─────────────────────────
     if (streamChunk?.type === "toolCallDelta") {
       this._recordFirstToken(pass);
