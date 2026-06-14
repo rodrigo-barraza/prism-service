@@ -332,6 +332,12 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
   const _loadInflight = new Map<string, Promise<void>>();
   const _loadModelInflight = new Map<string, Promise<unknown>>();
   const _activeRequestsCount = new Map<string, number>();
+  // ── GPU-constrained context ceiling per model ──────────────
+  // When a model load at the requested context length fails (GPU OOM)
+  // and falls back to a smaller context, we record the practical GPU
+  // ceiling here. Without this, every agentic iteration sees
+  // loadedContext < minContextLength and triggers a futile reload loop.
+  const _gpuConstrainedContextLength = new Map<string, number>();
   return {
     name: instanceId,
     async generateText(
@@ -468,8 +474,16 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
               // would just load the same max again, creating an infinite unload/reload loop
               // (e.g. minContextLength=150k but model max is 32k → loads at 32k → 32k<150k → reload → 32k → …).
               const modelMaximumContext = (entry as Record<string, unknown>)?.max_context_length as number || 0;
+              // Check both the model's theoretical max AND the GPU-constrained
+              // practical max (recorded after a fallback load). Without the GPU
+              // check, every agentic iteration sees loaded=65k < min=120k and
+              // triggers a futile unload/reload cycle.
+              const gpuCeiling = _gpuConstrainedContextLength.get(model);
+              const effectiveMaxContext = gpuCeiling
+                ? Math.min(modelMaximumContext || Infinity, gpuCeiling)
+                : modelMaximumContext;
               const alreadyAtMax =
-                modelMaximumContext > 0 && ((options._loadedContextLength as number) || 0) >= modelMaximumContext;
+                effectiveMaxContext > 0 && ((options._loadedContextLength as number) || 0) >= effectiveMaxContext;
 
               const isActive = (_activeRequestsCount.get(model) || 0) > 0;
               const needsReload =
@@ -482,7 +496,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
 
               if (alreadyAtMax && options.minContextLength && ((options._loadedContextLength as number) || 0) < options.minContextLength) {
                 logger.info(
-                  `[LM-Studio] Model ${model} already at max context (${options._loadedContextLength}/${modelMaximumContext}) — skipping reload (requested ${options.minContextLength})`,
+                  `[LM-Studio] Model ${model} already at max context (${options._loadedContextLength}/${effectiveMaxContext}${gpuCeiling ? ` gpu-ceiling=${gpuCeiling}` : ""}) — skipping reload (requested ${options.minContextLength})`,
                 );
               }
 
@@ -545,12 +559,18 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                 const maxContextLength =
                   ((entry as Record<string, unknown>)?.max_context_length as number) ||
                   LM_STUDIO_DEFAULT_MAX_CONTEXT;
+                // If we already know the GPU ceiling from a previous fallback,
+                // cap here to avoid a guaranteed-to-fail load attempt.
+                const gpuCeilingForLoad = _gpuConstrainedContextLength.get(model);
+                const effectiveMaxForLoad = gpuCeilingForLoad
+                  ? Math.min(maxContextLength, gpuCeilingForLoad)
+                  : maxContextLength;
                 loadOpts.context_length = Math.min(
                   options.minContextLength as number,
-                  maxContextLength,
+                  effectiveMaxForLoad,
                 );
                 logger.info(
-                  `[LM-Studio] Loading with context_length=${loadOpts.context_length} (min=${options.minContextLength}, max=${maxContextLength})`,
+                  `[LM-Studio] Loading with context_length=${loadOpts.context_length} (min=${options.minContextLength}, max=${maxContextLength}${gpuCeilingForLoad ? `, gpu-ceiling=${gpuCeilingForLoad}` : ""})`,
                 );
               }
 
@@ -636,8 +656,11 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                     loadOpts.context_length = fallbackContextLength;
                     await this.loadModel(model, loadOpts, options.signal);
                     loadError = null;
+                    // Record the GPU-constrained ceiling so subsequent
+                    // iterations don't attempt to reload above this limit.
+                    _gpuConstrainedContextLength.set(model, fallbackContextLength);
                     logger.info(
-                      `[LM-Studio] Fallback load succeeded at ctx=${fallbackContextLength}`,
+                      `[LM-Studio] Fallback load succeeded at ctx=${fallbackContextLength} — recorded as GPU ceiling`,
                     );
                     break;
                   } catch (fallbackLoadError: unknown) {
@@ -1259,26 +1282,31 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
           throw new Error(`API error: ${response.status} ${errorText}`);
         }
         const data = await response.json();
-        // Enrich each model with resolved architecture params for VRAM estimation
-        if ((data as Record<string, unknown>)?.data) {
-          for (const model of (data as Record<string, unknown>).data as Array<Record<string, unknown>>) {
-            const arch = model.architecture as string | undefined;
-            const params = model.params_string as string | undefined;
-            const sizeBytes = (model.size_bytes as number) || 0;
-            const bitsPerWeight = (model.quantization as Record<string, unknown>)?.bits_per_weight as number || 4;
-            model.archParams = resolveArchParams(arch ?? null, params ?? null, sizeBytes, bitsPerWeight);
-            model.key = String(model.id);
-            model.display_name = String(model.display_name || model.id);
-            model.type = "llm";
-          }
+        const rawRecord = data as Record<string, unknown>;
+        // LM Studio /api/v1/models returns { models: [...] } (native format)
+        // with full metadata including loaded_instances, max_context_length, etc.
+        // The older /v1/models endpoint returns { data: [...] } (OpenAI format)
+        // with minimal info. Support both.
+        const rawModels = (rawRecord.models || rawRecord.data || []) as Array<Record<string, unknown>>;
+        for (const model of rawModels) {
+          // Enrich with resolved architecture params for VRAM estimation
+          const arch = model.architecture as string | undefined;
+          const params = model.params_string as string | undefined;
+          const sizeBytes = (model.size_bytes as number) || 0;
+          const bitsPerWeight = (model.quantization as Record<string, unknown>)?.bits_per_weight as number || 4;
+          model.archParams = resolveArchParams(arch ?? null, params ?? null, sizeBytes, bitsPerWeight);
+          // Normalize key/display_name/type for both response formats
+          if (!model.key) model.key = String(model.id || "");
+          if (!model.display_name) model.display_name = String(model.display_name || model.id || "");
+          if (!model.type) model.type = "llm";
         }
-        const models = ((data as Record<string, unknown>).data as Array<{
+        const models = rawModels as Array<{
           key: string;
           display_name: string;
           type: string;
           loaded_instances?: Array<{ id: string; [key: string]: unknown }>;
           [key: string]: unknown;
-        }>) || [];
+        }>;
         return { models, data: models };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
