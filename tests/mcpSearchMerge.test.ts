@@ -291,6 +291,8 @@ describe("executeSearchToolsWithMCP — MCP search merge", () => {
 
     expect(result.action_required).toBeDefined();
     expect(result.action_required as string).toContain("enable_tools");
+    expect(result.actionRequired).toBeDefined();
+    expect(result.actionRequired as string).toContain("enable_tools");
   });
 
   it("does not override existing action_required from tools-api", async () => {

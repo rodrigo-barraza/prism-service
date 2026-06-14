@@ -58,7 +58,7 @@ function registerType(type: string, instances: ProviderInstanceConfig[]) {
     const maxConcurrency = Math.max(1, typeof concurrency === 'number' ? concurrency : parseInt(String(concurrency), 10) || 1);
     const provider = factory(url, id);
 
-    const entry = {
+    const entry: InstanceEntry = {
       id,
       type,
       baseUrl: url,
@@ -66,7 +66,7 @@ function registerType(type: string, instances: ProviderInstanceConfig[]) {
       instanceNumber,
       provider,
     };
-    if (nickname) (entry as Record<string, unknown>).nickname = nickname;
+    if (nickname) entry.nickname = nickname;
 
     registry.set(id, entry);
 
