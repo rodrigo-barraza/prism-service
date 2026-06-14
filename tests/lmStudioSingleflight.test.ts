@@ -205,37 +205,39 @@ describe("generateTextStream pre-load singleflight (race condition regression)",
     return {
       loadInflight,
       async ensureModelForStreaming(model: string): Promise<{ contextLength: number | null }> {
-        if (loadInflight.has(model)) {
-          await loadInflight.get(model);
-          return { contextLength: null };
-        }
-
-        // FIXED: register synchronously BEFORE async work
-        let resolveInflight!: () => void;
-        let rejectInflight!: (error: unknown) => void;
-        const inflightPromise = new Promise<void>((resolve, reject) => {
-          resolveInflight = resolve;
-          rejectInflight = reject;
-        });
-        inflightPromise.catch(() => {});
-        loadInflight.set(model, inflightPromise);
-
-        try {
-          const { isLoaded, contextLength } = await dependencies.listModels();
-
-          if (isLoaded) {
-            resolveInflight();
-            return { contextLength };
+        while (true) {
+          if (loadInflight.has(model)) {
+            await loadInflight.get(model);
+            continue;
           }
 
-          await dependencies.loadModel(model);
-          resolveInflight();
-          return { contextLength: null };
-        } catch (error) {
-          rejectInflight(error);
-          throw error;
-        } finally {
-          loadInflight.delete(model);
+          // Register synchronously BEFORE any async check
+          let resolveInflight!: () => void;
+          let rejectInflight!: (error: unknown) => void;
+          const inflightPromise = new Promise<void>((resolve, reject) => {
+            resolveInflight = resolve;
+            rejectInflight = reject;
+          });
+          inflightPromise.catch(() => {});
+          loadInflight.set(model, inflightPromise);
+
+          try {
+            const { isLoaded, contextLength } = await dependencies.listModels();
+
+            if (isLoaded) {
+              resolveInflight();
+              return { contextLength };
+            }
+
+            await dependencies.loadModel(model);
+            resolveInflight();
+            return { contextLength: null };
+          } catch (error) {
+            rejectInflight(error);
+            throw error;
+          } finally {
+            loadInflight.delete(model);
+          }
         }
       },
     };
@@ -290,12 +292,16 @@ describe("generateTextStream pre-load singleflight (race condition regression)",
   }
 
   it("FIXED: concurrent callers coalesce into a single loadModel call", async () => {
+    let isModelLoaded = false;
     const loadModelSpy = vi.fn(
-      () => new Promise<void>((resolve) => setTimeout(resolve, 50)),
+      () => new Promise<void>((resolve) => {
+        isModelLoaded = true;
+        setTimeout(resolve, 50);
+      }),
     );
     const listModelsSpy = vi.fn(
       () => new Promise<{ isLoaded: boolean; contextLength: number | null }>((resolve) =>
-        setTimeout(() => resolve({ isLoaded: false, contextLength: null }), 20),
+        setTimeout(() => resolve({ isLoaded: isModelLoaded, contextLength: isModelLoaded ? 32768 : null }), 20),
       ),
     );
 
@@ -313,64 +319,83 @@ describe("generateTextStream pre-load singleflight (race condition regression)",
     expect(loadModelSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("BROKEN (regression guard): old pattern allows duplicate loads with async gap", async () => {
-    // The real race: Caller A finishes listModels + loadModel + cleanup before
-    // Caller B finishes its listModels. When B's double-check fires, the map
-    // is already empty (A cleaned up), so B loads a duplicate.
-    //
-    // Timeline with fast loadModel (10ms) and slow listModels (50ms):
-    //   0ms: A enters, passes has() (empty), starts listModels
-    //   5ms: B enters, passes has() (empty), starts listModels
-    //  50ms: A's listModels resolves, A sets inflight, starts loadModel
-    //  55ms: B's listModels resolves, B checks has() → TRUE (A registered), B waits on A
-    //  60ms: A's loadModel resolves, A resolves inflight, deletes from map
-    //  60ms: B wakes from wait — only 1 loadModel call total
-    //
-    // The double-check in the broken pattern actually catches MOST races.
-    // But the actual production race was different: multiple workers hit the
-    // same instance across separate event loops (separate HTTP requests), not
-    // Promise.all in a single event loop. The singleflight map only prevents
-    // races within the same Node.js process.
-    //
-    // The real fix matters because in production, requests arrive at different
-    // times and the listModels() network call has variable latency. The broken
-    // pattern's async gap between has() and set() means that if two requests
-    // arrive within the listModels() round-trip, both proceed to load.
-    //
-    // We verify the fix works by ensuring the FIXED pattern always coalesces.
-    // Rather than trying to trigger the race deterministically (which is fragile),
-    // we test that the fixed pattern is strictly better: it prevents ALL
-    // concurrent duplicates regardless of timing.
+  it("BROKEN (regression guard): old pattern allows duplicate loads when Caller A finishes loading while Caller B's listModels() is still pending", async () => {
     const loadModelSpy = vi.fn(
-      () => new Promise<void>((resolve) => setTimeout(resolve, 10)),
-    );
-    const listModelsSpy = vi.fn(
-      () => new Promise<{ isLoaded: boolean; contextLength: number | null }>((resolve) =>
-        setTimeout(() => resolve({ isLoaded: false, contextLength: null }), 50),
-      ),
+      () => new Promise<void>((resolve) => setTimeout(resolve, 20)),
     );
 
-    // Test: the broken pattern does NOT register synchronously, so the inflight
-    // map is empty during the entire listModels() window. Verify that the map
-    // is indeed empty during the async gap.
-    const { ensureModelForStreaming, loadInflight } = createBrokenStreamPreload({
+    // Staggered listModels return values
+    const listModelsSpy = vi.fn(() => {
+      // Caller A (first call) starts at 0ms and resolves at 50ms
+      // Caller B (second call) starts at 30ms and resolves at 80ms
+      // Since the model is not loaded at the start of either query, they both return false.
+      return new Promise<{ isLoaded: boolean; contextLength: number | null }>((resolve) =>
+        setTimeout(() => resolve({ isLoaded: false, contextLength: null }), 50),
+      );
+    });
+
+    const { ensureModelForStreaming } = createBrokenStreamPreload({
       listModels: listModelsSpy,
       loadModel: loadModelSpy,
     });
 
-    // Start first caller
-    const firstCallerPromise = ensureModelForStreaming("gemma-4-12b-qat");
+    // Start Caller A at 0ms
+    const promiseA = ensureModelForStreaming("gemma-4-12b-qat");
 
-    // Check map state during the async gap (5ms after caller entered listModels)
-    await new Promise((resolve) => setTimeout(resolve, 5));
-    const mapWasEmptyDuringAsyncGap = !loadInflight.has("gemma-4-12b-qat");
+    // Start Caller B at 30ms
+    let promiseB!: Promise<{ contextLength: number | null }>;
+    await new Promise<void>((resolve) => {
+      setTimeout(() => {
+        promiseB = ensureModelForStreaming("gemma-4-12b-qat");
+        resolve();
+      }, 30);
+    });
 
-    await firstCallerPromise;
+    await Promise.all([promiseA, promiseB]);
 
-    // The critical assertion: the broken pattern leaves the map empty during
-    // the listModels() async gap, which is the window where concurrent callers
-    // would also pass the has() check and proceed to load independently.
-    expect(mapWasEmptyDuringAsyncGap).toBe(true);
+    // The broken pattern triggers duplicate loads because Caller B's listModels completes
+    // after Caller A has already finished loading and deleted the key, meaning B's stale check
+    // registers and loads the model again.
+    expect(loadModelSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("FIXED: new pattern prevents duplicate loads when Caller A finishes loading while Caller B's listModels() is still pending", async () => {
+    const loadModelSpy = vi.fn();
+
+    // listModelsSpy returns isLoaded: true only after loadModel has been called
+    let isModelLoaded = false;
+    const listModelsSpy = vi.fn(() => {
+      return new Promise<{ isLoaded: boolean; contextLength: number | null }>((resolve) =>
+        setTimeout(() => resolve({ isLoaded: isModelLoaded, contextLength: isModelLoaded ? 120000 : null }), 50),
+      );
+    });
+
+    loadModelSpy.mockImplementation(() => {
+      isModelLoaded = true;
+      return new Promise<void>((resolve) => setTimeout(resolve, 20));
+    });
+
+    const { ensureModelForStreaming } = createFixedStreamPreload({
+      listModels: listModelsSpy,
+      loadModel: loadModelSpy,
+    });
+
+    // Start Caller A
+    const promiseA = ensureModelForStreaming("gemma-4-12b-qat");
+
+    // Start Caller B at 30ms
+    let promiseB!: Promise<{ contextLength: number | null }>;
+    await new Promise<void>((resolve) => {
+      setTimeout(() => {
+        promiseB = ensureModelForStreaming("gemma-4-12b-qat");
+        resolve();
+      }, 30);
+    });
+
+    await Promise.all([promiseA, promiseB]);
+
+    // The fixed pattern with while(true) loop only calls loadModel once!
+    expect(loadModelSpy).toHaveBeenCalledTimes(1);
   });
 
   it("FIXED: skips load when recheck reveals model is already loaded", async () => {
