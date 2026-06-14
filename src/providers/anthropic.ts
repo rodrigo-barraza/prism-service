@@ -939,6 +939,11 @@ const anthropicProvider = {
             // Code execution starting — we'll accumulate the input
           }
 
+          // Custom tool_use start — emit early disclosure before argument streaming
+          if (block?.type === "tool_use" && currentBlockName && currentToolUseId) {
+            yield { type: "toolCallStart", id: currentToolUseId, name: currentBlockName };
+          }
+
           // Code execution tool result
           if (block?.type === "code_execution_tool_result") {
             const result = (

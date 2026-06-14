@@ -1084,6 +1084,9 @@ const openaiProvider = {
               callId: item.call_id,
               args: "",
             };
+            if (item.name && item.call_id) {
+              yield { type: "toolCallStart", id: item.call_id, name: item.name };
+            }
           }
         }
       }
@@ -1274,7 +1277,7 @@ const openaiProvider = {
     let usage = null;
     let lastFinishReason: string | null = null;
     // Accumulate tool calls across chunks
-    const pendingToolCalls: Record<number, { id: string; name: string; args: string }> = {};
+    const pendingToolCalls: Record<number, { id: string; name: string; args: string; startEmitted: boolean }> = {};
 
     for await (const chunk of stream) {
       if (options.signal?.aborted) break;
@@ -1301,6 +1304,7 @@ const openaiProvider = {
               id: toolCall.id || "",
               name: toolCall.function?.name || "",
               args: "",
+              startEmitted: false,
             };
           }
           if (toolCall.id) pendingToolCalls[index].id = toolCall.id;
@@ -1308,6 +1312,10 @@ const openaiProvider = {
           if (toolCall.function?.arguments) {
             pendingToolCalls[index].args += toolCall.function.arguments;
             deltaChars += toolCall.function.arguments.length;
+          }
+          if (!pendingToolCalls[index].startEmitted && pendingToolCalls[index].name && pendingToolCalls[index].id) {
+            pendingToolCalls[index].startEmitted = true;
+            yield { type: "toolCallStart", id: pendingToolCalls[index].id, name: pendingToolCalls[index].name };
           }
         }
         // Yield progress event so generation throughput tracking stays

@@ -107,6 +107,7 @@ interface PendingToolCall {
   id: string;
   name: string;
   args: string;
+  startEmitted: boolean;
 }
 
 interface PayloadDefaults {
@@ -131,6 +132,7 @@ export type SSEStreamChunk =
       status?: "calling" | "done" | "error";
       native?: boolean;
     }
+  | { type: "toolCallStart"; id: string; name: string }
   | { type: "toolCallDelta"; characters: number }
   | { type: "usage"; usage: TokenUsage }
   | { type: "stopReason"; stopReason: string }
@@ -606,6 +608,7 @@ export async function* parseSSEStream(
                   id: toolCall.id || "",
                   name: toolCall.function?.name || toolCall.name || "",
                   args: "",
+                  startEmitted: false,
                 };
               }
               if (toolCall.id) pendingToolCalls[index].id = toolCall.id;
@@ -615,6 +618,10 @@ export async function* parseSSEStream(
               if (chunkArgs) {
                 pendingToolCalls[index].args += chunkArgs;
                 deltaChars += chunkArgs.length;
+              }
+              if (!pendingToolCalls[index].startEmitted && pendingToolCalls[index].name && pendingToolCalls[index].id) {
+                pendingToolCalls[index].startEmitted = true;
+                yield { type: "toolCallStart" as const, id: pendingToolCalls[index].id, name: pendingToolCalls[index].name };
               }
             }
             // Yield a lightweight progress event so the generation tracker
