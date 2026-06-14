@@ -4,10 +4,23 @@
 // Shared helpers for providers that use the OpenAI Chat Completions
 // API format: lm-studio, vllm, llama-cpp, and openai itself.
 
+import { Agent } from "undici";
 import { getDataUrlMimeType } from "./media.ts";
 import { ThinkTagParser, extractThinkTags } from "./ThinkTagParser.ts";
 import type { ProviderOptions, ChatMessageContent } from "../types/ProviderTypes.ts";
 import type { TokenUsage, ToolCallEntry } from "../types/admin.ts";
+
+// ─── Streaming fetch dispatcher ─────────────────────────────
+// Node.js's built-in fetch (powered by undici) defaults bodyTimeout to
+// 300,000ms (5 minutes). This kills ANY streaming response body that
+// takes longer than 5 minutes to complete — even when data flows
+// continuously. Provide a shared Agent with no body timeout for all
+// long-running LLM streaming connections.
+export const STREAMING_DISPATCHER = new Agent({
+  bodyTimeout: 0,
+  headersTimeout: 300_000,
+  keepAliveTimeout: 30_000,
+});
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -701,6 +714,8 @@ export async function fetchOpenAICompat(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    // @ts-expect-error -- dispatcher is a valid undici option accepted by Node.js fetch
+    dispatcher: STREAMING_DISPATCHER,
     ...(options.signal && { signal: options.signal }),
   });
 
