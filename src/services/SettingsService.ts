@@ -165,6 +165,9 @@ const SettingsService = {
   invalidateCache() {
     _cache = null;
   },
+  getCached(): SettingsData {
+    return _cache || { ...DEFAULTS };
+  },
   getDefaults() {
     return { ...DEFAULTS };
   },
