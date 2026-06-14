@@ -88,11 +88,24 @@ const MOCK_ORCHESTRATOR_TOOL_SCHEMAS = [
   },
 ];
 
+const MOCK_INTERNAL_TOOL_SCHEMAS = [
+  {
+    name: "think",
+    description: "Think step-by-step about the problem",
+    parameters: { type: "object", properties: {} },
+  },
+  {
+    name: "sleep",
+    description: "Wait for a specified duration",
+    parameters: { type: "object", properties: {} },
+  },
+];
+
 // Mock ToolOrchestratorService
 vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
   default: {
     ensureSchemas: vi.fn().mockResolvedValue(undefined),
-    getToolSchemas: vi.fn(() => [...MOCK_TOOLS_API_SCHEMAS, ...MOCK_ORCHESTRATOR_TOOL_SCHEMAS]),
+    getToolSchemas: vi.fn(() => [...MOCK_TOOLS_API_SCHEMAS, ...MOCK_ORCHESTRATOR_TOOL_SCHEMAS, ...MOCK_INTERNAL_TOOL_SCHEMAS]),
     getMCPToolSchemas: vi.fn(() => mockMCPToolSchemas),
     getClientToolSchemas: vi.fn(() =>
       MOCK_TOOLS_API_SCHEMAS.map((tool) => ({
@@ -461,5 +474,85 @@ describe("AgenticToolResolver — tool resolution", () => {
 
     expect(toolNames).toContain("read_file");
     expect(toolNames).not.toContain("mcp__localserver__list_todos");
+  });
+});
+
+// ── Native thinking collision — think tool auto-disable ──────
+
+describe("AgenticToolResolver — native thinking collision", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("excludes the think tool when modelDefinition has thinking: true", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: { thinking: true },
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).not.toContain("think");
+    expect(toolNames).toContain("read_file");
+    expect(toolNames).toContain("evaluate_expression");
+  });
+
+  it("retains the think tool when modelDefinition has thinking: false", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: { thinking: false },
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).toContain("think");
+  });
+
+  it("retains the think tool when modelDefinition is undefined", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).toContain("think");
+  });
+
+  it("retains the think tool when modelDefinition has no thinking field", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: { outputTypes: ["text"] },
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).toContain("think");
+  });
+
+  it("excludes think tool even when thinkingEnabled option is false (model capability takes precedence)", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: { thinkingEnabled: false },
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: { thinking: true },
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).not.toContain("think");
   });
 });
