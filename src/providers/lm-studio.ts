@@ -330,6 +330,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
   // Key: model name → Promise that resolves when the load completes.
 
   const _loadInflight = new Map();
+  const _loadModelInflight = new Map<string, Promise<unknown>>();
   return {
     name: instanceId,
     async generateText(
@@ -1262,11 +1263,11 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
       // is called, even if the model is already loading. This gate ensures
       // only the first caller actually POSTs — all others await the same
       // inflight promise.
-      if (_loadInflight.has(model)) {
+      if (_loadModelInflight.has(model)) {
         logger.info(
           `[LM-Studio:${instanceId}] loadModel("${model}") — singleflight: already loading, waiting…`,
         );
-        return _loadInflight.get(model);
+        return _loadModelInflight.get(model);
       }
 
       const baseUrl = getBaseUrl();
@@ -1301,11 +1302,11 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         }
       })();
 
-      _loadInflight.set(model, loadWork);
+      _loadModelInflight.set(model, loadWork);
       try {
         return await loadWork;
       } finally {
-        _loadInflight.delete(model);
+        _loadModelInflight.delete(model);
       }
     },
     /**
