@@ -320,6 +320,7 @@ const MemoryService = {
       content,
       embedding,
       conversationId: conversationId || null,
+      agentSessionId: agentSessionId || null,
       createdAt: now,
       updatedAt: now,
     };
@@ -579,6 +580,8 @@ const MemoryService = {
     await collection.createIndex({ agent: 1, guildId: 1, aboutUserId: 1 });
     // Type-filtered queries
     await collection.createIndex({ agent: 1, project: 1, type: 1 });
+    // Conversation backlinks: memory → conversation provenance lookup
+    await collection.createIndex({ agent: 1, conversationId: 1 });
     // Unique ID
     await collection.createIndex({ id: 1 }, { unique: true });
     // Chronological listing

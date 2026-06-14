@@ -2,6 +2,7 @@ import AgentHooks, { type HookHandler } from "../../AgentHooks.ts";
 import AutoApprovalEngine from "../../AutoApprovalEngine.ts";
 import SystemPromptAssembler from "../../system-prompt/index.ts";
 import MemoryExtractor from "../../MemoryExtractor.ts";
+import ConversationEmbeddingService from "../../ConversationEmbeddingService.ts";
 import CriticGate from "./CriticGate.ts";
 import type { PolicyRule } from "../../PolicyEngine.ts";
 
@@ -12,6 +13,7 @@ import type { PolicyRule } from "../../PolicyEngine.ts";
  *   - beforePrompt  → SystemPromptAssembler (builds the system message)
  *   - beforeToolCall → AutoApprovalEngine (determines approval tier)
  *   - afterResponse  → MemoryExtractor (extracts memories from conversation)
+ *   - afterResponse  → ConversationEmbeddingService (embeds conversation for cross-session search)
  *
  * This module creates and wires them in a single call so harnesses
  * don't duplicate the registration boilerplate.
@@ -75,6 +77,13 @@ export function createStandardHooks({
     "afterResponse",
     MemoryExtractor.createHook() as HookHandler,
     "MemoryExtractor",
+    "inspect",
+  );
+
+  hooks.register(
+    "afterResponse",
+    ConversationEmbeddingService.createHook() as HookHandler,
+    "ConversationEmbedding",
     "inspect",
   );
 

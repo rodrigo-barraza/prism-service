@@ -69,6 +69,7 @@ async function init() {
     import("./AskUserQuestionTool.js"),
     import("./McpTools.js"),
     import("./ReminderTools.js"),
+    import("./ConversationSearchTool.js"),
   ]);
 
   for (const toolModule of modules) {

@@ -1,7 +1,9 @@
 import BaseAgenticHarness from "./BaseAgenticHarness.ts";
 import logger from "../../utils/logger.ts";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import ToolContext from "../ToolContext.ts";
+import ConversationEmbeddingService from "../ConversationEmbeddingService.ts";
 
 import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
 import { executeToolBatch } from "./lifecycle/ToolExecutor.ts";
@@ -262,6 +264,22 @@ export default class ReActHarness extends BaseAgenticHarness {
           state.compactionPerformed = true;
           state.preCompactTokenCount = compactionResult.preCompactTokenCount;
           state.postCompactTokenCount = compactionResult.postCompactTokenCount;
+
+          // Persist compaction summary on the conversation document (fire-and-forget).
+          // ConversationEmbeddingService will use this as a free embedding source
+          // during afterResponse — no additional LLM call needed.
+          if (compactionResult.summaryText && context.conversationId) {
+            ConversationEmbeddingService.persistCompactionSummary(
+              context.conversationId,
+              project || "",
+              username || "",
+              compactionResult.summaryText,
+            ).catch((error: unknown) =>
+              logger.error(
+                `[ReActHarness] Failed to persist compaction summary: ${errorMessage(error)}`,
+              ),
+            );
+          }
 
           logger.info(
             `[ReActHarness] Auto-compacted: ${compactionResult.preCompactTokenCount} → ` +
