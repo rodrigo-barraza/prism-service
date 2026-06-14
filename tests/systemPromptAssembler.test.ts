@@ -285,6 +285,7 @@ const MOCK_SETTINGS_SECTIONS: Record<string, Record<string, unknown>> = {
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
     getSection: vi.fn((section: string) =>
       Promise.resolve(MOCK_SETTINGS_SECTIONS[section] || {}),
     ),

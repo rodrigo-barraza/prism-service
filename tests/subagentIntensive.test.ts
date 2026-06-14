@@ -56,6 +56,7 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
 // Mock SettingsService
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
     getSection: vi.fn().mockResolvedValue({
       subagentProvider: "google",
       subagentModel: "gemini-3.5-flash",

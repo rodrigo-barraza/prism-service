@@ -100,6 +100,7 @@ vi.mock('../src/wrappers/MongoWrapper.ts', () => ({
 // ── Mock SettingsService to avoid DB dependency in EmbeddingService ────
 vi.mock('../src/services/SettingsService.ts', () => ({
     default: {
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
         get: vi.fn().mockResolvedValue({
             memory: {
                 extractionProvider: 'google',
