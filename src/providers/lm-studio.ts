@@ -674,15 +674,20 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
               if (loadError && loadOpts.context_length) {
                 const requestedContextLength = loadOpts.context_length;
                 const requestedBatchSize = loadOpts.eval_batch_size || LM_STUDIO_EVAL_BATCH_SIZE;
-                // Cascading fallback tiers: progressively reduce batch size,
-                // then context length, then both. The initial attempt already
-                // used the first tier (full context + full batch), so we skip
-                // any tier that matches or exceeds the original parameters.
-                const fallbackTiers = [
+                const rawTiers = [
                   { contextLength: requestedContextLength, batchSize: 512 },
                   { contextLength: 65_000, batchSize: LM_STUDIO_EVAL_BATCH_SIZE },
                   { contextLength: 65_000, batchSize: 512 },
                 ];
+
+                const fallbackTiers = rawTiers
+                  .map((tier) => ({
+                    contextLength: tier.contextLength,
+                    batchSize: Math.min(tier.batchSize, requestedBatchSize),
+                  }))
+                  .filter((tier, index, self) =>
+                    self.findIndex((t) => t.contextLength === tier.contextLength && t.batchSize === tier.batchSize) === index
+                  );
 
                 for (const tier of fallbackTiers) {
                   // Skip tiers that are >= the original request (already failed)

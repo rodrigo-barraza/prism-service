@@ -566,10 +566,10 @@ export async function handleConversation(
       conversationId: conversationId || null,
       traceId: traceId || null,
       success: false,
-            errorMessage: getErrorMessage(error),
+      errorMessage: getErrorMessage(error),
       totalSec,
       messages: context.rawMessages || [],
-      options: {},
+      options,
     });
         emit({ type: SSE_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
   }
@@ -712,7 +712,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
       errorMessage: getErrorMessage(error),
       totalSec,
       messages: context.rawMessages || [],
-      options: {},
+      options,
     });
         emit({ type: SSE_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
   }
