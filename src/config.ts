@@ -1154,13 +1154,13 @@ const MODELS = {
     outputTypes: [TYPES.AUDIO],
     streaming: true,
   },
-  INWORLD_TTS_1_5_MAX: {
+  INWORLD_TTS_2: {
     description:
-      "Inworld's premium Text-to-Speech engine, generating highly expressive, game-ready character voices.",
-    name: "inworld-tts-1.5-max",
-    label: "Inworld TTS 1.5 Max",
+      "Inworld's most powerful Text-to-Speech model with natural language steering for expressive, directed speech across 200+ languages.",
+    name: "inworld-tts-2",
+    label: "Inworld TTS-2",
     provider: PROVIDERS.INWORLD,
-    year: 2025,
+    year: 2026,
     modelType: MODEL_TYPES.AUDIO,
     default: true,
     pricing: { perCharacter: 0.00001, perMinute: 0.01 },
@@ -1168,9 +1168,22 @@ const MODELS = {
     outputTypes: [TYPES.AUDIO],
     streaming: true,
   },
+  INWORLD_TTS_1_5_MAX: {
+    description:
+      "Inworld's previous-generation premium TTS engine with low latency and 15-language support.",
+    name: "inworld-tts-1.5-max",
+    label: "Inworld TTS 1.5 Max",
+    provider: PROVIDERS.INWORLD,
+    year: 2025,
+    modelType: MODEL_TYPES.AUDIO,
+    pricing: { perCharacter: 0.00001, perMinute: 0.01 },
+    inputTypes: [TYPES.TEXT],
+    outputTypes: [TYPES.AUDIO],
+    streaming: true,
+  },
   INWORLD_TTS_1_5_MINI: {
     description:
-      "Inworld's lightweight Text-to-Speech engine, optimized for low-latency conversational audio.",
+      "Inworld's ultra-fast, cost-efficient TTS engine with 15-language support and ~120ms latency.",
     name: "inworld-tts-1.5-mini",
     label: "Inworld TTS 1.5 Mini",
     provider: PROVIDERS.INWORLD,

@@ -70,6 +70,8 @@ const inworldProvider = ({
       const model =
                 options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld;
 
+      const isTtsTwo = model.startsWith("inworld-tts-2");
+
       const response = await fetch(INWORLD_TTS_URL, {
         method: "POST",
         headers: {
@@ -83,7 +85,9 @@ const inworldProvider = ({
             audio_encoding: "MP3",
             sample_rate_hertz: 24000,
           },
-                    temperature: options.temperature ?? 1.1,
+          ...(isTtsTwo
+            ? { delivery_mode: options.deliveryMode ?? "CREATIVE" }
+            : { temperature: options.temperature ?? 1.1 }),
           model_id: model,
         }),
       });
@@ -146,6 +150,8 @@ const inworldProvider = ({
     const controller = new AbortController();
 
     try {
+      const isTtsTwo = model.startsWith("inworld-tts-2");
+
       const response = await fetch(INWORLD_TTS_URL, {
         method: "POST",
         headers: {
@@ -159,7 +165,9 @@ const inworldProvider = ({
             audio_encoding: "LINEAR16",
             sample_rate_hertz: 24000,
           },
-                    temperature: options.temperature ?? 1.1,
+          ...(isTtsTwo
+            ? { delivery_mode: options.deliveryMode ?? "CREATIVE" }
+            : { temperature: options.temperature ?? 1.1 }),
           model_id: model,
           timestampType: "WORD",
         }),
