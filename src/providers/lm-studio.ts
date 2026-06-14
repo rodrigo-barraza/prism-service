@@ -317,7 +317,7 @@ interface LmStudioProvider extends Provider {
   loadModel(model: string, options?: ProviderOptions, signal?: AbortSignal): Promise<unknown>;
   unloadModel(instanceId: string): Promise<unknown>;
   unloadModelByKey(modelKey: string): Promise<unknown>;
-  ensureModelLoaded(modelKey: string, options?: Record<string, unknown>, signal?: AbortSignal, onStatus?: (status: unknown) => void): Promise<unknown>;
+  ensureModelLoaded(modelKey: string, options?: ProviderOptions, signal?: AbortSignal, onStatus?: (status: string) => void): Promise<unknown>;
   _streamOpenAICompat(prepared: PreparedMessage[], model: string, options: ProviderOptions, baseUrl: string): AsyncGenerator<StreamChunk, void, unknown>;
 }
 
@@ -329,7 +329,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
   // (e.g. worker agents) hit the same instance before the first load finishes.
   // Key: model name → Promise that resolves when the load completes.
 
-  const _loadInflight = new Map();
+  const _loadInflight = new Map<string, Promise<void>>();
   const _loadModelInflight = new Map<string, Promise<unknown>>();
   return {
     name: instanceId,
@@ -443,37 +443,14 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                             `[LM-Studio] Model ${model} already at max context (${options._loadedContextLength}/${modelMaximumContext}) — skipping reload (requested ${options.minContextLength})`,
                         );
           }
-          if (needsReload) {
-            const target = Math.min(
-              options.minContextLength as number,
-              (modelEntry as Record<string, unknown>)?.max_context_length as number || options.minContextLength as number,
-            );
-                        logger.info(
-                            `[LM-Studio] Reloading ${model}: loaded ctx ${options._loadedContextLength} < required ${options.minContextLength}, target=${target}`,
-            );
-            yield {
-              type: "status",
-              message: `Reloading model with ${(target / 1000).toFixed(0)}k context…`,
-            };
-            // Unload current instance
-            for (const inst of (modelEntry?.loaded_instances as Array<Record<string, unknown>>) || []) {
-              await this.unloadModel((inst as Record<string, unknown>).id as string);
-            }
-            // Fall through to load below
-          }
-          if (!isLoaded || needsReload) {
-            // ── Singleflight: coalesce concurrent loads of the same model ──
-            // When multiple workers hit this instance simultaneously (e.g.
-            // team_create spawns 3 workers on the same instance), only the
-            // first triggers the actual load. Subsequent callers wait for
-            // the inflight promise to resolve, then proceed to inference.
-            //
-            // CRITICAL: The check-and-register is fully synchronous (no
-            // awaits between the check and the set). This closes the race
-            // window where concurrent workers could all pass the check
-            // before any of them registers the inflight.
-            if (_loadInflight.has(model) && !needsReload) {
-              // ── Another caller is already loading this model — wait ──
+          let currentIsLoaded = isLoaded;
+          let currentNeedsReload = needsReload;
+          let currentModelEntry = modelEntry;
+
+          while (true) {
+            if (options.signal?.aborted) return;
+
+            if (_loadInflight.has(model)) {
               logger.info(
                 `[LM-Studio:${instanceId}] Model "${model}" already loading (singleflight) — waiting…`,
               );
@@ -485,256 +462,249 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
               try {
                 await _loadInflight.get(model);
               } catch {
-                // If the original load failed, we'll re-detect below
+                /* ignore load failures of other workers, we'll re-evaluate and retry if needed */
               }
-                            if (options.signal?.aborted) return;
-              // Model should now be loaded — capture its context length
+              if (options.signal?.aborted) return;
+
+              // Refresh status
               const refreshed = await this.listModels();
-              const entry = ((refreshed as Record<string, unknown>).models as Array<Record<string, unknown>> || []).find(
+              currentModelEntry = ((refreshed as Record<string, unknown>).models as Array<Record<string, unknown>> || []).find(
                 (modelItem: Record<string, unknown>) => modelItem.key === model,
               );
-              if (entry?.loaded_instances) {
-                const instances = entry.loaded_instances as Array<Record<string, unknown>>;
-                if (instances.length > 0) {
-                  const config = instances[0]?.config as Record<string, unknown> | undefined;
-                  const context = config?.context_length as number | undefined;
-                  if (context) options._loadedContextLength = context;
-                }
-                logger.info(
-                  `[LM-Studio:${instanceId}] Singleflight resolved — model "${model}" ready (ctx=${options._loadedContextLength})`,
-                );
-                // Skip to inference — model is loaded
-              } else {
-                logger.warn(
-                  `[LM-Studio:${instanceId}] Singleflight resolved but model "${model}" not loaded — will attempt load`,
-                );
-                // The inflight was cleaned up by the original loader's finally block.
-                // Fall through — the next synchronous check will NOT find an inflight,
-                // so this worker becomes the new loader.
+              currentIsLoaded = ((currentModelEntry?.loaded_instances as Array<Record<string, unknown>>)?.length ?? 0) > 0;
+              if (currentIsLoaded) {
+                const loadedContext =
+                  (currentModelEntry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
+                if (loadedContext?.context_length) options._loadedContextLength = loadedContext.context_length as number;
               }
+              const modelMaximumContext = (currentModelEntry as Record<string, unknown>)?.max_context_length as number || 0;
+              const alreadyAtMax =
+                modelMaximumContext > 0 && ((options._loadedContextLength as number) || 0) >= modelMaximumContext;
+              currentNeedsReload =
+                currentIsLoaded &&
+                !!options.minContextLength &&
+                !!options._loadedContextLength &&
+                options._loadedContextLength < options.minContextLength &&
+                !alreadyAtMax;
+
+              continue;
             }
-            // ── Synchronous gate: check + register with NO async gap ──
-            // If no inflight exists, register one IMMEDIATELY (synchronous)
-            // before doing any async work. This guarantees only one caller
-            // enters the load path — all others will see the inflight above.
-            if (!_loadInflight.has(model)) {
-              // Check if the model was loaded by a previous singleflight or externally
-              const recheck = await this.listModels()
-                .then(({ models: ms }: Record<string, unknown>) =>
-                  ((ms || []) as Array<Record<string, unknown>>).find((modelItem: Record<string, unknown>) => modelItem.key === model),
-                )
-                .catch(() => null);
-              const isNowLoaded = (recheck as Record<string, unknown>)?.loaded_instances &&
-                ((recheck as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>).length > 0;
-              if (isNowLoaded && !needsReload) {
-                // Model is loaded — capture context and skip to inference
-                const context =
-                  ((recheck as Record<string, unknown>)?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
-                if (context?.context_length) options._loadedContextLength = context.context_length as number;
-              } else if (!_loadInflight.has(model)) {
-                // ── SYNCHRONOUS registration — no awaits after this point ──
-                // Double-check: between our listModels() and here, another
-                // worker may have registered. Only register if still clear.
-                let resolveInflight: (() => void) | undefined, rejectInflight: ((error: unknown) => void) | undefined;
-                const inflightPromise = new Promise<void>((res, rej) => {
-                  resolveInflight = res;
-                  rejectInflight = rej;
-                });
-                inflightPromise.catch(() => {}); // prevent unhandled rejection
-                _loadInflight.set(model, inflightPromise);
-                try {
-                  // Unload any other loaded models first (single-model enforcement)
-                  if (!needsReload) {
-                    for (const currentModelEntry of (models as Array<Record<string, unknown>>) || []) {
-                      if (options.signal?.aborted) return;
-                      for (const inst of ((currentModelEntry as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>) || []) {
-                        yield {
-                          type: "status",
-                          message: "Unloading previous model…",
-                        };
-                        logger.info(
-                          `Auto-unloading ${inst.id} before loading ${model}`,
-                        );
-                        await this.unloadModel((inst as Record<string, unknown>).id as string);
-                      }
-                    }
-                  }
-                                    if (options.signal?.aborted) return;
-                  logger.info(`Auto-loading model ${model} for streaming`);
+
+            if (!currentIsLoaded || currentNeedsReload) {
+              // Double check to avoid race after listModels() recheck
+              if (_loadInflight.has(model)) {
+                continue;
+              }
+
+              // Register synchronously
+              let resolveInflight: (() => void) | undefined = undefined;
+              let rejectInflight: ((error: unknown) => void) | undefined = undefined;
+              let isPromiseSettled = false;
+              const inflightPromise = new Promise<void>((resolve, reject) => {
+                resolveInflight = () => {
+                  isPromiseSettled = true;
+                  resolve();
+                };
+                rejectInflight = (error) => {
+                  isPromiseSettled = true;
+                  reject(error);
+                };
+              });
+              inflightPromise.catch(() => {}); // prevent unhandled rejection
+              _loadInflight.set(model, inflightPromise);
+
+              try {
+                // If the model is currently loaded but we need to reload it, unload it first
+                if (currentNeedsReload) {
+                  const target = Math.min(
+                    options.minContextLength as number,
+                    ((currentModelEntry as Record<string, unknown>)?.max_context_length as number) || (options.minContextLength as number),
+                  );
+                  logger.info(
+                    `[LM-Studio] Reloading ${model}: loaded ctx ${options._loadedContextLength} < required ${options.minContextLength}, target=${target}`,
+                  );
                   yield {
                     type: "status",
-                    message: "Loading model… 0%",
-                    phase: "loading",
+                    message: `Reloading model with ${(target / 1000).toFixed(0)}k context…`,
                   };
-                  // Build load options — enforce minContextLength if set
-                  // Apply default hardware params for consistent auto-load behavior
-                  const loadOpts = {
-                    eval_batch_size: LM_STUDIO_EVAL_BATCH_SIZE,
-                  };
-                    if (options.minContextLength) {
-                    const maxContextLength =
-                      (modelEntry as Record<string, unknown>)?.max_context_length as number ||
-                      LM_STUDIO_DEFAULT_MAX_CONTEXT;
-                    (loadOpts as Record<string, unknown>).context_length = Math.min(
-                      options.minContextLength as number,
-                      maxContextLength,
-                    );
-                    logger.info(
-                      `[LM-Studio] Loading with context_length=${(loadOpts as Record<string, unknown>).context_length} (min=${options.minContextLength}, max=${maxContextLength})`,
-                    );
+                  for (const instance of ((currentModelEntry as Record<string, unknown>)?.loaded_instances as Array<Record<string, unknown>>) || []) {
+                    await this.unloadModel(instance.id as string);
                   }
-                  // Start load (non-blocking) and poll for progress
-                  let loadDone = false;
-                  let loadError = null;
-                  const loadPromise = this.loadModel(
-                    model,
-                    loadOpts,
-                    options.signal,
-                  )
-                    .then(() => {
-                      loadDone = true;
-                    })
-                    .catch((error: unknown) => {
-                      loadDone = true;
-                      if ((error instanceof Error ? error.name : "") !== "AbortError") loadError = error;
-                    });
-                  const startTime = Date.now();
-                  const EXPECTED_LOAD_MS = 15_000;
-                  let lastPercentage = 0;
-                  while (!loadDone) {
-                    await sleep(500);
-                                        if (options.signal?.aborted) {
-                      logger.info(
-                        `[LM-Studio] Aborted during model load for ${model}`,
-                      );
-                      this.unloadModelByKey(model).catch((e: unknown) =>
-                        logger.warn(
-                        `[LM-Studio] Failed to unload ${model} after abort: ${getErrorMessage(e)}`,
-                        ),
-                      );
-                      return;
-                    }
-                    if (loadDone) break;
-                    const elapsed = Date.now() - startTime;
-                    const percentage = Math.min(
-                      95,
-                      Math.round(
-                        (elapsed / (elapsed + EXPECTED_LOAD_MS)) * 100,
-                      ),
-                    );
-                    if (percentage > lastPercentage) {
-                      lastPercentage = percentage;
+                } else {
+                  // Unload any other loaded models first (single-model enforcement)
+                  const refreshed = await this.listModels();
+                  for (const currentModelEntryItem of (refreshed.models as Array<Record<string, unknown>>) || []) {
+                    if (options.signal?.aborted) return;
+                    for (const instance of ((currentModelEntryItem as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>) || []) {
                       yield {
                         type: "status",
-                        message: `Loading model… ${percentage}%`,
-                        phase: "loading",
+                        message: "Unloading previous model…",
                       };
+                      logger.info(
+                        `Auto-unloading ${instance.id} before loading ${model}`,
+                      );
+                      await this.unloadModel(instance.id as string);
                     }
                   }
-                  await loadPromise;
-                                    if (options.signal?.aborted) {
+                }
+
+                if (options.signal?.aborted) return;
+                logger.info(`Auto-loading model ${model} for streaming`);
+                yield {
+                  type: "status",
+                  message: "Loading model… 0%",
+                  phase: "loading",
+                };
+                const loadOpts: ProviderOptions = {
+                  eval_batch_size: LM_STUDIO_EVAL_BATCH_SIZE,
+                };
+                if (options.minContextLength) {
+                  const maxContextLength =
+                    ((currentModelEntry as Record<string, unknown>)?.max_context_length as number) ||
+                    LM_STUDIO_DEFAULT_MAX_CONTEXT;
+                  loadOpts.context_length = Math.min(
+                    options.minContextLength as number,
+                    maxContextLength,
+                  );
+                  logger.info(
+                    `[LM-Studio] Loading with context_length=${loadOpts.context_length} (min=${options.minContextLength}, max=${maxContextLength})`,
+                  );
+                }
+
+                let loadDone = false;
+                let loadError: any = null;
+                const loadPromise = this.loadModel(
+                  model,
+                  loadOpts,
+                  options.signal,
+                )
+                  .then(() => {
+                    loadDone = true;
+                  })
+                  .catch((error: unknown) => {
+                    loadDone = true;
+                    if ((error instanceof Error ? error.name : "") !== "AbortError") loadError = error;
+                  });
+
+                const startTime = Date.now();
+                const EXPECTED_LOAD_MS = 15000;
+                let lastPercentage = 0;
+                while (!loadDone) {
+                  await sleep(500);
+                  if (options.signal?.aborted) {
                     logger.info(
-                      `[LM-Studio] Model ${model} loaded but benchmark aborted — unloading`,
+                      `[LM-Studio] Aborted during model load for ${model}`,
                     );
-                      this.unloadModelByKey(model).catch((e: unknown) =>
+                    this.unloadModelByKey(model).catch((error: unknown) =>
                       logger.warn(
-                        `[LM-Studio] Failed to unload ${model} after abort: ${getErrorMessage(e)}`,
+                        `[LM-Studio] Failed to unload ${model} after abort: ${getErrorMessage(error)}`,
                       ),
                     );
                     return;
                   }
-                  // ── Context-length fallback ─────────────────────────────
-                  // If the load failed and we requested a specific context_length
-                  // (e.g. 120K), it may have exceeded available VRAM. Retry with
-                  // progressively lower context tiers before giving up entirely.
-                  if (loadError && (loadOpts as Record<string, unknown>).context_length) {
-                    const requestedContextLength = (loadOpts as Record<string, unknown>).context_length as number;
-                    const contextFallbackTiers = [65_000];
+                  if (loadDone) break;
+                  const elapsed = Date.now() - startTime;
+                  const percentage = Math.min(
+                    95,
+                    Math.round(
+                      (elapsed / (elapsed + EXPECTED_LOAD_MS)) * 100,
+                    ),
+                  );
+                  if (percentage > lastPercentage) {
+                    lastPercentage = percentage;
+                    yield {
+                      type: "status",
+                      message: `Loading model… ${percentage}%`,
+                      phase: "loading",
+                    };
+                  }
+                }
+                await loadPromise;
+                if (options.signal?.aborted) {
+                  logger.info(
+                    `[LM-Studio] Model ${model} loaded but benchmark aborted — unloading`,
+                  );
+                  this.unloadModelByKey(model).catch((error: unknown) =>
+                    logger.warn(
+                      `[LM-Studio] Failed to unload ${model} after abort: ${getErrorMessage(error)}`,
+                    ),
+                  );
+                  return;
+                }
 
-                    for (const fallbackContextLength of contextFallbackTiers) {
-                      if (fallbackContextLength >= requestedContextLength) continue;
-                      if (options.signal?.aborted) return;
+                if (loadError && loadOpts.context_length) {
+                  const requestedContextLength = loadOpts.context_length;
+                  const contextFallbackTiers = [65000];
 
-                      logger.warn(
-                        `[LM-Studio] Load failed at ctx=${requestedContextLength} — retrying with ctx=${fallbackContextLength}`,
+                  for (const fallbackContextLength of contextFallbackTiers) {
+                    if (fallbackContextLength >= requestedContextLength) continue;
+                    if (options.signal?.aborted) return;
+
+                    logger.warn(
+                      `[LM-Studio] Load failed at ctx=${requestedContextLength} — retrying with ctx=${fallbackContextLength}`,
+                    );
+                    yield {
+                      type: "status",
+                      message: `Load failed — retrying with ${Math.round(fallbackContextLength / 1000)}k context…`,
+                      phase: "loading",
+                    };
+
+                    try {
+                      loadOpts.context_length = fallbackContextLength;
+                      await this.loadModel(model, loadOpts, options.signal);
+                      loadError = null;
+                      logger.info(
+                        `[LM-Studio] Fallback load succeeded at ctx=${fallbackContextLength}`,
                       );
-                      yield {
-                        type: "status",
-                        message: `Load failed — retrying with ${Math.round(fallbackContextLength / 1000)}k context…`,
-                        phase: "loading",
-                      };
-
-                      try {
-                        (loadOpts as Record<string, unknown>).context_length = fallbackContextLength;
-                        await this.loadModel(model, loadOpts, options.signal);
-                        loadError = null;
-                        logger.info(
-                          `[LM-Studio] Fallback load succeeded at ctx=${fallbackContextLength}`,
-                        );
-                        break;
-                      } catch (fallbackLoadError: unknown) {
-                        if (fallbackLoadError instanceof Error && fallbackLoadError.name === "AbortError") return;
-                        logger.warn(
-                          `[LM-Studio] Fallback load at ctx=${fallbackContextLength} also failed: ${getErrorMessage(fallbackLoadError)}`,
-                        );
-                      }
+                      break;
+                    } catch (fallbackLoadError: unknown) {
+                      if (fallbackLoadError instanceof Error && fallbackLoadError.name === "AbortError") return;
+                      logger.warn(
+                        `[LM-Studio] Fallback load at ctx=${fallbackContextLength} also failed: ${getErrorMessage(fallbackLoadError)}`,
+                      );
                     }
                   }
-                  if (loadError) {
-                    rejectInflight!(loadError);
-                    throw loadError;
-                  }
-                  yield {
-                    type: "status",
-                    message: "Loading model… 100%",
-                    phase: "loading",
-                  };
-                  // Re-fetch to get the loaded context length
-                  try {
-                    const refreshed = await this.listModels();
-                    const entry = ((refreshed as Record<string, unknown>).models as Array<Record<string, unknown>> || []).find(
-                      (modelItem: Record<string, unknown>) => modelItem.key === model,
-                    );
-                    const context =
-                      (entry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
-                    if (context?.context_length) options._loadedContextLength = context.context_length as number;
-                  } catch {
-                    /* ignore */
-                  }
-                  resolveInflight!();
-                } finally {
-                  _loadInflight.delete(model);
                 }
-              } else {
-                // Another worker registered between our recheck and here —
-                // loop back by recursing into the singleflight wait above.
-                // In practice this is extremely rare but handles the edge case.
-                logger.info(
-                  `[LM-Studio:${instanceId}] Inflight appeared during recheck — waiting…`,
-                );
+
+                if (loadError) {
+                  rejectInflight!(loadError);
+                  throw loadError;
+                }
+
                 yield {
                   type: "status",
-                  message: "Waiting for model load…",
+                  message: "Loading model… 100%",
                   phase: "loading",
                 };
+
                 try {
-                  await _loadInflight.get(model);
+                  const refreshed = await this.listModels();
+                  const entry = (refreshed.models || []).find(
+                    (modelItem) => modelItem.key === model,
+                  );
+                  const context =
+                    ((entry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown>) || undefined;
+                  if (context?.context_length) options._loadedContextLength = context.context_length as number;
                 } catch {
                   /* ignore */
                 }
-                                if (options.signal?.aborted) return;
-                const refreshed = await this.listModels().catch(() => ({
-                  models: [],
-                }));
-                const entry = ((refreshed as Record<string, unknown>).models as Array<Record<string, unknown>> || []).find(
-                  (modelItem: Record<string, unknown>) => modelItem.key === model,
-                );
-                const context =
-                  (entry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
-                if (context?.context_length) options._loadedContextLength = context.context_length as number;
+
+                resolveInflight!();
+                break;
+              } catch (error) {
+                rejectInflight!(error);
+                throw error;
+              } finally {
+                if (!isPromiseSettled) {
+                  rejectInflight!(new Error("Load aborted or cancelled"));
+                }
+                _loadInflight.delete(model);
               }
+            } else {
+              break;
             }
           }
+          
         } catch (loadCheckError: unknown) {
           // If model load explicitly failed, re-throw so the generator exits
           // cleanly. runSingleModel will catch it and record an error result,
@@ -1154,51 +1124,106 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
       onStatus?: (message: string) => void,
     ) {
       if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
-      const { models: ensureModels } = await this.listModels() as { models: Array<Record<string, unknown>> };
-      if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
-      // Check if the requested model is already loaded
-      const modelEntry = (ensureModels || []).find((modelItem: Record<string, unknown>) => modelItem.key === modelKey) as Record<string, unknown> | undefined;
-      const isLoaded = (modelEntry?.loaded_instances as Array<Record<string, unknown>>)?.length > 0;
-      if (isLoaded) {
-        const loadedContext =
-          (modelEntry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
-        const loadedContextValue = (loadedContext?.context_length as number) || null;
-        logger.info(
-          `[LM-Studio] Model ${modelKey} already loaded (ctx=${loadedContextValue})`,
-        );
-        return { alreadyLoaded: true, contextLength: loadedContextValue };
-      }
-      // Unload any other loaded models first (single-model enforcement)
-      for (const currentModelEntry of ensureModels || []) {
-        if (signal?.aborted)
-          return { alreadyLoaded: false, contextLength: null };
-        for (const inst of ((currentModelEntry as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>) || []) {
-          onStatus?.("Unloading previous model…");
+
+      while (true) {
+        if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
+
+        if (_loadInflight.has(modelKey)) {
           logger.info(
-            `[LM-Studio] Auto-unloading ${inst.id} before loading ${modelKey}`,
+            `[LM-Studio:${instanceId}] ensureModelLoaded("${modelKey}") — waiting on inflight load…`,
           );
-          await this.unloadModel(inst.id as string);
+          onStatus?.("Waiting for model load…");
+          try {
+            await _loadInflight.get(modelKey);
+          } catch {
+            // Ignore, we'll recheck status
+          }
+          continue;
+        }
+
+        const { models: ensureModels } = await this.listModels() as { models: Array<Record<string, unknown>> };
+        if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
+
+        const modelEntry = (ensureModels || []).find((modelItem: Record<string, unknown>) => modelItem.key === modelKey) as Record<string, unknown> | undefined;
+        const isLoaded = (modelEntry?.loaded_instances as Array<Record<string, unknown>>)?.length > 0;
+
+        if (isLoaded) {
+          const loadedContext =
+            (modelEntry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
+          const loadedContextValue = (loadedContext?.context_length as number) || null;
+          logger.info(
+            `[LM-Studio] Model ${modelKey} already loaded (ctx=${loadedContextValue})`,
+          );
+          return { alreadyLoaded: true, contextLength: loadedContextValue };
+        }
+
+        // Double check map before loading
+        if (_loadInflight.has(modelKey)) {
+          continue;
+        }
+
+        // Register synchronously
+        let resolveInflight: (() => void) | undefined = undefined;
+        let rejectInflight: ((error: unknown) => void) | undefined = undefined;
+        let isPromiseSettled = false;
+        const inflightPromise = new Promise<void>((resolve, reject) => {
+          resolveInflight = () => {
+            isPromiseSettled = true;
+            resolve();
+          };
+          rejectInflight = (error) => {
+            isPromiseSettled = true;
+            reject(error);
+          };
+        });
+        inflightPromise.catch(() => {});
+        _loadInflight.set(modelKey, inflightPromise);
+
+        try {
+          // Unload any other loaded models first (single-model enforcement)
+          for (const currentModelEntry of ensureModels || []) {
+            if (signal?.aborted)
+              return { alreadyLoaded: false, contextLength: null };
+            for (const instance of ((currentModelEntry as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>) || []) {
+              onStatus?.("Unloading previous model…");
+              logger.info(
+                `[LM-Studio] Auto-unloading ${instance.id} before loading ${modelKey}`,
+              );
+              try {
+                await this.unloadModel(instance.id as string);
+              } catch (error: unknown) {
+                // If it fails (e.g. concurrent unload), log and continue
+                logger.warn(`Failed to unload instance ${instance.id}: ${getErrorMessage(error)}`);
+              }
+            }
+          }
+          if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
+
+          logger.info(`[LM-Studio] Loading model ${modelKey}`);
+          onStatus?.("Loading model… 0%");
+          await this.loadModel(modelKey, loadOptions, signal);
+          onStatus?.("Loading model… 100%");
+
+          const refreshed = await this.listModels();
+          const entry = ((refreshed as Record<string, unknown>).models as Array<Record<string, unknown>> || []).find(
+            (modelItem: Record<string, unknown>) => modelItem.key === modelKey,
+          );
+          const context =
+            (entry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
+          resolveInflight!();
+          return { alreadyLoaded: false, contextLength: (context?.context_length as number) || null };
+        } catch (error) {
+          rejectInflight!(error);
+          throw error;
+        } finally {
+          if (!isPromiseSettled) {
+            rejectInflight!(new Error("Load aborted or cancelled"));
+          }
+          _loadInflight.delete(modelKey);
         }
       }
-      if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
-      // Load the requested model
-      logger.info(`[LM-Studio] Loading model ${modelKey}`);
-            onStatus?.("Loading model… 0%");
-      await this.loadModel(modelKey, loadOptions, signal);
-            onStatus?.("Loading model… 100%");
-      // Re-fetch to get the loaded context length
-      try {
-        const refreshed = await this.listModels();
-        const entry = ((refreshed as Record<string, unknown>).models as Array<Record<string, unknown>> || []).find(
-          (modelItem: Record<string, unknown>) => modelItem.key === modelKey,
-        );
-        const context =
-          (entry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
-        return { alreadyLoaded: false, contextLength: (context?.context_length as number) || null };
-      } catch {
-        return { alreadyLoaded: false, contextLength: null };
-      }
     },
+    
     /**
      * List all models available in LM Studio.
      * Uses the proprietary GET /api/v1/models endpoint.
