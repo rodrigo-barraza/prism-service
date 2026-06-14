@@ -108,6 +108,9 @@ export async function handleVoice(
         project,
         username,
         true,
+        {
+          title: typeof conversationMeta?.title === "string" ? conversationMeta.title : undefined,
+        },
       ).catch((error: Error) =>
         logger.error(`Failed to set isGenerating: ${error.message}`),
       );
@@ -372,6 +375,9 @@ router.post(
           req.project || "any",
           req.username || "any",
           true,
+          {
+            title: typeof conversationMeta?.title === "string" ? conversationMeta.title : undefined,
+          },
         ).catch((error: Error) =>
           logger.error(`Failed to set isGenerating: ${error.message}`),
         );

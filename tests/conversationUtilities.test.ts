@@ -169,6 +169,7 @@ describe("markGenerating", () => {
     markGenerating("conv-123", "coding", "testuser", false, {
       collection: "agent_sessions",
       agent: "CODING",
+      title: "My custom title",
     });
 
     expect(mockSetGenerating).toHaveBeenCalledWith(
@@ -176,7 +177,7 @@ describe("markGenerating", () => {
       "coding",
       "testuser",
       false,
-      { collection: "agent_sessions", agent: "CODING" },
+      { collection: "agent_sessions", agent: "CODING", title: "My custom title" },
     );
   });
 

@@ -621,7 +621,11 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
     project,
     username,
     true,
-    { ...getCollectionOpts(project), agent: agent ?? undefined },
+    {
+      ...getCollectionOpts(project),
+      agent: agent ?? undefined,
+      title: typeof conversationMeta?.title === "string" ? conversationMeta.title : undefined,
+    },
   );
   try {
     try {
@@ -743,7 +747,10 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
     project,
     username,
     true,
-    getCollectionOpts(project),
+    {
+      ...getCollectionOpts(project),
+      title: typeof conversationMeta?.title === "string" ? conversationMeta.title : undefined,
+    },
   );
   const lastUserMessage = (messages as ConversationMessage[]).filter((conversationMessage) => conversationMessage.role === "user").pop();
   const prompt = lastUserMessage?.content || "";
@@ -900,6 +907,7 @@ async function handleStreamingText(context: GenerationContext) {
     messages,
     options,
     conversationId,
+    conversationMeta,
     traceId,
     project,
     username,
@@ -916,7 +924,10 @@ async function handleStreamingText(context: GenerationContext) {
     project,
     username,
     true,
-    getCollectionOpts(project),
+    {
+      ...getCollectionOpts(project),
+      title: typeof conversationMeta?.title === "string" ? conversationMeta.title : undefined,
+    },
   );
   const stream =
     (modelDefinition as Record<string, unknown> | null)?.liveAPI && provider.generateTextStreamLive
@@ -1155,6 +1166,7 @@ async function handleNonStreamingText(context: GenerationContext) {
     messages,
     options,
     conversationId,
+    conversationMeta,
     project,
     username,
     requestStart,
@@ -1166,7 +1178,10 @@ async function handleNonStreamingText(context: GenerationContext) {
     project,
     username,
     true,
-    getCollectionOpts(project),
+    {
+      ...getCollectionOpts(project),
+      title: typeof conversationMeta?.title === "string" ? conversationMeta.title : undefined,
+    },
   );
   // Track this sub-request in SessionGenerationTracker if it belongs
   // to an active agent session (e.g., tools-api calling /chat?stream=false

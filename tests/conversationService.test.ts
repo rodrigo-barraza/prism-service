@@ -551,6 +551,26 @@ describe("ConversationService.setGenerating", () => {
     expect(doc.title).toBe("New Conversation");
   });
 
+  it("should create stub document when setting generating=true with a custom title", async () => {
+    await ConversationService.setGenerating(
+      "gen-test-title",
+      "coding",
+      "testuser",
+      true,
+      { collection: "agent_sessions", title: "Custom Title" },
+    );
+
+    const doc = await mockCollection.findOne({
+      id: "gen-test-title",
+      project: "coding",
+      username: "testuser",
+    });
+
+    expect(doc).not.toBeNull();
+    expect(doc.isGenerating).toBe(true);
+    expect(doc.title).toBe("Custom Title");
+  });
+
   it("should clear generating flag on existing document", async () => {
     // Pre-create
     await mockCollection.updateOne(
