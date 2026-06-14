@@ -425,7 +425,7 @@ Use these images to observe the environment, notice changes, animations, or user
           });
 
           currentMessages.push({
-            role: "user",
+            role: "system",
             content:
               `[VALIDATION ERROR] Your recent edit(s) introduced ${validationFeedback.length} error(s):\n\n` +
               `${errorBlock}\n\n` +

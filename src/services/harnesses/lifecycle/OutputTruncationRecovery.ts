@@ -29,11 +29,11 @@ const TOKEN_ESCALATION_MULTIPLIER = 1.5;
 /** Default maxTokens if none is configured on the agent context. */
 const DEFAULT_MAX_TOKENS = 8192;
 
-/** The continuation prompt injected as a user message after a truncated response. */
+/** The continuation prompt injected as a system message after a truncated response. */
 const CONTINUATION_PROMPT =
-  "[System: Your previous response was cut short because the output token limit " +
+  "Your previous response was cut short because the output token limit " +
   "was reached before you could finish. The truncated text has been preserved. " +
-  "Please continue exactly where you left off. Do NOT repeat what you already said.]";
+  "Please continue exactly where you left off. Do NOT repeat what you already said.";
 
 /**
  * Check whether a pass was truncated by the output token limit.
@@ -79,7 +79,7 @@ export function injectContinuationContext(
   }
 
   currentMessages.push({
-    role: "user",
+    role: "system",
     content: CONTINUATION_PROMPT,
   });
 

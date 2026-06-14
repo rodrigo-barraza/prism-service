@@ -444,7 +444,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
           });
 
           currentMessages.push({
-            role: "user",
+            role: "system",
             content:
               `[VALIDATION ERROR — BRANCH ${selectedBranch.branchIndex + 1} FAILED]\n\n` +
               `${errorBlock}\n\n` +

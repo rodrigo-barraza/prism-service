@@ -216,7 +216,6 @@ export default class AgenticToolResolver {
         (tool) => {
           if (clientDisabledSet?.has(tool.name)) return false;
           if (enabledSet.has(tool.name)) return true;
-          if (tool.name.startsWith("mcp__")) return true;
           if (isCoreToolsLocked && (CORE_AGENTIC_TOOLS.has(tool.name) || systemTools.has(tool.name))) return true;
           if (shouldBypassOrchestratorTools && CORE_ORCHESTRATOR_TOOLS.has(tool.name)) return true;
           if (PRISM_LOCAL_TOOL_NAMES.has(tool.name)) return true;

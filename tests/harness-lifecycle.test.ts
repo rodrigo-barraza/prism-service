@@ -522,7 +522,7 @@ describe("ExhaustionRecovery", () => {
       })
     );
     expect(currentMessages).toHaveLength(1);
-    expect(currentMessages[0].role).toBe("user");
+    expect(currentMessages[0].role).toBe("system");
     expect(currentMessages[0].content).toContain("maximum number of tool-call iterations");
     expect(mockHarness.consumeStream).toHaveBeenCalled();
     expect(mockHarness.emitGenerationProgress).toHaveBeenCalled();

@@ -841,17 +841,71 @@ describe("Tool Availability & Enablement", () => {
   });
 
   // ────────────────────────────────────────────────────────────
-  // 11. MCP Tools — Always Pass Through
+  // 11. MCP Tools — Unified Enable/Disable Lifecycle
   // ────────────────────────────────────────────────────────────
 
   describe("MCP tools", () => {
-    it("bypasses enabledTools filter for mcp__ prefixed tools", async () => {
+    it("includes MCP tools in disabledTools mode when not explicitly disabled", async () => {
+      (ToolOrchestratorService.getMCPToolSchemas as ReturnType<typeof vi.fn>).mockReturnValue(
+        MOCK_MCP_SCHEMAS,
+      );
+
+      const { finalTools } = await AgenticToolResolver.resolve({
+        options: { disabledTools: [] },
+        agent: "CODING",
+        project: "test",
+        username: "rodrigo",
+      });
+
+      const toolNames = extractToolNames(finalTools);
+
+      expect(toolNames).toContain("mcp__github__list_repos");
+      expect(toolNames).toContain("read_file");
+    });
+
+    it("excludes MCP tools when explicitly added to disabledTools", async () => {
+      (ToolOrchestratorService.getMCPToolSchemas as ReturnType<typeof vi.fn>).mockReturnValue(
+        MOCK_MCP_SCHEMAS,
+      );
+
+      const { finalTools } = await AgenticToolResolver.resolve({
+        options: { disabledTools: ["mcp__github__list_repos"] },
+        agent: "CODING",
+        project: "test",
+        username: "rodrigo",
+      });
+
+      const toolNames = extractToolNames(finalTools);
+
+      expect(toolNames).not.toContain("mcp__github__list_repos");
+      expect(toolNames).toContain("read_file");
+    });
+
+    it("excludes MCP tools from enabledTools mode unless explicitly included", async () => {
       (ToolOrchestratorService.getMCPToolSchemas as ReturnType<typeof vi.fn>).mockReturnValue(
         MOCK_MCP_SCHEMAS,
       );
 
       const { finalTools } = await AgenticToolResolver.resolve({
         options: { enabledTools: ["read_file"] },
+        agent: "CODING",
+        project: "test",
+        username: "rodrigo",
+      });
+
+      const toolNames = extractToolNames(finalTools);
+
+      expect(toolNames).not.toContain("mcp__github__list_repos");
+      expect(toolNames).toContain("read_file");
+    });
+
+    it("includes MCP tools in enabledTools mode when explicitly listed", async () => {
+      (ToolOrchestratorService.getMCPToolSchemas as ReturnType<typeof vi.fn>).mockReturnValue(
+        MOCK_MCP_SCHEMAS,
+      );
+
+      const { finalTools } = await AgenticToolResolver.resolve({
+        options: { enabledTools: ["read_file", "mcp__github__list_repos"] },
         agent: "CODING",
         project: "test",
         username: "rodrigo",
