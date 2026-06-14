@@ -512,36 +512,39 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                 // so this worker becomes the new loader.
               }
             }
-            // ── Synchronous gate: check + register with NO async gap ──
-            // If no inflight exists, register one IMMEDIATELY (synchronous)
-            // before doing any async work. This guarantees only one caller
-            // enters the load path — all others will see the inflight above.
+            // ── Synchronous gate: register inflight BEFORE any async work ──
+            // The inflight promise is set synchronously so that any concurrent
+            // workers entering this block will see it and wait. The listModels
+            // recheck happens INSIDE the guarded block — if the model turns out
+            // to already be loaded, we resolve immediately and skip the load.
             if (!_loadInflight.has(model)) {
-              // Check if the model was loaded by a previous singleflight or externally
-              const recheck = await this.listModels()
-                .then(({ models: ms }: Record<string, unknown>) =>
-                  ((ms || []) as Array<Record<string, unknown>>).find((modelItem: Record<string, unknown>) => modelItem.key === model),
-                )
-                .catch(() => null);
-              const isNowLoaded = (recheck as Record<string, unknown>)?.loaded_instances &&
-                ((recheck as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>).length > 0;
-              if (isNowLoaded && !needsReload) {
-                // Model is loaded — capture context and skip to inference
-                const context =
-                  ((recheck as Record<string, unknown>)?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
-                if (context?.context_length) options._loadedContextLength = context.context_length as number;
-              } else if (!_loadInflight.has(model)) {
-                // ── SYNCHRONOUS registration — no awaits after this point ──
-                // Double-check: between our listModels() and here, another
-                // worker may have registered. Only register if still clear.
-                let resolveInflight: (() => void) | undefined, rejectInflight: ((error: unknown) => void) | undefined;
-                const inflightPromise = new Promise<void>((res, rej) => {
-                  resolveInflight = res;
-                  rejectInflight = rej;
-                });
-                inflightPromise.catch(() => {}); // prevent unhandled rejection
-                _loadInflight.set(model, inflightPromise);
-                try {
+              let resolveInflight: (() => void) | undefined, rejectInflight: ((error: unknown) => void) | undefined;
+              const inflightPromise = new Promise<void>((resolve, reject) => {
+                resolveInflight = resolve;
+                rejectInflight = reject;
+              });
+              inflightPromise.catch(() => {}); // prevent unhandled rejection
+              _loadInflight.set(model, inflightPromise);
+              try {
+                // Now that the inflight is registered, recheck whether the
+                // model was loaded by a previous singleflight or externally
+                const recheck = await this.listModels()
+                  .then(({ models: modelsList }: Record<string, unknown>) =>
+                    ((modelsList || []) as Array<Record<string, unknown>>).find((modelItem: Record<string, unknown>) => modelItem.key === model),
+                  )
+                  .catch(() => null);
+                const isNowLoaded = (recheck as Record<string, unknown>)?.loaded_instances &&
+                  ((recheck as Record<string, unknown>).loaded_instances as Array<Record<string, unknown>>).length > 0;
+                if (isNowLoaded && !needsReload) {
+                  // Model is already loaded — capture context and skip to inference
+                  const context =
+                    ((recheck as Record<string, unknown>)?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
+                  if (context?.context_length) options._loadedContextLength = context.context_length as number;
+                  logger.info(
+                    `[LM-Studio:${instanceId}] Singleflight recheck: model "${model}" already loaded (ctx=${options._loadedContextLength}) — skipping load`,
+                  );
+                  resolveInflight!();
+                } else {
                   // Unload any other loaded models first (single-model enforcement)
                   if (!needsReload) {
                     for (const currentModelEntry of (models as Array<Record<string, unknown>>) || []) {
@@ -558,7 +561,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                       }
                     }
                   }
-                                    if (options.signal?.aborted) return;
+                  if (options.signal?.aborted) return;
                   logger.info(`Auto-loading model ${model} for streaming`);
                   yield {
                     type: "status",
@@ -570,7 +573,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                   const loadOpts = {
                     eval_batch_size: LM_STUDIO_EVAL_BATCH_SIZE,
                   };
-                    if (options.minContextLength) {
+                  if (options.minContextLength) {
                     const maxContextLength =
                       (modelEntry as Record<string, unknown>)?.max_context_length as number ||
                       LM_STUDIO_DEFAULT_MAX_CONTEXT;
@@ -602,13 +605,13 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                   let lastPercentage = 0;
                   while (!loadDone) {
                     await sleep(500);
-                                        if (options.signal?.aborted) {
+                    if (options.signal?.aborted) {
                       logger.info(
                         `[LM-Studio] Aborted during model load for ${model}`,
                       );
                       this.unloadModelByKey(model).catch((e: unknown) =>
                         logger.warn(
-                        `[LM-Studio] Failed to unload ${model} after abort: ${getErrorMessage(e)}`,
+                          `[LM-Studio] Failed to unload ${model} after abort: ${getErrorMessage(e)}`,
                         ),
                       );
                       return;
@@ -631,11 +634,11 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                     }
                   }
                   await loadPromise;
-                                    if (options.signal?.aborted) {
+                  if (options.signal?.aborted) {
                     logger.info(
                       `[LM-Studio] Model ${model} loaded but benchmark aborted — unloading`,
                     );
-                      this.unloadModelByKey(model).catch((e: unknown) =>
+                    this.unloadModelByKey(model).catch((e: unknown) =>
                       logger.warn(
                         `[LM-Studio] Failed to unload ${model} after abort: ${getErrorMessage(e)}`,
                       ),
@@ -701,36 +704,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                     /* ignore */
                   }
                   resolveInflight!();
-                } finally {
-                  _loadInflight.delete(model);
                 }
-              } else {
-                // Another worker registered between our recheck and here —
-                // loop back by recursing into the singleflight wait above.
-                // In practice this is extremely rare but handles the edge case.
-                logger.info(
-                  `[LM-Studio:${instanceId}] Inflight appeared during recheck — waiting…`,
-                );
-                yield {
-                  type: "status",
-                  message: "Waiting for model load…",
-                  phase: "loading",
-                };
-                try {
-                  await _loadInflight.get(model);
-                } catch {
-                  /* ignore */
-                }
-                                if (options.signal?.aborted) return;
-                const refreshed = await this.listModels().catch(() => ({
-                  models: [],
-                }));
-                const entry = ((refreshed as Record<string, unknown>).models as Array<Record<string, unknown>> || []).find(
-                  (modelItem: Record<string, unknown>) => modelItem.key === model,
-                );
-                const context =
-                  (entry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
-                if (context?.context_length) options._loadedContextLength = context.context_length as number;
+              } finally {
+                _loadInflight.delete(model);
               }
             }
           }
