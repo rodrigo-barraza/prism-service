@@ -458,3 +458,228 @@ describe("message persistence contract for TerminalRenderer", () => {
     expect(finalMessage.thinkingFragments).toBeDefined();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// Part 3: Thinking deduplication on final message
+// ═══════════════════════════════════════════════════════════════
+// Root cause: state.streamedThinking accumulated thinking across ALL
+// iterations. When the model re-generated identical reasoning in
+// iteration 2, the full accumulated thinking was persisted on the
+// final assistant message — but intermediate messages from earlier
+// iterations ALSO carried the same thinking on their own `thinking`
+// field. The renderer showed a ThinkingBlock for each message,
+// causing duplicate "Thoughts" in the UI.
+
+describe("finalizeTextGeneration — thinking deduplication across iterations", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ConversationService.appendMessages.mockResolvedValue(undefined);
+  });
+
+  it("should NOT duplicate thinking when intermediate message has identical thinking", async () => {
+    const thinkingContent = "The user wants to create a 3D cube. I should use the create_3d_model tool.";
+
+    const intermediateMessages = [
+      { role: "user", content: "make a cube" },
+      {
+        role: "assistant",
+        content: "",
+        thinking: thinkingContent,
+        toolCalls: [
+          { id: "tc-1", name: "discover_and_enable_tools", args: { query: "3d model" }, result: { success: true } },
+        ],
+      },
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          { id: "tc-2", name: "create_3d_model", args: { objects: [] }, result: { success: true } },
+        ],
+      },
+    ];
+
+    const context = makeCtx();
+    const generationResult = makeGenerationResult({
+      text: "I've created a 3D cube for you.",
+      thinking: thinkingContent,
+    });
+
+    await finalizeTextGeneration(context, generationResult, intermediateMessages);
+
+    const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
+    const finalMessage = appendedMessages[appendedMessages.length - 1];
+
+    expect(finalMessage.role).toBe("assistant");
+    expect(finalMessage.content).toBe("I've created a 3D cube for you.");
+    expect(finalMessage.thinking).toBeUndefined();
+  });
+
+  it("should preserve genuinely NEW thinking that differs from intermediate messages", async () => {
+    const iterationOneThinking = "I should search for files first.";
+    const iterationTwoThinking = "Found the files. Now I should refactor the code.";
+    const accumulatedThinking = iterationOneThinking + iterationTwoThinking;
+
+    const intermediateMessages = [
+      { role: "user", content: "refactor app.js" },
+      {
+        role: "assistant",
+        content: "Let me find the file.",
+        thinking: iterationOneThinking,
+        toolCalls: [
+          { id: "tc-1", name: "read_file", args: { path: "/src/app.js" }, result: { content: "old code" } },
+        ],
+      },
+    ];
+
+    const context = makeCtx();
+    const generationResult = makeGenerationResult({
+      text: "Done refactoring.",
+      thinking: accumulatedThinking,
+    });
+
+    await finalizeTextGeneration(context, generationResult, intermediateMessages);
+
+    const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
+    const finalMessage = appendedMessages[appendedMessages.length - 1];
+
+    expect(finalMessage.thinking).toBe(iterationTwoThinking);
+  });
+
+  it("should handle multiple intermediate messages each stripping their thinking prefix", async () => {
+    const thinkingA = "First I'll read the config.";
+    const thinkingB = "Now I'll update the settings.";
+    const thinkingC = "Finally let me verify.";
+    const accumulatedThinking = thinkingA + thinkingB + thinkingC;
+
+    const intermediateMessages = [
+      { role: "user", content: "update config" },
+      {
+        role: "assistant",
+        content: "Reading config.",
+        thinking: thinkingA,
+        toolCalls: [{ id: "tc-1", name: "read_file", args: {}, result: {} }],
+      },
+      {
+        role: "assistant",
+        content: "Updating settings.",
+        thinking: thinkingB,
+        toolCalls: [{ id: "tc-2", name: "write_file", args: {}, result: {} }],
+      },
+    ];
+
+    const context = makeCtx();
+    const generationResult = makeGenerationResult({
+      text: "Config updated.",
+      thinking: accumulatedThinking,
+    });
+
+    await finalizeTextGeneration(context, generationResult, intermediateMessages);
+
+    const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
+    const finalMessage = appendedMessages[appendedMessages.length - 1];
+
+    // Only thinkingC should remain — thinkingA was stripped by message 1,
+    // but thinkingB wasn't a prefix of the remaining string after A was stripped.
+    // The prefix-matching is sequential: after stripping A, the remaining is
+    // "Now I'll update the settings.Finally let me verify."
+    // thinkingB ("Now I'll update the settings.") IS a prefix → stripped.
+    // Remaining: "Finally let me verify." = thinkingC
+    expect(finalMessage.thinking).toBe(thinkingC);
+  });
+
+  it("should keep thinking intact for single-iteration turns (no intermediate tool messages)", async () => {
+    const thinkingContent = "Let me explain closures clearly.";
+
+    const intermediateMessages = [
+      { role: "user", content: "explain closures" },
+    ];
+
+    const context = makeCtx();
+    const generationResult = makeGenerationResult({
+      text: "A closure captures variables from its outer scope.",
+      thinking: thinkingContent,
+    });
+
+    await finalizeTextGeneration(context, generationResult, intermediateMessages);
+
+    const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
+    const finalMessage = appendedMessages[appendedMessages.length - 1];
+
+    expect(finalMessage.thinking).toBe(thinkingContent);
+  });
+
+  it("should keep thinking when intermediate assistant messages exist but have no toolCalls", async () => {
+    const thinkingContent = "Planning my response.";
+
+    const intermediateMessages = [
+      { role: "user", content: "hello" },
+      { role: "assistant", content: "Hi there!" },
+    ];
+
+    const context = makeCtx();
+    const generationResult = makeGenerationResult({
+      text: "How can I help?",
+      thinking: thinkingContent,
+    });
+
+    await finalizeTextGeneration(context, generationResult, intermediateMessages);
+
+    const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
+    const finalMessage = appendedMessages[appendedMessages.length - 1];
+
+    expect(finalMessage.thinking).toBe(thinkingContent);
+  });
+
+  it("should handle empty thinking gracefully", async () => {
+    const intermediateMessages = [
+      { role: "user", content: "do something" },
+      {
+        role: "assistant",
+        content: "Doing it.",
+        toolCalls: [{ id: "tc-1", name: "execute_command", args: {}, result: {} }],
+      },
+    ];
+
+    const context = makeCtx();
+    const generationResult = makeGenerationResult({
+      text: "Done.",
+      thinking: "",
+    });
+
+    await finalizeTextGeneration(context, generationResult, intermediateMessages);
+
+    const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
+    const finalMessage = appendedMessages[appendedMessages.length - 1];
+
+    expect(finalMessage.thinking).toBeUndefined();
+  });
+
+  it("should handle intermediate message with thinking but no prefix match on accumulated", async () => {
+    const intermediateThinking = "Completely different reasoning path.";
+    const accumulatedThinking = "The user asked about quantum physics. Let me explain.";
+
+    const intermediateMessages = [
+      { role: "user", content: "explain quantum physics" },
+      {
+        role: "assistant",
+        content: "Searching.",
+        thinking: intermediateThinking,
+        toolCalls: [{ id: "tc-1", name: "search_web", args: {}, result: {} }],
+      },
+    ];
+
+    const context = makeCtx();
+    const generationResult = makeGenerationResult({
+      text: "Here's the explanation.",
+      thinking: accumulatedThinking,
+    });
+
+    await finalizeTextGeneration(context, generationResult, intermediateMessages);
+
+    const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
+    const finalMessage = appendedMessages[appendedMessages.length - 1];
+
+    // No prefix match, so thinking stays unchanged
+    expect(finalMessage.thinking).toBe(accumulatedThinking);
+  });
+});
