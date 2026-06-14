@@ -415,5 +415,141 @@ describe('FunctionCallingUtilities adversarial', () => {
       const result = expandMessagesForFunctionCall(messages, { filterDeleted: false });
       expect(result.length).toBe(2);
     });
+
+    it('should include tool messages when result is null', () => {
+      const messages = [
+        {
+          role: "assistant",
+          content: "Working",
+          toolCalls: [
+            {
+              id: "toolCall-0",
+              name: "generate_audio",
+              args: {},
+              result: null,
+            },
+          ],
+        },
+      ] as any;
+      const expanded = expandMessagesForFunctionCall(messages);
+      const toolMessages = expanded.filter((message) => message.role === "tool");
+      expect(toolMessages).toHaveLength(1);
+      expect(toolMessages[0].content).toBe("null");
+    });
+
+    it('should handle multiple toolCalls with mixed results', () => {
+      const messages = [
+        {
+          role: "assistant",
+          content: "Doing both",
+          toolCalls: [
+            {
+              id: "toolCall-0",
+              name: "search_web",
+              args: {},
+              result: { found: true },
+            },
+            {
+              id: "toolCall-1",
+              name: "generate_audio",
+              args: {},
+              result: undefined,
+            },
+          ],
+        },
+      ] as any;
+      const expanded = expandMessagesForFunctionCall(messages);
+      const toolMessages = expanded.filter((message) => message.role === "tool");
+      expect(toolMessages).toHaveLength(1);
+      expect(toolMessages[0].name).toBe("search_web");
+    });
+
+    it('should simulate the exact iteration 2 message expansion for generate_audio flow', () => {
+      const messages = [
+        {
+          role: "system",
+          content: "You are a creative assistant with many tools available.",
+        },
+        { role: "user", content: "hey whats up" },
+        { role: "assistant", content: "Hey Rodrigo! What's good?" },
+        { role: "user", content: "make a song about the war" },
+        {
+          role: "assistant",
+          content: "I'll create an original song about war for you!",
+          toolCalls: [
+            {
+              id: "toolCall-0",
+              name: "generate_audio",
+              args: {
+                title: "Echoes of War",
+                tracks: [{ type: "oscillator", waveform: "sawtooth" }],
+              },
+              result: {
+                success: true,
+                audioRef: "minio://generations/audio/war.wav",
+                duration: 30,
+                sampleRate: 44100,
+              },
+            },
+          ],
+        },
+      ] as any;
+
+      const expanded = expandMessagesForFunctionCall(messages);
+
+      expect(expanded).toHaveLength(6);
+      expect(expanded[0].role).toBe("system");
+      expect(expanded[1].role).toBe("user");
+      expect(expanded[1].content).toBe("hey whats up");
+      expect(expanded[2].role).toBe("assistant");
+      expect(expanded[2].content).toBe("Hey Rodrigo! What's good?");
+      expect(expanded[3].role).toBe("user");
+      expect(expanded[3].content).toBe("make a song about the war");
+      expect(expanded[4].role).toBe("assistant");
+      expect(expanded[4].toolCalls).toHaveLength(1);
+      expect(expanded[5].role).toBe("tool");
+      expect(expanded[5].name).toBe("generate_audio");
+
+      const lastUserIndex = expanded.findLastIndex(
+        (message) => message.role === "user",
+      );
+      expect(lastUserIndex).toBe(3);
+
+      const toolIndex = expanded.findIndex(
+        (message) => message.role === "tool",
+      );
+      expect(toolIndex).toBe(5);
+      expect(toolIndex).toBeGreaterThan(lastUserIndex);
+    });
+
+    it('should verify tool result content is present for the model', () => {
+      const messages = [
+        { role: "user", content: "make audio" },
+        {
+          role: "assistant",
+          content: "Creating!",
+          toolCalls: [
+            {
+              id: "toolCall-0",
+              name: "generate_audio",
+              args: {},
+              result: {
+                success: true,
+                audioRef: "minio://audio.wav",
+                message: "Audio generated successfully",
+              },
+            },
+          ],
+        },
+      ] as any;
+
+      const expanded = expandMessagesForFunctionCall(messages);
+      const toolMessage = expanded.find((message) => message.role === "tool");
+
+      expect(toolMessage).toBeDefined();
+      const parsedContent = JSON.parse(toolMessage!.content as string);
+      expect(parsedContent.success).toBe(true);
+      expect(parsedContent.message).toBe("Audio generated successfully");
+    });
   });
 });

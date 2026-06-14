@@ -269,8 +269,3 @@ describe('AgenticLoopState concurrent operations — idempotency', () => {
   });
 });
 
-// ────────────────────────────────────────────────────────────────
-// 6. Dynamic Tool Activation — System Prompt Documentation Sync
-// ────────────────────────────────────────────────────────────────
-
-import ToolContext from '../src/services/ToolContext.ts';

@@ -402,7 +402,7 @@ const RequestLogger = {
       rateLimits,
       contextLength: (options?._loadedContextLength as number) ?? (options?.contextLength as number) ?? null,
       evalBatchSize: (options?._loadedEvalBatchSize as number) ?? (options?.eval_batch_size as number) ?? null,
-      physicalBatchSize: (options?._loadedPhysicalBatchSize as number) ?? (options?.n_batch as number) ?? null,
+      physicalBatchSize: (options?._loadedPhysicalBatchSize as number) ?? (options?.eval_batch_size as number) ?? null,
     });
   },
   /**

@@ -16,6 +16,10 @@
  *   4. Edge cases: empty arrays, zero costs, missing request logs
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  enrichConversationsWithRequestCosts,
+  enrichSingleConversationCost,
+} from "../src/services/ConversationService.ts";
 
 // ── Shared mock logger ──────────────────────────────────────────
 vi.mock("../src/utils/logger.ts", () => ({
@@ -36,29 +40,6 @@ vi.mock("../config.ts", () => ({
 // ═══════════════════════════════════════════════════════════════
 
 describe("Conversation List Cost Enrichment", () => {
-  /**
-   * Simulates the `enrichConversationsWithRequestCosts` helper extracted
-   * in ConversationsRoutes.ts. This is the exact algorithm used in
-   * the GET /conversations list endpoint.
-   */
-  function enrichConversationsWithRequestCosts(
-    conversations: Array<{ id: string; totalCost: number }>,
-    requestLogCosts: Array<{ _id: string; totalCost: number }>,
-  ) {
-    if (conversations.length === 0) return;
-    const costMap = new Map(
-      requestLogCosts.map((costEntry) => [costEntry._id, costEntry.totalCost]),
-    );
-    for (const conversation of conversations) {
-      const requestLogCost = costMap.get(conversation.id);
-      if (requestLogCost !== undefined && requestLogCost > 0) {
-        conversation.totalCost = Math.max(
-          conversation.totalCost || 0,
-          requestLogCost,
-        );
-      }
-    }
-  }
 
   // ── Model (direct) conversations ────────────────────────────
   describe("Model conversation enrichment", () => {
@@ -267,21 +248,6 @@ describe("Conversation List Cost Enrichment", () => {
 // ═══════════════════════════════════════════════════════════════
 
 describe("Single Conversation Cost Enrichment (GET /:id)", () => {
-  /**
-   * Simulates the cost enrichment logic added to the
-   * GET /conversations/:id endpoint for model conversations.
-   */
-  function enrichSingleConversationCost(
-    conversation: { totalCost: number },
-    requestLogAggregation: Array<{ _id: string; totalCost: number }>,
-  ) {
-    if (requestLogAggregation.length > 0 && requestLogAggregation[0].totalCost > 0) {
-      conversation.totalCost = Math.max(
-        conversation.totalCost || 0,
-        requestLogAggregation[0].totalCost,
-      );
-    }
-  }
 
   it("should enrich totalCost when request-log is higher", () => {
     const conversation = { totalCost: 0.001 };
@@ -360,7 +326,7 @@ describe("MongoDB Aggregation Pipeline Contract", () => {
     const conversationIds = ["session-1", "session-2"];
     const isAgentType = true;
 
-    const matchCondition = isAgentType
+    const matchCondition: any = isAgentType
       ? {
           $or: [
             { agentSessionId: { $in: conversationIds } },
@@ -379,7 +345,7 @@ describe("MongoDB Aggregation Pipeline Contract", () => {
 
   it("should produce correct $group _id for model conversations (simple field)", () => {
     const isAgentType = false;
-    const groupId = isAgentType
+    const groupId: any = isAgentType
       ? { $cond: ["complex", "expression"] }
       : "$conversationId";
 
@@ -390,7 +356,7 @@ describe("MongoDB Aggregation Pipeline Contract", () => {
     const conversationIds = ["session-1"];
     const isAgentType = true;
 
-    const groupId = isAgentType
+    const groupId: any = isAgentType
       ? {
           $cond: [
             {

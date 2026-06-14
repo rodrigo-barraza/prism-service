@@ -5,6 +5,8 @@ import requireDb from "../middleware/RequireDbMiddleware.ts";
 import ConversationService, {
   buildConversationPatchFields,
   type ConversationPatchInput,
+  enrichConversationsWithRequestCosts,
+  enrichSingleConversationCost,
 } from "../services/ConversationService.ts";
 import { COLLECTIONS, COST_SUM_EXPR } from "../constants.ts";
 import logger from "../utils/logger.ts";
@@ -143,7 +145,7 @@ router.get(
       // Background operations (memory extraction, embedding, consolidation)
       // log costs to the requests collection but never update the conversation
       // document, causing the sidebar cost badge to show stale values.
-      const enrichConversationsWithRequestCosts = async (
+      const queryAndEnrichConversationsWithRequestCosts = async (
         conversations: Document[],
         isAgentType: boolean,
       ) => {
@@ -198,21 +200,7 @@ router.get(
             ])
             .toArray();
 
-          if (costAggregation.length > 0) {
-            const costMap = new Map(
-              costAggregation.map((costEntry) => [costEntry._id, costEntry.totalCost]),
-            );
-            for (const conversation of conversations) {
-              const conversationId = (conversation as Record<string, unknown>).id as string;
-              const requestLogCost = costMap.get(conversationId);
-              if (requestLogCost !== undefined && requestLogCost > 0) {
-                (conversation as Record<string, unknown>).totalCost = Math.max(
-                  (conversation.totalCost as number) || 0,
-                  requestLogCost,
-                );
-              }
-            }
-          }
+          enrichConversationsWithRequestCosts(conversations, costAggregation);
         } catch (costError: unknown) {
           logger.warn(
             `Failed to enrich ${isAgentType ? "agent session" : "conversation"} costs: ${costError instanceof Error ? costError.message : String(costError)}`,
@@ -221,8 +209,8 @@ router.get(
       };
 
       await Promise.all([
-        enrichConversationsWithRequestCosts(modelConversations, false),
-        enrichConversationsWithRequestCosts(agentConversations, true),
+        queryAndEnrichConversationsWithRequestCosts(modelConversations, false),
+        queryAndEnrichConversationsWithRequestCosts(agentConversations, true),
       ]);
 
       // Merge and sort in memory by updatedAt descending
@@ -286,12 +274,7 @@ router.get(
             ])
             .toArray();
 
-          if (costAggregation.length > 0 && costAggregation[0].totalCost > 0) {
-            (chat as Record<string, unknown>).totalCost = Math.max(
-              (chat.totalCost as number) || 0,
-              costAggregation[0].totalCost,
-            );
-          }
+          enrichSingleConversationCost(chat, costAggregation);
         } catch {
           // Non-fatal — fall back to document-level totalCost
         }

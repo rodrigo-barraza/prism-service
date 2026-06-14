@@ -378,6 +378,268 @@ describe("done event → appendAndFinalize race condition", () => {
     // split them properly, and the post-refresh should update the display
     // to match the DB's canonical representation.
   });
+
+  describe("Done event emission timeline and async refresh guards", () => {
+    interface TimelineEvent {
+      timestamp: number;
+      event: string;
+    }
+
+    function simulateFireAndForget(
+      writeDelayMs: number,
+    ): {
+      appendAndFinalize: () => void;
+      events: TimelineEvent[];
+      getIsWriteComplete: () => boolean;
+    } {
+      const events: TimelineEvent[] = [];
+      let isWriteComplete = false;
+
+      const appendAndFinalize = () => {
+        events.push({ timestamp: Date.now(), event: "appendAndFinalize_start" });
+        setTimeout(() => {
+          isWriteComplete = true;
+          events.push({
+            timestamp: Date.now(),
+            event: "appendAndFinalize_complete",
+          });
+        }, writeDelayMs);
+      };
+
+      return {
+        appendAndFinalize,
+        events,
+        getIsWriteComplete: () => isWriteComplete,
+      };
+    }
+
+    function simulateAwaitableAppend(
+      writeDelayMs: number,
+    ): {
+      appendAndFinalize: () => Promise<void>;
+      events: TimelineEvent[];
+      getIsWriteComplete: () => boolean;
+    } {
+      const events: TimelineEvent[] = [];
+      let isWriteComplete = false;
+
+      const appendAndFinalize = async () => {
+        events.push({ timestamp: Date.now(), event: "appendAndFinalize_start" });
+        await new Promise((resolve) => setTimeout(resolve, writeDelayMs));
+        isWriteComplete = true;
+        events.push({
+          timestamp: Date.now(),
+          event: "appendAndFinalize_complete",
+        });
+      };
+
+      return {
+        appendAndFinalize,
+        events,
+        getIsWriteComplete: () => isWriteComplete,
+      };
+    }
+
+    it("BUGGY: done fires before DB write completes", async () => {
+      const events: string[] = [];
+
+      const donePromise = new Promise<void>((resolve) => {
+        events.push("emit_done");
+
+        const { appendAndFinalize, getIsWriteComplete } =
+          simulateFireAndForget(50);
+        appendAndFinalize();
+
+        events.push("client_resolve");
+        events.push("client_db_fetch");
+
+        expect(getIsWriteComplete()).toBe(false);
+        events.push("db_still_stale");
+
+        resolve();
+      });
+
+      await donePromise;
+
+      expect(events).toEqual([
+        "emit_done",
+        "client_resolve",
+        "client_db_fetch",
+        "db_still_stale",
+      ]);
+    });
+
+    it("FIXED: persist completes before done event", async () => {
+      const events: string[] = [];
+
+      const { appendAndFinalize, getIsWriteComplete } =
+        simulateAwaitableAppend(50);
+
+      await appendAndFinalize();
+      events.push("persist_complete");
+      events.push("emit_done");
+      events.push("client_resolve");
+      events.push("client_db_fetch");
+
+      expect(getIsWriteComplete()).toBe(true);
+      events.push("db_is_current");
+
+      expect(events).toEqual([
+        "persist_complete",
+        "emit_done",
+        "client_resolve",
+        "client_db_fetch",
+        "db_is_current",
+      ]);
+    });
+
+    it("Alternative fix: Finalizer returns persist promise", async () => {
+      let persistComplete = false;
+
+      const mockFinalizeTextGeneration = async (): Promise<Promise<void>> => {
+        const persistPromise = new Promise<void>((resolve) => {
+          setTimeout(() => {
+            persistComplete = true;
+            resolve();
+          }, 50);
+        });
+
+        return persistPromise;
+      };
+
+      const persistPromise = await mockFinalizeTextGeneration();
+      await persistPromise;
+
+      expect(persistComplete).toBe(true);
+    });
+
+    it("count-based guard passes even with wrong content", () => {
+      const streamingCount = 4;
+      const databaseCount = 4;
+
+      const countGuardBlocks = databaseCount < streamingCount;
+      expect(countGuardBlocks).toBe(false);
+    });
+
+    it("content-aware guard catches missing user messages", () => {
+      interface SimpleMessage {
+        role: string;
+        content: string;
+      }
+
+      const streamingMessages: SimpleMessage[] = [
+        { role: "user", content: "hey whats up" },
+        { role: "assistant", content: "Hey Rodrigo!" },
+        { role: "user", content: "make a song about the war" },
+        { role: "assistant", content: "Creating your song!" },
+      ];
+
+      const databaseMessages: SimpleMessage[] = [
+        { role: "user", content: "hey whats up" },
+        { role: "assistant", content: "Hey Rodrigo!" },
+        { role: "assistant", content: "Creating!" },
+        { role: "assistant", content: "Done!" },
+      ];
+
+      expect(databaseMessages.length >= streamingMessages.length).toBe(true);
+
+      const lastStreamingUser = [...streamingMessages]
+        .reverse()
+        .find((message) => message.role === "user");
+      const lastDatabaseUser = [...databaseMessages]
+        .reverse()
+        .find((message) => message.role === "user");
+
+      expect(lastStreamingUser?.content).toBe("make a song about the war");
+      expect(lastDatabaseUser?.content).toBe("hey whats up");
+
+      const contentGuardBlocks =
+        lastStreamingUser?.content !== lastDatabaseUser?.content;
+      expect(contentGuardBlocks).toBe(true);
+    });
+
+    it("improved guard: verify last user message content matches", () => {
+      interface SimpleMessage {
+        role: string;
+        content: string;
+      }
+
+      function shouldOverwriteWithDatabaseMessages(
+        streamingMessages: SimpleMessage[],
+        databaseMessages: SimpleMessage[],
+      ): boolean {
+        if (databaseMessages.length < streamingMessages.length) {
+          return false;
+        }
+
+        const lastStreamingUser = [...streamingMessages]
+          .reverse()
+          .find((message) => message.role === "user");
+
+        if (lastStreamingUser) {
+          const databaseUserMessages = databaseMessages
+            .filter((message) => message.role === "user")
+            .map((message) => message.content);
+
+          if (!databaseUserMessages.includes(lastStreamingUser.content)) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+
+      expect(
+        shouldOverwriteWithDatabaseMessages(
+          [
+            { role: "user", content: "hey" },
+            { role: "assistant", content: "Hi!" },
+            { role: "user", content: "make a song" },
+            { role: "assistant", content: "Creating!" },
+          ],
+          [
+            { role: "user", content: "hey" },
+            { role: "assistant", content: "Hi!" },
+            { role: "user", content: "make a song" },
+            { role: "assistant", content: "Creating!" },
+            { role: "assistant", content: "Done!" },
+          ],
+        ),
+      ).toBe(true);
+
+      expect(
+        shouldOverwriteWithDatabaseMessages(
+          [
+            { role: "user", content: "hey" },
+            { role: "assistant", content: "Hi!" },
+            { role: "user", content: "make a song" },
+            { role: "assistant", content: "Creating!" },
+          ],
+          [
+            { role: "user", content: "hey" },
+            { role: "assistant", content: "Hi!" },
+          ],
+        ),
+      ).toBe(false);
+
+      expect(
+        shouldOverwriteWithDatabaseMessages(
+          [
+            { role: "user", content: "hey" },
+            { role: "assistant", content: "Hi!" },
+            { role: "user", content: "make a song" },
+            { role: "assistant", content: "Creating!" },
+          ],
+          [
+            { role: "user", content: "hey" },
+            { role: "assistant", content: "Hi!" },
+            { role: "assistant", content: "Creating!" },
+            { role: "assistant", content: "Done!" },
+          ],
+        ),
+      ).toBe(false);
+    });
+  });
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
