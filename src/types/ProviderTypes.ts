@@ -49,6 +49,7 @@ export interface ProviderResponse {
 export interface ProviderOptions {
   maxTokens?: number;
   temperature?: number;
+  deliveryMode?: "STABLE" | "BALANCED" | "CREATIVE";
   topP?: number;
   topK?: number;
   stopSequences?: string[];

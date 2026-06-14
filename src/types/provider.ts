@@ -71,6 +71,7 @@ export interface ProviderOptions {
   format?: string;
   instructions?: string;
   language?: string;
+  deliveryMode?: "STABLE" | "BALANCED" | "CREATIVE";
 
   // ── Embedding ────────────────────────────────────────────
   dimensions?: number;
