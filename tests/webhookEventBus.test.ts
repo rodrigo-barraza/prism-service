@@ -1245,3 +1245,63 @@ describe("BaseAgenticHarness — native MCP tool call emits", () => {
     expect(completedEvents[0].data.status).toBe("done");
   });
 });
+
+// ── Adversarial Tests (merged from adversarial-qa-flows.test.ts) ──
+
+describe('Webhook Route adversarial — URL validation', () => {
+  const agent = request(app);
+
+  it('should reject webhook subscription with missing URL — 400 validation error', async () => {
+    const response = await agent
+      .post('/webhooks/subscriptions')
+      .set('x-project', 'test')
+      .set('x-username', 'adversarial')
+      .send({ events: ['*'] });
+    expect(response.status).toBe(400);
+  });
+
+  it('should reject webhook subscription with non-string URL — 400 validation error', async () => {
+    const response = await agent
+      .post('/webhooks/subscriptions')
+      .set('x-project', 'test')
+      .set('x-username', 'adversarial')
+      .send({ url: 12345 });
+    expect(response.status).toBe(400);
+  });
+
+  it('should reject webhook subscription with invalid URL format — 400 validation error', async () => {
+    const response = await agent
+      .post('/webhooks/subscriptions')
+      .set('x-project', 'test')
+      .set('x-username', 'adversarial')
+      .send({ url: 'not-a-valid-url' });
+    expect(response.status).toBe(400);
+  });
+
+  it('should reject webhook subscription with ftp:// protocol — 400 validation error', async () => {
+    const response = await agent
+      .post('/webhooks/subscriptions')
+      .set('x-project', 'test')
+      .set('x-username', 'adversarial')
+      .send({ url: 'ftp://evil.com/webhook' });
+    expect(response.status).toBe(400);
+  });
+
+  it('should reject webhook subscription with file:// protocol — 400 validation error', async () => {
+    const response = await agent
+      .post('/webhooks/subscriptions')
+      .set('x-project', 'test')
+      .set('x-username', 'adversarial')
+      .send({ url: 'file:///etc/passwd' });
+    expect(response.status).toBe(400);
+  });
+
+  it('should reject webhook subscription with javascript: protocol — 400 validation error', async () => {
+    const response = await agent
+      .post('/webhooks/subscriptions')
+      .set('x-project', 'test')
+      .set('x-username', 'adversarial')
+      .send({ url: 'javascript:alert(1)' });
+    expect(response.status).toBe(400);
+  });
+});

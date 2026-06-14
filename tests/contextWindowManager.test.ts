@@ -587,3 +587,123 @@ describe("Edge cases", () => {
     expect(result.truncated).toBe(false);
   });
 });
+
+// ── Adversarial Boundary Tests (merged from adversarial-boundary.test.ts) ──
+
+describe('ContextWindowManager adversarial', () => {
+  it('should handle empty messages array without crashing', () => {
+    const result = ContextWindowManager.enforce([], {
+      maxInputTokens: 128_000,
+    });
+    expect(result.messages).toEqual([]);
+    expect(result.truncated).toBe(false);
+  });
+
+  it('should handle single system message that exceeds context window', () => {
+    const giantSystemMessage = {
+      role: 'system',
+      content: 'x'.repeat(1_000_000),
+    };
+    const result = ContextWindowManager.enforce([giantSystemMessage] as any, {
+      maxInputTokens: 1000,
+      maxOutputTokens: 200,
+    });
+    // Should not throw — truncation strategies should kick in
+    expect(result).toBeDefined();
+  });
+
+  it('should not crash on messages with undefined content', () => {
+    const messagesWithUndefined = [
+      { role: 'system', content: 'You are helpful.' },
+      { role: 'user', content: undefined },
+      { role: 'assistant', content: 'Hello' },
+    ];
+    const result = ContextWindowManager.enforce(messagesWithUndefined as any, {
+      maxInputTokens: 128_000,
+    });
+    expect(result).toBeDefined();
+    expect(result.messages.length).toBeGreaterThan(0);
+  });
+
+  it('should handle messages with deeply nested toolCalls result objects', () => {
+    // Build a 50-level deep nested object to stress JSON.stringify in token estimation
+    let deepObject: Record<string, unknown> = { value: 'leaf' };
+    for (let depth = 0; depth < 50; depth++) {
+      deepObject = { nested: deepObject };
+    }
+
+    const messagesWithDeepToolResults = [
+      { role: 'system', content: 'system' },
+      { role: 'user', content: 'hello' },
+      {
+        role: 'assistant',
+        content: 'result',
+        toolCalls: [
+          { name: 'deep_tool', args: {}, result: deepObject },
+        ],
+      },
+    ];
+
+    const result = ContextWindowManager.enforce(messagesWithDeepToolResults as any, {
+      maxInputTokens: 128_000,
+    });
+    expect(result).toBeDefined();
+  });
+
+  it('should handle maxInputTokens of 0 — negative budget scenario', () => {
+    const messages = [
+      { role: 'system', content: 'You are helpful.' },
+      { role: 'user', content: 'Hi' },
+    ];
+    const result = ContextWindowManager.enforce(messages as any, {
+      maxInputTokens: 0,
+      maxOutputTokens: 100,
+    });
+    // Should not throw, should log warning about negative budget
+    expect(result.truncated).toBe(false);
+  });
+
+  it('should handle maxOutputTokens larger than maxInputTokens — inverted budget', () => {
+    const messages = [
+      { role: 'system', content: 'You are helpful.' },
+      { role: 'user', content: 'Hi' },
+    ];
+    const result = ContextWindowManager.enforce(messages as any, {
+      maxInputTokens: 1000,
+      maxOutputTokens: 50_000,
+    });
+    // Negative budget → should return messages as-is
+    expect(result.truncated).toBe(false);
+  });
+
+  it('should preserve the system message during sliding window truncation', () => {
+    const messages: any[] = [
+      { role: 'system', content: 'IMPORTANT SYSTEM PROMPT' },
+    ];
+    // Add 100 user/assistant turns to blow the budget
+    for (let index = 0; index < 100; index++) {
+      messages.push({ role: 'user', content: 'x'.repeat(500) });
+      messages.push({ role: 'assistant', content: 'y'.repeat(500) });
+    }
+
+    const result = ContextWindowManager.enforce(messages, {
+      maxInputTokens: 4000,
+      maxOutputTokens: 1000,
+    });
+
+    // System message must survive truncation
+    const systemMessage = result.messages.find((message) => message.role === 'system');
+    expect(systemMessage).toBeDefined();
+    expect(systemMessage?.content).toBe('IMPORTANT SYSTEM PROMPT');
+  });
+
+  it('should estimate 0 tokens for messages array with all-empty content', () => {
+    const emptyMessages = [
+      { role: 'user', content: '' },
+      { role: 'assistant', content: '' },
+    ];
+    const estimate = ContextWindowManager.estimateTokens(emptyMessages as any);
+    // Should still count per-message overhead (4 tokens each)
+    expect(estimate).toBe(8);
+  });
+});

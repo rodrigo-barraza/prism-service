@@ -360,3 +360,159 @@ describe("PolicyEngine.requiresApproval", () => {
     expect(PolicyEngine.requiresApproval(policies, "read_file", {})).toBe(false);
   });
 });
+
+// ── Adversarial Boundary Tests (merged from adversarial-boundary.test.ts + adversarial-qa-flows.test.ts) ──
+
+describe('PolicyEngine adversarial', () => {
+  it('should return null when policies array is empty', () => {
+    const result = PolicyEngine.evaluate([], 'any_tool', {});
+    expect(result).toBeNull();
+  });
+
+  it('should return null when policies is null', () => {
+    const result = PolicyEngine.evaluate(null as any, 'any_tool', {});
+    expect(result).toBeNull();
+  });
+
+  it('should prioritize specific deny over specific allow for the same tool', () => {
+    const policies = [
+      allow('execute_shell'),
+      deny('execute_shell'),
+    ];
+    const result = PolicyEngine.evaluate(policies, 'execute_shell', {});
+    expect(result?.decision).toBe('DENY');
+  });
+
+  it('should prioritize specific rules over wildcard rules', () => {
+    const policies = [
+      allowAll(),
+      deny('dangerous_tool'),
+    ];
+    const result = PolicyEngine.evaluate(policies, 'dangerous_tool', {});
+    expect(result?.decision).toBe('DENY');
+  });
+
+  it('should skip a rule when its predicate throws an error — no crash, moves to next rule', () => {
+    const policies = [
+      deny('tool', {
+        when: () => {
+          throw new Error('Predicate explosion');
+        },
+      }),
+      allow('tool'),
+    ];
+    const result = PolicyEngine.evaluate(policies, 'tool', {});
+    // Should skip the throwing deny and fall through to allow
+    expect(result?.decision).toBe('APPROVE');
+  });
+
+  it('should handle wildcard deny vs wildcard allow — deny wins', () => {
+    const policies = [
+      allowAll(),
+      denyAll(),
+    ];
+    const result = PolicyEngine.evaluate(policies, 'any_tool', {});
+    expect(result?.decision).toBe('DENY');
+  });
+
+  it('should handle predicate with prototype pollution in args', () => {
+    const policies = [
+      deny('tool', {
+        when: (args) => args.command === 'rm -rf /',
+      }),
+    ];
+    const maliciousArgs = JSON.parse('{"__proto__": {"polluted": true}, "command": "safe"}');
+    const result = PolicyEngine.evaluate(policies, 'tool', maliciousArgs);
+    // Should not match the deny since command is "safe"
+    expect(result).toBeNull();
+    // Prototype should not be polluted
+    expect(({} as any).polluted).toBeUndefined();
+  });
+
+  it('should handle tool name with special characters', () => {
+    const policies = [
+      deny('mcp__server/tool-name.v2'),
+    ];
+    const result = PolicyEngine.evaluate(policies, 'mcp__server/tool-name.v2', {});
+    expect(result?.decision).toBe('DENY');
+  });
+
+  it('should handle empty string tool name', () => {
+    const policies = [deny('')];
+    const result = PolicyEngine.evaluate(policies, '', {});
+    expect(result?.decision).toBe('DENY');
+  });
+
+  it('isDenied convenience should return false for unmatched tools', () => {
+    const policies = [deny('only_this_tool')];
+    expect(PolicyEngine.isDenied(policies, 'different_tool', {})).toBe(false);
+  });
+
+  it('requiresApproval should return true for ASK_USER', () => {
+    const policies = [askUser('risky_tool')];
+    expect(PolicyEngine.requiresApproval(policies, 'risky_tool', {})).toBe(true);
+  });
+
+  it('requiresApproval should return false for APPROVE', () => {
+    const policies = [allow('safe_tool')];
+    expect(PolicyEngine.requiresApproval(policies, 'safe_tool', {})).toBe(false);
+  });
+});
+
+describe('PolicyEngine advanced adversarial', () => {
+  it('should handle predicate that modifies the args object — mutation safety', async () => {
+    const PolicyEngine = (await import('../src/services/PolicyEngine.ts')).default;
+    const mutatingPolicy = deny('tool', {
+      when: (args) => {
+        (args as Record<string, unknown>).injected = true;
+        return false; // Does not match
+      },
+    });
+
+    const args: Record<string, unknown> = { command: 'ls' };
+    const result = PolicyEngine.evaluate(
+      [mutatingPolicy, allow('tool')],
+      'tool',
+      args,
+    );
+    expect(result?.decision).toBe('APPROVE');
+    // The predicate mutated args — this is a design concern (no defensive copy)
+    expect(args.injected).toBe(true);
+  });
+
+  it('should handle ASK_USER between specific deny and allow', async () => {
+    const PolicyEngine = (await import('../src/services/PolicyEngine.ts')).default;
+    const policies = [
+      deny('tool', { when: (args) => args.danger === true }),
+      askUser('tool'),
+      allow('tool'),
+    ];
+
+    // Safe call — deny doesn't match, askUser matches first
+    const safeResult = PolicyEngine.evaluate(
+      policies,
+      'tool',
+      { danger: false },
+    );
+    // After sorting by priority: deny(0) → askUser(1) → allow(2)
+    // deny's when returns false → skip
+    // askUser has no when → matches
+    expect(safeResult?.decision).toBe('ASK_USER');
+  });
+
+  it('should handle 100 wildcard policies efficiently — no exponential blowup', async () => {
+    const PolicyEngine = (await import('../src/services/PolicyEngine.ts')).default;
+    const manyPolicies = Array.from({ length: 100 }, (_, index) =>
+      allow('*', { name: `wildcard-${index}` }),
+    );
+    const startTime = performance.now();
+    const result = PolicyEngine.evaluate(
+      manyPolicies,
+      'any_tool',
+      {},
+    );
+    const elapsed = performance.now() - startTime;
+    expect(result?.decision).toBe('APPROVE');
+    expect(elapsed).toBeLessThan(100); // Should complete in under 100ms
+  });
+});

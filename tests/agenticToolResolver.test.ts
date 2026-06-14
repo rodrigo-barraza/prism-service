@@ -193,6 +193,7 @@ vi.mock("../src/utils/logger.ts", () => ({
 const { default: AgenticToolResolver } = await import(
   "../src/services/AgenticToolResolver.js"
 );
+import { resolveToolEntriesToSet } from "../src/utils/resolveToolEntriesToSet.ts";
 
 // ── Tests ───────────────────────────────────────────────────
 
@@ -554,5 +555,91 @@ describe("AgenticToolResolver — native thinking collision", () => {
     const toolNames = finalTools.map((tool) => tool.name);
 
     expect(toolNames).not.toContain("think");
+  });
+});
+
+// ── Adversarial Tests (merged from adversarial-qa-flows.test.ts) ──
+
+describe('resolveToolEntriesToSet adversarial', () => {
+  const mockSchemas = [
+    { name: 'read_file', domain: 'Core Workspace', domainKey: 'workspace' },
+    { name: 'write_file', domain: 'Core Workspace', domainKey: 'workspace' },
+    { name: 'execute_shell', domain: 'Core Workspace', domainKey: 'workspace' },
+    { name: 'search_web', domain: 'Web Tools', domainKey: 'web' },
+    { name: 'get_weather', domain: 'Weather', domainKey: 'weather' },
+  ];
+
+  it('should resolve exact tool names as-is', () => {
+    const result = resolveToolEntriesToSet(['read_file', 'search_web'], mockSchemas);
+    expect(result.size).toBe(2);
+    expect(result.has('read_file')).toBe(true);
+    expect(result.has('search_web')).toBe(true);
+  });
+
+  it('should expand domainKey: prefix to all matching tools', () => {
+    const result = resolveToolEntriesToSet(['domainKey:workspace'], mockSchemas);
+    expect(result.size).toBe(3);
+    expect(result.has('read_file')).toBe(true);
+    expect(result.has('write_file')).toBe(true);
+    expect(result.has('execute_shell')).toBe(true);
+  });
+
+  it('should expand domain: prefix to all matching tools', () => {
+    const result = resolveToolEntriesToSet(['domain:Core Workspace'], mockSchemas);
+    expect(result.size).toBe(3);
+  });
+
+  it('should handle domainKey: with no matching schemas — empty set', () => {
+    const result = resolveToolEntriesToSet(['domainKey:nonexistent'], mockSchemas);
+    expect(result.size).toBe(0);
+  });
+
+  it('should handle empty entries array', () => {
+    const result = resolveToolEntriesToSet([], mockSchemas);
+    expect(result.size).toBe(0);
+  });
+
+  it('should handle empty schemas array — domainKey/domain expansion returns nothing', () => {
+    const result = resolveToolEntriesToSet(['domainKey:workspace', 'read_file'], []);
+    expect(result.size).toBe(1); // Only exact name passes through
+    expect(result.has('read_file')).toBe(true);
+  });
+
+  it('should handle mixed exact names and domain prefixes', () => {
+    const result = resolveToolEntriesToSet(
+      ['get_weather', 'domainKey:workspace'],
+      mockSchemas,
+    );
+    expect(result.size).toBe(4); // get_weather + 3 workspace tools
+  });
+
+  it('should deduplicate when entry matches both exact and domain expansion', () => {
+    const result = resolveToolEntriesToSet(
+      ['read_file', 'domainKey:workspace'],
+      mockSchemas,
+    );
+    // read_file added twice via both paths, but Set deduplicates
+    expect(result.size).toBe(3);
+  });
+
+  it('should handle entry string that starts with "domainKey:" but has empty suffix', () => {
+    const result = resolveToolEntriesToSet(['domainKey:'], mockSchemas);
+    // slice(10) on "domainKey:" gives "" — no schema has domainKey === ""
+    expect(result.size).toBe(0);
+  });
+
+  it('should handle entry that looks like domain: but with extra colon — treated as exact name', () => {
+    const result = resolveToolEntriesToSet(['domain:Core:Extra'], mockSchemas);
+    // domain.slice(7) → "Core:Extra" — no match, returns empty
+    expect(result.size).toBe(0);
+  });
+
+  it('should handle entry with injection-like prefix — "domainKey:workspace; DROP TABLE" passes through', () => {
+    const result = resolveToolEntriesToSet(
+      ['domainKey:workspace; DROP TABLE tools'],
+      mockSchemas,
+    );
+    // slice(10) → "workspace; DROP TABLE tools" — no domainKey match
+    expect(result.size).toBe(0);
   });
 });

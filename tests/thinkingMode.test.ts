@@ -4,6 +4,10 @@ import googleProvider from "../src/providers/google.ts";
 import anthropicProvider from "../src/providers/anthropic.ts";
 import AgenticLoopState from "../src/services/AgenticLoopState.ts";
 import { MODELS } from "../src/config.ts";
+import {
+  extractThinkTags,
+  ThinkTagParser,
+} from "../src/utils/ThinkTagParser.ts";
 
 
 // ── Mock @google/genai module in detail ──────────────────────────────
@@ -845,3 +849,126 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
   });
 });
 
+
+// ── Adversarial Boundary Tests (merged from adversarial-boundary.test.ts) ──
+
+describe('ThinkTagParser adversarial', () => {
+  describe('extractThinkTags — static extraction', () => {
+    it('should handle nested <think> tags — inner tags treated as content', () => {
+      const raw = '<think>outer <think>inner</think> still outer</think> text';
+      const result = extractThinkTags(raw);
+      // Non-greedy regex should capture "outer <think>inner" then " still outer" remains
+      // The exact behavior depends on regex non-greedy semantics
+      expect(result.text).toBeDefined();
+      expect(typeof result.text).toBe('string');
+    });
+
+    it('should handle unclosed <think> tag — no match, returned as plain text', () => {
+      const raw = '<think>this tag is never closed and trails off...';
+      const result = extractThinkTags(raw);
+      // Non-greedy regex won\'t match without </think>
+      expect(result.thinking).toBeNull();
+      expect(result.text).toContain('<think>');
+    });
+
+    it('should handle </think> without opening tag — treated as plain text', () => {
+      const raw = 'some text </think> more text';
+      const result = extractThinkTags(raw);
+      expect(result.thinking).toBeNull();
+      expect(result.text).toContain('</think>');
+    });
+
+    it('should handle empty <think></think> block', () => {
+      const raw = 'before <think></think> after';
+      const result = extractThinkTags(raw);
+      // Empty think content should result in no thinking (empty string trimmed to nothing)
+      expect(result.text).toBe('before  after');
+    });
+
+    it('should handle case-insensitive tags — <THINK> and <Think>', () => {
+      const raw = '<THINK>uppercase thinking</THINK> text';
+      const result = extractThinkTags(raw);
+      expect(result.thinking).toBe('uppercase thinking');
+      expect(result.text).toBe('text');
+    });
+
+    it('should handle think tags spanning multiple lines', () => {
+      const raw = '<think>\nline 1\nline 2\nline 3\n</think>\nfinal text';
+      const result = extractThinkTags(raw);
+      expect(result.thinking).toContain('line 1');
+      expect(result.thinking).toContain('line 3');
+      expect(result.text).toBe('final text');
+    });
+
+    it('should handle null bytes inside think tags', () => {
+      const raw = '<think>before\0after</think> text';
+      const result = extractThinkTags(raw);
+      expect(result.thinking).toContain('\0');
+    });
+  });
+
+  describe('ThinkTagParser — streaming partial boundaries', () => {
+    it('should handle <think> tag split across two chunks: "<thi" + "nk>"', () => {
+      const parser = new ThinkTagParser();
+      const chunks1 = parser.feed('<thi');
+      // Should buffer the partial tag, not emit it yet
+      const textContent1 = chunks1.filter((chunk) => chunk.type === 'text').map((chunk) => chunk.content).join('');
+      expect(textContent1).not.toContain('<thi');
+
+      const chunks2 = parser.feed('nk>hello');
+      const thinkingContent = chunks2.filter((chunk) => chunk.type === 'thinking').map((chunk) => chunk.content).join('');
+      expect(thinkingContent).toBe('hello');
+    });
+
+    it('should handle </think> tag split across three chunks', () => {
+      const parser = new ThinkTagParser();
+      parser.feed('<think>content');
+      parser.feed('</th');
+      const chunks3 = parser.feed('ink>after');
+      const afterTextContent = chunks3.filter((chunk) => chunk.type === 'text').map((chunk) => chunk.content).join('');
+      expect(afterTextContent).toContain('after');
+    });
+
+    it('should handle rapid alternation between think and text', () => {
+      const parser = new ThinkTagParser();
+      let allResults: Array<{ type: string; content: string }> = [];
+      for (let index = 0; index < 100; index++) {
+        allResults = allResults.concat(parser.feed(`<think>t${index}</think>x${index}`));
+      }
+      const thinkCount = allResults.filter((result) => result.type === 'thinking').length;
+      const textCount = allResults.filter((result) => result.type === 'text').length;
+      expect(thinkCount).toBe(100);
+      expect(textCount).toBe(100);
+    });
+
+    it('should emit thinking content via feed() and leave nothing for flush()', () => {
+      const parser = new ThinkTagParser();
+      const feedResult = parser.feed('<think>unflushed content');
+      // feed() eagerly emits all content — buffer only holds partial tags
+      const thinkingChunks = feedResult.filter((chunk) => chunk.type === 'thinking');
+      expect(thinkingChunks.length).toBe(1);
+      expect(thinkingChunks[0].content).toBe('unflushed content');
+      // flush() returns empty because feed() already emitted
+      const flushed = parser.flush();
+      expect(flushed.length).toBe(0);
+    });
+
+    it('should emit text content via feed() and leave nothing for flush()', () => {
+      const parser = new ThinkTagParser();
+      const feedResult = parser.feed('regular text');
+      // feed() eagerly emits text when no partial tag is pending
+      const textChunks = feedResult.filter((chunk) => chunk.type === 'text');
+      expect(textChunks.length).toBe(1);
+      expect(textChunks[0].content).toBe('regular text');
+      // flush() returns empty because feed() already emitted
+      const flushed = parser.flush();
+      expect(flushed.length).toBe(0);
+    });
+
+    it('should handle empty string feed', () => {
+      const parser = new ThinkTagParser();
+      const result = parser.feed('');
+      expect(result).toEqual([]);
+    });
+  });
+});

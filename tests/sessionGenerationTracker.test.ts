@@ -200,3 +200,109 @@ describe("SessionGenerationTracker — cross-session isolation", () => {
     SessionGenerationTracker.cleanup("session-b");
   });
 });
+
+// ── Adversarial Tests (merged from adversarial-qa-flows.test.ts) ──
+
+describe('SessionGenerationTracker adversarial', () => {
+  afterEach(() => {
+    // Clean up any state leaked between tests
+    SessionGenerationTracker.cleanup('adversarial-session');
+    SessionGenerationTracker.cleanup('session-a');
+    SessionGenerationTracker.cleanup('session-b');
+    SessionGenerationTracker.cleanup('orphan-session');
+  });
+
+  it('should silently ignore register with empty agentSessionId', () => {
+    SessionGenerationTracker.register('', 'req-1');
+    expect(SessionGenerationTracker.totalActiveRequests).toBe(0);
+  });
+
+  it('should silently ignore register with empty requestId', () => {
+    SessionGenerationTracker.register('session-1', '');
+    expect(SessionGenerationTracker.totalActiveRequests).toBe(0);
+  });
+
+  it('should silently ignore update for non-existent requestId', () => {
+    // Should not throw
+    SessionGenerationTracker.update('nonexistent-request', { outputTokens: 100 });
+  });
+
+  it('should silently ignore complete for non-existent requestId', () => {
+    // Should not throw
+    SessionGenerationTracker.complete('nonexistent-request');
+  });
+
+  it('should handle double-complete of the same request — idempotent', () => {
+    SessionGenerationTracker.register('adversarial-session', 'double-req');
+    SessionGenerationTracker.complete('double-req');
+    // Second complete should be a no-op (entry already deleted)
+    SessionGenerationTracker.complete('double-req');
+    expect(SessionGenerationTracker.totalActiveRequests).toBe(0);
+  });
+
+  it('should return zeroed stats for unknown session', () => {
+    const stats = SessionGenerationTracker.getSessionStats('unknown-session');
+    expect(stats.activeRequests).toBe(0);
+    expect(stats.totalOutputTokens).toBe(0);
+    expect(stats.totalInputTokens).toBe(0);
+    expect(stats.tokPerSec).toBeNull();
+    expect(stats.avgTtft).toBeNull();
+  });
+
+  it('should isolate stats between different sessions', () => {
+    SessionGenerationTracker.register('session-a', 'req-a', { provider: 'openai', model: 'gpt-5' });
+    SessionGenerationTracker.register('session-b', 'req-b', { provider: 'google', model: 'gemini-3-flash' });
+
+    SessionGenerationTracker.update('req-a', { outputTokens: 500 });
+    SessionGenerationTracker.update('req-b', { outputTokens: 1000 });
+
+    const statsA = SessionGenerationTracker.getSessionStats('session-a');
+    const statsB = SessionGenerationTracker.getSessionStats('session-b');
+
+    // Each session should only see its own request's tokens
+    expect(statsA.activeRequests).toBe(1);
+    expect(statsB.activeRequests).toBe(1);
+  });
+
+  it('should accumulate completed tokens across iterations', () => {
+    SessionGenerationTracker.register('adversarial-session', 'iter-1');
+    SessionGenerationTracker.update('iter-1', { outputTokens: 100 });
+    SessionGenerationTracker.complete('iter-1');
+
+    SessionGenerationTracker.register('adversarial-session', 'iter-2');
+    SessionGenerationTracker.update('iter-2', { outputTokens: 200 });
+
+    const stats = SessionGenerationTracker.getSessionStats('adversarial-session');
+    // 100 completed + 200 active = 300 total
+    expect(stats.totalOutputTokens).toBe(300);
+  });
+
+  it('should handle cleanup of session with active requests — no orphaned entries', () => {
+    SessionGenerationTracker.register('orphan-session', 'orphan-req-1');
+    SessionGenerationTracker.register('orphan-session', 'orphan-req-2');
+    SessionGenerationTracker.cleanup('orphan-session');
+    expect(SessionGenerationTracker.hasActiveRequests('orphan-session')).toBe(false);
+    expect(SessionGenerationTracker.totalActiveRequests).toBe(0);
+  });
+
+  it('should handle recordChunkTiming on non-existent request — no throw', () => {
+    SessionGenerationTracker.recordChunkTiming('ghost-request', 100);
+    // Should not throw
+  });
+
+  it('should not report tokPerSec during warm-up period (< MIN_ELAPSED_SEC)', () => {
+    SessionGenerationTracker.register('adversarial-session', 'fast-req');
+    // Set firstTokenTime and lastTokenTime very close together (< 500ms)
+    SessionGenerationTracker.recordChunkTiming('fast-req', 5);
+    SessionGenerationTracker.update('fast-req', { outputTokens: 100 });
+
+    const stats = SessionGenerationTracker.getSessionStats('adversarial-session');
+    // Should be null because elapsed time is too short
+    expect(stats.tokPerSec).toBeNull();
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// 4. StreamChunkDispatcher — Chunk Type Confusion & Null Poisoning
+// ────────────────────────────────────────────────────────────────
+
