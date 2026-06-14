@@ -13,6 +13,7 @@ import { resolveArchParams } from "../utils/gguf-arch.ts";
 import {
   TOOLS_SERVICE_URL,
   LM_STUDIO_EVAL_BATCH_SIZE,
+  LM_STUDIO_PHYSICAL_BATCH_SIZE,
   LM_STUDIO_DEFAULT_MAX_CONTEXT,
 } from "../../config.ts";
 import { TYPES, getDefaultModels } from "../config.ts";
@@ -586,6 +587,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
               };
               const loadOpts: ProviderOptions = {
                 eval_batch_size: LM_STUDIO_EVAL_BATCH_SIZE,
+                n_batch: LM_STUDIO_PHYSICAL_BATCH_SIZE,
               };
               if (options.minContextLength) {
                 const maxContextLength =
@@ -669,36 +671,54 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
 
               if (loadError && loadOpts.context_length) {
                 const requestedContextLength = loadOpts.context_length;
-                const contextFallbackTiers = [65000];
+                const requestedBatchSize = loadOpts.eval_batch_size || LM_STUDIO_EVAL_BATCH_SIZE;
+                // Cascading fallback tiers: progressively reduce batch size,
+                // then context length, then both. The initial attempt already
+                // used the first tier (full context + full batch), so we skip
+                // any tier that matches or exceeds the original parameters.
+                const fallbackTiers = [
+                  { contextLength: requestedContextLength, batchSize: 512 },
+                  { contextLength: 65_000, batchSize: LM_STUDIO_EVAL_BATCH_SIZE },
+                  { contextLength: 65_000, batchSize: 512 },
+                ];
 
-                for (const fallbackContextLength of contextFallbackTiers) {
-                  if (fallbackContextLength >= requestedContextLength) continue;
+                for (const tier of fallbackTiers) {
+                  // Skip tiers that are >= the original request (already failed)
+                  if (
+                    tier.contextLength >= requestedContextLength &&
+                    tier.batchSize >= requestedBatchSize
+                  ) continue;
+                  // Skip tiers with context >= requested (only batch changed)
+                  // unless batch is actually smaller
+                  if (tier.contextLength > requestedContextLength) continue;
                   if (options.signal?.aborted) return;
 
                   logger.warn(
-                    `[LM-Studio] Load failed at ctx=${requestedContextLength} — retrying with ctx=${fallbackContextLength}`,
+                    `[LM-Studio] Load failed at ctx=${requestedContextLength}/batch=${requestedBatchSize} — retrying with ctx=${tier.contextLength}/batch=${tier.batchSize}`,
                   );
                   yield {
                     type: "status",
-                    message: `Load failed — retrying with ${Math.round(fallbackContextLength / 1000)}k context…`,
+                    message: `Load failed — retrying with ${Math.round(tier.contextLength / 1000)}k context, batch ${tier.batchSize}…`,
                     phase: "loading",
                   };
 
                   try {
-                    loadOpts.context_length = fallbackContextLength;
+                    loadOpts.context_length = tier.contextLength;
+                    loadOpts.eval_batch_size = tier.batchSize;
+                    loadOpts.n_batch = tier.batchSize;
                     await this.loadModel(model, loadOpts, options.signal);
                     loadError = null;
                     // Record the GPU-constrained ceiling so subsequent
                     // iterations don't attempt to reload above this limit.
-                    _gpuConstrainedContextLength.set(model, fallbackContextLength);
+                    _gpuConstrainedContextLength.set(model, tier.contextLength);
                     logger.info(
-                      `[LM-Studio] Fallback load succeeded at ctx=${fallbackContextLength} — recorded as GPU ceiling`,
+                      `[LM-Studio] Fallback load succeeded at ctx=${tier.contextLength}/batch=${tier.batchSize} — recorded as GPU ceiling`,
                     );
                     break;
                   } catch (fallbackLoadError: unknown) {
                     if (fallbackLoadError instanceof Error && fallbackLoadError.name === "AbortError") return;
                     logger.warn(
-                      `[LM-Studio] Fallback load at ctx=${fallbackContextLength} also failed: ${getErrorMessage(fallbackLoadError)}`,
+                      `[LM-Studio] Fallback load at ctx=${tier.contextLength}/batch=${tier.batchSize} also failed: ${getErrorMessage(fallbackLoadError)}`,
                     );
                   }
                 }
@@ -1385,6 +1405,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
             (payload as Record<string, unknown>).offload_kv_cache_to_gpu = options.offload_kv_cache_to_gpu;
           if (options.eval_batch_size != null)
             (payload as Record<string, unknown>).eval_batch_size = options.eval_batch_size;
+          if (options.n_batch != null)
+            (payload as Record<string, unknown>).n_batch = options.n_batch;
           const response = await fetch(`${baseUrl}/api/v1/models/load`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
