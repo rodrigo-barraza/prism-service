@@ -499,6 +499,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                 const loadedContext =
                   (entry?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown> | undefined;
                 if (loadedContext?.context_length) options._loadedContextLength = loadedContext.context_length as number;
+                if (loadedContext?.eval_batch_size) options._loadedEvalBatchSize = loadedContext.eval_batch_size as number;
+                if (loadedContext?.n_batch) options._loadedPhysicalBatchSize = loadedContext.n_batch as number;
               }
 
               // If minContextLength is requested (e.g. agentic mode) and model is loaded
@@ -743,6 +745,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                 const context =
                   ((entryAfterLoad?.loaded_instances as Array<Record<string, unknown>>)?.[0]?.config as Record<string, unknown>) || undefined;
                 if (context?.context_length) options._loadedContextLength = context.context_length as number;
+                if (context?.eval_batch_size) options._loadedEvalBatchSize = context.eval_batch_size as number;
+                if (context?.n_batch) options._loadedPhysicalBatchSize = context.n_batch as number;
               } catch {
                 /* ignore */
               }

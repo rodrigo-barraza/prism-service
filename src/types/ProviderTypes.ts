@@ -92,6 +92,8 @@ export interface ProviderOptions {
   minContextLength?: number;
   contextLength?: number;
   _loadedContextLength?: number;
+  _loadedEvalBatchSize?: number;
+  _loadedPhysicalBatchSize?: number;
   // Embedding
   dimensions?: number;
   // Extended sampling
