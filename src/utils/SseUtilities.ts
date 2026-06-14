@@ -7,8 +7,6 @@ import type { ChatRequest } from "../types/schemas.ts";
 
 // ─── shared by /chat and /agent routes ──────────────────────
 
-const SSE_HEARTBEAT_INTERVAL_MS = 30_000;
-
 /**
  * Configure an Express response for SSE (Server-Sent Events) streaming.
  * Sets the required headers and flushes them immediately.
@@ -18,19 +16,6 @@ export function initSseResponse(res: Response) {
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
-}
-
-/**
- * Start an SSE heartbeat that sends a comment line every 30 seconds.
- * Prevents reverse proxy idle timeouts (Caddy, Nginx, Cloudflare)
- * from killing long-running streams. SSE comment lines (`: ...`)
- * are silently ignored by compliant EventSource clients.
- */
-function startHeartbeat(res: Response, signal: AbortSignal): NodeJS.Timeout {
-  return setInterval(() => {
-    if (signal.aborted || res.writableEnded) return;
-    res.write(`: heartbeat\n\n`);
-  }, SSE_HEARTBEAT_INTERVAL_MS);
 }
 
 /**
@@ -157,15 +142,9 @@ export async function handleSseRequest(
     if (!res.writableFinished) controller.abort();
   });
 
-  const heartbeatInterval = startHeartbeat(res, controller.signal);
-
-  try {
-    await handler(params, createSseEmitter(res, controller.signal), {
-      signal: controller.signal,
-    });
-  } finally {
-    clearInterval(heartbeatInterval);
-  }
+  await handler(params, createSseEmitter(res, controller.signal), {
+    signal: controller.signal,
+  });
 
   if (!controller.signal.aborted) res.end();
 }
