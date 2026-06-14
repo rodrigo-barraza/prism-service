@@ -166,10 +166,9 @@ export function createOllamaProvider(baseUrl: string, instanceId: string = "olla
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody),
-          // @ts-expect-error -- dispatcher is a valid undici option accepted by Node.js fetch
           dispatcher: STREAMING_DISPATCHER,
           ...(options.signal && { signal: options.signal }),
-        });
+        } as RequestInit & { dispatcher: typeof STREAMING_DISPATCHER });
 
         if (!response.ok) {
           const errorText = await response.text();
