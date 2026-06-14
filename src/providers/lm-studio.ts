@@ -27,6 +27,7 @@ import {
   processNonStreamingResponse,
   fetchOpenAICompat,
   parseSSEStream,
+  STREAMING_DISPATCHER,
   MEDIA_STRATEGIES,
   type PreparedMessage,
   type OpenAICompletionResponse,
@@ -847,6 +848,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
+            // @ts-expect-error -- dispatcher is a valid undici option accepted by Node.js fetch
+            dispatcher: STREAMING_DISPATCHER,
                         ...(options.signal && { signal: options.signal }),
           });
           return response;
