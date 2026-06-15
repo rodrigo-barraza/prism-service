@@ -116,6 +116,9 @@ const AgentPersonaRegistry = {
       enabledByDefaultTools: Array.isArray(doc.enabledByDefaultTools) ? (doc.enabledByDefaultTools as string[]) : undefined,
       policies: policies.length > 0 ? policies : undefined,
       capabilities: "",
+      platformRules: typeof doc.platformRules === 'object' && doc.platformRules !== null && Object.keys(doc.platformRules as object).length > 0
+        ? doc.platformRules as Record<string, string>
+        : undefined,
       usesDirectoryTree: (doc.usesDirectoryTree as boolean) || false,
       usesCodingGuidelines: (doc.usesCodingGuidelines as boolean) || false,
     };

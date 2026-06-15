@@ -305,7 +305,6 @@ export const LuposPersona: Persona = {
       LUPOS_GENERATIVE_CAPABILITIES,
       buildResponseGuidelines(isAprilFools),
       buildInteractionRules(isAprilFools),
-      LUPOS_DISCORD_RULES,
     ];
 
     if (!isClockCrew) {
@@ -318,6 +317,9 @@ export const LuposPersona: Persona = {
   },
   guidelines: "",
   interactionRules: "",
+  platformRules: {
+    discord: LUPOS_DISCORD_RULES,
+  },
   toolPolicy: (context) => buildToolPolicy(LUPOS_TOOL_POLICY_SECTIONS, context),
   availableTools: LUPOS_AVAILABLE_TOOLS,
   blockedTools: [

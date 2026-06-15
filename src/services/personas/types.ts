@@ -38,6 +38,8 @@ export interface SerializedPolicy {
   field?: string;
 }
 
+export type PlatformKey = 'discord' | 'slack' | 'teams' | 'web' | string;
+
 export interface Persona {
   id: string;
   name: string;
@@ -66,6 +68,13 @@ export interface Persona {
   capabilities: string;
   /** When true, tool descriptions in the system prompt are truncated to the first sentence and optional parameters are omitted. Saves ~1,500 tokens for conversational agents that don't need full parameter docs. */
   compactToolDocs?: boolean;
+  /**
+   * Platform-specific interaction rules, keyed by platform identifier.
+   * Only the section matching the current platform (from agentContext.platform)
+   * is injected into the system prompt. When absent, the agent has no
+   * platform-specific behavior — it remains fully platform-agnostic.
+   */
+  platformRules?: Record<PlatformKey, string | ((context: PersonaContext) => string)>;
   usesDirectoryTree: boolean;
   usesCodingGuidelines: boolean;
 }
