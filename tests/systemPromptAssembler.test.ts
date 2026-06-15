@@ -727,9 +727,9 @@ describe("SystemPromptAssembler", () => {
   // ──────────────────────────────────────────────────────────
 
   describe("agent context injection", () => {
-    it("injects Discord context when provided", async () => {
+    it("injects Discord context into platform context message", async () => {
       const assembler = createAssembler();
-      const { prompt } = await assembler.assemble({
+      const { platformContextMessage } = await assembler.assemble({
         agent: "LUPOS",
         project: "lupos",
         messages: [{ role: "user", content: "Hello" }],
@@ -738,24 +738,26 @@ describe("SystemPromptAssembler", () => {
         },
       });
 
-      expect(prompt).toContain("Discord Server");
-      expect(prompt).toContain("Test Server");
+      expect(platformContextMessage).toContain("Discord Server");
+      expect(platformContextMessage).toContain("Test Server");
     });
 
-    it("injects guild ID when provided", async () => {
+    it("injects guild ID into platform context when provided", async () => {
       const assembler = createAssembler();
-      const { prompt } = await assembler.assemble({
+      const { platformContextMessage } = await assembler.assemble({
         agent: "LUPOS",
         project: "lupos",
         messages: [{ role: "user", content: "Hello" }],
         agentContext: {
-          guildId: "123456789",
-          channelId: "987654321",
+          platform: "discord",
+          platformContext: {
+            ids: "# Discord IDs\n- Guild ID: 123456789\n- Channel ID: 987654321",
+          },
         },
       });
 
-      expect(prompt).toContain("Guild ID: 123456789");
-      expect(prompt).toContain("Channel ID: 987654321");
+      expect(platformContextMessage).toContain("Guild ID: 123456789");
+      expect(platformContextMessage).toContain("Channel ID: 987654321");
     });
 
     it("does not inject agent context when absent", async () => {

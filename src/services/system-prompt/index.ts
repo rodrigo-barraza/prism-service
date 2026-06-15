@@ -17,6 +17,7 @@ import { DirectoryTreeFormatter } from "./DirectoryTreeFormatter.ts";
 import { ToolDocFormatter } from "./ToolDocFormatter.ts";
 import { SkillMemoryScorer } from "./SkillMemoryScorer.ts";
 import { AssemblerContext } from "./types.ts";
+import SomaticStateService from "../somatic/SomaticStateService.ts";
 
 export default class SystemPromptAssembler {
   workspaceRoot: string;
@@ -84,23 +85,57 @@ export default class SystemPromptAssembler {
       }
     }
 
-    // ── 2. Agent Context (runtime data from caller) ──────────────
+    // ── 2. Runtime Context (from caller) ──────────────────────────
+    // Platform context and self context are collected into separate
+    // arrays — they become distinct role:"system" messages instead of
+    // being concatenated into the main system prompt.
+    const platformContextSections: string[] = [];
+    const selfContextSections: string[] = [];
+
     if (context.agentContext) {
       const agentContext = context.agentContext;
 
-      if (agentContext.discordContext) {
-        sections.push(agentContext.discordContext as string);
+      // ── 2a. Platform Context (separate SYSTEM message) ──────────
+      // Runtime platform data (server/channel/participant info, matched
+      // knowledge, image captions, IDs). Injected as its own system
+      // message so the LLM sees it as a distinct instruction block.
+      const platformContext = agentContext.platformContext as Record<string, unknown> | undefined;
+      if (platformContext) {
+        if (platformContext.description) {
+          platformContextSections.push(platformContext.description as string);
+        }
+        if (platformContext.serverContext) {
+          platformContextSections.push(platformContext.serverContext as string);
+        }
+        if (platformContext.imageContext) {
+          platformContextSections.push(platformContext.imageContext as string);
+        }
+        if (platformContext.ids) {
+          platformContextSections.push(platformContext.ids as string);
+        }
+      } else {
+        // Legacy flat fields — backward compatible
+        if (agentContext.discordContext) {
+          platformContextSections.push(agentContext.discordContext as string);
+        }
+        if (agentContext.serverContext) {
+          platformContextSections.push(agentContext.serverContext as string);
+        }
+        if (agentContext.imageContext) {
+          platformContextSections.push(agentContext.imageContext as string);
+        }
+        if (agentContext.guildId) {
+          let idsBlock = `# Discord IDs\n- Guild ID: ${agentContext.guildId}`;
+          if (agentContext.channelId) idsBlock += `\n- Channel ID: ${agentContext.channelId}`;
+          platformContextSections.push(idsBlock);
+        }
       }
-      if (agentContext.serverContext) {
-        sections.push(agentContext.serverContext as string);
-      }
-      if (agentContext.imageContext) {
-        sections.push(agentContext.imageContext as string);
-      }
+
+      // Agent-specific runtime context (non-platform, non-self)
+      // These remain in the main system prompt for now
       if (agentContext.clockCrewContext) {
         sections.push(agentContext.clockCrewContext as string);
       }
-
       if (agentContext.stickersContext) {
         sections.push(agentContext.stickersContext as string);
       }
@@ -110,27 +145,25 @@ export default class SystemPromptAssembler {
       if (agentContext.visualContext) {
         sections.push(agentContext.visualContext as string);
       }
-
-      if (agentContext.guildId) {
-        let idsBlock = `# Discord IDs\n- Guild ID: ${agentContext.guildId}`;
-        if (agentContext.channelId) idsBlock += `\n- Channel ID: ${agentContext.channelId}`;
-        sections.push(idsBlock);
-      }
-
       if (agentContext.lightsContext) {
         sections.push(agentContext.lightsContext as string);
       }
 
-      if (agentContext.somaticState) {
-        const somatic = agentContext.somaticState as Record<string, { level: number; label?: string; name?: string }>;
-        const entries = Object.entries(somatic);
-        if (entries.length > 0) {
-          let block = `# Your Current Physical & Emotional State`;
-          for (const [key, state] of entries) {
-            const display = state.label || state.name || `Level ${state.level}`;
-            block += `\n- ${key.charAt(0).toUpperCase() + key.slice(1)}: ${display} (${state.level}/100)`;
-          }
-          sections.push(block);
+      // ── 2b. Self Context (separate SYSTEM message) ──────────────
+      // Somatic state is owned by SomaticStateService (centralized,
+      // persisted to MongoDB). Gated by persona.hasSomaticState so
+      // only agents that opt in get this injected.
+      // Before rendering, adapt state based on the latest user message.
+      if (persona?.hasSomaticState && agentId) {
+        const userMessages = context.messages?.filter((message) => message.role === "user") || [];
+        const latestUserMessage = userMessages[userMessages.length - 1];
+        if (latestUserMessage && typeof latestUserMessage.content === "string") {
+          await SomaticStateService.adaptFromMessage(agentId, latestUserMessage.content);
+        }
+
+        const somaticMessage = await SomaticStateService.renderSystemMessage(agentId);
+        if (somaticMessage) {
+          selfContextSections.push(somaticMessage);
         }
       }
     }
@@ -345,6 +378,8 @@ export default class SystemPromptAssembler {
 
     return {
       prompt: sections.join("\n\n"),
+      platformContextMessage: platformContextSections.length > 0 ? platformContextSections.join("\n\n") : null,
+      selfContextMessage: selfContextSections.length > 0 ? selfContextSections.join("\n\n") : null,
       skillNames,
       skillsText,
       memoriesText,
@@ -356,6 +391,8 @@ export default class SystemPromptAssembler {
       try {
         const {
           prompt: systemPrompt,
+          platformContextMessage,
+          selfContextMessage,
           skillNames,
           skillsText,
           memoriesText,
@@ -364,6 +401,7 @@ export default class SystemPromptAssembler {
 
         context._injectedSkills = skillNames;
 
+        // ── Insert main system prompt as messages[0] ─────────────
         const systemMessageIndex = context.messages?.findIndex(
           (message) => message.role === "system",
         );
@@ -371,6 +409,37 @@ export default class SystemPromptAssembler {
           context.messages![systemMessageIndex].content = systemPrompt;
         } else {
           context.messages?.unshift({ role: "system", content: systemPrompt });
+        }
+
+        // ── Insert platform context after the main system prompt ───
+        // Platform context is relatively stable within a conversation
+        // (same server/channel), so it stays at the top for caching.
+        if (context.messages && platformContextMessage) {
+          const platformInsertionPoint = (systemMessageIndex !== undefined && systemMessageIndex >= 0)
+            ? systemMessageIndex + 1
+            : 1;
+          context.messages.splice(platformInsertionPoint, 0, {
+            role: "system",
+            content: platformContextMessage,
+          });
+        }
+
+        // ── Interleave self context before the last user message ───
+        // Self context (somatic state) changes per turn, so it's placed
+        // right before the newest user message. This keeps all previous
+        // messages frozen → maximizes the cacheable prefix.
+        if (context.messages && selfContextMessage) {
+          const lastUserMessageIndex = context.messages.reduce(
+            (lastIndex: number, message: { role: string }, index: number) =>
+              message.role === "user" ? index : lastIndex,
+            -1,
+          );
+          if (lastUserMessageIndex >= 0) {
+            context.messages.splice(lastUserMessageIndex, 0, {
+              role: "system",
+              content: selfContextMessage,
+            });
+          }
         }
 
         if (context.messages) {

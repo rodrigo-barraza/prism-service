@@ -75,6 +75,8 @@ export interface Persona {
    * platform-specific behavior — it remains fully platform-agnostic.
    */
   platformRules?: Record<PlatformKey, string | ((context: PersonaContext) => string)>;
+  /** When true, the assembler injects the agent's somatic state (from agentContext.selfContext) as an interleaved system message before the last user message. */
+  hasSomaticState?: boolean;
   usesDirectoryTree: boolean;
   usesCodingGuidelines: boolean;
 }

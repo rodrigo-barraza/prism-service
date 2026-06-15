@@ -55,6 +55,7 @@ export const COLLECTIONS = {
   CONVERSATION_TIMERS: "conversation_timers",
   PROMPTS: "prompts",
   WEBHOOK_SUBSCRIPTIONS: "webhook_subscriptions",
+  SOMATIC_STATE: "somatic_state",
 };
 
 /**

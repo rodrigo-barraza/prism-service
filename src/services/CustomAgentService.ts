@@ -76,6 +76,7 @@ const CustomAgentService = {
       enabledByDefaultTools: Array.isArray(data.enabledByDefaultTools) ? data.enabledByDefaultTools : [],
       policies: Array.isArray(data.policies) ? data.policies : [],
       platformRules: typeof data.platformRules === 'object' && data.platformRules !== null ? data.platformRules : {},
+      hasSomaticState: data.hasSomaticState || false,
       usesDirectoryTree: data.usesDirectoryTree || false,
       usesCodingGuidelines: data.usesCodingGuidelines || false,
       createdAt: new Date().toISOString(),
