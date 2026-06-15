@@ -310,4 +310,80 @@ router.get(
   }),
 );
 
+/**
+ * GET /workspaces/download/tray-app
+ * Proxies the system tray Electron app installer download from tools-service.
+ * Requires 'platform' query parameter: win-x64, linux-x64, mac-x64, mac-arm64.
+ */
+router.get(
+  "/download/tray-app",
+  asyncHandler(async (req: Request, res: Response) => {
+    try {
+      const platform = req.query.platform;
+      if (!platform) {
+        return res.status(400).json({
+          error: "Missing 'platform' query parameter. Supported: win-x64, linux-x64, mac-x64, mac-arm64",
+        });
+      }
+
+      const toolsUrl = `${TOOLS_SERVICE_URL}/agents/download/tray-app?platform=${encodeURIComponent(String(platform))}`;
+
+      const toolsResponse = await fetch(
+        toolsUrl,
+        { signal: AbortSignal.timeout(120_000) },
+      );
+
+      if (!toolsResponse.ok) {
+        const errorBody = (await toolsResponse.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        return res.status(toolsResponse.status).json({
+          error:
+            errorBody.error || `tools-service returned ${toolsResponse.status}`,
+        });
+      }
+
+      res.setHeader(
+        "Content-Type",
+        toolsResponse.headers.get("Content-Type") ||
+          "application/octet-stream",
+      );
+      res.setHeader(
+        "Content-Disposition",
+        toolsResponse.headers.get("Content-Disposition") ||
+          `attachment; filename="prism-workspace-agent-${String(platform)}"`,
+      );
+      const contentLength = toolsResponse.headers.get("Content-Length");
+      if (contentLength) {
+        res.setHeader("Content-Length", contentLength);
+      }
+      res.setHeader("Cache-Control", "public, max-age=300");
+
+      const reader = toolsResponse.body?.getReader();
+      if (!reader) {
+        return res
+          .status(502)
+          .json({ error: "Empty response from tools-service" });
+      }
+
+      const pump = async () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(value);
+        }
+        res.end();
+      };
+      await pump();
+    } catch (error: unknown) {
+      logger.error(
+        `GET /workspaces/download/tray-app error: ${getErrorMessage(error)}`,
+      );
+      res
+        .status(502)
+        .json({ error: "Failed to download tray app installer from tools-service" });
+    }
+  }),
+);
+
 export default router;
