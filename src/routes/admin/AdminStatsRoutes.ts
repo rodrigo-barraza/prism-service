@@ -380,7 +380,6 @@ router.get(
             totalCost: COST_SUM_EXPR,
             avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
             avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
-            _convIds: { $addToSet: "$conversationId" },
             toolsUsed: {
               $max: { $cond: [{ $eq: ["$toolsUsed", true] }, true, false] },
             },
@@ -389,66 +388,70 @@ router.get(
         { $sort: { totalRequests: -1 } },
       ];
 
-      const results = await req.db
-        .collection(REQUESTS_COLLECTION)
-        .aggregate(pipeline)
-        .toArray();
+      // Separate lightweight pipeline: count unique conversations per model
+      const convCountPipeline: Record<string, unknown>[] = [
+        ...(Object.keys(match).length ? [{ $match: match }] : []),
+        { $match: { conversationId: { $ne: null } } },
+        {
+          $group: {
+            _id: {
+              model: "$model",
+              provider: "$provider",
+              conversationId: "$conversationId",
+            },
+          },
+        },
+        {
+          $group: {
+            _id: { model: "$_id.model", provider: "$_id.provider" },
+            conversationCount: { $sum: 1 },
+          },
+        },
+      ];
 
-      const allConvIds = new Set();
-      for (const r of results) {
-        for (const conversationId of r._convIds || []) {
-          if (conversationId) allConvIds.add(conversationId);
-        }
+      // Separate lightweight pipeline: count unique traces per model
+      const traceCountPipeline: Record<string, unknown>[] = [
+        ...(Object.keys(match).length ? [{ $match: match }] : []),
+        { $match: { traceId: { $ne: null } } },
+        {
+          $group: {
+            _id: {
+              model: "$model",
+              provider: "$provider",
+              traceId: "$traceId",
+            },
+          },
+        },
+        {
+          $group: {
+            _id: { model: "$_id.model", provider: "$_id.provider" },
+            traceCount: { $sum: 1 },
+          },
+        },
+      ];
+
+      const [results, convCounts, traceCounts] = await Promise.all([
+        req.db.collection(REQUESTS_COLLECTION).aggregate(pipeline).toArray(),
+        req.db.collection(REQUESTS_COLLECTION).aggregate(convCountPipeline).toArray(),
+        req.db.collection(REQUESTS_COLLECTION).aggregate(traceCountPipeline).toArray(),
+      ]);
+
+      // Build lookup maps keyed by "model|provider"
+      const convCountMap: Record<string, number> = {};
+      for (const entry of convCounts) {
+        const key = `${(entry._id as { model: string }).model}|${(entry._id as { provider: string }).provider}`;
+        convCountMap[key] = (entry as { conversationCount: number }).conversationCount;
       }
 
-      const wfByConv: Record<string, number> = {};
-      if (allConvIds.size > 0) {
-        const wfResults = await req.db
-          .collection(WORKFLOWS_COLLECTION)
-          .aggregate([
-            {
-              $match: {
-                conversationIds: { $elemMatch: { $in: [...allConvIds] } },
-              },
-            },
-            { $unwind: "$conversationIds" },
-            { $match: { conversationIds: { $in: [...allConvIds] } } },
-            {
-              $group: { _id: "$conversationIds", wfIds: { $addToSet: "$_id" } },
-            },
-            { $project: { _id: 1, workflowCount: { $size: "$wfIds" } } },
-          ])
-          .toArray();
-        for (const workflow of wfResults) {
-          wfByConv[workflow._id] = workflow.workflowCount;
-        }
-      }
-
-      const traceByConv: Record<string, string> = {};
-      if (allConvIds.size > 0) {
-        const convDocs = await req.db
-          .collection(CONVERSATIONS_COLLECTION)
-          .find({
-            id: { $in: [...allConvIds] },
-            traceId: { $exists: true, $ne: null },
-          })
-          .project({ id: 1, traceId: 1 })
-          .toArray();
-        for (const item of convDocs) {
-          traceByConv[item.id] = item.traceId;
-        }
+      const traceCountMap: Record<string, number> = {};
+      for (const entry of traceCounts) {
+        const key = `${(entry._id as { model: string }).model}|${(entry._id as { provider: string }).provider}`;
+        traceCountMap[key] = (entry as { traceCount: number }).traceCount;
       }
 
       res.json(
         results.map((r: Record<string, unknown>) => {
-          const convIds = ((r._convIds || []) as string[]).filter(Boolean);
-          const conversationCount = convIds.length;
-          let workflowCount = 0;
-          const traceSet = new Set();
-          for (const conversationId of convIds) {
-            workflowCount += wfByConv[conversationId] || 0;
-            if (traceByConv[conversationId]) traceSet.add(traceByConv[conversationId]);
-          }
+          const modelKey = `${(r._id as { model: string }).model}|${(r._id as { provider: string }).provider}`;
           return {
             model: (r._id as { model: string }).model,
             provider: (r._id as { provider: string }).provider,
@@ -460,9 +463,9 @@ router.get(
             avgLatency: r.avgLatency,
             avgTokensPerSec: r.avgTokensPerSec,
             toolsUsed: r.toolsUsed || false,
-            conversationCount,
-            workflowCount,
-            traceCount: traceSet.size,
+            conversationCount: convCountMap[modelKey] || 0,
+            workflowCount: 0,
+            traceCount: traceCountMap[modelKey] || 0,
           };
         }),
       );

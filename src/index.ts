@@ -227,6 +227,10 @@ setupWebSocket(wss);
         db.collection(COLLECTIONS.REQUESTS).createIndex({ project: 1, timestamp: -1 }),
         // requests — agent session joins (admin traces, session detail)
         db.collection(COLLECTIONS.REQUESTS).createIndex({ agentSessionId: 1 }),
+        // requests — parent session hierarchy traversal (7+ query sites use $in on this field)
+        db.collection(COLLECTIONS.REQUESTS).createIndex({ parentAgentSessionId: 1 }),
+        // requests — per-user stats aggregation
+        db.collection(COLLECTIONS.REQUESTS).createIndex({ username: 1, timestamp: -1 }),
         // requests — tool stats aggregation (multikey on array field)
         db.collection(COLLECTIONS.REQUESTS).createIndex({ toolApiNames: 1 }),
         // requests — model/provider breakdown aggregation
@@ -242,6 +246,8 @@ setupWebSocket(wss);
           .collection(COLLECTIONS.MODEL_CONVERSATIONS)
           .createIndex({ project: 1, username: 1, updatedAt: -1 }),
         db.collection(COLLECTIONS.MODEL_CONVERSATIONS).createIndex({ traceId: 1 }),
+        // conversations — admin workspace filter
+        db.collection(COLLECTIONS.MODEL_CONVERSATIONS).createIndex({ workspaceRoot: 1 }),
 
         // agent_sessions — same indexes as conversations
         db
@@ -251,6 +257,8 @@ setupWebSocket(wss);
         db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .createIndex({ project: 1, username: 1, updatedAt: -1 }),
+        // agent_sessions — admin workspace filter
+        db.collection(COLLECTIONS.AGENT_CONVERSATIONS).createIndex({ workspaceRoot: 1 }),
 
         // workflows — used by conversationIds lookup
         db.collection(COLLECTIONS.WORKFLOWS).createIndex({ id: 1 }, { unique: true }),
