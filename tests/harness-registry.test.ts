@@ -83,14 +83,14 @@ describe("HarnessRegistry", () => {
   it("should resolve the ReAct harness by the 'standard' id", () => {
     const HarnessClass = HarnessRegistry.get("standard");
     expect(HarnessClass).toBeDefined();
-    expect(HarnessClass.id).toBe("standard");
-    expect(HarnessClass.label).toBe("ReAct Loop");
+    expect(HarnessClass!.id).toBe("standard");
+    expect(HarnessClass!.label).toBe("ReAct Loop");
   });
 
   it("should fall back to the ReAct harness for unknown ids", () => {
     const HarnessClass = HarnessRegistry.get("nonexistent-harness-id");
     expect(HarnessClass).toBeDefined();
-    expect(HarnessClass.id).toBe("standard");
+    expect(HarnessClass!.id).toBe("standard");
   });
 
   it("should list all registered harnesses", () => {
@@ -102,8 +102,8 @@ describe("HarnessRegistry", () => {
       (entry: any) => entry.id === "standard",
     );
     expect(reactHarnessEntry).toBeDefined();
-    expect(reactHarnessEntry.label).toBe("ReAct Loop");
-    expect(reactHarnessEntry.description).toContain("Reason→Act→Observe");
+    expect(reactHarnessEntry!.label).toBe("ReAct Loop");
+    expect(reactHarnessEntry!.description).toContain("Reason→Act→Observe");
   });
 
   it("should report 'standard' as a registered harness id", () => {
@@ -113,6 +113,21 @@ describe("HarnessRegistry", () => {
   it("should report unknown ids as not registered", () => {
     expect(HarnessRegistry.has("nonexistent")).toBe(false);
   });
+
+  it("should have TreeOfThoughtHarness registered inside HarnessRegistry", () => {
+    const harnessClass = HarnessRegistry.get("tree_of_thought");
+    expect(harnessClass).toBeDefined();
+    expect(harnessClass!.id).toBe("tree_of_thought");
+    expect(harnessClass!.label).toBe("Tree of Thought");
+    expect(harnessClass!.description).toContain("backtracking");
+  });
+
+  it("should include TreeOfThoughtHarness inside the list of available harnesses", () => {
+    const harnessList = HarnessRegistry.list();
+    const treeOfThoughtHarnessEntry = harnessList.find((entry) => entry.id === "tree_of_thought");
+    expect(treeOfThoughtHarnessEntry).toBeDefined();
+    expect(treeOfThoughtHarnessEntry?.label).toBe("Tree of Thought");
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -121,23 +136,23 @@ describe("ReActHarness — static metadata", () => {
     const HarnessClass = HarnessRegistry.get("standard");
     // The static id MUST remain 'standard' for backward compatibility
     // with existing agent sessions in MongoDB
-    expect(HarnessClass.id).toBe("standard");
+    expect(HarnessClass!.id).toBe("standard");
   });
 
   it("should extend BaseAgenticHarness", () => {
     const HarnessClass = HarnessRegistry.get("standard");
     // Verify it's a class (constructor function)
     expect(typeof HarnessClass).toBe("function");
-    expect(HarnessClass.prototype).toBeDefined();
-    expect(typeof HarnessClass.prototype.run).toBe("function");
+    expect(HarnessClass!.prototype).toBeDefined();
+    expect(typeof HarnessClass!.prototype.run).toBe("function");
   });
 
   it("should have a descriptive label and description", () => {
     const HarnessClass = HarnessRegistry.get("standard");
-    expect(HarnessClass.label).not.toBe("Standard");
-    expect(HarnessClass.label).toBe("ReAct Loop");
-    expect(HarnessClass.description).toContain("approval gating");
-    expect(HarnessClass.description).toContain("exhaustion recovery");
+    expect(HarnessClass!.label).not.toBe("Standard");
+    expect(HarnessClass!.label).toBe("ReAct Loop");
+    expect(HarnessClass!.description).toContain("approval gating");
+    expect(HarnessClass!.description).toContain("exhaustion recovery");
   });
 });
 

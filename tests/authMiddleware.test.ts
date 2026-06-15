@@ -335,5 +335,3 @@ describe('AuthMiddleware adversarial — header injection', () => {
     expect(response.status).toBe(200);
   });
 });
-
-// ────────────────────────────────────────────────────────────────

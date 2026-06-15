@@ -142,8 +142,3 @@ describe('RateLimitStore adversarial', () => {
     expect(model.rateLimits.rpm).toBe(200);
   });
 });
-
-// ────────────────────────────────────────────────────────────────
-// 8. resolveToolEntriesToSet — Prefix Injection & Edge Cases
-// ────────────────────────────────────────────────────────────────
-
