@@ -341,6 +341,7 @@ export const LuposPersona: Persona = {
   ],
   enabledByDefaultTools: ["*"],
   capabilities: "",
+  hasSomaticState: true,
   usesDirectoryTree: false,
   usesCodingGuidelines: false,
 };

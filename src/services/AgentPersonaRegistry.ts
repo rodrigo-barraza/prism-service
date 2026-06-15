@@ -119,6 +119,7 @@ const AgentPersonaRegistry = {
       platformRules: typeof doc.platformRules === 'object' && doc.platformRules !== null && Object.keys(doc.platformRules as object).length > 0
         ? doc.platformRules as Record<string, string>
         : undefined,
+      hasSomaticState: (doc.hasSomaticState as boolean) || false,
       usesDirectoryTree: (doc.usesDirectoryTree as boolean) || false,
       usesCodingGuidelines: (doc.usesCodingGuidelines as boolean) || false,
     };

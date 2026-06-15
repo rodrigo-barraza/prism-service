@@ -294,6 +294,8 @@ setupWebSocket(wss);
         // webhook_subscriptions
         db.collection(COLLECTIONS.WEBHOOK_SUBSCRIPTIONS).createIndex({ id: 1 }, { unique: true }),
         db.collection(COLLECTIONS.WEBHOOK_SUBSCRIPTIONS).createIndex({ enabled: 1 }),
+        // somatic_state — unique per agent
+        db.collection(COLLECTIONS.SOMATIC_STATE).createIndex({ agentId: 1 }, { unique: true }),
       ]);
       logger.success("Database indexes ensured");
     }
@@ -475,6 +477,15 @@ setupWebSocket(wss);
     registerCleanup(async () => WebhookDispatcher.destroy());
   } catch (error: unknown) {
     logger.error("Failed to initialize Webhook Dispatcher: " + errorMessage(error));
+  }
+
+  // ── Somatic State Service ──────────────────────────────────
+  try {
+    const { default: SomaticStateService } = await import("./services/somatic/SomaticStateService.ts");
+    SomaticStateService.initialize();
+    registerCleanup(async () => SomaticStateService.persistAll());
+  } catch (error: unknown) {
+    logger.error("Failed to initialize Somatic State Service: " + errorMessage(error));
   }
 
   // ── Background Housekeeping ────────────────────────────────
