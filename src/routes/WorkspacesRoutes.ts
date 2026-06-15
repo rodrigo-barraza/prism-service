@@ -282,7 +282,7 @@ router.get(
             path: workspacePath,
             maxDepth: maxDepth ? parseInt(String(maxDepth), 10) : 3,
           }),
-          signal: AbortSignal.timeout(10_000),
+          signal: AbortSignal.timeout(30_000),
         },
       );
 
@@ -296,8 +296,14 @@ router.get(
       const result = await toolsResponse.json();
       res.json(result);
     } catch (error: unknown) {
-      logger.error(`GET /workspaces/tree error: ${getErrorMessage(error)}`);
-      res.status(500).json({ error: "Failed to fetch workspace tree" });
+      const errorDetail = getErrorMessage(error);
+      logger.error(`GET /workspaces/tree error: ${errorDetail}`);
+      const isTimeout = error instanceof Error && error.name === "TimeoutError";
+      res.status(isTimeout ? 504 : 500).json({
+        error: isTimeout
+          ? "Workspace tree request timed out — the workspace agent may be slow or disconnected"
+          : `Failed to fetch workspace tree: ${errorDetail}`,
+      });
     }
   }),
 );
