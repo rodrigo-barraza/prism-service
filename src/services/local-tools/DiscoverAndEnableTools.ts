@@ -1,11 +1,18 @@
 import logger from "../../utils/logger.ts";
 import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import SettingsService from "../SettingsService.ts";
 import { extractDiscoverableDomains, extractDomainKeywords } from "../personas/utils.ts";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 import { getCurrentDynamicTools, persistDynamicTools } from "./utils/DynamicToolHelpers.ts";
+
+const getToolOrchestratorService = () => {
+  const service = (globalThis as any).ToolOrchestratorService;
+  if (!service) {
+    throw new Error("ToolOrchestratorService not registered on globalThis");
+  }
+  return service;
+};
 
 export interface ToolMatch {
   name: string;
@@ -31,7 +38,7 @@ export interface SearchToolsResult {
  * and the tool count are never hardcoded.
  */
 function buildDiscoverAndEnableSchema() {
-  const totalToolCount = ToolOrchestratorService.getClientToolSchemas().length;
+  const totalToolCount = getToolOrchestratorService().getClientToolSchemas().length;
   const discoverableDomains = extractDiscoverableDomains();
   const domainListLowercase = discoverableDomains.map((domain) => domain.toLowerCase()).join(", ");
   const domainListQuoted = discoverableDomains.map((domain) => `'${domain}'`).join(", ");
@@ -108,7 +115,7 @@ const discoverAndEnableTools = {
     }
 
     // Step 1: Search via the tools-api
-    const searchResult = await ToolOrchestratorService.executeTool(
+    const searchResult = await getToolOrchestratorService().executeTool(
       TOOL_NAMES.SEARCH_TOOLS,
       {
         query,

@@ -1,10 +1,17 @@
 import logger from "../../utils/logger.ts";
 import { TOOL_NAMES, DOMAINS, CORE_AGENTIC_TOOLS, CORE_ORCHESTRATOR_TOOLS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import SettingsService from "../SettingsService.ts";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 import { getCurrentDynamicTools, persistDynamicTools } from "./utils/DynamicToolHelpers.ts";
+
+const getToolOrchestratorService = () => {
+  const service = (globalThis as any).ToolOrchestratorService;
+  if (!service) {
+    throw new Error("ToolOrchestratorService not registered on globalThis");
+  }
+  return service;
+};
 
 const PROTECTED_TOOL_NAMES = new Set<string>([
   ...CORE_AGENTIC_TOOLS,
@@ -61,7 +68,7 @@ const enableTools = {
       return { error: "'tools' must be a non-empty array of tool names or domain prefixes." };
     }
 
-    const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
+    const clientSchemas = getToolOrchestratorService().getClientToolSchemas();
     const resolvedRequestedNames = resolveToolEntriesToSet(
       requestedToolEntries as string[],
       clientSchemas,
@@ -154,7 +161,7 @@ const disableTools = {
       return { error: "'tools' must be a non-empty array of tool names or domain prefixes." };
     }
 
-    const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
+    const clientSchemas = getToolOrchestratorService().getClientToolSchemas();
     const resolvedRequestedNames = resolveToolEntriesToSet(
       requestedToolEntries as string[],
       clientSchemas,

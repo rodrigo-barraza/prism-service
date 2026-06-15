@@ -12,6 +12,19 @@ import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 // The registry auto-imports everything in this directory on init().
 // ────────────────────────────────────────────────────────────
 
+import enterPlanModeTool from "./EnterPlanModeTool.ts";
+import exitPlanModeTool from "./ExitPlanModeTool.ts";
+import toolActivationTools from "./ToolActivationTools.ts";
+import discoverAndEnableTools from "./DiscoverAndEnableTools.ts";
+import skillTools from "./SkillTools.ts";
+import worktreeTools from "./WorktreeTools.ts";
+import todoWriteTool from "./TodoWriteTool.ts";
+import briefTool from "./BriefTool.ts";
+import askUserQuestionTool from "./AskUserQuestionTool.ts";
+import mcpTools from "./McpTools.ts";
+import reminderTools from "./ReminderTools.ts";
+import conversationSearchTool from "./ConversationSearchTool.ts";
+
 export interface InternalToolSchemaParameters {
   type?: string;
   properties?: Record<string, { type: string; description?: string; items?: { type: string } }>;
@@ -53,27 +66,26 @@ function register(tool: InternalTool) {
 }
 
 /**
- * Initialize the registry by importing all tool modules in this directory.
- * Called once at module load — non-blocking.
+ * Initialize the registry by registering all imported tool modules.
+ * Called immediately at module load — synchronous.
  */
-async function init() {
-  const modules = await Promise.all([
-    import("./EnterPlanModeTool.js"),
-    import("./ExitPlanModeTool.js"),
-    import("./ToolActivationTools.js"),
-    import("./DiscoverAndEnableTools.js"),
-    import("./SkillTools.js"),
-    import("./WorktreeTools.js"),
-    import("./TodoWriteTool.js"),
-    import("./BriefTool.js"),
-    import("./AskUserQuestionTool.js"),
-    import("./McpTools.js"),
-    import("./ReminderTools.js"),
-    import("./ConversationSearchTool.js"),
-  ]);
+function init() {
+  const toolsList = [
+    enterPlanModeTool,
+    exitPlanModeTool,
+    toolActivationTools,
+    discoverAndEnableTools,
+    skillTools,
+    worktreeTools,
+    todoWriteTool,
+    briefTool,
+    askUserQuestionTool,
+    mcpTools,
+    reminderTools,
+    conversationSearchTool,
+  ];
 
-  for (const toolModule of modules) {
-    const tools = toolModule.default;
+  for (const tools of toolsList) {
     // Modules can export a single tool or an array of tools
     if (Array.isArray(tools)) {
       for (const tool of tools) {
@@ -89,10 +101,11 @@ async function init() {
   );
 }
 
-// Kick off registration at module load
-init().catch((error: Error) =>
-  logger.error(`[InternalToolRegistry] Init failed: ${error.message}`),
-);
+try {
+  init();
+} catch (error: unknown) {
+  logger.error(`[InternalToolRegistry] Init failed: ${error instanceof Error ? error.message : String(error)}`);
+}
 
 export default class InternalToolRegistry {
   static has(name: string) {

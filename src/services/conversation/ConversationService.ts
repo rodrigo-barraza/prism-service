@@ -278,6 +278,7 @@ const ConversationService: ConversationServiceInterface = {
     let totalReasoningOutputTokens = 0;
     const mergedModalities: Record<string, boolean> = {};
     const toolCounts: Record<string, number> = {};
+    let requestErrorCount = 0;
 
     for (const r of requests) {
       totalCost += r.estimatedCost || 0;
@@ -300,6 +301,9 @@ const ConversationService: ConversationServiceInterface = {
         for (const name of r.toolApiNames) {
           toolCounts[name] = (toolCounts[name] || 0) + 1;
         }
+      }
+      if (r.success === false) {
+        requestErrorCount++;
       }
     }
 
@@ -342,6 +346,7 @@ const ConversationService: ConversationServiceInterface = {
       operations: [...operations],
       modalities: mergedModalities,
       toolCounts,
+      requestErrorCount,
       totalElapsedTime,
       createdAt,
       updatedAt,

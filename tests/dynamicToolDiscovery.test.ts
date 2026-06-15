@@ -11,16 +11,6 @@ import { ToolDocFormatter } from "../src/services/system-prompt/ToolDocFormatter
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 describe("Dynamic Tool Discovery & Prompt Injection", () => {
-  beforeAll(async () => {
-    // Wait for InternalToolRegistry async dynamic imports initialization to complete
-    for (let waitIterationIndex = 0; waitIterationIndex < 50; waitIterationIndex++) {
-      if (InternalToolRegistry.has("discover_and_enable_tools")) {
-        break;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-  });
-
   // 1. Catalog & Recursion Tests
   describe("Catalog Introspection & Recursion Guard", () => {
     it("should not trigger infinite recursion when retrieving client schemas", () => {
@@ -37,14 +27,18 @@ describe("Dynamic Tool Discovery & Prompt Injection", () => {
       const discoverAndEnableToolSchema = clientToolSchemas.find((tool) => tool.name === "discover_and_enable_tools");
 
       expect(discoverAndEnableToolSchema).toBeDefined();
+      if (!discoverAndEnableToolSchema) {
+        throw new Error("discover_and_enable_tools schema not found");
+      }
       expect(discoverAndEnableToolSchema.description).toContain("Search the FULL tool catalog");
       expect(discoverAndEnableToolSchema.description).toContain("Covers all domains: weather");
 
-      const queryParameterDescription = discoverAndEnableToolSchema.parameters?.properties?.query?.description;
+      const parameters = discoverAndEnableToolSchema.parameters as Record<string, any> | undefined;
+      const queryParameterDescription = parameters?.properties?.query?.description;
       expect(queryParameterDescription).toBeDefined();
       expect(queryParameterDescription).toContain("Examples: 'get weather'");
 
-      const domainParameterDescription = discoverAndEnableToolSchema.parameters?.properties?.domain?.description;
+      const domainParameterDescription = parameters?.properties?.domain?.description;
       expect(domainParameterDescription).toBeDefined();
       expect(domainParameterDescription).toContain("Known domains: 'Weather'");
     });

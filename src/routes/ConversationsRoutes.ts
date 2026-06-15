@@ -183,7 +183,7 @@ router.get(
 
           const costAggregation = await db
             .collection(COLLECTIONS.REQUESTS)
-            .aggregate<{ _id: string; totalCost: number }>([
+            .aggregate<{ _id: string; totalCost: number; requestErrorCount: number }>([
               {
                 $match: {
                   ...matchCondition,
@@ -195,6 +195,9 @@ router.get(
                 $group: {
                   _id: groupId,
                   totalCost: COST_SUM_EXPR,
+                  requestErrorCount: {
+                    $sum: { $cond: [{ $eq: ["$success", false] }, 1, 0] },
+                  },
                 },
               },
             ])
@@ -261,7 +264,7 @@ router.get(
         try {
           const costAggregation = await db
             .collection(COLLECTIONS.REQUESTS)
-            .aggregate<{ _id: string; totalCost: number }>([
+            .aggregate<{ _id: string; totalCost: number; requestErrorCount: number }>([
               {
                 $match: { conversationId, project, username },
               },
@@ -269,6 +272,9 @@ router.get(
                 $group: {
                   _id: "$conversationId",
                   totalCost: COST_SUM_EXPR,
+                  requestErrorCount: {
+                    $sum: { $cond: [{ $eq: ["$success", false] }, 1, 0] },
+                  },
                 },
               },
             ])

@@ -25,5 +25,6 @@ export declare const OPENAI_TRANSCRIPTION_MODEL: string | undefined;
 export declare const GOOGLE_TTS_MODEL: string | undefined;
 export declare const GOOGLE_EMBEDDING_MODEL: string | undefined;
 export declare const LM_STUDIO_EVAL_BATCH_SIZE: number;
+export declare const LM_STUDIO_PHYSICAL_BATCH_SIZE: number;
 export declare const LM_STUDIO_DEFAULT_MAX_CONTEXT: number;
 //# sourceMappingURL=config.d.ts.map

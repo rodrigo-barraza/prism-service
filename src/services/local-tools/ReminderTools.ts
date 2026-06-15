@@ -1,6 +1,5 @@
 import logger from "../../utils/logger.ts";
 import { TOOL_NAMES, DOMAINS, DEFAULT_USERNAME, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
-import ConversationTimerService from "../ConversationTimerService.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
@@ -75,6 +74,7 @@ const setTimer = {
     }
 
     try {
+      const { default: ConversationTimerService } = await import("../ConversationTimerService.js");
       const timer = await ConversationTimerService.createTimer({
         conversationId,
         project,
@@ -129,6 +129,7 @@ const listTimers = {
     }
 
     try {
+      const { default: ConversationTimerService } = await import("../ConversationTimerService.js");
       const activeTimers = await ConversationTimerService.listActiveTimers(conversationId, project, username);
       const oneShotTimers = activeTimers.filter(
         (timer) => timer.mode === "one_shot" && (timer.durationSeconds === undefined || timer.durationSeconds < CRON_MINIMUM_DELAY_SECONDS),
@@ -182,6 +183,7 @@ const cancelTimer = {
     }
 
     try {
+      const { default: ConversationTimerService } = await import("../ConversationTimerService.js");
       const wasCancelled = await ConversationTimerService.cancelTimer(timerId, project, username);
 
       if (!wasCancelled) {
