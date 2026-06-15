@@ -9,6 +9,48 @@ import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
 
+interface MappedWorkspace {
+  id: string;
+  name: string;
+  path: string;
+  isPinned: boolean;
+  isAgentServed: boolean;
+  agentId: string | null;
+  agentName: string | null;
+  hostname: string | null;
+  platform: string | null;
+  arch: string | null;
+  clientIp: string | null;
+}
+
+function disambiguateWorkspaceNames(workspaces: MappedWorkspace[]): void {
+  const nameOccurrences = new Map<string, MappedWorkspace[]>();
+  for (const workspace of workspaces) {
+    const normalizedName = workspace.name.toLowerCase();
+    if (!nameOccurrences.has(normalizedName)) {
+      nameOccurrences.set(normalizedName, []);
+    }
+    nameOccurrences.get(normalizedName)!.push(workspace);
+  }
+
+  for (const [, duplicates] of nameOccurrences) {
+    if (duplicates.length <= 1) continue;
+
+    for (const workspace of duplicates) {
+      if (workspace.hostname) {
+        workspace.name = `${workspace.name} (${workspace.hostname})`;
+      } else if (workspace.agentName && workspace.agentName !== workspace.name) {
+        workspace.name = `${workspace.name} (${workspace.agentName})`;
+      } else {
+        const parentSegment = workspace.path.split("/").filter(Boolean).slice(-2, -1)[0];
+        if (parentSegment) {
+          workspace.name = `${workspace.name} (${parentSegment})`;
+        }
+      }
+    }
+  }
+}
+
 interface WorkspaceAgent {
   id: string;
   name: string;
@@ -58,20 +100,32 @@ router.get(
         );
       }
 
-      const agentServedRoots = new Set<string>();
+      const rootToAgentMap = new Map<string, WorkspaceAgent>();
       for (const agent of connectedAgents) {
         for (const root of agent.roots || []) {
-          agentServedRoots.add(root);
+          rootToAgentMap.set(root, agent);
         }
       }
 
-      const mappedWorkspaces = workspaceRoots.map((rootPath: string) => ({
-        id: rootPath,
-        name: basename(rootPath),
-        path: rootPath,
-        isPinned: staticWorkspaceRoots.includes(rootPath),
-        isAgentServed: agentServedRoots.has(rootPath),
-      }));
+      const mappedWorkspaces = workspaceRoots.map((rootPath: string) => {
+        const servingAgent = rootToAgentMap.get(rootPath) || null;
+        const hostInfo = (servingAgent as WorkspaceAgent & { hostInfo?: Record<string, unknown> })?.hostInfo || null;
+        return {
+          id: rootPath,
+          name: basename(rootPath),
+          path: rootPath,
+          isPinned: staticWorkspaceRoots.includes(rootPath),
+          isAgentServed: !!servingAgent,
+          agentId: servingAgent?.id || null,
+          agentName: servingAgent?.name || null,
+          hostname: (hostInfo as Record<string, unknown>)?.hostname as string || null,
+          platform: (hostInfo as Record<string, unknown>)?.platform as string || null,
+          arch: (hostInfo as Record<string, unknown>)?.arch as string || null,
+          clientIp: (servingAgent as WorkspaceAgent & { clientIp?: string })?.clientIp || null,
+        };
+      });
+
+      disambiguateWorkspaceNames(mappedWorkspaces);
 
       res.json(mappedWorkspaces);
     } catch (error: unknown) {
@@ -110,21 +164,32 @@ router.get(
         );
       }
 
-      // Build a set of agent-served roots for quick lookup
-      const agentRootSet = new Set<string>();
+      const rootToAgentMap = new Map<string, WorkspaceAgent>();
       for (const agent of agents) {
         for (const root of agent.roots || []) {
-          agentRootSet.add(root);
+          rootToAgentMap.set(root, agent);
         }
       }
 
-      const workspaces = roots.map((rootPath: string) => ({
-        id: rootPath,
-        name: basename(rootPath),
-        path: rootPath,
-        isPinned: staticRoots.includes(rootPath),
-        isAgentServed: agentRootSet.has(rootPath),
-      }));
+      const workspaces: MappedWorkspace[] = roots.map((rootPath: string) => {
+        const servingAgent = rootToAgentMap.get(rootPath) || null;
+        const hostInfo = (servingAgent as WorkspaceAgent & { hostInfo?: Record<string, unknown> })?.hostInfo || null;
+        return {
+          id: rootPath,
+          name: basename(rootPath),
+          path: rootPath,
+          isPinned: staticRoots.includes(rootPath),
+          isAgentServed: !!servingAgent,
+          agentId: servingAgent?.id || null,
+          agentName: servingAgent?.name || null,
+          hostname: (hostInfo as Record<string, unknown>)?.hostname as string || null,
+          platform: (hostInfo as Record<string, unknown>)?.platform as string || null,
+          arch: (hostInfo as Record<string, unknown>)?.arch as string || null,
+          clientIp: (servingAgent as WorkspaceAgent & { clientIp?: string })?.clientIp || null,
+        };
+      });
+
+      disambiguateWorkspaceNames(workspaces);
 
       res.json({ workspaces, agents, staticRoots });
     } catch (error: unknown) {
