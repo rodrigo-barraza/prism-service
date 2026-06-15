@@ -1453,3 +1453,5 @@ export default class ToolOrchestratorService {
     );
   }
 }
+
+(globalThis as any).ToolOrchestratorService = ToolOrchestratorService;

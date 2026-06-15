@@ -248,20 +248,25 @@ export function buildConversationPatchFields({
  */
 export function enrichConversationsWithRequestCosts(
   conversations: Array<Record<string, any>>,
-  requestLogCosts: Array<{ _id: string; totalCost: number }>,
+  requestLogCosts: Array<{ _id: string; totalCost: number; requestErrorCount?: number }>,
 ): void {
   if (conversations.length === 0) return;
   const costMap = new Map(
-    requestLogCosts.map((costEntry) => [costEntry._id, costEntry.totalCost]),
+    requestLogCosts.map((costEntry) => [costEntry._id, { totalCost: costEntry.totalCost, requestErrorCount: costEntry.requestErrorCount || 0 }]),
   );
   for (const conversation of conversations) {
     const conversationId = conversation.id;
-    const requestLogCost = costMap.get(conversationId);
-    if (requestLogCost !== undefined && requestLogCost > 0) {
-      conversation.totalCost = Math.max(
-        (conversation.totalCost as number) || 0,
-        requestLogCost,
-      );
+    const aggregated = costMap.get(conversationId);
+    if (aggregated) {
+      if (aggregated.totalCost > 0) {
+        conversation.totalCost = Math.max(
+          (conversation.totalCost as number) || 0,
+          aggregated.totalCost,
+        );
+      }
+      if (aggregated.requestErrorCount > 0) {
+        conversation.requestErrorCount = aggregated.requestErrorCount;
+      }
     }
   }
 }
@@ -271,12 +276,17 @@ export function enrichConversationsWithRequestCosts(
  */
 export function enrichSingleConversationCost(
   conversation: Record<string, any>,
-  requestLogAggregation: Array<{ _id: string; totalCost: number }>,
+  requestLogAggregation: Array<{ _id: string; totalCost: number; requestErrorCount?: number }>,
 ): void {
-  if (requestLogAggregation.length > 0 && requestLogAggregation[0].totalCost > 0) {
-    conversation.totalCost = Math.max(
-      (conversation.totalCost as number) || 0,
-      requestLogAggregation[0].totalCost,
-    );
+  if (requestLogAggregation.length > 0) {
+    if (requestLogAggregation[0].totalCost > 0) {
+      conversation.totalCost = Math.max(
+        (conversation.totalCost as number) || 0,
+        requestLogAggregation[0].totalCost,
+      );
+    }
+    if ((requestLogAggregation[0].requestErrorCount || 0) > 0) {
+      conversation.requestErrorCount = requestLogAggregation[0].requestErrorCount;
+    }
   }
 }
