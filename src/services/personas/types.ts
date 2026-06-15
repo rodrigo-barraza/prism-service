@@ -64,6 +64,8 @@ export interface Persona {
   /** Declarative tool call policies (serialized for custom agents). */
   policies?: PolicyRule[];
   capabilities: string;
+  /** When true, tool descriptions in the system prompt are truncated to the first sentence and optional parameters are omitted. Saves ~1,500 tokens for conversational agents that don't need full parameter docs. */
+  compactToolDocs?: boolean;
   usesDirectoryTree: boolean;
   usesCodingGuidelines: boolean;
 }

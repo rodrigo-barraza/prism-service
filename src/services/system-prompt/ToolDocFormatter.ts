@@ -31,7 +31,7 @@ export class ToolDocFormatter {
    *   - Name + first sentence of description (capability summary)
    *   - Full parameter listing with required markers
    */
-  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string, resolvedToolNames?: string[], lockedOffToolNames?: Set<string>): string {
+  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string, resolvedToolNames?: string[], lockedOffToolNames?: Set<string>, compact?: boolean): string {
     const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology) as ToolSchemaDescriptor[];
 
     if (resolvedToolNames?.length) {
@@ -44,7 +44,7 @@ export class ToolDocFormatter {
           (toolSchema) => !lockedOffToolNames.has(toolSchema.name),
         );
       }
-      return this._formatToolDescriptions(filteredSchemas);
+      return this._formatToolDescriptions(filteredSchemas, compact);
     }
 
     if (!enabledTools) {
@@ -54,7 +54,7 @@ export class ToolDocFormatter {
           (toolSchema) => !lockedOffToolNames.has(toolSchema.name),
         );
       }
-      return this._formatToolDescriptions(allSchemas);
+      return this._formatToolDescriptions(allSchemas, compact);
     }
 
     const hasPrefixed = enabledTools.some(
@@ -90,10 +90,10 @@ export class ToolDocFormatter {
       );
     }
 
-    return this._formatToolDescriptions(filteredSchemas);
+    return this._formatToolDescriptions(filteredSchemas, compact);
   }
 
-  private _formatToolDescriptions(filteredSchemas: ToolSchemaDescriptor[]): string {
+  private _formatToolDescriptions(filteredSchemas: ToolSchemaDescriptor[], compact?: boolean): string {
     if (filteredSchemas.length === 0) return "";
 
     // Group by domain
@@ -108,20 +108,37 @@ export class ToolDocFormatter {
     const sections: string[] = [];
     for (const [domain, domainTools] of groups) {
       const entries = domainTools.map((tool) => {
-        const description = tool.description || "";
+        const fullDescription = tool.description || "";
+
+        // In compact mode, truncate to first sentence only
+        const description = compact
+          ? fullDescription.split(/(?<=[.!?])\s/)[0] || fullDescription
+          : fullDescription;
 
         const parameters = tool.parameters?.properties || {};
         const parameterNames = Object.keys(parameters);
         const required = tool.parameters?.required || [];
-        const parameterString = parameterNames
+
+        // In compact mode, only show required parameters
+        const filteredParameterNames = compact
+          ? parameterNames.filter((parameterName) => required.includes(parameterName))
+          : parameterNames;
+
+        const parameterString = filteredParameterNames
           .map((parameterName) => {
             const isRequired = required.includes(parameterName);
             const parameterDescription = parameters[parameterName].description || "";
-            return `  - ${parameterName}${isRequired ? " (required)" : ""}: ${parameterDescription}`;
+
+            // In compact mode, truncate parameter descriptions to first sentence
+            const truncatedDescription = compact
+              ? parameterDescription.split(/(?<=[.!?])\s/)[0] || parameterDescription
+              : parameterDescription;
+
+            return `  - ${parameterName}${isRequired ? " (required)" : ""}: ${truncatedDescription}`;
           })
           .join("\n");
 
-        return `### ${tool.name}\n${description}\n${parameterString}`;
+        return `### ${tool.name}\n${description}${parameterString ? "\n" + parameterString : ""}`;
       });
 
       sections.push(`**${domain}**\n${entries.join("\n\n")}`);
