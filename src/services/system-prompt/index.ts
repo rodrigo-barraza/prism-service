@@ -72,6 +72,18 @@ export default class SystemPromptAssembler {
       );
     }
 
+    // ── 1b. Platform-Specific Rules ──────────────────────────────
+    if (persona?.platformRules && context.agentContext?.platform) {
+      const platformKey = context.agentContext.platform as string;
+      const platformSection = persona.platformRules[platformKey];
+      if (platformSection) {
+        const platformText = typeof platformSection === 'function'
+          ? platformSection(context)
+          : platformSection;
+        if (platformText) sections.push(platformText);
+      }
+    }
+
     // ── 2. Agent Context (runtime data from caller) ──────────────
     if (context.agentContext) {
       const agentContext = context.agentContext;
