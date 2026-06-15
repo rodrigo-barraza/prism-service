@@ -39,8 +39,8 @@ export default class SystemPromptAssembler {
     return this.directoryFormatter.fetchDirectoryTree();
   }
 
-  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string, resolvedToolNames?: string[], lockedOffToolNames?: Set<string>): string {
-    return this.docFormatter.buildToolDescriptions(enabledTools, agentId, defaultTopology, resolvedToolNames, lockedOffToolNames);
+  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string, resolvedToolNames?: string[], lockedOffToolNames?: Set<string>, compact?: boolean): string {
+    return this.docFormatter.buildToolDescriptions(enabledTools, agentId, defaultTopology, resolvedToolNames, lockedOffToolNames, compact);
   }
 
   async assemble(context: AssemblerContext) {
@@ -135,7 +135,8 @@ export default class SystemPromptAssembler {
     // ── 4. Enabled Tools (domain-grouped) ──────────────────────
     {
       const lockedOffToolNames = await resolveLockedOffToolNames();
-      const toolDescriptions = this.buildToolDescriptions(context.enabledTools, agentId, defaultTopology, context.resolvedToolNames, lockedOffToolNames);
+      const isCompactToolDocs = persona?.compactToolDocs === true;
+      const toolDescriptions = this.buildToolDescriptions(context.enabledTools, agentId, defaultTopology, context.resolvedToolNames, lockedOffToolNames, isCompactToolDocs);
       if (toolDescriptions) {
         let count: number;
         if (context.resolvedToolNames?.length) {
