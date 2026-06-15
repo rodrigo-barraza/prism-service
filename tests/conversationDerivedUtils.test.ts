@@ -227,6 +227,91 @@ describe("computeModalities", () => {
     expect(modalities.textIn).toBe(false);
   });
 
+  it("should detect videoIn from data:video/ image references", () => {
+    const messages: TestMessage[] = [
+      { role: "user", content: "Check this video", images: ["data:video/mp4;base64,abc123"] },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.videoIn).toBe(true);
+    expect(modalities.imageIn).toBe(false);
+  });
+
+  it("should detect videoIn from .mp4 and .webm file extensions", () => {
+    const messages: TestMessage[] = [
+      { role: "user", content: "Watch this", images: ["minio://uploads/clip.mp4"] },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.videoIn).toBe(true);
+    expect(modalities.imageIn).toBe(false);
+  });
+
+  it("should not set videoIn for regular image references", () => {
+    const messages: TestMessage[] = [
+      { role: "user", content: "Look at this", images: ["data:image/png;base64,abc"] },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.videoIn).toBe(false);
+    expect(modalities.imageIn).toBe(true);
+  });
+
+  it("should detect docIn from data:application/ prefixed image references", () => {
+    const messages: TestMessage[] = [
+      { role: "user", content: "Parse this", images: ["data:application/pdf;base64,abc"] },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.docIn).toBe(true);
+    expect(modalities.imageIn).toBe(false);
+  });
+
+  it("should detect docIn from data:text/ prefixed image references", () => {
+    const messages: TestMessage[] = [
+      { role: "user", content: "Read this", images: ["data:text/plain;base64,abc"] },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.docIn).toBe(true);
+    expect(modalities.imageIn).toBe(false);
+  });
+
+  it("should classify mixed image references correctly in a single message", () => {
+    const messages: TestMessage[] = [
+      {
+        role: "user",
+        content: "Multiple files",
+        images: [
+          "data:image/png;base64,img",
+          "data:video/mp4;base64,vid",
+          "data:application/pdf;base64,doc",
+        ],
+      },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.imageIn).toBe(true);
+    expect(modalities.videoIn).toBe(true);
+    expect(modalities.docIn).toBe(true);
+  });
+
+  it("should detect imageIn from standalone image field when images array is empty", () => {
+    const messages: TestMessage[] = [
+      { role: "user", content: "See this", image: "data:image/jpeg;base64,abc" },
+    ];
+
+    const modalities = computeModalities(messages as any);
+
+    expect(modalities.imageIn).toBe(true);
+  });
+
   it("should return all false for empty messages array", () => {
     const modalities = computeModalities([] as any);
 
@@ -236,6 +321,7 @@ describe("computeModalities", () => {
     expect(modalities.imageOut).toBe(false);
     expect(modalities.audioIn).toBe(false);
     expect(modalities.audioOut).toBe(false);
+    expect(modalities.videoIn).toBe(false);
     expect(modalities.webSearch).toBe(false);
     expect(modalities.functionCalling).toBe(false);
     expect(modalities.thinking).toBe(false);

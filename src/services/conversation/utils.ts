@@ -91,6 +91,7 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
     imageOut: false,
     audioIn: false,
     audioOut: false,
+    videoIn: false,
     docIn: false,
     webSearch: false,
     codeExecution: false,
@@ -100,6 +101,7 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
 
   const WEB_SEARCH_NAMES: Set<string> = new Set([TOOL_NAMES.SEARCH_WEB, TOOL_NAMES.SEARCH_WEB_PREVIEW]);
   const CODE_EXEC_NAMES: Set<string> = new Set([TOOL_NAMES.CODE_EXECUTION]);
+  const VIDEO_EXTENSIONS = [".mp4", ".mov", ".avi", ".webm"];
 
   for (const chatMessage of messages || []) {
     if (chatMessage.deleted) continue;
@@ -113,22 +115,43 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
     if (isAssistant && chatMessage.toolCalls && chatMessage.toolCalls.length > 0) {
       modalities.textOut = true;
     }
-    if ((chatMessage.images && chatMessage.images.length > 0) || (chatMessage as Record<string, unknown>).image) {
+
+    // Classify each image reference as image, video, or document
+    if (chatMessage.images && chatMessage.images.length > 0) {
+      for (const imageReference of chatMessage.images) {
+        if (typeof imageReference !== "string") continue;
+        const isDocumentReference =
+          imageReference.startsWith("data:application/") ||
+          imageReference.startsWith("data:text/") ||
+          imageReference.endsWith(".pdf") ||
+          imageReference.endsWith(".txt");
+        const isVideoReference =
+          imageReference.startsWith("data:video/") ||
+          VIDEO_EXTENSIONS.some((extension) => imageReference.endsWith(extension));
+        if (isDocumentReference) {
+          modalities.docIn = true;
+        } else if (isVideoReference) {
+          if (isUser) modalities.videoIn = true;
+        } else {
+          if (isUser) modalities.imageIn = true;
+          if (isAssistant) modalities.imageOut = true;
+        }
+      }
+    }
+
+    // Standalone image field (not from images array)
+    if ((chatMessage as Record<string, unknown>).image && !chatMessage.images?.length) {
       if (isUser) modalities.imageIn = true;
       if (isAssistant) modalities.imageOut = true;
     }
+
     if (chatMessage.audio) {
       if (isUser) modalities.audioIn = true;
       if (isAssistant) modalities.audioOut = true;
     }
-    if (
-      ((chatMessage as Record<string, unknown>).documents as string[] | undefined)?.length ||
-      chatMessage.images?.some(
-        (ref: string) =>
-          typeof ref === "string" &&
-          (ref.endsWith(".pdf") || ref.endsWith(".txt")),
-      )
-    ) {
+
+    // Documents array (separate from image-based document detection)
+    if (((chatMessage as Record<string, unknown>).documents as string[] | undefined)?.length) {
       modalities.docIn = true;
     }
 
@@ -177,6 +200,7 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
   }
   return modalities;
 }
+
 
 /**
  * Extract unique providers from messages and settings.
