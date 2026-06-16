@@ -249,13 +249,13 @@ describe("Message Array Construction", () => {
     const SOMATIC_STATE = "[Somatic State — Lupos]\ncurrent_emotion: amused";
 
     beforeEach(() => {
-      // History loaded from DB: system + platform + somatic + user + assistant + new user
+      // History loaded from DB: system + user + assistant + platform + somatic + new user
       originalMessages = [
         { role: "system", content: "Previous system prompt" },
-        { role: "system", content: "Previous platform context" },
-        { role: "system", content: "Previous somatic state" },
         { role: "user", content: "first message" },
         { role: "assistant", content: "first response" },
+        { role: "system", content: "Previous platform context" },
+        { role: "system", content: "Previous somatic state" },
         { role: "user", content: "tell me a joke" },
       ];
       originalMessageCount = originalMessages.length; // 6
@@ -274,9 +274,14 @@ describe("Message Array Construction", () => {
       expect(currentMessages[0].content).toBe(LUPOS_IDENTITY);
     });
 
-    it("should insert platform context after the system prompt", () => {
-      expect(currentMessages[1].role).toBe("system");
-      expect(currentMessages[1].content).toBe(PLATFORM_CONTEXT);
+    it("should interleave platform context before the last user message (before somatic)", () => {
+      const lastUserIndex = currentMessages.reduce(
+        (lastIndex, message, index) =>
+          message.role === "user" ? index : lastIndex,
+        -1,
+      );
+      expect(currentMessages[lastUserIndex - 2].role).toBe("system");
+      expect(currentMessages[lastUserIndex - 2].content).toBe(PLATFORM_CONTEXT);
     });
 
     it("should insert somatic state before the last user message", () => {
@@ -305,10 +310,17 @@ describe("Message Array Construction", () => {
 
       // sliceIndex = max(0, 6 - 1) = 5
       // After hook injection, currentMessages has extra messages shifted in.
-      // From index 5 onward: somatic state + user msg + assistant
-      expect(newTurnMessages.length).toBeGreaterThanOrEqual(3);
+      // From index 5 onward: platform context + somatic state + user msg + assistant
+      expect(newTurnMessages.length).toBeGreaterThanOrEqual(4);
       expect(
         newTurnMessages.some((message) => message.role === "assistant"),
+      ).toBe(true);
+      expect(
+        newTurnMessages.some(
+          (message) =>
+            message.role === "system" &&
+            message.content === PLATFORM_CONTEXT,
+        ),
       ).toBe(true);
       expect(
         newTurnMessages.some(
@@ -357,9 +369,14 @@ describe("Message Array Construction", () => {
       expect(currentMessages[0].role).toBe("system");
       expect(currentMessages[0].content).toBe(LUPOS_IDENTITY);
 
-      // Platform context must be at index 1
-      expect(currentMessages[1].role).toBe("system");
-      expect(currentMessages[1].content).toBe(PLATFORM_CONTEXT);
+      // Platform context must be interleaved before the last user message (before somatic)
+      const lastUserIndex = currentMessages.reduce(
+        (lastIndex, message, index) =>
+          message.role === "user" ? index : lastIndex,
+        -1,
+      );
+      expect(currentMessages[lastUserIndex - 2].role).toBe("system");
+      expect(currentMessages[lastUserIndex - 2].content).toBe(PLATFORM_CONTEXT);
 
       // The old somatic state from history should still exist (shifted right)
       const oldSomaticMessage = currentMessages.find(
@@ -370,11 +387,6 @@ describe("Message Array Construction", () => {
       expect(oldSomaticMessage).toBeDefined();
 
       // New somatic state should be interleaved before the last user message
-      const lastUserIndex = currentMessages.reduce(
-        (lastIndex, message, index) =>
-          message.role === "user" ? index : lastIndex,
-        -1,
-      );
       expect(currentMessages[lastUserIndex - 1].role).toBe("system");
       expect(currentMessages[lastUserIndex - 1].content).toBe(SOMATIC_STATE);
     });
@@ -412,20 +424,27 @@ describe("Message Array Construction", () => {
       // sliceIndex = max(0, 3 - 1) = 2
       // After injection, messages are:
       // [0] system (identity) — injected
-      // [1] system (platform) — injected
-      // [2] user: "hey lupos"
-      // [3] assistant: "yo"
+      // [1] user: "hey lupos"
+      // [2] assistant: "yo"
+      // [3] system (platform) — injected before last user
       // [4] system (somatic) — injected before last user
       // [5] user: "tell me something" — with [System Context]
       // [6] assistant: response
       //
-      // Slice from index 2 captures: user, assistant, somatic, user, assistant
-      // But identity (0) and platform (1) are BEFORE the slice — that's expected
-      // because the Finalizer persists systemPrompt separately via conversationMeta.
-      // Platform context, however, needs to survive in the persisted messages.
+      // Slice from index 2 captures: assistant, platform, somatic, user, assistant
+      // Identity (0) is BEFORE the slice — that's expected because the
+      // Finalizer persists systemPrompt separately via conversationMeta.
+      // Platform context now survives in the slice since it's interleaved.
       //
-      // The key assertion: somatic state and user message are in the slice.
-      expect(newTurnMessages.length).toBeGreaterThanOrEqual(3);
+      // The key assertions: platform, somatic state, and user message are in the slice.
+      expect(newTurnMessages.length).toBeGreaterThanOrEqual(4);
+      expect(
+        newTurnMessages.some(
+          (message) =>
+            message.role === "system" &&
+            message.content === PLATFORM_CONTEXT,
+        ),
+      ).toBe(true);
       expect(
         newTurnMessages.some(
           (message) =>
@@ -457,17 +476,17 @@ describe("Message Array Construction", () => {
 
       // Full expected order:
       // [0] system: identity (unshifted)
-      // [1] system: platform context (spliced at 1)
-      // [2] user: "hey" (shifted from 0)
-      // [3] assistant: "sup" (shifted from 1)
+      // [1] user: "hey"
+      // [2] assistant: "sup"
+      // [3] system: platform context (interleaved before last user)
       // [4] system: somatic state (interleaved before last user)
-      // [5] user: "draw me a wolf" (shifted from 2, with [System Context])
+      // [5] user: "draw me a wolf" (with [System Context])
       expect(currentMessages).toHaveLength(6);
       expect(currentMessages[0]).toMatchObject({ role: "system", content: LUPOS_IDENTITY });
-      expect(currentMessages[1]).toMatchObject({ role: "system", content: PLATFORM_CONTEXT });
-      expect(currentMessages[2]).toMatchObject({ role: "user" });
-      expect(currentMessages[2].content).toBe("hey");
-      expect(currentMessages[3]).toMatchObject({ role: "assistant", content: "sup" });
+      expect(currentMessages[1]).toMatchObject({ role: "user" });
+      expect(currentMessages[1].content).toBe("hey");
+      expect(currentMessages[2]).toMatchObject({ role: "assistant", content: "sup" });
+      expect(currentMessages[3]).toMatchObject({ role: "system", content: PLATFORM_CONTEXT });
       expect(currentMessages[4]).toMatchObject({ role: "system", content: SOMATIC_STATE });
       expect(currentMessages[5].role).toBe("user");
       expect(currentMessages[5].content).toContain("[System Context]");
@@ -498,7 +517,13 @@ describe("Message Array Construction", () => {
       );
       expect(identityMessages).toHaveLength(1);
       expect(currentMessages[0].content).toBe(LUPOS_IDENTITY);
-      expect(currentMessages[1].content).toBe(PLATFORM_CONTEXT);
+      // Platform context is now interleaved before the last user message
+      const lastUserIndex = currentMessages.reduce(
+        (lastIndex, message, index) =>
+          message.role === "user" ? index : lastIndex,
+        -1,
+      );
+      expect(currentMessages[lastUserIndex - 2].content).toBe(PLATFORM_CONTEXT);
     });
   });
 
@@ -687,8 +712,8 @@ describe("Message Array Construction", () => {
   // Ensures cache-friendly ordering: static context at top,
   // volatile somatic state near the bottom
   // ────────────────────────────────────────────────────────────
-  describe("Cache-friendly message ordering", () => {
-    it("should maintain cache-optimal ordering: identity → platform → history → somatic → user", () => {
+  describe("Recency-optimal message ordering", () => {
+    it("should maintain recency-optimal ordering: identity → history → platform → somatic → user", () => {
       const originalMessages: ConversationMessage[] = [
         { role: "system", content: "Old identity" },
         { role: "system", content: "Old platform context" },
@@ -705,22 +730,20 @@ describe("Message Array Construction", () => {
       });
 
       // Verify ordering: identity is at top (static, cacheable),
-      // platform context follows, then history, then somatic state
-      // (volatile, changes per turn), then user message
-      const roles = currentMessages.map((message) => message.role);
-      const identityIndex = 0;
-      const platformIndex = roles.indexOf("system", identityIndex + 1);
-      const lastUserIndex = roles.length - 1;
+      // then history, then platform context and somatic state
+      // (both interleaved before the last user message for recency bias)
+      const lastUserIndex = currentMessages.length - 1;
       const somaticIndex = lastUserIndex - 1;
+      const platformIndex = lastUserIndex - 2;
 
-      expect(currentMessages[identityIndex].content).toBe("Updated Lupos identity");
+      expect(currentMessages[0].content).toBe("Updated Lupos identity");
       expect(currentMessages[platformIndex].content).toBe("Updated platform context");
       expect(currentMessages[somaticIndex].content).toBe("Updated somatic state");
       expect(currentMessages[lastUserIndex].role).toBe("user");
 
-      // Identity and platform should come before somatic
-      expect(identityIndex).toBeLessThan(somaticIndex);
+      // Platform should come right before somatic, both before last user
       expect(platformIndex).toBeLessThan(somaticIndex);
+      expect(somaticIndex).toBeLessThan(lastUserIndex);
     });
   });
 
@@ -3154,7 +3177,7 @@ describe("Message Array Construction", () => {
   // system messages coexist in the correct order
   // ────────────────────────────────────────────────────────────
   describe("Discord agent with tool discovery + somatic state", () => {
-    it("should order system messages correctly: identity → platform → somatic → tool-updates", () => {
+    it("should order system messages correctly: identity → ... → platform → somatic → tool-updates", () => {
       const originalMessages: ConversationMessage[] = [
         { role: "user", content: "search for drawing tools" },
       ];
@@ -3239,15 +3262,33 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // Verify first 3 system messages are in correct order
+      // Verify identity is first
       expect(newTurnMessages[0].role).toBe("system");
       expect(newTurnMessages[0].content).toBe("You are Lupos.");
 
-      expect(newTurnMessages[1].role).toBe("system");
-      expect(newTurnMessages[1].content).toContain("Platform: Discord");
+      // Find platform context and somatic state — both should be
+      // interleaved near the end (before the user message), not at top.
+      const platformMessage = newTurnMessages.find(
+        (message) =>
+          message.role === "system" &&
+          typeof message.content === "string" &&
+          message.content.includes("Platform: Discord"),
+      );
+      const somaticMessage = newTurnMessages.find(
+        (message) =>
+          message.role === "system" &&
+          typeof message.content === "string" &&
+          message.content.includes("Somatic State"),
+      );
+      expect(platformMessage).toBeDefined();
+      expect(somaticMessage).toBeDefined();
 
-      expect(newTurnMessages[2].role).toBe("system");
-      expect(newTurnMessages[2].content).toContain("Somatic State");
+      // Platform and somatic should appear before the user message
+      const platformIdx = newTurnMessages.indexOf(platformMessage!);
+      const somaticIdx = newTurnMessages.indexOf(somaticMessage!);
+      const userIdx = newTurnMessages.findIndex((message) => message.role === "user");
+      expect(platformIdx).toBeLessThan(somaticIdx);
+      expect(somaticIdx).toBeLessThan(userIdx);
 
       // Verify tool-update messages come later (after tool calls)
       const toolUpdateIndices = newTurnMessages.reduce(
@@ -3264,9 +3305,9 @@ describe("Message Array Construction", () => {
         [],
       );
 
-      // Tool updates should come after the first 3 system messages (identity, platform, somatic)
+      // Tool updates should come after the user message (they're mid-conversation injections)
       for (const toolUpdateIndex of toolUpdateIndices) {
-        expect(toolUpdateIndex).toBeGreaterThan(2);
+        expect(toolUpdateIndex).toBeGreaterThan(userIdx);
       }
     });
   });
@@ -3385,11 +3426,23 @@ describe("Message Array Construction", () => {
     });
 
     it("should NOT set _isIdentityPrompt on platform context message", () => {
-      expect(currentMessages[1]._isIdentityPrompt).toBeUndefined();
+      const platformMessage = currentMessages.find(
+        (message) =>
+          message.role === "system" &&
+          typeof message.content === "string" &&
+          message.content.includes("Platform: Discord"),
+      );
+      expect(platformMessage!._isIdentityPrompt).toBeUndefined();
     });
 
     it("should NOT set _isIdentityPrompt on somatic state message", () => {
-      expect(currentMessages[2]._isIdentityPrompt).toBeUndefined();
+      const somaticMessage = currentMessages.find(
+        (message) =>
+          message.role === "system" &&
+          typeof message.content === "string" &&
+          message.content.includes("Somatic State"),
+      );
+      expect(somaticMessage!._isIdentityPrompt).toBeUndefined();
     });
 
     it("should find identity prompt via _isIdentityPrompt tag even if other system messages exist", () => {
