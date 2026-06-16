@@ -11,6 +11,7 @@
  * as "generating" in the UI.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { COLLECTIONS } from "../src/constants.ts";
 
 // ── Mock ConversationService before import ─────────────────────
 const mockAppendMessages = vi.fn();
@@ -59,7 +60,7 @@ describe("appendAndFinalize", () => {
       "testuser",
       [{ role: "user", content: "Hello" }],
       null,
-      { collection: "agent_sessions" },
+      { collection: COLLECTIONS.AGENT_CONVERSATIONS },
     );
 
     expect(callOrder).toEqual(["appendMessages", "setGenerating"]);
@@ -68,7 +69,7 @@ describe("appendAndFinalize", () => {
       "coding",
       "testuser",
       false,
-      { collection: "agent_sessions" },
+      { collection: COLLECTIONS.AGENT_CONVERSATIONS },
     );
   });
 
@@ -124,7 +125,7 @@ describe("appendAndFinalize", () => {
 
   it("should forward meta and options to appendMessages", async () => {
     const meta = { title: "My Session", settings: { provider: "google" } };
-    const options = { collection: "agent_sessions" };
+    const options = { collection: COLLECTIONS.AGENT_CONVERSATIONS };
 
     await appendAndFinalize(
       "conv-456",
@@ -167,7 +168,7 @@ describe("markGenerating", () => {
 
   it("should forward options to setGenerating", () => {
     markGenerating("conv-123", "coding", "testuser", false, {
-      collection: "agent_sessions",
+      collection: COLLECTIONS.AGENT_CONVERSATIONS,
       agent: "CODING",
       title: "My custom title",
     });
@@ -177,7 +178,7 @@ describe("markGenerating", () => {
       "coding",
       "testuser",
       false,
-      { collection: "agent_sessions", agent: "CODING", title: "My custom title" },
+      { collection: COLLECTIONS.AGENT_CONVERSATIONS, agent: "CODING", title: "My custom title" },
     );
   });
 

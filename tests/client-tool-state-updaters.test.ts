@@ -12,119 +12,13 @@
  */
 
 import { describe, it, expect } from "vitest";
-
-// ── Types matching the client-side shapes ────────────────────────
-
-interface ToolCallEvent {
-  id: string;
-  name: string;
-  args: Record<string, unknown>;
-  status?: string;
-  result?: unknown;
-  timestamp?: number;
-}
-
-interface ContentSegment {
-  type: "text" | "thinking" | "tools";
-  fragmentIndex?: number;
-  toolIds?: string[];
-}
-
-interface ToolMessageSlice {
-  role: string;
-  content?: string;
-  toolCalls?: ToolCallEvent[];
-  contentSegments?: ContentSegment[];
-  textFragments?: string[];
-  thinkingFragments?: string[];
-}
-
-interface ToolExecutionInput {
-  id?: string;
-  name?: string;
-  args?: Record<string, unknown>;
-  result?: unknown;
-  status: string;
-}
-
-interface SegmentSnapshot {
-  contentSegments: ContentSegment[];
-  textFragments: string[];
-  thinkingFragments: string[];
-}
-
-// ── Reimplementation of applyToolExecutionToMessages ──────────────
-// (Copied from toolCallStateUpdaters.ts to avoid JSX/React imports)
-
-function applyToolExecutionToMessages(
-  messages: ToolMessageSlice[],
-  resolvedId: string,
-  toolInput: ToolExecutionInput,
-  snapshot: SegmentSnapshot,
-): ToolMessageSlice[] {
-  const array = [...messages];
-  const last = array[array.length - 1];
-
-  const currentToolCalls: ToolCallEvent[] =
-    last?.role === "assistant" ? (last.toolCalls || []) : [];
-
-  let updatedToolCalls: ToolCallEvent[];
-
-  if (toolInput.status === "calling") {
-    if (currentToolCalls.some((toolCall) => toolCall.id === resolvedId)) {
-      updatedToolCalls = currentToolCalls;
-    } else {
-      updatedToolCalls = [
-        ...currentToolCalls,
-        {
-          id: resolvedId,
-          name: toolInput.name || "unknown",
-          args: toolInput.args || {},
-          status: "calling",
-          timestamp: Date.now(),
-        },
-      ];
-    }
-  } else {
-    updatedToolCalls = currentToolCalls.map((toolCall) => {
-      if (
-        (toolInput.id && toolCall.id === toolInput.id) ||
-        (!toolInput.id &&
-          toolCall.name === (toolInput.name || "unknown") &&
-          toolCall.status === "calling")
-      ) {
-        return {
-          ...toolCall,
-          status: toolInput.status,
-          result: toolInput.result,
-          args: toolInput.args || {},
-        };
-      }
-      return toolCall;
-    });
-  }
-
-  if (last?.role === "assistant") {
-    array[array.length - 1] = {
-      ...last,
-      toolCalls: updatedToolCalls,
-      contentSegments: snapshot.contentSegments,
-      textFragments: snapshot.textFragments,
-      thinkingFragments: snapshot.thinkingFragments,
-    };
-  } else {
-    array.push({
-      role: "assistant",
-      content: "",
-      toolCalls: updatedToolCalls,
-      contentSegments: snapshot.contentSegments,
-      textFragments: snapshot.textFragments,
-      thinkingFragments: snapshot.thinkingFragments,
-    });
-  }
-
-  return array;
-}
+import {
+  applyToolExecutionToMessages,
+  type ToolMessageSlice,
+  type ToolExecutionInput,
+  type SegmentSnapshot,
+} from "../../prism-client/src/utils/toolCallStateUpdaters.ts";
+import type { ToolCallEvent, ContentSegment } from "../../prism-client/src/types/types.ts";
 
 // ── Reimplementation of prepareDisplayMessages ───────────────────
 

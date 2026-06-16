@@ -7,6 +7,7 @@
  * positions, the workflow graph renders incorrectly or crashes.
  */
 import { describe, it, expect, vi } from "vitest";
+import type { WorkflowStep } from "../src/types/workflow.ts";
 
 vi.mock("../src/config.ts", () => ({
   getModelByName: vi.fn().mockReturnValue(null),
@@ -14,20 +15,6 @@ vi.mock("../src/config.ts", () => ({
 
 const { assembleGraph } = await import("../src/services/WorkflowAssembler.ts");
 
-// ── Types ──────────────────────────────────────────────────────
-interface TestStep {
-  label?: string;
-  systemPrompt?: string;
-  input?: string;
-  output?: string;
-  model?: string;
-  type?: string;
-  outputType?: string;
-  outputImageRef?: string;
-  duration?: number;
-  timestamp?: string;
-  index?: number;
-}
 
 // ═══════════════════════════════════════════════════════════════
 describe("assembleGraph — empty/invalid input", () => {
@@ -50,7 +37,7 @@ describe("assembleGraph — empty/invalid input", () => {
 // ═══════════════════════════════════════════════════════════════
 describe("assembleGraph — single step", () => {
   it("should produce input, conversation, model, and viewer nodes", () => {
-    const steps: TestStep[] = [
+    const steps: WorkflowStep[] = [
       {
         systemPrompt: "You are helpful",
         input: "Hello",
@@ -74,7 +61,7 @@ describe("assembleGraph — single step", () => {
   });
 
   it("should store text results in nodeResults", () => {
-    const steps: TestStep[] = [
+    const steps: WorkflowStep[] = [
       { input: "Hello", output: "World", model: "test" },
     ];
 
@@ -85,7 +72,7 @@ describe("assembleGraph — single step", () => {
   });
 
   it("should store image results in nodeResults when outputImageRef is present", () => {
-    const steps: TestStep[] = [
+    const steps: WorkflowStep[] = [
       {
         input: "Generate an image",
         output: "Here's the image",
@@ -102,7 +89,7 @@ describe("assembleGraph — single step", () => {
   });
 
   it("should skip system prompt node when systemPrompt is empty", () => {
-    const steps: TestStep[] = [
+    const steps: WorkflowStep[] = [
       { input: "Hello", output: "World", model: "test" },
     ];
 
@@ -117,7 +104,7 @@ describe("assembleGraph — single step", () => {
 // ═══════════════════════════════════════════════════════════════
 describe("assembleGraph — multi-step chains", () => {
   it("should create chain edges between sequential non-utility steps", () => {
-    const steps: TestStep[] = [
+    const steps: WorkflowStep[] = [
       { input: "Step 1", output: "Result 1", model: "gpt-5.5" },
       { input: "Step 2", output: "Result 2", model: "gpt-5.5" },
     ];
@@ -134,7 +121,7 @@ describe("assembleGraph — multi-step chains", () => {
   });
 
   it("should have conv_to_model edges for every step", () => {
-    const steps: TestStep[] = [
+    const steps: WorkflowStep[] = [
       { input: "Step 1", output: "Result 1", model: "gpt-5.5" },
       { input: "Step 2", output: "Result 2", model: "claude-4" },
     ];
@@ -153,7 +140,7 @@ describe("assembleGraph — multi-step chains", () => {
 // ═══════════════════════════════════════════════════════════════
 describe("assembleGraph — utility steps (🧠 prefix)", () => {
   it("should not create chain edges from utility steps", () => {
-    const steps: TestStep[] = [
+    const steps: WorkflowStep[] = [
       { label: "Generate Answer", input: "Hello", output: "Answer", model: "gpt-5.5" },
       { label: "🧠 Emoji Detection", input: "Check emoji", output: "none", model: "gemini-3.5-flash" },
       { label: "Continue", input: "Continue", output: "More", model: "gpt-5.5" },
@@ -171,7 +158,7 @@ describe("assembleGraph — utility steps (🧠 prefix)", () => {
   });
 
   it("should still produce viewer nodes for utility steps", () => {
-    const steps: TestStep[] = [
+    const steps: WorkflowStep[] = [
       { label: "🧠 Internal Decision", input: "Check", output: "yes", model: "test" },
     ];
 
@@ -184,7 +171,7 @@ describe("assembleGraph — utility steps (🧠 prefix)", () => {
 // ═══════════════════════════════════════════════════════════════
 describe("assembleGraph — edge wiring", () => {
   it("should wire sys → conv and user → conv edges when both exist", () => {
-    const steps: TestStep[] = [
+    const steps: WorkflowStep[] = [
       {
         systemPrompt: "You are helpful",
         input: "Hello",
@@ -200,7 +187,7 @@ describe("assembleGraph — edge wiring", () => {
   });
 
   it("should wire model → viewer text edge when output exists", () => {
-    const steps: TestStep[] = [
+    const steps: WorkflowStep[] = [
       { input: "Hello", output: "World", model: "test" },
     ];
 
@@ -212,7 +199,7 @@ describe("assembleGraph — edge wiring", () => {
   });
 
   it("should wire model → viewer image edge when outputImageRef exists", () => {
-    const steps: TestStep[] = [
+    const steps: WorkflowStep[] = [
       {
         input: "Generate",
         output: "Image",
