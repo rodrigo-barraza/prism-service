@@ -278,6 +278,35 @@ async function resolveEmotionModel(): Promise<{ provider: string; model: string 
   }
 }
 
+function extractEmotionFromResponse(responseText: string): PrimaryEmotion | "neutral" {
+  const trimmedResponse = responseText.trim().toLowerCase();
+
+  // Fast path: the model returned exactly a valid emotion word (ideal case)
+  if (VALID_EMOTIONS.includes(trimmedResponse)) {
+    return trimmedResponse as PrimaryEmotion | "neutral";
+  }
+
+  // Strip non-alpha and check if the cleaned single-token matches
+  // Only valid for short responses (< 30 chars) to avoid collapsing garbage
+  if (trimmedResponse.length < 30) {
+    const strippedResponse = trimmedResponse.replace(/[^a-z]/g, "");
+    if (VALID_EMOTIONS.includes(strippedResponse)) {
+      return strippedResponse as PrimaryEmotion | "neutral";
+    }
+  }
+
+  // Fallback: scan the response for any valid emotion word boundary match
+  // Handles cases where the model wraps the emotion in quotes or a sentence
+  for (const emotion of VALID_EMOTIONS) {
+    const emotionBoundaryPattern = new RegExp(`\\b${emotion}\\b`);
+    if (emotionBoundaryPattern.test(trimmedResponse)) {
+      return emotion as PrimaryEmotion | "neutral";
+    }
+  }
+
+  return "neutral";
+}
+
 async function analyzeEmotionFromText(
   agentId: string,
   text: string,
@@ -311,46 +340,45 @@ async function analyzeEmotionFromText(
     success = false;
     errorMessage = (error as Error).message;
     logger.error(`[SomaticStateService] ❌ Emotion analysis API failed: ${errorMessage}`);
-  } finally {
-    RequestLogger.logBackgroundLlmCall({
-      requestId,
-      endpoint: requestContext.endpoint || "/agent",
-      operation: "somatic:emotion-analysis",
-      project: requestContext.project || null,
-      username: requestContext.username || "system",
-      agent: agentId,
-      provider: providerName,
-      model: modelName,
-      traceId: requestContext.traceId || null,
-      agentSessionId: requestContext.agentSessionId || null,
-      aiMessages,
-      resultText: result?.text || null,
-      usage: result?.usage || null,
-      success,
-      errorMessage,
-      requestStartMs: requestStart,
-      extraRequestPayload: {
-        inputTextLength: text.length,
-      },
-      extraResponsePayload: success
-        ? { detectedEmotion: result?.text?.trim().toLowerCase().replace(/[^a-z]/g, "") || "neutral" }
-        : undefined,
-    });
   }
+
+  const detectedEmotion = success
+    ? extractEmotionFromResponse(result?.text || "")
+    : "neutral";
+
+  RequestLogger.logBackgroundLlmCall({
+    requestId,
+    endpoint: requestContext.endpoint || "/agent",
+    operation: "somatic:emotion-analysis",
+    project: requestContext.project || null,
+    username: requestContext.username || "system",
+    agent: agentId,
+    provider: providerName,
+    model: modelName,
+    traceId: requestContext.traceId || null,
+    agentSessionId: requestContext.agentSessionId || null,
+    aiMessages,
+    resultText: result?.text || null,
+    usage: result?.usage || null,
+    success,
+    errorMessage,
+    requestStartMs: requestStart,
+    extraRequestPayload: {
+      inputTextLength: text.length,
+      textPreview: text.slice(0, 200),
+    },
+    extraResponsePayload: success
+      ? { detectedEmotion }
+      : undefined,
+  });
 
   if (!success) return "neutral";
 
-  const cleanedEmotion = (result?.text || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z]/g, "");
-
-  if (VALID_EMOTIONS.includes(cleanedEmotion)) {
-    return cleanedEmotion as PrimaryEmotion | "neutral";
+  if (detectedEmotion === "neutral" && result?.text?.trim()) {
+    logger.warn(`[SomaticStateService] Emotion analysis returned unrecognized value: "${result.text.trim()}" — defaulting to neutral`);
   }
 
-  logger.warn(`[SomaticStateService] Emotion analysis returned unrecognized value: "${cleanedEmotion}" — defaulting to neutral`);
-  return "neutral";
+  return detectedEmotion;
 }
 
 const SomaticStateService = {
