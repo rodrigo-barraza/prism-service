@@ -14,31 +14,19 @@
 import { describe, it, expect } from "vitest";
 import { swapMessageContent, assembleMessagesToAppend as assembleMessagesToAppendReal } from "../src/services/harnesses/lifecycle/Finalizer.ts";
 import { PROMPT_DELIMITERS } from "../src/constants.ts";
+import type { MessagePayload } from "../src/services/conversation/types.ts";
 
 // ── Types ───────────────────────────────────────────────────────
 
-interface TestMessage {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
+type TestMessage = Omit<MessagePayload, "toolCalls"> & {
+  role: string;
+  toolCalls?: any[];
   rawContent?: string;
-  toolCalls?: Array<{
-    id: string;
-    name: string;
-    args: Record<string, unknown>;
-    result?: unknown;
-  }>;
-  audio?: string;
-  images?: string[];
-  model?: string;
-  provider?: string;
   isCompactSummary?: boolean;
-  timestamp?: string;
-  usage?: unknown;
   totalTime?: number | null;
   tokensPerSec?: number | null;
   estimatedCost?: number | null;
-  [key: string]: any;
-}
+};
 
 // ── Simulate the Finalizer's message assembly ───────────────────
 
@@ -48,18 +36,13 @@ interface FinalizerAssemblyInput {
   finalThinking: string;
   images: string[];
   audioRef: string | null;
-  toolCalls: Array<{
-    id: string;
-    name: string;
-    args: Record<string, unknown>;
-    result?: unknown;
-  }>;
+  toolCalls: any[];
   resolvedModel: string;
   providerName: string;
 }
 
 /**
- * Replicates lines 349-449 of Finalizer.ts — the messagesToAppend assembly logic.
+ * Replicates the messagesToAppend assembly & sanitization logic of Finalizer.ts.
  */
 function assembleMessagesToAppend(input: FinalizerAssemblyInput): TestMessage[] {
   const messages = assembleMessagesToAppendReal({
@@ -71,12 +54,12 @@ function assembleMessagesToAppend(input: FinalizerAssemblyInput): TestMessage[] 
     toolCalls: input.toolCalls,
     resolvedModel: input.resolvedModel,
     providerName: input.providerName,
-  });
+  }) as TestMessage[];
 
   return messages.filter((message) => {
     if (message.role === "user" && typeof message.content === "string") {
-      if (message.content.startsWith("[CONTEXT NOTE:")) return false;
-      if (message.content.startsWith("[Conversation Summary")) return false;
+      if (message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX)) return false;
+      if (message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY)) return false;
       if (message.isCompactSummary === true) return false;
     }
     return true;
@@ -631,14 +614,14 @@ describe("swapMsgContent — system context injection handling", () => {
     const message: TestMessage = {
       role: "user",
       content:
-        "[System Context]\nYou are helpful.\n\n[User Message]\nmake a song about the war",
+        `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nYou are helpful.\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nmake a song about the war`,
     };
 
     swapMessageContent(message);
 
     expect(message.content).toBe("make a song about the war");
     expect(message.rawContent).toBe(
-      "[System Context]\nYou are helpful.\n\n[User Message]\nmake a song about the war",
+      `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nYou are helpful.\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nmake a song about the war`,
     );
   });
 
@@ -646,13 +629,13 @@ describe("swapMsgContent — system context injection handling", () => {
     const message: TestMessage = {
       role: "user",
       content:
-        "[System Context - Local Time: 2026-05-26T20:00:00-07:00]\n\nhey whats up",
+        `${PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX} 2026-05-26T20:00:00-07:00]\n\nhey whats up`,
     };
 
     swapMessageContent(message);
 
     expect(message.content).toBe("hey whats up");
-    expect(message.rawContent).toContain("[System Context - Local Time:");
+    expect(message.rawContent).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX);
   });
 
   it("uses rawContent swap when rawContent has system context prefix", () => {
@@ -663,40 +646,40 @@ describe("swapMsgContent — system context injection handling", () => {
       role: "user",
       content: "make a song about the war",
       rawContent:
-        "[System Context]\nContext\n\n[User Message]\nmake a song about the war",
+        `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nContext\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nmake a song about the war`,
     };
 
     swapMessageContent(message);
 
     // No swap — rawContent already has the context prefix
     expect(message.content).toBe("make a song about the war");
-    expect(message.rawContent).toContain("[System Context]");
+    expect(message.rawContent).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
   });
 
   it("no-ops when rawContent already has System Context prefix", () => {
     const message: TestMessage = {
       role: "user",
       content: "make a song",
-      rawContent: "[System Context]\nAlready swapped",
+      rawContent: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nAlready swapped`,
     };
 
     swapMessageContent(message);
 
     // Should not swap — rawContent already has the system context
     expect(message.content).toBe("make a song");
-    expect(message.rawContent).toBe("[System Context]\nAlready swapped");
+    expect(message.rawContent).toBe(`${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nAlready swapped`);
   });
 
   it("does nothing to assistant messages", () => {
     const message: TestMessage = {
       role: "assistant",
-      content: "[System Context]\nThis should not be swapped",
+      content: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nThis should not be swapped`,
     };
 
     swapMessageContent(message);
 
     expect(message.content).toBe(
-      "[System Context]\nThis should not be swapped",
+      `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nThis should not be swapped`,
     );
     expect(message.rawContent).toBeUndefined();
   });
@@ -736,7 +719,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
         role: "user",
         content: "hey whats up",
         rawContent:
-          "[System Context - Local Time: 2026-05-26T20:00:00]\n\nhey whats up",
+          `${PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX} 2026-05-26T20:00:00]\n\nhey whats up`,
       },
       {
         role: "assistant",
@@ -771,7 +754,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
         role: "user",
         content: "make a song about the war",
         rawContent:
-          "[System Context - Local Time: 2026-05-26T20:00:10]\n\nmake a song about the war",
+          `${PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX} 2026-05-26T20:00:10]\n\nmake a song about the war`,
       },
       {
         role: "assistant",
@@ -836,8 +819,14 @@ describe("End-to-end DB state after generate_audio flow", () => {
     expect(userMessages[1].content).toBe("make a song about the war");
 
     // 3. User messages have rawContent with system context
-    expect(userMessages[0].rawContent).toContain("[System Context");
-    expect(userMessages[1].rawContent).toContain("[System Context");
+    expect(
+      userMessages[0].rawContent?.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT) ||
+      userMessages[0].rawContent?.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX)
+    ).toBe(true);
+    expect(
+      userMessages[1].rawContent?.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT) ||
+      userMessages[1].rawContent?.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX)
+    ).toBe(true);
 
     // 4. Tool calls preserved
     const toolMessage = databaseAfterTurn2.find(

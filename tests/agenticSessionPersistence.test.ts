@@ -68,7 +68,7 @@ vi.mock("../src/services/FileService.ts", () => ({
 vi.mock("../src/services/RequestLogger.ts", () => ({
   default: {
     log: vi.fn(),
-    logChatGeneration: vi.fn().mockResolvedValue(),
+    logChatGeneration: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -82,15 +82,19 @@ vi.mock("../src/services/ConversationService.ts", () => ({
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
-    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
-    get: vi.fn().mockResolvedValue({}),
-    getSection: vi.fn().mockResolvedValue({}),
+    getCached: vi.fn().mockReturnValue({
+      creative: {
+        textToSpeechProvider: "elevenlabs",
+      } as Partial<Required<ReturnType<typeof import("../src/services/SettingsService.ts").default.getCached>>["creative"]>,
+    } as any),
+    get: vi.fn().mockResolvedValue({} as any),
+    getSection: vi.fn().mockResolvedValue({} as any),
   },
 }));
 
 // ── Import SUT ─────────────────────────────────────────────────
 const { finalizeTextGeneration } = await import("../src/services/harnesses/lifecycle/Finalizer.ts");
-const ConversationService = (await import("../src/services/ConversationService.ts")).default;
+const ConversationService = (await import("../src/services/ConversationService.ts")).default as any;
 
 // ── Helpers ────────────────────────────────────────────────────
 function makeCtx(overrides = {}) {
@@ -361,7 +365,7 @@ describe("finalizeTextGeneration — segment deduplication", () => {
 
     // Verify intermediate messages are preserved as-is
     const toolMessages = appendedMessages.filter(
-      (message) => message.role === "assistant" && message.toolCalls?.length > 0,
+      (message: any) => message.role === "assistant" && message.toolCalls?.length > 0,
     );
     expect(toolMessages).toHaveLength(3);
   });
@@ -377,7 +381,7 @@ describe("finalizeTextGeneration — segment deduplication", () => {
 describe("message persistence contract for TerminalRenderer", () => {
   it("intermediate assistant messages should carry toolCalls with result.stdout", () => {
     // Simulate what the DB contains after our fix
-    const storedMessages = [
+    const storedMessages: any[] = [
       { role: "user", content: "Run npm install" },
       {
         role: "assistant",
@@ -435,7 +439,7 @@ describe("message persistence contract for TerminalRenderer", () => {
   });
 
   it("single-iteration messages should still have contentSegments for interleaved display", () => {
-    const storedMessages = [
+    const storedMessages: any[] = [
       { role: "user", content: "What is 2+2?" },
       {
         role: "assistant",

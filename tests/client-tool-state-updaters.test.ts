@@ -18,29 +18,20 @@ import {
   type ToolExecutionInput,
   type SegmentSnapshot,
 } from "../../prism-client/src/utils/toolCallStateUpdaters.ts";
-import type { ToolCallEvent, ContentSegment } from "../../prism-client/src/types/types.ts";
+import type { Message, ToolCallEvent, ContentSegment } from "../../prism-client/src/types/types.ts";
 
 // ── Reimplementation of prepareDisplayMessages ───────────────────
 
-interface DisplayMessage {
-  role: string;
-  content?: string;
-  toolCalls?: ToolCallEvent[];
+type DisplayMessage = Omit<Message, "tool_calls"> & {
   tool_calls?: Array<{
     id: string;
     name?: string;
-    args?: unknown;
-    result?: unknown;
+    args?: any;
+    result?: any;
     status?: string;
     function?: { name?: string; arguments?: string };
   }>;
-  tool_call_id?: string;
-  toolCallId?: string;
-  images?: string[];
-  audio?: string;
-  error?: string;
-  deleted?: boolean;
-}
+};
 
 function prepareDisplayMessages(
   rawMessages: DisplayMessage[] | undefined | null,

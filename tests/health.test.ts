@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import { app } from './setup.ts';
+import { PROVIDERS } from '../src/constants.ts';
 
 describe('GET / (Health Check)', () => {
   it('returns 200 without auth header', async () => {
@@ -37,11 +38,11 @@ describe('GET / (Health Check)', () => {
     const res = await request(app).get('/').expect(200);
     const providers = res.body.providers;
 
-    expect(providers).toContain('openai');
-    expect(providers).toContain('anthropic');
-    expect(providers).toContain('google');
-    expect(providers).toContain('elevenlabs');
-    expect(providers).toContain('inworld');
+    expect(providers).toContain(PROVIDERS.OPENAI);
+    expect(providers).toContain(PROVIDERS.ANTHROPIC);
+    expect(providers).toContain(PROVIDERS.GOOGLE);
+    expect(providers).toContain(PROVIDERS.ELEVENLABS);
+    expect(providers).toContain(PROVIDERS.INWORLD);
     expect(providers).toContain('openai-compatible');
   });
 });

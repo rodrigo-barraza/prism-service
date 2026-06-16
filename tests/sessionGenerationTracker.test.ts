@@ -6,11 +6,12 @@
  * If register/update/complete lifecycle is broken, the frontend shows
  * stale or incorrect tok/s. If cleanup leaks, memory grows unbounded.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const { default: SessionGenerationTracker } = await import(
   "../src/services/SessionGenerationTracker.ts"
 );
+import { PROVIDERS } from "../src/constants.ts";
 
 // ═══════════════════════════════════════════════════════════════
 describe("SessionGenerationTracker — lifecycle", () => {
@@ -21,7 +22,7 @@ describe("SessionGenerationTracker — lifecycle", () => {
 
   it("should register a request and track it as active", () => {
     SessionGenerationTracker.register("session-1", "req-1", {
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
       model: "gemini-3.5-flash",
     });
 
@@ -250,8 +251,8 @@ describe('SessionGenerationTracker adversarial', () => {
   });
 
   it('should isolate stats between different sessions', () => {
-    SessionGenerationTracker.register('session-a', 'req-a', { provider: 'openai', model: 'gpt-5' });
-    SessionGenerationTracker.register('session-b', 'req-b', { provider: 'google', model: 'gemini-3-flash' });
+    SessionGenerationTracker.register('session-a', 'req-a', { provider: PROVIDERS.OPENAI, model: 'gpt-5' });
+    SessionGenerationTracker.register('session-b', 'req-b', { provider: PROVIDERS.GOOGLE, model: 'gemini-3-flash' });
 
     SessionGenerationTracker.update('req-a', { outputTokens: 500 });
     SessionGenerationTracker.update('req-b', { outputTokens: 1000 });

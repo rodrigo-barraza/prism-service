@@ -34,7 +34,8 @@ const {
 } = await import("../src/services/conversation/utils.ts");
 
 // ── Type alias for convenience ────────────────────────────────
-type TestMessage = Record<string, unknown>;
+import type { ChatMessage } from "../src/types/admin.ts";
+type TestMessage = ChatMessage;
 
 // ═══════════════════════════════════════════════════════════════
 describe("computeModalities", () => {
@@ -43,7 +44,7 @@ describe("computeModalities", () => {
       { role: "user", content: "Hello" },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.textIn).toBe(true);
     expect(modalities.textOut).toBe(false);
@@ -54,7 +55,7 @@ describe("computeModalities", () => {
       { role: "assistant", content: "Hi there!" },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.textOut).toBe(true);
   });
@@ -67,7 +68,7 @@ describe("computeModalities", () => {
       },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.textOut).toBe(true);
     expect(modalities.functionCalling).toBe(true);
@@ -78,7 +79,7 @@ describe("computeModalities", () => {
       { role: "user", content: "What is this?", images: ["data:image/png;base64,abc"] },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.imageIn).toBe(true);
     expect(modalities.imageOut).toBe(false);
@@ -89,7 +90,7 @@ describe("computeModalities", () => {
       { role: "assistant", content: "Here's your image", images: ["minio://img/1.png"] },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.imageOut).toBe(true);
   });
@@ -99,7 +100,7 @@ describe("computeModalities", () => {
       { role: "user", audio: "data:audio/wav;base64,abc" },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.audioIn).toBe(true);
   });
@@ -109,7 +110,7 @@ describe("computeModalities", () => {
       { role: "assistant", audio: "minio://audio/clip.mp3" },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.audioOut).toBe(true);
   });
@@ -119,7 +120,7 @@ describe("computeModalities", () => {
       { role: "user", content: "Analyze this", documents: ["doc.pdf"] },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.docIn).toBe(true);
   });
@@ -129,7 +130,7 @@ describe("computeModalities", () => {
       { role: "user", content: "Read this", images: ["report.pdf"] },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.docIn).toBe(true);
   });
@@ -142,7 +143,7 @@ describe("computeModalities", () => {
       },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.webSearch).toBe(true);
   });
@@ -155,7 +156,7 @@ describe("computeModalities", () => {
       },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.webSearch).toBe(true);
   });
@@ -168,7 +169,7 @@ describe("computeModalities", () => {
       },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.codeExecution).toBe(true);
   });
@@ -181,7 +182,7 @@ describe("computeModalities", () => {
       },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.codeExecution).toBe(true);
   });
@@ -191,7 +192,7 @@ describe("computeModalities", () => {
       { role: "tool", content: JSON.stringify({ result: "ok" }) },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.functionCalling).toBe(true);
   });
@@ -201,7 +202,7 @@ describe("computeModalities", () => {
       { role: "assistant", content: "Answer", thinking: "Let me reason about this..." },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.thinking).toBe(true);
   });
@@ -212,7 +213,7 @@ describe("computeModalities", () => {
       { role: "assistant", content: "Hi", deleted: true },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.textIn).toBe(false);
     expect(modalities.textOut).toBe(false);
@@ -223,7 +224,7 @@ describe("computeModalities", () => {
       { role: "user", content: "live audio text", liveTranscription: true },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.textIn).toBe(false);
   });
@@ -233,7 +234,7 @@ describe("computeModalities", () => {
       { role: "user", content: "Check this video", images: ["data:video/mp4;base64,abc123"] },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.videoIn).toBe(true);
     expect(modalities.imageIn).toBe(false);
@@ -244,7 +245,7 @@ describe("computeModalities", () => {
       { role: "user", content: "Watch this", images: ["minio://uploads/clip.mp4"] },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.videoIn).toBe(true);
     expect(modalities.imageIn).toBe(false);
@@ -255,7 +256,7 @@ describe("computeModalities", () => {
       { role: "user", content: "Look at this", images: ["data:image/png;base64,abc"] },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.videoIn).toBe(false);
     expect(modalities.imageIn).toBe(true);
@@ -266,7 +267,7 @@ describe("computeModalities", () => {
       { role: "user", content: "Parse this", images: ["data:application/pdf;base64,abc"] },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.docIn).toBe(true);
     expect(modalities.imageIn).toBe(false);
@@ -277,7 +278,7 @@ describe("computeModalities", () => {
       { role: "user", content: "Read this", images: ["data:text/plain;base64,abc"] },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.docIn).toBe(true);
     expect(modalities.imageIn).toBe(false);
@@ -296,7 +297,7 @@ describe("computeModalities", () => {
       },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.imageIn).toBe(true);
     expect(modalities.videoIn).toBe(true);
@@ -308,13 +309,13 @@ describe("computeModalities", () => {
       { role: "user", content: "See this", image: "data:image/jpeg;base64,abc" },
     ];
 
-    const modalities = computeModalities(messages as any);
+    const modalities = computeModalities(messages);
 
     expect(modalities.imageIn).toBe(true);
   });
 
   it("should return all false for empty messages array", () => {
-    const modalities = computeModalities([] as any);
+    const modalities = computeModalities([]);
 
     expect(modalities.textIn).toBe(false);
     expect(modalities.textOut).toBe(false);
@@ -337,7 +338,7 @@ describe("extractProviders", () => {
       { role: "assistant", content: "Hello", provider: PROVIDERS.ANTHROPIC.toUpperCase() },
     ];
 
-    const providers = extractProviders(messages as any, null);
+    const providers = extractProviders(messages, null);
 
     expect(providers).toContain(PROVIDERS.OPENAI);
     expect(providers).toContain(PROVIDERS.ANTHROPIC);
@@ -348,7 +349,7 @@ describe("extractProviders", () => {
       { role: "assistant", content: "Hi", provider: PROVIDERS.GOOGLE.toUpperCase() },
     ];
 
-    const providers = extractProviders(messages as any, null);
+    const providers = extractProviders(messages, null);
 
     expect(providers).toContain(PROVIDERS.GOOGLE);
   });
@@ -359,7 +360,7 @@ describe("extractProviders", () => {
       { role: "assistant", content: "B", provider: PROVIDERS.OPENAI },
     ];
 
-    const providers = extractProviders(messages as any, null);
+    const providers = extractProviders(messages, null);
 
     expect(providers.filter((provider: string) => provider === PROVIDERS.OPENAI)).toHaveLength(1);
   });
@@ -368,7 +369,7 @@ describe("extractProviders", () => {
     const messages: TestMessage[] = [];
     const settings = { provider: PROVIDERS.GOOGLE, model: "gemini-3.5-flash" };
 
-    const providers = extractProviders(messages as any, settings as any);
+    const providers = extractProviders(messages, settings);
 
     expect(providers).toContain(PROVIDERS.GOOGLE);
   });
@@ -378,13 +379,13 @@ describe("extractProviders", () => {
       { role: "assistant", content: "Hi", provider: PROVIDERS.OPENAI, deleted: true },
     ];
 
-    const providers = extractProviders(messages as any, null);
+    const providers = extractProviders(messages, null);
 
     expect(providers).toHaveLength(0);
   });
 
   it("should return empty array for empty messages and no settings", () => {
-    const providers = extractProviders([] as any, null);
+    const providers = extractProviders([], null);
 
     expect(providers).toEqual([]);
   });
@@ -399,7 +400,7 @@ describe("computeTotalCost", () => {
       { role: "assistant", content: "C", estimatedCost: 0.0005 },
     ];
 
-    const totalCost = computeTotalCost(messages as any);
+    const totalCost = computeTotalCost(messages);
 
     expect(totalCost).toBeCloseTo(0.0035);
   });
@@ -410,7 +411,7 @@ describe("computeTotalCost", () => {
       { role: "assistant", content: "B", estimatedCost: 0.02, deleted: true },
     ];
 
-    const totalCost = computeTotalCost(messages as any);
+    const totalCost = computeTotalCost(messages);
 
     expect(totalCost).toBeCloseTo(0.01);
   });
@@ -421,13 +422,13 @@ describe("computeTotalCost", () => {
       { role: "assistant", content: "Hi" },
     ];
 
-    const totalCost = computeTotalCost(messages as any);
+    const totalCost = computeTotalCost(messages);
 
     expect(totalCost).toBe(0);
   });
 
   it("should return 0 for empty array", () => {
-    const totalCost = computeTotalCost([] as any);
+    const totalCost = computeTotalCost([]);
 
     expect(totalCost).toBe(0);
   });
@@ -452,7 +453,7 @@ describe("buildConversationPatchFields", () => {
           provider: PROVIDERS.OPENAI,
           estimatedCost: 0.001,
         },
-      ] as any,
+      ],
       settings: { provider: PROVIDERS.OPENAI, model: "gpt-4o" },
     });
 

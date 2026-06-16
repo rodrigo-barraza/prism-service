@@ -5,6 +5,7 @@ import request from "supertest";
 import { app } from "./setup.ts";
 import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
 import { setupWebSocket } from "../src/websocket/index.ts";
+import { PROVIDERS } from "../src/constants.ts";
 
 // Mock @google/genai to prevent real network calls and mock Live API session connection
 let mockLiveSessionCallbacks: any = null;
@@ -67,7 +68,7 @@ describe("Telemetry Context Propagation — Integration Tests", () => {
       .set("x-username", "test-user")
       .set("x-agent", "weather-agent")
       .send({
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         model: "gemini-3.5-flash",
         agent: "weather-agent",
         functionCallingEnabled: true,
@@ -84,7 +85,7 @@ describe("Telemetry Context Propagation — Integration Tests", () => {
     expect(lastCallContext.requestId).toBeDefined();
     expect(lastCallContext.conversationId).toBeDefined();
     expect(lastCallContext.iteration).toBe(1);
-    expect(lastCallContext._providerName).toBe("google");
+    expect(lastCallContext._providerName).toBe(PROVIDERS.GOOGLE);
     expect(lastCallContext._resolvedModel).toBe("gemini-3.5-flash");
   });
 
@@ -171,7 +172,7 @@ describe("Telemetry Context Propagation — Integration Tests", () => {
     expect(lastCallContext.agent).toBe("my-agent");
     expect(lastCallContext.conversationId).toBe("live-conv-789");
     expect(lastCallContext.clientIp).toBe("127.0.0.1");
-    expect(lastCallContext._providerName).toBe("google");
+    expect(lastCallContext._providerName).toBe(PROVIDERS.GOOGLE);
     expect(lastCallContext._resolvedModel).toBe("gemini-2.0-flash-live-001");
   });
 });

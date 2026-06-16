@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 
 // Mock dependencies
 vi.mock("../src/utils/logger.ts", () => ({
@@ -33,9 +34,9 @@ describe("LocalModelQueue", () => {
 
   describe("isLocal", () => {
     it("should return true for base local provider types", () => {
-      expect(localModelQueue.isLocal("lm-studio")).toBe(true);
-      expect(localModelQueue.isLocal("ollama")).toBe(true);
-      expect(localModelQueue.isLocal("vllm")).toBe(true);
+      expect(localModelQueue.isLocal(PROVIDERS.LM_STUDIO)).toBe(true);
+      expect(localModelQueue.isLocal(PROVIDERS.OLLAMA)).toBe(true);
+      expect(localModelQueue.isLocal(PROVIDERS.VLLM)).toBe(true);
     });
 
     it("should return true for registered instance IDs", () => {
@@ -44,8 +45,8 @@ describe("LocalModelQueue", () => {
     });
 
     it("should return false for non-local providers", () => {
-      expect(localModelQueue.isLocal("openai")).toBe(false);
-      expect(localModelQueue.isLocal("anthropic")).toBe(false);
+      expect(localModelQueue.isLocal(PROVIDERS.OPENAI)).toBe(false);
+      expect(localModelQueue.isLocal(PROVIDERS.ANTHROPIC)).toBe(false);
     });
   });
 
