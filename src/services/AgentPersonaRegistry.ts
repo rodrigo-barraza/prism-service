@@ -101,9 +101,9 @@ const AgentPersonaRegistry = {
         let sections: ToolPolicySection[];
 
         if (Array.isArray(raw)) {
-          sections = (raw as Array<Record<string, unknown>>).map((s) => ({
-            content: (s.content as string) || "",
-            ...(Array.isArray(s.requires) ? { requires: s.requires as string[] } : {}),
+          sections = (raw as Array<Record<string, unknown>>).map((section) => ({
+            content: (section.content as string) || "",
+            ...(Array.isArray(section.requires) ? { requires: section.requires as string[] } : {}),
           }));
         } else {
           const text = (raw as string) || "";

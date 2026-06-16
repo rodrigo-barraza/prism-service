@@ -6,12 +6,10 @@ import { extractDiscoverableDomains, extractDomainKeywords } from "../personas/u
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 import { getCurrentDynamicTools, persistDynamicTools } from "./utils/DynamicToolHelpers.ts";
 
+import { getGlobalToolOrchestratorService } from "../../types/GlobalToolOrchestratorRegistry.ts";
+
 const getToolOrchestratorService = () => {
-  const service = (globalThis as any).ToolOrchestratorService;
-  if (!service) {
-    throw new Error("ToolOrchestratorService not registered on globalThis");
-  }
-  return service;
+  return getGlobalToolOrchestratorService();
 };
 
 export interface ToolMatch {

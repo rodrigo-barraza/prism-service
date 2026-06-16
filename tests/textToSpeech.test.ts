@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
+import { PROVIDERS } from "../src/constants.ts";
 import { app, MOCK_GENERATE_SPEECH } from "./setup.ts";
 
 describe("POST /text-to-audio", () => {
@@ -35,7 +36,7 @@ describe("POST /text-to-audio", () => {
   it("returns 400 when text is missing", async () => {
     const res = await request(app)
       .post("/text-to-audio")
-      .send({ provider: "openai" })
+      .send({ provider: PROVIDERS.OPENAI })
       .expect(400);
 
     expect(res.body).toHaveProperty("error", true);
@@ -47,7 +48,7 @@ describe("POST /text-to-audio", () => {
   it("returns binary audio with correct Content-Type (minimal params)", async () => {
     const res = await request(app)
       .post("/text-to-audio")
-      .send({ provider: "openai", text: "Hello world" })
+      .send({ provider: PROVIDERS.OPENAI, text: "Hello world" })
       .expect(200);
 
     expect(res.headers["content-type"]).toMatch(/audio/);
@@ -60,7 +61,7 @@ describe("POST /text-to-audio", () => {
   it("passes voice parameter to the provider", async () => {
     await request(app)
       .post("/text-to-audio")
-      .send({ provider: "openai", text: "Hello world", voice: "echo" })
+      .send({ provider: PROVIDERS.OPENAI, text: "Hello world", voice: "echo" })
       .expect(200);
 
     expect(MOCK_GENERATE_SPEECH).toHaveBeenCalledTimes(1);
@@ -71,7 +72,7 @@ describe("POST /text-to-audio", () => {
   it("passes undefined voice when omitted", async () => {
     await request(app)
       .post("/text-to-audio")
-      .send({ provider: "openai", text: "Hello world" })
+      .send({ provider: PROVIDERS.OPENAI, text: "Hello world" })
       .expect(200);
 
     const calledVoice = MOCK_GENERATE_SPEECH.mock.calls[0][1];
@@ -151,7 +152,7 @@ describe("POST /text-to-audio", () => {
   it("works with elevenlabs provider", async () => {
     await request(app)
       .post("/text-to-audio")
-      .send({ provider: "elevenlabs", text: "Hello" })
+      .send({ provider: PROVIDERS.ELEVENLABS, text: "Hello" })
       .expect(200);
 
     expect(MOCK_GENERATE_SPEECH).toHaveBeenCalledTimes(1);
@@ -160,7 +161,7 @@ describe("POST /text-to-audio", () => {
   it("works with google provider", async () => {
     await request(app)
       .post("/text-to-audio")
-      .send({ provider: "google", text: "Hello" })
+      .send({ provider: PROVIDERS.GOOGLE, text: "Hello" })
       .expect(200);
 
     expect(MOCK_GENERATE_SPEECH).toHaveBeenCalledTimes(1);
@@ -169,7 +170,7 @@ describe("POST /text-to-audio", () => {
   it("works with inworld provider", async () => {
     await request(app)
       .post("/text-to-audio")
-      .send({ provider: "inworld", text: "Hello" })
+      .send({ provider: PROVIDERS.INWORLD, text: "Hello" })
       .expect(200);
 
     expect(MOCK_GENERATE_SPEECH).toHaveBeenCalledTimes(1);
@@ -180,7 +181,7 @@ describe("POST /text-to-audio", () => {
   it("returns 400 for provider that does not support TTS", async () => {
     const res = await request(app)
       .post("/text-to-audio")
-      .send({ provider: "anthropic", text: "Hello" })
+      .send({ provider: PROVIDERS.ANTHROPIC, text: "Hello" })
       .expect(400);
 
     expect(res.body).toHaveProperty("error", true);
@@ -207,7 +208,7 @@ describe("POST /text-to-audio", () => {
 
     const res = await request(app)
       .post("/text-to-audio")
-      .send({ provider: "openai", text: "Hello" })
+      .send({ provider: PROVIDERS.OPENAI, text: "Hello" })
       .expect(200);
 
     expect(res.headers["content-type"]).toMatch(/audio/);

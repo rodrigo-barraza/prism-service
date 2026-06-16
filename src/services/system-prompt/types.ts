@@ -16,6 +16,32 @@ export interface ScoredSkill {
   score: number;
 }
 
+export interface PlatformContext {
+  description?: string;
+  serverContext?: string;
+  imageContext?: string;
+  ids?: string;
+  [key: string]: unknown;
+}
+
+export interface AgentContext {
+  platform?: string;
+  platformContext?: PlatformContext;
+  discordContext?: string;
+  serverContext?: string;
+  imageContext?: string;
+  guildId?: string;
+  channelId?: string;
+  clockCrewContext?: string;
+  stickersContext?: string;
+  emotionContext?: string;
+  visualContext?: string;
+  lightsContext?: string;
+  endpoint?: string;
+  participantUserIds?: string[];
+  [key: string]: unknown;
+}
+
 export interface AssemblerContext {
   agent?: string | null;
   project?: string | null;
@@ -23,7 +49,7 @@ export interface AssemblerContext {
   messages?: Array<{ role: string; content?: string; [key: string]: unknown }>;
   enabledTools?: string[];
   resolvedToolNames?: string[];
-  agentContext?: Record<string, unknown>;
+  agentContext?: AgentContext;
   traceId?: string | null;
   agentSessionId?: string | null;
   clientIp?: string | null;

@@ -424,11 +424,11 @@ const MCPClientService = {
 
     try {
       const result = await conn.client.listResources();
-      const resources = (result.resources || []).map((r) => ({
-        uri: r.uri,
-        name: r.name || r.uri,
-        description: r.description || null,
-        mimeType: r.mimeType || null,
+      const resources = (result.resources || []).map((resource) => ({
+        uri: resource.uri,
+        name: resource.name || resource.uri,
+        description: resource.description || null,
+        mimeType: resource.mimeType || null,
       }));
       return { resources, serverName, count: resources.length };
     } catch (error: unknown) {
@@ -584,7 +584,7 @@ const MCPClientService = {
       );
 
       const results = await Promise.allSettled(
-        servers.map((s) => this.connect(s)),
+        servers.map((server) => this.connect(server)),
       );
 
       for (let i = 0; i < results.length; i++) {

@@ -15,6 +15,7 @@ import RequestLogger from "../RequestLogger.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
 import { COLLECTIONS } from "../../constants.ts";
 import logger from "../../utils/logger.ts";
+import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
 interface SomaticStatEntry {
   level: number;
@@ -179,7 +180,7 @@ async function loadFromDatabase(agentId: string): Promise<Partial<SomaticLevels>
     if (!document?.levels) return null;
     return document.levels as Partial<SomaticLevels>;
   } catch (error: unknown) {
-    logger.warn(`[SomaticStateService] Failed to load state for "${agentId}": ${(error as Error).message}`);
+    logger.warn(`[SomaticStateService] Failed to load state for "${agentId}": ${getErrorMessage(error)}`);
     return null;
   }
 }
@@ -215,7 +216,7 @@ async function persistToDatabase(agentId: string, state: AgentSomaticState): Pro
 
     state.isDirty = false;
   } catch (error: unknown) {
-    logger.warn(`[SomaticStateService] Failed to persist state for "${agentId}": ${(error as Error).message}`);
+    logger.warn(`[SomaticStateService] Failed to persist state for "${agentId}": ${getErrorMessage(error)}`);
   }
 }
 
@@ -338,7 +339,7 @@ async function analyzeEmotionFromText(
     });
   } catch (error: unknown) {
     success = false;
-    errorMessage = (error as Error).message;
+    errorMessage = getErrorMessage(error);
     logger.error(`[SomaticStateService] ❌ Emotion analysis API failed: ${errorMessage}`);
   }
 

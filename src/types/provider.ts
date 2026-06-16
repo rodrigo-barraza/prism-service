@@ -189,6 +189,14 @@ export interface Provider {
     model?: string,
     options?: ProviderOptions
   ): AsyncGenerator<StreamChunk, void, unknown>;
+  generateTextStreamLive?(
+    messages: ChatMessage[],
+    model?: string,
+    options?: ProviderOptions
+  ): AsyncGenerator<StreamChunk, void, unknown>;
+  generateImage?(
+    ...args: unknown[]
+  ): Promise<unknown>;
   captionImage?(
     images: string[],
     prompt?: string,
@@ -223,4 +231,23 @@ export interface Provider {
     slotsProcessing?: number | null;
     error?: string;
   }>;
+  generateSpeech?(
+    text: string,
+    voice?: string,
+    options?: ProviderOptions
+  ): Promise<{ stream: ReadableStream | import("stream").Readable | null; contentType: string }>;
+  generateSpeechStream?(
+    textStream: AsyncIterable<string>,
+    voice?: string,
+    options?: ProviderOptions
+  ): AsyncGenerator<Buffer | Uint8Array, void, unknown>;
+  transcribeAudio?(
+    audioBuffer: Buffer,
+    mimeType: string,
+    model?: string,
+    options?: ProviderOptions
+  ): Promise<{ text: string; usage: Record<string, number> }>;
+  unloadModelByKey?(modelKey: string): Promise<void>;
+  ensureModelLoaded?(modelKey: string): Promise<void>;
+  unloadModel?(modelId: string): Promise<void>;
 }

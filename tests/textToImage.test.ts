@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
+import { PROVIDERS } from "../src/constants.ts";
 import {
   app,
   TEST_SECRET,
@@ -35,7 +36,7 @@ describe("POST /chat (text-to-image via imageAPI model)", () => {
     const res = await request(app)
       .post("/chat?stream=false")
       .set("x-api-secret", TEST_SECRET)
-      .send({ provider: "openai", model: "gpt-image-1.5" })
+      .send({ provider: PROVIDERS.OPENAI, model: "gpt-image-1.5" })
       .expect(500);
 
     expect(res.body).toHaveProperty("error", true);
@@ -49,7 +50,7 @@ describe("POST /chat (text-to-image via imageAPI model)", () => {
       .post("/chat?stream=false")
       .set("x-api-secret", TEST_SECRET)
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-image-1.5",
         messages: [{ role: "user", content: "A sunset over the ocean" }],
       })
@@ -128,7 +129,7 @@ describe("POST /chat (text-to-image via imageAPI model)", () => {
       .post("/chat?stream=false")
       .set("x-api-secret", TEST_SECRET)
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-image-1.5",
         messages: [{ role: "user", content: "A frog" }],
       })
@@ -164,7 +165,7 @@ describe("POST /chat (text-to-image via imageAPI model)", () => {
       .post("/chat?stream=false")
       .set("x-api-secret", TEST_SECRET)
       .send({
-        provider: "anthropic",
+        provider: PROVIDERS.ANTHROPIC,
         model: "gpt-image-1.5",
         messages: [{ role: "user", content: "A cat" }],
       })

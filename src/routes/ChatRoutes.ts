@@ -365,7 +365,7 @@ async function prepareGenerationContext(
         }
         logger.info(
           `[chat] ⚖️ Load balance: ${providerName} → ${bestId} ` +
-          `(model="${resolvedModel}", ${siblings.map((s) => `${s.id}:${s.concurrency - localModelQueue._getQueue(s.id).activeCount}free`).join(", ")})`,
+          `(model="${resolvedModel}", ${siblings.map((sibling) => `${sibling.id}:${sibling.concurrency - localModelQueue._getQueue(sibling.id).activeCount}free`).join(", ")})`,
         );
         providerName = bestId;
       }

@@ -172,7 +172,7 @@ const elevenlabsProvider = ({
           if (error)
             throw new ProviderError("elevenlabs", getErrorMessage(error), 500, error);
           if (ended) break;
-          await new Promise<void>((r) => { resolveMessage = r; });
+          await new Promise<void>((resolve) => { resolveMessage = resolve; });
         }
       }
     } finally {

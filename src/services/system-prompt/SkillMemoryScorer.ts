@@ -69,15 +69,15 @@ export class SkillMemoryScorer {
       if (skills.length === 0) return [];
 
       // If no query or no skills have embeddings, return all (graceful fallback)
-      const hasEmbeddings = skills.some((s) => Array.isArray(s.embedding) && s.embedding.length > 0);
+      const hasEmbeddings = skills.some((skill) => Array.isArray(skill.embedding) && skill.embedding.length > 0);
       if (!queryText || !hasEmbeddings) {
         logger.info(
           `[SystemPromptAssembler] Returning all ${skills.length} skills (no query or no embeddings)`
         );
-        return skills.map((s) => ({
-          name: s.name as string,
-          content: s.content as string,
-          description: s.description as string,
+        return skills.map((skill) => ({
+          name: skill.name as string,
+          content: skill.content as string,
+          description: skill.description as string,
           score: 1,
         }));
       }
@@ -97,29 +97,29 @@ export class SkillMemoryScorer {
         logger.warn(
           `[SystemPromptAssembler] Query embedding failed: ${getErrorMessage(error)} — returning all skills`
         );
-        return skills.map((s) => ({
-          name: s.name as string,
-          content: s.content as string,
-          description: s.description as string,
+        return skills.map((skill) => ({
+          name: skill.name as string,
+          content: skill.content as string,
+          description: skill.description as string,
           score: 1,
         }));
       }
 
       // Score and filter by relevance threshold
       const scored: ScoredSkill[] = skills
-        .map((s) => ({
-          name: s.name as string,
-          content: s.content as string,
-          description: s.description as string,
-          score: s.embedding
-            ? cosineSimilarity(queryEmbedding, s.embedding as number[])
+        .map((skill) => ({
+          name: skill.name as string,
+          content: skill.content as string,
+          description: skill.description as string,
+          score: skill.embedding
+            ? cosineSimilarity(queryEmbedding, skill.embedding as number[])
             : 0,
         }))
-        .filter((s) => s.score >= SKILL_RELEVANCE_THRESHOLD)
+        .filter((skill) => skill.score >= SKILL_RELEVANCE_THRESHOLD)
         .sort((firstItem, b) => b.score - firstItem.score);
 
       logger.info(
-        `[SystemPromptAssembler] Skills: ${scored.length}/${skills.length} above threshold (${scored.map((s) => `${s.name}:${s.score.toFixed(2)}`).join(", ")})`
+        `[SystemPromptAssembler] Skills: ${scored.length}/${skills.length} above threshold (${scored.map((skill) => `${skill.name}:${skill.score.toFixed(2)}`).join(", ")})`
       );
 
       return scored;

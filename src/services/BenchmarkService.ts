@@ -689,11 +689,11 @@ const BenchmarkService = {
     const results = bucketOutputs.flat();
     const completedAt = new Date().toISOString();
     const wasAborted = signal?.aborted || aborted;
-    const passed = results.filter((r) => r.passed).length;
-    const failed = results.filter((r) => !r.passed && !r.error).length;
-    const errored = results.filter((r) => r.error).length;
+    const passed = results.filter((benchmarkResult) => benchmarkResult.passed).length;
+    const failed = results.filter((benchmarkResult) => !benchmarkResult.passed && !benchmarkResult.error).length;
+    const errored = results.filter((benchmarkResult) => benchmarkResult.error).length;
     const totalCost = results.reduce(
-      (sum, r) => sum + (r.estimatedCost || 0),
+      (sum, benchmarkResult) => sum + (benchmarkResult.estimatedCost || 0),
       0,
     );
     const run = {

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
+import { PROVIDERS } from "../src/constants.ts";
 import {
   app,
   MOCK_GENERATE_TEXT_STREAM,
@@ -30,7 +31,7 @@ describe("POST /chat (text-to-text)", () => {
   it("returns error when messages is missing", async () => {
     const res = await request(app)
       .post("/chat?stream=false")
-      .send({ provider: "openai" })
+      .send({ provider: PROVIDERS.OPENAI })
       .expect(500);
 
     expect(res.body).toHaveProperty("error", true);
@@ -40,7 +41,7 @@ describe("POST /chat (text-to-text)", () => {
   it("returns error when messages is not an array", async () => {
     const res = await request(app)
       .post("/chat?stream=false")
-      .send({ provider: "openai", messages: "not an array" })
+      .send({ provider: PROVIDERS.OPENAI, messages: "not an array" })
       .expect(500);
 
     expect(res.body).toHaveProperty("error", true);
@@ -53,13 +54,13 @@ describe("POST /chat (text-to-text)", () => {
     const res = await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         messages: [{ role: "user", content: "Hello" }],
       })
       .expect(200);
 
     expect(res.body).toHaveProperty("text", "Hello from mock");
-    expect(res.body).toHaveProperty("provider", "openai");
+    expect(res.body).toHaveProperty("provider", PROVIDERS.OPENAI);
     expect(res.body).toHaveProperty("usage");
     expect(res.body.usage).toHaveProperty("inputTokens", 10);
     expect(res.body.usage).toHaveProperty("outputTokens", 5);
@@ -72,7 +73,7 @@ describe("POST /chat (text-to-text)", () => {
     await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         messages: [{ role: "user", content: "hi" }],
       })
       .expect(200);
@@ -88,7 +89,7 @@ describe("POST /chat (text-to-text)", () => {
     await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-5.2",
         messages: [{ role: "user", content: "hi" }],
       })
@@ -105,7 +106,7 @@ describe("POST /chat (text-to-text)", () => {
     await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         messages: [{ role: "user", content: "hi" }],
         temperature: 0.5,
         maxTokens: 100,
@@ -121,7 +122,7 @@ describe("POST /chat (text-to-text)", () => {
     await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         messages: [{ role: "user", content: "hi" }],
         thinkingLevel: "medium",
       })
@@ -139,7 +140,7 @@ describe("POST /chat (text-to-text)", () => {
     await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         messages: [{ role: "user", content: "hi" }],
       })
       .expect(200);
@@ -154,7 +155,7 @@ describe("POST /chat (text-to-text)", () => {
     await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         messages: [
           { role: "system", content: "You are helpful." },
           { role: "user", content: "Hello" },
@@ -174,24 +175,24 @@ describe("POST /chat (text-to-text)", () => {
     const res = await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "anthropic",
+        provider: PROVIDERS.ANTHROPIC,
         messages: [{ role: "user", content: "hi" }],
       })
       .expect(200);
 
-    expect(res.body).toHaveProperty("provider", "anthropic");
+    expect(res.body).toHaveProperty("provider", PROVIDERS.ANTHROPIC);
   });
 
   it("works with google provider", async () => {
     const res = await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         messages: [{ role: "user", content: "hi" }],
       })
       .expect(200);
 
-    expect(res.body).toHaveProperty("provider", "google");
+    expect(res.body).toHaveProperty("provider", PROVIDERS.GOOGLE);
   });
 
   it("works with openai-compatible provider", async () => {
@@ -217,7 +218,7 @@ describe("POST /chat (text-to-text)", () => {
     const res = await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         messages: [{ role: "user", content: "hi" }],
       })
       .expect(500);
@@ -230,7 +231,7 @@ describe("POST /chat (text-to-text)", () => {
     const res = await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "elevenlabs",
+        provider: PROVIDERS.ELEVENLABS,
         messages: [{ role: "user", content: "hi" }],
       })
       .expect(500);

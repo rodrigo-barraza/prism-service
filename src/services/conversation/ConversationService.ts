@@ -280,35 +280,35 @@ const ConversationService: ConversationServiceInterface = {
     const toolCounts: Record<string, number> = {};
     let requestErrorCount = 0;
 
-    for (const r of requests) {
-      totalCost += r.estimatedCost || 0;
-      totalInputTokens += r.inputTokens || 0;
-      totalOutputTokens += r.outputTokens || 0;
-      totalCacheReadInputTokens += r.cacheReadInputTokens || 0;
-      totalCacheCreationInputTokens += r.cacheCreationInputTokens || 0;
-      totalReasoningOutputTokens += r.reasoningOutputTokens || 0;
-      if (r.provider) providers.add(r.provider);
-      if (r.model) models.add(r.model);
-      if (r.operation) operations.add(r.operation);
+    for (const request of requests) {
+      totalCost += request.estimatedCost || 0;
+      totalInputTokens += request.inputTokens || 0;
+      totalOutputTokens += request.outputTokens || 0;
+      totalCacheReadInputTokens += request.cacheReadInputTokens || 0;
+      totalCacheCreationInputTokens += request.cacheCreationInputTokens || 0;
+      totalReasoningOutputTokens += request.reasoningOutputTokens || 0;
+      if (request.provider) providers.add(request.provider);
+      if (request.model) models.add(request.model);
+      if (request.operation) operations.add(request.operation);
       // Merge modalities
-      if (r.modalities) {
-        for (const [k, value] of Object.entries(r.modalities)) {
+      if (request.modalities) {
+        for (const [k, value] of Object.entries(request.modalities)) {
           if (value) mergedModalities[k] = true;
         }
       }
       // Count tool usage
-      if (r.toolApiNames && r.toolApiNames.length > 0) {
-        for (const name of r.toolApiNames) {
+      if (request.toolApiNames && request.toolApiNames.length > 0) {
+        for (const name of request.toolApiNames) {
           toolCounts[name] = (toolCounts[name] || 0) + 1;
         }
       }
-      if (r.success === false) {
+      if (request.success === false) {
         requestErrorCount++;
       }
     }
 
     const workerRequestCount = requests.filter(
-      (r) => r.agentSessionId !== sessionId,
+      (reservation) => reservation.agentSessionId !== sessionId,
     ).length;
 
     const createdAt = (requests as Record<string, unknown>[]).reduce(

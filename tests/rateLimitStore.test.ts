@@ -6,6 +6,7 @@
  * the admin sees stale or incorrect limits.
  */
 import { describe, it, expect, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 
 // Import the singleton — tests exercise its public interface
 const { default: rateLimitStore } = await import(
@@ -24,7 +25,7 @@ describe("RateLimitStore", () => {
   });
 
   it("should store and retrieve dynamic rate limits", () => {
-    rateLimitStore.update("openai", "gpt-5.5", {
+    rateLimitStore.update(PROVIDERS.OPENAI, "gpt-5.5", {
       rpm: 10000,
       tpm: 30_000_000,
       rpd: 10_000,
@@ -42,11 +43,11 @@ describe("RateLimitStore", () => {
   });
 
   it("should group multiple models under the same provider", () => {
-    rateLimitStore.update("anthropic", "claude-opus-4", {
+    rateLimitStore.update(PROVIDERS.ANTHROPIC, "claude-opus-4", {
       rpm: 4000,
       tpm: 400_000,
     });
-    rateLimitStore.update("anthropic", "claude-4-sonnet", {
+    rateLimitStore.update(PROVIDERS.ANTHROPIC, "claude-4-sonnet", {
       rpm: 4000,
       tpm: 400_000,
     });
@@ -60,7 +61,7 @@ describe("RateLimitStore", () => {
   it("should be a no-op when rateLimits is null", () => {
     // Should not throw
     expect(() => {
-      rateLimitStore.update("openai", "gpt-5.5", null as any);
+      rateLimitStore.update(PROVIDERS.OPENAI, "gpt-5.5", null as any);
     }).not.toThrow();
   });
 
@@ -72,13 +73,13 @@ describe("RateLimitStore", () => {
 
   it("should be a no-op when model is empty", () => {
     expect(() => {
-      rateLimitStore.update("openai", "", { rpm: 100 });
+      rateLimitStore.update(PROVIDERS.OPENAI, "", { rpm: 100 });
     }).not.toThrow();
   });
 
   it("should overwrite previous limits on subsequent update", () => {
-    rateLimitStore.update("openai", "overwrite-test", { rpm: 100 });
-    rateLimitStore.update("openai", "overwrite-test", { rpm: 200 });
+    rateLimitStore.update(PROVIDERS.OPENAI, "overwrite-test", { rpm: 100 });
+    rateLimitStore.update(PROVIDERS.OPENAI, "overwrite-test", { rpm: 200 });
 
     const allLimits = rateLimitStore.getAll();
     const modelData = allLimits.openai.models["overwrite-test"] as Record<string, unknown>;
@@ -88,7 +89,7 @@ describe("RateLimitStore", () => {
   });
 
   it("should include updatedAt timestamp on dynamic entries", () => {
-    rateLimitStore.update("openai", "timestamp-test", { rpm: 100 });
+    rateLimitStore.update(PROVIDERS.OPENAI, "timestamp-test", { rpm: 100 });
 
     const allLimits = rateLimitStore.getAll();
     const modelData = allLimits.openai.models["timestamp-test"] as Record<string, unknown>;
@@ -102,7 +103,7 @@ describe("RateLimitStore", () => {
 
 describe('RateLimitStore adversarial', () => {
   it('should silently ignore update with null rateLimits', () => {
-    rateLimitStore.update('openai', 'gpt-5', null as unknown as { rpm?: number });
+    rateLimitStore.update(PROVIDERS.OPENAI, 'gpt-5', null as unknown as { rpm?: number });
     // Should not throw or add any entry
   });
 
@@ -112,7 +113,7 @@ describe('RateLimitStore adversarial', () => {
   });
 
   it('should silently ignore update with empty model name', () => {
-    rateLimitStore.update('openai', '', { rpm: 100 });
+    rateLimitStore.update(PROVIDERS.OPENAI, '', { rpm: 100 });
     // Should not throw — guard clause returns early
   });
 

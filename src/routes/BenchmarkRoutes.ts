@@ -263,20 +263,20 @@ router.get(
           let errored = 0;
           const perBenchmark: (PerBenchmarkStat & { latestPassed: boolean; latestErrored: boolean })[] = [];
 
-                    for ( const r of benchmarkResults) {
-            if (r.error) errored++;
-            else if (r.passed) passed++;
+                    for ( const benchmarkResult of benchmarkResults) {
+            if (benchmarkResult.error) errored++;
+            else if (benchmarkResult.passed) passed++;
             else failed++;
 
             // Detail card uses cumulative (all runs) stats
-            const cumulKey = `${modelKey}::${r.benchmarkId}`;
+            const cumulKey = `${modelKey}::${benchmarkResult.benchmarkId}`;
             const cumul = cumulativeBenchmarks.get(cumulKey);
 
             perBenchmark.push({
-              name: r.benchmarkName,
+              name: benchmarkResult.benchmarkName,
               // Latest result (for the status badge)
-              latestPassed: !r.error && r.passed,
-              latestErrored: !!r.error,
+              latestPassed: !benchmarkResult.error && benchmarkResult.passed,
+              latestErrored: !!benchmarkResult.error,
               // Cumulative stats (all runs)
               total: cumul?.total || 0,
               passed: cumul?.passed || 0,

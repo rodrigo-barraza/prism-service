@@ -60,14 +60,14 @@ router.get(
       // Enrich with live connection status
       const connectedServers = MCPClientService.getConnectedServers() as ConnectedServerInfo[];
       const connectedMap = new Map<string, ConnectedServerInfo>(
-        connectedServers.map((s) => [s.name, s]),
+        connectedServers.map((server) => [server.name, server]),
       );
 
-      const enriched = servers.map((s) => {
-        const conn = connectedMap.get(s.name);
+      const enriched = servers.map((server) => {
+        const conn = connectedMap.get(server.name);
         return {
-          ...s,
-          id: s._id.toString(),
+          ...server,
+          id: server._id.toString(),
           connected: !!conn,
           toolCount: conn?.toolCount || 0,
           tools: conn?.tools || [],

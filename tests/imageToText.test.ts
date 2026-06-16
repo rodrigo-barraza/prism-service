@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
+import { PROVIDERS } from "../src/constants.ts";
 import {
   app,
   MOCK_GENERATE_TEXT_STREAM,
@@ -37,7 +38,7 @@ describe("POST /chat (image-to-text / vision)", () => {
   it("returns error when messages is missing", async () => {
     const res = await request(app)
       .post("/chat?stream=false")
-      .send({ provider: "google" })
+      .send({ provider: PROVIDERS.GOOGLE })
       .expect(500);
 
     expect(res.body).toHaveProperty("error", true);
@@ -50,7 +51,7 @@ describe("POST /chat (image-to-text / vision)", () => {
     const res = await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         model: "gemini-3-flash-preview",
         messages: [
           {
@@ -63,7 +64,7 @@ describe("POST /chat (image-to-text / vision)", () => {
       .expect(200);
 
     expect(res.body).toHaveProperty("text", "A photo of a cat");
-    expect(res.body).toHaveProperty("provider", "google");
+    expect(res.body).toHaveProperty("provider", PROVIDERS.GOOGLE);
     expect(res.body).toHaveProperty("usage");
     expect(res.body.usage).toHaveProperty("inputTokens", 100);
     expect(res.body.usage).toHaveProperty("outputTokens", 50);
@@ -75,7 +76,7 @@ describe("POST /chat (image-to-text / vision)", () => {
     const res = await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         model: "gemini-3-flash-preview",
         messages: [
           {
@@ -96,7 +97,7 @@ describe("POST /chat (image-to-text / vision)", () => {
     await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-5-mini",
         messages: [
           {
@@ -117,7 +118,7 @@ describe("POST /chat (image-to-text / vision)", () => {
     const res = await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         model: "gemini-3-flash-preview",
         messages: [
           {
@@ -131,7 +132,7 @@ describe("POST /chat (image-to-text / vision)", () => {
 
     // Model is not returned in the response when using streaming path
     // and no explicit model is provided — it falls through to the provider's default
-    expect(res.body).toHaveProperty("provider", "google");
+    expect(res.body).toHaveProperty("provider", PROVIDERS.GOOGLE);
   });
 
   // ── Image formats ─────────────────────────────────────────────────
@@ -140,7 +141,7 @@ describe("POST /chat (image-to-text / vision)", () => {
     await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         model: "gemini-3-flash-preview",
         messages: [
           {
@@ -164,7 +165,7 @@ describe("POST /chat (image-to-text / vision)", () => {
     await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         model: "gemini-3-flash-preview",
         messages: [
           {
@@ -188,7 +189,7 @@ describe("POST /chat (image-to-text / vision)", () => {
     const res = await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         messages: [
           {
             role: "user",
@@ -199,7 +200,7 @@ describe("POST /chat (image-to-text / vision)", () => {
       })
       .expect(200);
 
-    expect(res.body).toHaveProperty("provider", "openai");
+    expect(res.body).toHaveProperty("provider", PROVIDERS.OPENAI);
   });
 
   // ── Error handling ────────────────────────────────────────────────
@@ -208,7 +209,7 @@ describe("POST /chat (image-to-text / vision)", () => {
     const res = await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "elevenlabs",
+        provider: PROVIDERS.ELEVENLABS,
         messages: [
           {
             role: "user",
@@ -232,7 +233,7 @@ describe("POST /chat (image-to-text / vision)", () => {
     const res = await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         model: "gemini-3-flash-preview",
         messages: [
           {

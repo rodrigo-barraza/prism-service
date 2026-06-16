@@ -56,8 +56,8 @@ const listMcpResources = {
     for (const server of servers) {
       const result = await MCPClientService.listResources(server.name);
       if (result.resources) {
-        for (const r of result.resources)
-          allResources.push({ ...r, server: server.name });
+        for (const resource of result.resources)
+          allResources.push({ ...resource, server: server.name });
       }
     }
     logger.info(
@@ -66,7 +66,7 @@ const listMcpResources = {
     return {
       resources: allResources,
       count: allResources.length,
-      servers: servers.map((s) => s.name),
+      servers: servers.map((server) => server.name),
     };
   },
 };

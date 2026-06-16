@@ -574,10 +574,10 @@ function handleWebsocketLive(
                       });
                     }
 
-                    const functionResponses = results.map((r) => ({
-                      id: r.id,
-                      name: r.name,
-                      response: truncateToolResult(r.result) as Record<string, unknown>,
+                    const functionResponses = results.map((toolResult) => ({
+                      id: toolResult.id,
+                      name: toolResult.name,
+                      response: truncateToolResult(toolResult.result) as Record<string, unknown>,
                     }));
 
                     if (liveSession) {

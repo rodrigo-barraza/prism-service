@@ -28,7 +28,7 @@ function signPayload(payload: string, secret: string): string {
   return crypto.createHmac("sha256", secret).update(payload).digest("hex");
 }
 
-function matchesFilter(
+export function matchesFilter(
   event: WebhookEvent,
   filter: Record<string, string>,
 ): boolean {
@@ -38,7 +38,7 @@ function matchesFilter(
   return true;
 }
 
-function matchesEventTypes(
+export function matchesEventTypes(
   eventType: string,
   subscribedEvents: string[],
 ): boolean {

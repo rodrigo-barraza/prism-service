@@ -78,20 +78,20 @@ router.get(
         .toArray();
 
       res.json(
-        results.map((r) => ({
-          model: r._id.model,
-          provider: r._id.provider,
-          totalRequests: r.totalRequests,
-          totalInputTokens: r.totalInputTokens,
-          totalOutputTokens: r.totalOutputTokens,
-          totalTokens: r.totalTokens,
-          totalCost: r.totalCost,
-          avgLatency: r.avgLatency,
-          avgTokensPerSec: r.avgTokensPerSec,
-          firstUsed: r.firstUsed,
-          lastUsed: r.lastUsed,
-          successCount: r.successCount,
-          errorCount: r.errorCount,
+        results.map((resultEntry) => ({
+          model: resultEntry._id.model,
+          provider: resultEntry._id.provider,
+          totalRequests: resultEntry.totalRequests,
+          totalInputTokens: resultEntry.totalInputTokens,
+          totalOutputTokens: resultEntry.totalOutputTokens,
+          totalTokens: resultEntry.totalTokens,
+          totalCost: resultEntry.totalCost,
+          avgLatency: resultEntry.avgLatency,
+          avgTokensPerSec: resultEntry.avgTokensPerSec,
+          firstUsed: resultEntry.firstUsed,
+          lastUsed: resultEntry.lastUsed,
+          successCount: resultEntry.successCount,
+          errorCount: resultEntry.errorCount,
         })),
       );
     } catch (error: unknown) {
