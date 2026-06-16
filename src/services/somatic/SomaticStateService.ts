@@ -269,18 +269,13 @@ interface EmotionAnalysisContext {
   username?: string | null;
 }
 
-const EMOTION_ANALYSIS_FALLBACK_PROVIDER = "anthropic";
-const EMOTION_ANALYSIS_FALLBACK_MODEL = "claude-haiku-4-5-20250414";
-
-async function resolveEmotionModel(): Promise<{ provider: string; model: string }> {
+async function resolveEmotionModel(): Promise<{ provider: string; model: string } | null> {
   try {
     const SettingsService = (await import("../SettingsService.ts")).default;
-    const configured = await SettingsService.getSomaticModelConfig();
-    if (configured) return configured;
+    return await SettingsService.getSomaticModelConfig();
   } catch {
-    // SettingsService unavailable (e.g. DB not ready) — use fallback
+    return null;
   }
-  return { provider: EMOTION_ANALYSIS_FALLBACK_PROVIDER, model: EMOTION_ANALYSIS_FALLBACK_MODEL };
 }
 
 async function analyzeEmotionFromText(
@@ -288,8 +283,11 @@ async function analyzeEmotionFromText(
   text: string,
   requestContext: EmotionAnalysisContext = {},
 ): Promise<PrimaryEmotion | "neutral"> {
+  const emotionModel = await resolveEmotionModel();
+  if (!emotionModel) return "neutral";
+
   const { getProvider } = await import("../../providers/index.ts");
-  const { provider: providerName, model: modelName } = await resolveEmotionModel();
+  const { provider: providerName, model: modelName } = emotionModel;
   const provider = getProvider(providerName);
   const systemPrompt = EMOTION_ANALYSIS_SYSTEM_PROMPT(VALID_EMOTIONS.join(", "));
   const requestId = crypto.randomUUID();
