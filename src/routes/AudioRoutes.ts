@@ -121,17 +121,23 @@ export async function handleVoice(
     const contentType = result.contentType || "audio/mpeg";
     // Collect audio chunks for MinIO upload when conversationId is provided
     const audioChunks: Buffer[] | null = conversationId ? [] : null;
-    if (result.stream.pipe) {
+    if (!result.stream) {
+      throw new Error("Speech generation returned no stream");
+    }
+    const stream = result.stream;
+    if ("pipe" in stream && typeof (stream as any).pipe === "function") {
       // Node.js readable stream
+      const nodeStream = stream as import("stream").Readable;
       if (audioChunks) {
-        result.stream.on("data", (chunk: Buffer) => audioChunks.push(chunk));
+        nodeStream.on("data", (chunk: Buffer) => audioChunks.push(chunk));
       }
-      for await (const chunk of result.stream) {
-        emitBinary(chunk);
+      for await (const chunk of nodeStream) {
+        emitBinary(chunk as Buffer);
       }
     } else {
       // Web ReadableStream (from fetch)
-      const reader = result.stream.getReader();
+      const webStream = stream as ReadableStream<Uint8Array>;
+      const reader = webStream.getReader();
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;

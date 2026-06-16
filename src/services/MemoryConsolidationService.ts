@@ -220,7 +220,7 @@ async function processBatch(
 
   try {
     result = await provider.generateText(
-      aiMessages as import("../types/admin.ts").ChatMessage[],
+      aiMessages as any,
       consolidationModel,
       {
         maxTokens: LLM_MAX_OUTPUT_TOKENS,

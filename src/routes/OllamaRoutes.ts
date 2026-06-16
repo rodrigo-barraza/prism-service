@@ -24,6 +24,9 @@ router.get(
     try {
       const instanceId = resolveInstanceId(req);
       const provider = getProvider(instanceId);
+      if (!provider.listModels) {
+        throw new Error(`Provider "${instanceId}" does not support listing models`);
+      }
       const data = await provider.listModels();
       res.json(data);
     } catch (error: unknown) {

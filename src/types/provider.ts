@@ -204,7 +204,7 @@ export interface Provider {
     systemPrompt?: string
   ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }>;
   generateEmbedding?(
-    content: string | string[],
+    content: any,
     model: string,
     options?: ProviderOptions
   ): Promise<{ embedding: number[]; dimensions: number }>;
@@ -247,7 +247,7 @@ export interface Provider {
     model?: string,
     options?: ProviderOptions
   ): Promise<{ text: string; usage: Record<string, number> }>;
-  unloadModelByKey?(modelKey: string): Promise<void>;
-  ensureModelLoaded?(modelKey: string): Promise<void>;
-  unloadModel?(modelId: string): Promise<void>;
+  unloadModelByKey?(modelKey: string): Promise<any>;
+  ensureModelLoaded?(modelKey: string, options?: ProviderOptions, signal?: AbortSignal, onStatus?: (status: string) => void): Promise<any>;
+  unloadModel?(modelId: string): Promise<any>;
 }

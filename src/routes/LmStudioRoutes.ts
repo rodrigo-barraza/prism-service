@@ -2,6 +2,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { sleep } from "@rodrigo-barraza/utilities-library";
 import express, { Request, Response, NextFunction } from "express";
 import { getProvider } from "../providers/index.ts";
+import type { LmStudioProvider } from "../providers/lm-studio.ts";
 import { isInstance } from "../providers/instance-registry.ts";
 import { PROVIDERS } from "../constants.ts";
 import logger from "../utils/logger.ts";
@@ -25,7 +26,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const instanceId = resolveInstanceId(req);
-      const provider = getProvider(instanceId);
+      const provider = getProvider(instanceId) as LmStudioProvider;
       const data = await provider.listModels();
       res.json(data);
     } catch (error: unknown) {
@@ -56,7 +57,7 @@ router.post(
           .json({ error: "Missing 'model' in request body" });
       }
       const instanceId = resolveInstanceId(req);
-      const provider = getProvider(instanceId);
+      const provider = getProvider(instanceId) as LmStudioProvider;
       // Build load options from request body
       const loadOptions: Record<string, unknown> = {};
             if (context_length != null) loadOptions.context_length = context_length;
@@ -123,7 +124,7 @@ router.post(
     });
     try {
       const instanceId = resolveInstanceId(req);
-      const provider = getProvider(instanceId);
+      const provider = getProvider(instanceId) as LmStudioProvider;
       send({ type: "start", model });
       // Build load options
       const loadOptions: Record<string, unknown> = {};
@@ -141,7 +142,7 @@ router.post(
       try {
         const { models } = await provider.listModels();
         const modelEntry = (models || []).find((entry: Record<string, unknown>) => entry.key === model);
-        const isLoaded = modelEntry?.loaded_instances?.length > 0;
+        const isLoaded = (modelEntry?.loaded_instances?.length ?? 0) > 0;
         if (isLoaded) {
           // Already loaded — skip entirely
           logger.info(`[load-stream] Model ${model} already loaded — skipping`);
@@ -228,7 +229,7 @@ router.post(
         });
       }
       const instanceId = resolveInstanceId(req);
-      const provider = getProvider(instanceId);
+      const provider = getProvider(instanceId) as LmStudioProvider;
       const data = await provider.unloadModel(instance_id);
       res.json(data);
     } catch (error: unknown) {
@@ -262,7 +263,7 @@ router.post(
       // Fall back to direct gguf-arch if we need raw model data (e.g. for
       // custom gpuLayers values from the slider).
       const instanceId = resolveInstanceId(req);
-      const provider = getProvider(instanceId);
+      const provider = getProvider(instanceId) as LmStudioProvider;
       const result = await provider.listModels();
       const allModels = result?.data || result?.models || [];
       const modelData = allModels.find(
