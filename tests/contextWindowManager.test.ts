@@ -12,6 +12,8 @@ vi.mock("../src/utils/logger.ts", () => ({
 }));
 
 import ContextWindowManager from "../src/utils/ContextWindowManager.ts";
+import { PROMPT_DELIMITERS } from "../src/constants.ts";
+
 
 // ═══════════════════════════════════════════════════════════════
 // Token Estimation
@@ -313,7 +315,7 @@ describe("ContextWindowManager.enforce — sliding window", () => {
 
     // Should have a context note about dropped messages
     const contextNote = result.messages.find(
-      (m) => m.content?.includes("CONTEXT NOTE") || m.content?.includes("earlier messages were removed"),
+      (m) => m.content?.includes(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX) || m.content?.includes("earlier messages were removed"),
     );
     expect(contextNote).toBeTruthy();
 
@@ -370,7 +372,7 @@ describe("ContextWindowManager.enforce — sliding window", () => {
     expect(result.strategy).toBe("sliding_window");
 
     const userMessages = result.messages.filter(
-      (m) => m.role === "user" && !m.content?.includes("CONTEXT NOTE"),
+      (m) => m.role === "user" && !m.content?.includes(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX),
     );
 
     expect(userMessages.length).toBeGreaterThanOrEqual(2);

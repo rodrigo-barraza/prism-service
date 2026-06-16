@@ -16,17 +16,11 @@ import { swapMessageContent, assembleMessagesToAppend as assembleMessagesToAppen
 import { PROMPT_DELIMITERS } from "../src/constants.ts";
 import type { MessagePayload } from "../src/services/conversation/types.ts";
 
-// ── Types ───────────────────────────────────────────────────────
-
-type TestMessage = Omit<MessagePayload, "toolCalls"> & {
-  role: string;
+type TestMessage = MessagePayload & {
   toolCalls?: any[];
-  rawContent?: string;
-  isCompactSummary?: boolean;
-  totalTime?: number | null;
-  tokensPerSec?: number | null;
-  estimatedCost?: number | null;
 };
+
+
 
 // ── Simulate the Finalizer's message assembly ───────────────────
 
@@ -98,7 +92,7 @@ describe("Finalizer message assembly", () => {
       images: [],
       audioRef: null,
       toolCalls: [],
-      resolvedModel: "claude-haiku-4-5-20250514",
+      resolvedModel: "claude-haiku-4-5-20251001",
       providerName: "anthropic",
     });
 
@@ -150,7 +144,7 @@ describe("Finalizer message assembly", () => {
         { id: "toolCall-0", name: "search_web", args: {}, result: { results: [] } },
         { id: "toolCall-1", name: "generate_audio", args: {}, result: { success: true } },
       ],
-      resolvedModel: "claude-haiku-4-5-20250514",
+      resolvedModel: "claude-haiku-4-5-20251001",
       providerName: "anthropic",
     });
 
@@ -206,7 +200,7 @@ describe("Finalizer message assembly", () => {
       images: [],
       audioRef: null,
       toolCalls: [],
-      resolvedModel: "claude-haiku-4-5-20250514",
+      resolvedModel: "claude-haiku-4-5-20251001",
       providerName: "anthropic",
     });
 
@@ -724,7 +718,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
       {
         role: "assistant",
         content: "Hey Rodrigo! Not much, just here and ready to help.",
-        model: "claude-haiku-4-5-20250514",
+        model: "claude-haiku-4-5-20251001",
         provider: "anthropic",
       },
     ];
@@ -788,7 +782,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
       images: [],
       audioRef: null,
       toolCalls: [],
-      resolvedModel: "claude-haiku-4-5-20250514",
+      resolvedModel: "claude-haiku-4-5-20251001",
       providerName: "anthropic",
     });
 

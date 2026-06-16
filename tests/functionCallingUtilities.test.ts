@@ -13,9 +13,10 @@ import {
   expandMessagesForFunctionCall,
   truncateToolResult,
 } from "../src/utils/FunctionCallingUtilities.ts";
+import type { ChatMessage } from "../src/types/admin.ts";
 
 // ── Types ──────────────────────────────────────────────────────
-type TestMessage = Record<string, unknown>;
+type TestMessage = ChatMessage;
 
 // ═══════════════════════════════════════════════════════════════
 describe("truncateToolResult", () => {
@@ -89,7 +90,7 @@ describe("expandMessagesForFunctionCall", () => {
       { role: "user", content: "Hello" },
     ];
 
-    const expanded = expandMessagesForFunctionCall(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages);
 
     expect(expanded).toHaveLength(1);
     expect(expanded[0].role).toBe("user");
@@ -112,7 +113,7 @@ describe("expandMessagesForFunctionCall", () => {
       },
     ];
 
-    const expanded = expandMessagesForFunctionCall(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages);
 
     // Should produce: [assistant(with toolCalls), tool(result)]
     expect(expanded).toHaveLength(2);
@@ -140,7 +141,7 @@ describe("expandMessagesForFunctionCall", () => {
       },
     ];
 
-    const expanded = expandMessagesForFunctionCall(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages);
     const toolMessage = expanded.find((message) => message.role === "tool");
 
     // The content should be truncated JSON
@@ -156,7 +157,7 @@ describe("expandMessagesForFunctionCall", () => {
       { role: "user", content: "How are you?" },
     ];
 
-    const expanded = expandMessagesForFunctionCall(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages);
 
     expect(expanded).toHaveLength(2);
     expect(expanded[0].content).toBe("Hello");
@@ -169,7 +170,7 @@ describe("expandMessagesForFunctionCall", () => {
       { role: "assistant", content: "Hi", deleted: true },
     ];
 
-    const expanded = expandMessagesForFunctionCall(messages as any, {
+    const expanded = expandMessagesForFunctionCall(messages, {
       filterDeleted: false,
     });
 
@@ -183,7 +184,7 @@ describe("expandMessagesForFunctionCall", () => {
       { role: "user", content: "Continue" },
     ];
 
-    const expanded = expandMessagesForFunctionCall(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages);
 
     expect(expanded).toHaveLength(2);
   });
@@ -199,7 +200,7 @@ describe("expandMessagesForFunctionCall", () => {
       },
     ];
 
-    const expanded = expandMessagesForFunctionCall(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages);
 
     expect(expanded).toHaveLength(1);
     expect(expanded[0].role).toBe("assistant");
@@ -216,7 +217,7 @@ describe("expandMessagesForFunctionCall", () => {
       },
     ];
 
-    const expanded = expandMessagesForFunctionCall(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages);
 
     expect(expanded[0].thinking).toBe("Let me reason...");
     expect(expanded[0].thinkingSignature).toBe("sig-abc");
@@ -231,7 +232,7 @@ describe("expandMessagesForFunctionCall", () => {
       },
     ];
 
-    const expanded = expandMessagesForFunctionCall(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages);
 
     expect(expanded[0].images).toEqual(["data:image/png;base64,abc"]);
   });
@@ -241,7 +242,7 @@ describe("expandMessagesForFunctionCall", () => {
       { role: "user", content: "" },
     ];
 
-    const expanded = expandMessagesForFunctionCall(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages);
 
     expect(expanded[0].content).toBe(" ");
   });
@@ -257,7 +258,7 @@ describe("expandMessagesForFunctionCall", () => {
       },
     ];
 
-    const expanded = expandMessagesForFunctionCall(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages);
 
     // Only assistant message, no tool message (result undefined = pending)
     expect(expanded).toHaveLength(1);
@@ -276,7 +277,7 @@ describe("expandMessagesForFunctionCall", () => {
       },
     ];
 
-    const expanded = expandMessagesForFunctionCall(messages as any);
+    const expanded = expandMessagesForFunctionCall(messages);
 
     // assistant + tool1 + tool2 = 3
     expect(expanded).toHaveLength(3);
