@@ -13,7 +13,9 @@
 import { describe, it, expect } from "vitest";
 import { PROMPT_DELIMITERS } from "../src/constants.ts";
 import type { ChatMessage } from "../src/types/admin.ts";
-import { computeNewTurnMessages } from "../src/services/harnesses/lifecycle/Finalizer.ts";
+import { computeNewTurnMessages, sanitizeMessagesForPersistence } from "../src/services/harnesses/lifecycle/Finalizer.ts";
+
+import type { MessagePayload } from "../src/services/conversation/types.ts";
 
 // ── Types mirroring the harness ConversationMessage shape ────────
 type TestMessage = ChatMessage;
@@ -26,25 +28,18 @@ function extractNewTurnMessages(
   currentMessages: TestMessage[],
   originalMessageCount: number,
 ): TestMessage[] {
-  return computeNewTurnMessages(currentMessages, currentMessages, originalMessageCount) as TestMessage[];
+  const messagesAsPayload = currentMessages as unknown as MessagePayload[];
+  return computeNewTurnMessages(messagesAsPayload, messagesAsPayload, originalMessageCount) as unknown as TestMessage[];
 }
 
 /**
- * Replicates the sanitization filter from Finalizer.ts lines 470-483.
- * This filters out compaction artifacts that should never reach MongoDB.
+ * Delegates to the production sanitization filter from Finalizer.ts.
+ * Filters out compaction artifacts that should never reach MongoDB.
  */
 function sanitizeMessagesToAppend(
   messagesToAppend: TestMessage[],
 ): TestMessage[] {
-  return messagesToAppend.filter((message) => {
-    if (message.role === "user" && typeof message.content === "string") {
-      if (message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX)) return false;
-      if (message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY)) return false;
-      if (message.isCompactSummary === true) return false;
-    }
-    if ((message as any)._alreadyPersisted === true) return false;
-    return true;
-  });
+  return sanitizeMessagesForPersistence(messagesToAppend as any) as unknown as TestMessage[];
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

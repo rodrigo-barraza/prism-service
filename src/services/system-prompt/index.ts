@@ -76,7 +76,7 @@ export default class SystemPromptAssembler {
 
     // ── 1b. Platform-Specific Rules ──────────────────────────────
     if (persona?.platformRules && context.agentContext?.platform) {
-      const platformKey = context.agentContext.platform as string;
+      const platformKey = context.agentContext.platform;
       const platformSection = persona.platformRules[platformKey];
       if (platformSection) {
         const platformText = typeof platformSection === 'function'
@@ -100,30 +100,30 @@ export default class SystemPromptAssembler {
       // Runtime platform data (server/channel/participant info, matched
       // knowledge, image captions, IDs). Injected as its own system
       // message so the LLM sees it as a distinct instruction block.
-      const platformContext = agentContext.platformContext as Record<string, unknown> | undefined;
+      const platformContext = agentContext.platformContext;
       if (platformContext) {
         if (platformContext.description) {
-          platformContextSections.push(platformContext.description as string);
+          platformContextSections.push(platformContext.description);
         }
         if (platformContext.serverContext) {
-          platformContextSections.push(platformContext.serverContext as string);
+          platformContextSections.push(platformContext.serverContext);
         }
         if (platformContext.imageContext) {
-          platformContextSections.push(platformContext.imageContext as string);
+          platformContextSections.push(platformContext.imageContext);
         }
         if (platformContext.ids) {
-          platformContextSections.push(platformContext.ids as string);
+          platformContextSections.push(platformContext.ids);
         }
       } else {
         // Legacy flat fields — backward compatible
         if (agentContext.discordContext) {
-          platformContextSections.push(agentContext.discordContext as string);
+          platformContextSections.push(agentContext.discordContext);
         }
         if (agentContext.serverContext) {
-          platformContextSections.push(agentContext.serverContext as string);
+          platformContextSections.push(agentContext.serverContext);
         }
         if (agentContext.imageContext) {
-          platformContextSections.push(agentContext.imageContext as string);
+          platformContextSections.push(agentContext.imageContext);
         }
         if (agentContext.guildId) {
           let idsBlock = `# Discord IDs\n- Guild ID: ${agentContext.guildId}`;
@@ -135,19 +135,19 @@ export default class SystemPromptAssembler {
       // Agent-specific runtime context (non-platform, non-self)
       // These remain in the main system prompt for now
       if (agentContext.clockCrewContext) {
-        sections.push(agentContext.clockCrewContext as string);
+        sections.push(agentContext.clockCrewContext);
       }
       if (agentContext.stickersContext) {
-        sections.push(agentContext.stickersContext as string);
+        sections.push(agentContext.stickersContext);
       }
       if (agentContext.emotionContext) {
-        sections.push(agentContext.emotionContext as string);
+        sections.push(agentContext.emotionContext);
       }
       if (agentContext.visualContext) {
-        sections.push(agentContext.visualContext as string);
+        sections.push(agentContext.visualContext);
       }
       if (agentContext.lightsContext) {
-        sections.push(agentContext.lightsContext as string);
+        sections.push(agentContext.lightsContext);
       }
     }
 
@@ -163,7 +163,7 @@ export default class SystemPromptAssembler {
         await SomaticStateService.adaptFromMessage(agentId, latestUserMessage.content, {
           traceId: context.traceId,
           agentSessionId: context.agentSessionId,
-          endpoint: context.agentContext?.endpoint as string || "/agent",
+          endpoint: context.agentContext?.endpoint || "/agent",
           project: context.project,
           username: context.username,
         });
@@ -362,8 +362,8 @@ export default class SystemPromptAssembler {
 
     if (memoryQuery) {
       const agentContextForMemory = context.agentContext || {};
-      const memoryGuildId = agentContextForMemory.guildId as string | undefined;
-      const memoryUserIds = agentContextForMemory.participantUserIds as string[] | undefined;
+      const memoryGuildId = agentContextForMemory.guildId;
+      const memoryUserIds = agentContextForMemory.participantUserIds;
 
       const memories = await this.scorer.fetchMemories(
         agentId,
@@ -434,7 +434,7 @@ export default class SystemPromptAssembler {
  * use the identical alignment algorithm without code duplication.
  */
 export function injectSystemPromptContext(
-  messages: Array<any>,
+  messages: Array<{ role: string; content?: string | unknown[] | null; _isIdentityPrompt?: boolean; [key: string]: unknown }>,
   options: {
     systemPrompt: string;
     platformContextMessage?: string | null;

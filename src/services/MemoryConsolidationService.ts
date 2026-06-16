@@ -219,10 +219,14 @@ async function processBatch(
   let result: { text?: string; usage?: Record<string, number> } | null = null;
 
   try {
-    result = await (provider as { generateText: (msgs: { role: string; content: string }[], model: string, opts: Record<string, unknown>) => Promise<{ text?: string; usage?: Record<string, number> }> }).generateText(aiMessages, consolidationModel, {
-      maxTokens: LLM_MAX_OUTPUT_TOKENS,
-      temperature: 0.1,
-    });
+    result = await provider.generateText(
+      aiMessages as import("../types/admin.ts").ChatMessage[],
+      consolidationModel,
+      {
+        maxTokens: LLM_MAX_OUTPUT_TOKENS,
+        temperature: 0.1,
+      },
+    ) as unknown as { text?: string; usage?: Record<string, number> };
   } catch (error: unknown) {
     llmSuccess = false;
     llmError = getErrorMessage(error);

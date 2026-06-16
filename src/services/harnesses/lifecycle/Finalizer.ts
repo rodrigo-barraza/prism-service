@@ -431,27 +431,7 @@ export async function finalizeTextGeneration(
     // Ensure all user messages to append are properly swapped/sanitized,
     // then filter out synthetic compaction artifacts that should never
     // reach MongoDB (context notes, compaction summaries, cleared stubs).
-    const sanitizedMessagesToAppend = messagesToAppend
-      .map((message) => {
-        const cloned = { ...message };
-        swapMessageContent(cloned);
-        // Strip runtime-only tags that should not reach MongoDB
-        delete cloned._isIdentityPrompt;
-        return cloned;
-      })
-      .filter((message) => {
-        if (message.role === "user" && typeof message.content === "string") {
-          if (message.content.startsWith("[CONTEXT NOTE:")) return false;
-          if (message.content.startsWith("[Conversation Summary")) return false;
-          if (message.isCompactSummary === true) return false;
-        }
-        // Strip ephemeral planning injection messages (cache-stable planning mode)
-        if (message._isPlanningInjection === true) return false;
-        // Strip eagerly-persisted messages (timer reminders, scheduled task triggers)
-        // that were already appended to MongoDB before the agentic loop ran
-        if (message._alreadyPersisted === true) return false;
-        return true;
-      });
+    const sanitizedMessagesToAppend = sanitizeMessagesForPersistence(messagesToAppend);
 
     await appendAndFinalize(
       conversationId || "",
@@ -487,6 +467,37 @@ export async function finalizeTextGeneration(
 }
 
 export { getCollectionOpts };
+
+/**
+ * Sanitize messages for MongoDB persistence — clones each message,
+ * applies content/rawContent swapping, strips runtime-only tags,
+ * and filters out synthetic compaction artifacts that should never
+ * reach the database (context notes, compaction summaries, planning
+ * injections, eagerly-persisted stubs).
+ *
+ * Shared between production finalizer and test assertion suites.
+ */
+export function sanitizeMessagesForPersistence(
+  messagesToAppend: MessagePayload[],
+): MessagePayload[] {
+  return messagesToAppend
+    .map((message) => {
+      const cloned = { ...message };
+      swapMessageContent(cloned);
+      delete cloned._isIdentityPrompt;
+      return cloned;
+    })
+    .filter((message) => {
+      if (message.role === "user" && typeof message.content === "string") {
+        if (message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX)) return false;
+        if (message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY)) return false;
+        if (message.isCompactSummary === true) return false;
+      }
+      if (message._isPlanningInjection === true) return false;
+      if (message._alreadyPersisted === true) return false;
+      return true;
+    });
+}
 
 /**
  * Standard utility to assemble the messages array to append to the database.
@@ -587,7 +598,7 @@ export function assembleMessagesToAppend(options: {
         ...(reasoningEffort ? { reasoningEffort } : {}),
         ...(thinkingBudget ? { thinkingBudget } : {}),
       },
-    } as any);
+    } as MessagePayload);
   } else {
     if (userMessage && conversationMeta) {
       messagesToAppend.push({
@@ -608,7 +619,7 @@ export function assembleMessagesToAppend(options: {
       provider: providerName,
       timestamp: new Date().toISOString(),
       usage: usage || null,
-      totalTime: totalSeconds != null ? roundMs(totalSeconds as number) : null,
+      totalTime: totalSeconds != null ? roundMs(totalSeconds) : null,
       tokensPerSec: tokensPerSecond,
       estimatedCost,
       generationSettings: {
@@ -618,7 +629,7 @@ export function assembleMessagesToAppend(options: {
         ...(reasoningEffort ? { reasoningEffort } : {}),
         ...(thinkingBudget ? { thinkingBudget } : {}),
       },
-    } as any);
+    } as MessagePayload);
   }
 
   return messagesToAppend;
@@ -630,10 +641,10 @@ export function assembleMessagesToAppend(options: {
  * they do not diverge.
  */
 export function computeNewTurnMessages(
-  originalMessages: Array<any>,
-  currentMessages: Array<any>,
+  originalMessages: MessagePayload[],
+  currentMessages: MessagePayload[],
   originalMessageCount: number,
-): Array<any> {
+): MessagePayload[] {
   const lastOriginalMessage = originalMessages[originalMessageCount - 1];
   const isLastAlreadyPersisted =
     lastOriginalMessage && lastOriginalMessage._alreadyPersisted === true;

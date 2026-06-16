@@ -43,7 +43,7 @@ export interface ConsolidationBatch {
 
 /** Options for processBatch */
 export interface ProcessBatchOptions {
-  provider: Record<string, unknown>;
+  provider: import("../../types/provider.ts").Provider;
   consolidationProvider: string;
   consolidationModel: string;
   agent: string;

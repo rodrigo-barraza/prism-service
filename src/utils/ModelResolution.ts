@@ -168,9 +168,9 @@ export async function resolveModelForInstances(
     }
 
     const summary = usable
-      .map((s) => {
-        const override = modelOverrides.get(s.id);
-        return override ? `${s.id}→"${override}"` : `${s.id} (exact)`;
+      .map((instance) => {
+        const override = modelOverrides.get(instance.id);
+        return override ? `${instance.id}→"${override}"` : `${instance.id} (exact)`;
       })
       .join(", ");
     logger.info(

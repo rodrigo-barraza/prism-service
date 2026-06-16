@@ -81,6 +81,20 @@ interface WorktreeState {
   [key: string]: unknown;
 }
 
+interface GenerateImageToolResult {
+  image?: { data?: string; mimeType?: string; minioRef?: string };
+  error?: string;
+  [key: string]: unknown;
+}
+
+interface BrowserActionToolResult {
+  screenshot?: string;
+  screenshotRef?: string;
+  mimeType?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
 // ────────────────────────────────────────────────────────────
 // Schema Cache — fetched from tools-api at startup
 // ────────────────────────────────────────────────────────────
@@ -1054,10 +1068,11 @@ export default class ToolOrchestratorService {
     const result = await executeToolGeneric(name, args, context);
 
     // Post-process: upload generated images to MinIO
-    if (name === TOOL_NAMES.GENERATE_IMAGE && (result as Record<string, unknown>).image && !(result as Record<string, unknown>).error) {
+    const imageResult = result as GenerateImageToolResult;
+    if (name === TOOL_NAMES.GENERATE_IMAGE && imageResult.image && !imageResult.error) {
       try {
         const FileService = (await import("./FileService.js")).default;
-        const image = (result as Record<string, unknown>).image as Record<string, unknown>;
+        const image = imageResult.image;
         const dataUrl = `data:${image.mimeType || "image/png"};base64,${image.data}`;
         const { ref } = await FileService.uploadFile(
           dataUrl,
@@ -1074,24 +1089,23 @@ export default class ToolOrchestratorService {
     }
 
     // Post-process: upload browser screenshots to MinIO
-    if (name === TOOL_NAMES.BROWSER_ACTION && (result as Record<string, unknown>).screenshot && !(result as Record<string, unknown>).error) {
+    const browserResult = result as BrowserActionToolResult;
+    if (name === TOOL_NAMES.BROWSER_ACTION && browserResult.screenshot && !browserResult.error) {
       try {
         const FileService = (await import("./FileService.js")).default;
-        const resultObject = result as Record<string, unknown>;
-        const dataUrl = `data:${resultObject.mimeType || "image/png"};base64,${resultObject.screenshot}`;
+        const dataUrl = `data:${browserResult.mimeType || "image/png"};base64,${browserResult.screenshot}`;
         const { ref } = await FileService.uploadFile(
           dataUrl,
           FILE_CATEGORIES.SCREENSHOTS,
           context.project || null,
           context.username || null,
         );
-        resultObject.screenshotRef = ref;
-        delete resultObject.screenshot; // Don't send base64 downstream
+        browserResult.screenshotRef = ref;
+        delete browserResult.screenshot;
       } catch (error: unknown) {
         logger.warn(
                     `[ToolOrchestrator] Screenshot MinIO upload failed: ${getErrorMessage(error)}`,
         );
-        // Keep base64 as fallback if MinIO fails
       }
     }
 
@@ -1454,4 +1468,5 @@ export default class ToolOrchestratorService {
   }
 }
 
-(globalThis as any).ToolOrchestratorService = ToolOrchestratorService;
+import { registerGlobalToolOrchestratorService } from "../types/GlobalToolOrchestratorRegistry.ts";
+registerGlobalToolOrchestratorService(ToolOrchestratorService);

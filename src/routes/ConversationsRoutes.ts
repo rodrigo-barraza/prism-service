@@ -59,6 +59,7 @@ interface ConversationDocument {
   messages: Record<string, unknown>[];
   systemPrompt?: string;
   settings?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 interface WorkflowDocument {
@@ -203,7 +204,7 @@ router.get(
             ])
             .toArray();
 
-          enrichConversationsWithRequestCosts(conversations, costAggregation);
+          enrichConversationsWithRequestCosts(conversations as ConversationDocument[], costAggregation);
         } catch (costError: unknown) {
           logger.warn(
             `Failed to enrich ${isAgentType ? "agent session" : "conversation"} costs: ${costError instanceof Error ? costError.message : String(costError)}`,

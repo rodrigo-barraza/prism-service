@@ -6,6 +6,13 @@ import { FILE_CATEGORIES } from "../../constants.ts";
 import type { ChatMessage } from "../../types/admin.ts";
 import type { MessagePayload, ConversationSettings, ConversationPatchInput, ConversationPatchFields } from "./types.ts";
 
+interface ConversationDocument {
+  id: string;
+  totalCost?: number;
+  requestErrorCount?: number;
+  [key: string]: unknown;
+}
+
 /**
  * Upload any base64 data URLs in message images/audio to external storage.
  * Replaces inline data with minio:// refs when MinIO is available.
@@ -271,7 +278,7 @@ export function buildConversationPatchFields({
  * Enrich conversations list with authoritative totalCost from request logs.
  */
 export function enrichConversationsWithRequestCosts(
-  conversations: Array<Record<string, any>>,
+  conversations: ConversationDocument[],
   requestLogCosts: Array<{ _id: string; totalCost: number; requestErrorCount?: number }>,
 ): void {
   if (conversations.length === 0) return;
@@ -284,7 +291,7 @@ export function enrichConversationsWithRequestCosts(
     if (aggregated) {
       if (aggregated.totalCost > 0) {
         conversation.totalCost = Math.max(
-          (conversation.totalCost as number) || 0,
+          conversation.totalCost || 0,
           aggregated.totalCost,
         );
       }
@@ -299,13 +306,13 @@ export function enrichConversationsWithRequestCosts(
  * Enrich a single conversation's totalCost with request logs.
  */
 export function enrichSingleConversationCost(
-  conversation: Record<string, any>,
+  conversation: ConversationDocument,
   requestLogAggregation: Array<{ _id: string; totalCost: number; requestErrorCount?: number }>,
 ): void {
   if (requestLogAggregation.length > 0) {
     if (requestLogAggregation[0].totalCost > 0) {
       conversation.totalCost = Math.max(
-        (conversation.totalCost as number) || 0,
+        conversation.totalCost || 0,
         requestLogAggregation[0].totalCost,
       );
     }

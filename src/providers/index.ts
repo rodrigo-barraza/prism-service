@@ -5,22 +5,15 @@ import elevenlabsProvider from "./elevenlabs.ts";
 import inworldProvider from "./inworld.ts";
 import ActiveGenerationTracker from "../services/ActiveGenerationTracker.ts";
 import { getInstanceProvider, isInstance } from "./instance-registry.ts";
-
-/**
- * Loose provider shape — each provider exports an object with various
- * generate/transcribe methods. We don't enumerate every possible method
- * because providers are heterogeneous (cloud vs local, text vs audio).
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Provider = Record<string, any>;
+import type { Provider } from "../types/provider.ts";
 
 // Static cloud providers — local providers are resolved via instance registry
 const providers: Record<string, Provider> = {
-  openai: openaiProvider as Provider,
+  openai: openaiProvider as unknown as Provider,
   anthropic: anthropicProvider as Provider,
   google: googleProvider as Provider,
-  elevenlabs: elevenlabsProvider as Provider,
-  inworld: inworldProvider as Provider,
+  elevenlabs: elevenlabsProvider as unknown as Provider,
+  inworld: inworldProvider as unknown as Provider,
 };
 
 /**

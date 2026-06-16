@@ -60,7 +60,7 @@ router.get(
         .project<SkillDocument>({ embedding: 0 })
         .toArray();
 
-      res.json(skills.map((s) => ({ ...s, id: s._id ? s._id.toString() : "" })));
+      res.json(skills.map((skill) => ({ ...skill, id: skill._id ? skill._id.toString() : "" })));
     } catch (error: unknown) {
       next(error);
     }
