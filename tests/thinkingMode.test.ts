@@ -158,7 +158,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       expect(args.config.thinkingConfig.thinkingBudget).toBe(2048);
     });
 
-    it("does not configure thinkingConfig if thinkingEnabled is explicitly false", async () => {
+    it("configures thinkingConfig with thinkingBudget 0 if thinkingEnabled is explicitly false", async () => {
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: "Done" }] } }],
         usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
@@ -170,7 +170,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       });
 
       const args = mockGenerateContent.mock.calls[0][0];
-      expect(args.config.thinkingConfig).toBeUndefined();
+      expect(args.config.thinkingConfig).toEqual({ thinkingBudget: 0 });
     });
 
     it("does not configure thinkingConfig if model does not support thinking", async () => {
