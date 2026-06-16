@@ -13,6 +13,10 @@ const { REQUESTS: REQUESTS_COLLECTION } = COLLECTIONS;
 router.use(requireDb);
 
 // ─── GET /traces — paginated trace list (derived from requests) ─
+// Lightweight summary-only aggregate: no $push of full documents.
+// Full request details are fetched lazily via GET /traces/:id.
+const AGGREGATE_MAX_TIME_MS = 30_000;
+
 router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
@@ -86,146 +90,141 @@ router.get(
         ];
       }
 
-      const pipeline: Record<string, unknown>[] = [
+      const groupStage = {
+        $group: {
+          _id: "$traceId",
+          project: { $first: "$project" },
+          username: { $first: "$username" },
+          createdAt: { $min: "$timestamp" },
+          updatedAt: { $max: "$timestamp" },
+          requestCount: { $sum: 1 },
+          totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
+          totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
+          totalCost: COST_SUM_EXPR,
+          totalLatency: { $sum: { $ifNull: ["$totalTime", 0] } },
+          totalMessages: { $sum: { $ifNull: ["$messageCount", 0] } },
+          _models: { $addToSet: "$model" },
+          _providers: { $addToSet: "$provider" },
+          _agents: { $addToSet: "$agent" },
+          _toolDisplayNames: { $addToSet: "$toolDisplayNames" },
+          _toolApiNames: { $addToSet: "$toolApiNames" },
+          _hasAudio: { $max: { $ifNull: ["$modalities.audio", false] } },
+          _hasVision: { $max: { $ifNull: ["$modalities.vision", false] } },
+          _hasImage: { $max: { $ifNull: ["$modalities.image", false] } },
+          _tpsSum: {
+            $sum: {
+              $cond: [
+                { $and: [{ $ne: ["$tokensPerSec", null] }, { $gt: ["$tokensPerSec", 0] }] },
+                "$tokensPerSec",
+                0,
+              ],
+            },
+          },
+          _tpsCount: {
+            $sum: {
+              $cond: [
+                { $and: [{ $ne: ["$tokensPerSec", null] }, { $gt: ["$tokensPerSec", 0] }] },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      };
+
+      const projectStage = {
+        $addFields: {
+          id: "$_id",
+          models: { $setDifference: ["$_models", [null]] },
+          providers: { $setDifference: ["$_providers", [null]] },
+          agents: { $setDifference: ["$_agents", [null]] },
+          toolDisplayNames: {
+            $setDifference: [
+              {
+                $reduce: {
+                  input: { $filter: { input: "$_toolDisplayNames", as: "array", cond: { $isArray: "$$array" } } },
+                  initialValue: [],
+                  in: { $setUnion: ["$$value", "$$this"] },
+                },
+              },
+              [null],
+            ],
+          },
+          toolApiNames: {
+            $setDifference: [
+              {
+                $reduce: {
+                  input: { $filter: { input: "$_toolApiNames", as: "array", cond: { $isArray: "$$array" } } },
+                  initialValue: [],
+                  in: { $setUnion: ["$$value", "$$this"] },
+                },
+              },
+              [null],
+            ],
+          },
+          avgTokensPerSec: {
+            $cond: [
+              { $gt: ["$_tpsCount", 0] },
+              { $divide: ["$_tpsSum", "$_tpsCount"] },
+              null,
+            ],
+          },
+          startedAt: "$createdAt",
+          finishedAt: "$updatedAt",
+          modalities: {
+            $arrayToObject: {
+              $filter: {
+                input: [
+                  { k: "audio", v: "$_hasAudio" },
+                  { k: "vision", v: "$_hasVision" },
+                  { k: "image", v: "$_hasImage" },
+                ],
+                as: "entry",
+                cond: { $eq: ["$$entry.v", true] },
+              },
+            },
+          },
+        },
+      };
+
+      const cleanupStage = {
+        $project: {
+          _id: 0,
+          _models: 0,
+          _providers: 0,
+          _agents: 0,
+          _toolDisplayNames: 0,
+          _toolApiNames: 0,
+          _tpsSum: 0,
+          _tpsCount: 0,
+          _hasAudio: 0,
+          _hasVision: 0,
+          _hasImage: 0,
+        },
+      };
+
+      const sortStage = { $sort: { [sort as string]: sortDirection } };
+
+      const facetPipeline = [
         { $match: match },
+        groupStage,
+        projectStage,
+        cleanupStage,
         {
-          $group: {
-            _id: "$traceId",
-            project: { $first: "$project" },
-            username: { $first: "$username" },
-            createdAt: { $min: "$timestamp" },
-            updatedAt: { $max: "$timestamp" },
-            requestCount: { $sum: 1 },
-            totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
-            totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
-            totalCost: COST_SUM_EXPR,
-            totalLatency: { $sum: { $ifNull: ["$totalTime", 0] } },
-            totalMessages: { $sum: { $ifNull: ["$messageCount", 0] } },
-            _models: { $addToSet: "$model" },
-            _providers: { $addToSet: "$provider" },
-            _agents: { $addToSet: "$agent" },
-            _toolArrays: { $push: { $ifNull: ["$toolDisplayNames", []] } },
-            _toolCallArrays: { $push: { $ifNull: ["$toolApiNames", []] } },
-            _tpsValues: { $push: "$tokensPerSec" },
-            _modalities: { $push: "$modalities" },
-            _requests: {
-              $push: {
-                requestId: "$requestId",
-                conversationId: "$conversationId",
-                traceId: "$traceId",
-                inputTokens: "$inputTokens",
-                outputTokens: "$outputTokens",
-                model: "$model",
-                provider: "$provider",
-                project: "$project",
-                username: "$username",
-                endpoint: "$endpoint",
-                operation: "$operation",
-                estimatedCost: "$estimatedCost",
-                success: "$success",
-                modalities: "$modalities",
-                messageCount: "$messageCount",
-                tokensPerSec: "$tokensPerSec",
-                totalTime: "$totalTime",
-                toolsUsed: "$toolsUsed",
-                toolDisplayNames: "$toolDisplayNames",
-                toolApiNames: "$toolApiNames",
-                agent: "$agent",
-                timestamp: "$timestamp",
-              },
-            },
+          $facet: {
+            data: [sortStage, { $skip: skip }, { $limit: limit }],
+            metadata: [{ $count: "total" }],
           },
         },
-        {
-          $addFields: {
-            id: "$_id",
-            models: { $setDifference: ["$_models", [null]] },
-            providers: { $setDifference: ["$_providers", [null]] },
-            agents: { $setDifference: ["$_agents", [null]] },
-            toolDisplayNames: {
-              $setUnion: {
-                $reduce: {
-                  input: "$_toolArrays",
-                  initialValue: [],
-                  in: { $concatArrays: ["$$value", "$$this"] },
-                },
-              },
-            },
-            toolApiNames: {
-              $setUnion: {
-                $reduce: {
-                  input: "$_toolCallArrays",
-                  initialValue: [],
-                  in: { $concatArrays: ["$$value", "$$this"] },
-                },
-              },
-            },
-            avgTokensPerSec: {
-              $avg: {
-                $filter: {
-                  input: "$_tpsValues",
-                  as: "tps",
-                  cond: {
-                    $and: [{ $ne: ["$$tps", null] }, { $gt: ["$$tps", 0] }],
-                  },
-                },
-              },
-            },
-            startedAt: "$createdAt",
-            finishedAt: "$updatedAt",
-            modalities: {
-              $reduce: {
-                input: "$_modalities",
-                initialValue: {},
-                in: {
-                  $mergeObjects: [
-                    "$$value",
-                    {
-                      $cond: [
-                        { $ne: ["$$this", null] },
-                        {
-                          $arrayToObject: {
-                            $filter: {
-                              input: { $objectToArray: "$$this" },
-                              as: "kv",
-                              cond: { $eq: ["$$kv.v", true] },
-                            },
-                          },
-                        },
-                        {},
-                      ],
-                    },
-                  ],
-                },
-              },
-            },
-            requests: "$_requests",
-          },
-        },
-        {
-          $project: {
-            _id: 0,
-            _models: 0,
-            _providers: 0,
-            _agents: 0,
-            _toolArrays: 0,
-            _toolCallArrays: 0,
-            _tpsValues: 0,
-            _modalities: 0,
-            _requests: 0,
-          },
-        },
-        { $sort: { [sort as string]: sortDirection } },
       ];
 
-      const countPipeline: Record<string, unknown>[] = [...pipeline, { $count: "total" }];
-      pipeline.push({ $skip: skip }, { $limit: limit });
+      const [result] = await req.db
+        .collection(REQUESTS_COLLECTION)
+        .aggregate(facetPipeline, { maxTimeMS: AGGREGATE_MAX_TIME_MS })
+        .toArray();
 
-      const [docs, countResult] = await Promise.all([
-        req.db.collection(REQUESTS_COLLECTION).aggregate(pipeline).toArray(),
-        req.db.collection(REQUESTS_COLLECTION).aggregate(countPipeline).toArray(),
-      ]);
-      const total = countResult[0]?.total || 0;
+      const docs = result?.data || [];
+      const total = result?.metadata?.[0]?.total || 0;
 
       res.json({ data: docs, total, page, limit });
     } catch (error: unknown) {
@@ -242,7 +241,10 @@ router.get(
     try {
       const requests = await req.db
         .collection(REQUESTS_COLLECTION)
-        .find({ traceId: req.params.id })
+        .find(
+          { traceId: req.params.id },
+          { projection: { requestPayload: 0, responsePayload: 0 }, maxTimeMS: AGGREGATE_MAX_TIME_MS },
+        )
         .toArray();
 
       if (requests.length === 0) {
