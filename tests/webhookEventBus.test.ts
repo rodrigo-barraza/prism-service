@@ -1,3 +1,4 @@
+import "./setup.ts";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { WebhookEvent } from "../src/services/WebhookEventBus.ts";
 import { PROVIDERS } from "../src/constants.ts";
