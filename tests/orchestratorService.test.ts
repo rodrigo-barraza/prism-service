@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "./setup.ts";
 import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
+import { PROVIDERS } from "../src/constants.ts";
 
 let mockExistsSyncResult: boolean | undefined = undefined;
 
@@ -66,7 +67,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       project: "test-project",
       username: "test-user",
       agent: "CODING",
-      providerName: "google",
+      providerName: PROVIDERS.GOOGLE,
       resolvedModel: "gemini-3-flash-preview",
       traceId: "trace-id-123",
       agentSessionId: "session-id-456",

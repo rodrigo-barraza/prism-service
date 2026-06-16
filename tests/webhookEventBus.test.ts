@@ -242,7 +242,7 @@ describe("ActiveGenerationTracker — webhook events", () => {
     ActiveGenerationTracker.increment({
       agent: "meepo",
       model: "claude-sonnet-4-20250514",
-      provider: "anthropic",
+      provider: PROVIDERS.ANTHROPIC,
       conversationId: "conv-123",
     });
 
@@ -253,7 +253,7 @@ describe("ActiveGenerationTracker — webhook events", () => {
 
     expect(eventData.agent).toBe("meepo");
     expect(eventData.model).toBe("claude-sonnet-4-20250514");
-    expect(eventData.provider).toBe("anthropic");
+    expect(eventData.provider).toBe(PROVIDERS.ANTHROPIC);
     expect(eventData.conversationId).toBe("conv-123");
   });
 

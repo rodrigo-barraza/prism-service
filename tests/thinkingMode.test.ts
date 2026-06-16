@@ -11,21 +11,21 @@ import {
 
 
 // ── Mock @google/genai module in detail ──────────────────────────────
-const mockGenerateContent = vi.fn();
-const mockGenerateContentStream = vi.fn();
-const mockConnect = vi.fn();
+const mockGenerateContent = vi.fn<InstanceType<typeof import("@google/genai").GoogleGenAI>["models"]["generateContent"]>();
+const mockGenerateContentStream = vi.fn<InstanceType<typeof import("@google/genai").GoogleGenAI>["models"]["generateContentStream"]>();
+const mockConnect = vi.fn<InstanceType<typeof import("@google/genai").GoogleGenAI>["live"]["connect"]>();
 
 // ── Mock @anthropic-ai/sdk module in detail ──────────────────────────
-const mockMessagesCreate = vi.fn();
-const mockMessagesStream = vi.fn();
+const mockMessagesCreate = vi.fn<InstanceType<typeof import("@anthropic-ai/sdk").default>["messages"]["create"]>();
+const mockMessagesStream = vi.fn<InstanceType<typeof import("@anthropic-ai/sdk").default>["messages"]["stream"]>();
 
 vi.mock("@anthropic-ai/sdk", () => {
   return {
     default: class {
       constructor() {}
       messages = {
-        create: (...args: any[]) => {
-          const res = mockMessagesCreate(...args);
+        create: (...args: Parameters<InstanceType<typeof import("@anthropic-ai/sdk").default>["messages"]["create"]>) => {
+          const res = (mockMessagesCreate as any)(...args);
           return {
             withResponse: async () => ({
               data: res,
@@ -45,7 +45,7 @@ vi.mock("@anthropic-ai/sdk", () => {
             }),
           };
         },
-        stream: (...args: any[]) => mockMessagesStream(...args),
+        stream: (...args: Parameters<InstanceType<typeof import("@anthropic-ai/sdk").default>["messages"]["stream"]>) => (mockMessagesStream as any)(...args),
       };
     }
   };
@@ -56,11 +56,11 @@ vi.mock("@google/genai", () => {
     GoogleGenAI: class {
       constructor() {}
       models = {
-        generateContent: (...args: any[]) => mockGenerateContent(...args),
-        generateContentStream: (...args: any[]) => mockGenerateContentStream(...args),
+        generateContent: (...args: Parameters<InstanceType<typeof import("@google/genai").GoogleGenAI>["models"]["generateContent"]>) => (mockGenerateContent as any)(...args),
+        generateContentStream: (...args: Parameters<InstanceType<typeof import("@google/genai").GoogleGenAI>["models"]["generateContentStream"]>) => (mockGenerateContentStream as any)(...args),
       };
       live = {
-        connect: (...args: any[]) => mockConnect(...args),
+        connect: (...args: Parameters<InstanceType<typeof import("@google/genai").GoogleGenAI>["live"]["connect"]>) => (mockConnect as any)(...args),
       };
     },
     Modality: {
@@ -94,7 +94,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
           activeLiveCallbacks.onopen();
         }
       });
-      return mockLiveSession;
+      return mockLiveSession as any;
     });
   });
 
@@ -105,7 +105,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: "Done" }] } }],
         usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await googleProvider.generateText(messages, MODELS.GEMINI_35_FLASH.name, {
@@ -114,7 +114,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       });
 
       expect(mockGenerateContent).toHaveBeenCalledTimes(1);
-      const args = mockGenerateContent.mock.calls[0][0];
+      const args = mockGenerateContent.mock.calls[0][0] as any;
       expect(args.config.thinkingConfig).toBeDefined();
       expect(args.config.thinkingConfig.includeThoughts).toBe(true);
       expect(args.config.thinkingConfig.thinkingLevel).toBe("medium");
@@ -125,7 +125,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: "Done" }] } }],
         usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await googleProvider.generateText(messages, MODELS.GEMINI_35_FLASH.name, {
@@ -135,7 +135,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       });
 
       expect(mockGenerateContent).toHaveBeenCalledTimes(1);
-      const args = mockGenerateContent.mock.calls[0][0];
+      const args = mockGenerateContent.mock.calls[0][0] as any;
       expect(args.config.thinkingConfig).toBeDefined();
       expect(args.config.thinkingConfig.includeThoughts).toBe(true);
       expect(args.config.thinkingConfig.thinkingLevel).toBeUndefined();
@@ -146,7 +146,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: "Done" }] } }],
         usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await googleProvider.generateText(messages, MODELS.GEMINI_35_FLASH.name, {
@@ -154,7 +154,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
         thinkingBudget: "2048",
       });
 
-      const args = mockGenerateContent.mock.calls[0][0];
+      const args = mockGenerateContent.mock.calls[0][0] as any;
       expect(args.config.thinkingConfig.thinkingBudget).toBe(2048);
     });
 
@@ -162,14 +162,14 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: "Done" }] } }],
         usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await googleProvider.generateText(messages, MODELS.GEMINI_35_FLASH.name, {
         thinkingEnabled: false,
       });
 
-      const args = mockGenerateContent.mock.calls[0][0];
+      const args = mockGenerateContent.mock.calls[0][0] as any;
       expect(args.config.thinkingConfig).toEqual({ thinkingBudget: 0 });
     });
 
@@ -177,7 +177,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: "Done" }] } }],
         usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
-      });
+      } as any);
 
       // Using espeak-ng or any model that does not have thinking: true in MODELS config
       const messages = [{ role: "user", content: "hello" }];
@@ -185,7 +185,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
         thinkingEnabled: true,
       });
 
-      const args = mockGenerateContent.mock.calls[0][0];
+      const args = mockGenerateContent.mock.calls[0][0] as any;
       expect(args.config.thinkingConfig).toBeUndefined();
     });
 
@@ -193,7 +193,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: "Done" }] } }],
         usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await googleProvider.generateText(messages, MODELS.GEMINI_35_FLASH.name, {
@@ -201,7 +201,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       });
 
       expect(mockGenerateContent).toHaveBeenCalledTimes(1);
-      const args = mockGenerateContent.mock.calls[0][0];
+      const args = mockGenerateContent.mock.calls[0][0] as any;
       expect(args.config.serviceTier).toBeUndefined();
     });
 
@@ -209,7 +209,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: "Done" }] } }],
         usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await googleProvider.generateText(messages, MODELS.GEMINI_35_FLASH.name, {
@@ -217,7 +217,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       });
 
       expect(mockGenerateContent).toHaveBeenCalledTimes(1);
-      const args = mockGenerateContent.mock.calls[0][0];
+      const args = mockGenerateContent.mock.calls[0][0] as any;
       expect(args.config.serviceTier).toBe("standard");
     });
 
@@ -225,7 +225,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: "Done" }] } }],
         usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await googleProvider.generateText(messages, MODELS.GEMINI_35_FLASH.name, {
@@ -242,7 +242,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       });
 
       expect(mockGenerateContent).toHaveBeenCalledTimes(1);
-      const args = mockGenerateContent.mock.calls[0][0];
+      const args = mockGenerateContent.mock.calls[0][0] as any;
       expect(args.config.temperature).toBe(0.4);
       expect(args.config.topP).toBe(0.85);
       expect(args.config.topK).toBe(15);
@@ -280,7 +280,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
           usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 }
         };
       }
-      mockGenerateContentStream.mockResolvedValueOnce(mockGenerator());
+      mockGenerateContentStream.mockResolvedValueOnce(mockGenerator() as any);
 
       const stream = googleProvider.generateTextStream([{ role: "user", content: "hi" }], MODELS.GEMINI_35_FLASH.name);
       const results: any[] = [];
@@ -500,7 +500,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       mockMessagesCreate.mockReturnValueOnce({
         content: [{ type: "text", text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await anthropicProvider.generateText(messages, MODELS.SONNET_46.name, {
@@ -513,7 +513,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       });
 
       expect(mockMessagesCreate).toHaveBeenCalledTimes(1);
-      const args = mockMessagesCreate.mock.calls[0][0];
+      const args = mockMessagesCreate.mock.calls[0][0] as any;
       expect(args.thinking).toBeDefined();
       expect(args.thinking.type).toBe("enabled");
       expect(args.thinking.budget_tokens).toBe(2048);
@@ -527,7 +527,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       mockMessagesCreate.mockReturnValueOnce({
         content: [{ type: "text", text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await anthropicProvider.generateText(messages, MODELS.SONNET_46.name, {
@@ -535,19 +535,19 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
         thinkingBudget: "1024",
       });
 
-      const args1 = mockMessagesCreate.mock.calls[0][0];
+      const args1 = mockMessagesCreate.mock.calls[0][0] as any;
       expect(args1.thinking.budget_tokens).toBe(1024);
 
       // Verify effort levels map correctly
       mockMessagesCreate.mockReturnValueOnce({
         content: [{ type: "text", text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
-      });
+      } as any);
       await anthropicProvider.generateText(messages, MODELS.SONNET_46.name, {
         thinkingEnabled: true,
         reasoningEffort: "medium",
       });
-      const args2 = mockMessagesCreate.mock.calls[1][0];
+      const args2 = mockMessagesCreate.mock.calls[1][0] as any;
       expect(args2.thinking.budget_tokens).toBe(4096);
     });
 
@@ -555,7 +555,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       mockMessagesCreate.mockReturnValueOnce({
         content: [{ type: "text", text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await anthropicProvider.generateText(messages, MODELS.SONNET_46.name, {
@@ -563,7 +563,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
         temperature: 0.7,
       });
 
-      const args = mockMessagesCreate.mock.calls[0][0];
+      const args = mockMessagesCreate.mock.calls[0][0] as any;
       expect(args.thinking).toBeUndefined();
       expect(args.temperature).toBe(0.7);
 
@@ -571,12 +571,12 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       mockMessagesCreate.mockReturnValueOnce({
         content: [{ type: "text", text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
-      });
+      } as any);
       await anthropicProvider.generateText(messages, MODELS.SONNET_46.name, {
         thinkingEnabled: false,
         topP: 0.8,
       });
-      const args2 = mockMessagesCreate.mock.calls[1][0];
+      const args2 = mockMessagesCreate.mock.calls[1][0] as any;
       expect(args2.top_p).toBe(0.8);
     });
 
@@ -584,7 +584,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       mockMessagesCreate.mockReturnValueOnce({
         content: [{ type: "text", text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await anthropicProvider.generateText(messages, MODELS.SONNET_46.name, {
@@ -597,7 +597,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       });
 
       expect(mockMessagesCreate).toHaveBeenCalledTimes(1);
-      const args = mockMessagesCreate.mock.calls[0][0];
+      const args = mockMessagesCreate.mock.calls[0][0] as any;
       expect(args.temperature).toBe(0.6);
       expect(args.top_p).toBeUndefined(); // Omitted when temperature is passed
       expect(args.top_k).toBe(25);
@@ -610,7 +610,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       mockMessagesCreate.mockReturnValueOnce({
         content: [{ type: "text", text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await anthropicProvider.generateText(messages, MODELS.FABLE_5.name, {
@@ -618,7 +618,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       });
 
       expect(mockMessagesCreate).toHaveBeenCalledTimes(1);
-      const args = mockMessagesCreate.mock.calls[0][0];
+      const args = mockMessagesCreate.mock.calls[0][0] as any;
       expect(args.top_k).toBeUndefined();
     });
 
@@ -626,13 +626,13 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       mockMessagesCreate.mockReturnValueOnce({
         content: [{ type: "text", text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await anthropicProvider.generateText(messages, MODELS.FABLE_5.name, {});
 
       expect(mockMessagesCreate).toHaveBeenCalledTimes(1);
-      const args = mockMessagesCreate.mock.calls[0][0];
+      const args = mockMessagesCreate.mock.calls[0][0] as any;
       expect(args.thinking).toBeDefined();
       expect(args.thinking.type).toBe("adaptive");
       expect(args.temperature).toBe(1);
@@ -644,7 +644,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       mockMessagesCreate.mockReturnValueOnce({
         content: [{ type: "text", text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
-      });
+      } as any);
 
       const messages = [{ role: "user", content: "hello" }];
       await anthropicProvider.generateText(messages, MODELS.FABLE_5.name, {
@@ -652,7 +652,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       });
 
       expect(mockMessagesCreate).toHaveBeenCalledTimes(1);
-      const args = mockMessagesCreate.mock.calls[0][0];
+      const args = mockMessagesCreate.mock.calls[0][0] as any;
       expect(args.thinking).toBeUndefined();
     });
   });
@@ -713,7 +713,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
         }),
       };
 
-      mockMessagesStream.mockReturnValueOnce(mockStream);
+      mockMessagesStream.mockReturnValueOnce(mockStream as any);
 
       const stream = anthropicProvider.generateTextStream([{ role: "user", content: "hi" }], MODELS.SONNET_46.name, {
         thinkingEnabled: true,

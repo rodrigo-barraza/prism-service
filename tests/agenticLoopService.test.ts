@@ -16,7 +16,7 @@ vi.mock("../src/utils/logger.ts", () => ({
 
 vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
   default: {
-    ensureSchemas: vi.fn().mockResolvedValue(),
+    ensureSchemas: vi.fn().mockResolvedValue(undefined),
     getToolSchemas: vi.fn().mockReturnValue([
       { name: "search_web", description: "Search the web" },
       { name: "read_file", description: "Read a file" },
@@ -59,7 +59,7 @@ vi.mock("../src/services/FileService.ts", () => ({
 
 vi.mock("../src/services/RequestLogger.ts", () => ({
   default: {
-    logChatGeneration: vi.fn().mockResolvedValue(),
+    logChatGeneration: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -110,14 +110,24 @@ vi.mock("../src/services/system-prompt/index.ts", () => ({
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
-    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
-    get: vi.fn().mockResolvedValue({ agents: { harness: "standard" } }),
-    getSection: vi.fn().mockResolvedValue({ harness: "standard" }),
+    getCached: vi.fn().mockReturnValue({
+      creative: {
+        textToSpeechProvider: "elevenlabs",
+      } as Partial<Required<ReturnType<typeof import("../src/services/SettingsService.ts").default.getCached>>["creative"]>,
+    } as any),
+    get: vi.fn().mockResolvedValue({
+      agents: {
+        harness: "standard",
+      } as Partial<Required<ReturnType<typeof import("../src/services/SettingsService.ts").default.getCached>>["agents"]>,
+    } as any),
+    getSection: vi.fn().mockResolvedValue({
+      harness: "standard",
+    } as Partial<Required<ReturnType<typeof import("../src/services/SettingsService.ts").default.getCached>>["agents"]>),
   },
 }));
 
 vi.mock("../src/routes/ChatRoutes.ts", () => ({
-  finalizeTextGeneration: vi.fn().mockResolvedValue(),
+  finalizeTextGeneration: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../src/services/MemoryExtractor.ts", () => ({
@@ -135,9 +145,9 @@ vi.mock("../src/services/PlanningModeService.ts", () => ({
 }));
 
 describe("AgenticLoopService", () => {
-  let mockProvider;
-  let mockContext;
-  let emittedEvents;
+  let mockProvider: any;
+  let mockContext: any;
+  let emittedEvents: any[];
 
   beforeEach(() => {
     emittedEvents = [];
@@ -179,7 +189,7 @@ describe("AgenticLoopService", () => {
     await AgenticLoopService.runAgenticLoop(mockContext);
 
     expect(mockContext.emit).toHaveBeenCalled();
-    const chunks = emittedEvents.filter(e => e.type === "chunk");
+    const chunks = emittedEvents.filter((e: any) => e.type === "chunk");
     expect(chunks.length).toBe(2);
     expect(chunks[0].content).toBe("Hello");
     expect(chunks[1].content).toBe(" World");
@@ -194,8 +204,8 @@ describe("AgenticLoopService", () => {
     const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
     const passTools = callArgs.tools;
     
-    expect(passTools.find(tool => tool.name === "search_web")).toBeUndefined();
-    expect(passTools.find(tool => tool.name === "read_file")).toBeDefined();
+    expect(passTools.find((tool: any) => tool.name === "search_web")).toBeUndefined();
+    expect(passTools.find((tool: any) => tool.name === "read_file")).toBeDefined();
   });
 
   it("should filter out generate_image if model natively outputs images", async () => {
@@ -207,8 +217,8 @@ describe("AgenticLoopService", () => {
     const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
     const passTools = callArgs.tools;
     
-    expect(passTools.find(tool => tool.name === "generate_image")).toBeUndefined();
-    expect(passTools.find(tool => tool.name === "read_file")).toBeDefined();
+    expect(passTools.find((tool: any) => tool.name === "generate_image")).toBeUndefined();
+    expect(passTools.find((tool: any) => tool.name === "read_file")).toBeDefined();
   });
 
   it("should filter out describe_image if model natively inputs images", async () => {
@@ -220,8 +230,8 @@ describe("AgenticLoopService", () => {
     const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
     const passTools = callArgs.tools;
     
-    expect(passTools.find(tool => tool.name === "describe_image")).toBeUndefined();
-    expect(passTools.find(tool => tool.name === "read_file")).toBeDefined();
+    expect(passTools.find((tool: any) => tool.name === "describe_image")).toBeUndefined();
+    expect(passTools.find((tool: any) => tool.name === "read_file")).toBeDefined();
   });
 
   it("should expand domain and label selectors for enabledTools", async () => {
@@ -234,11 +244,11 @@ describe("AgenticLoopService", () => {
     
     // getClientToolSchemas returns search_web as domain:knowledge
     expect(passTools.length).toBeGreaterThan(0);
-    expect(passTools.find(tool => tool.name === "search_web")).toBeDefined();
+    expect(passTools.find((tool: any) => tool.name === "search_web")).toBeDefined();
   });
 
   it("should handle context truncation", async () => {
-    ContextWindowManager.enforce.mockReturnValueOnce({
+    (ContextWindowManager.enforce as any).mockReturnValueOnce({
       truncated: true,
       messages: [{ role: "user", content: "Truncated" }],
       strategy: "oldest",
@@ -250,7 +260,7 @@ describe("AgenticLoopService", () => {
     const callArgs = mockProvider.generateTextStream.mock.calls[0][0];
     expect(callArgs[0].content).toBe("Truncated");
     
-    const truncationEvents = emittedEvents.filter(e => e.message === "context_truncated");
+    const truncationEvents = emittedEvents.filter((e: any) => e.message === "context_truncated");
     expect(truncationEvents.length).toBe(1);
   });
   
@@ -263,9 +273,9 @@ describe("AgenticLoopService", () => {
     const passTools = callArgs.tools;
     
     // Should only have exit_plan_mode
-    expect(passTools.every(tool => tool.name === "exit_plan_mode")).toBe(true);
+    expect(passTools.every((tool: any) => tool.name === "exit_plan_mode")).toBe(true);
     
-    const enterEvents = emittedEvents.filter(e => e.message === "plan_mode_entered");
+    const enterEvents = emittedEvents.filter((e: any) => e.message === "plan_mode_entered");
     expect(enterEvents.length).toBe(1);
   });
 
@@ -277,11 +287,11 @@ describe("AgenticLoopService", () => {
 
     await AgenticLoopService.runAgenticLoop(mockContext);
 
-    const thinkingEvents = emittedEvents.filter(e => e.type === "thinking");
+    const thinkingEvents = emittedEvents.filter((e: any) => e.type === "thinking");
     expect(thinkingEvents.length).toBeGreaterThan(0);
     expect(thinkingEvents[0].content).toBe("Thinking...");
 
-    const startedEvents = emittedEvents.filter(e => e.message === "generation_started");
+    const startedEvents = emittedEvents.filter((e: any) => e.message === "generation_started");
     expect(startedEvents.length).toBeGreaterThan(0);
   });
 
@@ -295,13 +305,13 @@ describe("AgenticLoopService", () => {
 
     await AgenticLoopService.runAgenticLoop(mockContext);
 
-    const toolExecutionEvents = emittedEvents.filter(e => e.type === "tool_execution");
+    const toolExecutionEvents = emittedEvents.filter((e: any) => e.type === "tool_execution");
     // Should be 0 since dangerous_tool is not allowed and dropped
     expect(toolExecutionEvents.length).toBe(0);
   });
 
   it("should handle native MCP tool call streaming directly", async () => {
-    mockProvider.generateTextStream.mockImplementation(async function* (messages, model, options) {
+    mockProvider.generateTextStream.mockImplementation(async function* (messages: any, model: any, options: any) {
       if (options && !options.tools) {
         yield "Recovery summary text";
         yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
@@ -320,13 +330,13 @@ describe("AgenticLoopService", () => {
 
     await AgenticLoopService.runAgenticLoop(mockContext);
 
-    const toolCallEvents = emittedEvents.filter(e => e.type === "toolCall");
+    const toolCallEvents = emittedEvents.filter((e: any) => e.type === "toolCall");
     expect(toolCallEvents.length).toBe(1);
     expect(toolCallEvents[0].name).toBe("mcp__server__tool");
     expect(toolCallEvents[0].args).toEqual({ foo: "bar" });
     
     // Ensure it didn't queue a standard tool_execution
-    const toolExecutionEvents = emittedEvents.filter(e => e.type === "tool_execution");
+    const toolExecutionEvents = emittedEvents.filter((e: any) => e.type === "tool_execution");
     expect(toolExecutionEvents.length).toBe(0);
   });
 
@@ -353,14 +363,14 @@ describe("AgenticLoopService", () => {
     expect(mockProvider.generateTextStream).toHaveBeenCalledTimes(2);
 
     // Verify it executed the tool
-    const toolExecEvents = emittedEvents.filter(e => e.type === "tool_execution");
+    const toolExecEvents = emittedEvents.filter((e: any) => e.type === "tool_execution");
     expect(toolExecEvents.length).toBe(2);
     expect(toolExecEvents[0].status).toBe("calling");
     expect(toolExecEvents[1].status).toBe("done");
     expect(toolExecEvents[0].tool.name).toBe("read_file");
 
     // Verify chunk from the second iteration
-    const chunkEvents = emittedEvents.filter(e => e.type === "chunk");
+    const chunkEvents = emittedEvents.filter((e: any) => e.type === "chunk");
     expect(chunkEvents.length).toBe(1);
     expect(chunkEvents[0].content).toBe("File contents are: xyz");
 
@@ -408,8 +418,8 @@ describe("AgenticLoopService", () => {
     const passTools = callArgs.tools;
     
     // Should contain search_web (as it's in the schemas), but NOT generate_image
-    expect(passTools.find(tool => tool.name === "search_web")).toBeDefined();
-    expect(passTools.find(tool => tool.name === "generate_image")).toBeUndefined();
+    expect(passTools.find((tool: any) => tool.name === "search_web")).toBeDefined();
+    expect(passTools.find((tool: any) => tool.name === "generate_image")).toBeUndefined();
   });
 
   it("should block unauthorized tools in plan mode by dropping them via schema enforcer", async () => {
@@ -425,7 +435,7 @@ describe("AgenticLoopService", () => {
     await AgenticLoopService.runAgenticLoop(mockContext);
 
     // Because it's dropped by the schema enforcer, no tool execution occurs
-    const toolExecEvents = emittedEvents.filter(e => e.type === "tool_execution");
+    const toolExecEvents = emittedEvents.filter((e: any) => e.type === "tool_execution");
     expect(toolExecEvents.length).toBe(0);
     
     // And it shouldn't have iterated a second time because there were no pending tools

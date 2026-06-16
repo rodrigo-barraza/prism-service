@@ -12,49 +12,24 @@
 
 import { describe, it, expect } from "vitest";
 import { PROMPT_DELIMITERS } from "../src/constants.ts";
+import type { ChatMessage } from "../src/types/admin.ts";
+import { computeNewTurnMessages } from "../src/services/harnesses/lifecycle/Finalizer.ts";
 
 // ── Types mirroring the harness ConversationMessage shape ────────
-interface TestMessage {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-  toolCalls?: Array<{
-    id: string;
-    name: string;
-    args: Record<string, unknown>;
-    result?: unknown;
-  }>;
+type TestMessage = ChatMessage & {
   isCompactSummary?: boolean;
   _alreadyPersisted?: boolean;
-}
+};
 
 /**
- * Replicates the exact newTurnMessages slice logic from
- * BaseAgenticHarness.finalize() — lines 596-605.
- *
- * This is the function under test.
+ * Delegates to the production newTurnMessages slice logic from
+ * BaseAgenticHarness.finalize() / Finalizer.ts.
  */
 function extractNewTurnMessages(
   currentMessages: TestMessage[],
   originalMessageCount: number,
 ): TestMessage[] {
-  const lastOriginalMessage = currentMessages[originalMessageCount - 1];
-  const isLastAlreadyPersisted = lastOriginalMessage && (lastOriginalMessage as any)._alreadyPersisted;
-
-  const sliceIndex = isLastAlreadyPersisted
-    ? originalMessageCount
-    : Math.max(0, originalMessageCount - 1);
-
-  return currentMessages
-    .slice(sliceIndex)
-    .filter(
-      (message) =>
-        !(
-          message.role === "user" &&
-          typeof message.content === "string" &&
-          message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX)
-        ) &&
-        !(message as any)._alreadyPersisted,
-    );
+  return computeNewTurnMessages(currentMessages, currentMessages, originalMessageCount) as TestMessage[];
 }
 
 /**
