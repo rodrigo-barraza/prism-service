@@ -12,6 +12,8 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { swapMessageContent, assembleMessagesToAppend as assembleMessagesToAppendReal } from "../src/services/harnesses/lifecycle/Finalizer.ts";
+import { PROMPT_DELIMITERS } from "../src/constants.ts";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -35,6 +37,7 @@ interface TestMessage {
   totalTime?: number | null;
   tokensPerSec?: number | null;
   estimatedCost?: number | null;
+  [key: string]: any;
 }
 
 // ── Simulate the Finalizer's message assembly ───────────────────
@@ -59,50 +62,25 @@ interface FinalizerAssemblyInput {
  * Replicates lines 349-449 of Finalizer.ts — the messagesToAppend assembly logic.
  */
 function assembleMessagesToAppend(input: FinalizerAssemblyInput): TestMessage[] {
-  const {
-    overrideMessagesToAppend,
-    finalText,
-    finalThinking,
-    images,
-    audioRef,
-    toolCalls,
-    resolvedModel,
-    providerName,
-  } = input;
+  const messages = assembleMessagesToAppendReal({
+    overrideMessagesToAppend: input.overrideMessagesToAppend,
+    text: input.finalText,
+    thinking: input.finalThinking,
+    images: input.images,
+    audioReference: input.audioRef,
+    toolCalls: input.toolCalls,
+    resolvedModel: input.resolvedModel,
+    providerName: input.providerName,
+  });
 
-  const messagesToAppend: TestMessage[] = [...overrideMessagesToAppend];
-
-  const hasIntermediateToolMessages = overrideMessagesToAppend.some(
-    (message) =>
-      message.role === "assistant" &&
-      message.toolCalls &&
-      message.toolCalls.length > 0,
-  );
-
-  const finalAssistant: TestMessage = {
-    role: "assistant",
-    content: finalText,
-    ...(finalThinking && { thinking: finalThinking } as any),
-    ...(images.length > 0 && { images }),
-    ...(audioRef && { audio: audioRef }),
-    ...(!hasIntermediateToolMessages &&
-      toolCalls.length > 0 && { toolCalls }),
-    model: resolvedModel,
-    provider: providerName,
-    timestamp: new Date().toISOString(),
-  };
-
-  messagesToAppend.push(finalAssistant);
-
-  // Apply sanitization filter
-  return messagesToAppend.filter((message) => {
+  return messages.filter((message) => {
     if (message.role === "user" && typeof message.content === "string") {
       if (message.content.startsWith("[CONTEXT NOTE:")) return false;
       if (message.content.startsWith("[Conversation Summary")) return false;
       if (message.isCompactSummary === true) return false;
     }
     return true;
-  });
+  }) as TestMessage[];
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -646,46 +624,7 @@ describe("done event → appendAndFinalize race condition", () => {
 //  swapMsgContent tests
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/**
- * Replicates the swapMsgContent function from Finalizer.ts lines 136-170.
- * This swaps `content` and `rawContent` to ensure the DB stores clean user text
- * in `content` and the injected system context in `rawContent`.
- */
-function swapMessageContent(message: TestMessage): void {
-  if (message.role === "user" && typeof message.content === "string") {
-    if (
-      message.rawContent?.startsWith("[System Context]") ||
-      message.rawContent?.startsWith("[System Context - Local Time:")
-    ) {
-      return;
-    }
-    if (message.rawContent) {
-      const dirty = message.content;
-      message.content = message.rawContent;
-      message.rawContent = dirty;
-    } else if (message.content.startsWith("[System Context]")) {
-      const dirty = message.content;
-      let clean = message.content;
-      const splitIndex = message.content.indexOf("\n\n[User Message]\n");
-      if (splitIndex !== -1) {
-        clean = message.content.substring(
-          splitIndex + "\n\n[User Message]\n".length,
-        );
-      }
-      message.content = clean;
-      message.rawContent = dirty;
-    } else if (message.content.startsWith("[System Context - Local Time:")) {
-      const dirty = message.content;
-      let clean = message.content;
-      const index = message.content.indexOf("]\n\n");
-      if (index !== -1) {
-        clean = message.content.slice(index + 3);
-      }
-      message.content = clean;
-      message.rawContent = dirty;
-    }
-  }
-}
+// swapMessageContent is imported from Finalizer.ts
 
 describe("swapMsgContent — system context injection handling", () => {
   it("swaps injected system context to rawContent", () => {

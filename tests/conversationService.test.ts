@@ -11,6 +11,8 @@
  * that enforces the same constraint MongoDB does.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { COLLECTIONS } from "../src/constants.ts";
+
 
 // ── Mock config ────────────────────────────────────────────────
 vi.mock("../config.ts", () => ({
@@ -185,7 +187,7 @@ describe("ConversationService.appendMessages", () => {
           BASE_ARGS.username,
           makeMessages(2),
           { title: "User's first message", settings: { provider: "openai", model: "gpt-4o" } },
-          { collection: "agent_sessions" },
+          { collection: COLLECTIONS.AGENT_CONVERSATIONS },
         ),
       ).resolves.not.toThrow();
     });
@@ -213,7 +215,7 @@ describe("ConversationService.appendMessages", () => {
           BASE_ARGS.username,
           makeMessages(2),
           { title: "With trace", traceId: "trace-1", settings: { provider: "google", model: "gemini" } },
-          { collection: "agent_sessions" },
+          { collection: COLLECTIONS.AGENT_CONVERSATIONS },
         ),
       ).resolves.not.toThrow();
     });
@@ -228,7 +230,7 @@ describe("ConversationService.appendMessages", () => {
           BASE_ARGS.username,
           makeMessages(2),
           { title: "Worker task", parentAgentSessionId: "parent-abc", settings: {} },
-          { collection: "agent_sessions" },
+          { collection: COLLECTIONS.AGENT_CONVERSATIONS },
         ),
       ).resolves.not.toThrow();
     });
@@ -252,7 +254,7 @@ describe("ConversationService.appendMessages", () => {
             settings: { provider: "anthropic", model: "claude-4" },
           },
           // Use conversations collection (not agent_sessions) to exercise systemPrompt path
-          { collection: "conversations" },
+          { collection: COLLECTIONS.MODEL_CONVERSATIONS },
         ),
       ).resolves.not.toThrow();
     });
@@ -267,7 +269,7 @@ describe("ConversationService.appendMessages", () => {
           BASE_ARGS.username,
           makeMessages(2),
           null,
-          { collection: "agent_sessions" },
+          { collection: COLLECTIONS.AGENT_CONVERSATIONS },
         ),
       ).resolves.not.toThrow();
     });
@@ -284,7 +286,7 @@ describe("ConversationService.appendMessages", () => {
         BASE_ARGS.username,
         makeMessages(2),
         { title: "Test session" },
-        { collection: "agent_sessions" },
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
       );
 
       expect(result.messages).toHaveLength(2);
@@ -299,7 +301,7 @@ describe("ConversationService.appendMessages", () => {
         BASE_ARGS.username,
         makeMessages(2),
         null, // no meta
-        { collection: "agent_sessions" },
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
       );
 
       expect(result.messages).toHaveLength(2);
@@ -315,7 +317,7 @@ describe("ConversationService.appendMessages", () => {
         BASE_ARGS.username,
         makeMessages(1),
         { title: "My custom title" },
-        { collection: "agent_sessions" },
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
       );
 
       expect(result.title).toBe("My custom title");
@@ -330,7 +332,7 @@ describe("ConversationService.appendMessages", () => {
         BASE_ARGS.username,
         [{ role: "user", content: "First message" }],
         { title: "Multi-turn" },
-        { collection: "agent_sessions" },
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
       );
 
       const result = await ConversationService.appendMessages(
@@ -339,7 +341,7 @@ describe("ConversationService.appendMessages", () => {
         BASE_ARGS.username,
         [{ role: "assistant", content: "Response", provider: "openai", model: "gpt-4o" }],
         null, // no meta on follow-up
-        { collection: "agent_sessions" },
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
       );
 
       expect(result.messages).toHaveLength(2);
@@ -360,7 +362,7 @@ describe("ConversationService.appendMessages", () => {
           { role: "assistant", content: "It's a test", provider: "openai", model: "gpt-4o" },
         ],
         null,
-        { collection: "agent_sessions" },
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
       );
 
       expect(result.modalities.textIn).toBe(true);
@@ -377,7 +379,7 @@ describe("ConversationService.appendMessages", () => {
           { role: "assistant", content: "Hi", provider: "anthropic", model: "claude-4" },
         ],
         { settings: { provider: "anthropic", model: "claude-4" } },
-        { collection: "agent_sessions" },
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
       );
 
       expect(result.providers).toContain("anthropic");
@@ -394,7 +396,7 @@ describe("ConversationService.appendMessages", () => {
           { role: "assistant", content: "More", estimatedCost: 0.0015, provider: "openai" },
         ],
         null,
-        { collection: "agent_sessions" },
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
       );
 
       expect(result.totalCost).toBeCloseTo(0.004);
@@ -413,7 +415,7 @@ describe("ConversationService.appendMessages", () => {
       mockTimersCollection = createMockCollection();
       MongoWrapper.getDb.mockReturnValue({
         collection: (name) => {
-          if (name === "conversation_timers") {
+          if (name === COLLECTIONS.CONVERSATION_TIMERS) {
             return mockTimersCollection;
           }
           return mockCollection;
@@ -453,7 +455,7 @@ describe("ConversationService.appendMessages", () => {
         "testuser",
         [{ role: "user", content: "Check status please" }],
         null,
-        { collection: "agent_sessions" }
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS }
       );
 
       const timer = await mockTimersCollection.findOne(filter);
@@ -471,7 +473,7 @@ describe("ConversationService.appendMessages", () => {
         "testuser",
         [{ role: "assistant", content: "I've set a timer for 1 minute. Stay hydrated! 💧", model: "gemini-3.5-flash", provider: "google" }],
         null,
-        { collection: "agent_sessions" }
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS }
       );
 
       const timer = await mockTimersCollection.findOne(filter);
@@ -489,7 +491,7 @@ describe("ConversationService.appendMessages", () => {
         "testuser",
         [{ role: "user", content: "🔔 Notification: check build status" }],
         null,
-        { collection: "agent_sessions" }
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS }
       );
 
       const timer = await mockTimersCollection.findOne(filter);
@@ -512,7 +514,7 @@ describe("ConversationService.appendMessages", () => {
           { role: "assistant", content: "All good!", model: "gemini-3.5-flash", provider: "google" },
         ],
         null,
-        { collection: "agent_sessions" }
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS }
       );
 
       const timer = await mockTimersCollection.findOne(filter);
@@ -536,7 +538,7 @@ describe("ConversationService.setGenerating", () => {
       "coding",
       "testuser",
       true,
-      { collection: "agent_sessions" },
+      { collection: COLLECTIONS.AGENT_CONVERSATIONS },
     );
 
     const doc = await mockCollection.findOne({
@@ -557,7 +559,7 @@ describe("ConversationService.setGenerating", () => {
       "coding",
       "testuser",
       true,
-      { collection: "agent_sessions", title: "Custom Title" },
+      { collection: COLLECTIONS.AGENT_CONVERSATIONS, title: "Custom Title" },
     );
 
     const doc = await mockCollection.findOne({
@@ -587,7 +589,7 @@ describe("ConversationService.setGenerating", () => {
       "coding",
       "testuser",
       false,
-      { collection: "agent_sessions" },
+      { collection: COLLECTIONS.AGENT_CONVERSATIONS },
     );
 
     const doc = await mockCollection.findOne({

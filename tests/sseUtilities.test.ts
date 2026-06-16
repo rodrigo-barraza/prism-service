@@ -38,11 +38,12 @@ vi.mock("../src/services/ConversationService.ts", () => ({
   default: {
     appendMessages: vi.fn(),
     setGenerating: vi.fn(),
+    getSessionStats: vi.fn(),
   },
 }));
 
 vi.mock("../src/services/RequestLogger.ts", () => ({
-  default: { log: vi.fn(), logChatGeneration: vi.fn() },
+  default: { log: vi.fn(), logChatGeneration: vi.fn(), logBackgroundLlmCall: vi.fn() },
 }));
 
 vi.mock("../src/services/SettingsService.ts", () => ({
@@ -56,6 +57,9 @@ vi.mock("../src/services/SettingsService.ts", () => ({
   },
 }));
 
+import { PROVIDERS } from "../src/constants.ts";
+
+
 vi.mock("../src/providers/index.ts", () => ({
   getProvider: vi.fn(),
   listProviders: () => [],
@@ -65,8 +69,10 @@ const { buildJsonResponseFromEvents } = await import(
   "../src/utils/SseUtilities.ts"
 );
 
+import type { SseEvent } from "../src/types/SseTypes.ts";
+
 // ── Types ──────────────────────────────────────────────────────
-type TestEvent = Record<string, unknown>;
+type TestEvent = SseEvent;
 
 // ═══════════════════════════════════════════════════════════════
 describe("buildJsonResponseFromEvents", () => {
@@ -76,7 +82,7 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "chunk", content: "world!" },
       {
         type: "done",
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-5.5",
         usage: { inputTokens: 10, outputTokens: 5 },
         estimatedCost: 0.001,
@@ -84,13 +90,13 @@ describe("buildJsonResponseFromEvents", () => {
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       model: "gpt-5.5",
     } as any);
 
     expect(result.error).toBeUndefined();
     expect(result.response!.text).toBe("Hello world!");
-    expect(result.response!.provider).toBe("openai");
+    expect(result.response!.provider).toBe(PROVIDERS.OPENAI);
     expect(result.response!.model).toBe("gpt-5.5");
     expect(result.response!.usage).toEqual({ inputTokens: 10, outputTokens: 5 });
     expect(result.response!.estimatedCost).toBe(0.001);
@@ -98,11 +104,11 @@ describe("buildJsonResponseFromEvents", () => {
 
   it("should return null text when no chunk events exist", () => {
     const events: TestEvent[] = [
-      { type: "done", provider: "google", model: "gemini-3.5-flash" },
+      { type: "done", provider: PROVIDERS.GOOGLE, model: "gemini-3.5-flash" },
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
     } as any);
 
     expect(result.response!.text).toBeNull();
@@ -113,11 +119,11 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "thinking", content: "Let me " },
       { type: "thinking", content: "reason..." },
       { type: "chunk", content: "Answer here" },
-      { type: "done", provider: "anthropic", model: "claude-opus-4" },
+      { type: "done", provider: PROVIDERS.ANTHROPIC, model: "claude-opus-4" },
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "anthropic",
+      provider: PROVIDERS.ANTHROPIC,
     } as any);
 
     expect(result.response!.thinking).toBe("Let me reason...");
@@ -127,11 +133,11 @@ describe("buildJsonResponseFromEvents", () => {
   it("should return null thinking when no thinking events exist", () => {
     const events: TestEvent[] = [
       { type: "chunk", content: "Simple answer" },
-      { type: "done", provider: "google" },
+      { type: "done", provider: PROVIDERS.GOOGLE },
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
     } as any);
 
     expect(result.response!.thinking).toBeNull();
@@ -145,11 +151,11 @@ describe("buildJsonResponseFromEvents", () => {
         mimeType: "image/png",
         minioRef: "minio://images/1.png",
       },
-      { type: "done", provider: "openai" },
+      { type: "done", provider: PROVIDERS.OPENAI },
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
     } as any);
 
     expect(result.response!.images).toHaveLength(1);
@@ -163,11 +169,11 @@ describe("buildJsonResponseFromEvents", () => {
   it("should omit images when no image events exist", () => {
     const events: TestEvent[] = [
       { type: "chunk", content: "Text only" },
-      { type: "done", provider: "google" },
+      { type: "done", provider: PROVIDERS.GOOGLE },
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
     } as any);
 
     expect(result.response!.images).toBeUndefined();
@@ -183,13 +189,13 @@ describe("buildJsonResponseFromEvents", () => {
       {
         type: "tool_execution",
         status: "done",
-        tool: { name: "read_file", result: "contents" },
+        tool: { name: "read_file", args: {}, result: "contents" },
       },
-      { type: "done", provider: "google" },
+      { type: "done", provider: PROVIDERS.GOOGLE },
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
     } as any);
 
     // Only "calling" status should be included
@@ -204,7 +210,7 @@ describe("buildJsonResponseFromEvents", () => {
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
     } as any);
 
     expect(result.error).toBeDefined();
@@ -215,7 +221,7 @@ describe("buildJsonResponseFromEvents", () => {
     const events: TestEvent[] = [{ type: "error" }];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
     } as any);
 
     expect(result.error).toBeDefined();
@@ -229,21 +235,21 @@ describe("buildJsonResponseFromEvents", () => {
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "anthropic",
+      provider: PROVIDERS.ANTHROPIC,
       model: "claude-4-sonnet",
     } as any);
 
-    expect(result.response!.provider).toBe("anthropic");
+    expect(result.response!.provider).toBe(PROVIDERS.ANTHROPIC);
     expect(result.response!.model).toBe("claude-4-sonnet");
   });
 
   it("should include traceId from done event when present", () => {
     const events: TestEvent[] = [
-      { type: "done", provider: "google", traceId: "trace-abc-123" },
+      { type: "done", provider: PROVIDERS.GOOGLE, traceId: "trace-abc-123" },
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
     } as any);
 
     expect(result.response!.traceId).toBe("trace-abc-123");
@@ -251,11 +257,11 @@ describe("buildJsonResponseFromEvents", () => {
 
   it("should not include traceId when absent", () => {
     const events: TestEvent[] = [
-      { type: "done", provider: "google" },
+      { type: "done", provider: PROVIDERS.GOOGLE },
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
     } as any);
 
     expect(result.response).not.toHaveProperty("traceId");
@@ -265,13 +271,13 @@ describe("buildJsonResponseFromEvents", () => {
     const events: TestEvent[] = [
       {
         type: "done",
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         conversationId: "conv-xyz",
       },
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
     } as any);
 
     expect(result.response!.conversationId).toBe("conv-xyz");
@@ -326,11 +332,11 @@ describe("buildJsonResponseFromEvents", () => {
           result: "Something went wrong",
         },
       },
-      { type: "done", provider: "google" },
+      { type: "done", provider: PROVIDERS.GOOGLE },
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
     } as any);
 
     expect(result.response!.toolResults).toHaveLength(2);
@@ -358,13 +364,13 @@ describe("buildJsonResponseFromEvents", () => {
       },
       {
         type: "done",
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         audioRef: "audio-ref-789",
       },
     ];
 
     const result = buildJsonResponseFromEvents(events as any, {
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
     } as any);
 
     expect(result.response!.audio).toHaveLength(1);

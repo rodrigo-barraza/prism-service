@@ -7,6 +7,8 @@ import {
 } from "./setup.ts";
 import { calculateTextCost } from "../src/utils/CostCalculator.ts";
 import { TYPES, getPricing } from "../src/config.ts";
+import { PROVIDERS } from "../src/constants.ts";
+
 
 // ═══════════════════════════════════════════════════════════════
 // Token & Cost Accuracy Tests
@@ -310,7 +312,7 @@ function sendChat(payload) {
 
 describe("Token/Cost Accuracy — OpenAI gpt-5-nano", () => {
   const MODEL = "gpt-5-nano";
-  const PROVIDER = "openai";
+  const PROVIDER = PROVIDERS.OPENAI;
 
   beforeEach(() => {
     MOCK_GENERATE_TEXT.mockClear();
@@ -392,7 +394,7 @@ describe("Token/Cost Accuracy — OpenAI gpt-5-nano", () => {
 
 describe("Token/Cost Accuracy — Anthropic haiku-4.5", () => {
   const MODEL = "claude-haiku-4-5-20251001";
-  const PROVIDER = "anthropic";
+  const PROVIDER = PROVIDERS.ANTHROPIC;
 
   beforeEach(() => {
     MOCK_GENERATE_TEXT.mockClear();
@@ -547,7 +549,7 @@ describe("Token/Cost Accuracy — Anthropic haiku-4.5", () => {
 
 describe("Token/Cost Accuracy — Google gemini-3-flash", () => {
   const MODEL = "gemini-3-flash-preview";
-  const PROVIDER = "google";
+  const PROVIDER = PROVIDERS.GOOGLE;
 
   beforeEach(() => {
     MOCK_GENERATE_TEXT.mockClear();
@@ -632,9 +634,9 @@ describe("Cross-provider cost consistency", () => {
 
   it("all providers return estimatedCost as a number (not null) for known models", async () => {
     const cases = [
-      { provider: "openai", model: "gpt-5-nano" },
-      { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
-      { provider: "google", model: "gemini-3-flash-preview" },
+      { provider: PROVIDERS.OPENAI, model: "gpt-5-nano" },
+      { provider: PROVIDERS.ANTHROPIC, model: "claude-haiku-4-5-20251001" },
+      { provider: PROVIDERS.GOOGLE, model: "gemini-3-flash-preview" },
     ];
 
     for (const { provider, model } of cases) {
@@ -670,7 +672,7 @@ describe("Cross-provider cost consistency", () => {
       });
 
       const res = await sendChat({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-5-nano",
         messages: [{ role: "user", content: "Scale test" }],
       }).expect(200);
@@ -692,7 +694,7 @@ describe("Cross-provider cost consistency", () => {
       yield { type: "usage", usage };
     });
     const resNoTools = await sendChat({
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
       model: "gemini-3-flash-preview",
       messages: [{ role: "user", content: "Hello" }],
     }).expect(200);
@@ -703,7 +705,7 @@ describe("Cross-provider cost consistency", () => {
       yield { type: "usage", usage };
     });
     const resWithTools = await sendChat({
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
       model: "gemini-3-flash-preview",
       messages: [{ role: "user", content: "Hello" }],
       tools: SAMPLE_TOOLS,
@@ -733,7 +735,7 @@ describe("Token/Cost edge cases", () => {
     });
 
     const res = await sendChat({
-      provider: "anthropic",
+      provider: PROVIDERS.ANTHROPIC,
       model: "claude-haiku-4-5-20251001",
       messages: [{ role: "user", content: "Empty response test" }],
     }).expect(200);
@@ -752,7 +754,7 @@ describe("Token/Cost edge cases", () => {
     });
 
     const res = await sendChat({
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       model: "gpt-5-nano",
       messages: [{ role: "user", content: "Max context" }],
     }).expect(200);
@@ -774,7 +776,7 @@ describe("Token/Cost edge cases", () => {
     });
 
     const res = await sendChat({
-      provider: "anthropic",
+      provider: PROVIDERS.ANTHROPIC,
       model: "claude-haiku-4-5-20251001",
       messages: [{ role: "user", content: "Cache test" }],
     }).expect(200);

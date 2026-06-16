@@ -142,3 +142,17 @@ export const FILE_CATEGORIES = {
   SCREENSHOTS: "screenshots",
   PROJECTS: "projects",
 } as const;
+
+// ─── Prompt Construction Delimiters ──────────────────────────
+
+export const PROMPT_DELIMITERS = {
+  SYSTEM_CONTEXT: "[System Context]",
+  SYSTEM_CONTEXT_LOCAL_TIME_PREFIX: "[System Context - Local Time:",
+  CONTEXT_NOTE_PREFIX: "[CONTEXT NOTE:",
+  USER_MESSAGE: "[User Message]",
+  PROJECT_SKILLS: "[Project Skills]",
+  AGENT_MEMORY: "[Agent Memory]",
+  SOMATIC_STATE: "[Somatic State",
+  CONVERSATION_SUMMARY: "[Conversation Summary",
+} as const;
+

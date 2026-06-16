@@ -2,6 +2,7 @@ import logger from "./logger.ts";
 import { estimateTokens } from "./CostCalculator.ts";
 import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
 import MicroCompactionService from "../services/compact/MicroCompactionService.ts";
+import { PROMPT_DELIMITERS } from "../constants.ts";
 
 // ────────────────────────────────────────────────────────────
 // ContextWindowManager — Token-Budget Truncation
@@ -284,7 +285,7 @@ function slidingWindowTruncation(messages: ChatMessage[], maxTokens: number): Ch
     // Insert a context marker so the model knows history was dropped
     head.push({
       role: "user",
-      content: `[CONTEXT NOTE: ${droppedCount} earlier messages were removed to fit the context window. The conversation continues below.]`,
+      content: `${PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX} ${droppedCount} earlier messages were removed to fit the context window. The conversation continues below.]`,
     });
   }
 

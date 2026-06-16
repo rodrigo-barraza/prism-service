@@ -100,6 +100,9 @@ export interface LlmOptions {
   presencePenalty?: number;
   stopSequences?: string[];
   tools?: { name?: string; function?: { name: string } }[];
+  thinkingEnabled?: boolean;
+  reasoningEffort?: string;
+  thinkingBudget?: number;
   [key: string]: unknown;
 }
 

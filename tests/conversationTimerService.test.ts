@@ -11,6 +11,7 @@
  * success and error paths.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { COLLECTIONS } from "../src/constants.ts";
 
 // ── Mock config ────────────────────────────────────────────────
 vi.mock("../config.ts", () => ({
@@ -306,7 +307,7 @@ describe("ConversationTimerService.executeAgenticLoop", () => {
     // Both setGenerating calls should target agent_conversations
     for (const call of mockSetGenerating.mock.calls) {
       const collectionOption = call[4];
-      expect(collectionOption.collection).toBe("agent_conversations");
+      expect(collectionOption.collection).toBe(COLLECTIONS.AGENT_CONVERSATIONS);
     }
   });
 });
@@ -398,7 +399,7 @@ describe("ConversationTimerService.tick — isGenerating lifecycle", () => {
       "testuser",
       expect.any(Array),
       null,
-      { collection: "model_conversations" }
+      { collection: COLLECTIONS.MODEL_CONVERSATIONS }
     );
   });
 

@@ -7,6 +7,7 @@
  * Wrong cost = incorrect billing display. Wrong providers = broken model filters.
  */
 import { describe, it, expect, vi } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 
 vi.mock("../src/services/FileService.ts", () => ({
   default: {
@@ -332,49 +333,49 @@ describe("computeModalities", () => {
 describe("extractProviders", () => {
   it("should extract providers from messages", () => {
     const messages: TestMessage[] = [
-      { role: "assistant", content: "Hi", provider: "OpenAI" },
-      { role: "assistant", content: "Hello", provider: "Anthropic" },
+      { role: "assistant", content: "Hi", provider: PROVIDERS.OPENAI.toUpperCase() },
+      { role: "assistant", content: "Hello", provider: PROVIDERS.ANTHROPIC.toUpperCase() },
     ];
 
     const providers = extractProviders(messages as any, null);
 
-    expect(providers).toContain("openai");
-    expect(providers).toContain("anthropic");
+    expect(providers).toContain(PROVIDERS.OPENAI);
+    expect(providers).toContain(PROVIDERS.ANTHROPIC);
   });
 
   it("should normalize providers to lowercase", () => {
     const messages: TestMessage[] = [
-      { role: "assistant", content: "Hi", provider: "GOOGLE" },
+      { role: "assistant", content: "Hi", provider: PROVIDERS.GOOGLE.toUpperCase() },
     ];
 
     const providers = extractProviders(messages as any, null);
 
-    expect(providers).toContain("google");
+    expect(providers).toContain(PROVIDERS.GOOGLE);
   });
 
   it("should deduplicate providers", () => {
     const messages: TestMessage[] = [
-      { role: "assistant", content: "A", provider: "openai" },
-      { role: "assistant", content: "B", provider: "openai" },
+      { role: "assistant", content: "A", provider: PROVIDERS.OPENAI },
+      { role: "assistant", content: "B", provider: PROVIDERS.OPENAI },
     ];
 
     const providers = extractProviders(messages as any, null);
 
-    expect(providers.filter((provider: string) => provider === "openai")).toHaveLength(1);
+    expect(providers.filter((provider: string) => provider === PROVIDERS.OPENAI)).toHaveLength(1);
   });
 
   it("should include provider from settings", () => {
     const messages: TestMessage[] = [];
-    const settings = { provider: "Google", model: "gemini-3.5-flash" };
+    const settings = { provider: PROVIDERS.GOOGLE, model: "gemini-3.5-flash" };
 
     const providers = extractProviders(messages as any, settings as any);
 
-    expect(providers).toContain("google");
+    expect(providers).toContain(PROVIDERS.GOOGLE);
   });
 
   it("should skip deleted messages", () => {
     const messages: TestMessage[] = [
-      { role: "assistant", content: "Hi", provider: "openai", deleted: true },
+      { role: "assistant", content: "Hi", provider: PROVIDERS.OPENAI, deleted: true },
     ];
 
     const providers = extractProviders(messages as any, null);
@@ -448,17 +449,17 @@ describe("buildConversationPatchFields", () => {
         {
           role: "assistant",
           content: "Hi",
-          provider: "openai",
+          provider: PROVIDERS.OPENAI,
           estimatedCost: 0.001,
         },
       ] as any,
-      settings: { provider: "openai", model: "gpt-4o" },
+      settings: { provider: PROVIDERS.OPENAI, model: "gpt-4o" },
     });
 
     expect(fields.modalities).toBeDefined();
     expect(fields.modalities!.textIn).toBe(true);
     expect(fields.modalities!.textOut).toBe(true);
-    expect(fields.providers).toContain("openai");
+    expect(fields.providers).toContain(PROVIDERS.OPENAI);
     expect(fields.totalCost).toBeCloseTo(0.001);
   });
 
@@ -472,18 +473,18 @@ describe("buildConversationPatchFields", () => {
 
   it("should include settings with systemPrompt embedded", () => {
     const fields = buildConversationPatchFields({
-      settings: { provider: "google", model: "gemini-3.5-flash" },
+      settings: { provider: PROVIDERS.GOOGLE, model: "gemini-3.5-flash" },
       systemPrompt: "Be concise.",
     });
 
     expect(fields.settings).toBeDefined();
-    expect(fields.settings!.provider).toBe("google");
+    expect(fields.settings!.provider).toBe(PROVIDERS.GOOGLE);
     expect(fields.settings!.systemPrompt).toBe("Be concise.");
   });
 
   it("should set empty systemPrompt in settings when systemPrompt is not provided", () => {
     const fields = buildConversationPatchFields({
-      settings: { provider: "openai" },
+      settings: { provider: PROVIDERS.OPENAI },
     });
 
     expect(fields.settings!.systemPrompt).toBe("");

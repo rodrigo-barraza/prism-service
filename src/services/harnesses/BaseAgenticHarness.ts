@@ -14,7 +14,7 @@ import FileService from "../FileService.ts";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
 import { COLLECTIONS, FILE_CATEGORIES } from "../../constants.ts";
-import { finalizeTextGeneration, type FinalizerContext } from "./lifecycle/Finalizer.ts";
+import { finalizeTextGeneration, type FinalizerContext, computeNewTurnMessages } from "./lifecycle/Finalizer.ts";
 import logger from "../../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
@@ -820,21 +820,10 @@ export default class BaseAgenticHarness {
     // If the last message of the original context was already persisted (e.g. background timer reminder or scheduled task),
     // we slice from originalMessageCount so we don't append it again. Otherwise, we slice from
     // originalMessageCount - 1 to capture the user's triggering message for this turn.
-    const lastOriginalMessage = context.messages[state.originalMessageCount - 1];
-    const isLastAlreadyPersisted = lastOriginalMessage && lastOriginalMessage._alreadyPersisted === true;
-
-    const sliceIndex = isLastAlreadyPersisted
-      ? state.originalMessageCount
-      : Math.max(0, state.originalMessageCount - 1);
-
-    const newTurnMessages = currentMessages.slice(sliceIndex).filter(
-      (message) =>
-        !(
-          message.role === "user" &&
-          typeof message.content === "string" &&
-          message.content.startsWith("[CONTEXT NOTE:")
-        ) &&
-        !message._alreadyPersisted,
+    const newTurnMessages = computeNewTurnMessages(
+      context.messages,
+      currentMessages,
+      state.originalMessageCount,
     );
 
     logger.info(

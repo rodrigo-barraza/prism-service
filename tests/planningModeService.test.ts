@@ -23,7 +23,7 @@ const { default: PlanningModeService } = await import(
 
 // ── Helpers ────────────────────────────────────────────────────
 
-type ConversationMessage = { role: string; content: string; _isPlanningInjection?: boolean };
+import type { ConversationMessage } from "../src/services/harnesses/types.ts";
 
 function createBaseMessages(): ConversationMessage[] {
   return [
