@@ -448,21 +448,20 @@ export function injectSystemPromptContext(
   } = options;
 
   // ── 1. Insert main system prompt as messages[0] ─────────────
-  const systemMessageIndex = messages.findIndex(
-    (message) => message.role === "system",
-  );
-  if (systemMessageIndex >= 0) {
-    messages[systemMessageIndex].content = systemPrompt;
+  // Always place the identity system prompt at index 0.
+  // On subsequent turns, the history may contain mid-conversation
+  // system messages (somatic state, validation errors) — we must
+  // NOT overwrite those. Instead, always target index 0 specifically.
+  if (messages.length > 0 && messages[0].role === "system") {
+    messages[0].content = systemPrompt;
   } else {
     messages.unshift({ role: "system", content: systemPrompt });
   }
 
   // ── 2. Insert platform context after the main system prompt ───
+  // Always insert at index 1 (right after the identity prompt at 0).
   if (platformContextMessage) {
-    const platformInsertionPoint = systemMessageIndex >= 0
-      ? systemMessageIndex + 1
-      : 1;
-    messages.splice(platformInsertionPoint, 0, {
+    messages.splice(1, 0, {
       role: "system",
       content: platformContextMessage,
     });

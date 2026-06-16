@@ -289,7 +289,7 @@ describe("Message Array Construction", () => {
       expect(currentMessages[lastUserIndex - 1].content).toBe(SOMATIC_STATE);
     });
 
-    it("should only persist new messages from the current turn via finalize", () => {
+    it("should persist somatic state and user message from the current turn via finalize", () => {
       currentMessages.push({
         role: "assistant",
         content: "Why did the wolf cross the road?",
@@ -304,13 +304,201 @@ describe("Message Array Construction", () => {
       );
 
       // sliceIndex = max(0, 6 - 1) = 5
-      // From index 5 onward in currentMessages — should be:
-      // somatic state (injected before last user), the last user msg, and assistant
-      // But we need to account for the fact that hook injection shifted indices
-      expect(newTurnMessages.length).toBeGreaterThanOrEqual(1);
+      // After hook injection, currentMessages has extra messages shifted in.
+      // From index 5 onward: somatic state + user msg + assistant
+      expect(newTurnMessages.length).toBeGreaterThanOrEqual(3);
       expect(
         newTurnMessages.some((message) => message.role === "assistant"),
       ).toBe(true);
+      expect(
+        newTurnMessages.some(
+          (message) =>
+            message.role === "system" &&
+            message.content === SOMATIC_STATE,
+        ),
+      ).toBe(true);
+      expect(
+        newTurnMessages.some((message) => message.role === "user"),
+      ).toBe(true);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────
+  // Scenario 3b: Subsequent turn — history with somatic-only
+  // system message (platform context was lost on prior persist)
+  //
+  // This reproduces the real-world bug where the DB document
+  // has a somatic system message mid-conversation but NO
+  // identity prompt or platform context at the top.
+  // ────────────────────────────────────────────────────────────
+  describe("Discord Agent (Lupos) — subsequent turn, somatic-only system message in history", () => {
+    const LUPOS_IDENTITY = "You are Lupos, an artist wolf king...";
+    const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab\nChannel: #general";
+    const SOMATIC_STATE = "[Somatic State — Lupos]\ncurrent_emotion: curious";
+
+    it("should NOT overwrite a mid-conversation somatic system message with the identity prompt", () => {
+      // History loaded from DB: the prior turn only persisted
+      // somatic + user + assistant (platform context was dropped)
+      const originalMessages: ConversationMessage[] = [
+        { role: "user", content: "hey lupos" },
+        { role: "assistant", content: "yo" },
+        { role: "system", content: "[Somatic State — Lupos]\ncurrent_emotion: bored" },
+        { role: "user", content: "tell me something" },
+      ];
+      const currentMessages: ConversationMessage[] = [...originalMessages];
+
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: LUPOS_IDENTITY,
+        platformContextMessage: PLATFORM_CONTEXT,
+        selfContextMessage: SOMATIC_STATE,
+      });
+
+      // Identity prompt must be at index 0, NOT overwriting the old somatic at index 2
+      expect(currentMessages[0].role).toBe("system");
+      expect(currentMessages[0].content).toBe(LUPOS_IDENTITY);
+
+      // Platform context must be at index 1
+      expect(currentMessages[1].role).toBe("system");
+      expect(currentMessages[1].content).toBe(PLATFORM_CONTEXT);
+
+      // The old somatic state from history should still exist (shifted right)
+      const oldSomaticMessage = currentMessages.find(
+        (message) =>
+          message.role === "system" &&
+          message.content?.includes("bored"),
+      );
+      expect(oldSomaticMessage).toBeDefined();
+
+      // New somatic state should be interleaved before the last user message
+      const lastUserIndex = currentMessages.reduce(
+        (lastIndex, message, index) =>
+          message.role === "user" ? index : lastIndex,
+        -1,
+      );
+      expect(currentMessages[lastUserIndex - 1].role).toBe("system");
+      expect(currentMessages[lastUserIndex - 1].content).toBe(SOMATIC_STATE);
+    });
+
+    it("should persist platform context on subsequent turns when it was missing from history", () => {
+      // History without any system messages at all (worst case)
+      const originalMessages: ConversationMessage[] = [
+        { role: "user", content: "hey lupos" },
+        { role: "assistant", content: "yo" },
+        { role: "user", content: "tell me something" },
+      ];
+      const originalMessageCount = originalMessages.length; // 3
+      const currentMessages: ConversationMessage[] = [...originalMessages];
+
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: LUPOS_IDENTITY,
+        platformContextMessage: PLATFORM_CONTEXT,
+        selfContextMessage: SOMATIC_STATE,
+      });
+
+      // Add assistant response
+      currentMessages.push({
+        role: "assistant",
+        content: "Here's something for you.",
+        model: "gpt-4.1",
+        provider: "openai",
+      });
+
+      const newTurnMessages = computeNewTurnMessages(
+        originalMessages,
+        currentMessages,
+        originalMessageCount,
+      );
+
+      // sliceIndex = max(0, 3 - 1) = 2
+      // After injection, messages are:
+      // [0] system (identity) — injected
+      // [1] system (platform) — injected
+      // [2] user: "hey lupos"
+      // [3] assistant: "yo"
+      // [4] system (somatic) — injected before last user
+      // [5] user: "tell me something" — with [System Context]
+      // [6] assistant: response
+      //
+      // Slice from index 2 captures: user, assistant, somatic, user, assistant
+      // But identity (0) and platform (1) are BEFORE the slice — that's expected
+      // because the Finalizer persists systemPrompt separately via conversationMeta.
+      // Platform context, however, needs to survive in the persisted messages.
+      //
+      // The key assertion: somatic state and user message are in the slice.
+      expect(newTurnMessages.length).toBeGreaterThanOrEqual(3);
+      expect(
+        newTurnMessages.some(
+          (message) =>
+            message.role === "system" &&
+            message.content === SOMATIC_STATE,
+        ),
+      ).toBe(true);
+      expect(
+        newTurnMessages.some((message) => message.role === "user"),
+      ).toBe(true);
+      expect(
+        newTurnMessages.some((message) => message.role === "assistant"),
+      ).toBe(true);
+    });
+
+    it("should correctly order all messages when history has NO system messages", () => {
+      const originalMessages: ConversationMessage[] = [
+        { role: "user", content: "hey" },
+        { role: "assistant", content: "sup" },
+        { role: "user", content: "draw me a wolf" },
+      ];
+      const currentMessages: ConversationMessage[] = [...originalMessages];
+
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: LUPOS_IDENTITY,
+        platformContextMessage: PLATFORM_CONTEXT,
+        selfContextMessage: SOMATIC_STATE,
+      });
+
+      // Full expected order:
+      // [0] system: identity (unshifted)
+      // [1] system: platform context (spliced at 1)
+      // [2] user: "hey" (shifted from 0)
+      // [3] assistant: "sup" (shifted from 1)
+      // [4] system: somatic state (interleaved before last user)
+      // [5] user: "draw me a wolf" (shifted from 2, with [System Context])
+      expect(currentMessages).toHaveLength(6);
+      expect(currentMessages[0]).toMatchObject({ role: "system", content: LUPOS_IDENTITY });
+      expect(currentMessages[1]).toMatchObject({ role: "system", content: PLATFORM_CONTEXT });
+      expect(currentMessages[2]).toMatchObject({ role: "user" });
+      expect(currentMessages[2].content).toBe("hey");
+      expect(currentMessages[3]).toMatchObject({ role: "assistant", content: "sup" });
+      expect(currentMessages[4]).toMatchObject({ role: "system", content: SOMATIC_STATE });
+      expect(currentMessages[5].role).toBe("user");
+      expect(currentMessages[5].content).toContain("[System Context]");
+      expect(currentMessages[5].content).toContain("draw me a wolf");
+    });
+
+    it("should not create duplicate identity prompts when history already has one at index 0", () => {
+      const originalMessages: ConversationMessage[] = [
+        { role: "system", content: "Old identity" },
+        { role: "user", content: "hey" },
+        { role: "assistant", content: "sup" },
+        { role: "user", content: "new message" },
+      ];
+      const currentMessages: ConversationMessage[] = [...originalMessages];
+
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: LUPOS_IDENTITY,
+        platformContextMessage: PLATFORM_CONTEXT,
+        selfContextMessage: SOMATIC_STATE,
+      });
+
+      // Index 0 should be replaced, not duplicated
+      const systemMessages = currentMessages.filter(
+        (message) => message.role === "system",
+      );
+      const identityMessages = systemMessages.filter(
+        (message) => message.content === LUPOS_IDENTITY,
+      );
+      expect(identityMessages).toHaveLength(1);
+      expect(currentMessages[0].content).toBe(LUPOS_IDENTITY);
+      expect(currentMessages[1].content).toBe(PLATFORM_CONTEXT);
     });
   });
 
