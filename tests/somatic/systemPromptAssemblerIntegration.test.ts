@@ -191,7 +191,10 @@ describe("SystemPromptAssembler — hasSomaticState gating", () => {
     const context = createContext();
     const result = await assembler.assemble(context);
 
-    expect(mockAdaptFromMessage).toHaveBeenCalledWith("LUPOS", "How are you feeling today?");
+    expect(mockAdaptFromMessage).toHaveBeenCalledWith("LUPOS", "How are you feeling today?", expect.objectContaining({
+      project: "lupos",
+      endpoint: "/agent",
+    }));
     expect(mockRenderSystemMessage).toHaveBeenCalledWith("LUPOS");
     expect(result.selfContextMessage).toContain("Your Current Physical & Emotional State");
   });
@@ -465,7 +468,10 @@ describe("SystemPromptAssembler — adaptation targets latest user message", () 
     });
 
     await assembler.assemble(context);
-    expect(mockAdaptFromMessage).toHaveBeenCalledWith("LUPOS", "Give me pizza 🍕");
+    expect(mockAdaptFromMessage).toHaveBeenCalledWith("LUPOS", "Give me pizza 🍕", expect.objectContaining({
+      project: "lupos",
+      endpoint: "/agent",
+    }));
   });
 
   it("does not call adaptFromMessage when there are no user messages", async () => {

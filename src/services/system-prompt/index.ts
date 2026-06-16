@@ -160,7 +160,13 @@ export default class SystemPromptAssembler {
       const userMessages = context.messages?.filter((message) => message.role === "user") || [];
       const latestUserMessage = userMessages[userMessages.length - 1];
       if (latestUserMessage && typeof latestUserMessage.content === "string") {
-        await SomaticStateService.adaptFromMessage(agentId, latestUserMessage.content);
+        await SomaticStateService.adaptFromMessage(agentId, latestUserMessage.content, {
+          traceId: context.traceId,
+          agentSessionId: context.agentSessionId,
+          endpoint: context.agentContext?.endpoint as string || "/agent",
+          project: context.project,
+          username: context.username,
+        });
       }
 
       const somaticMessage = await SomaticStateService.renderSystemMessage(agentId);
