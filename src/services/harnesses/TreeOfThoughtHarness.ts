@@ -159,7 +159,11 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     };
     await hooks.run("beforePrompt", hookContext);
 
-    const assembledSystemMessage = currentMessages.find((message) => message.role === "system");
+    const assembledSystemMessage =
+      currentMessages.find(
+        (message) => message.role === "system" && message._isIdentityPrompt === true,
+      ) ||
+      currentMessages.find((message) => message.role === "system");
     if (assembledSystemMessage?.content) {
       context.conversationMeta = {
         ...(context.conversationMeta || {}),

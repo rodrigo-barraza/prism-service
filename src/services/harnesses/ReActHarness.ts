@@ -172,9 +172,11 @@ export default class ReActHarness extends BaseAgenticHarness {
         await hooks.run("beforePrompt", hookContext);
 
         // ── Persist assembled system prompt to conversationMeta ──
-        const assembledSystemMessage = currentMessages.find(
-          (message) => message.role === "system",
-        );
+        const assembledSystemMessage =
+          currentMessages.find(
+            (message) => message.role === "system" && message._isIdentityPrompt === true,
+          ) ||
+          currentMessages.find((message) => message.role === "system");
         if (assembledSystemMessage?.content) {
           context.conversationMeta = {
             ...(context.conversationMeta || {}),
