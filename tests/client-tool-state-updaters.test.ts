@@ -18,9 +18,8 @@ import {
   type ToolExecutionInput,
   type SegmentSnapshot,
 } from "../../prism-client/src/utils/toolCallStateUpdaters.ts";
-import type { Message, ToolCallEvent, ContentSegment } from "../../prism-client/src/types/types.ts";
 
-// ── Reimplementation of prepareDisplayMessages ───────────────────
+import type { Message, ToolCallEvent } from "../../prism-client/src/types/types.ts";
 
 type DisplayMessage = Omit<Message, "tool_calls"> & {
   tool_calls?: Array<{
@@ -33,6 +32,10 @@ type DisplayMessage = Omit<Message, "tool_calls"> & {
   }>;
 };
 
+// ── Reimplementation of prepareDisplayMessages ───────────────────
+// This helper is duplicated locally because importing it from
+// MessageListComponent.tsx pulls in CSS modules and React components
+// that cannot be parsed in the service's Node/Vitest backend environment.
 function prepareDisplayMessages(
   rawMessages: DisplayMessage[] | undefined | null,
 ): DisplayMessage[] {
@@ -105,6 +108,10 @@ function prepareDisplayMessages(
 
   return filtered;
 }
+
+
+
+
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  applyToolExecutionToMessages tests

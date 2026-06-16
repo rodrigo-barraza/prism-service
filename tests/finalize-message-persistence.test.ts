@@ -16,10 +16,7 @@ import type { ChatMessage } from "../src/types/admin.ts";
 import { computeNewTurnMessages } from "../src/services/harnesses/lifecycle/Finalizer.ts";
 
 // ── Types mirroring the harness ConversationMessage shape ────────
-type TestMessage = ChatMessage & {
-  isCompactSummary?: boolean;
-  _alreadyPersisted?: boolean;
-};
+type TestMessage = ChatMessage;
 
 /**
  * Delegates to the production newTurnMessages slice logic from

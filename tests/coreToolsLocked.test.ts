@@ -11,6 +11,8 @@
 import { describe, it, expect } from "vitest";
 import request from "supertest";
 import { app, TEST_SECRET } from "./setup.ts";
+import { AGENT_IDS } from "../src/services/ToolTaxonomyConstants.ts";
+
 
 interface PersonaResponse {
   id: string;
@@ -60,7 +62,7 @@ describe("GET /config/agents — coreToolsLocked field", () => {
     const response = await authenticatedGet("/config/agents").expect(200);
     const agents = response.body as PersonaResponse[];
 
-    const lupos = agents.find((agent) => agent.id === "LUPOS");
+    const lupos = agents.find((agent) => agent.id === AGENT_IDS.LUPOS);
     expect(lupos).toBeDefined();
     expect(lupos!.enabledByDefaultToolNames).toBeDefined();
     expect(lupos!.enabledByDefaultToolNames).not.toContain("*");
@@ -75,7 +77,7 @@ describe("GET /config/agents — coreToolsLocked field", () => {
 
 describe("GET /config/tools — per-persona filtering", () => {
   it("returns system-flagged tools for CODING even if not in enabledTools", async () => {
-    const response = await authenticatedGet("/config/tools?agent=CODING").expect(200);
+    const response = await authenticatedGet(`/config/tools?agent=${AGENT_IDS.CODING}`).expect(200);
     const tools = response.body as ToolSchemaResponse[];
 
     const systemTools = tools.filter((tool) => tool.system === true);
@@ -95,7 +97,7 @@ describe("GET /config/tools — per-persona filtering", () => {
   });
 
   it("returns tools for LUPOS consistent with its enabledToolNames", async () => {
-    const response = await authenticatedGet("/config/tools?agent=LUPOS").expect(200);
+    const response = await authenticatedGet(`/config/tools?agent=${AGENT_IDS.LUPOS}`).expect(200);
     const tools = response.body as ToolSchemaResponse[];
 
     for (const tool of tools) {
@@ -105,7 +107,7 @@ describe("GET /config/tools — per-persona filtering", () => {
     // Cross-check: fetch the persona to get enabledToolNames
     const agentsResponse = await authenticatedGet("/config/agents").expect(200);
     const lupos = (agentsResponse.body as PersonaResponse[]).find(
-      (agent) => agent.id === "LUPOS",
+      (agent) => agent.id === AGENT_IDS.LUPOS,
     );
     expect(lupos).toBeDefined();
 
@@ -120,11 +122,11 @@ describe("GET /config/tools — per-persona filtering", () => {
   it("LUPOS /config/tools returns only tools present in /config/agents enabledToolNames", async () => {
     const [agentsResponse, toolsResponse] = await Promise.all([
       authenticatedGet("/config/agents").expect(200),
-      authenticatedGet("/config/tools?agent=LUPOS").expect(200),
+      authenticatedGet(`/config/tools?agent=${AGENT_IDS.LUPOS}`).expect(200),
     ]);
 
     const lupos = (agentsResponse.body as PersonaResponse[]).find(
-      (agent) => agent.id === "LUPOS",
+      (agent) => agent.id === AGENT_IDS.LUPOS,
     );
     const tools = toolsResponse.body as ToolSchemaResponse[];
 

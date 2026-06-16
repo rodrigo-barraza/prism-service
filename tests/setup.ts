@@ -138,9 +138,7 @@ vi.mock('../src/services/ConversationService.ts', () => ({
     default: {
         appendMessages: vi.fn().mockResolvedValue(undefined),
         setGenerating: vi.fn().mockResolvedValue(undefined),
-        getConversation: vi.fn().mockResolvedValue(null),
-        listConversations: vi.fn().mockResolvedValue([]),
-        deleteConversation: vi.fn().mockResolvedValue(undefined),
+        getSessionStats: vi.fn().mockResolvedValue(null),
     },
 }));
 
@@ -149,6 +147,7 @@ vi.mock('../src/services/RequestLogger.ts', () => ({
     default: {
         log: vi.fn(),
         logChatGeneration: vi.fn().mockResolvedValue(undefined),
+        logBackgroundLlmCall: vi.fn().mockResolvedValue(undefined),
     },
 }));
 
