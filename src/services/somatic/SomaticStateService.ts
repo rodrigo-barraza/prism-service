@@ -269,8 +269,19 @@ interface EmotionAnalysisContext {
   username?: string | null;
 }
 
-const EMOTION_ANALYSIS_PROVIDER = "anthropic";
-const EMOTION_ANALYSIS_MODEL = "claude-haiku-4-5-20250414";
+const EMOTION_ANALYSIS_FALLBACK_PROVIDER = "anthropic";
+const EMOTION_ANALYSIS_FALLBACK_MODEL = "claude-haiku-4-5-20250414";
+
+async function resolveEmotionModel(): Promise<{ provider: string; model: string }> {
+  try {
+    const SettingsService = (await import("../SettingsService.ts")).default;
+    const configured = await SettingsService.getSomaticModelConfig();
+    if (configured) return configured;
+  } catch {
+    // SettingsService unavailable (e.g. DB not ready) — use fallback
+  }
+  return { provider: EMOTION_ANALYSIS_FALLBACK_PROVIDER, model: EMOTION_ANALYSIS_FALLBACK_MODEL };
+}
 
 async function analyzeEmotionFromText(
   agentId: string,
@@ -278,7 +289,8 @@ async function analyzeEmotionFromText(
   requestContext: EmotionAnalysisContext = {},
 ): Promise<PrimaryEmotion | "neutral"> {
   const { getProvider } = await import("../../providers/index.ts");
-  const provider = getProvider(EMOTION_ANALYSIS_PROVIDER);
+  const { provider: providerName, model: modelName } = await resolveEmotionModel();
+  const provider = getProvider(providerName);
   const systemPrompt = EMOTION_ANALYSIS_SYSTEM_PROMPT(VALID_EMOTIONS.join(", "));
   const requestId = crypto.randomUUID();
   const requestStart = performance.now();
@@ -293,7 +305,7 @@ async function analyzeEmotionFromText(
   let errorMessage = null;
 
   try {
-    result = await provider.generateText(aiMessages, EMOTION_ANALYSIS_MODEL, {
+    result = await provider.generateText(aiMessages, modelName, {
       maxTokens: 10,
       temperature: 0,
     });
@@ -309,8 +321,8 @@ async function analyzeEmotionFromText(
       project: requestContext.project || null,
       username: requestContext.username || "system",
       agent: agentId,
-      provider: EMOTION_ANALYSIS_PROVIDER,
-      model: EMOTION_ANALYSIS_MODEL,
+      provider: providerName,
+      model: modelName,
       traceId: requestContext.traceId || null,
       agentSessionId: requestContext.agentSessionId || null,
       aiMessages,
