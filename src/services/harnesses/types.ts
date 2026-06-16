@@ -161,7 +161,7 @@ export interface AgenticOptions {
   policies?: PolicyRule[];
   /** Enable CriticGate multi-model review of dangerous tool calls. */
   enableCriticGate?: boolean;
-  /** Model to use for CriticGate reviews (default: gemini-2.5-flash). */
+  /** Model to use for CriticGate reviews (resolved from settings). */
   criticModel?: string;
   /** Number of parallel branches for TreeOfThought harness (default: 2, max: 5). */
   branchCount?: number;
