@@ -124,6 +124,10 @@ vi.mock('../src/services/SettingsService.ts', () => ({
             provider: 'google',
             model: 'gemini-embedding-2-preview',
         }),
+        getSomaticModelConfig: vi.fn().mockResolvedValue({
+            provider: 'google',
+            model: 'gemini-3.5-flash',
+        }),
         invalidateCache: vi.fn(),
         getDefaults: vi.fn(),
     },
