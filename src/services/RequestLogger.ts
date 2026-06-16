@@ -486,6 +486,7 @@ const RequestLogger = {
       modalities: { textIn: true, textOut: true },
       requestPayload: {
         operation,
+        messages: aiMessages?.map(sanitizeMessage) ?? [],
                 ...extraRequestPayload,
       },
       responsePayload: success
