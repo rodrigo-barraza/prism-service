@@ -334,6 +334,7 @@ async function analyzeEmotionFromText(
     result = await provider.generateText(aiMessages, modelName, {
       maxTokens: 10,
       temperature: 0,
+      thinkingEnabled: false,
     });
   } catch (error: unknown) {
     success = false;
