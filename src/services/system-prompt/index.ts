@@ -9,7 +9,7 @@ import {
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import { resolveLockedOffToolNames } from "../../utils/resolveLockedOffToolNames.ts";
 import SettingsService from "../SettingsService.ts";
-import { AGENT_IDS, DOMAINS, DEFAULT_TOPOLOGY, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, isCoreDomain } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { AGENT_IDS, DEFAULT_TOPOLOGY, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, isCoreDomain } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 

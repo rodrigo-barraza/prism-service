@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 
 // ─── Mock everything the SystemPromptAssembler touches ──────────
 
@@ -299,7 +299,7 @@ describe("SystemPromptAssembler.createHook — message interleaving", () => {
     mockAdaptFromMessage.mockReset();
   });
 
-  it("platform context is placed after the system prompt at the top", async () => {
+  it("platform context is interleaved before the last user message", async () => {
     mockPersonas.set("LUPOS", createLuposPersona());
     mockRenderSystemMessage.mockResolvedValue(null);
 
@@ -311,8 +311,14 @@ describe("SystemPromptAssembler.createHook — message interleaving", () => {
     const systemMessageIndex = messages.findIndex((message) => message.role === "system" && (message.content as string).includes("Lupos"));
     expect(systemMessageIndex).toBe(0);
 
+    const lastUserMessageIndex = messages.reduce(
+      (lastIndex: number, message: { role: string }, index: number) =>
+        message.role === "user" ? index : lastIndex,
+      -1,
+    );
+
     const platformMessageIndex = messages.findIndex((message) => message.role === "system" && (message.content as string).includes("Discord server"));
-    expect(platformMessageIndex).toBe(1);
+    expect(platformMessageIndex).toBe(lastUserMessageIndex - 1);
   });
 
   it("self context (somatic) is interleaved before the last user message", async () => {
