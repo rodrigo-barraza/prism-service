@@ -4,7 +4,7 @@ import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
 import ConversationEmbeddingService from "../src/services/ConversationEmbeddingService.ts";
 import EmbeddingService from "../src/services/EmbeddingService.ts";
 import searchConversations from "../src/services/local-tools/ConversationSearchTool.ts";
-import { COLLECTIONS } from "../src/services/constants.ts";
+import { COLLECTIONS } from "../src/constants.ts";
 
 describe("ConversationEmbeddingService & ConversationSearchTool", () => {
   let mockUpdateOne: any;
