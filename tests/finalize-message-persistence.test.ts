@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { PROMPT_DELIMITERS } from "../src/constants.ts";
 
 // ── Types mirroring the harness ConversationMessage shape ────────
 interface TestMessage {
@@ -50,7 +51,7 @@ function extractNewTurnMessages(
         !(
           message.role === "user" &&
           typeof message.content === "string" &&
-          message.content.startsWith("[CONTEXT NOTE:")
+          message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX)
         ) &&
         !(message as any)._alreadyPersisted,
     );
@@ -65,8 +66,8 @@ function sanitizeMessagesToAppend(
 ): TestMessage[] {
   return messagesToAppend.filter((message) => {
     if (message.role === "user" && typeof message.content === "string") {
-      if (message.content.startsWith("[CONTEXT NOTE:")) return false;
-      if (message.content.startsWith("[Conversation Summary")) return false;
+      if (message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX)) return false;
+      if (message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY)) return false;
       if (message.isCompactSummary === true) return false;
     }
     if ((message as any)._alreadyPersisted === true) return false;
@@ -388,7 +389,7 @@ describe("newTurnMessages slice — context window enforcement", () => {
 
     const currentMessages: TestMessage[] = [
       { role: "system", content: "System" },
-      { role: "user", content: "[CONTEXT NOTE: 2 messages truncated]" },
+      { role: "user", content: `${PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX} 2 messages truncated]` },
       { role: "user", content: "second message" },
       { role: "assistant", content: "response to second" },
       { role: "user", content: "third message" },

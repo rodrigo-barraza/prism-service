@@ -10,47 +10,20 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 
-// ── Types ──────────────────────────────────────────────────────
-interface ToolCallEntry {
-  id: string;
-  name: string;
-  args: Record<string, unknown>;
-  result?: unknown;
-  durationMs?: number;
-  thoughtSignature?: string;
-  responsesItemId?: string;
-  reasoningItem?: Record<string, unknown>;
-}
+import type { ConversationMessage as BaseConversationMessage } from "../types.ts";
 
-interface ConversationMessage {
-  role: string;
-  content?: string;
+import { injectSystemPromptContext } from "../../system-prompt/index.ts";
+import { computeNewTurnMessages as computeNewTurnMessagesReal } from "../lifecycle/Finalizer.ts";
+
+interface ConversationMessage extends BaseConversationMessage {
   rawContent?: string;
-  model?: string;
-  provider?: string;
-  thinking?: string;
-  thinkingSignature?: string;
-  toolCalls?: ToolCallEntry[];
-  images?: string[];
-  audio?: string;
-  usage?: Record<string, unknown>;
-  totalTime?: number;
-  tokensPerSec?: number;
-  estimatedCost?: number;
-  generationSettings?: Record<string, unknown>;
-  contentSegments?: Array<Record<string, unknown>>;
-  textFragments?: string[];
-  thinkingFragments?: string[];
-  timestamp?: string;
   isCompactSummary?: boolean;
   _alreadyPersisted?: boolean;
-  _isPlanningInjection?: boolean;
   _isErrorIndicator?: boolean;
-  [key: string]: unknown;
 }
 
 
-// ── Simulate hook injection (mirrors SystemPromptAssembler.createHook) ──
+// ── Simulate hook injection (delegates to SystemPromptAssembler.injectSystemPromptContext) ──
 function simulateBeforePromptHook(
   currentMessages: ConversationMessage[],
   options: {
@@ -61,99 +34,21 @@ function simulateBeforePromptHook(
     memoriesText?: string;
   },
 ): void {
-  const {
-    systemPrompt,
-    platformContextMessage,
-    selfContextMessage,
-    skillsText,
-    memoriesText,
-  } = options;
-
-  // 1. Insert main system prompt as messages[0]
-  const systemMessageIndex = currentMessages.findIndex(
-    (message) => message.role === "system",
-  );
-  if (systemMessageIndex >= 0) {
-    currentMessages[systemMessageIndex].content = systemPrompt;
-  } else {
-    currentMessages.unshift({ role: "system", content: systemPrompt });
-  }
-
-  // 2. Insert platform context after the main system prompt
-  if (platformContextMessage) {
-    const insertionPoint =
-      systemMessageIndex >= 0 ? systemMessageIndex + 1 : 1;
-    currentMessages.splice(insertionPoint, 0, {
-      role: "system",
-      content: platformContextMessage,
-    });
-  }
-
-  // 3. Interleave self context (somatic state) before the last user message
-  if (selfContextMessage) {
-    const lastUserMessageIndex = currentMessages.reduce(
-      (lastIndex: number, message: ConversationMessage, index: number) =>
-        message.role === "user" ? index : lastIndex,
-      -1,
-    );
-    if (lastUserMessageIndex >= 0) {
-      currentMessages.splice(lastUserMessageIndex, 0, {
-        role: "system",
-        content: selfContextMessage,
-      });
-    }
-  }
-
-  // 4. Prepend [System Context] to last user message (skills + memories + time)
-  const userMessages = currentMessages.filter(
-    (message) => message.role === "user",
-  );
-  const lastUserMessage = userMessages[userMessages.length - 1];
-  if (lastUserMessage && typeof lastUserMessage.content === "string") {
-    const contextLines = [
-      `- Local Time: Sunday, June 15, 2026 at 4:40:00 PM PDT`,
-    ];
-    let systemContextBlock = `[System Context]\n${contextLines.join("\n")}\n\n`;
-    if (skillsText) systemContextBlock += `${skillsText}\n\n`;
-    if (memoriesText) systemContextBlock += `${memoriesText}\n\n`;
-
-    if (!lastUserMessage.content.startsWith("[System Context]")) {
-      const messageIndex = currentMessages.indexOf(lastUserMessage);
-      if (messageIndex !== -1) {
-        const originalContent = lastUserMessage.content;
-        currentMessages[messageIndex] = {
-          ...lastUserMessage,
-          rawContent: originalContent,
-          content: systemContextBlock + `[User Message]\n${originalContent}`,
-        };
-      }
-    }
-  }
+  injectSystemPromptContext(currentMessages, {
+    ...options,
+    localTimeText: "Sunday, June 15, 2026 at 4:40:00 PM PDT",
+  });
 }
 
-// ── Simulate finalize slice logic (mirrors BaseAgenticHarness.finalize) ──
+// ── Simulate finalize slice logic (delegates to computeNewTurnMessages) ──
 function computeNewTurnMessages(
   originalMessages: ConversationMessage[],
   currentMessages: ConversationMessage[],
   originalMessageCount: number,
 ): ConversationMessage[] {
-  const lastOriginalMessage = originalMessages[originalMessageCount - 1];
-  const isLastAlreadyPersisted =
-    lastOriginalMessage && lastOriginalMessage._alreadyPersisted === true;
-
-  const sliceIndex = isLastAlreadyPersisted
-    ? originalMessageCount
-    : Math.max(0, originalMessageCount - 1);
-
-  return currentMessages.slice(sliceIndex).filter(
-    (message) =>
-      !(
-        message.role === "user" &&
-        typeof message.content === "string" &&
-        message.content.startsWith("[CONTEXT NOTE:")
-      ) && !message._alreadyPersisted,
-  );
+  return computeNewTurnMessagesReal(originalMessages, currentMessages, originalMessageCount);
 }
+
 
 // ────────────────────────────────────────────────────────────────
 // Test Suites

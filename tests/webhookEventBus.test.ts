@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { WebhookEvent } from "../src/services/WebhookEventBus.ts";
+import { PROVIDERS } from "../src/constants.ts";
 
 // ═══════════════════════════════════════════════════════════════
 //  WebhookEventBus — unit tests
@@ -543,16 +544,16 @@ describe("WebhookEventBus — server-side event filtering", () => {
     const anthropicEvents: WebhookEvent[] = [];
 
     const providerFilterListener = (event: WebhookEvent) => {
-      if (event.data.provider === "anthropic") {
+      if (event.data.provider === PROVIDERS.ANTHROPIC) {
         anthropicEvents.push(event);
       }
     };
 
     WebhookEventBus.subscribe(providerFilterListener);
 
-    WebhookEventBus.emit("request.created", { provider: "anthropic" });
-    WebhookEventBus.emit("request.created", { provider: "google" });
-    WebhookEventBus.emit("request.created", { provider: "anthropic" });
+    WebhookEventBus.emit("request.created", { provider: PROVIDERS.ANTHROPIC });
+    WebhookEventBus.emit("request.created", { provider: PROVIDERS.GOOGLE });
+    WebhookEventBus.emit("request.created", { provider: PROVIDERS.ANTHROPIC });
 
     expect(anthropicEvents).toHaveLength(2);
 
@@ -719,7 +720,7 @@ describe("PostExecutionEmitter — request.tool_call.completed webhook contract"
       agentSessionId: "sess-789",
       project: "coding",
       username: "rodrigo",
-      provider: "anthropic",
+      provider: PROVIDERS.ANTHROPIC,
       model: "claude-sonnet-4-20250514",
     });
 
@@ -734,7 +735,7 @@ describe("PostExecutionEmitter — request.tool_call.completed webhook contract"
     expect(data.durationMs).toBe(450);
     expect(data.status).toBe("done");
     expect(data.agent).toBe("meepo");
-    expect(data.provider).toBe("anthropic");
+    expect(data.provider).toBe(PROVIDERS.ANTHROPIC);
     expect(data.model).toBe("claude-sonnet-4-20250514");
   });
 
@@ -788,7 +789,7 @@ describe("BaseAgenticHarness — request.tool_call.started webhook contract", ()
       agentSessionId: "sess-start-001",
       project: "coding",
       username: "rodrigo",
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
       model: "gemini-3-flash",
       iteration: 2,
     });
@@ -807,7 +808,7 @@ describe("BaseAgenticHarness — request.tool_call.started webhook contract", ()
     });
     expect(data.agent).toBe("meepo");
     expect(data.iteration).toBe(2);
-    expect(data.provider).toBe("google");
+    expect(data.provider).toBe(PROVIDERS.GOOGLE);
     expect(data.model).toBe("gemini-3-flash");
   });
 });
@@ -1185,7 +1186,7 @@ describe("BaseAgenticHarness — native MCP tool call emits", () => {
       provider: {
         generateTextStream: vi.fn(),
       },
-      providerName: "anthropic",
+      providerName: PROVIDERS.ANTHROPIC,
       resolvedModel: "claude-sonnet-4",
       emit: vi.fn(),
       requestId: "req-1",

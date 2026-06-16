@@ -3,6 +3,8 @@ import request from "supertest";
 import { app } from "./setup.ts";
 import adminRouter from "../src/routes/AdminRoutes.ts";
 import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
+import { COLLECTIONS, PROVIDERS } from "../src/constants.ts";
+
 
 app.use("/admin", adminRouter);
 
@@ -200,7 +202,7 @@ describe("GET /admin/stats/tools", () => {
         success: true,
         model: "gpt-4o",
         agent: "CODING",
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         timestamp: "2026-05-30T10:00:00Z",
       },
       {
@@ -213,7 +215,7 @@ describe("GET /admin/stats/tools", () => {
         success: true,
         model: "gpt-4o",
         agent: "CODING",
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         timestamp: "2026-05-30T10:05:00Z",
       },
     ];
@@ -273,7 +275,7 @@ describe("GET /admin/stats/tools", () => {
           conversationId: "conv-1",
           project: "project-a",
           agent: "agent-a",
-          provider: "openai",
+          provider: PROVIDERS.OPENAI,
           model: "gpt-4o",
           inputTokens: 100,
           outputTokens: 50,
@@ -287,7 +289,7 @@ describe("GET /admin/stats/tools", () => {
           agentSessionId: "session-2",
           project: "project-b",
           agent: "agent-b",
-          provider: "anthropic",
+          provider: PROVIDERS.ANTHROPIC,
           model: "claude-3",
           inputTokens: 200,
           outputTokens: 100,
@@ -308,7 +310,7 @@ describe("GET /admin/stats/tools", () => {
 
       const mockDb = {
         collection: (name: string) => {
-          if (name === "requests") {
+          if (name === COLLECTIONS.REQUESTS) {
             return {
               aggregate: (pipeline: any[]) => {
                 return {
@@ -369,7 +371,7 @@ describe("GET /admin/stats/tools", () => {
               },
               countDocuments: async () => mockRequests.length
             };
-          } else if (name === "model_conversations") {
+          } else if (name === COLLECTIONS.MODEL_CONVERSATIONS) {
             return {
               find: (query: any) => {
                 const filtered = mockModelConvs.filter(c => c.workspaceRoot === query.workspaceRoot);
@@ -386,7 +388,7 @@ describe("GET /admin/stats/tools", () => {
                 return filtered.length;
               }
             };
-          } else if (name === "agent_conversations") {
+          } else if (name === COLLECTIONS.AGENT_CONVERSATIONS) {
             return {
               find: (query: any) => {
                 const filtered = mockAgentConvs.filter(c => c.workspaceRoot === query.workspaceRoot);
@@ -416,13 +418,13 @@ describe("GET /admin/stats/tools", () => {
 
     it("filters stats by provider and model", async () => {
       const resOpenai = await request(app)
-        .get("/admin/stats?provider=openai")
+        .get("/admin/stats?provider=" + PROVIDERS.OPENAI)
         .set("x-gateway-secret", "test-secret")
         .expect(200);
       expect(resOpenai.body.totalRequests).toBe(1);
 
       const resAnthropic = await request(app)
-        .get("/admin/stats?provider=anthropic")
+        .get("/admin/stats?provider=" + PROVIDERS.ANTHROPIC)
         .set("x-gateway-secret", "test-secret")
         .expect(200);
       expect(resAnthropic.body.totalRequests).toBe(1);

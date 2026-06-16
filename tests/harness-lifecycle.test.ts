@@ -24,6 +24,7 @@ import SessionGenerationTracker from "../src/services/SessionGenerationTracker.t
 import BaseAgenticHarness from "../src/services/harnesses/BaseAgenticHarness.ts";
 import AgentHooks from "../src/services/AgentHooks.ts";
 import AutoApprovalEngine from "../src/services/AutoApprovalEngine.ts";
+import { COLLECTIONS } from "../src/constants.ts";
 import SystemPromptAssembler from "../src/services/system-prompt/index.ts";
 
 vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
@@ -477,7 +478,7 @@ describe("Finalizer", () => {
   describe("getCollectionOpts", () => {
     it("should return agent_sessions collection for agent projects", () => {
       const result = getCollectionOpts("agent_coding");
-      expect(result).toEqual({ collection: "agent_conversations" });
+      expect(result).toEqual({ collection: COLLECTIONS.AGENT_CONVERSATIONS });
     });
 
     it("should return undefined for non-agent projects", () => {

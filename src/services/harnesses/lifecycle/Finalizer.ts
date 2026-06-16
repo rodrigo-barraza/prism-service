@@ -14,7 +14,7 @@ import { resolveToolEntriesToSet } from "../../../utils/resolveToolEntriesToSet.
 import {
   appendAndFinalize,
 } from "../../../utils/ConversationUtilities.ts";
-import { COLLECTIONS, FILE_CATEGORIES } from "../../../constants.ts";
+import { COLLECTIONS, FILE_CATEGORIES, PROMPT_DELIMITERS } from "../../../constants.ts";
 import logger from "../../../utils/logger.ts";
 import { TokenUsage, MessagePayload, ToolCallPayload, LlmOptions } from "../../RequestLogger.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
@@ -78,7 +78,7 @@ function getCollectionOpts(project: string | null | undefined) {
  * Swap content and rawContent if present to ensure the database and caller get clean text.
  * Fallback to regex parsing for legacy/unmigrated messages to populate rawContent and clean content.
  */
-function swapMessageContent(message: MessagePayload) {
+export function swapMessageContent(message: MessagePayload) {
   if (message.role === "user" && typeof message.content === "string") {
     if (message.rawContent?.startsWith("[System Context]") || message.rawContent?.startsWith("[System Context - Local Time:")) {
       return;
@@ -342,118 +342,31 @@ export async function finalizeTextGeneration(
   // must NOT persist their messages into the parent conversation document —
   // their output is returned via the create_team tool call result instead.
   if (conversationId) {
-    let messagesToAppend: MessagePayload[] = [];
-    if (overrideMessagesToAppend) {
-            messagesToAppend = [...overrideMessagesToAppend];
-      // When the agentic loop ran multiple iterations, intermediate assistant
-      // messages already carry their own content + toolCalls. Attaching the
-      // full-turn contentSegments/textFragments to the final message would
-      // duplicate that content on page refresh (each intermediate message
-      // renders its own content, then segments re-render everything again).
-      // Only include segments on single-iteration turns where the final
-      // message is the sole assistant message — segments preserve the
-      // thinking ↔ tools ↔ text interleaving for that case.
-            const hasIntermediateToolMessages = overrideMessagesToAppend.some(
-                (message) => message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0,
-      );
-      // Append the final LLM response block (contains telemetry and final text step)
-      // When intermediate assistant messages already carry their own thinking,
-      // only include genuinely NEW thinking on the final message (thinking
-      // that wasn't already persisted on an earlier iteration's message).
-      // Without this, the same thinking renders twice on page refresh.
-      let finalThinking = thinking || "";
-      if (hasIntermediateToolMessages && finalThinking) {
-        for (const message of overrideMessagesToAppend) {
-          if (message.role === "assistant" && message.thinking && finalThinking.startsWith(message.thinking)) {
-            finalThinking = finalThinking.slice(message.thinking.length).trim();
-          }
-        }
-      }
-            messagesToAppend.push({
-        role: "assistant",
-        content: text,
-                ...(finalThinking && { thinking: finalThinking }),
-                ...(thinkingSignature && { thinkingSignature }),
-                ...(images.length > 0 && { images }),
-        ...(audioRef && { audio: audioRef }),
-        // Include toolCalls on the final message if no intermediate message
-        // already persists them. The regular agentic loop embeds toolCalls in
-        // intermediate assistant messages (overrideMessagesToAppend), but
-        // native MCP tool calls (e.g. LM Studio) bypass that path — without
-        // this, tool calls vanish on page refresh.
-        ...(!hasIntermediateToolMessages &&
-                    toolCalls.length > 0 && { toolCalls }),
-        model: resolvedModel,
-        provider: providerName,
-        timestamp: new Date().toISOString(),
-        usage: usage || null,
-                totalTime: totalSec != null ? roundMs(totalSec as number) : null,
-        tokensPerSec,
-        estimatedCost,
-        // Display segment metadata — preserves interleaving order for Prism Client.
-        // Only attach when there are NO intermediate tool-calling messages;
-        // otherwise intermediate messages already carry their own content and
-        // the segments would cause duplicate rendering on page refresh.
-        ...(!hasIntermediateToolMessages &&
-                    contentSegments?.length ? { contentSegments } : {}),
-        ...(!hasIntermediateToolMessages &&
-                    textFragments?.length ? { textFragments } : {}),
-        ...(!hasIntermediateToolMessages &&
-                    thinkingFragments?.length ? { thinkingFragments } : {}),
-        // Generation settings — source of truth per request
-        generationSettings: {
-                    temperature: options.temperature,
-                    maxTokens: options.maxTokens,
-                    thinkingEnabled: options.thinkingEnabled || false,
-                    ...(options.reasoningEffort ? {
-                        reasoningEffort: options.reasoningEffort,
-          } : {}),
-                    ...(options.thinkingBudget ? {
-                        thinkingBudget: options.thinkingBudget,
-          } : {}),
-        },
-      });
-    } else {
-      // Only append the user message on the first call for this turn
-      // (indicated by conversationMeta). Follow-up tool iterations reuse
-      // the same conversationId but omit conversationMeta, so the user
-      // message is already persisted from the first call.
-      if (userMessage && conversationMeta) {
-        messagesToAppend.push({
-          ...userMessage,
-          role: "user",
-                    timestamp: userMessage.timestamp || new Date().toISOString(),
-        });
-      }
-      messagesToAppend.push({
-        role: "assistant",
-        content: text,
-                ...(thinking && { thinking }),
-                ...(thinkingSignature && { thinkingSignature }),
-                ...(images.length > 0 && { images }),
-        ...(audioRef && { audio: audioRef }),
-                ...(toolCalls.length > 0 && { toolCalls }),
-        model: resolvedModel,
-        provider: providerName,
-        timestamp: new Date().toISOString(),
-        usage: usage || null,
-                totalTime: totalSec != null ? roundMs(totalSec as number) : null,
-        tokensPerSec,
-        estimatedCost,
-        // Generation settings — source of truth per request
-        generationSettings: {
-                    temperature: options.temperature,
-                    maxTokens: options.maxTokens,
-                    thinkingEnabled: options.thinkingEnabled || false,
-                    ...(options.reasoningEffort ? {
-                        reasoningEffort: options.reasoningEffort,
-          } : {}),
-                    ...(options.thinkingBudget ? {
-                        thinkingBudget: options.thinkingBudget,
-          } : {}),
-        },
-      });
-    }
+    const messagesToAppend = assembleMessagesToAppend({
+      overrideMessagesToAppend,
+      text,
+      thinking,
+      thinkingSignature,
+      images,
+      audioReference: audioRef,
+      toolCalls,
+      resolvedModel,
+      providerName,
+      usage,
+      totalSeconds: totalSec,
+      tokensPerSecond: tokensPerSec,
+      estimatedCost,
+      contentSegments,
+      textFragments,
+      thinkingFragments,
+      temperature: options.temperature,
+      maxTokens: options.maxTokens,
+      thinkingEnabled: options.thinkingEnabled,
+      reasoningEffort: options.reasoningEffort,
+      thinkingBudget: options.thinkingBudget,
+      userMessage,
+      conversationMeta,
+    });
     let toolConfig: Record<string, unknown> | undefined = undefined;
     if (resolvedEnabledTools) {
       const existingSettings = conversationMeta?.settings as Record<string, unknown> | undefined;
@@ -567,3 +480,168 @@ export async function finalizeTextGeneration(
 }
 
 export { getCollectionOpts };
+
+/**
+ * Standard utility to assemble the messages array to append to the database.
+ * Shared between production finalizers and test assertion modules.
+ */
+export function assembleMessagesToAppend(options: {
+  overrideMessagesToAppend?: MessagePayload[] | null;
+  text: string | null;
+  thinking?: string | null;
+  thinkingSignature?: string | null;
+  images?: string[];
+  audioReference?: string | null;
+  toolCalls?: ToolCallPayload[];
+  resolvedModel: string;
+  providerName: string;
+  usage?: TokenUsage | null;
+  totalSeconds?: number | null;
+  tokensPerSecond?: number | null;
+  estimatedCost?: number | null;
+  contentSegments?: unknown[];
+  textFragments?: unknown[];
+  thinkingFragments?: unknown[];
+  temperature?: number;
+  maxTokens?: number;
+  thinkingEnabled?: boolean;
+  reasoningEffort?: string;
+  thinkingBudget?: number;
+  userMessage?: MessagePayload | null;
+  conversationMeta?: Record<string, unknown> | null;
+}): MessagePayload[] {
+  const {
+    overrideMessagesToAppend,
+    text,
+    thinking,
+    thinkingSignature,
+    images = [],
+    audioReference,
+    toolCalls = [],
+    resolvedModel,
+    providerName,
+    usage,
+    totalSeconds,
+    tokensPerSecond,
+    estimatedCost,
+    contentSegments,
+    textFragments,
+    thinkingFragments,
+    temperature,
+    maxTokens,
+    thinkingEnabled,
+    reasoningEffort,
+    thinkingBudget,
+    userMessage,
+    conversationMeta,
+  } = options;
+
+  let messagesToAppend: MessagePayload[] = [];
+
+  if (overrideMessagesToAppend) {
+    messagesToAppend = [...overrideMessagesToAppend];
+    const hasIntermediateToolMessages = overrideMessagesToAppend.some(
+      (message) => message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0,
+    );
+    let finalThinking = thinking || "";
+    if (hasIntermediateToolMessages && finalThinking) {
+      for (const message of overrideMessagesToAppend) {
+        if (message.role === "assistant" && message.thinking && finalThinking.startsWith(message.thinking)) {
+          finalThinking = finalThinking.slice(message.thinking.length).trim();
+        }
+      }
+    }
+    messagesToAppend.push({
+      role: "assistant",
+      content: text,
+      ...(finalThinking && { thinking: finalThinking }),
+      ...(thinkingSignature && { thinkingSignature }),
+      ...(images.length > 0 && { images }),
+      ...(audioReference && { audio: audioReference }),
+      ...(!hasIntermediateToolMessages &&
+        toolCalls.length > 0 && { toolCalls }),
+      model: resolvedModel,
+      provider: providerName,
+      timestamp: new Date().toISOString(),
+      usage: usage || null,
+      totalTime: totalSeconds != null ? roundMs(totalSeconds as number) : null,
+      tokensPerSec: tokensPerSecond,
+      estimatedCost,
+      ...(!hasIntermediateToolMessages &&
+        contentSegments?.length ? { contentSegments } : {}),
+      ...(!hasIntermediateToolMessages &&
+        textFragments?.length ? { textFragments } : {}),
+      ...(!hasIntermediateToolMessages &&
+        thinkingFragments?.length ? { thinkingFragments } : {}),
+      generationSettings: {
+        temperature,
+        maxTokens,
+        thinkingEnabled: thinkingEnabled || false,
+        ...(reasoningEffort ? { reasoningEffort } : {}),
+        ...(thinkingBudget ? { thinkingBudget } : {}),
+      },
+    } as any);
+  } else {
+    if (userMessage && conversationMeta) {
+      messagesToAppend.push({
+        ...userMessage,
+        role: "user",
+        timestamp: userMessage.timestamp || new Date().toISOString(),
+      });
+    }
+    messagesToAppend.push({
+      role: "assistant",
+      content: text,
+      ...(thinking && { thinking }),
+      ...(thinkingSignature && { thinkingSignature }),
+      ...(images.length > 0 && { images }),
+      ...(audioReference && { audio: audioReference }),
+      ...(toolCalls.length > 0 && { toolCalls }),
+      model: resolvedModel,
+      provider: providerName,
+      timestamp: new Date().toISOString(),
+      usage: usage || null,
+      totalTime: totalSeconds != null ? roundMs(totalSeconds as number) : null,
+      tokensPerSec: tokensPerSecond,
+      estimatedCost,
+      generationSettings: {
+        temperature,
+        maxTokens,
+        thinkingEnabled: thinkingEnabled || false,
+        ...(reasoningEffort ? { reasoningEffort } : {}),
+        ...(thinkingBudget ? { thinkingBudget } : {}),
+      },
+    } as any);
+  }
+
+  return messagesToAppend;
+}
+
+/**
+ * Slice and filter message history to identify new messages for the current turn.
+ * Shared between BaseAgenticHarness execution and test suite assertion suites to ensure
+ * they do not diverge.
+ */
+export function computeNewTurnMessages(
+  originalMessages: Array<any>,
+  currentMessages: Array<any>,
+  originalMessageCount: number,
+): Array<any> {
+  const lastOriginalMessage = originalMessages[originalMessageCount - 1];
+  const isLastAlreadyPersisted =
+    lastOriginalMessage && lastOriginalMessage._alreadyPersisted === true;
+
+  const sliceIndex = isLastAlreadyPersisted
+    ? originalMessageCount
+    : Math.max(0, originalMessageCount - 1);
+
+  return currentMessages.slice(sliceIndex).filter(
+    (message) =>
+      !(
+        message.role === "user" &&
+        typeof message.content === "string" &&
+        message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX)
+      ) && !message._alreadyPersisted,
+  );
+}
+

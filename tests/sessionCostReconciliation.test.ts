@@ -14,6 +14,7 @@
  * pattern already used for toolCounts enrichment.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { COLLECTIONS } from "../src/constants.ts";
 
 // ── Mock logger (top-level as vitest requires) ──────────────────
 vi.mock("../src/utils/logger.ts", () => ({
@@ -386,11 +387,11 @@ describe("Session Cost Reconciliation", () => {
           return {
             find: (queryFilter: any) => {
               let docs: any[] = [];
-              if (collectionName === "agent_conversations") {
+              if (collectionName === COLLECTIONS.AGENT_CONVERSATIONS) {
                 docs = agentConversations;
-              } else if (collectionName === "model_conversations") {
+              } else if (collectionName === COLLECTIONS.MODEL_CONVERSATIONS) {
                 docs = modelConversations;
-              } else if (collectionName === "requests") {
+              } else if (collectionName === COLLECTIONS.REQUESTS) {
                 docs = requests;
               }
 
@@ -404,10 +405,10 @@ describe("Session Cost Reconciliation", () => {
               return chain;
             },
             countDocuments: async () => {
-              if (collectionName === "agent_conversations") {
+              if (collectionName === COLLECTIONS.AGENT_CONVERSATIONS) {
                 return agentConversations.length;
               }
-              if (collectionName === "model_conversations") {
+              if (collectionName === COLLECTIONS.MODEL_CONVERSATIONS) {
                 return modelConversations.length;
               }
               return 0;

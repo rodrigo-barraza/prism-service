@@ -18,6 +18,7 @@ import { ToolDocFormatter } from "./ToolDocFormatter.ts";
 import { SkillMemoryScorer } from "./SkillMemoryScorer.ts";
 import { AssemblerContext } from "./types.ts";
 import SomaticStateService from "../somatic/SomaticStateService.ts";
+import { PROMPT_DELIMITERS } from "../../constants.ts";
 
 export default class SystemPromptAssembler {
   workspaceRoot: string;
@@ -346,7 +347,7 @@ export default class SystemPromptAssembler {
         skillNames.push(s.name);
         return `### ${s.name}\n${s.content}`;
       });
-      skillsText = `[Project Skills]\n` + skillBlocks.join("\n\n");
+      skillsText = `${PROMPT_DELIMITERS.PROJECT_SKILLS}\n` + skillBlocks.join("\n\n");
     }
 
     // ── 9. Session Memory (embedding search) ────────────────────
@@ -372,7 +373,7 @@ export default class SystemPromptAssembler {
         },
       );
       if (memories) {
-        memoriesText = `[Agent Memory]\n` + memories;
+        memoriesText = `${PROMPT_DELIMITERS.AGENT_MEMORY}\n` + memories;
       }
     }
 
@@ -401,83 +402,13 @@ export default class SystemPromptAssembler {
 
         context._injectedSkills = skillNames;
 
-        // ── Insert main system prompt as messages[0] ─────────────
-        const systemMessageIndex = context.messages?.findIndex(
-          (message) => message.role === "system",
-        );
-        if (systemMessageIndex !== undefined && systemMessageIndex >= 0) {
-          context.messages![systemMessageIndex].content = systemPrompt;
-        } else {
-          context.messages?.unshift({ role: "system", content: systemPrompt });
-        }
-
-        // ── Insert platform context after the main system prompt ───
-        // Platform context is relatively stable within a conversation
-        // (same server/channel), so it stays at the top for caching.
-        if (context.messages && platformContextMessage) {
-          const platformInsertionPoint = (systemMessageIndex !== undefined && systemMessageIndex >= 0)
-            ? systemMessageIndex + 1
-            : 1;
-          context.messages.splice(platformInsertionPoint, 0, {
-            role: "system",
-            content: platformContextMessage,
-          });
-        }
-
-        // ── Interleave self context before the last user message ───
-        // Self context (somatic state) changes per turn, so it's placed
-        // right before the newest user message. This keeps all previous
-        // messages frozen → maximizes the cacheable prefix.
-        if (context.messages && selfContextMessage) {
-          const lastUserMessageIndex = context.messages.reduce(
-            (lastIndex: number, message: { role: string }, index: number) =>
-              message.role === "user" ? index : lastIndex,
-            -1,
-          );
-          if (lastUserMessageIndex >= 0) {
-            context.messages.splice(lastUserMessageIndex, 0, {
-              role: "system",
-              content: selfContextMessage,
-            });
-          }
-        }
-
-        if (context.messages) {
-          const userMessages = context.messages.filter((message) => message.role === "user");
-          const lastUserMessage = userMessages[userMessages.length - 1];
-          if (lastUserMessage && typeof lastUserMessage.content === "string") {
-            const contextLines: string[] = [];
-
-            contextLines.push(
-              `- Local Time: ${new Date().toLocaleString("en-US", {
-                dateStyle: "full",
-                timeStyle: "long",
-              })}`,
-            );
-
-            let systemContextBlock = `[System Context]\n${contextLines.join("\n")}\n\n`;
-
-            if (skillsText) {
-              systemContextBlock += `${skillsText}\n\n`;
-            }
-
-            if (memoriesText) {
-              systemContextBlock += `${memoriesText}\n\n`;
-            }
-
-            if (!lastUserMessage.content.startsWith("[System Context]")) {
-              const messageIndex = context.messages.indexOf(lastUserMessage);
-              if (messageIndex !== -1) {
-                const originalContent = lastUserMessage.content;
-                context.messages[messageIndex] = {
-                  ...lastUserMessage,
-                  rawContent: originalContent,
-                  content: systemContextBlock + `[User Message]\n${originalContent}`,
-                };
-              }
-            }
-          }
-        }
+        injectSystemPromptContext(context.messages!, {
+          systemPrompt,
+          platformContextMessage,
+          selfContextMessage,
+          skillsText,
+          memoriesText,
+        });
 
         logger.info(
           `[SystemPromptAssembler] Assembled ${systemPrompt.length} char static system prompt for agent="${context.agent || "DIRECT"}" (${skillNames.length} skills injected into user context)`,
@@ -490,4 +421,102 @@ export default class SystemPromptAssembler {
     };
   }
 }
+
+/**
+ * Standard utility to inject system prompts and contexts (platform context, somatic state, skills, memories)
+ * into a conversation message history. Exposed so that both production assembler hooks and test harnesses
+ * use the identical alignment algorithm without code duplication.
+ */
+export function injectSystemPromptContext(
+  messages: Array<any>,
+  options: {
+    systemPrompt: string;
+    platformContextMessage?: string | null;
+    selfContextMessage?: string | null;
+    skillsText?: string;
+    memoriesText?: string;
+    localTimeText?: string;
+  }
+): void {
+  const {
+    systemPrompt,
+    platformContextMessage,
+    selfContextMessage,
+    skillsText,
+    memoriesText,
+    localTimeText,
+  } = options;
+
+  // ── 1. Insert main system prompt as messages[0] ─────────────
+  const systemMessageIndex = messages.findIndex(
+    (message) => message.role === "system",
+  );
+  if (systemMessageIndex >= 0) {
+    messages[systemMessageIndex].content = systemPrompt;
+  } else {
+    messages.unshift({ role: "system", content: systemPrompt });
+  }
+
+  // ── 2. Insert platform context after the main system prompt ───
+  if (platformContextMessage) {
+    const platformInsertionPoint = systemMessageIndex >= 0
+      ? systemMessageIndex + 1
+      : 1;
+    messages.splice(platformInsertionPoint, 0, {
+      role: "system",
+      content: platformContextMessage,
+    });
+  }
+
+  // ── 3. Interleave self context before the last user message ───
+  if (selfContextMessage) {
+    const lastUserMessageIndex = messages.reduce(
+      (lastIndex: number, message: { role: string }, index: number) =>
+        message.role === "user" ? index : lastIndex,
+      -1,
+    );
+    if (lastUserMessageIndex >= 0) {
+      messages.splice(lastUserMessageIndex, 0, {
+        role: "system",
+        content: selfContextMessage,
+      });
+    }
+  }
+
+  // ── 4. Prepend [System Context] to last user message ───
+  const userMessages = messages.filter((message) => message.role === "user");
+  const lastUserMessage = userMessages[userMessages.length - 1];
+  if (lastUserMessage && typeof lastUserMessage.content === "string") {
+    const timeText = localTimeText || new Date().toLocaleString("en-US", {
+      dateStyle: "full",
+      timeStyle: "long",
+    });
+
+    const contextLines = [`- Local Time: ${timeText}`];
+
+    let systemContextBlock = `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\n${contextLines.join("\n")}\n\n`;
+
+    if (skillsText) {
+      systemContextBlock += `${skillsText}\n\n`;
+    }
+
+    if (memoriesText) {
+      systemContextBlock += `${memoriesText}\n\n`;
+    }
+
+    if (!lastUserMessage.content.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT)) {
+      const messageIndex = messages.indexOf(lastUserMessage);
+      if (messageIndex !== -1) {
+        const originalContent = lastUserMessage.content;
+        messages[messageIndex] = {
+          ...lastUserMessage,
+          rawContent: originalContent,
+          content: systemContextBlock + `${PROMPT_DELIMITERS.USER_MESSAGE}\n${originalContent}`,
+        };
+      }
+    }
+  }
+}
+
 export { SystemPromptAssembler };
+

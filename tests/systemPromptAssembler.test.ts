@@ -16,6 +16,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { PROMPT_DELIMITERS } from "../src/constants.ts";
 
 // ── Mock tool schemas (simulates tools-api + coordinator tools) ────────
 
@@ -829,9 +830,9 @@ describe("SystemPromptAssembler", () => {
       await hook(context);
 
       const userMessage = context.messages.find((message) => message.role === "user");
-      expect(userMessage?.content).toContain("[System Context]");
+      expect(userMessage?.content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
       expect(userMessage?.content).toContain("Local Time:");
-      expect(userMessage?.content).toContain("[User Message]");
+      expect(userMessage?.content).toContain(PROMPT_DELIMITERS.USER_MESSAGE);
       expect(userMessage?.content).toContain("Hello world");
     });
 
@@ -859,14 +860,15 @@ describe("SystemPromptAssembler", () => {
         agent: "CODING",
         project: "prism-chat",
         messages: [
-          { role: "user", content: "[System Context]\nAlready injected\n\n[User Message]\nHello" },
+          { role: "user", content: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nAlready injected\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nHello` },
         ] as Array<{ role: string; content?: string; rawContent?: string }>,
       };
 
       await hook(context);
 
       const userMessage = context.messages.find((message) => message.role === "user");
-      const systemContextOccurrences = (userMessage?.content?.match(/\[System Context\]/g) || []).length;
+      const systemContextRegex = new RegExp(PROMPT_DELIMITERS.SYSTEM_CONTEXT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      const systemContextOccurrences = (userMessage?.content?.match(systemContextRegex) || []).length;
       expect(systemContextOccurrences).toBe(1);
     });
   });
