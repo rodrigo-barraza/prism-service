@@ -5,7 +5,7 @@ import {
   SOMATIC_KEYWORDS,
   VALID_EMOTIONS,
   EMOTION_BEHAVIOR_PROMPTS,
-  EMOTION_ANALYSIS_SYSTEM_PROMPT,
+  EMOTION_CLASSIFICATION_PROMPT,
   type PrimaryEmotion,
   type DominantEmotionResult,
 } from "./SomaticConstants.ts";
@@ -318,13 +318,12 @@ async function analyzeEmotionFromText(
   const { getProvider } = await import("../../providers/index.ts");
   const { provider: providerName, model: modelName } = emotionModel;
   const provider = getProvider(providerName);
-  const systemPrompt = EMOTION_ANALYSIS_SYSTEM_PROMPT(VALID_EMOTIONS.join(", "));
+  const classificationPrompt = EMOTION_CLASSIFICATION_PROMPT(VALID_EMOTIONS.join(", "), text);
   const requestId = crypto.randomUUID();
   const requestStart = performance.now();
 
   const aiMessages = [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: text },
+    { role: "user", content: classificationPrompt },
   ];
 
   let result: { text: string; usage?: Record<string, unknown> } | undefined;

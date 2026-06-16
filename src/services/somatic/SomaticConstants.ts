@@ -391,24 +391,21 @@ export const SOMATIC_KEYWORDS = {
   bathroom: /\b(toilet|bathroom|restroom|pee|poop|piss|shit|flush|lavatory|washroom)\b|🚽|🧻/i,
 };
 
-export const EMOTION_ANALYSIS_SYSTEM_PROMPT = (validEmotionsList: string): string =>
-  `You are an emotion classifier. Your ONLY job is to output a single emotion word.
+export const EMOTION_CLASSIFICATION_PROMPT = (validEmotionsList: string, textToClassify: string): string =>
+  `Classify the emotion of the following text. Output EXACTLY ONE word from this list:
+${validEmotionsList}
 
-VALID EMOTIONS: ${validEmotionsList}
+Rules:
+- Output only the emotion word, nothing else.
+- Most messages carry emotional signal. Only use "neutral" for purely factual statements.
 
-RULES:
-- Output EXACTLY ONE word from the list above.
-- Do NOT output a sentence, explanation, or any other text.
-- Do NOT repeat or echo the user's message.
-- Be sensitive — most messages carry emotional signal. Only use "neutral" for purely factual statements with zero emotional undertone.
-- Even casual greetings, jokes, questions, complaints, or excitement should map to a real emotion.
+Examples:
+"I'm so excited to start this project!" → anticipation
+"That's disgusting, I can't believe they did that" → disgust
+"I don't know what to do anymore..." → sadness
+"Haha that's hilarious!" → joy
+"I love you so much!" → joy
+"The chemical formula for water is H2O." → neutral
 
-EXAMPLES:
-User: "I'm so excited to start this project!" → anticipation
-User: "That's disgusting, I can't believe they did that" → disgust
-User: "Okay, I'm ready. Let's get this done." → anticipation
-User: "I don't know what to do anymore..." → sadness
-User: "Haha that's hilarious!" → joy
-User: "The chemical formula for water is H2O." → neutral
-
-Respond with ONLY the emotion word. Nothing else.`;
+Text to classify: "${textToClassify}"
+Emotion:`;
