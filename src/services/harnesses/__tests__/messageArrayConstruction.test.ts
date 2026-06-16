@@ -3270,4 +3270,229 @@ describe("Message Array Construction", () => {
       }
     });
   });
+
+  // ────────────────────────────────────────────────────────────
+  // Scenario: Prism-Client Lupos — No agentContext
+  // Somatic state should still be injected because it's agent-level,
+  // not platform-level. Only platform context should be absent.
+  // ────────────────────────────────────────────────────────────
+  describe("Prism-Client Lupos — no agentContext, somatic state still injected", () => {
+    let originalMessages: ConversationMessage[];
+    let currentMessages: ConversationMessage[];
+    let originalMessageCount: number;
+
+    const LUPOS_IDENTITY = "You are Lupos, an insane recovering-drug-addicted artist wolf king...";
+    const SOMATIC_STATE = [
+      "[Somatic State — Lupos]",
+      "current_emotion: curious",
+      "emotional_valence: 0.6",
+      "arousal: 0.45",
+      "dominance: 0.5",
+    ].join("\n");
+
+    beforeEach(() => {
+      originalMessages = [
+        { role: "user", content: "hey lupos, what's up?" },
+      ];
+      originalMessageCount = originalMessages.length;
+      currentMessages = [...originalMessages];
+
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: LUPOS_IDENTITY,
+        platformContextMessage: null,
+        selfContextMessage: SOMATIC_STATE,
+      });
+    });
+
+    it("should have 3 messages after hook injection (no platform context)", () => {
+      expect(currentMessages).toHaveLength(3);
+    });
+
+    it("should place identity system prompt at index 0", () => {
+      expect(currentMessages[0].role).toBe("system");
+      expect(currentMessages[0].content).toBe(LUPOS_IDENTITY);
+    });
+
+    it("should NOT have platform context (prism-client sends no agentContext)", () => {
+      const platformMessage = currentMessages.find(
+        (message) =>
+          message.role === "system" &&
+          typeof message.content === "string" &&
+          message.content.includes("Platform: Discord"),
+      );
+      expect(platformMessage).toBeUndefined();
+    });
+
+    it("should still inject somatic state as interleaved system message", () => {
+      expect(currentMessages[1].role).toBe("system");
+      expect(currentMessages[1].content).toBe(SOMATIC_STATE);
+    });
+
+    it("should place user message last with system context prepended", () => {
+      expect(currentMessages[2].role).toBe("user");
+      expect(currentMessages[2].content).toContain("[System Context]");
+      expect(currentMessages[2].rawContent).toBe("hey lupos, what's up?");
+    });
+
+    it("should persist somatic state + user + assistant (no platform context)", () => {
+      currentMessages.push({
+        role: "assistant",
+        content: "*yawns* Not much, just woke up from a weird dream...",
+        model: "gpt-4.1",
+        provider: "openai",
+      });
+
+      const newTurnMessages = computeNewTurnMessages(
+        originalMessages,
+        currentMessages,
+        originalMessageCount,
+      );
+
+      expect(newTurnMessages).toHaveLength(4);
+      expect(newTurnMessages.map((message) => message.role)).toEqual([
+        "system",    // identity
+        "system",    // somatic state (NO platform context between them)
+        "user",      // user message
+        "assistant", // response
+      ]);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────
+  // Scenario: _isIdentityPrompt tag is set and enables reliable capture
+  // ────────────────────────────────────────────────────────────
+  describe("_isIdentityPrompt tag — reliable conversationMeta.systemPrompt capture", () => {
+    let currentMessages: ConversationMessage[];
+
+    const LUPOS_IDENTITY = "You are Lupos, an insane recovering-drug-addicted artist wolf king...";
+    const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab";
+    const SOMATIC_STATE = "[Somatic State — Lupos]\ncurrent_emotion: amused";
+
+    beforeEach(() => {
+      currentMessages = [
+        { role: "user", content: "hey lupos" },
+      ];
+
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: LUPOS_IDENTITY,
+        platformContextMessage: PLATFORM_CONTEXT,
+        selfContextMessage: SOMATIC_STATE,
+      });
+    });
+
+    it("should set _isIdentityPrompt: true on the identity system message at index 0", () => {
+      expect(currentMessages[0]._isIdentityPrompt).toBe(true);
+    });
+
+    it("should NOT set _isIdentityPrompt on platform context message", () => {
+      expect(currentMessages[1]._isIdentityPrompt).toBeUndefined();
+    });
+
+    it("should NOT set _isIdentityPrompt on somatic state message", () => {
+      expect(currentMessages[2]._isIdentityPrompt).toBeUndefined();
+    });
+
+    it("should find identity prompt via _isIdentityPrompt tag even if other system messages exist", () => {
+      const identityMessage = currentMessages.find(
+        (message) => message.role === "system" && message._isIdentityPrompt === true,
+      );
+      expect(identityMessage).toBeDefined();
+      expect(identityMessage!.content).toBe(LUPOS_IDENTITY);
+    });
+
+    it("should prefer _isIdentityPrompt-tagged message over first system message for conversationMeta capture", () => {
+      // Simulate a scenario where a validation error system message gets prepended
+      // (this could happen in edge cases with compaction or error injection)
+      const messagesWithErrorFirst: ConversationMessage[] = [
+        { role: "system", content: "[VALIDATION ERROR] Some lint error..." },
+        { role: "system", content: LUPOS_IDENTITY, _isIdentityPrompt: true },
+        { role: "system", content: SOMATIC_STATE },
+        { role: "user", content: "test" },
+      ];
+
+      // Simulate the harness capture logic
+      const capturedMessage =
+        messagesWithErrorFirst.find(
+          (message) => message.role === "system" && message._isIdentityPrompt === true,
+        ) ||
+        messagesWithErrorFirst.find((message) => message.role === "system");
+
+      expect(capturedMessage!.content).toBe(LUPOS_IDENTITY);
+    });
+
+    it("should fall back to first system message when no _isIdentityPrompt tag exists (backward compat)", () => {
+      const legacyMessages: ConversationMessage[] = [
+        { role: "system", content: "Legacy identity prompt without tag" },
+        { role: "user", content: "test" },
+      ];
+
+      const capturedMessage =
+        legacyMessages.find(
+          (message) => message.role === "system" && message._isIdentityPrompt === true,
+        ) ||
+        legacyMessages.find((message) => message.role === "system");
+
+      expect(capturedMessage!.content).toBe("Legacy identity prompt without tag");
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────
+  // Scenario: conversationMeta.systemPrompt captures identity, not somatic
+  // ────────────────────────────────────────────────────────────
+  describe("conversationMeta.systemPrompt — captures identity not somatic state", () => {
+    it("should capture identity prompt when all three system message types exist", () => {
+      const LUPOS_IDENTITY = "You are Lupos...";
+      const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab";
+      const SOMATIC_STATE = "[Somatic State — Lupos]\ncurrent_emotion: melancholy";
+
+      const currentMessages: ConversationMessage[] = [
+        { role: "user", content: "hey" },
+      ];
+
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: LUPOS_IDENTITY,
+        platformContextMessage: PLATFORM_CONTEXT,
+        selfContextMessage: SOMATIC_STATE,
+      });
+
+      // Simulate the harness capture logic (same as ReActHarness line 174-185)
+      const assembledSystemMessage =
+        currentMessages.find(
+          (message) => message.role === "system" && message._isIdentityPrompt === true,
+        ) ||
+        currentMessages.find((message) => message.role === "system");
+
+      const conversationMeta: Record<string, unknown> = {};
+      if (assembledSystemMessage?.content) {
+        conversationMeta.systemPrompt = assembledSystemMessage.content;
+      }
+
+      expect(conversationMeta.systemPrompt).toBe(LUPOS_IDENTITY);
+      expect(conversationMeta.systemPrompt).not.toContain("Somatic State");
+      expect(conversationMeta.systemPrompt).not.toContain("Platform: Discord");
+    });
+
+    it("should capture identity even when only somatic state + identity exist (prism-client)", () => {
+      const LUPOS_IDENTITY = "You are Lupos...";
+      const SOMATIC_STATE = "[Somatic State — Lupos]\ncurrent_emotion: happy";
+
+      const currentMessages: ConversationMessage[] = [
+        { role: "user", content: "how are you?" },
+      ];
+
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: LUPOS_IDENTITY,
+        platformContextMessage: null,
+        selfContextMessage: SOMATIC_STATE,
+      });
+
+      const assembledSystemMessage =
+        currentMessages.find(
+          (message) => message.role === "system" && message._isIdentityPrompt === true,
+        ) ||
+        currentMessages.find((message) => message.role === "system");
+
+      expect(assembledSystemMessage!.content).toBe(LUPOS_IDENTITY);
+    });
+  });
 });

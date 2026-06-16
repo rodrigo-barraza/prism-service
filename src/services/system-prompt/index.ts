@@ -149,23 +149,23 @@ export default class SystemPromptAssembler {
       if (agentContext.lightsContext) {
         sections.push(agentContext.lightsContext as string);
       }
+    }
 
-      // ── 2b. Self Context (separate SYSTEM message) ──────────────
-      // Somatic state is owned by SomaticStateService (centralized,
-      // persisted to MongoDB). Gated by persona.hasSomaticState so
-      // only agents that opt in get this injected.
-      // Before rendering, adapt state based on the latest user message.
-      if (persona?.hasSomaticState && agentId) {
-        const userMessages = context.messages?.filter((message) => message.role === "user") || [];
-        const latestUserMessage = userMessages[userMessages.length - 1];
-        if (latestUserMessage && typeof latestUserMessage.content === "string") {
-          await SomaticStateService.adaptFromMessage(agentId, latestUserMessage.content);
-        }
+    // ── 2b. Self Context (separate SYSTEM message) ──────────────
+    // Somatic state is agent-level (not platform-level). Runs for any
+    // agent with hasSomaticState, regardless of whether agentContext
+    // is present. This ensures prism-client Lupos gets somatic state
+    // even though only Discord sends agentContext.
+    if (persona?.hasSomaticState && agentId) {
+      const userMessages = context.messages?.filter((message) => message.role === "user") || [];
+      const latestUserMessage = userMessages[userMessages.length - 1];
+      if (latestUserMessage && typeof latestUserMessage.content === "string") {
+        await SomaticStateService.adaptFromMessage(agentId, latestUserMessage.content);
+      }
 
-        const somaticMessage = await SomaticStateService.renderSystemMessage(agentId);
-        if (somaticMessage) {
-          selfContextSections.push(somaticMessage);
-        }
+      const somaticMessage = await SomaticStateService.renderSystemMessage(agentId);
+      if (somaticMessage) {
+        selfContextSections.push(somaticMessage);
       }
     }
 
@@ -454,8 +454,9 @@ export function injectSystemPromptContext(
   // NOT overwrite those. Instead, always target index 0 specifically.
   if (messages.length > 0 && messages[0].role === "system") {
     messages[0].content = systemPrompt;
+    messages[0]._isIdentityPrompt = true;
   } else {
-    messages.unshift({ role: "system", content: systemPrompt });
+    messages.unshift({ role: "system", content: systemPrompt, _isIdentityPrompt: true });
   }
 
   // ── 2. Insert platform context after the main system prompt ───

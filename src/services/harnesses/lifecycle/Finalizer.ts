@@ -435,6 +435,8 @@ export async function finalizeTextGeneration(
       .map((message) => {
         const cloned = { ...message };
         swapMessageContent(cloned);
+        // Strip runtime-only tags that should not reach MongoDB
+        delete cloned._isIdentityPrompt;
         return cloned;
       })
       .filter((message) => {
