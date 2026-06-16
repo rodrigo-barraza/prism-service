@@ -37,6 +37,15 @@ vi.mock("../../src/providers/index.ts", () => ({
   })),
 }));
 
+vi.mock("../../src/services/SettingsService.ts", () => ({
+  default: {
+    getSomaticModelConfig: vi.fn().mockResolvedValue({
+      provider: "google",
+      model: "gemini-3.5-flash",
+    }),
+  },
+}));
+
 import SomaticStateService from "../../src/services/somatic/SomaticStateService.ts";
 import { SOMATIC_KEYWORDS } from "../../src/services/somatic/SomaticConstants.ts";
 import { EmotionalStateEngine } from "../../src/services/somatic/EmotionalStateEngine.ts";
