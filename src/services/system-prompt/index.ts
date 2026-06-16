@@ -459,16 +459,26 @@ export function injectSystemPromptContext(
     messages.unshift({ role: "system", content: systemPrompt, _isIdentityPrompt: true });
   }
 
-  // ── 2. Insert platform context after the main system prompt ───
-  // Always insert at index 1 (right after the identity prompt at 0).
+  // ── 2. Interleave platform context before the last user message ──
+  // Inserted first so that when somatic state is also spliced in (step 3),
+  // the final order is: ...history → platform → somatic → last user msg.
   if (platformContextMessage) {
-    messages.splice(1, 0, {
-      role: "system",
-      content: platformContextMessage,
-    });
+    const lastUserMessageIndex = messages.reduce(
+      (lastIndex: number, message: { role: string }, index: number) =>
+        message.role === "user" ? index : lastIndex,
+      -1,
+    );
+    if (lastUserMessageIndex >= 0) {
+      messages.splice(lastUserMessageIndex, 0, {
+        role: "system",
+        content: platformContextMessage,
+      });
+    }
   }
 
   // ── 3. Interleave self context before the last user message ───
+  // Re-scans for the last user message (which may have shifted after
+  // step 2), so somatic state always sits directly before the user input.
   if (selfContextMessage) {
     const lastUserMessageIndex = messages.reduce(
       (lastIndex: number, message: { role: string }, index: number) =>
