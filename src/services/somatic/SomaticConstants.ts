@@ -68,7 +68,7 @@ export interface EmotionPersonality {
 export const DEFAULT_EMOTION_PERSONALITY: EmotionPersonality = {
   decayRate: 0.04,
   linearDecay: 0.3,
-  zeroClamp: 0.5,
+  zeroClamp: 0.1,
   sensitivity: 2.0,
   volatility: 0.6,
   emotionalInertia: 0.45,
@@ -392,4 +392,4 @@ export const SOMATIC_KEYWORDS = {
 };
 
 export const EMOTION_ANALYSIS_SYSTEM_PROMPT = (validEmotionsList: string): string =>
-  `You are an emotion analysis AI. Your task is to classify the following user message into EXACTLY ONE of these emotions: ${validEmotionsList}. Return ONLY the emotion name, lowercase, with no punctuation or explanation.`;
+  `You are an emotion analysis AI. Classify the following user message into EXACTLY ONE of these emotions: ${validEmotionsList}. Be sensitive — most human messages carry some emotional signal. Only return "neutral" when the message is purely factual with absolutely zero emotional undertone (e.g. "the sky is blue"). Even casual greetings, jokes, questions, complaints, or excitement should map to a real emotion. Return ONLY the emotion name, lowercase, with no punctuation or explanation.`;

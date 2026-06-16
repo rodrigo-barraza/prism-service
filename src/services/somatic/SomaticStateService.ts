@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import StatFactory, { type StatInstance } from "./StatFactory.ts";
 import {
   ALCOHOL_DESCRIPTIONS,
@@ -10,6 +11,7 @@ import {
 } from "./SomaticConstants.ts";
 import { EmotionalStateEngine, type SerializedEmotionalState } from "./EmotionalStateEngine.ts";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
+import RequestLogger from "../RequestLogger.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
 import { COLLECTIONS } from "../../constants.ts";
 import logger from "../../utils/logger.ts";
@@ -259,36 +261,86 @@ function startPersistenceLoop(): void {
   logger.info(`[SomaticStateService] Persistence loop started (interval: ${PERSIST_INTERVAL_MILLISECONDS / 1000}s)`);
 }
 
-async function analyzeEmotionFromText(text: string): Promise<PrimaryEmotion | "neutral"> {
+interface EmotionAnalysisContext {
+  traceId?: string | null;
+  agentSessionId?: string | null;
+  endpoint?: string | null;
+  project?: string | null;
+  username?: string | null;
+}
+
+const EMOTION_ANALYSIS_PROVIDER = "anthropic";
+const EMOTION_ANALYSIS_MODEL = "claude-haiku-4-5-20250414";
+
+async function analyzeEmotionFromText(
+  agentId: string,
+  text: string,
+  requestContext: EmotionAnalysisContext = {},
+): Promise<PrimaryEmotion | "neutral"> {
+  const { getProvider } = await import("../../providers/index.ts");
+  const provider = getProvider(EMOTION_ANALYSIS_PROVIDER);
+  const systemPrompt = EMOTION_ANALYSIS_SYSTEM_PROMPT(VALID_EMOTIONS.join(", "));
+  const requestId = crypto.randomUUID();
+  const requestStart = performance.now();
+
+  const aiMessages = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: text },
+  ];
+
+  let result: { text: string; usage?: Record<string, unknown> } | undefined;
+  let success = true;
+  let errorMessage = null;
+
   try {
-    const { getProvider } = await import("../../providers/index.ts");
-
-    const provider = getProvider("anthropic");
-    const systemPrompt = EMOTION_ANALYSIS_SYSTEM_PROMPT(VALID_EMOTIONS.join(", "));
-
-    const result = await provider.generateText(
-      [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: text },
-      ],
-      "claude-haiku-4-5-20250414",
-      { maxTokens: 10, temperature: 0 },
-    );
-
-    const cleanedEmotion = (result?.text || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z]/g, "");
-
-    if (VALID_EMOTIONS.includes(cleanedEmotion)) {
-      return cleanedEmotion as PrimaryEmotion | "neutral";
-    }
-
-    return "neutral";
+    result = await provider.generateText(aiMessages, EMOTION_ANALYSIS_MODEL, {
+      maxTokens: 10,
+      temperature: 0,
+    });
   } catch (error: unknown) {
-    logger.warn(`[SomaticStateService] Emotion analysis failed: ${(error as Error).message}`);
-    return "neutral";
+    success = false;
+    errorMessage = (error as Error).message;
+    logger.error(`[SomaticStateService] ❌ Emotion analysis API failed: ${errorMessage}`);
+  } finally {
+    RequestLogger.logBackgroundLlmCall({
+      requestId,
+      endpoint: requestContext.endpoint || "/agent",
+      operation: "somatic:emotion-analysis",
+      project: requestContext.project || null,
+      username: requestContext.username || "system",
+      agent: agentId,
+      provider: EMOTION_ANALYSIS_PROVIDER,
+      model: EMOTION_ANALYSIS_MODEL,
+      traceId: requestContext.traceId || null,
+      agentSessionId: requestContext.agentSessionId || null,
+      aiMessages,
+      resultText: result?.text || null,
+      usage: result?.usage || null,
+      success,
+      errorMessage,
+      requestStartMs: requestStart,
+      extraRequestPayload: {
+        inputTextLength: text.length,
+      },
+      extraResponsePayload: success
+        ? { detectedEmotion: result?.text?.trim().toLowerCase().replace(/[^a-z]/g, "") || "neutral" }
+        : undefined,
+    });
   }
+
+  if (!success) return "neutral";
+
+  const cleanedEmotion = (result?.text || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z]/g, "");
+
+  if (VALID_EMOTIONS.includes(cleanedEmotion)) {
+    return cleanedEmotion as PrimaryEmotion | "neutral";
+  }
+
+  logger.warn(`[SomaticStateService] Emotion analysis returned unrecognized value: "${cleanedEmotion}" — defaulting to neutral`);
+  return "neutral";
 }
 
 const SomaticStateService = {
@@ -428,7 +480,7 @@ const SomaticStateService = {
     return description + alcoholSuffix + levelInfo;
   },
 
-  async adaptFromMessage(agentId: string, text: string): Promise<void> {
+  async adaptFromMessage(agentId: string, text: string, requestContext: EmotionAnalysisContext = {}): Promise<void> {
     if (!text) return;
     const state = await ensureState(agentId);
     const cleanText = text.toLowerCase();
@@ -436,10 +488,16 @@ const SomaticStateService = {
     applyHomeostaticDrift(state);
 
     // LLM-based emotion analysis — detect user emotion and feed the Plutchik wheel
-    const detectedEmotion = await analyzeEmotionFromText(text);
+    // Uses addEmotion directly instead of processInteraction to avoid double-decay:
+    // the 30s setInterval timer already handles continuous decay, so calling
+    // decay() again on every message would suppress emotional gains.
+    const detectedEmotion = await analyzeEmotionFromText(agentId, text, requestContext);
     if (detectedEmotion !== "neutral") {
-      state.emotionalState.processInteraction(detectedEmotion);
-      logger.debug(`[SomaticStateService] 🎭 Detected emotion "${detectedEmotion}" for "${agentId}" → dominant: ${state.emotionalState.getDominantEmotion().emotion}`);
+      state.emotionalState.addEmotion(detectedEmotion as PrimaryEmotion);
+      const dominant = state.emotionalState.getDominantEmotion();
+      logger.info(`[SomaticStateService] 🎭 Emotion "${detectedEmotion}" detected for "${agentId}" → dominant: ${dominant.emotion} (${Math.round(dominant.intensity)}/100)`);
+    } else {
+      logger.debug(`[SomaticStateService] 🎭 Emotion classified as "neutral" for "${agentId}" — no emotional gain applied`);
     }
 
     if (SOMATIC_KEYWORDS.food.test(cleanText)) {
