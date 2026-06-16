@@ -367,9 +367,13 @@ router.get(
           isGenerating: true,
           updatedAt: { $gte: fiveMinAgo },
         }),
-        req.db
-          .collection(CONVERSATIONS_COLLECTION)
-          .countDocuments({ ...filter, updatedAt: { $gte: oneHourAgo } }),
+        project
+          ? req.db
+              .collection(CONVERSATIONS_COLLECTION)
+              .countDocuments({ ...filter, updatedAt: { $gte: oneHourAgo } })
+          : req.db
+              .collection(CONVERSATIONS_COLLECTION)
+              .estimatedDocumentCount(),
       ]);
 
       res.json({
@@ -413,23 +417,14 @@ router.get(
             isGenerating: true,
             updatedAt: { $gte: fiveMinAgo },
           }),
-          req.db
-            .collection(CONVERSATIONS_COLLECTION)
-            .countDocuments({ ...filter, updatedAt: { $gte: oneHourAgo } }),
+          project
+            ? req.db
+                .collection(CONVERSATIONS_COLLECTION)
+                .countDocuments({ ...filter, updatedAt: { $gte: oneHourAgo } })
+            : req.db
+                .collection(CONVERSATIONS_COLLECTION)
+                .estimatedDocumentCount(),
         ]);
-
-        req.db.collection(CONVERSATIONS_COLLECTION)
-          .updateMany(
-            { isGenerating: true, updatedAt: { $lt: fiveMinAgo } },
-            { $set: { isGenerating: false } },
-          )
-          .then(({ modifiedCount }: { modifiedCount: number }) => {
-            if (modifiedCount > 0)
-              logger.info(
-                `Auto-cleared ${modifiedCount} stale isGenerating flag(s)`,
-              );
-          })
-          .catch(() => {});
 
         const payload = JSON.stringify({
           generatingCount:
@@ -448,6 +443,22 @@ router.get(
     };
 
     await sendStats();
+
+    const staleCleanupInterval = setInterval(() => {
+      const fiveMinAgo = new Date(Date.now() - minutes(5)).toISOString();
+      req.db.collection(CONVERSATIONS_COLLECTION)
+        .updateMany(
+          { isGenerating: true, updatedAt: { $lt: fiveMinAgo } },
+          { $set: { isGenerating: false } },
+        )
+        .then(({ modifiedCount }: { modifiedCount: number }) => {
+          if (modifiedCount > 0)
+            logger.info(
+              `Auto-cleared ${modifiedCount} stale isGenerating flag(s)`,
+            );
+        })
+        .catch(() => {});
+    }, MS_PER_MINUTE);
 
     if (ChangeStreamService.available) {
       const onEvent = (event: import("../../services/ChangeStreamService.ts").ChangeStreamEventPayload) => {
@@ -478,6 +489,7 @@ router.get(
         ChangeStreamService.unsubscribe(onEvent);
         clearInterval(generationPoll);
         clearInterval(keepAlive);
+        clearInterval(staleCleanupInterval);
       });
     } else {
       const interval = setInterval(sendStats, 2000);
@@ -488,6 +500,7 @@ router.get(
       req.on("close", () => {
         clearInterval(interval);
         clearInterval(keepAlive);
+        clearInterval(staleCleanupInterval);
       });
     }
   }),

@@ -248,6 +248,8 @@ setupWebSocket(wss);
         db.collection(COLLECTIONS.MODEL_CONVERSATIONS).createIndex({ traceId: 1 }),
         // conversations — admin workspace filter
         db.collection(COLLECTIONS.MODEL_CONVERSATIONS).createIndex({ workspaceRoot: 1 }),
+        // conversations — stale isGenerating cleanup + stats count
+        db.collection(COLLECTIONS.MODEL_CONVERSATIONS).createIndex({ isGenerating: 1, updatedAt: -1 }),
 
         // agent_sessions — same indexes as conversations
         db
@@ -259,6 +261,8 @@ setupWebSocket(wss);
           .createIndex({ project: 1, username: 1, updatedAt: -1 }),
         // agent_sessions — admin workspace filter
         db.collection(COLLECTIONS.AGENT_CONVERSATIONS).createIndex({ workspaceRoot: 1 }),
+        // agent_sessions — stale isGenerating cleanup + stats count
+        db.collection(COLLECTIONS.AGENT_CONVERSATIONS).createIndex({ isGenerating: 1, updatedAt: -1 }),
 
         // workflows — used by conversationIds lookup
         db.collection(COLLECTIONS.WORKFLOWS).createIndex({ id: 1 }, { unique: true }),
