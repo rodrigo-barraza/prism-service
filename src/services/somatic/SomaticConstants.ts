@@ -66,12 +66,12 @@ export interface EmotionPersonality {
 }
 
 export const DEFAULT_EMOTION_PERSONALITY: EmotionPersonality = {
-  decayRate: 0.01,
-  linearDecay: 0.1,
+  decayRate: 0.04,
+  linearDecay: 0.3,
   zeroClamp: 0.5,
-  sensitivity: 5.0,
-  volatility: 0.8,
-  emotionalInertia: 0.3,
+  sensitivity: 2.0,
+  volatility: 0.6,
+  emotionalInertia: 0.45,
   baselineEmotion: null,
   baselinePull: 0.01,
   threshold: 0.1,
