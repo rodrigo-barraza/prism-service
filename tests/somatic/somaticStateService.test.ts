@@ -29,10 +29,189 @@ vi.mock("../../../config.ts", () => ({
   MONGO_DB_NAME: "prism_test",
 }));
 
+// Mock the provider used by emotion analysis
+const mockGenerateText = vi.fn().mockResolvedValue({ text: "neutral" });
+vi.mock("../../src/providers/index.ts", () => ({
+  getProvider: vi.fn(() => ({
+    generateText: mockGenerateText,
+  })),
+}));
+
 import SomaticStateService from "../../src/services/somatic/SomaticStateService.ts";
 import { SOMATIC_KEYWORDS } from "../../src/services/somatic/SomaticConstants.ts";
+import { EmotionalStateEngine } from "../../src/services/somatic/EmotionalStateEngine.ts";
 
 const TEST_AGENT_ID = "LUPOS_TEST";
+
+// ═══════════════════════════════════════════════════════════════
+// EmotionalStateEngine — Core Plutchik Mechanics
+// ═══════════════════════════════════════════════════════════════
+
+describe("EmotionalStateEngine — basic mechanics", () => {
+  it("initializes all 8 primary emotions at 0", () => {
+    const engine = new EmotionalStateEngine();
+    const values = engine.getEmotionValues();
+    expect(values.joy).toBe(0);
+    expect(values.trust).toBe(0);
+    expect(values.fear).toBe(0);
+    expect(values.surprise).toBe(0);
+    expect(values.sadness).toBe(0);
+    expect(values.disgust).toBe(0);
+    expect(values.anger).toBe(0);
+    expect(values.anticipation).toBe(0);
+  });
+
+  it("getDominantEmotion returns neutral when all values are 0", () => {
+    const engine = new EmotionalStateEngine();
+    const dominant = engine.getDominantEmotion();
+    expect(dominant.emotion).toBe("neutral");
+    expect(dominant.intensity).toBe(0);
+  });
+
+  it("addEmotion increases the specified emotion", () => {
+    const engine = new EmotionalStateEngine();
+    engine.addEmotion("joy", 20);
+    const values = engine.getEmotionValues();
+    expect(values.joy).toBeGreaterThan(0);
+  });
+
+  it("addEmotion suppresses the opposing emotion", () => {
+    const engine = new EmotionalStateEngine();
+    engine.emotions.sadness = 50;
+    engine.addEmotion("joy", 30);
+    expect(engine.emotions.sadness).toBeLessThan(50);
+  });
+
+  it("getDominantEmotion returns the highest primary emotion", () => {
+    const engine = new EmotionalStateEngine();
+    engine.addEmotion("anger", 50);
+    const dominant = engine.getDominantEmotion();
+    expect(dominant.emotion).toBe("anger");
+    expect(dominant.intensity).toBeGreaterThan(0);
+  });
+
+  it("decay reduces all emotion values toward 0", () => {
+    const engine = new EmotionalStateEngine();
+    engine.addEmotion("joy", 50);
+    const valueBefore = engine.emotions.joy;
+    engine.decay();
+    expect(engine.emotions.joy).toBeLessThan(valueBefore);
+  });
+
+  it("reset sets all emotions back to 0", () => {
+    const engine = new EmotionalStateEngine();
+    engine.addEmotion("joy", 50);
+    engine.addEmotion("anger", 30);
+    engine.reset();
+    const values = engine.getEmotionValues();
+    for (const value of Object.values(values)) {
+      expect(value).toBe(0);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// EmotionalStateEngine — Opposing Pair Suppression
+// ═══════════════════════════════════════════════════════════════
+
+describe("EmotionalStateEngine — opposing pairs", () => {
+  const opposingPairs: [string, string][] = [
+    ["joy", "sadness"],
+    ["trust", "disgust"],
+    ["fear", "anger"],
+    ["surprise", "anticipation"],
+  ];
+
+  for (const [first, second] of opposingPairs) {
+    it(`${first} suppresses ${second}`, () => {
+      const engine = new EmotionalStateEngine();
+      engine.emotions[second as keyof typeof engine.emotions] = 50;
+      engine.addEmotion(first as any, 30);
+      expect(engine.emotions[second as keyof typeof engine.emotions]).toBeLessThan(50);
+    });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// EmotionalStateEngine — Dyad Detection
+// ═══════════════════════════════════════════════════════════════
+
+describe("EmotionalStateEngine — dyad detection", () => {
+  it("joy + trust above threshold produces love", () => {
+    const engine = new EmotionalStateEngine();
+    engine.emotions.joy = 60;
+    engine.emotions.trust = 55;
+    const dominant = engine.getDominantEmotion();
+    expect(dominant.emotion).toBe("love");
+    expect(dominant.isDyad).toBe(true);
+    expect(dominant.components).toContain("joy");
+    expect(dominant.components).toContain("trust");
+  });
+
+  it("anger + disgust above threshold produces contempt", () => {
+    const engine = new EmotionalStateEngine();
+    engine.emotions.anger = 60;
+    engine.emotions.disgust = 55;
+    const dominant = engine.getDominantEmotion();
+    expect(dominant.emotion).toBe("contempt");
+    expect(dominant.isDyad).toBe(true);
+  });
+
+  it("anger + anticipation above threshold produces aggressiveness", () => {
+    const engine = new EmotionalStateEngine();
+    engine.emotions.anger = 70;
+    engine.emotions.anticipation = 65;
+    const dominant = engine.getDominantEmotion();
+    expect(dominant.emotion).toBe("aggressiveness");
+    expect(dominant.isDyad).toBe(true);
+  });
+
+  it("does not produce dyad when second emotion is too weak", () => {
+    const engine = new EmotionalStateEngine();
+    engine.emotions.joy = 60;
+    engine.emotions.trust = 5;
+    const dominant = engine.getDominantEmotion();
+    expect(dominant.emotion).toBe("joy");
+    expect(dominant.isDyad).toBeUndefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// EmotionalStateEngine — Serialization Round-Trip
+// ═══════════════════════════════════════════════════════════════
+
+describe("EmotionalStateEngine — serialization", () => {
+  it("serialize and deserialize preserve emotion values", () => {
+    const engine = new EmotionalStateEngine();
+    engine.addEmotion("joy", 40);
+    engine.addEmotion("fear", 20);
+
+    const serialized = engine.serialize();
+    const restored = EmotionalStateEngine.deserialize(serialized);
+
+    expect(restored.emotions.joy).toBe(engine.emotions.joy);
+    expect(restored.emotions.fear).toBe(engine.emotions.fear);
+    expect(restored.emotions.sadness).toBe(engine.emotions.sadness);
+  });
+
+  it("clamps deserialized values to 0-100 range", () => {
+    const corrupted = {
+      emotions: {
+        joy: 150,
+        trust: -20,
+        fear: 50,
+        surprise: 0,
+        sadness: 0,
+        disgust: 0,
+        anger: 0,
+        anticipation: 0,
+      },
+    };
+    const restored = EmotionalStateEngine.deserialize(corrupted);
+    expect(restored.emotions.joy).toBe(100);
+    expect(restored.emotions.trust).toBe(0);
+  });
+});
 
 // ═══════════════════════════════════════════════════════════════
 // SomaticStateService — getSnapshot (fresh agent)
@@ -40,7 +219,6 @@ const TEST_AGENT_ID = "LUPOS_TEST";
 
 describe("SomaticStateService — fresh agent snapshot", () => {
   beforeEach(() => {
-    // Destroy any leftover state between tests to avoid timer leaks
     if (SomaticStateService.hasAgent(TEST_AGENT_ID)) {
       SomaticStateService.destroyAgent(TEST_AGENT_ID);
     }
@@ -53,9 +231,9 @@ describe("SomaticStateService — fresh agent snapshot", () => {
     }
   });
 
-  it("returns a complete snapshot with all 8 stats", async () => {
+  it("returns a complete snapshot with all stat categories", async () => {
     const snapshot = await SomaticStateService.getSnapshot(TEST_AGENT_ID);
-    expect(snapshot).toHaveProperty("mood");
+    expect(snapshot).toHaveProperty("emotion");
     expect(snapshot).toHaveProperty("hunger");
     expect(snapshot).toHaveProperty("thirst");
     expect(snapshot).toHaveProperty("energy");
@@ -65,10 +243,10 @@ describe("SomaticStateService — fresh agent snapshot", () => {
     expect(snapshot).toHaveProperty("bathroom");
   });
 
-  it("initializes mood at 0 (Neutral) when no database record exists", async () => {
+  it("initializes emotion as neutral with 0 intensity when no database record exists", async () => {
     const snapshot = await SomaticStateService.getSnapshot(TEST_AGENT_ID);
-    expect(snapshot.mood.level).toBe(0);
-    expect(snapshot.mood.name).toBe("Neutral");
+    expect(snapshot.emotion.dominant).toBe("neutral");
+    expect(snapshot.emotion.intensity).toBe(0);
   });
 
   it("initializes hunger at 0 (Satisfied)", async () => {
@@ -107,11 +285,10 @@ describe("SomaticStateService — loads from database", () => {
     }
   });
 
-  it("restores levels from a saved database record", async () => {
+  it("restores physical stat levels from a saved database record", async () => {
     mockFindOne.mockResolvedValueOnce({
       agentId: "DB_AGENT",
       levels: {
-        mood: 5,
         hunger: 60,
         thirst: 30,
         energy: 40,
@@ -123,8 +300,6 @@ describe("SomaticStateService — loads from database", () => {
     });
 
     const snapshot = await SomaticStateService.getSnapshot("DB_AGENT");
-    expect(snapshot.mood.level).toBe(5);
-    expect(snapshot.mood.name).toBe("Happy");
     expect(snapshot.hunger.level).toBe(60);
     expect(snapshot.hunger.label).toBe("Hungry");
     expect(snapshot.energy.level).toBe(40);
@@ -133,10 +308,42 @@ describe("SomaticStateService — loads from database", () => {
     expect(snapshot.alcohol.label).toBe("Tipsy");
   });
 
+  it("restores emotional state from a saved database record", async () => {
+    mockFindOne.mockResolvedValueOnce({
+      agentId: "DB_AGENT",
+      levels: {
+        emotionalState: {
+          emotions: {
+            joy: 60,
+            trust: 55,
+            fear: 0,
+            surprise: 0,
+            sadness: 0,
+            disgust: 0,
+            anger: 0,
+            anticipation: 0,
+          },
+        },
+        hunger: 0,
+        thirst: 0,
+        energy: 100,
+        sickness: 0,
+        alcohol: 0,
+        substance: 0,
+        bathroom: 0,
+      },
+    });
+
+    const snapshot = await SomaticStateService.getSnapshot("DB_AGENT");
+    expect(snapshot.emotion.dominant).toBe("love");
+    expect(snapshot.emotion.isDyad).toBe(true);
+    expect(snapshot.emotion.intensity).toBeGreaterThan(0);
+  });
+
   it("falls back to defaults when database returns null levels", async () => {
     mockFindOne.mockResolvedValueOnce({ agentId: "DB_AGENT", levels: null });
     const snapshot = await SomaticStateService.getSnapshot("DB_AGENT");
-    expect(snapshot.mood.level).toBe(0);
+    expect(snapshot.emotion.dominant).toBe("neutral");
     expect(snapshot.energy.level).toBe(100);
   });
 });
@@ -158,36 +365,50 @@ describe("SomaticStateService — stat manipulation", () => {
     }
   });
 
-  it("setStatLevel changes and persists immediately", async () => {
+  it("setPhysicalStatLevel changes and persists immediately", async () => {
     await SomaticStateService.getSnapshot(AGENT);
-    await SomaticStateService.setStatLevel(AGENT, "mood", 7);
-    expect(await SomaticStateService.getStatLevel(AGENT, "mood")).toBe(7);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 70);
+    expect(await SomaticStateService.getPhysicalStatLevel(AGENT, "hunger")).toBe(70);
     expect(mockUpdateOne).toHaveBeenCalled();
   });
 
-  it("increaseStat bumps the level", async () => {
+  it("increasePhysicalStat bumps the level", async () => {
     await SomaticStateService.getSnapshot(AGENT);
-    await SomaticStateService.increaseStat(AGENT, "hunger", 5);
-    expect(await SomaticStateService.getStatLevel(AGENT, "hunger")).toBe(5);
+    await SomaticStateService.increasePhysicalStat(AGENT, "hunger", 5);
+    expect(await SomaticStateService.getPhysicalStatLevel(AGENT, "hunger")).toBe(5);
   });
 
-  it("decreaseStat reduces the level", async () => {
+  it("decreasePhysicalStat reduces the level", async () => {
     await SomaticStateService.getSnapshot(AGENT);
-    await SomaticStateService.decreaseStat(AGENT, "energy", 10);
-    expect(await SomaticStateService.getStatLevel(AGENT, "energy")).toBe(90);
+    await SomaticStateService.decreasePhysicalStat(AGENT, "energy", 10);
+    expect(await SomaticStateService.getPhysicalStatLevel(AGENT, "energy")).toBe(90);
   });
 
-  it("getMoodName returns the correct mood entry", async () => {
-    await SomaticStateService.setStatLevel(AGENT, "mood", -8);
-    const moodName = await SomaticStateService.getMoodName(AGENT);
-    expect(moodName).toBe("Furious");
+  it("addEmotion updates the emotional state", async () => {
+    await SomaticStateService.getSnapshot(AGENT);
+    const result = await SomaticStateService.addEmotion(AGENT, "anger", 40);
+    expect(result.emotion).toBe("anger");
+    expect(result.intensity).toBeGreaterThan(0);
   });
 
-  it("getMoodDescription returns a non-empty string", async () => {
-    await SomaticStateService.setStatLevel(AGENT, "mood", 10);
-    const description = await SomaticStateService.getMoodDescription(AGENT);
-    expect(description.length).toBeGreaterThan(0);
-    expect(description).toContain("transcendent");
+  it("getDominantEmotion returns current dominant after stimulus", async () => {
+    await SomaticStateService.addEmotion(AGENT, "joy", 50);
+    const result = await SomaticStateService.getDominantEmotion(AGENT);
+    expect(result.emotion).toBe("joy");
+  });
+
+  it("getEmotionBehaviorPrompt returns mood override text", async () => {
+    await SomaticStateService.addEmotion(AGENT, "anger", 50);
+    const prompt = await SomaticStateService.getEmotionBehaviorPrompt(AGENT);
+    expect(prompt).toContain("ANGER");
+    expect(prompt).toContain("VOLCANIC FURY");
+  });
+
+  it("legacy setStatLevel('mood') warns and no-ops", async () => {
+    const logger = (await import("../../src/utils/logger.ts")).default;
+    await SomaticStateService.getSnapshot(AGENT);
+    await SomaticStateService.setStatLevel(AGENT, "mood", 5);
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("deprecated"));
   });
 
   it("getAlcoholSystemPrompt returns empty for sober agent", async () => {
@@ -197,7 +418,7 @@ describe("SomaticStateService — stat manipulation", () => {
   });
 
   it("getAlcoholSystemPrompt returns content when drunk", async () => {
-    await SomaticStateService.setStatLevel(AGENT, "alcohol", 5);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "alcohol", 5);
     const prompt = await SomaticStateService.getAlcoholSystemPrompt(AGENT);
     expect(prompt).toContain("5/10 drunk");
     expect(prompt).toContain("inhibitions");
@@ -213,6 +434,7 @@ describe("SomaticStateService — adaptFromMessage", () => {
 
   beforeEach(() => {
     mockFindOne.mockResolvedValue(null);
+    mockGenerateText.mockResolvedValue({ text: "neutral" });
   });
 
   afterEach(async () => {
@@ -222,59 +444,59 @@ describe("SomaticStateService — adaptFromMessage", () => {
   });
 
   it("decreases hunger on food keywords", async () => {
-    await SomaticStateService.setStatLevel(AGENT, "hunger", 50);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 50);
     await SomaticStateService.adaptFromMessage(AGENT, "Hey Lupos, have some pizza 🍕");
-    expect(await SomaticStateService.getStatLevel(AGENT, "hunger")).toBeLessThan(50);
+    expect(await SomaticStateService.getPhysicalStatLevel(AGENT, "hunger")).toBeLessThan(50);
   });
 
   it("decreases thirst on drink keywords", async () => {
-    await SomaticStateService.setStatLevel(AGENT, "thirst", 50);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "thirst", 50);
     await SomaticStateService.adaptFromMessage(AGENT, "here's some water for you 💧");
-    expect(await SomaticStateService.getStatLevel(AGENT, "thirst")).toBeLessThan(50);
+    expect(await SomaticStateService.getPhysicalStatLevel(AGENT, "thirst")).toBeLessThan(50);
   });
 
   it("increases energy on rest keywords", async () => {
-    await SomaticStateService.setStatLevel(AGENT, "energy", 30);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "energy", 30);
     await SomaticStateService.adaptFromMessage(AGENT, "Go take a nap already 😴");
-    expect(await SomaticStateService.getStatLevel(AGENT, "energy")).toBeGreaterThan(30);
+    expect(await SomaticStateService.getPhysicalStatLevel(AGENT, "energy")).toBeGreaterThan(30);
   });
 
   it("decreases energy on work keywords", async () => {
-    const initialEnergy = await SomaticStateService.getStatLevel(AGENT, "energy");
+    const initialEnergy = await SomaticStateService.getPhysicalStatLevel(AGENT, "energy");
     await SomaticStateService.adaptFromMessage(AGENT, "Time to start coding and testing");
-    const afterEnergy = await SomaticStateService.getStatLevel(AGENT, "energy");
+    const afterEnergy = await SomaticStateService.getPhysicalStatLevel(AGENT, "energy");
     expect(afterEnergy).toBeLessThanOrEqual(initialEnergy);
   });
 
   it("increases alcohol on alcohol keywords", async () => {
     await SomaticStateService.getSnapshot(AGENT);
     await SomaticStateService.adaptFromMessage(AGENT, "Let's do some shots of whiskey 🍺");
-    expect(await SomaticStateService.getStatLevel(AGENT, "alcohol")).toBeGreaterThan(0);
+    expect(await SomaticStateService.getPhysicalStatLevel(AGENT, "alcohol")).toBeGreaterThan(0);
   });
 
   it("increases substance on substance keywords", async () => {
     await SomaticStateService.getSnapshot(AGENT);
     await SomaticStateService.adaptFromMessage(AGENT, "Pass me that joint bro 🌿");
-    expect(await SomaticStateService.getStatLevel(AGENT, "substance")).toBeGreaterThan(0);
+    expect(await SomaticStateService.getPhysicalStatLevel(AGENT, "substance")).toBeGreaterThan(0);
   });
 
   it("increases sickness on sick keywords", async () => {
     await SomaticStateService.getSnapshot(AGENT);
     await SomaticStateService.adaptFromMessage(AGENT, "I feel like I'm going to vomit 🤮");
-    expect(await SomaticStateService.getStatLevel(AGENT, "sickness")).toBeGreaterThan(0);
+    expect(await SomaticStateService.getPhysicalStatLevel(AGENT, "sickness")).toBeGreaterThan(0);
   });
 
   it("decreases bathroom on bathroom keywords", async () => {
-    await SomaticStateService.setStatLevel(AGENT, "bathroom", 50);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "bathroom", 50);
     await SomaticStateService.adaptFromMessage(AGENT, "I just went to the bathroom 🚽");
-    expect(await SomaticStateService.getStatLevel(AGENT, "bathroom")).toBeLessThan(50);
+    expect(await SomaticStateService.getPhysicalStatLevel(AGENT, "bathroom")).toBeLessThan(50);
   });
 
   it("food increases bathroom as a side effect", async () => {
     await SomaticStateService.getSnapshot(AGENT);
-    const bathroomBefore = await SomaticStateService.getStatLevel(AGENT, "bathroom");
+    const bathroomBefore = await SomaticStateService.getPhysicalStatLevel(AGENT, "bathroom");
     await SomaticStateService.adaptFromMessage(AGENT, "I just ate a massive burger 🍔");
-    const bathroomAfter = await SomaticStateService.getStatLevel(AGENT, "bathroom");
+    const bathroomAfter = await SomaticStateService.getPhysicalStatLevel(AGENT, "bathroom");
     expect(bathroomAfter).toBeGreaterThan(bathroomBefore);
   });
 
@@ -283,23 +505,24 @@ describe("SomaticStateService — adaptFromMessage", () => {
     const snapshotBefore = await SomaticStateService.getSnapshot(AGENT);
     await SomaticStateService.adaptFromMessage(AGENT, "");
     const snapshotAfter = await SomaticStateService.getSnapshot(AGENT);
-    expect(snapshotAfter.mood.level).toBe(snapshotBefore.mood.level);
+    expect(snapshotAfter.emotion.dominant).toBe(snapshotBefore.emotion.dominant);
   });
 
-  it("does nothing on message with no matching keywords", async () => {
+  it("detects emotion via LLM and feeds the Plutchik wheel", async () => {
+    mockGenerateText.mockResolvedValueOnce({ text: "anger" });
     await SomaticStateService.getSnapshot(AGENT);
-    const hungerBefore = await SomaticStateService.getStatLevel(AGENT, "hunger");
-    await SomaticStateService.adaptFromMessage(AGENT, "The weather is nice today");
-    const hungerAfter = await SomaticStateService.getStatLevel(AGENT, "hunger");
-    expect(hungerAfter).toBe(hungerBefore);
+    await SomaticStateService.adaptFromMessage(AGENT, "I'm so angry right now!");
+    const dominant = await SomaticStateService.getDominantEmotion(AGENT);
+    expect(dominant.emotion).toBe("anger");
+    expect(dominant.intensity).toBeGreaterThan(0);
   });
 
   it("handles multiple keyword categories in one message", async () => {
-    await SomaticStateService.setStatLevel(AGENT, "hunger", 50);
-    await SomaticStateService.setStatLevel(AGENT, "thirst", 50);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 50);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "thirst", 50);
     await SomaticStateService.adaptFromMessage(AGENT, "I brought pizza and water for the party 🍕💧");
-    expect(await SomaticStateService.getStatLevel(AGENT, "hunger")).toBeLessThan(50);
-    expect(await SomaticStateService.getStatLevel(AGENT, "thirst")).toBeLessThan(50);
+    expect(await SomaticStateService.getPhysicalStatLevel(AGENT, "hunger")).toBeLessThan(50);
+    expect(await SomaticStateService.getPhysicalStatLevel(AGENT, "thirst")).toBeLessThan(50);
   });
 });
 
@@ -320,11 +543,17 @@ describe("SomaticStateService — renderSystemMessage", () => {
     }
   });
 
-  it("returns a markdown header with all stat categories", async () => {
+  it("returns the emotion behavioral override directive", async () => {
     const message = await SomaticStateService.renderSystemMessage(AGENT);
     expect(message).not.toBeNull();
-    expect(message).toContain("# Your Current Physical & Emotional State");
-    expect(message).toContain("Mood:");
+    expect(message).toContain("ACTIVE MOOD STATE");
+    expect(message).toContain("NEUTRAL");
+    expect(message).toContain("MOOD OVERRIDE");
+  });
+
+  it("includes physical stat section with correct labels", async () => {
+    const message = await SomaticStateService.renderSystemMessage(AGENT);
+    expect(message).toContain("Your Current Physical State");
     expect(message).toContain("Hunger:");
     expect(message).toContain("Thirst:");
     expect(message).toContain("Energy:");
@@ -336,19 +565,29 @@ describe("SomaticStateService — renderSystemMessage", () => {
 
   it("includes human-readable labels in the output", async () => {
     const message = await SomaticStateService.renderSystemMessage(AGENT);
-    expect(message).toContain("Neutral");
     expect(message).toContain("Satisfied");
     expect(message).toContain("Energized");
     expect(message).toContain("Sober");
     expect(message).toContain("Healthy");
   });
 
-  it("updates the rendered message after stat changes", async () => {
-    await SomaticStateService.setStatLevel(AGENT, "mood", -10);
-    await SomaticStateService.setStatLevel(AGENT, "alcohol", 8);
+  it("shows correct max values per stat", async () => {
     const message = await SomaticStateService.renderSystemMessage(AGENT);
-    expect(message).toContain("Enraged");
-    expect(message).toContain("Wasted");
+    expect(message).toContain("0/100");
+    expect(message).toContain("100/100");
+    expect(message).toContain("0/10");
+  });
+
+  it("updates emotion section after addEmotion", async () => {
+    await SomaticStateService.addEmotion(AGENT, "anger", 50);
+    const message = await SomaticStateService.renderSystemMessage(AGENT);
+    expect(message).toContain("ANGER");
+    expect(message).toContain("VOLCANIC FURY");
+  });
+
+  it("includes intensity bracket labels", async () => {
+    const message = await SomaticStateService.renderSystemMessage(AGENT);
+    expect(message).toMatch(/MILD|MODERATE|STRONG|OVERWHELMING/);
   });
 });
 
@@ -379,7 +618,7 @@ describe("SomaticStateService — agent lifecycle", () => {
   it("destroyAgent persists state before clearing", async () => {
     mockFindOne.mockResolvedValue(null);
     mockUpdateOne.mockClear();
-    await SomaticStateService.setStatLevel("PERSIST_AGENT", "mood", 5);
+    await SomaticStateService.addEmotion("PERSIST_AGENT", "joy", 20);
     await SomaticStateService.destroyAgent("PERSIST_AGENT");
     expect(mockUpdateOne).toHaveBeenCalled();
   });
@@ -409,23 +648,35 @@ describe("SomaticStateService — per-agent isolation", () => {
     }
   });
 
-  it("two agents have completely independent state", async () => {
+  it("two agents have completely independent physical state", async () => {
     mockFindOne.mockResolvedValue(null);
-    await SomaticStateService.setStatLevel("ISO_A", "mood", 10);
-    await SomaticStateService.setStatLevel("ISO_B", "mood", -10);
+    await SomaticStateService.setPhysicalStatLevel("ISO_A", "hunger", 80);
+    await SomaticStateService.setPhysicalStatLevel("ISO_B", "hunger", 10);
 
-    expect(await SomaticStateService.getStatLevel("ISO_A", "mood")).toBe(10);
-    expect(await SomaticStateService.getStatLevel("ISO_B", "mood")).toBe(-10);
+    expect(await SomaticStateService.getPhysicalStatLevel("ISO_A", "hunger")).toBe(80);
+    expect(await SomaticStateService.getPhysicalStatLevel("ISO_B", "hunger")).toBe(10);
+  });
+
+  it("two agents have completely independent emotional state", async () => {
+    mockFindOne.mockResolvedValue(null);
+    await SomaticStateService.addEmotion("ISO_A", "joy", 50);
+    await SomaticStateService.addEmotion("ISO_B", "anger", 50);
+
+    const dominantA = await SomaticStateService.getDominantEmotion("ISO_A");
+    const dominantB = await SomaticStateService.getDominantEmotion("ISO_B");
+
+    expect(dominantA.emotion).toBe("joy");
+    expect(dominantB.emotion).toBe("anger");
   });
 
   it("adaptFromMessage on one agent does not affect another", async () => {
     mockFindOne.mockResolvedValue(null);
-    await SomaticStateService.setStatLevel("ISO_A", "hunger", 50);
-    await SomaticStateService.setStatLevel("ISO_B", "hunger", 50);
+    await SomaticStateService.setPhysicalStatLevel("ISO_A", "hunger", 50);
+    await SomaticStateService.setPhysicalStatLevel("ISO_B", "hunger", 50);
 
     await SomaticStateService.adaptFromMessage("ISO_A", "Eat a massive pizza 🍕");
-    const hungerA = await SomaticStateService.getStatLevel("ISO_A", "hunger");
-    const hungerB = await SomaticStateService.getStatLevel("ISO_B", "hunger");
+    const hungerA = await SomaticStateService.getPhysicalStatLevel("ISO_A", "hunger");
+    const hungerB = await SomaticStateService.getPhysicalStatLevel("ISO_B", "hunger");
 
     expect(hungerA).toBeLessThan(50);
     expect(hungerB).toBe(50);
@@ -456,7 +707,7 @@ describe("SomaticConstants — keyword regex patterns", () => {
     expect(SOMATIC_KEYWORDS.substance.test("hello")).toBe(false);
   });
 
-  it("rest regex does not match 'testing' or 'resting' incorrectly", () => {
+  it("rest regex matches rest-related keywords", () => {
     expect(SOMATIC_KEYWORDS.rest.test("rest")).toBe(true);
     expect(SOMATIC_KEYWORDS.rest.test("sleep")).toBe(true);
   });
@@ -492,56 +743,56 @@ describe("SomaticStateService — label threshold accuracy", () => {
   });
 
   it("hunger labels are correct at boundaries", async () => {
-    await SomaticStateService.setStatLevel(AGENT, "hunger", 0);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 0);
     expect((await SomaticStateService.getSnapshot(AGENT)).hunger.label).toBe("Satisfied");
 
-    await SomaticStateService.setStatLevel(AGENT, "hunger", 39);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 39);
     expect((await SomaticStateService.getSnapshot(AGENT)).hunger.label).toBe("Satisfied");
 
-    await SomaticStateService.setStatLevel(AGENT, "hunger", 40);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 40);
     expect((await SomaticStateService.getSnapshot(AGENT)).hunger.label).toBe("Hungry");
 
-    await SomaticStateService.setStatLevel(AGENT, "hunger", 79);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 79);
     expect((await SomaticStateService.getSnapshot(AGENT)).hunger.label).toBe("Hungry");
 
-    await SomaticStateService.setStatLevel(AGENT, "hunger", 80);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 80);
     expect((await SomaticStateService.getSnapshot(AGENT)).hunger.label).toBe("Starving");
   });
 
   it("energy labels are correct at boundaries", async () => {
-    await SomaticStateService.setStatLevel(AGENT, "energy", 100);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "energy", 100);
     expect((await SomaticStateService.getSnapshot(AGENT)).energy.label).toBe("Energized");
 
-    await SomaticStateService.setStatLevel(AGENT, "energy", 61);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "energy", 61);
     expect((await SomaticStateService.getSnapshot(AGENT)).energy.label).toBe("Energized");
 
-    await SomaticStateService.setStatLevel(AGENT, "energy", 60);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "energy", 60);
     expect((await SomaticStateService.getSnapshot(AGENT)).energy.label).toBe("Tired");
 
-    await SomaticStateService.setStatLevel(AGENT, "energy", 31);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "energy", 31);
     expect((await SomaticStateService.getSnapshot(AGENT)).energy.label).toBe("Tired");
 
-    await SomaticStateService.setStatLevel(AGENT, "energy", 30);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "energy", 30);
     expect((await SomaticStateService.getSnapshot(AGENT)).energy.label).toBe("Exhausted");
 
-    await SomaticStateService.setStatLevel(AGENT, "energy", 0);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "energy", 0);
     expect((await SomaticStateService.getSnapshot(AGENT)).energy.label).toBe("Exhausted");
   });
 
   it("alcohol labels match threshold progression", async () => {
-    await SomaticStateService.setStatLevel(AGENT, "alcohol", 0);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "alcohol", 0);
     expect((await SomaticStateService.getSnapshot(AGENT)).alcohol.label).toBe("Sober");
 
-    await SomaticStateService.setStatLevel(AGENT, "alcohol", 1);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "alcohol", 1);
     expect((await SomaticStateService.getSnapshot(AGENT)).alcohol.label).toBe("Tipsy");
 
-    await SomaticStateService.setStatLevel(AGENT, "alcohol", 4);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "alcohol", 4);
     expect((await SomaticStateService.getSnapshot(AGENT)).alcohol.label).toBe("Drunk");
 
-    await SomaticStateService.setStatLevel(AGENT, "alcohol", 7);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "alcohol", 7);
     expect((await SomaticStateService.getSnapshot(AGENT)).alcohol.label).toBe("Wasted");
 
-    await SomaticStateService.setStatLevel(AGENT, "alcohol", 10);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "alcohol", 10);
     expect((await SomaticStateService.getSnapshot(AGENT)).alcohol.label).toBe("Wasted");
   });
 });

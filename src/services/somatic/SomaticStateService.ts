@@ -1,5 +1,14 @@
 import StatFactory, { type StatInstance } from "./StatFactory.ts";
-import { MOODS, ALCOHOL_DESCRIPTIONS, SOMATIC_KEYWORDS } from "./SomaticConstants.ts";
+import {
+  ALCOHOL_DESCRIPTIONS,
+  SOMATIC_KEYWORDS,
+  VALID_EMOTIONS,
+  EMOTION_BEHAVIOR_PROMPTS,
+  EMOTION_ANALYSIS_SYSTEM_PROMPT,
+  type PrimaryEmotion,
+  type DominantEmotionResult,
+} from "./SomaticConstants.ts";
+import { EmotionalStateEngine, type SerializedEmotionalState } from "./EmotionalStateEngine.ts";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
 import { COLLECTIONS } from "../../constants.ts";
@@ -11,8 +20,16 @@ interface SomaticStatEntry {
   name?: string;
 }
 
+interface EmotionSnapshotEntry {
+  dominant: string;
+  intensity: number;
+  all: Record<PrimaryEmotion, number>;
+  isDyad?: boolean;
+  components?: string[];
+}
+
 interface SomaticSnapshot {
-  mood: SomaticStatEntry;
+  emotion: EmotionSnapshotEntry;
   hunger: SomaticStatEntry;
   thirst: SomaticStatEntry;
   energy: SomaticStatEntry;
@@ -23,7 +40,7 @@ interface SomaticSnapshot {
 }
 
 interface SomaticLevels {
-  mood: number;
+  emotionalState?: SerializedEmotionalState;
   hunger: number;
   thirst: number;
   energy: number;
@@ -33,8 +50,10 @@ interface SomaticLevels {
   bathroom: number;
 }
 
+type PhysicalStatName = "hunger" | "thirst" | "energy" | "sickness" | "alcohol" | "substance" | "bathroom";
+
 interface AgentSomaticState {
-  mood: StatInstance;
+  emotionalState: EmotionalStateEngine;
   hunger: StatInstance;
   thirst: StatInstance;
   energy: StatInstance;
@@ -46,8 +65,12 @@ interface AgentSomaticState {
   isDirty: boolean;
 }
 
-const STAT_NAMES: (keyof SomaticSnapshot)[] = [
-  "mood", "hunger", "thirst", "energy", "sickness", "alcohol", "substance", "bathroom",
+const PHYSICAL_STAT_NAMES: PhysicalStatName[] = [
+  "hunger", "thirst", "energy", "sickness", "alcohol", "substance", "bathroom",
+];
+
+const STAT_NAMES: string[] = [
+  "emotion", ...PHYSICAL_STAT_NAMES,
 ];
 
 const HUNGER_LABELS: [number, string][] = [[80, "Starving"], [40, "Hungry"], [0, "Satisfied"]];
@@ -56,6 +79,16 @@ const SICKNESS_LABELS: [number, string][] = [[70, "Severely Ill"], [30, "Nauseou
 const ALCOHOL_LABELS: [number, string][] = [[7, "Wasted"], [4, "Drunk"], [1, "Tipsy"], [0, "Sober"]];
 const SUBSTANCE_LABELS: [number, string][] = [[7, "Tripping / Stoned"], [4, "High / Baked"], [1, "Buzzed / Elevated"], [0, "Sober"]];
 const BATHROOM_LABELS: [number, string][] = [[80, "Needs to use restroom urgently"], [40, "Needs to pee"], [0, "Fine"]];
+
+const STAT_MAX_VALUES: Record<PhysicalStatName, number> = {
+  hunger: 100,
+  thirst: 100,
+  energy: 100,
+  sickness: 100,
+  alcohol: 10,
+  substance: 10,
+  bathroom: 100,
+};
 
 function resolveLabelDescending(level: number, thresholds: [number, string][]): string {
   for (const [threshold, label] of thresholds) {
@@ -76,8 +109,12 @@ const PERSIST_INTERVAL_MILLISECONDS = 60_000;
 const agentStates = new Map<string, AgentSomaticState>();
 
 function createStatInstances(levels?: Partial<SomaticLevels>): Omit<AgentSomaticState, "decayIntervalId" | "isDirty"> {
+  const emotionalState = levels?.emotionalState
+    ? EmotionalStateEngine.deserialize(levels.emotionalState)
+    : new EmotionalStateEngine();
+
   return {
-    mood: StatFactory.create("mood", { min: -10, max: 10, initial: levels?.mood ?? 0 }),
+    emotionalState,
     hunger: StatFactory.create("hunger", { min: 0, max: 100, initial: levels?.hunger ?? 0 }),
     thirst: StatFactory.create("thirst", { min: 0, max: 100, initial: levels?.thirst ?? 0 }),
     energy: StatFactory.create("energy", { min: 0, max: 100, initial: levels?.energy ?? 100 }),
@@ -88,9 +125,8 @@ function createStatInstances(levels?: Partial<SomaticLevels>): Omit<AgentSomatic
   };
 }
 
-function getLevelsFromState(state: AgentSomaticState): SomaticLevels {
+function getPhysicalLevelsFromState(state: AgentSomaticState): Omit<SomaticLevels, "emotionalState"> {
   return {
-    mood: state.mood.getLevel(),
     hunger: state.hunger.getLevel(),
     thirst: state.thirst.getLevel(),
     energy: state.energy.getLevel(),
@@ -109,6 +145,8 @@ function applyPassiveDecay(state: AgentSomaticState): void {
   if (state.alcohol.getLevel() > 0) state.alcohol.decrease();
   if (state.substance.getLevel() > 0) state.substance.decrease();
   if (state.sickness.getLevel() > 0) state.sickness.setLevel(state.sickness.getLevel() - 5);
+
+  state.emotionalState.decay();
 
   state.isDirty = true;
 }
@@ -149,16 +187,20 @@ async function persistToDatabase(agentId: string, state: AgentSomaticState): Pro
     const collection = getCollection();
     if (!collection) return;
 
-    const levels = getLevelsFromState(state);
-    const moodEntry = MOODS.find((entry) => entry.level === levels.mood);
+    const dominantEmotion = state.emotionalState.getDominantEmotion();
+
+    const levels: SomaticLevels = {
+      emotionalState: state.emotionalState.serialize(),
+      ...getPhysicalLevelsFromState(state),
+    };
 
     await collection.updateOne(
       { agentId },
       {
         $set: {
           levels,
-          moodName: moodEntry?.name || "Unknown",
-          moodEmoji: moodEntry?.emoji || "😑",
+          dominantEmotion: dominantEmotion.emotion,
+          emotionIntensity: Math.round(dominantEmotion.intensity),
           updatedAt: new Date().toISOString(),
         },
         $setOnInsert: {
@@ -203,7 +245,6 @@ async function ensureState(agentId: string): Promise<AgentSomaticState> {
   return state;
 }
 
-// Periodic persistence — flushes dirty states to MongoDB
 let persistIntervalId: ReturnType<typeof setInterval> | null = null;
 
 function startPersistenceLoop(): void {
@@ -218,6 +259,38 @@ function startPersistenceLoop(): void {
   logger.info(`[SomaticStateService] Persistence loop started (interval: ${PERSIST_INTERVAL_MILLISECONDS / 1000}s)`);
 }
 
+async function analyzeEmotionFromText(text: string): Promise<PrimaryEmotion | "neutral"> {
+  try {
+    const { getProvider } = await import("../../providers/index.ts");
+
+    const provider = getProvider("anthropic");
+    const systemPrompt = EMOTION_ANALYSIS_SYSTEM_PROMPT(VALID_EMOTIONS.join(", "));
+
+    const result = await provider.generateText(
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: text },
+      ],
+      "claude-haiku-4-5-20250414",
+      { maxTokens: 10, temperature: 0 },
+    );
+
+    const cleanedEmotion = (result?.text || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z]/g, "");
+
+    if (VALID_EMOTIONS.includes(cleanedEmotion)) {
+      return cleanedEmotion as PrimaryEmotion | "neutral";
+    }
+
+    return "neutral";
+  } catch (error: unknown) {
+    logger.warn(`[SomaticStateService] Emotion analysis failed: ${(error as Error).message}`);
+    return "neutral";
+  }
+}
+
 const SomaticStateService = {
   initialize(): void {
     startPersistenceLoop();
@@ -225,10 +298,15 @@ const SomaticStateService = {
 
   async getSnapshot(agentId: string): Promise<SomaticSnapshot> {
     const state = await ensureState(agentId);
+    const dominantEmotion = state.emotionalState.getDominantEmotion();
+
     return {
-      mood: {
-        level: state.mood.getLevel(),
-        name: MOODS.find((moodEntry) => moodEntry.level === state.mood.getLevel())?.name || "Unknown",
+      emotion: {
+        dominant: dominantEmotion.emotion,
+        intensity: Math.round(dominantEmotion.intensity),
+        all: dominantEmotion.all,
+        isDyad: dominantEmotion.isDyad,
+        components: dominantEmotion.components,
       },
       hunger: {
         level: state.hunger.getLevel(),
@@ -261,12 +339,12 @@ const SomaticStateService = {
     };
   },
 
-  async getStatLevel(agentId: string, statName: keyof SomaticSnapshot): Promise<number> {
+  async getPhysicalStatLevel(agentId: string, statName: PhysicalStatName): Promise<number> {
     const state = await ensureState(agentId);
     return state[statName].getLevel();
   },
 
-  async setStatLevel(agentId: string, statName: keyof SomaticSnapshot, level: number): Promise<number> {
+  async setPhysicalStatLevel(agentId: string, statName: PhysicalStatName, level: number): Promise<number> {
     const state = await ensureState(agentId);
     const result = state[statName].setLevel(level);
     state.isDirty = true;
@@ -274,30 +352,70 @@ const SomaticStateService = {
     return result;
   },
 
-  async increaseStat(agentId: string, statName: keyof SomaticSnapshot, multiplier: number = 1): Promise<number> {
+  async increasePhysicalStat(agentId: string, statName: PhysicalStatName, multiplier: number = 1): Promise<number> {
     const state = await ensureState(agentId);
     const result = state[statName].increase(multiplier);
     state.isDirty = true;
     return result;
   },
 
-  async decreaseStat(agentId: string, statName: keyof SomaticSnapshot, multiplier: number = 1): Promise<number> {
+  async decreasePhysicalStat(agentId: string, statName: PhysicalStatName, multiplier: number = 1): Promise<number> {
     const state = await ensureState(agentId);
     const result = state[statName].decrease(multiplier);
     state.isDirty = true;
     return result;
   },
 
-  async getMoodName(agentId: string): Promise<string> {
-    const state = await ensureState(agentId);
-    const moodEntry = MOODS.find((entry) => entry.level === state.mood.getLevel());
-    return moodEntry?.name || "Unknown";
+  // Legacy compatibility aliases
+  async getStatLevel(agentId: string, statName: string): Promise<number> {
+    if (statName === "mood" || statName === "emotion") {
+      const state = await ensureState(agentId);
+      return Math.round(state.emotionalState.getDominantEmotion().intensity);
+    }
+    return this.getPhysicalStatLevel(agentId, statName as PhysicalStatName);
   },
 
-  async getMoodDescription(agentId: string): Promise<string> {
+  async setStatLevel(agentId: string, statName: string, level: number): Promise<number> {
+    if (statName === "mood" || statName === "emotion") {
+      // For backward compat — setting "mood" directly no longer makes sense
+      // with Plutchik, but we avoid crashing. No-op with a warning.
+      logger.warn(`[SomaticStateService] setStatLevel("${statName}") is deprecated. Use addEmotion() instead.`);
+      return level;
+    }
+    return this.setPhysicalStatLevel(agentId, statName as PhysicalStatName, level);
+  },
+
+  async increaseStat(agentId: string, statName: string, multiplier: number = 1): Promise<number> {
+    if (statName === "mood" || statName === "emotion") {
+      logger.warn(`[SomaticStateService] increaseStat("${statName}") is deprecated. Use addEmotion() instead.`);
+      return 0;
+    }
+    return this.increasePhysicalStat(agentId, statName as PhysicalStatName, multiplier);
+  },
+
+  async decreaseStat(agentId: string, statName: string, multiplier: number = 1): Promise<number> {
+    if (statName === "mood" || statName === "emotion") {
+      logger.warn(`[SomaticStateService] decreaseStat("${statName}") is deprecated. Use addEmotion() instead.`);
+      return 0;
+    }
+    return this.decreasePhysicalStat(agentId, statName as PhysicalStatName, multiplier);
+  },
+
+  async addEmotion(agentId: string, emotion: PrimaryEmotion, intensity: number = 20): Promise<DominantEmotionResult> {
     const state = await ensureState(agentId);
-    const moodEntry = MOODS.find((entry) => entry.level === state.mood.getLevel());
-    return moodEntry?.description || "";
+    state.emotionalState.addEmotion(emotion, intensity);
+    state.isDirty = true;
+    return state.emotionalState.getDominantEmotion();
+  },
+
+  async getDominantEmotion(agentId: string): Promise<DominantEmotionResult> {
+    const state = await ensureState(agentId);
+    return state.emotionalState.getDominantEmotion();
+  },
+
+  async getEmotionBehaviorPrompt(agentId: string): Promise<string> {
+    const dominant = await this.getDominantEmotion(agentId);
+    return EMOTION_BEHAVIOR_PROMPTS[dominant.emotion] || EMOTION_BEHAVIOR_PROMPTS["neutral"];
   },
 
   async getAlcoholSystemPrompt(agentId: string): Promise<string> {
@@ -316,6 +434,13 @@ const SomaticStateService = {
     const cleanText = text.toLowerCase();
 
     applyHomeostaticDrift(state);
+
+    // LLM-based emotion analysis — detect user emotion and feed the Plutchik wheel
+    const detectedEmotion = await analyzeEmotionFromText(text);
+    if (detectedEmotion !== "neutral") {
+      state.emotionalState.processInteraction(detectedEmotion);
+      logger.debug(`[SomaticStateService] 🎭 Detected emotion "${detectedEmotion}" for "${agentId}" → dominant: ${state.emotionalState.getDominantEmotion().emotion}`);
+    }
 
     if (SOMATIC_KEYWORDS.food.test(cleanText)) {
       state.hunger.decrease();
@@ -364,15 +489,55 @@ const SomaticStateService = {
 
   async renderSystemMessage(agentId: string): Promise<string | null> {
     const snapshot = await this.getSnapshot(agentId);
-    const entries = Object.entries(snapshot);
-    if (entries.length === 0) return null;
+    const dominantEmotion = snapshot.emotion;
 
-    let block = `# Your Current Physical & Emotional State`;
-    for (const [key, state] of entries) {
-      const typedState = state as SomaticStatEntry;
-      const display = typedState.label || typedState.name || `Level ${typedState.level}`;
-      block += `\n- ${key.charAt(0).toUpperCase() + key.slice(1)}: ${display} (${typedState.level}/100)`;
+    const intensityBracket = dominantEmotion.intensity >= 75
+      ? "OVERWHELMING"
+      : dominantEmotion.intensity >= 50
+        ? "STRONG"
+        : dominantEmotion.intensity >= 25
+          ? "MODERATE"
+          : "MILD";
+
+    const behaviorPrompt = EMOTION_BEHAVIOR_PROMPTS[dominantEmotion.dominant] || EMOTION_BEHAVIOR_PROMPTS["neutral"];
+
+    const emotionDetailsLines = Object.entries(dominantEmotion.all)
+      .map(([emotionName, value]) => `  - ${emotionName.charAt(0).toUpperCase() + emotionName.slice(1)}: ${Math.round(value)}/100`)
+      .join("\n");
+
+    let block = `# ⚡ ACTIVE MOOD STATE — THIS IS YOUR PRIMARY DIRECTIVE ⚡
+## Your current mood is: ${dominantEmotion.dominant.toUpperCase()} at ${intensityBracket} intensity (${Math.round(dominantEmotion.intensity)}/100)
+## THIS MOOD COMPLETELY DEFINES HOW YOU SPEAK, THINK, AND BEHAVE RIGHT NOW.
+## Every word you say MUST be filtered through this emotional lens.
+
+${behaviorPrompt}
+
+## Emotional Spectrum (your full internal state):
+${emotionDetailsLines}
+
+## Mood Intensity Rules:
+- At MILD intensity (0-25): The mood colors your default personality with an emotional lean.
+- At MODERATE intensity (25-50): The mood is clearly affecting you. Tone, word choice, and behavior shift noticeably.
+- At STRONG intensity (50-75): The mood DOMINATES. You can barely contain it. It bleeds into every sentence.
+- At OVERWHELMING intensity (75-100): You ARE this emotion. Nothing else exists. Fully consumed.`;
+
+    block += `\n\n# Your Current Physical State`;
+
+    const physicalStats: [string, SomaticStatEntry, number][] = [
+      ["Hunger", snapshot.hunger, STAT_MAX_VALUES.hunger],
+      ["Thirst", snapshot.thirst, STAT_MAX_VALUES.thirst],
+      ["Energy", snapshot.energy, STAT_MAX_VALUES.energy],
+      ["Sickness", snapshot.sickness, STAT_MAX_VALUES.sickness],
+      ["Alcohol", snapshot.alcohol, STAT_MAX_VALUES.alcohol],
+      ["Substance", snapshot.substance, STAT_MAX_VALUES.substance],
+      ["Bathroom", snapshot.bathroom, STAT_MAX_VALUES.bathroom],
+    ];
+
+    for (const [statName, statState, maxValue] of physicalStats) {
+      const display = statState.label || statState.name || `Level ${statState.level}`;
+      block += `\n- ${statName}: ${display} (${statState.level}/${maxValue})`;
     }
+
     return block;
   },
 
@@ -404,5 +569,5 @@ const SomaticStateService = {
 };
 
 export default SomaticStateService;
-export { STAT_NAMES };
-export type { SomaticSnapshot, SomaticStatEntry, SomaticLevels };
+export { STAT_NAMES, PHYSICAL_STAT_NAMES };
+export type { SomaticSnapshot, SomaticStatEntry, SomaticLevels, PhysicalStatName, EmotionSnapshotEntry };
