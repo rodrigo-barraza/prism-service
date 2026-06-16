@@ -80,28 +80,33 @@ function getCollectionOpts(project: string | null | undefined) {
  */
 export function swapMessageContent(message: MessagePayload) {
   if (message.role === "user" && typeof message.content === "string") {
-    if (message.rawContent?.startsWith("[System Context]") || message.rawContent?.startsWith("[System Context - Local Time:")) {
+    if (
+      message.rawContent?.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT) ||
+      message.rawContent?.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX)
+    ) {
       return;
     }
     if (message.rawContent) {
       const dirty = message.content;
       message.content = message.rawContent;
       message.rawContent = dirty;
-    } else if (message.content.startsWith("[System Context]")) {
+    } else if (message.content.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT)) {
       const dirty = message.content;
       let clean = message.content;
-      const splitIndex = message.content.indexOf("\n\n[User Message]\n");
+      const splitDelimiter = "\n\n" + PROMPT_DELIMITERS.USER_MESSAGE + "\n";
+      const splitIndex = message.content.indexOf(splitDelimiter);
       if (splitIndex !== -1) {
-        clean = message.content.substring(splitIndex + "\n\n[User Message]\n".length);
+        clean = message.content.substring(splitIndex + splitDelimiter.length);
       } else {
-        const altSplit = message.content.indexOf("[User Message]\n");
+        const altDelimiter = PROMPT_DELIMITERS.USER_MESSAGE + "\n";
+        const altSplit = message.content.indexOf(altDelimiter);
         if (altSplit !== -1) {
-          clean = message.content.substring(altSplit + "[User Message]\n".length);
+          clean = message.content.substring(altSplit + altDelimiter.length);
         }
       }
       message.content = clean;
       message.rawContent = dirty;
-    } else if (message.content.startsWith("[System Context - Local Time:")) {
+    } else if (message.content.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX)) {
       const dirty = message.content;
       let clean = message.content;
       const index = message.content.indexOf("]\n\n");

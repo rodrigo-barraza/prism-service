@@ -6,7 +6,7 @@ import {
   MOCK_GENERATE_TEXT_STREAM,
 } from "./setup.ts";
 import { calculateTextCost } from "../src/utils/CostCalculator.ts";
-import { TYPES, getPricing } from "../src/config.ts";
+import { TYPES, getPricing, MODELS } from "../src/config.ts";
 import { PROVIDERS } from "../src/constants.ts";
 
 
@@ -310,8 +310,8 @@ function sendChat(payload) {
 // 1. OpenAI — GPT-5 Nano (cheapest FC model)
 // ═══════════════════════════════════════════════════════════════
 
-describe("Token/Cost Accuracy — OpenAI gpt-5-nano", () => {
-  const MODEL = "gpt-5-nano";
+describe(`Token/Cost Accuracy — OpenAI ${MODELS.GPT_5_NANO.name}`, () => {
+  const MODEL = MODELS.GPT_5_NANO.name;
   const PROVIDER = PROVIDERS.OPENAI;
 
   beforeEach(() => {
@@ -392,8 +392,8 @@ describe("Token/Cost Accuracy — OpenAI gpt-5-nano", () => {
 // 2. Anthropic — Haiku 4.5 (cheapest FC model)
 // ═══════════════════════════════════════════════════════════════
 
-describe("Token/Cost Accuracy — Anthropic haiku-4.5", () => {
-  const MODEL = "claude-haiku-4-5-20251001";
+describe(`Token/Cost Accuracy — Anthropic ${MODELS.HAIKU_45.name}`, () => {
+  const MODEL = MODELS.HAIKU_45.name;
   const PROVIDER = PROVIDERS.ANTHROPIC;
 
   beforeEach(() => {
@@ -547,8 +547,8 @@ describe("Token/Cost Accuracy — Anthropic haiku-4.5", () => {
 // 3. Google — Gemini 3 Flash (cheapest FC model)
 // ═══════════════════════════════════════════════════════════════
 
-describe("Token/Cost Accuracy — Google gemini-3-flash", () => {
-  const MODEL = "gemini-3-flash-preview";
+describe(`Token/Cost Accuracy — Google ${MODELS.GEMINI_3_FLASH.name}`, () => {
+  const MODEL = MODELS.GEMINI_3_FLASH.name;
   const PROVIDER = PROVIDERS.GOOGLE;
 
   beforeEach(() => {
@@ -634,9 +634,9 @@ describe("Cross-provider cost consistency", () => {
 
   it("all providers return estimatedCost as a number (not null) for known models", async () => {
     const cases = [
-      { provider: PROVIDERS.OPENAI, model: "gpt-5-nano" },
-      { provider: PROVIDERS.ANTHROPIC, model: "claude-haiku-4-5-20251001" },
-      { provider: PROVIDERS.GOOGLE, model: "gemini-3-flash-preview" },
+      { provider: PROVIDERS.OPENAI, model: MODELS.GPT_5_NANO.name },
+      { provider: PROVIDERS.ANTHROPIC, model: MODELS.HAIKU_45.name },
+      { provider: PROVIDERS.GOOGLE, model: MODELS.GEMINI_3_FLASH.name },
     ];
 
     for (const { provider, model } of cases) {
@@ -673,7 +673,7 @@ describe("Cross-provider cost consistency", () => {
 
       const res = await sendChat({
         provider: PROVIDERS.OPENAI,
-        model: "gpt-5-nano",
+        model: MODELS.GPT_5_NANO.name,
         messages: [{ role: "user", content: "Scale test" }],
       }).expect(200);
 
@@ -695,7 +695,7 @@ describe("Cross-provider cost consistency", () => {
     });
     const resNoTools = await sendChat({
       provider: PROVIDERS.GOOGLE,
-      model: "gemini-3-flash-preview",
+      model: MODELS.GEMINI_3_FLASH.name,
       messages: [{ role: "user", content: "Hello" }],
     }).expect(200);
 
@@ -706,7 +706,7 @@ describe("Cross-provider cost consistency", () => {
     });
     const resWithTools = await sendChat({
       provider: PROVIDERS.GOOGLE,
-      model: "gemini-3-flash-preview",
+      model: MODELS.GEMINI_3_FLASH.name,
       messages: [{ role: "user", content: "Hello" }],
       tools: SAMPLE_TOOLS,
     }).expect(200);
@@ -736,7 +736,7 @@ describe("Token/Cost edge cases", () => {
 
     const res = await sendChat({
       provider: PROVIDERS.ANTHROPIC,
-      model: "claude-haiku-4-5-20251001",
+      model: MODELS.HAIKU_45.name,
       messages: [{ role: "user", content: "Empty response test" }],
     }).expect(200);
 
@@ -755,7 +755,7 @@ describe("Token/Cost edge cases", () => {
 
     const res = await sendChat({
       provider: PROVIDERS.OPENAI,
-      model: "gpt-5-nano",
+      model: MODELS.GPT_5_NANO.name,
       messages: [{ role: "user", content: "Max context" }],
     }).expect(200);
 
@@ -777,7 +777,7 @@ describe("Token/Cost edge cases", () => {
 
     const res = await sendChat({
       provider: PROVIDERS.ANTHROPIC,
-      model: "claude-haiku-4-5-20251001",
+      model: MODELS.HAIKU_45.name,
       messages: [{ role: "user", content: "Cache test" }],
     }).expect(200);
 
@@ -790,7 +790,7 @@ describe("Token/Cost edge cases", () => {
     });
 
     // Verify cost includes all cache tiers
-    const expected = expectedCost("claude-haiku-4-5-20251001", usage);
+    const expected = expectedCost(MODELS.HAIKU_45.name, usage);
     expect(res.body.estimatedCost).toBeCloseTo(expected, 8);
 
     // Manual:
