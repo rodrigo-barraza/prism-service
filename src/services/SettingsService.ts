@@ -40,6 +40,11 @@ interface SettingsData {
     speechToTextProvider?: string;
     speechToTextModel?: string;
   };
+  somatic?: {
+    emotionProvider: string;
+    emotionModel: string;
+    [key: string]: string;
+  };
   [key: string]: unknown;
 }
 
@@ -73,6 +78,10 @@ const DEFAULTS: SettingsData = {
     textToSpeechModel: "",
     speechToTextProvider: PROVIDERS.OPENAI,
     speechToTextModel: "",
+  },
+  somatic: {
+    emotionProvider: "",
+    emotionModel: "",
   },
 };
 
@@ -162,6 +171,17 @@ const SettingsService = {
     }
     return { provider, model };
   },
+
+  async getSomaticModelConfig() {
+    const somaticSettings = await this.getSection("somatic");
+    const provider = somaticSettings?.emotionProvider;
+    const model = somaticSettings?.emotionModel;
+    if (!provider || !model) {
+      return null;
+    }
+    return { provider, model };
+  },
+
   invalidateCache() {
     _cache = null;
   },
