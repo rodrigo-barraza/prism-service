@@ -198,7 +198,7 @@ export default class CompactionService {
 
     try {
       const provider = getProvider(compactionProvider);
-      result = await provider.generateText(summarizationMessages, compactionModel, {
+      result = await provider.generateText(summarizationMessages as any, compactionModel, {
         maxTokens: COMPACT_MAX_OUTPUT_TOKENS,
         temperature: 0.1,
       });

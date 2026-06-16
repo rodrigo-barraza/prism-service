@@ -434,7 +434,7 @@ router.patch(
         .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
         .updateOne(
           { id: conversationId, project, username },
-          { $set: setFields }
+          { $set: setFields as any }
         );
 
       if (result.matchedCount > 0) {
@@ -449,7 +449,7 @@ router.patch(
         .collection(COLLECTIONS.AGENT_CONVERSATIONS)
         .updateOne(
           { id: conversationId, project, username },
-          { $set: setFields }
+          { $set: setFields as any }
         );
 
       if (result.matchedCount > 0) {

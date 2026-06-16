@@ -329,7 +329,7 @@ function buildNativeInput(messages: PreparedMessage[]) {
 }
 import { AGENT_IDS, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-interface LmStudioProvider extends Provider {
+export interface LmStudioProvider extends Provider {
   listModels(): Promise<{
     models: Array<{
       key: string;
@@ -346,10 +346,10 @@ interface LmStudioProvider extends Provider {
       [key: string]: unknown;
     }>;
   }>;
-  loadModel(model: string, options?: ProviderOptions, signal?: AbortSignal): Promise<unknown>;
-  unloadModel(instanceId: string): Promise<unknown>;
-  unloadModelByKey(modelKey: string): Promise<unknown>;
-  ensureModelLoaded(modelKey: string, options?: ProviderOptions, signal?: AbortSignal, onStatus?: (status: string) => void): Promise<unknown>;
+  loadModel(model: string, options?: ProviderOptions, signal?: AbortSignal): Promise<any>;
+  unloadModel(instanceId: string): Promise<any>;
+  unloadModelByKey(modelKey: string): Promise<any>;
+  ensureModelLoaded(modelKey: string, options?: ProviderOptions, signal?: AbortSignal, onStatus?: (status: string) => void): Promise<any>;
   _streamOpenAICompat(prepared: PreparedMessage[], model: string, options: ProviderOptions, baseUrl: string): AsyncGenerator<StreamChunk, void, unknown>;
 }
 

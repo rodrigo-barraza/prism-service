@@ -234,7 +234,7 @@ export default class MemoryExtractor {
       let extractionError: string | null = null;
 
       try {
-        result = await provider.generateText(aiMessages, extractionModel, {
+        result = await provider.generateText(aiMessages as any, extractionModel, {
           maxTokens: 1000,
           temperature: 0.1,
         });

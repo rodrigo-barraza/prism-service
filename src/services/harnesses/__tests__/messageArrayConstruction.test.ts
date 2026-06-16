@@ -45,7 +45,7 @@ function computeNewTurnMessages(
   originalMessages: ConversationMessage[],
   currentMessages: ConversationMessage[],
   originalMessageCount: number,
-): ConversationMessage[] {
+): any[] {
   return computeNewTurnMessagesReal(originalMessages, currentMessages, originalMessageCount);
 }
 
@@ -2348,7 +2348,7 @@ describe("Message Array Construction", () => {
         (message) =>
           message.role === "assistant" &&
           message.toolCalls?.some(
-            (toolCall) => toolCall.name === "enable_tools",
+            (toolCall: any) => toolCall.name === "enable_tools",
           ),
       );
       expect(enableToolsCalls).toHaveLength(0);
@@ -2838,7 +2838,7 @@ describe("Message Array Construction", () => {
         (message) =>
           message.role === "assistant" &&
           message.toolCalls?.some(
-            (toolCall) => toolCall.name === "run_command",
+            (toolCall: any) => toolCall.name === "run_command",
           ),
       );
       expect(successfulToolCall).toBeDefined();

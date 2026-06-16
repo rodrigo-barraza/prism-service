@@ -2,6 +2,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { getProvider } from "../../providers/index.ts";
+import type { LmStudioProvider } from "../../providers/lm-studio.ts";
 import { PROVIDERS } from "../../constants.ts";
 import { resolveArchParams, estimateMemory } from "../../utils/gguf-arch.ts";
 import logger from "../../utils/logger.ts";
@@ -14,7 +15,7 @@ router.get(
   "/models",
   asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      const provider = getProvider(PROVIDERS.LM_STUDIO);
+      const provider = getProvider(PROVIDERS.LM_STUDIO) as LmStudioProvider;
       const data = await provider.listModels();
       res.json(data);
     } catch (error: unknown) {
@@ -41,7 +42,7 @@ router.post(
           .json({ error: "Missing 'model' in request body" });
       }
 
-      const provider = getProvider(PROVIDERS.LM_STUDIO);
+      const provider = getProvider(PROVIDERS.LM_STUDIO) as LmStudioProvider;
 
       const loadOptions: Record<string, unknown> = {};
       if (context_length != null) loadOptions.context_length = context_length;
@@ -80,7 +81,7 @@ router.post(
         });
       }
 
-      const provider = getProvider(PROVIDERS.LM_STUDIO);
+      const provider = getProvider(PROVIDERS.LM_STUDIO) as LmStudioProvider;
       const data = await provider.unloadModel(instance_id);
       res.json(data);
     } catch (error: unknown) {
@@ -108,12 +109,12 @@ router.post(
           .json({ error: "Missing 'model' in request body" });
       }
 
-      const provider = getProvider(PROVIDERS.LM_STUDIO);
+      const provider = getProvider(PROVIDERS.LM_STUDIO) as LmStudioProvider;
       const result = await provider.listModels();
       const allModels = result?.data || result?.models || [];
       const modelData = allModels.find(
         (record: Record<string, unknown>) => record.id === model || record.path === model || record.key === model,
-      );
+      ) as any;
 
       if (!modelData) {
         return res.status(404).json({ error: `Model '${model}' not found` });

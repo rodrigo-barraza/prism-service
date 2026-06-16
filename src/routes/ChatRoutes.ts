@@ -532,7 +532,7 @@ export async function handleConversation(
       }
 
       const useStreaming =
-        context.provider.generateTextStream && (modelDefinition as Record<string, unknown> | null)?.streaming !== false;
+        typeof context.provider.generateTextStream === "function" && (modelDefinition as Record<string, unknown> | null)?.streaming !== false;
       if (useStreaming) {
         await handleStreamingText(fullContext);
       } else {
@@ -761,12 +761,15 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
       allImages.push(...message.images);
     }
   }
-  const result = await provider.generateImage(
+  if (!provider.generateImage) {
+    throw new Error(`Provider "${providerName}" does not support image generation`);
+  }
+  const result = (await provider.generateImage(
     prompt,
     allImages,
     resolvedModel,
     options?.systemPrompt,
-  );
+  )) as any;
   const totalSec = (performance.now() - requestStart) / 1000;
   // Cost calculation
   const imgPricing =
@@ -931,11 +934,11 @@ async function handleStreamingText(context: GenerationContext) {
   );
   const stream =
     (modelDefinition as Record<string, unknown> | null)?.liveAPI && provider.generateTextStreamLive
-      ? provider.generateTextStreamLive(messages, resolvedModel, {
+      ? provider.generateTextStreamLive(messages as any, resolvedModel, {
           ...options,
           signal,
         })
-      : provider.generateTextStream(messages, resolvedModel, {
+      : provider.generateTextStream(messages as any, resolvedModel, {
           ...options,
           signal,
         });
@@ -1071,7 +1074,7 @@ async function handleStreamingText(context: GenerationContext) {
     streamState.thinkingSignature = "";
     streamState.toolCalls.length = 0;
     const followUpStream = provider.generateTextStream(
-      updatedMessages,
+      updatedMessages as any,
       resolvedModel,
       {
         ...options,
@@ -1198,7 +1201,7 @@ async function handleNonStreamingText(context: GenerationContext) {
   }
   const generationStart = performance.now();
   const genResult = await provider.generateText(
-    messages,
+    messages as any,
     resolvedModel,
     options,
   );
@@ -1270,7 +1273,7 @@ async function handleNonStreamingText(context: GenerationContext) {
     thinking: genResult.thinking || "",
     images,
     toolCalls:
-      genResult.toolCalls?.map((toolCall: Record<string, unknown>) => ({
+      genResult.toolCalls?.map((toolCall: any) => ({
         id: toolCall.id || null,
         name: toolCall.name,
         args: toolCall.args || {},
@@ -1285,7 +1288,7 @@ async function handleNonStreamingText(context: GenerationContext) {
     timeToGenerationSec: (generationStart - requestStart) / 1000,
     generationSec: (now - generationStart) / 1000,
     totalSec: (now - requestStart) / 1000,
-    rateLimits: genResult.rateLimits || null,
+    rateLimits: (genResult as any).rateLimits || null,
   });
 }
 // ─── SSE streaming or JSON fallback ─────────────────────────

@@ -558,14 +558,19 @@ async function executeModelNode(
       model: node.modelName,
     });
 
-    // Collect audio stream into a data URL
     const audioChunks: Buffer[] = [];
-    if (result.stream.pipe) {
-      for await (const chunk of result.stream) {
-        audioChunks.push(Buffer.from(chunk));
+    if (!result.stream) {
+      throw new Error("Speech generation returned no stream");
+    }
+    const stream = result.stream;
+    if ("pipe" in stream && typeof (stream as any).pipe === "function") {
+      const nodeStream = stream as import("stream").Readable;
+      for await (const chunk of nodeStream) {
+        audioChunks.push(Buffer.from(chunk as Buffer | Uint8Array));
       }
     } else {
-      const reader = result.stream.getReader();
+      const webStream = stream as ReadableStream<Uint8Array>;
+      const reader = webStream.getReader();
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
