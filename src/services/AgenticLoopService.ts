@@ -66,13 +66,20 @@ export default class AgenticLoopService {
     // 3. Select harness (from request option → persisted settings → default)
     let harnessId = options.harness;
     let topologyId = options.topology;
-    if (!harnessId || !topologyId) {
+    if (!harnessId || !topologyId || options.enableCriticGate === undefined) {
       try {
         const { default: SettingsService } =
           await import("./SettingsService.js");
         const agentSettings = await SettingsService.getSection("agents");
         if (!harnessId) harnessId = agentSettings?.harness || "standard";
         if (!topologyId) topologyId = agentSettings?.topology || DEFAULT_TOPOLOGY;
+
+        // CriticGate: auto-enable from settings when a critic model is configured
+        // and the request didn't explicitly set enableCriticGate.
+        if (options.enableCriticGate === undefined && agentSettings?.criticModel) {
+          options.enableCriticGate = true;
+          options.criticModel = options.criticModel || agentSettings.criticModel;
+        }
       } catch {
         if (!harnessId) harnessId = "standard";
         if (!topologyId) topologyId = DEFAULT_TOPOLOGY;

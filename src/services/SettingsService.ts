@@ -22,6 +22,8 @@ interface SettingsData {
   agents: {
     subAgentProvider: string;
     subAgentModel: string;
+    criticProvider: string;
+    criticModel: string;
     harness: string;
     topology: string;
     dynamicToolActivation: boolean;
@@ -62,6 +64,8 @@ const DEFAULTS: SettingsData = {
   agents: {
     subAgentProvider: "",
     subAgentModel: "",
+    criticProvider: "",
+    criticModel: "",
     harness: "standard",
     topology: DEFAULT_TOPOLOGY,
     dynamicToolActivation: true,
