@@ -204,15 +204,18 @@ function buildGenerateConfig(options: ProviderOptions, modelDefinition: ModelDef
 
   // Thinking config
   const supportsThinking = modelDefinition?.thinking === true;
-  if (
-    supportsThinking &&
-    options.thinkingEnabled !== false
-  ) {
-    config.thinkingConfig = { includeThoughts: true };
-    if (options.thinkingBudget !== undefined && options.thinkingBudget !== "") {
-      config.thinkingConfig.thinkingBudget = parseInt(String(options.thinkingBudget));
-    } else if (options.thinkingLevel && modelDefinition?.thinkingLevels) {
-      config.thinkingConfig.thinkingLevel = options.thinkingLevel as ThinkingLevel;
+  if (supportsThinking) {
+    if (options.thinkingEnabled === false) {
+      // Explicitly disable thinking — omitting thinkingConfig would let the
+      // model default to thinking, silently consuming the output token budget.
+      config.thinkingConfig = { thinkingBudget: 0 };
+    } else {
+      config.thinkingConfig = { includeThoughts: true };
+      if (options.thinkingBudget !== undefined && options.thinkingBudget !== "") {
+        config.thinkingConfig.thinkingBudget = parseInt(String(options.thinkingBudget));
+      } else if (options.thinkingLevel && modelDefinition?.thinkingLevels) {
+        config.thinkingConfig.thinkingLevel = options.thinkingLevel as ThinkingLevel;
+      }
     }
   }
 
