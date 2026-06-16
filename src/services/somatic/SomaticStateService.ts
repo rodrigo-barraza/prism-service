@@ -381,6 +381,26 @@ async function analyzeEmotionFromText(
   return detectedEmotion;
 }
 
+const MESSAGE_CONTENT_TAG_PATTERN = /<message_content>\s*([\s\S]*?)\s*<\/message_content>/gi;
+const DISCORD_MENTION_PATTERN = /<@!?\d+>/g;
+
+function extractMessageContent(formattedText: string): string {
+  const tagMatches = [...formattedText.matchAll(MESSAGE_CONTENT_TAG_PATTERN)];
+
+  if (tagMatches.length > 0) {
+    // Extract content from the last <message_content> tag (the current message,
+    // since earlier tags are replied-to messages in the Discord format)
+    const lastMatchContent = tagMatches[tagMatches.length - 1][1];
+    return lastMatchContent
+      .replace(DISCORD_MENTION_PATTERN, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  // Non-Discord source (prism-client, API) — pass through as-is
+  return formattedText.trim();
+}
+
 const SomaticStateService = {
   initialize(): void {
     startPersistenceLoop();
@@ -521,7 +541,12 @@ const SomaticStateService = {
   async adaptFromMessage(agentId: string, text: string, requestContext: EmotionAnalysisContext = {}): Promise<void> {
     if (!text) return;
     const state = await ensureState(agentId);
-    const cleanText = text.toLowerCase();
+
+    // Extract the actual human message content from Discord-formatted text.
+    // Discord messages arrive wrapped in metadata headers, XML tags, reactions, etc.
+    // The emotion classifier and keyword matching need only the raw user text.
+    const extractedContent = extractMessageContent(text);
+    const cleanText = extractedContent.toLowerCase();
 
     applyHomeostaticDrift(state);
 
@@ -529,7 +554,7 @@ const SomaticStateService = {
     // Uses addEmotion directly instead of processInteraction to avoid double-decay:
     // the 30s setInterval timer already handles continuous decay, so calling
     // decay() again on every message would suppress emotional gains.
-    const detectedEmotion = await analyzeEmotionFromText(agentId, text, requestContext);
+    const detectedEmotion = await analyzeEmotionFromText(agentId, extractedContent, requestContext);
     if (detectedEmotion !== "neutral") {
       state.emotionalState.addEmotion(detectedEmotion as PrimaryEmotion);
       const dominant = state.emotionalState.getDominantEmotion();
