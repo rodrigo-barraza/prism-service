@@ -15,8 +15,8 @@
 // ────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { PROMPT_DELIMITERS } from "../src/constants.ts";
+import { TOOL_NAMES, CORE_ORCHESTRATOR_TOOLS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { PROMPT_DELIMITERS, PROVIDERS } from "../src/constants.ts";
 
 // ── Mock tool schemas (simulates tools-api + coordinator tools) ────────
 
@@ -208,9 +208,12 @@ const codingPersona = {
   id: "CODING",
   name: "Coding",
   type: "coding",
+  project: "coding",
   identity: () => "You are a coding agent.",
   guidelines: "## Coding Guidelines\n- Always read before editing",
+  interactionRules: "",
   toolPolicy: null,
+  capabilities: "General-purpose coding assistant.",
   availableTools: ["*"],
   usesDirectoryTree: true,
   usesCodingGuidelines: true,
@@ -220,9 +223,12 @@ const luposPersona = {
   id: "LUPOS",
   name: "Lupos",
   type: "assistant",
+  project: "lupos",
   identity: () => "You are Lupos, a conversational AI.",
   guidelines: "## Lupos Guidelines\n- Be friendly",
+  interactionRules: "",
   toolPolicy: "## Lupos Tool Policy\n- Use tools wisely",
+  capabilities: "Conversational AI assistant.",
   availableTools: ["domainKey:weather"],
   usesDirectoryTree: false,
   usesCodingGuidelines: false,
@@ -232,9 +238,12 @@ const omniPersona = {
   id: "OMNI",
   name: "Omni",
   type: "coding",
+  project: "omni",
   identity: () => "You are Omni, a full-capability agent.",
   guidelines: "## Omni Guidelines\n- Comprehensive approach",
+  interactionRules: "",
   toolPolicy: null,
+  capabilities: "Full-capability agent.",
   availableTools: ["*"],
   usesDirectoryTree: true,
   usesCodingGuidelines: true,
@@ -257,7 +266,7 @@ vi.mock("../src/services/OrchestratorPrompt.ts", () => ({
   getOrchestratorPromptAddendum: vi.fn(
     () => "## Orchestrator Mode — Multi-Agent Orchestration\n\nMocked coordinator prompt addendum.",
   ),
-  ORCHESTRATOR_ONLY_TOOLS: ["create_team", "send_message", "stop_agent", "get_task_output", "delete_team"],
+  ORCHESTRATOR_ONLY_TOOLS: [...CORE_ORCHESTRATOR_TOOLS],
 }));
 
 // ── Mock SettingsService ─────────────────────────────────────────────
@@ -286,7 +295,7 @@ const MOCK_SETTINGS_SECTIONS: Record<string, Record<string, unknown>> = {
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
-    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     getSection: vi.fn((section: string) =>
       Promise.resolve(MOCK_SETTINGS_SECTIONS[section] || {}),
     ),
@@ -303,12 +312,8 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
 
 // ── Mock config ──────────────────────────────────────────────────────
 
-vi.mock("../../config.ts", () => ({
-  TOOLS_SERVICE_URL: "http://localhost:5590",
-  MONGO_DB_NAME: "prism-test",
-}));
 vi.mock("../config.ts", () => ({
-  TOOLS_SERVICE_URL: "http://localhost:5590",
+  TOOLS_SERVICE_URL: "https://tools.test.rod.dev",
   MONGO_DB_NAME: "prism-test",
 }));
 
@@ -928,11 +933,11 @@ describe("SystemPromptAssembler", () => {
 
     it("includes memory tools in system prompt when all memory models are configured", async () => {
       MOCK_SETTINGS_SECTIONS.memory = {
-        extractionProvider: "openai",
+        extractionProvider: PROVIDERS.OPENAI,
         extractionModel: "gpt-4o",
-        consolidationProvider: "openai",
+        consolidationProvider: PROVIDERS.OPENAI,
         consolidationModel: "gpt-4o",
-        embeddingProvider: "openai",
+        embeddingProvider: PROVIDERS.OPENAI,
         embeddingModel: "text-embedding-3-small",
       };
 
@@ -948,13 +953,13 @@ describe("SystemPromptAssembler", () => {
 
     it("includes creative tools in system prompt when image/vision models are configured", async () => {
       MOCK_SETTINGS_SECTIONS.creative = {
-        imageProvider: "google",
+        imageProvider: PROVIDERS.GOOGLE,
         imageModel: "gemini-image",
-        visionProvider: "google",
+        visionProvider: PROVIDERS.GOOGLE,
         visionModel: "gemini-flash",
-        textToSpeechProvider: "elevenlabs",
+        textToSpeechProvider: PROVIDERS.ELEVENLABS,
         textToSpeechModel: "eleven_turbo_v2",
-        speechToTextProvider: "openai",
+        speechToTextProvider: PROVIDERS.OPENAI,
         speechToTextModel: "whisper-1",
       };
 
@@ -1008,11 +1013,11 @@ describe("SystemPromptAssembler", () => {
 
     it("partially configured memory: only locks off tools missing their specific model", async () => {
       MOCK_SETTINGS_SECTIONS.memory = {
-        extractionProvider: "openai",
+        extractionProvider: PROVIDERS.OPENAI,
         extractionModel: "gpt-4o",
         consolidationProvider: "",
         consolidationModel: "",
-        embeddingProvider: "openai",
+        embeddingProvider: PROVIDERS.OPENAI,
         embeddingModel: "text-embedding-3-small",
       };
 

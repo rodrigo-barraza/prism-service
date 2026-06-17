@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import AgenticLoopService from "../src/services/AgenticLoopService.ts";
 import ContextWindowManager from "../src/utils/ContextWindowManager.ts";
+import SettingsService from "../src/services/SettingsService.ts";
+import { PROVIDERS } from "../src/constants.ts";
 import { TYPES } from "../src/config.ts";
 
 vi.mock("../src/utils/logger.ts", () => ({
@@ -110,11 +112,7 @@ vi.mock("../src/services/system-prompt/index.ts", () => ({
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
-    getCached: vi.fn().mockReturnValue({
-      creative: {
-        textToSpeechProvider: "elevenlabs",
-      } as Partial<Required<ReturnType<typeof import("../src/services/SettingsService.ts").default.getCached>>["creative"]>,
-    } as any),
+    getCached: vi.fn(),
     get: vi.fn().mockResolvedValue({
       agents: {
         harness: "standard",
@@ -151,6 +149,11 @@ describe("AgenticLoopService", () => {
 
   beforeEach(() => {
     emittedEvents = [];
+    (SettingsService.getCached as any).mockReturnValue({
+      creative: {
+        textToSpeechProvider: PROVIDERS.ELEVENLABS,
+      },
+    });
     
     mockProvider = {
       generateTextStream: vi.fn().mockImplementation(async function* () {

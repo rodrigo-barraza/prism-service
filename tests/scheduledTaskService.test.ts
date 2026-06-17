@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 
 // ── Mock config ────────────────────────────────────────────────
 vi.mock("../config.ts", () => ({
   MONGO_DB_NAME: "prism-test",
   getModelByName: vi.fn().mockReturnValue({
     name: "test-model",
-    provider: "google",
+    provider: PROVIDERS.GOOGLE,
     contextLength: 128_000,
   }),
 }));
@@ -80,7 +81,7 @@ const TASK_FIXTURE = {
   username: "rodrigo",
   prompt: "Verify server status",
   agent: "OMNI",
-  provider: "google",
+  provider: PROVIDERS.GOOGLE,
   model: "gemini-3.5-flash",
   scheduleType: "once" as const,
   enabled: true,
@@ -99,7 +100,7 @@ describe("ScheduledTaskService — Tool Configuration & Propagation Tests", () =
       project: "prism-chat",
       prompt: "Verify server status",
       agent: "OMNI",
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
       model: "gemini-3.5-flash",
       scheduleType: "once",
       enabled: true,

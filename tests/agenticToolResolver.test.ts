@@ -9,6 +9,7 @@
 // ────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 
 // ── Mock dependencies ────────────────────────────────────────
 
@@ -550,6 +551,156 @@ describe("AgenticToolResolver — native thinking collision", () => {
       project: "coding",
       username: "anonymous",
       modelDefinition: { thinking: true },
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).not.toContain("think");
+  });
+
+  it("excludes the think tool when modelDefinition has supportsThinking: true", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: { supportsThinking: true },
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).not.toContain("think");
+  });
+
+  it("excludes the think tool when modelDefinition has non-empty thinkingLevels", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: { thinkingLevels: ["minimal", "low", "medium", "high"] },
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).not.toContain("think");
+  });
+
+  it("retains the think tool when modelDefinition has empty thinkingLevels array", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: { thinkingLevels: [] },
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).toContain("think");
+  });
+
+  it("excludes the think tool when modelDefinition tools array includes 'Thinking'", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: { tools: ["Tool Calling", "Thinking", "Web Search"] },
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).not.toContain("think");
+  });
+
+  it("excludes the think tool for LM Studio model with thinking pattern in name (e.g. gemma-4)", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+      providerName: PROVIDERS.LM_STUDIO,
+      resolvedModel: "gemma-4-12b-qat",
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).not.toContain("think");
+  });
+
+  it("excludes the think tool for LM Studio deepseek-r1 model", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+      providerName: PROVIDERS.LM_STUDIO,
+      resolvedModel: "deepseek-r1-0528-qwen3-8b",
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).not.toContain("think");
+  });
+
+  it("excludes the think tool for Ollama qwen3 model", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+      providerName: PROVIDERS.OLLAMA,
+      resolvedModel: "qwen3:14b",
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).not.toContain("think");
+  });
+
+  it("retains the think tool for LM Studio model without thinking pattern (e.g. llama)", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+      providerName: PROVIDERS.LM_STUDIO,
+      resolvedModel: "llama-3.1-8b",
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).toContain("think");
+  });
+
+  it("retains the think tool for non-local provider even with matching model name", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+      providerName: PROVIDERS.OPENAI,
+      resolvedModel: "deepseek-r1-something",
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).toContain("think");
+  });
+
+  it("excludes the think tool when thinkingEnabled option is true (even without modelDefinition)", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: { thinkingEnabled: true },
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
     });
 
     const toolNames = finalTools.map((tool) => tool.name);

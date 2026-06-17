@@ -1674,8 +1674,8 @@ function resolveRecommendedDefault(
 
   // Priority 1–2: Google (Gemini Flash variants)
   const googleResult = tryProvider("google", [
-    "gemini-3.5-flash",
-    "gemini-3-flash-preview",
+    MODELS.GEMINI_35_FLASH.name,
+    MODELS.GEMINI_3_FLASH.name,
   ]);
   if (googleResult) return googleResult;
 
@@ -1705,10 +1705,10 @@ function resolveRecommendedDefault(
 
   // Priority 4–5: OpenAI (Mini/Nano variants)
   const openaiResult = tryProvider("openai", [
-    "gpt-5.4-mini",
-    "gpt-5-mini",
-    "gpt-5.4-nano",
-    "gpt-5-nano",
+    MODELS.GPT_54_MINI.name,
+    MODELS.GPT_5_MINI.name,
+    MODELS.GPT_54_NANO.name,
+    MODELS.GPT_5_NANO.name,
   ]);
   if (openaiResult) return openaiResult;
 

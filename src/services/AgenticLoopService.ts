@@ -48,6 +48,8 @@ export default class AgenticLoopService {
       username,
       modelDefinition: modelDefinition || undefined,
       agentSessionId,
+      providerName: context.providerName,
+      resolvedModel: context.resolvedModel,
     });
 
     // If dynamicEnabledTools is not in ToolContext, populate it with the resolved tools

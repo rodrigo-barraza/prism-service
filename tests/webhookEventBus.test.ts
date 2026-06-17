@@ -322,7 +322,7 @@ describe("WebhookEventBus — event type contract", () => {
   it("should propagate request.created event type", () => {
     WebhookEventBus.emit("request.created", {
       requestId: "req-001",
-      provider: "anthropic",
+      provider: PROVIDERS.ANTHROPIC,
       model: "claude-sonnet-4-20250514",
       agent: "meepo",
       estimatedCost: 0.0234,
@@ -331,7 +331,7 @@ describe("WebhookEventBus — event type contract", () => {
     expect(capturedEvents).toHaveLength(1);
     expect(capturedEvents[0].eventType).toBe("request.created");
     expect(capturedEvents[0].data.requestId).toBe("req-001");
-    expect(capturedEvents[0].data.provider).toBe("anthropic");
+    expect(capturedEvents[0].data.provider).toBe(PROVIDERS.ANTHROPIC);
     expect(capturedEvents[0].data.agent).toBe("meepo");
     expect(capturedEvents[0].data.estimatedCost).toBe(0.0234);
   });
@@ -859,7 +859,7 @@ describe("Webhook subscription — event matching logic", () => {
   it("should match when filter is empty", () => {
     expect(
       matchesFilter(
-        createWebhookEvent({ agent: "meepo", provider: "anthropic" }),
+        createWebhookEvent({ agent: "meepo", provider: PROVIDERS.ANTHROPIC }),
         {},
       ),
     ).toBe(true);
@@ -868,7 +868,7 @@ describe("Webhook subscription — event matching logic", () => {
   it("should match when filter fields match event data", () => {
     expect(
       matchesFilter(
-        createWebhookEvent({ agent: "meepo", provider: "anthropic" }),
+        createWebhookEvent({ agent: "meepo", provider: PROVIDERS.ANTHROPIC }),
         { agent: "meepo" },
       ),
     ).toBe(true);
@@ -877,7 +877,7 @@ describe("Webhook subscription — event matching logic", () => {
   it("should not match when filter fields differ from event data", () => {
     expect(
       matchesFilter(
-        createWebhookEvent({ agent: "meepo", provider: "anthropic" }),
+        createWebhookEvent({ agent: "meepo", provider: PROVIDERS.ANTHROPIC }),
         { agent: "phoenix" },
       ),
     ).toBe(false);
@@ -886,8 +886,8 @@ describe("Webhook subscription — event matching logic", () => {
   it("should match when multiple filter fields all match", () => {
     expect(
       matchesFilter(
-        createWebhookEvent({ agent: "meepo", provider: "anthropic", project: "coding" }),
-        { agent: "meepo", provider: "anthropic" },
+        createWebhookEvent({ agent: "meepo", provider: PROVIDERS.ANTHROPIC, project: "coding" }),
+        { agent: "meepo", provider: PROVIDERS.ANTHROPIC },
       ),
     ).toBe(true);
   });
@@ -895,8 +895,8 @@ describe("Webhook subscription — event matching logic", () => {
   it("should not match when one filter field mismatches", () => {
     expect(
       matchesFilter(
-        createWebhookEvent({ agent: "meepo", provider: "anthropic" }),
-        { agent: "meepo", provider: "google" },
+        createWebhookEvent({ agent: "meepo", provider: PROVIDERS.ANTHROPIC }),
+        { agent: "meepo", provider: PROVIDERS.GOOGLE },
       ),
     ).toBe(false);
   });

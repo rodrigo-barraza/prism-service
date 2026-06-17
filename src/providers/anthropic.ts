@@ -221,7 +221,7 @@ async function prepareMessages(messages: ChatMessage[]) {
               type: "tool_use",
               id: toolCall.id || toolCall.name || `toolCall-${Date.now()}`,
               name: toolCall.name,
-              input: toolCall.args || {},
+              input: (toolCall.args as Record<string, unknown>) || {},
             });
           }
           return {
@@ -368,11 +368,11 @@ async function prepareMessages(messages: ChatMessage[]) {
         const previousBlocks =
           typeof previous.content === "string"
             ? [{ type: "text", text: previous.content }]
-            : previous.content;
+            : previous.content || [];
         const currentBlocks =
           typeof current.content === "string"
             ? [{ type: "text", text: current.content }]
-            : current.content;
+            : current.content || [];
         previous.content = [...previousBlocks, ...currentBlocks];
       }
     } else {

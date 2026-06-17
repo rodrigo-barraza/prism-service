@@ -14,6 +14,7 @@
  *      duplicate content for multi-iteration agentic turns
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 
 // ═══════════════════════════════════════════════════════════════
 // Part 1: finalizeTextGeneration segment attachment logic
@@ -84,7 +85,7 @@ vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
     getCached: vi.fn().mockReturnValue({
       creative: {
-        textToSpeechProvider: "elevenlabs",
+        textToSpeechProvider: PROVIDERS.ELEVENLABS,
       } as Partial<Required<ReturnType<typeof import("../src/services/SettingsService.ts").default.getCached>>["creative"]>,
     } as any),
     get: vi.fn().mockResolvedValue({} as any),

@@ -30,6 +30,7 @@
 // ────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 
 // ── Mock tool schemas ────────────────────────────────────────
 
@@ -165,7 +166,7 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
-    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     getSection: vi.fn().mockResolvedValue({ topology: "hierarchical" }),
   },
 }));

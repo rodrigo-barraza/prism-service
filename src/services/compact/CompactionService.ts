@@ -17,8 +17,8 @@ import {
   extractSummaryFromResponse,
   stripImagesFromMessages,
 } from "./CompactionPrompt.ts";
-import type { ChatMessage } from "../../types/admin.ts";
-import type { GenerateTextResult } from "../../types/provider.ts";
+import type { ChatMessage as AdminChatMessage } from "../../types/admin.ts";
+import type { ChatMessage, GenerateTextResult } from "../../types/provider.ts";
 import type { EmitFunction } from "../harnesses/types.ts";
 
 // ────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ const COMPACT_MAX_OUTPUT_TOKENS = 16_384;
 const MAX_CONSECUTIVE_COMPACT_FAILURES = 3;
 
 export interface CompactionResult {
-  compactedMessages: ChatMessage[];
+  compactedMessages: AdminChatMessage[];
   summaryText: string;
   preCompactTokenCount: number;
   postCompactTokenCount: number;
@@ -78,7 +78,7 @@ interface MemorySettingsSection {
   extractionModel?: string;
 }
 
-function estimateTotalTokens(messages: ChatMessage[]): number {
+function estimateTotalTokens(messages: AdminChatMessage[]): number {
   return messages.reduce((sum, message) => {
     let tokens = 4;
     if (message.content) {
@@ -122,7 +122,7 @@ export default class CompactionService {
    *   4. Builds: [CompactBoundary, SummaryUserMessage, ...recentTail]
    */
   static async compactConversation(
-    messages: ChatMessage[],
+    messages: AdminChatMessage[],
     options: CompactionOptions,
   ): Promise<CompactionResult | null> {
     // ── Circuit breaker ────────────────────────────────────────
@@ -198,7 +198,7 @@ export default class CompactionService {
 
     try {
       const provider = getProvider(compactionProvider);
-      result = await provider.generateText(summarizationMessages as any, compactionModel, {
+      result = await provider.generateText(summarizationMessages, compactionModel, {
         maxTokens: COMPACT_MAX_OUTPUT_TOKENS,
         temperature: 0.1,
       });
@@ -253,7 +253,7 @@ export default class CompactionService {
     // ── Build compacted message array ─────────────────────────
     // Structure: [system prompt, summary as user message, ...recent tail]
     const systemMessage = messages.find((message) => message.role === "system");
-    const compactedMessages: ChatMessage[] = [];
+    const compactedMessages: AdminChatMessage[] = [];
 
     if (systemMessage) {
       compactedMessages.push(systemMessage);
@@ -343,7 +343,7 @@ export default class CompactionService {
  */
 const RECENT_TAIL_TURN_COUNT = 3;
 
-function extractRecentTail(messages: ChatMessage[]): ChatMessage[] {
+function extractRecentTail(messages: AdminChatMessage[]): AdminChatMessage[] {
   // Walk backwards counting user turns
   let userTurnsSeen = 0;
   // Default to 0 so that if the conversation has fewer user turns than

@@ -16,7 +16,7 @@ import {
 import { TYPES, getPricing } from "../config.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import type { ConversationMessage, ToolCall, EmitFunction, AgenticContext } from "./harnesses/types.ts";
-import type { GenerateTextResult } from "../types/provider.ts";
+import type { ChatMessage, GenerateTextResult } from "../types/provider.ts";
 import type { MessagePayload } from "./RequestLogger.ts";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -219,7 +219,7 @@ export default class MemoryExtractor {
         })
         .join("\n");
 
-      const aiMessages: MessagePayload[] = [
+      const aiMessages: ChatMessage[] = [
         { role: "system", content: EXTRACTION_PROMPT },
         {
           role: "user",
@@ -234,7 +234,7 @@ export default class MemoryExtractor {
       let extractionError: string | null = null;
 
       try {
-        result = await provider.generateText(aiMessages as any, extractionModel, {
+        result = await provider.generateText(aiMessages, extractionModel, {
           maxTokens: 1000,
           temperature: 0.1,
         });
@@ -266,7 +266,7 @@ export default class MemoryExtractor {
           model: extractionModel,
           traceId: traceId || null,
           agentSessionId: agentSessionId || null,
-          aiMessages,
+          aiMessages: aiMessages as MessagePayload[],
           resultText: result?.text || "",
           usage: realUsage,
           success,

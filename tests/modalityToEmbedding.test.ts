@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { app, MOCK_GENERATE_EMBEDDING } from "./setup.ts";
+import { PROVIDERS } from "../src/constants.ts";
 
 describe("POST /modality-to-embedding", () => {
     beforeEach(() => {
@@ -26,7 +27,7 @@ describe("POST /modality-to-embedding", () => {
     it("returns 400 when no content inputs provided", async () => {
         const res = await request(app)
             .post("/embed")
-            .send({ provider: "google" })
+            .send({ provider: PROVIDERS.GOOGLE })
             .expect(400);
 
         expect(res.body).toHaveProperty("error", true);
@@ -38,33 +39,33 @@ describe("POST /modality-to-embedding", () => {
     it("returns 200 with text-only input", async () => {
         const res = await request(app)
             .post("/embed")
-            .send({ provider: "google", text: "What is the meaning of life?" })
+            .send({ provider: PROVIDERS.GOOGLE, text: "What is the meaning of life?" })
             .expect(200);
 
         expect(res.body).toHaveProperty("embedding");
         expect(Array.isArray(res.body.embedding)).toBe(true);
         expect(res.body).toHaveProperty("dimensions", 3);
-        expect(res.body).toHaveProperty("provider", "google");
+        expect(res.body).toHaveProperty("provider", PROVIDERS.GOOGLE);
     });
 
     it("returns 200 with image input", async () => {
         const res = await request(app)
             .post("/embed")
             .send({
-                provider: "google",
+                provider: PROVIDERS.GOOGLE,
                 images: ["data:image/png;base64,iVBORw0KGgo="],
             })
             .expect(200);
 
         expect(res.body).toHaveProperty("embedding");
-        expect(res.body).toHaveProperty("provider", "google");
+        expect(res.body).toHaveProperty("provider", PROVIDERS.GOOGLE);
     });
 
     it("returns 200 with text + image multimodal input", async () => {
         const res = await request(app)
             .post("/embed")
             .send({
-                provider: "google",
+                provider: PROVIDERS.GOOGLE,
                 text: "An image of a dog",
                 images: ["data:image/png;base64,iVBORw0KGgo="],
             })
@@ -82,7 +83,7 @@ describe("POST /modality-to-embedding", () => {
         await request(app)
             .post("/embed")
             .send({
-                provider: "google",
+                provider: PROVIDERS.GOOGLE,
                 text: "Hello",
                 taskType: "SEMANTIC_SIMILARITY",
                 dimensions: 768,
@@ -98,7 +99,7 @@ describe("POST /modality-to-embedding", () => {
         await request(app)
             .post("/embed")
             .send({
-                provider: "google",
+                provider: PROVIDERS.GOOGLE,
                 text: "Hello",
                 model: "gemini-embedding-001",
             })
@@ -113,7 +114,7 @@ describe("POST /modality-to-embedding", () => {
     it("returns 400 for provider that does not support embeddings", async () => {
         const res = await request(app)
             .post("/embed")
-            .send({ provider: "elevenlabs", text: "Hello" })
+            .send({ provider: PROVIDERS.ELEVENLABS, text: "Hello" })
             .expect(400);
 
         expect(res.body).toHaveProperty("error", true);
@@ -127,7 +128,7 @@ describe("POST /modality-to-embedding", () => {
 
         const res = await request(app)
             .post("/embed")
-            .send({ provider: "google", text: "Hello" })
+            .send({ provider: PROVIDERS.GOOGLE, text: "Hello" })
             .expect(500);
 
         expect(res.body).toHaveProperty("error", true);

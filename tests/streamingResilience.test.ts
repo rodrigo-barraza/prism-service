@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import { PROVIDERS } from "../src/constants.ts";
 
 /**
  * Streaming resilience tests — verifies that all providers and SSE parsers
@@ -394,12 +395,12 @@ describe("ProviderError enrichment", () => {
   it("ProviderError.toJSON includes provider and message", () => {
     const { ProviderError } = require("../src/utils/errors.ts");
     const enrichedError = new ProviderError(
-      "lm-studio",
+      PROVIDERS.LM_STUDIO,
       "LM Studio (lm-studio-1) stream error: terminated, model=gemma-4-12b-qat",
       500,
     );
     const serialized = enrichedError.toJSON();
-    expect(serialized.provider).toBe("lm-studio");
+    expect(serialized.provider).toBe(PROVIDERS.LM_STUDIO);
     expect(serialized.message).toContain("LM Studio");
     expect(serialized.message).toContain("terminated");
     expect(serialized.message).toContain("gemma-4-12b-qat");
@@ -409,7 +410,7 @@ describe("ProviderError enrichment", () => {
   it("ProviderError preserves structured errorType from original error", () => {
     const { ProviderError } = require("../src/utils/errors.ts");
     const originalError = { type: "rate_limit_error", message: "Too many requests" };
-    const enrichedError = new ProviderError("anthropic", "Rate limited", 429, originalError);
+    const enrichedError = new ProviderError(PROVIDERS.ANTHROPIC, "Rate limited", 429, originalError);
     expect(enrichedError.errorType).toBe("rate_limit_error");
     const serialized = enrichedError.toJSON();
     expect(serialized.errorType).toBe("rate_limit_error");

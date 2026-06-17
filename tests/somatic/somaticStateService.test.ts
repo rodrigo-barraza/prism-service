@@ -1,4 +1,5 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import { PROVIDERS } from "../../src/constants.ts";
 
 // Mock logger
 vi.mock("../../src/utils/logger.ts", () => ({
@@ -40,7 +41,7 @@ vi.mock("../../src/providers/index.ts", () => ({
 vi.mock("../../src/services/SettingsService.ts", () => ({
   default: {
     getSomaticModelConfig: vi.fn().mockResolvedValue({
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
       model: "gemini-3.5-flash",
     }),
   },

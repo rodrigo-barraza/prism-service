@@ -14,6 +14,7 @@
  * and prefers real API-reported tokens when available.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 
 // ── Mock logger ──────────────────────────────────────────────────
 vi.mock("../src/utils/logger.ts", () => ({
@@ -152,7 +153,7 @@ describe("Background Token Accuracy", () => {
       project: "coding",
       username: "testuser",
       agent: null,
-      provider: "anthropic",
+      provider: PROVIDERS.ANTHROPIC,
       model: "claude-haiku-4-5-20251001",
       traceId: null,
       agentSessionId: "session-1",
@@ -434,7 +435,7 @@ describe("Background Token Accuracy", () => {
         project: "coding",
         username: "testuser",
         agent: null,
-        provider: "anthropic",
+        provider: PROVIDERS.ANTHROPIC,
         model: "claude-haiku-4-5-20251001",
         traceId: null,
         agentSessionId: "session-1",
@@ -475,7 +476,7 @@ describe("Background Token Accuracy", () => {
         project: "coding",
         username: "testuser",
         agent: null,
-        provider: "anthropic",
+        provider: PROVIDERS.ANTHROPIC,
         model: "claude-haiku-4-5-20251001",
         traceId: null,
         agentSessionId: "session-2",
@@ -518,7 +519,7 @@ describe("Background Token Accuracy", () => {
         project: "coding",
         username: "testuser",
         agent: null,
-        provider: "anthropic",
+        provider: PROVIDERS.ANTHROPIC,
         model: "claude-haiku-4-5-20251001",
         traceId: null,
         agentSessionId: "session-3",

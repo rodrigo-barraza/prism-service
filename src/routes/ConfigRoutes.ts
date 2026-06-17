@@ -23,6 +23,7 @@ import SettingsService from "../services/SettingsService.ts";
 import rateLimitStore from "../services/RateLimitStore.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import LocalProviderGateway from "../services/local-provider/index.ts";
+import { THINKING_PATTERNS } from "../services/local-provider/constants.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "../services/OrchestratorPrompt.ts";
 import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
@@ -284,6 +285,7 @@ Guidelines:
       providerList: availableProviderList,
       availableProviders: availableProviderList,
       localProviders: LOCAL_PROVIDERS,
+      thinkingPatterns: THINKING_PATTERNS,
       textToText: {
         models: textToTextModels,
         defaults: filterDefaults(getDefaultModels(TYPES.TEXT, TYPES.TEXT)),

@@ -6,6 +6,7 @@
  * unknown harness IDs with graceful fallback.
  */
 import { describe, it, expect, vi } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 
 // ── Mock heavy dependencies that ReActHarness transitively imports ──
 vi.mock("../src/utils/logger.ts", () => ({
@@ -47,11 +48,11 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
-    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     get: vi.fn().mockResolvedValue({}),
     getSection: vi.fn().mockResolvedValue({}),
     getMemoryModelConfig: vi.fn().mockResolvedValue({
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
       model: "gemini-embedding-2-preview",
     }),
     invalidateCache: vi.fn(),

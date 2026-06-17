@@ -11,14 +11,14 @@
  * success and error paths.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { COLLECTIONS } from "../src/constants.ts";
+import { PROVIDERS, COLLECTIONS } from "../src/constants.ts";
 
 // ── Mock config ────────────────────────────────────────────────
 vi.mock("../config.ts", () => ({
   MONGO_DB_NAME: "prism-test",
   getModelByName: vi.fn().mockReturnValue({
     name: "test-model",
-    provider: "google",
+    provider: PROVIDERS.GOOGLE,
     contextLength: 128_000,
   }),
 }));
@@ -130,7 +130,7 @@ const CONVERSATION_FIXTURE = {
     { role: "user", content: "Hello", timestamp: new Date().toISOString() },
   ],
   settings: {
-    provider: "google",
+    provider: PROVIDERS.GOOGLE,
     model: "gemini-3-flash",
   },
   isGenerating: false,
@@ -242,7 +242,7 @@ describe("ConversationTimerService.executeAgenticLoop", () => {
     expect(loopArguments.agentSessionId).not.toBe("session-abc-123");
     // conversationId should be the timer's conversationId (document persistence key)
     expect(loopArguments.conversationId).toBe("session-abc-123");
-    expect(loopArguments.providerName).toBe("google");
+    expect(loopArguments.providerName).toBe(PROVIDERS.GOOGLE);
     expect(loopArguments.resolvedModel).toBe("gemini-3-flash");
     expect(loopArguments.project).toBe("coding");
     expect(loopArguments.username).toBe("testuser");
@@ -259,7 +259,7 @@ describe("ConversationTimerService.executeAgenticLoop", () => {
     const conversationWithSettings = {
       ...CONVERSATION_FIXTURE,
       settings: {
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         model: "gemini-3.5-flash",
         agent: "CUSTOM_DEVELOPER",
         workspaceRoot: "/custom/root",
@@ -280,7 +280,7 @@ describe("ConversationTimerService.executeAgenticLoop", () => {
     expect(mockRunAgenticLoop).toHaveBeenCalledTimes(1);
 
     const loopArguments = mockRunAgenticLoop.mock.calls[0][0];
-    expect(loopArguments.providerName).toBe("google");
+    expect(loopArguments.providerName).toBe(PROVIDERS.GOOGLE);
     expect(loopArguments.resolvedModel).toBe("gemini-3.5-flash");
     expect(loopArguments.agent).toBe("CUSTOM_DEVELOPER");
     expect(loopArguments.workspaceRoot).toBe("/custom/root");

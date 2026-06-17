@@ -3,6 +3,7 @@ import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { deepMerge } from "@rodrigo-barraza/utilities-library";
 import { MONGO_DB_NAME } from "../../config.ts";
 import { COLLECTIONS, PROVIDERS } from "../constants.ts";
+import { MODELS } from "../config.ts";
 import logger from "../utils/logger.ts";
 
 // ─── In-memory cache ──────────────────────────────────────────────────────────
@@ -75,9 +76,9 @@ const DEFAULTS: SettingsData = {
   },
   creative: {
     imageProvider: PROVIDERS.GOOGLE,
-    imageModel: "gemini-3-pro-image-preview",
+    imageModel: MODELS.GEMINI_3_PRO_IMAGE.name,
     visionProvider: PROVIDERS.GOOGLE,
-    visionModel: "gemini-3.5-flash",
+    visionModel: MODELS.GEMINI_35_FLASH.name,
     textToSpeechProvider: PROVIDERS.ELEVENLABS,
     textToSpeechModel: "",
     speechToTextProvider: PROVIDERS.OPENAI,

@@ -14,7 +14,7 @@
  * pattern already used for toolCounts enrichment.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { COLLECTIONS } from "../src/constants.ts";
+import { COLLECTIONS, PROVIDERS } from "../src/constants.ts";
 
 // ── Mock logger (top-level as vitest requires) ──────────────────
 vi.mock("../src/utils/logger.ts", () => ({
@@ -64,7 +64,7 @@ describe("Session Cost Reconciliation", () => {
           role: "assistant",
           content: "I've fixed the bug. Here's what I did...",
           estimatedCost: 0.01851, // last iteration only
-          provider: "anthropic",
+          provider: PROVIDERS.ANTHROPIC,
           model: "claude-sonnet-4-20250514",
         },
       ];
@@ -242,9 +242,9 @@ describe("Session Cost Reconciliation", () => {
       // so message-level estimatedCost matches the request log total.
       const messages = [
         { role: "user", content: "Hello" },
-        { role: "assistant", content: "Hi", estimatedCost: 0.0005, provider: "openai" },
+        { role: "assistant", content: "Hi", estimatedCost: 0.0005, provider: PROVIDERS.OPENAI },
         { role: "user", content: "How are you?" },
-        { role: "assistant", content: "I'm well", estimatedCost: 0.0008, provider: "openai" },
+        { role: "assistant", content: "I'm well", estimatedCost: 0.0008, provider: PROVIDERS.OPENAI },
       ];
 
       const messageLevelTotal = computeTotalCost(messages);

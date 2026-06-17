@@ -11,7 +11,7 @@
  * as "generating" in the UI.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { COLLECTIONS } from "../src/constants.ts";
+import { PROVIDERS, COLLECTIONS } from "../src/constants.ts";
 
 // ── Mock ConversationService before import ─────────────────────
 const mockAppendMessages = vi.fn();
@@ -124,7 +124,7 @@ describe("appendAndFinalize", () => {
   });
 
   it("should forward meta and options to appendMessages", async () => {
-    const meta = { title: "My Session", settings: { provider: "google" } };
+    const meta = { title: "My Session", settings: { provider: PROVIDERS.GOOGLE } };
     const options = { collection: COLLECTIONS.AGENT_CONVERSATIONS };
 
     await appendAndFinalize(

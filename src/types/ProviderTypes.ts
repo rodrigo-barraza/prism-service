@@ -25,16 +25,21 @@ export interface ChatMessageContent {
 
 export interface ChatMessage {
   role: string;
-  content: string | ChatMessageContent[];
+  content?: string | ChatMessageContent[];
   name?: string;
   images?: string[];
-  toolCalls?: Array<{ id?: string; name: string; args: Record<string, unknown> }>;
+  toolCalls?: Array<{ id?: string | null; name: string; args?: Record<string, unknown> | unknown }>;
   thinking?: string;
   thinkingSignature?: string;
   /** Tool result correlation — maps this message to the tool_use that produced it. */
   tool_call_id?: string;
   /** Generic message ID — fallback for tool correlation. */
   id?: string;
+}
+
+export interface ProviderResponseUsage {
+  inputTokens: number;
+  outputTokens: number;
 }
 
 export interface ProviderResponse {
@@ -44,7 +49,7 @@ export interface ProviderResponse {
   toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
   provider?: string;
   model?: string;
-  usage?: Record<string, number>;
+  usage?: ProviderResponseUsage;
   estimatedCost?: number;
 }
 
@@ -114,5 +119,10 @@ export interface ProviderOptions {
   agent?: string;
   username?: string;
   project?: string;
-  [key: string]: unknown;
+  // ElevenLabs-specific
+  modelId?: string;
+  stability?: number;
+  similarityBoost?: number;
+  // Google embedding task type
+  taskType?: string;
 }

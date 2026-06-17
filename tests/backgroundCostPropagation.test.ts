@@ -15,6 +15,7 @@
  *   3. Cost values are computed correctly using calculateTextCost
  */
 import { describe, it, expect, vi } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 
 // ── Mock config.js ──────────────────────────────────────────────
 const MOCK_TEXT_PRICING = {
@@ -61,7 +62,7 @@ vi.mock("../src/providers/index.ts", () => ({
 // ── Mock SettingsService ────────────────────────────────────────
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
-    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     getSection: vi.fn().mockResolvedValue({
       extractionProvider: "test-provider",
       extractionModel: "test-extract-model",

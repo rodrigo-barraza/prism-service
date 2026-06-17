@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import "./setup.ts";
+import { PROVIDERS } from "../src/constants.ts";
 
 // ── Mocks ─────────────────────────────────────────────────────
 
@@ -50,15 +51,16 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
     mergeWorktree: (...args: unknown[]) => mockMergeWorktree(...args),
     getWorktreeDiff: (...args: unknown[]) => mockGetWorktreeDiff(...args),
     toolsApiPost: (...args: unknown[]) => mockToolsApiPost(...args),
+    cleanupWorktrees: vi.fn().mockResolvedValue({}),
   },
 }));
 
 // Mock SettingsService
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
-    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     getSection: vi.fn().mockResolvedValue({
-      subagentProvider: "google",
+      subagentProvider: PROVIDERS.GOOGLE,
       subagentModel: "gemini-3.5-flash",
       topology: "hierarchical",
     }),
@@ -114,7 +116,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       project: "test-project",
       username: "test-user",
       agent: "CODING",
-      providerName: "google",
+      providerName: PROVIDERS.GOOGLE,
       resolvedModel: "gemini-3-flash-preview",
       traceId: "trace-id-abc",
       agentSessionId: "session-id-def",
