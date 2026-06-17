@@ -20,6 +20,7 @@
  * ═══════════════════════════════════════════════════════════
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { PROVIDERS } from "../../src/constants.ts";
 import { calculateTextCost } from "../../src/utils/CostCalculator.ts";
 import { TYPES, getPricing } from "../../src/config.ts";
 
@@ -346,13 +347,13 @@ beforeAll(async () => {
   }
 
   // Check each provider
-  availability.openai = await isProviderAvailable("openai", "gpt-5-nano");
+  availability.openai = await isProviderAvailable(PROVIDERS.OPENAI, "gpt-5-nano");
   availability.anthropic = await isProviderAvailable(
-    "anthropic",
+    PROVIDERS.ANTHROPIC,
     "claude-haiku-4-5-20251001",
   );
   availability.google = await isProviderAvailable(
-    "google",
+    PROVIDERS.GOOGLE,
     "gemini-3-flash-preview",
   );
 
@@ -375,7 +376,7 @@ beforeAll(async () => {
 
 describe("Live — OpenAI gpt-5-nano", () => {
   const MODEL = "gpt-5-nano";
-  const PROVIDER = "openai";
+  const PROVIDER = PROVIDERS.OPENAI;
 
   it("returns valid tokens and cost WITHOUT function calling", async () => {
     if (!availability.openai) return;
@@ -459,7 +460,7 @@ describe("Live — OpenAI gpt-5-nano", () => {
 
 describe("Live — Anthropic haiku-4.5", () => {
   const MODEL = "claude-haiku-4-5-20251001";
-  const PROVIDER = "anthropic";
+  const PROVIDER = PROVIDERS.ANTHROPIC;
 
   it("returns valid tokens and cost WITHOUT function calling", async () => {
     if (!availability.anthropic) return;
@@ -545,7 +546,7 @@ describe("Live — Anthropic haiku-4.5", () => {
 
 describe("Live — Google gemini-3-flash", () => {
   const MODEL = "gemini-3-flash-preview";
-  const PROVIDER = "google";
+  const PROVIDER = PROVIDERS.GOOGLE;
 
   it("returns valid tokens and cost WITHOUT function calling", async () => {
     if (!availability.google) return;
@@ -629,7 +630,7 @@ describe("Live — LM Studio (local)", () => {
     if (!lmStudioModel) return;
 
     const res = await chat({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: lmStudioModel,
       messages: [{ role: "user", content: SIMPLE_PROMPT }],
       maxTokens: 20,
@@ -668,17 +669,17 @@ describe("Live — Cross-provider consistency", () => {
   it("all available providers return matching cost calculation", async () => {
     const providers = [
       {
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-5-nano",
         available: availability.openai,
       },
       {
-        provider: "anthropic",
+        provider: PROVIDERS.ANTHROPIC,
         model: "claude-haiku-4-5-20251001",
         available: availability.anthropic,
       },
       {
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         model: "gemini-3-flash-preview",
         available: availability.google,
       },

@@ -19,7 +19,17 @@ interface ModelDefinition {
   thinking?: boolean;
   thinkingLevels?: string[];
   outputTypes?: string[];
-  [key: string]: unknown;
+  listed?: boolean;
+  imageAPI?: boolean;
+  defaultTemperature?: number;
+  imageTokensPerImage?: number;
+  pricing?: Record<string, number>;
+  maxInputTokens?: number;
+  maxOutputTokens?: number;
+  provider?: string;
+  modelType?: string;
+  streaming?: boolean;
+  webSearch?: boolean | string;
 }
 // ── Google GenAI Content Types ──────────────────────────────
 
@@ -29,8 +39,17 @@ interface GoogleToolDeclaration {
     description: string;
     parameters: Record<string, unknown>;
   }>;
-  [key: string]: unknown;
 }
+
+interface GoogleSearchTool { googleSearch: Record<string, never> }
+interface GoogleCodeExecutionTool { codeExecution: Record<string, never> }
+interface GoogleUrlContextTool { urlContext: Record<string, never> }
+
+export type GoogleToolConfigEntry =
+  | GoogleToolDeclaration
+  | GoogleSearchTool
+  | GoogleCodeExecutionTool
+  | GoogleUrlContextTool;
 
 export interface ConversationMessage {
   role: string;
@@ -45,9 +64,27 @@ export interface ConversationMessage {
   audio?: string[];
   video?: string[];
   pdf?: string[];
-  [key: string]: unknown;
+  thinking?: string;
+  thinkingSignature?: string;
+  tool_call_id?: string;
+  id?: string;
 }
 
+/**
+ * Extension of Google GenAI's `Part` that includes undocumented
+ * `thoughtSignature` field used by Gemini for thinking-paired tool calls.
+ */
+interface PartWithThoughtSignature extends Part {
+  thoughtSignature?: string;
+}
+
+/** Safely extract HTTP status from Google GenAI error objects. */
+function getErrorStatus(error: unknown): number {
+  if (error instanceof Error && "status" in error) {
+    return (error as Error & { status: number }).status;
+  }
+  return 500;
+}
 let client: GoogleGenAI | null = null;
 
 function getClient(): GoogleGenAI {
@@ -393,7 +430,7 @@ const googleProvider = {
             id: `google-toolCall-${crypto.randomUUID()}`,
             name: part.functionCall.name || "any",
             args: (part.functionCall.args || {}) as Record<string, unknown>,
-            thoughtSignature: (part as Record<string, unknown>).thoughtSignature as string | undefined,
+            thoughtSignature: (part as PartWithThoughtSignature).thoughtSignature,
           });
         } else if (part.text) {
           textParts.push(part.text);
@@ -446,7 +483,7 @@ const googleProvider = {
       const config = buildGenerateConfig(options, modelDefinition);
 
       // Build tools array based on enabled options
-      const tools: Record<string, unknown>[] = [];
+      const tools: GoogleToolConfigEntry[] = [];
       if (options.webSearch) tools.push({ googleSearch: {} });
       if (options.codeExecution) tools.push({ codeExecution: {} });
       if (options.urlContext) tools.push({ urlContext: {} });
@@ -491,7 +528,7 @@ const googleProvider = {
                 id: `google-toolCall-${crypto.randomUUID()}`,
                 name: part.functionCall.name || "any",
                 args: (part.functionCall.args || {}) as Record<string, unknown>,
-                thoughtSignature: (part as Record<string, unknown>).thoughtSignature as string | undefined,
+                thoughtSignature: (part as PartWithThoughtSignature).thoughtSignature,
               };
             } else if (part.thought && part.text) {
               yield { type: "thinking", content: part.text };
@@ -599,7 +636,7 @@ const googleProvider = {
       }
 
       // Tools
-      const tools: Record<string, unknown>[] = [];
+      const tools: GoogleToolConfigEntry[] = [];
       if (options.webSearch) tools.push({ googleSearch: {} });
       const customTools = convertToolsToGoogle(options.tools);
       if (customTools) tools.push(...customTools);
@@ -1042,7 +1079,7 @@ const googleProvider = {
   async transcribeAudio(
     audioBuffer: Buffer,
     mimeType: string,
-    model: string = GOOGLE_TTS_MODEL || "gemini-2.0-flash",
+    model: string = GOOGLE_TTS_MODEL || MODELS.GEMINI_35_FLASH.name,
     options: ProviderOptions = {},
   ) {
     logger.provider("Google", `transcribeAudio model=${model}`);
@@ -1093,7 +1130,7 @@ const googleProvider = {
       model ||
       getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)?.google ||
       GOOGLE_EMBEDDING_MODEL ||
-      "gemini-embedding-2-preview";
+      MODELS.GEMINI_EMBEDDING_2.name;
     logger.provider("Google", `generateEmbedding model=${resolvedModel}`);
     try {
       type EmbedParams = Parameters<GoogleGenAI["models"]["embedContent"]>[0];
@@ -1147,7 +1184,7 @@ const googleProvider = {
       throw new ProviderError(
         "google",
         getErrorMessage(error),
-        ((error as Record<string, unknown>).status as number) || 500,
+        getErrorStatus(error),
         error,
       );
     }

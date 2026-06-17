@@ -16,11 +16,12 @@ import ConversationService from "../services/ConversationService.ts";
 import { calculateLiveCost } from "../utils/CostCalculator.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { FILE_CATEGORIES } from "../constants.ts";
-import { getModelByName } from "../config.ts";
+import { getModelByName, MODELS } from "../config.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";
 import type { WebSocket } from "ws";
 import type { IncomingMessage } from "http";
 import type { WebSocketServer } from "ws";
+import type { GoogleToolConfigEntry } from "../providers/google.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -325,7 +326,7 @@ function handleWebsocketLive(
         liveSession = null;
       }
 
-      const model = (data.model as string) || LIVE_AUDIO_MODEL || "gemini-2.0-flash-live-001";
+      const model = (data.model as string) || LIVE_AUDIO_MODEL || MODELS.GEMINI_31_FLASH_LIVE.name;
       const clientConfig = (data.config || {}) as LiveClientConfig;
 
       activeModel = model;
@@ -340,7 +341,7 @@ function handleWebsocketLive(
         undefined;
 
       // Tools setup
-      const tools: Record<string, unknown>[] = [];
+      const tools: GoogleToolConfigEntry[] = [];
       if (
         clientConfig.enabledTools &&
         Array.isArray(clientConfig.enabledTools)

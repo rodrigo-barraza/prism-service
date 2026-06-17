@@ -9,26 +9,29 @@
  * Call `.getAll()` to get a snapshot of all providers/models.
  */
 
+import { MODELS } from "../config.ts";
+
 // Static Google Tier 2 limits — seeded on module load since Google
 // doesn't expose rate-limit headers in their SDK responses.
 const GOOGLE_STATIC_LIMITS = {
   note: "Static tier-2 limits from Google AI Studio. Not dynamically updated.",
   models: {
-    "gemini-3.5-flash": {
+    [MODELS.GEMINI_35_FLASH.name]: {
       rpm: 2000,
       tpm: 4_000_000,
       rpd: 100_000,
     },
-    "gemini-3-flash": {
+    [MODELS.GEMINI_3_FLASH.name]: {
       rpm: 2000,
       tpm: 3_000_000,
       rpd: 100_000,
     },
-    "gemini-3.1-pro": {
+    [MODELS.GEMINI_31_PRO.name]: {
       rpm: 1000,
       tpm: 5_000_000,
       rpd: 50_000,
     },
+    // Legacy models — not in the active MODELS catalog
     "gemini-2.5-flash": {
       rpm: 2000,
       tpm: 3_000_000,

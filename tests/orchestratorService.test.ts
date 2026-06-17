@@ -36,16 +36,17 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
   GitWorktreeHelper: {
     getDefaultWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
     resolveRepositoryPath: vi.fn().mockReturnValue("/workspace"),
+    toolsApiPost: vi.fn().mockResolvedValue({}),
     createWorktree: vi.fn().mockResolvedValue({ worktreePath: "/workspace/worktree-1" }),
     removeWorktree: vi.fn().mockResolvedValue({}),
     mergeWorktree: vi.fn().mockResolvedValue({ success: true }),
-    toolsApiPost: vi.fn().mockResolvedValue({}),
     getWorktreeDiff: vi.fn().mockResolvedValue({
       hasChanges: false,
       additions: 0,
       deletions: 0,
       files: [],
     }),
+    cleanupWorktrees: vi.fn().mockResolvedValue({}),
   },
 }));
 

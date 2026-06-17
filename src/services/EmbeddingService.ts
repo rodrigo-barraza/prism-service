@@ -9,6 +9,7 @@ import logger from "../utils/logger.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";
 import SettingsService from "./SettingsService.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import type { EmbeddingMultimodalPart, EmbeddingContent } from "../types/provider.ts";
 /** Resolve the current embedding provider + model from settings. */
 async function getEmbeddingConfig() {
   return SettingsService.getMemoryModelConfig("embedding");
@@ -20,13 +21,6 @@ async function getEmbeddingConfig() {
  * ensuring both HTTP `/embed` requests and internal callers (MemoryService,
  * SystemPromptAssembler) flow through the same path.
  */
-interface MultimodalPart {
-  text?: string;
-  inlineData?: {
-    mimeType?: string;
-    data?: string;
-  };
-}
 
 interface EmbeddingOptions {
   provider?: string;
@@ -44,7 +38,7 @@ interface EmbeddingOptions {
 }
 
 const EmbeddingService = {
-  async generate(content: string | MultimodalPart[], options: EmbeddingOptions = {}) {
+  async generate(content: EmbeddingContent, options: EmbeddingOptions = {}) {
     const requestId = crypto.randomUUID();
     const requestStart = performance.now();
     // Resolve defaults from settings when no explicit provider/model given
@@ -134,12 +128,16 @@ const EmbeddingService = {
             modalities.textIn = true;
           } else if (Array.isArray(content)) {
             for (const part of content) {
-              if (part.text) modalities.textIn = true;
-              const mime = part.inlineData?.mimeType || "";
-              if (mime.startsWith("image/")) modalities.imageIn = true;
-              else if (mime.startsWith("audio/")) modalities.audioIn = true;
-              else if (mime.startsWith("video/")) modalities.videoIn = true;
-              else if (mime === "application/pdf") modalities.docIn = true;
+              if (typeof part === "string") {
+                modalities.textIn = true;
+              } else {
+                if (part.text) modalities.textIn = true;
+                const mime = part.inlineData?.mimeType || "";
+                if (mime.startsWith("image/")) modalities.imageIn = true;
+                else if (mime.startsWith("audio/")) modalities.audioIn = true;
+                else if (mime.startsWith("video/")) modalities.videoIn = true;
+                else if (mime === "application/pdf") modalities.docIn = true;
+              }
             }
           }
           return modalities;
@@ -171,7 +169,7 @@ const EmbeddingService = {
       model: resolvedModel,
     };
   },
-  async embed(text: string | MultimodalPart[], options: EmbeddingOptions = {}) {
+  async embed(text: EmbeddingContent, options: EmbeddingOptions = {}) {
     const result = await this.generate(text, options);
     return result.embedding;
   },

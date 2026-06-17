@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import type { WorkflowStep } from "../src/types/workflow.ts";
+import { PROVIDERS } from "../src/constants.ts";
 
 vi.mock("../src/config.ts", () => ({
   getModelByName: vi.fn().mockReturnValue(null),
@@ -43,7 +44,7 @@ describe("assembleGraph — single step", () => {
         input: "Hello",
         output: "Hi there!",
         model: "gpt-5.5",
-        type: "openai",
+        type: PROVIDERS.OPENAI,
       },
     ];
 

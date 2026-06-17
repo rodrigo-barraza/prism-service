@@ -17,6 +17,7 @@
  * even ran, and plan mode could activate in the middle of an error correction cycle.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 
 vi.mock("../src/utils/logger.ts", () => ({
   default: {
@@ -57,11 +58,11 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
-    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     get: vi.fn().mockResolvedValue({}),
     getSection: vi.fn().mockResolvedValue({}),
     getMemoryModelConfig: vi.fn().mockResolvedValue({
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
       model: "gemini-embedding-2-preview",
     }),
     invalidateCache: vi.fn(),

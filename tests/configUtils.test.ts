@@ -12,6 +12,7 @@
 import { describe, it, expect } from "vitest";
 import request from "supertest";
 import { app } from "./setup.ts";
+import { PROVIDERS } from "../src/constants.ts";
 
 // ═══════════════════════════════════════════════════════════════
 // Pattern detection — verify the extracted constants work correctly
@@ -243,14 +244,14 @@ describe("LM Studio config integration", () => {
     const res = await request(app).get("/config").expect(200);
 
     const providerList = res.body.providerList;
-    expect(providerList).not.toContain("lm-studio");
+    expect(providerList).not.toContain(PROVIDERS.LM_STUDIO);
   });
 
   it("lm-studio models are not present in textToText when provider is unavailable", async () => {
     const res = await request(app).get("/config").expect(200);
 
     const textToTextModels = res.body.textToText.models;
-    expect(textToTextModels).not.toHaveProperty("lm-studio");
+    expect(textToTextModels).not.toHaveProperty(PROVIDERS.LM_STUDIO);
   });
 
   it("local model entries have zero pricing", async () => {
@@ -315,12 +316,12 @@ describe("Provider availability filtering", () => {
     // With our mock setup, openai/anthropic/google/elevenlabs/inworld have keys
     // lm-studio/vllm/ollama do NOT
     const list = res.body.providerList;
-    expect(list).toContain("openai");
-    expect(list).toContain("anthropic");
-    expect(list).toContain("google");
-    expect(list).not.toContain("lm-studio");
-    expect(list).not.toContain("vllm");
-    expect(list).not.toContain("ollama");
+    expect(list).toContain(PROVIDERS.OPENAI);
+    expect(list).toContain(PROVIDERS.ANTHROPIC);
+    expect(list).toContain(PROVIDERS.GOOGLE);
+    expect(list).not.toContain(PROVIDERS.LM_STUDIO);
+    expect(list).not.toContain(PROVIDERS.VLLM);
+    expect(list).not.toContain(PROVIDERS.OLLAMA);
   });
 
   it("models map only contains available providers", async () => {
@@ -328,9 +329,9 @@ describe("Provider availability filtering", () => {
 
     const providers = Object.keys(res.body.textToText.models);
     // Should not have unavailable providers
-    expect(providers).not.toContain("lm-studio");
-    expect(providers).not.toContain("vllm");
-    expect(providers).not.toContain("ollama");
+    expect(providers).not.toContain(PROVIDERS.LM_STUDIO);
+    expect(providers).not.toContain(PROVIDERS.VLLM);
+    expect(providers).not.toContain(PROVIDERS.OLLAMA);
   });
 
   it("defaults only contain available providers", async () => {

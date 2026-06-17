@@ -1,22 +1,7 @@
-/**
- * Provider Type Definitions
- *
- * Shared interfaces for AI provider options, generation config,
- * and streaming chunk types. Consumed by all provider implementations
- * (google.ts, openai.ts, anthropic.ts, lm-studio.ts, etc.)
- */
-
 import type { ToolSchema } from "../services/harnesses/types.ts";
 import type { ChatMessage, ProviderOptions } from "./ProviderTypes.ts";
 
 export type { ChatMessage, ProviderOptions };
-
-// ── Provider Generation Options ─────────────────────────────
-
-/**
- * Unified options object passed to all provider generateText / generateTextStream methods.
- * Each provider picks the fields it supports and ignores the rest.
- */
 
 // ── Google GenAI Config ─────────────────────────────────────
 
@@ -38,7 +23,6 @@ export interface GoogleGenerateConfig {
   tools?: Record<string, unknown>[];
   responseModalities?: string[];
   systemInstruction?: string;
-  [key: string]: unknown;
 }
 
 // ── LM Studio Config ────────────────────────────────────────
@@ -50,7 +34,6 @@ export interface LmStudioLoadConfig {
   flash_attention?: boolean;
   offload_kv_cache_to_gpu?: boolean;
   eval_batch_size?: number;
-  [key: string]: unknown;
 }
 
 export interface LmStudioModelMeta {
@@ -64,7 +47,6 @@ export interface LmStudioModelMeta {
   signal?: AbortSignal;
   thinkingEnabled?: boolean;
   tools?: ToolSchema[];
-  [key: string]: unknown;
 }
 
 export interface LmStudioResponsesBody {
@@ -76,7 +58,6 @@ export interface LmStudioResponsesBody {
   max_output_tokens?: number;
   repeat_penalty?: number;
   tools?: ToolSchema[];
-  [key: string]: unknown;
 }
 
 // ── Streaming Chunk Types ───────────────────────────────────
@@ -177,6 +158,93 @@ export interface GenerateTextResult {
   safetyBlock?: boolean;
 }
 
+export interface GenerateImageResult {
+  imageData: string;
+  mimeType: string;
+  text: string;
+}
+
+export interface EmbeddingResult {
+  embedding: number[];
+  dimensions: number;
+}
+
+/** Content types accepted by `generateEmbedding`. Providers narrow as needed. */
+export type EmbeddingContent = string | string[] | EmbeddingMultimodalPart[];
+
+export interface EmbeddingMultimodalPart {
+  text?: string;
+  inlineData?: { mimeType?: string; data?: string };
+}
+
+export interface EnsureModelLoadedResult {
+  alreadyLoaded: boolean;
+  contextLength: number | null;
+}
+
+export interface CaptionResult {
+  text: string | null;
+  usage: { inputTokens: number; outputTokens: number };
+}
+
+export interface TranscriptionResult {
+  text: string;
+  usage: Record<string, number>;
+}
+
+export interface SpeechResult {
+  stream: ReadableStream | import("stream").Readable | null;
+  contentType: string;
+}
+
+export interface HealthCheckResult {
+  ok: boolean;
+  status: string;
+  slotsIdle?: number | null;
+  slotsProcessing?: number | null;
+  error?: string;
+}
+
+export interface LmStudioModelEntry {
+  key: string;
+  display_name?: string;
+  type: string;
+  loaded_instances?: Array<LmStudioLoadedInstance>;
+  archParams?: Record<string, unknown>;
+  architecture?: string;
+  params_string?: string;
+  size_bytes?: number;
+  quantization?: { bits_per_weight?: number };
+  max_context_length?: number;
+  id?: string;
+  capabilities?: { vision?: boolean };
+}
+
+export interface LmStudioLoadedInstance {
+  id: string;
+  config?: LmStudioInstanceConfig;
+}
+
+export interface LmStudioInstanceConfig {
+  context_length?: number;
+  eval_batch_size?: number;
+  physical_batch_size?: number;
+}
+
+export interface ListModelsResult {
+  models: LmStudioModelEntry[];
+  data?: LmStudioModelEntry[];
+}
+
+// ── Rate Limits ─────────────────────────────────────────────
+
+export interface StreamRateLimitsChunk {
+  type: "rateLimits";
+  rateLimits: Record<string, unknown>;
+}
+
+// ── Provider Interface ──────────────────────────────────────
+
 export interface Provider {
   name: string;
   generateText(
@@ -195,47 +263,29 @@ export interface Provider {
     options?: ProviderOptions
   ): AsyncGenerator<StreamChunk, void, unknown>;
   generateImage?(
-    ...args: unknown[]
-  ): Promise<unknown>;
+    prompt: string,
+    images?: Array<string | { imageData: string; mimeType?: string }>,
+    model?: string,
+    systemPrompt?: string
+  ): Promise<GenerateImageResult>;
   captionImage?(
     images: string[],
     prompt?: string,
     model?: string,
     systemPrompt?: string
-  ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }>;
+  ): Promise<CaptionResult>;
   generateEmbedding?(
-    content: any,
+    content: EmbeddingContent,
     model: string,
     options?: ProviderOptions
-  ): Promise<{ embedding: number[]; dimensions: number }>;
-  listModels?(): Promise<{
-    models?: Array<{
-      key: string;
-      display_name?: string;
-      type: string;
-      loaded_instances?: Array<{ id: string; [key: string]: unknown }>;
-      [key: string]: unknown;
-    }>;
-    data?: Array<{
-      key: string;
-      display_name?: string;
-      type: string;
-      loaded_instances?: Array<{ id: string; [key: string]: unknown }>;
-      [key: string]: unknown;
-    }>;
-  }>;
-  checkHealth?(): Promise<{
-    ok: boolean;
-    status: string;
-    slotsIdle?: number | null;
-    slotsProcessing?: number | null;
-    error?: string;
-  }>;
+  ): Promise<EmbeddingResult>;
+  listModels?(): Promise<ListModelsResult>;
+  checkHealth?(): Promise<HealthCheckResult>;
   generateSpeech?(
     text: string,
     voice?: string,
     options?: ProviderOptions
-  ): Promise<{ stream: ReadableStream | import("stream").Readable | null; contentType: string }>;
+  ): Promise<SpeechResult>;
   generateSpeechStream?(
     textStream: AsyncIterable<string>,
     voice?: string,
@@ -246,8 +296,13 @@ export interface Provider {
     mimeType: string,
     model?: string,
     options?: ProviderOptions
-  ): Promise<{ text: string; usage: Record<string, number> }>;
-  unloadModelByKey?(modelKey: string): Promise<any>;
-  ensureModelLoaded?(modelKey: string, options?: ProviderOptions, signal?: AbortSignal, onStatus?: (status: string) => void): Promise<any>;
-  unloadModel?(modelId: string): Promise<any>;
+  ): Promise<TranscriptionResult>;
+  unloadModelByKey?(modelKey: string): Promise<void>;
+  ensureModelLoaded?(
+    modelKey: string,
+    options?: ProviderOptions,
+    signal?: AbortSignal,
+    onStatus?: (status: string) => void
+  ): Promise<EnsureModelLoadedResult>;
+  unloadModel?(modelId: string): Promise<void>;
 }

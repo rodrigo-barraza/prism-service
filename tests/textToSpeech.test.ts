@@ -85,7 +85,7 @@ describe("POST /text-to-audio", () => {
     await request(app)
       .post("/text-to-audio")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         text: "Hello",
         instructions: "Speak slowly",
       })
@@ -101,7 +101,7 @@ describe("POST /text-to-audio", () => {
     await request(app)
       .post("/text-to-audio")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         text: "Hello",
         model: "gpt-4o-mini-tts",
       })
@@ -117,7 +117,7 @@ describe("POST /text-to-audio", () => {
     await request(app)
       .post("/text-to-audio")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         text: "Hello",
         options: { speed: 1.5, format: "mp3" },
       })
@@ -132,7 +132,7 @@ describe("POST /text-to-audio", () => {
     await request(app)
       .post("/text-to-audio")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         text: "Hello",
         voice: "coral",
         instructions: "Be cheerful",

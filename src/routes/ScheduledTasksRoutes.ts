@@ -4,6 +4,7 @@ import ScheduledTaskService from "../services/ScheduledTaskService.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { PROVIDERS } from "../constants.ts";
+import { MODELS } from "../config.ts";
 
 const router = express.Router();
 
@@ -57,7 +58,7 @@ router.post(
     let { name, prompt, agent, provider, model, scheduleType, scheduleTime, scheduleDay, scheduleDate, cronExpression, recurrenceRule, toolConfig } = req.body;
 
     provider = provider || PROVIDERS.ANTHROPIC;
-    model = model || "claude-sonnet-4-5-20250929";
+    model = model || MODELS.SONNET_45.name;
 
     if (!name || !prompt || !provider || !model || !scheduleType) {
       return res.status(400).json({ error: "Missing required fields: name, prompt, provider, model, scheduleType" });

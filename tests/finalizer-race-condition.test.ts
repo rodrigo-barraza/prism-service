@@ -13,41 +13,35 @@
 
 import { describe, it, expect } from "vitest";
 import { swapMessageContent, assembleMessagesToAppend as assembleMessagesToAppendReal, sanitizeMessagesForPersistence } from "../src/services/harnesses/lifecycle/Finalizer.ts";
-import { PROMPT_DELIMITERS } from "../src/constants.ts";
+import { PROMPT_DELIMITERS, PROVIDERS } from "../src/constants.ts";
 import type { MessagePayload } from "../src/services/conversation/types.ts";
 
 type TestMessage = MessagePayload & {
   toolCalls?: any[];
 };
 
+type FinalizerInput = Parameters<typeof assembleMessagesToAppendReal>[0];
 
-
-// ── Simulate the Finalizer's message assembly ───────────────────
-
-interface FinalizerAssemblyInput {
+type TestAssemblyInput = Omit<FinalizerInput, "text" | "thinking" | "audioReference" | "overrideMessagesToAppend" | "toolCalls"> & {
   overrideMessagesToAppend: TestMessage[];
   finalText: string;
   finalThinking: string;
-  images: string[];
   audioRef: string | null;
   toolCalls: any[];
-  resolvedModel: string;
-  providerName: string;
-}
+};
+
+// ── Simulate the Finalizer's message assembly ───────────────────
 
 /**
- * Replicates the messagesToAppend assembly & sanitization logic of Finalizer.ts.
+ * Convenience wrapper around the production assembleMessagesToAppend + sanitize.
+ * Maps test-friendly field names to the canonical production parameter names.
  */
-function assembleMessagesToAppend(input: FinalizerAssemblyInput): TestMessage[] {
+function assembleMessagesToAppend(input: TestAssemblyInput): TestMessage[] {
   const messages = assembleMessagesToAppendReal({
-    overrideMessagesToAppend: input.overrideMessagesToAppend,
+    ...input,
     text: input.finalText,
     thinking: input.finalThinking,
-    images: input.images,
     audioReference: input.audioRef,
-    toolCalls: input.toolCalls,
-    resolvedModel: input.resolvedModel,
-    providerName: input.providerName,
   }) as TestMessage[];
 
   return sanitizeMessagesForPersistence(messages) as TestMessage[];
@@ -86,7 +80,7 @@ describe("Finalizer message assembly", () => {
       audioRef: null,
       toolCalls: [],
       resolvedModel: "claude-haiku-4-5-20251001",
-      providerName: "anthropic",
+      providerName: PROVIDERS.ANTHROPIC,
     });
 
     expect(messagesToAppend).toHaveLength(3);
@@ -138,7 +132,7 @@ describe("Finalizer message assembly", () => {
         { id: "toolCall-1", name: "generate_audio", args: {}, result: { success: true } },
       ],
       resolvedModel: "claude-haiku-4-5-20251001",
-      providerName: "anthropic",
+      providerName: PROVIDERS.ANTHROPIC,
     });
 
     // Final message should NOT have toolCalls since intermediates already have them
@@ -161,7 +155,7 @@ describe("Finalizer message assembly", () => {
         { id: "toolCall-0", name: "mcp_query", args: {}, result: { rows: [] } },
       ],
       resolvedModel: "qwen3-8b",
-      providerName: "lm-studio",
+      providerName: PROVIDERS.LM_STUDIO,
     });
 
     // Final message SHOULD have toolCalls since no intermediate messages
@@ -194,7 +188,7 @@ describe("Finalizer message assembly", () => {
       audioRef: null,
       toolCalls: [],
       resolvedModel: "claude-haiku-4-5-20251001",
-      providerName: "anthropic",
+      providerName: PROVIDERS.ANTHROPIC,
     });
 
     // Summary should be filtered out
@@ -712,7 +706,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
         role: "assistant",
         content: "Hey Rodrigo! Not much, just here and ready to help.",
         model: "claude-haiku-4-5-20251001",
-        provider: "anthropic",
+        provider: PROVIDERS.ANTHROPIC,
       },
     ];
 
@@ -776,7 +770,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
       audioRef: null,
       toolCalls: [],
       resolvedModel: "claude-haiku-4-5-20251001",
-      providerName: "anthropic",
+      providerName: PROVIDERS.ANTHROPIC,
     });
 
     // Apply content swap

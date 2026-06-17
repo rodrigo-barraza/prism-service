@@ -4,6 +4,7 @@ import googleProvider from "../src/providers/google.ts";
 import anthropicProvider from "../src/providers/anthropic.ts";
 import AgenticLoopState from "../src/services/AgenticLoopState.ts";
 import { MODELS } from "../src/config.ts";
+import { PROVIDERS } from "../src/constants.ts";
 import {
   extractThinkTags,
   ThinkTagParser,
@@ -370,7 +371,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
     it("properly appends thinking chunks, displays segments, and emits thinking events", async () => {
       const emittedEvents: any[] = [];
       const mockContext: any = {
-        providerName: "google",
+        providerName: PROVIDERS.GOOGLE,
         resolvedModel: MODELS.GEMINI_35_FLASH.name,
         modelDefinition: MODELS.GEMINI_35_FLASH,
         messages: [{ role: "user", content: "Solve math: 2+2" }],
@@ -744,7 +745,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
     it("properly appends thinking, captures signature, and emits thinking events", async () => {
       const emittedEvents: any[] = [];
       const mockContext: any = {
-        providerName: "anthropic",
+        providerName: PROVIDERS.ANTHROPIC,
         resolvedModel: MODELS.SONNET_46.name,
         modelDefinition: MODELS.SONNET_46,
         messages: [{ role: "user", content: "Identify prime factors of 96" }],

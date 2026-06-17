@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import { PROVIDERS } from "../../src/constants.ts";
 
 const PRISM_SERVICE_URL = process.env.PRISM_SERVICE_URL || "http://localhost:7777";
 
@@ -14,7 +15,7 @@ describe("Live Function Calling Orchestration", () => {
 
   it("should execute a tool call end-to-end via AgenticLoopService using Anthropic", async () => {
     const payload = {
-      provider: "anthropic",
+      provider: PROVIDERS.ANTHROPIC,
       model: "claude-haiku-4-5-20251001",
       functionCallingEnabled: true,
       enabledTools: ["get_current_weather"],
@@ -38,7 +39,7 @@ describe("Live Function Calling Orchestration", () => {
     expect(Array.isArray(data.toolCalls)).toBe(true);
     expect(data.toolCalls.length).toBeGreaterThan(0);
     
-    const weatherCall = data.toolCalls.find((toolCall) => toolCall.name === "get_current_weather");
+    const weatherCall = data.toolCalls.find((toolCall: any) => toolCall.name === "get_current_weather");
     expect(weatherCall).toBeDefined();
     
     expect(data.usage).toBeDefined();

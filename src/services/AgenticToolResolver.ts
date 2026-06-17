@@ -8,6 +8,7 @@ import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
 import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST, TOOL_NAMES, DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TYPES } from "../config.ts";
 import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
+import { THINKING_PATTERNS, LOCAL_PROVIDER_TYPES } from "./local-provider/constants.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -41,6 +42,8 @@ interface ResolveParams {
   username?: string;
   modelDefinition?: ModelDefinition;
   agentSessionId?: string;
+  providerName?: string;
+  resolvedModel?: string;
 }
 
 /** Orchestrator tools bypass the enabledTools filter for coordinator agents (excluded for sub-agents to prevent recursive spawning) */
@@ -64,7 +67,7 @@ export default class AgenticToolResolver {
    * Handles MCP tools, disabledBuiltIns mode, prefix expansion,
    * and native provider tool collision prevention.
    */
-  static async resolve({ options, agent, project: _project, username: _username, modelDefinition, agentSessionId }: ResolveParams) {
+  static async resolve({ options, agent, project: _project, username: _username, modelDefinition, agentSessionId, providerName, resolvedModel }: ResolveParams) {
     // Ensure tool schemas are loaded from tools-api (lazy init — if tools-api
     // was unreachable at boot, this fetches on-demand before proceeding)
     await ToolOrchestratorService.ensureSchemas();
@@ -249,7 +252,14 @@ export default class AgenticToolResolver {
 
     // When the model has native thinking as a built-in capability, the think
     // tool is redundant — the model reasons natively before each response/tool call.
-    if (modelDefinition?.thinking) {
+    // This mirrors the client's comprehensive detection in ChatSessionComponent.
+    const hasNativeThinking = AgenticToolResolver.detectNativeThinking(
+      modelDefinition,
+      providerName,
+      resolvedModel,
+      options.thinkingEnabled as boolean | undefined,
+    );
+    if (hasNativeThinking) {
       finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.THINK);
     }
 
@@ -258,4 +268,56 @@ export default class AgenticToolResolver {
     );
     return { finalTools, resolvedEnabledTools };
   }
+
+  /**
+   * Detects whether the current model has native thinking/reasoning capability,
+   * making the think tool redundant. Mirrors the client's comprehensive detection
+   * in ChatSessionComponent's `lockedOffTools` useMemo.
+   *
+   * Checks (any truthy = native thinking):
+   *   1. modelDefinition.thinking — static registry flag
+   *   2. modelDefinition.supportsThinking — alternate registry flag
+   *   3. modelDefinition.thinkingLevels — non-empty array = thinking model
+   *   4. modelDefinition.tools includes "Thinking" — tools capability array
+   *   5. Name-based pattern matching for local provider models (THINKING_PATTERNS)
+   *   6. options.thinkingEnabled — client has already determined thinking is active
+   */
+  static detectNativeThinking(
+    modelDefinition?: ModelDefinition,
+    providerName?: string,
+    resolvedModel?: string,
+    thinkingEnabled?: boolean,
+  ): boolean {
+    if (modelDefinition?.thinking) return true;
+    if (modelDefinition?.supportsThinking) return true;
+
+    if (
+      Array.isArray(modelDefinition?.thinkingLevels) &&
+      (modelDefinition!.thinkingLevels as string[]).length > 0
+    ) {
+      return true;
+    }
+
+    if (
+      Array.isArray(modelDefinition?.tools) &&
+      (modelDefinition!.tools as string[]).includes("Thinking")
+    ) {
+      return true;
+    }
+
+    // Name-based detection for local provider models not in the static registry
+    if (providerName && resolvedModel && LOCAL_PROVIDER_TYPES.has(providerName)) {
+      const modelNameLowercase = resolvedModel.toLowerCase();
+      if (THINKING_PATTERNS.some((pattern) => modelNameLowercase.includes(pattern))) {
+        return true;
+      }
+    }
+
+    // When the client explicitly enables thinking, the model's native
+    // reasoning is active and the think tool is redundant
+    if (thinkingEnabled === true) return true;
+
+    return false;
+  }
 }
+

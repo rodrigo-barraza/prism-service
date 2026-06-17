@@ -764,12 +764,12 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
   if (!provider.generateImage) {
     throw new Error(`Provider "${providerName}" does not support image generation`);
   }
-  const result = (await provider.generateImage(
+  const result = await provider.generateImage(
     prompt,
     allImages,
     resolvedModel,
-    options?.systemPrompt,
-  )) as any;
+    options?.systemPrompt as string | undefined,
+  );
   const totalSec = (performance.now() - requestStart) / 1000;
   // Cost calculation
   const imgPricing =
@@ -886,7 +886,7 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
   }
   emit({
     type: SSE_EVENT_TYPES.DONE,
-    usage: result.usage || null,
+    usage: null,
     estimatedCost,
     totalTime: totalSec,
     ...(traceId && { traceId }),

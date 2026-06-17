@@ -11,7 +11,7 @@
  * that enforces the same constraint MongoDB does.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { COLLECTIONS } from "../src/constants.ts";
+import { COLLECTIONS, PROVIDERS } from "../src/constants.ts";
 
 
 // ── Mock config ────────────────────────────────────────────────
@@ -135,7 +135,7 @@ function makeMessages(count = 1) {
       role: "assistant",
       content: `Response ${i}`,
       model: "test-model",
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       timestamp: new Date().toISOString(),
     });
   }
@@ -186,7 +186,7 @@ describe("ConversationService.appendMessages", () => {
           BASE_ARGS.project,
           BASE_ARGS.username,
           makeMessages(2),
-          { title: "User's first message", settings: { provider: "openai", model: "gpt-4o" } },
+          { title: "User's first message", settings: { provider: PROVIDERS.OPENAI, model: "gpt-4o" } },
           { collection: COLLECTIONS.AGENT_CONVERSATIONS },
         ),
       ).resolves.not.toThrow();
@@ -214,7 +214,7 @@ describe("ConversationService.appendMessages", () => {
           BASE_ARGS.project,
           BASE_ARGS.username,
           makeMessages(2),
-          { title: "With trace", traceId: "trace-1", settings: { provider: "google", model: "gemini" } },
+          { title: "With trace", traceId: "trace-1", settings: { provider: PROVIDERS.GOOGLE, model: "gemini" } },
           { collection: COLLECTIONS.AGENT_CONVERSATIONS },
         ),
       ).resolves.not.toThrow();
@@ -251,7 +251,7 @@ describe("ConversationService.appendMessages", () => {
             traceId: "trace-full",
             systemPrompt: "You are helpful",
             parentAgentSessionId: "parent-xyz",
-            settings: { provider: "anthropic", model: "claude-4" },
+            settings: { provider: PROVIDERS.ANTHROPIC, model: "claude-4" },
           },
           // Use conversations collection (not agent_sessions) to exercise systemPrompt path
           { collection: COLLECTIONS.MODEL_CONVERSATIONS },
@@ -339,7 +339,7 @@ describe("ConversationService.appendMessages", () => {
         sessionId,
         BASE_ARGS.project,
         BASE_ARGS.username,
-        [{ role: "assistant", content: "Response", provider: "openai", model: "gpt-4o" }],
+        [{ role: "assistant", content: "Response", provider: PROVIDERS.OPENAI, model: "gpt-4o" }],
         null, // no meta on follow-up
         { collection: COLLECTIONS.AGENT_CONVERSATIONS },
       );
@@ -359,7 +359,7 @@ describe("ConversationService.appendMessages", () => {
         BASE_ARGS.username,
         [
           { role: "user", content: "What is this?" },
-          { role: "assistant", content: "It's a test", provider: "openai", model: "gpt-4o" },
+          { role: "assistant", content: "It's a test", provider: PROVIDERS.OPENAI, model: "gpt-4o" },
         ],
         null,
         { collection: COLLECTIONS.AGENT_CONVERSATIONS },
@@ -376,13 +376,13 @@ describe("ConversationService.appendMessages", () => {
         BASE_ARGS.username,
         [
           { role: "user", content: "Hello" },
-          { role: "assistant", content: "Hi", provider: "anthropic", model: "claude-4" },
+          { role: "assistant", content: "Hi", provider: PROVIDERS.ANTHROPIC, model: "claude-4" },
         ],
-        { settings: { provider: "anthropic", model: "claude-4" } },
+        { settings: { provider: PROVIDERS.ANTHROPIC, model: "claude-4" } },
         { collection: COLLECTIONS.AGENT_CONVERSATIONS },
       );
 
-      expect(result.providers).toContain("anthropic");
+      expect(result.providers).toContain(PROVIDERS.ANTHROPIC);
     });
 
     it("should compute totalCost from appended messages", async () => {
@@ -392,8 +392,8 @@ describe("ConversationService.appendMessages", () => {
         BASE_ARGS.username,
         [
           { role: "user", content: "Hello" },
-          { role: "assistant", content: "Hi", estimatedCost: 0.0025, provider: "openai" },
-          { role: "assistant", content: "More", estimatedCost: 0.0015, provider: "openai" },
+          { role: "assistant", content: "Hi", estimatedCost: 0.0025, provider: PROVIDERS.OPENAI },
+          { role: "assistant", content: "More", estimatedCost: 0.0015, provider: PROVIDERS.OPENAI },
         ],
         null,
         { collection: COLLECTIONS.AGENT_CONVERSATIONS },
@@ -471,7 +471,7 @@ describe("ConversationService.appendMessages", () => {
         sessionId,
         "coding",
         "testuser",
-        [{ role: "assistant", content: "I've set a timer for 1 minute. Stay hydrated! 💧", model: "gemini-3.5-flash", provider: "google" }],
+        [{ role: "assistant", content: "I've set a timer for 1 minute. Stay hydrated! 💧", model: "gemini-3.5-flash", provider: PROVIDERS.GOOGLE }],
         null,
         { collection: COLLECTIONS.AGENT_CONVERSATIONS }
       );
@@ -509,9 +509,9 @@ describe("ConversationService.appendMessages", () => {
         "testuser",
         [
           { role: "user", content: "What's the status?" },
-          { role: "assistant", content: "Let me check.", model: "gemini-3.5-flash", provider: "google" },
+          { role: "assistant", content: "Let me check.", model: "gemini-3.5-flash", provider: PROVIDERS.GOOGLE },
           { role: "tool", content: JSON.stringify({ result: "success" }) },
-          { role: "assistant", content: "All good!", model: "gemini-3.5-flash", provider: "google" },
+          { role: "assistant", content: "All good!", model: "gemini-3.5-flash", provider: PROVIDERS.GOOGLE },
         ],
         null,
         { collection: COLLECTIONS.AGENT_CONVERSATIONS }

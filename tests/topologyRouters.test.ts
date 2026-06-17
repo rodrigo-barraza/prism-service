@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 import type {
   OrchestratorContext,
   SubAgentResult,
@@ -20,9 +21,9 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
 // Mock SettingsService
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
-    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     getSection: vi.fn().mockResolvedValue({
-      subAgentProvider: "google",
+      subAgentProvider: PROVIDERS.GOOGLE,
       subAgentModel: "gemini-3.5-flash",
       topology: "hierarchical",
     }),
@@ -45,7 +46,7 @@ describe("Topology Routers Test Suite", () => {
       project: "test-project",
       username: "test-user",
       agent: "CODING",
-      providerName: "google",
+      providerName: PROVIDERS.GOOGLE,
       resolvedModel: "gemini-3.5-flash",
       traceId: "trace-id-123",
       agentSessionId: "session-id-456",

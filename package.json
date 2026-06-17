@@ -16,6 +16,8 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "test:live": "vitest run --config vitest.live.config.ts",
+    "test:live:agent-behavior": "vitest run --config vitest.live.config.ts tests/live/agentBehavior.live.test.ts",
+    "test:live:agent-behavior:cloud": "INCLUDE_CLOUD=true vitest run --config vitest.live.config.ts tests/live/agentBehavior.live.test.ts",
     "test:lm-studio": "vitest run --config vitest.live.config.ts tests/live/lmStudioModels.live.test.js",
     "vram:bench": "node scripts/vram-bench.js",
     "vram:quick": "node scripts/vram-bench.js --skip-settings --contexts=4k,8k",

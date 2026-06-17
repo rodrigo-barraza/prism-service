@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import BenchmarkService from "../src/services/BenchmarkService.ts";
 import { handleConversation, handleAgent } from "../src/routes/ChatRoutes.ts";
 import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
+import { PROVIDERS } from "../src/constants.ts";
 
 vi.mock("../src/routes/ChatRoutes.ts", () => ({
   handleConversation: vi.fn(),
@@ -56,7 +57,7 @@ describe("BenchmarkService", () => {
 
     const modelTargets = [
       {
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-4o",
         display_name: "Custom Model Name",
         thinkingEnabled: false,
@@ -94,7 +95,7 @@ describe("BenchmarkService", () => {
 
     const modelTargets = [
       {
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-4o",
         display_name: "GPT-4o with Wrench",
         thinkingEnabled: false,
@@ -132,7 +133,7 @@ describe("BenchmarkService", () => {
 
     const modelTargets = [
       {
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-4o",
         display_name: "Normal GPT-4o",
         thinkingEnabled: false,

@@ -7,6 +7,7 @@ import { PROVIDERS } from "../../constants.ts";
 import { resolveArchParams, estimateMemory } from "../../utils/gguf-arch.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import type { ProviderOptions } from "../../types/provider.ts";
 
 const router = express.Router();
 
@@ -44,7 +45,7 @@ router.post(
 
       const provider = getProvider(PROVIDERS.LM_STUDIO) as LmStudioProvider;
 
-      const loadOptions: Record<string, unknown> = {};
+      const loadOptions: ProviderOptions = {};
       if (context_length != null) loadOptions.context_length = context_length;
       if (flash_attention != null)
         loadOptions.flash_attention = flash_attention;
@@ -82,8 +83,8 @@ router.post(
       }
 
       const provider = getProvider(PROVIDERS.LM_STUDIO) as LmStudioProvider;
-      const data = await provider.unloadModel(instance_id);
-      res.json(data);
+      await provider.unloadModel(instance_id);
+      res.json({ success: true, instance_id });
     } catch (error: unknown) {
       logger.error(`Admin /lm-studio/unload error: ${getErrorMessage(error)}`);
       next(error);
@@ -113,8 +114,8 @@ router.post(
       const result = await provider.listModels();
       const allModels = result?.data || result?.models || [];
       const modelData = allModels.find(
-        (record: Record<string, unknown>) => record.id === model || record.path === model || record.key === model,
-      ) as any;
+        (entry) => entry.id === model || entry.key === model,
+      );
 
       if (!modelData) {
         return res.status(404).json({ error: `Model '${model}' not found` });

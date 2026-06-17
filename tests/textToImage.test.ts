@@ -72,7 +72,7 @@ describe("POST /chat (text-to-image via imageAPI model)", () => {
       .post("/chat?stream=false")
       .set("x-api-secret", TEST_SECRET)
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-image-1.5",
         messages: [{ role: "user", content: "A cat" }],
       })
@@ -89,7 +89,7 @@ describe("POST /chat (text-to-image via imageAPI model)", () => {
       .post("/chat?stream=false")
       .set("x-api-secret", TEST_SECRET)
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-image-1.5",
         messages: [
           { role: "user", content: "Edit this image", images },
@@ -108,7 +108,7 @@ describe("POST /chat (text-to-image via imageAPI model)", () => {
       .post("/chat?stream=false")
       .set("x-api-secret", TEST_SECRET)
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-image-1.5",
         messages: [{ role: "user", content: "A dog" }],
       })
@@ -148,7 +148,7 @@ describe("POST /chat (text-to-image via imageAPI model)", () => {
       .post("/chat?stream=false")
       .set("x-api-secret", TEST_SECRET)
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-image-1.5",
         messages: [{ role: "user", content: "A bird" }],
       })
@@ -185,7 +185,7 @@ describe("POST /chat (text-to-image via imageAPI model)", () => {
       .post("/chat?stream=false")
       .set("x-api-secret", TEST_SECRET)
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         model: "gpt-image-1.5",
         messages: [{ role: "user", content: "A cat" }],
       })

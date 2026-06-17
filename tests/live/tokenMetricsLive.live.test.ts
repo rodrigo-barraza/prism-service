@@ -18,6 +18,7 @@
  * ═══════════════════════════════════════════════════════════════
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { PROVIDERS } from "../../src/constants.ts";
 
 const PRISM_SERVICE_URL = "http://localhost:7777";
 const LM_STUDIO_URL = "http://localhost:1234";
@@ -464,9 +465,9 @@ describe("LM Studio — Token Metrics", () => {
 // ═══════════════════════════════════════════════════════════════
 
 describe.each([
-  ["openai", ONLINE_MODELS.openai],
-  ["anthropic", ONLINE_MODELS.anthropic],
-  ["google", ONLINE_MODELS.google],
+  [PROVIDERS.OPENAI, ONLINE_MODELS.openai],
+  [PROVIDERS.ANTHROPIC, ONLINE_MODELS.anthropic],
+  [PROVIDERS.GOOGLE, ONLINE_MODELS.google],
 ])("%s — Token Metrics (%s)", (provider, { model, label }) => {
 
   // ═══════════════════════════════════════════════════════════
@@ -583,9 +584,9 @@ describe.each([
 // aggregate tok/s, and worker completion events.
 
 describe.each([
-  ["openai", ONLINE_MODELS.openai],
-  ["anthropic", ONLINE_MODELS.anthropic],
-  ["google", ONLINE_MODELS.google],
+  [PROVIDERS.OPENAI, ONLINE_MODELS.openai],
+  [PROVIDERS.ANTHROPIC, ONLINE_MODELS.anthropic],
+  [PROVIDERS.GOOGLE, ONLINE_MODELS.google],
 ])("%s — Coordinator + 4 Workers (%s)", (provider, { model, label }) => {
 
   it(`${label}: coordinator spawns 4 workers with accurate per-worker token tracking`, async () => {

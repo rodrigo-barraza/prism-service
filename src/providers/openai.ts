@@ -8,6 +8,7 @@ import { extractOpenAIRateLimits } from "../utils/rateLimits.ts";
 import { OPENAI_API_KEY, OPENAI_TRANSCRIPTION_MODEL } from "../../config.ts";
 import {
   TYPES,
+  MODELS,
   DEFAULT_VOICES,
   getDefaultModels,
   getModelByName,
@@ -104,7 +105,8 @@ export interface OpenAIMessage {
   }>;
   tool_call_id?: string;
   id?: string;
-  [key: string]: unknown;
+  thinking?: string;
+  thinkingSignature?: string;
 }
 
 /**
@@ -1377,7 +1379,7 @@ const openaiProvider = {
     }
   },
 
-  async generateImage(prompt: string, images: Array<string | { imageData: string; mimeType?: string }> = [], model: string = "gpt-image-1.5") {
+  async generateImage(prompt: string, images: Array<string | { imageData: string; mimeType?: string }> = [], model: string = MODELS.GPT_IMAGE_15.name) {
     logger.provider(
       "OpenAI",
       `generateImage model=${model} images=${images.length}`,

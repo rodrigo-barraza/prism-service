@@ -5,6 +5,7 @@ import { getProvider } from "../src/providers/index.ts";
 import EmbeddingService from "../src/services/EmbeddingService.ts";
 import FileService from "../src/services/FileService.ts";
 import MinioWrapper from "../src/wrappers/MinioWrapper.ts";
+import { PROVIDERS } from "../src/constants.ts";
 
 vi.mock("../src/routes/ChatRoutes.ts", () => ({
   handleConversation: vi.fn(),
@@ -65,7 +66,7 @@ describe("WorkflowExecutionService", () => {
     it("should execute nodes in topological order and stream results", async () => {
       const nodes = [
         { id: "node-a", nodeType: "input", modality: "text", content: "hello input" },
-        { id: "node-b", nodeType: "model", provider: "openai", modelName: "gpt-4", outputTypes: ["text"] },
+        { id: "node-b", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: ["text"] },
         { id: "node-c", nodeType: "viewer" },
       ];
       const edges = [
@@ -103,8 +104,8 @@ describe("WorkflowExecutionService", () => {
 
     it("should skip downstream nodes when an upstream node fails", async () => {
       const nodes = [
-        { id: "node-a", nodeType: "model", provider: "openai", modelName: "gpt-4", outputTypes: ["text"] },
-        { id: "node-b", nodeType: "model", provider: "openai", modelName: "gpt-4", outputTypes: ["text"] },
+        { id: "node-a", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: ["text"] },
+        { id: "node-b", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: ["text"] },
       ];
       const edges = [
         { sourceNodeId: "node-a", targetNodeId: "node-b", sourceModality: "text", targetModality: "text" },
@@ -136,7 +137,7 @@ describe("WorkflowExecutionService", () => {
     it("should abort execution mid-flight when the abort signal is triggered", async () => {
       const nodes = [
         { id: "node-a", nodeType: "input", modality: "text", content: "input content" },
-        { id: "node-b", nodeType: "model", provider: "openai", modelName: "gpt-4", outputTypes: ["text"] },
+        { id: "node-b", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: ["text"] },
       ];
       const edges = [
         { sourceNodeId: "node-a", targetNodeId: "node-b", sourceModality: "text", targetModality: "text" },

@@ -3,6 +3,8 @@ import { daysSinceIso } from "@rodrigo-barraza/utilities-library";
 import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
+import type { ChatMessage } from "../types/provider.ts";
+import type { MessagePayload } from "./conversation/types.ts";
 import MemoryService from "./MemoryService.ts";
 import RequestLogger from "./RequestLogger.ts";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
@@ -201,7 +203,7 @@ async function processBatch(
     `[MemoryConsolidation] ${batchLabel} Processing ${clusterCount} clusters, ${staleCount} stale memories`,
   );
 
-  const aiMessages = [
+  const aiMessages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
     { role: "user", content: input },
   ];
@@ -220,7 +222,7 @@ async function processBatch(
 
   try {
     result = await provider.generateText(
-      aiMessages as any,
+      aiMessages,
       consolidationModel,
       {
         maxTokens: LLM_MAX_OUTPUT_TOKENS,
@@ -256,7 +258,7 @@ async function processBatch(
     model: consolidationModel,
     traceId: traceId || null,
     agentSessionId: agentSessionId || null,
-    aiMessages,
+    aiMessages: aiMessages as MessagePayload[],
     resultText: result?.text || "",
     usage: realUsage,
     success: llmSuccess,

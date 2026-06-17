@@ -12,6 +12,7 @@
 // ────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 
 // ── Mock MCP tool schemas ──────────────────────────────────────
 
@@ -95,7 +96,7 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
-    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
+    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     get: vi.fn().mockResolvedValue({}),
     getSection: vi.fn().mockResolvedValue({}),
   },

@@ -256,7 +256,7 @@ describe("POST /chat (text-to-text)", () => {
     await request(app)
       .post("/chat?stream=false")
       .send({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         messages: [{ role: "user", content: "hi" }],
         functionCallingEnabled: true,
         enabledTools: ["get_weather"],
