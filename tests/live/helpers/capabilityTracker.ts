@@ -35,21 +35,11 @@ export const CAPABILITIES = {
   TOOL_COMPLIANCE: "tool-compliance",
   TOOL_CHAINING: "tool-chaining",
   TOOL_ERROR_RECOVERY: "tool-error-recovery",
-  THINKING_GENERATION: "thinking-generation",
-  THINKING_SEPARATION: "thinking-separation",
+  THINKING_QUALITY: "thinking-quality",
   MULTI_TURN_RECALL: "multi-turn-recall",
-  MULTI_TURN_STABILITY: "multi-turn-stability",
   PLAN_MODE_COMPLIANCE: "plan-mode-compliance",
   MULTI_AGENT_ORCHESTRATION: "multi-agent-orchestration",
   USAGE_REPORTING: "usage-reporting",
-  MAX_TOKENS_COMPLIANCE: "max-tokens-compliance",
-  UNICODE_HANDLING: "unicode-handling",
-  EMPTY_INPUT_HANDLING: "empty-input-handling",
-  LARGE_INPUT_HANDLING: "large-input-handling",
-  OUTPUT_QUALITY: "output-quality",
-  ITERATION_LIMIT_COMPLIANCE: "iteration-limit-compliance",
-  SSE_STRUCTURE: "sse-structure",
-  SESSION_ISOLATION: "session-isolation",
 } as const;
 
 // ── Tracker Implementation ──────────────────────────────────────
