@@ -114,3 +114,40 @@ export const ITERATION_STRESS =
   "4. Read /etc/os-release\n" +
   "5. List files in /var\n" +
   "Complete all steps using tools.";
+
+// ── Plan Mode Exit ─────────────────────────────────────────────
+
+export const PLAN_MODE_EXIT_INSTRUCTION =
+  "The plan looks good. Please exit plan mode now and proceed with implementation. " +
+  "Call the exit_plan_mode tool to leave planning mode.";
+
+// ── Context Window Stress ──────────────────────────────────────
+
+export const CONTEXT_WINDOW_FILLER_MESSAGE =
+  "This is a context window filler message that contains a lot of text to push " +
+  "the conversation closer to the context window limit. ".repeat(200);
+
+// ── Truncation Recovery Verification ───────────────────────────
+
+export const LONG_STRUCTURED_OUTPUT =
+  "Write a detailed numbered list of the first 50 elements on the periodic table. " +
+  "For each element, include its symbol, atomic number, and a one-sentence description. " +
+  "Do not skip any elements. Output ALL 50.";
+
+// ── Error Recovery ─────────────────────────────────────────────
+
+export const POST_ERROR_HEALTH_CHECK =
+  "Say 'system healthy' and nothing else.";
+
+// ── Tree-of-Thought Branch Verification ────────────────────────
+
+export const TREE_OF_THOUGHT_BRANCH_PROMPT =
+  "Should I use a linked list or an array for a queue implementation? " +
+  "Consider different approaches and pick the best one. Explain briefly.";
+
+// ── Dynamic Tool Discovery ─────────────────────────────────────
+
+export const SEARCH_FOR_TOOLS =
+  "Search for available tools that can help with file operations. " +
+  "Use the search_tools tool to find them.";
+
