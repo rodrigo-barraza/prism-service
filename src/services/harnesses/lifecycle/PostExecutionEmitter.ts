@@ -1,6 +1,6 @@
 import logger from "../../../utils/logger.ts";
 import { TOOL_NAMES } from "../../ToolTaxonomyConstants.ts";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type { ToolCall, ToolResult, PassState, EmitFunction, AgenticContext } from "../types.ts";
@@ -40,7 +40,7 @@ export function emitPostExecutionStatus(
         toolCall.name.includes("_task") || toolCall.name.startsWith("task_"),
     )
   ) {
-    emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.TASKS_UPDATED });
+    emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.TASKS_UPDATED });
   }
 
   if (
@@ -52,11 +52,11 @@ export function emitPostExecutionStatus(
         toolCall.name === TOOL_NAMES.STOP_AGENT,
     )
   ) {
-    emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.SUB_AGENTS_UPDATED });
+    emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.SUB_AGENTS_UPDATED });
   }
 
   if (toolCalls.some((toolCall) => toolCall.name === TOOL_NAMES.SAVE_MEMORY)) {
-    emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.MEMORIES_UPDATED });
+    emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.MEMORIES_UPDATED });
   }
 }
 
@@ -88,7 +88,7 @@ export async function processToolResultMedia(
           delete resultObject.audio;
         }
         emit({
-          type: SSE_EVENT_TYPES.AUDIO,
+          type: SERVER_SENT_EVENT_TYPES.AUDIO,
           data: uploadResult.ref,
           mimeType,
           minioRef: uploadResult.ref,
@@ -99,7 +99,7 @@ export async function processToolResultMedia(
     }
 
     emit({
-      type: SSE_EVENT_TYPES.TOOL_EXECUTION,
+      type: SERVER_SENT_EVENT_TYPES.TOOL_EXECUTION,
       tool: {
         name: toolCall.name,
         args: toolCall.args || {},
@@ -140,7 +140,7 @@ export async function processToolResultMedia(
       state.streamedImages.push(toolImgRef);
       pass.streamedImages.push(toolImgRef);
       emit({
-        type: SSE_EVENT_TYPES.IMAGE,
+        type: SERVER_SENT_EVENT_TYPES.IMAGE,
         data: imageResult.data,
         mimeType: imageResult.mimeType,
         minioRef: imageResult.minioRef,
@@ -172,7 +172,7 @@ export function trackToolErrors(
           `[AgenticLoop] Tool "${toolCall.name}" hit error limit (${count}), skipping in future iterations`,
         );
         emit({
-          type: SSE_EVENT_TYPES.STATUS,
+          type: SERVER_SENT_EVENT_TYPES.STATUS,
           message: `Tool "${toolCall.name}" failed ${count} times consecutively — skipping`,
         });
       }

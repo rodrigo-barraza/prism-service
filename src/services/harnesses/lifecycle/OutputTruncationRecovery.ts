@@ -18,7 +18,7 @@
 
 import logger from "../../../utils/logger.ts";
 import type { ConversationMessage, PassState, AgenticContext } from "../types.ts";
-import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 /** Maximum number of auto-continuation attempts before giving up. */
 export const MAX_OUTPUT_TRUNCATION_RECOVERIES = 3;
@@ -93,7 +93,7 @@ export function injectContinuationContext(
   );
 
   context.emit({
-    type: SSE_EVENT_TYPES.STATUS,
+    type: SERVER_SENT_EVENT_TYPES.STATUS,
     message: "output_truncation_recovery",
     attempt: recoveryAttempt,
     maxAttempts: MAX_OUTPUT_TRUNCATION_RECOVERIES,
@@ -124,7 +124,7 @@ export function injectErrorAsConversationMessage(
   currentMessages.push(errorMessage);
 
   context.emit({
-    type: SSE_EVENT_TYPES.CHUNK,
+    type: SERVER_SENT_EVENT_TYPES.CHUNK,
     content: errorMessage.content,
   });
 

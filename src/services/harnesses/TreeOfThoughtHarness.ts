@@ -1,6 +1,6 @@
 import BaseAgenticHarness from "./BaseAgenticHarness.ts";
 import logger from "../../utils/logger.ts";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
 import { executeToolBatch } from "./lifecycle/ToolExecutor.ts";
@@ -176,7 +176,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       hookContext._injectedSkills.length > 0
     ) {
       emit({
-        type: SSE_EVENT_TYPES.STATUS,
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.SKILLS_INJECTED,
         skills: hookContext._injectedSkills,
       });
@@ -189,7 +189,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       state.iterations++;
 
       emit({
-        type: SSE_EVENT_TYPES.STATUS,
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.ITERATION_PROGRESS,
         iteration: state.iterations,
         maxIterations: resolvedMaxIterations,
@@ -252,7 +252,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
       emit({
-        type: SSE_EVENT_TYPES.STATUS,
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.BRANCHING_STARTED,
         branchCount,
         iteration: state.iterations,
@@ -304,7 +304,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       state.streamedThinking = selectedBranch.pass.streamedThinking;
 
       emit({
-        type: SSE_EVENT_TYPES.STATUS,
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.BRANCH_SELECTED,
         branchIndex: selectedBranch.branchIndex,
         score: selectedBranch.score,
@@ -412,7 +412,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
         if (validationFeedback.length > 0 && scoredBranches.length > 1) {
           state.branchesBacktracked++;
           emit({
-            type: SSE_EVENT_TYPES.STATUS,
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
             message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
             branchIndex: selectedBranch.branchIndex,
             validationErrors: validationFeedback.length,

@@ -1,9 +1,9 @@
-import { bootstrapEnv } from "@rodrigo-barraza/utilities-library/vault";
+import { bootstrapEnvironment } from "@rodrigo-barraza/utilities-library/vault";
 import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
 import fs from "fs";
 
 async function main() {
-  await bootstrapEnv();
+  await bootstrapEnvironment();
 
   const mongoUri = "mongodb://rodrigo:jLhNbFA3kt9k7BnwL-sW@192.168.86.2:27017/?directConnection=true&replicaSet=rs0&authSource=admin";
   const mongoDbName = "prism";

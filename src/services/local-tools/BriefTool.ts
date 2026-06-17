@@ -1,5 +1,5 @@
 import logger from "../../utils/logger.ts";
-import { SSE_EVENT_TYPES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SERVER_SENT_EVENT_TYPES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
 interface BriefContext extends InternalToolContext {
@@ -69,7 +69,7 @@ export default {
     );
 
     if (context._emit) {
-      context._emit({ type: SSE_EVENT_TYPES.BRIEF_UPDATE, brief });
+      context._emit({ type: SERVER_SENT_EVENT_TYPES.BRIEF_UPDATE, brief });
     }
 
     return { acknowledged: true, brief };

@@ -1,6 +1,6 @@
 import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
 import ToolContext from "../../ToolContext.ts";
-import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type AgentHooks from "../../AgentHooks.ts";
@@ -51,7 +51,7 @@ export async function executeToolBatch(
           toolCall.args as Record<string, unknown>,
           (event: string, data: string | null, meta?: Record<string, unknown>) => {
             emit({
-              type: SSE_EVENT_TYPES.TOOL_OUTPUT,
+              type: SERVER_SENT_EVENT_TYPES.TOOL_OUTPUT,
               toolCallId: toolCall.id,
               name: toolCall.name,
               event,

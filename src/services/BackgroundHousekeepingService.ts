@@ -15,7 +15,7 @@
 
 import { readdir, stat, rm } from "node:fs/promises";
 import { resolve } from "node:path";
-import { MS_PER_DAY, hours } from "@rodrigo-barraza/utilities-library";
+import { MILLISECONDS_PER_DAY, hours } from "@rodrigo-barraza/utilities-library";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
@@ -26,7 +26,7 @@ import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Worktrees older than this are considered orphaned */
-const WORKTREE_MAX_AGE_MS = MS_PER_DAY;
+const WORKTREE_MAX_AGE_MS = MILLISECONDS_PER_DAY;
 
 /** Temp worktree root directory used by OrchestratorService */
 const WORKTREE_ROOT = "/tmp/prism-worktrees";
@@ -140,7 +140,7 @@ async function pruneOldRequestLogs(): Promise<number> {
   if (!db) return 0;
 
   const cutoff = new Date(
-    Date.now() - REQUEST_LOG_MAX_AGE_DAYS * MS_PER_DAY
+    Date.now() - REQUEST_LOG_MAX_AGE_DAYS * MILLISECONDS_PER_DAY
   ).toISOString();
   const result = await db.collection(COLLECTIONS.REQUESTS).deleteMany({
     timestamp: { $lt: cutoff },

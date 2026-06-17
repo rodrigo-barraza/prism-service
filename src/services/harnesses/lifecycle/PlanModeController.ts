@@ -1,7 +1,7 @@
 import PlanningModeService from "../../PlanningModeService.ts";
 import { pendingApprovals } from "../../ApprovalRegistry.ts";
 import logger from "../../../utils/logger.ts";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type {
@@ -137,11 +137,11 @@ export async function handleExitPlanMode(
 
   if (!planApproved || signal?.aborted) {
     emit({
-      type: SSE_EVENT_TYPES.STATUS,
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: "Plan rejected — execution cancelled.",
     });
     emit({
-      type: SSE_EVENT_TYPES.DONE,
+      type: SERVER_SENT_EVENT_TYPES.DONE,
       usage: state.overallUsage,
       totalTime: (performance.now() - (context.requestStart ?? performance.now())) / 1000,
     });
@@ -163,7 +163,7 @@ export async function handleExitPlanMode(
   state.planModeActive = false;
   state.planModeText = "";
   PlanningModeService.stripPlanningInstruction(currentMessages);
-  emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.PLAN_MODE_EXITED });
+  emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.PLAN_MODE_EXITED });
 
   return { shouldContinueLoop: true };
 }
@@ -183,6 +183,6 @@ export function checkForPlanModeEntry(
     state.planModeActive = true;
     state.planModeText = "";
     PlanningModeService.injectPlanningInstruction(currentMessages);
-    emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.PLAN_MODE_ENTERED });
+    emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.PLAN_MODE_ENTERED });
   }
 }

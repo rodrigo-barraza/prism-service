@@ -7,22 +7,22 @@
 // This adapter bridges the legacy API to the shared library:
 //   createClient(name, uri) → MongoManager.connect(uri, { name })
 //   getClient(name)         → ❌ deprecated — use getDb(name) instead
-//   getDb(name)             → MongoManager.getDB(name)
+//   getDb(name)             → MongoManager.getDatabase(name)
 //   getCollection(db, col)  → MongoManager.getCollection(col, db)
 //   closeClient(name)       → MongoManager.disconnect(name)
 // ─────────────────────────────────────────────────────────────────────
 
 import {
-  connectDB,
-  getDB,
+  connectDatabase,
+  getDatabase,
   getCollection,
-  disconnectDB,
+  disconnectDatabase,
 } from "@rodrigo-barraza/service-library/mongo";
 import logger from "../utils/logger.ts";
 
 const MongoWrapper = {
   async createClient(name: string, uri: string) {
-    return connectDB(uri, { name, dbName: name, logger });
+    return connectDatabase(uri, { name, dbName: name, logger });
   },
   getClient(_name: string) {
     // Deprecated — getClient returns the raw MongoClient, which is no
@@ -33,14 +33,14 @@ const MongoWrapper = {
     );
   },
   getDb(name: string) {
-    return getDB(name);
+    return getDatabase(name);
   },
   getCollection(dbName: string, collectionName: string) {
     // Note: service-library uses (collectionName, dbName) — reversed order
     return getCollection(collectionName, dbName);
   },
   closeClient(name: string) {
-    return disconnectDB(name);
+    return disconnectDatabase(name);
   },
 };
 

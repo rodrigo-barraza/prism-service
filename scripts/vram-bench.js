@@ -1213,7 +1213,7 @@ function logKV(key, value, indent = 4) {
 let _db = null;
 let _mongoClient = null;
 
-async function connectDB() {
+async function connectDatabase() {
   if (NO_DB || !MONGO_URI || !MONGO_DB_NAME) return null;
   try {
     _mongoClient = new MongoClient(MONGO_URI);
@@ -1445,7 +1445,7 @@ async function main() {
   logHeader(`VRAM Benchmark — ${provider.name}`);
 
   // ── Step 0: Connect to MongoDB ───────────────────────────
-  await connectDB();
+  await connectDatabase();
 
   // ── Step 0.5: Collect System Profile ─────────────────────
   logSection("System Profile");

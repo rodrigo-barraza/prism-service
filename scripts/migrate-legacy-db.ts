@@ -1,15 +1,15 @@
-import { bootstrapEnv } from "@rodrigo-barraza/utilities-library/vault";
-await bootstrapEnv();
+import { bootstrapEnvironment } from "@rodrigo-barraza/utilities-library/vault";
+await bootstrapEnvironment();
 
-import { connectDB, getDB, getCollection, disconnectDB } from "@rodrigo-barraza/service-library/mongo";
+import { connectDatabase, getDatabase, getCollection, disconnectDatabase } from "@rodrigo-barraza/service-library/mongo";
 import { MONGO_DB_NAME, MONGO_URI } from "../config.ts";
 
 const dbName = MONGO_DB_NAME || "prism";
 const mongoUri = MONGO_URI || "mongodb://rodrigo:jLhNbFA3kt9k7BnwL-sW@192.168.86.2:27017/?directConnection=true&replicaSet=rs0&authSource=admin";
 
 console.log("Connecting to MongoDB:", mongoUri);
-await connectDB(mongoUri, { name: dbName, dbName: dbName });
-const db = getDB(dbName);
+await connectDatabase(mongoUri, { name: dbName, dbName: dbName });
+const db = getDatabase(dbName);
 
 if (db) {
   // 1. Rename workers -> subAgents in agent_conversations
@@ -66,6 +66,6 @@ if (db) {
   console.error("Failed to retrieve DB instance.");
 }
 
-await disconnectDB(MONGO_DB_NAME);
+await disconnectDatabase(MONGO_DB_NAME);
 console.log("Migration complete.");
 process.exit(0);

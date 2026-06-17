@@ -1,5 +1,5 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import { formatCostTag, roundMs, errorMessage } from "@rodrigo-barraza/utilities-library";
+import { formatCostTag, roundMilliseconds, errorMessage } from "@rodrigo-barraza/utilities-library";
 import express, { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
@@ -164,7 +164,7 @@ export async function handleVoice(
       traceId: traceId || null,
       success: true,
       inputCharacters: text.length,
-      totalTime: roundMs(totalSec),
+      totalTime: roundMilliseconds(totalSec),
     });
     emitJSON({ type: "done" });
     // Auto-append to conversation
@@ -198,7 +198,7 @@ export async function handleVoice(
         provider: providerName,
         voice: voice || undefined,
         timestamp: new Date().toISOString(),
-        totalTime: roundMs(totalSec),
+        totalTime: roundMilliseconds(totalSec),
       });
       const meta = conversationMeta
         ? { ...conversationMeta, settings: { provider: providerName, model } }
@@ -446,7 +446,7 @@ router.post(
         inputTokens: result.usage?.inputTokens || 0,
         outputTokens: result.usage?.outputTokens || 0,
         estimatedCost,
-        totalTime: roundMs(totalSec),
+        totalTime: roundMilliseconds(totalSec),
       });
       // ── Conversation persistence ────────────────────────────────
       if (conversationId) {
@@ -476,7 +476,7 @@ router.post(
             model: model || undefined,
             provider: providerName,
             timestamp: new Date().toISOString(),
-            totalTime: roundMs(totalSec),
+            totalTime: roundMilliseconds(totalSec),
             estimatedCost: estimatedCost ?? undefined,
             usage: result.usage || undefined,
           },
@@ -512,7 +512,7 @@ router.post(
         text: result.text,
         usage: result.usage || {},
         estimatedCost,
-        totalTime: roundMs(totalSec),
+        totalTime: roundMilliseconds(totalSec),
         ...(traceId && { traceId }),
       });
     } catch (error: unknown) {
