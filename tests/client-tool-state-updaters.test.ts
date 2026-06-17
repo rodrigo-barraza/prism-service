@@ -20,6 +20,7 @@ import {
 } from "../../prism-client/src/utils/toolCallStateUpdaters.ts";
 
 import type { Message, ToolCallEvent } from "../../prism-client/src/types/types.ts";
+import { prepareDisplayMessages } from "../../prism-client/src/utils/messageHelpers.ts";
 
 type DisplayMessage = Omit<Message, "tool_calls"> & {
   tool_calls?: Array<{
@@ -32,82 +33,7 @@ type DisplayMessage = Omit<Message, "tool_calls"> & {
   }>;
 };
 
-// ── Reimplementation of prepareDisplayMessages ───────────────────
-// This helper is duplicated locally because importing it from
-// MessageListComponent.tsx pulls in CSS modules and React components
-// that cannot be parsed in the service's Node/Vitest backend environment.
-function prepareDisplayMessages(
-  rawMessages: DisplayMessage[] | undefined | null,
-): DisplayMessage[] {
-  if (!rawMessages || rawMessages.length === 0) return [];
-
-  const normalizedMessages = rawMessages.map((message) => {
-    if ((message as any).tool_calls && !message.toolCalls) {
-      const normalizedCalls = (message as any).tool_calls.map(
-        (toolCall: any) => ({
-          id: toolCall.id,
-          name: toolCall.name || toolCall.function?.name,
-          args:
-            typeof toolCall.args === "string"
-              ? JSON.parse(toolCall.args)
-              : toolCall.args ||
-                (typeof toolCall.function?.arguments === "string"
-                  ? JSON.parse(toolCall.function.arguments)
-                  : toolCall.function?.arguments) ||
-                {},
-          result: toolCall.result,
-          status: toolCall.status,
-        }),
-      );
-      return { ...message, toolCalls: normalizedCalls };
-    }
-    return message;
-  });
-
-  const toolResults: Record<string, string> = {};
-  for (const message of normalizedMessages) {
-    if (message.role === "tool") {
-      const id = message.tool_call_id || message.toolCallId;
-      if (id) toolResults[id] = message.content || "";
-    }
-  }
-
-  const filtered = normalizedMessages
-    .filter((message) => {
-      if (message.role === "tool") return false;
-      if (message.role === "system") return false;
-      const isEmptyAssistant =
-        message.role === "assistant" &&
-        !message.content?.trim() &&
-        !message.toolCalls?.length &&
-        !message.images?.length &&
-        !message.audio &&
-        !message.error;
-      return !isEmptyAssistant;
-    })
-    .map((message) => {
-      if (
-        message.toolCalls &&
-        message.toolCalls.length > 0 &&
-        Object.keys(toolResults).length > 0
-      ) {
-        const enrichedCalls = message.toolCalls.map(
-          (toolCall: ToolCallEvent) => ({
-            ...toolCall,
-            result:
-              toolCall.result ||
-              toolResults[toolCall.id] ||
-              toolResults[(toolCall as any).tool_call_id || ""] ||
-              null,
-          }),
-        );
-        return { ...message, toolCalls: enrichedCalls };
-      }
-      return message;
-    });
-
-  return filtered;
-}
+// prepareDisplayMessages is now imported directly from prism-client utils
 
 
 
@@ -314,7 +240,7 @@ describe("applyToolExecutionToMessages", () => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 describe("prepareDisplayMessages", () => {
-  it("filters out system and tool role messages", () => {
+  it("retains system messages and filters out tool role messages", () => {
     const raw: DisplayMessage[] = [
       { role: "system", content: "You are helpful" },
       { role: "user", content: "hello" },
@@ -323,9 +249,10 @@ describe("prepareDisplayMessages", () => {
     ];
 
     const result = prepareDisplayMessages(raw);
-    expect(result).toHaveLength(2);
-    expect(result[0].role).toBe("user");
-    expect(result[1].role).toBe("assistant");
+    expect(result).toHaveLength(3);
+    expect(result[0].role).toBe("system");
+    expect(result[1].role).toBe("user");
+    expect(result[2].role).toBe("assistant");
   });
 
   it("filters out empty assistant messages", () => {
