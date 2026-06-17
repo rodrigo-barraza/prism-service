@@ -13,9 +13,9 @@
 
 // ── Constants ───────────────────────────────────────────────────
 
-const PRISM_SERVICE_URL = "http://localhost:7777";
-const LM_STUDIO_URL = "http://localhost:1234";
-const OLLAMA_URL = "http://localhost:11434";
+const PRISM_SERVICE_URL = process.env.PRISM_TEST_URL || "https://api.prism.rod.dev";
+const LM_STUDIO_URL = process.env.LM_STUDIO_TEST_URL || "https://api.prism.rod.dev/lm-studio";
+const OLLAMA_URL = process.env.OLLAMA_TEST_URL || "https://api.prism.rod.dev/ollama";
 
 const DEFAULT_AGENT_TIMEOUT_MS = 120_000;
 const CLOUD_AGENT_TIMEOUT_MS = 60_000;
@@ -332,66 +332,62 @@ const TOOL_CALLING_SKIP_PATTERNS = [
 ];
 
 /**
- * Discover available LM Studio models.
+ * Discover available LM Studio models via Prism's /lm-studio/models endpoint.
+ * Checks multiple instances (lm-studio, lm-studio-2, ..., lm-studio-4).
  */
 async function discoverLmStudioModels(): Promise<ProviderTarget[]> {
-  try {
-    const response = await fetch(`${LM_STUDIO_URL}/api/v1/models`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!response.ok) return [];
-    const data = (await response.json()) as { models?: Array<{ key?: string; id?: string; type?: string }>; data?: Array<{ id?: string }> };
-    const models = data.models || data.data || [];
+  const targets: ProviderTarget[] = [];
+  const instanceIds = ["lm-studio", "lm-studio-2", "lm-studio-3", "lm-studio-4"];
 
-    // Find a loaded conversational model
-    const loaded = (models as Array<Record<string, unknown>>).find(
-      (model) =>
-        ((model.loaded_instances as unknown[])?.length ?? 0) > 0 &&
-        model.type !== "embedding",
-    );
-
-    if (!loaded) {
-      const firstConversational = models.find(
-        (model) => (model as Record<string, unknown>).type !== "embedding",
+  for (const instanceId of instanceIds) {
+    try {
+      const response = await fetch(
+        `${PRISM_SERVICE_URL}/lm-studio/models?instance=${instanceId}`,
+        { signal: AbortSignal.timeout(10_000) },
       );
-      if (!firstConversational) return [];
-      const modelKey = (firstConversational as Record<string, unknown>).key as string ||
-        (firstConversational as Record<string, unknown>).id as string;
-      return [
-        {
-          providerName: "lm-studio",
+      if (!response.ok) continue;
+
+      const data = (await response.json()) as {
+        models?: Array<Record<string, unknown>>;
+        data?: Array<Record<string, unknown>>;
+      };
+      const models = data.models || data.data || [];
+
+      // Find loaded conversational models on this instance
+      const loadedModels = models.filter(
+        (model) =>
+          ((model.loaded_instances as unknown[])?.length ?? 0) > 0 &&
+          model.type !== "embedding",
+      );
+
+      for (const loadedModel of loadedModels) {
+        const modelKey = (loadedModel.key as string) || (loadedModel.id as string);
+        if (!modelKey) continue;
+
+        targets.push({
+          providerName: instanceId,
           model: modelKey,
           isLocal: true,
           supportsThinking: THINKING_MODEL_PATTERNS.some((pattern) => pattern.test(modelKey)),
           supportsToolCalling: true,
           timeoutMultiplier: 2,
-        },
-      ];
+        });
+      }
+    } catch {
+      // Instance doesn't exist or not reachable — skip silently
     }
-
-    const modelKey = (loaded.key as string) || (loaded.id as string);
-    return [
-      {
-        providerName: "lm-studio",
-        model: modelKey,
-        isLocal: true,
-        supportsThinking: THINKING_MODEL_PATTERNS.some((pattern) => pattern.test(modelKey)),
-        supportsToolCalling: true,
-        timeoutMultiplier: 2,
-      },
-    ];
-  } catch {
-    return [];
   }
+
+  return targets;
 }
 
 /**
- * Discover available Ollama models.
+ * Discover available Ollama models via Prism's proxy endpoint.
  */
 async function discoverOllamaModels(): Promise<ProviderTarget[]> {
   try {
-    const response = await fetch(`${OLLAMA_URL}/api/tags`, {
-      signal: AbortSignal.timeout(5000),
+    const response = await fetch(`${PRISM_SERVICE_URL}/ollama/tags`, {
+      signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) return [];
     const data = (await response.json()) as { models?: Array<{ name: string }> };
@@ -399,7 +395,6 @@ async function discoverOllamaModels(): Promise<ProviderTarget[]> {
 
     if (models.length === 0) return [];
 
-    // Pick the first non-embedding model
     const conversationalModel = models.find(
       (model) => !TOOL_CALLING_SKIP_PATTERNS.some((pattern) => pattern.test(model.name)),
     );
@@ -512,6 +507,48 @@ export function getMultiAgentTimeout(target: ProviderTarget): number {
 
 export { CLOUD_AGENT_TIMEOUT_MS, DEFAULT_AGENT_TIMEOUT_MS, MULTI_AGENT_TIMEOUT_MS };
 
+// ── Empty Response Detection ────────────────────────────────────
+
+/**
+ * Check if the agent produced a meaningful response (non-empty text/thinking/tool calls).
+ * Returns false when the model was saturated and produced 0 output tokens.
+ */
+export function isEmptyResponse(result: AgentSSEResult): boolean {
+  return (
+    result.text.length === 0 &&
+    result.thinking.length === 0 &&
+    result.toolExecutions.length === 0 &&
+    result.toolCalls.length === 0
+  );
+}
+
+/**
+ * Retry an agent stream request up to maxRetries times when the model returns
+ * an empty response (0 output tokens). This handles model saturation under
+ * heavy sequential test load against local models.
+ */
+export async function agentStreamWithRetry(
+  payload: Parameters<typeof agentStream>[0],
+  options: { timeoutMs?: number; maxRetries?: number } = {},
+): Promise<AgentSSEResult> {
+  const maximumRetries = options.maxRetries ?? 2;
+  let lastResult: AgentSSEResult | null = null;
+
+  for (let attemptIndex = 0; attemptIndex <= maximumRetries; attemptIndex++) {
+    if (attemptIndex > 0) {
+      const backoffMs = 10_000 * attemptIndex;
+      console.log(`    ↻ Retry ${attemptIndex}/${maximumRetries} after ${backoffMs / 1000}s backoff (empty response — model recovery)`);
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
+
+    lastResult = await agentStream(payload, { timeoutMs: options.timeoutMs });
+
+    if (!isEmptyResponse(lastResult)) return lastResult;
+  }
+
+  return lastResult!;
+}
+
 // ── Assertion Helpers ───────────────────────────────────────────
 
 /**
@@ -602,13 +639,34 @@ export function assertCleanCompletion(result: AgentSSEResult): void {
 }
 
 /**
+ * Get effective usage from the best available source.
+ * LM Studio's OpenAI-compat streaming endpoint reports 0 tokens in the
+ * done event's usage. Fall back to the last usage_update event which
+ * accurately tracks accumulated tokens during streaming.
+ */
+export function getEffectiveUsage(result: AgentSSEResult): UsageData {
+  const doneUsage = result.done?.usage;
+  const hasDoneUsage = doneUsage &&
+    ((doneUsage.inputTokens ?? 0) > 0 || (doneUsage.outputTokens ?? 0) > 0);
+
+  if (hasDoneUsage) return doneUsage;
+
+  // Fall back to the last usage_update event (streaming accumulator)
+  if (result.usageUpdates.length > 0) {
+    const lastUpdate = result.usageUpdates[result.usageUpdates.length - 1];
+    if (lastUpdate.usage) return lastUpdate.usage;
+  }
+
+  return doneUsage || { inputTokens: 0, outputTokens: 0 };
+}
+
+/**
  * Assert that usage data has non-zero input and output tokens.
+ * Falls back to usage_update events when the done event reports 0
+ * (known LM Studio OpenAI-compat limitation).
  */
 export function assertUsagePresent(result: AgentSSEResult): void {
-  const usage = result.done?.usage;
-  if (!usage) {
-    throw new Error("No usage data in done event");
-  }
+  const usage = getEffectiveUsage(result);
   if (!usage.inputTokens || usage.inputTokens <= 0) {
     throw new Error(`Expected inputTokens > 0 but got ${usage.inputTokens}`);
   }
