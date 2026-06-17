@@ -8,7 +8,7 @@ import {
 } from "../providers/instance-registry.ts";
 
 
-import { SSE_EVENT_TYPES, STATUS_MESSAGES, DEFAULT_TOPOLOGY, TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES, DEFAULT_TOPOLOGY, TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import localModelQueue from "./LocalModelQueue.ts";
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "./OrchestratorPrompt.ts";
@@ -401,7 +401,7 @@ export default class OrchestratorService {
       // Notify frontend immediately so the StatusBar stops showing "Generating..."
       if (orchestratorContext.emit) {
         orchestratorContext.emit({
-          type: SSE_EVENT_TYPES.SUB_AGENT_STATUS,
+          type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
           workerId: agentId,
           message: "failed",
           error: getErrorMessage(error),
@@ -411,7 +411,7 @@ export default class OrchestratorService {
 
     // Notify UI that sub-agent state changed
     if (orchestratorContext.emit) {
-      orchestratorContext.emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.SUB_AGENTS_UPDATED });
+      orchestratorContext.emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.SUB_AGENTS_UPDATED });
     }
 
     const subAgentResult = buildSubAgentResult(subAgentState);

@@ -16,7 +16,7 @@
  *   MONGO_DB_NAME (or PRISM_MONGO_DB_NAME) — database name (default: "prism")
  */
 
-import { connectDB, getDB, disconnectDB } from "@rodrigo-barraza/service-library/mongo";
+import { connectDatabase, getDatabase, disconnectDatabase } from "@rodrigo-barraza/service-library/mongo";
 import { computeModalities, computeTotalCost, extractProviders } from "../src/services/conversation/utils.ts";
 import type { Db, Document } from "mongodb";
 
@@ -133,9 +133,9 @@ async function main() {
   }
 
   console.log(`Connecting to MongoDB: ${MONGO_DB_NAME}`);
-  await connectDB(MONGO_URI, { name: MONGO_DB_NAME, dbName: MONGO_DB_NAME });
+  await connectDatabase(MONGO_URI, { name: MONGO_DB_NAME, dbName: MONGO_DB_NAME });
 
-  const database = getDB(MONGO_DB_NAME);
+  const database = getDatabase(MONGO_DB_NAME);
   if (!database) {
     console.error("Failed to get database instance");
     process.exit(1);
@@ -163,7 +163,7 @@ async function main() {
   console.log(`Total skipped:  ${totalStatistics.skipped}`);
   console.log(`Total errors:   ${totalStatistics.errors}`);
 
-  await disconnectDB(MONGO_DB_NAME);
+  await disconnectDatabase(MONGO_DB_NAME);
   process.exit(totalStatistics.errors > 0 ? 1 : 0);
 }
 

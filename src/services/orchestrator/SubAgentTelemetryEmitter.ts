@@ -5,7 +5,7 @@
 
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
 import { estimateTokens } from "./SubAgentResultBuilder.ts";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { EmitFunction, ToolCall } from "../harnesses/types.ts";
 
 interface SubAgentTelemetryConfig {
@@ -110,7 +110,7 @@ export class SubAgentTelemetryEmitter {
       this.highWaterMarkInputTokens = Math.max(this.highWaterMarkInputTokens, stats.totalInputTokens);
       this.highWaterMarkTotalTokens = Math.max(this.highWaterMarkTotalTokens, stats.totalTokens);
       this.parentEmit({
-        type: SSE_EVENT_TYPES.STATUS,
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.GENERATION_PROGRESS,
         tokPerSec: stats.tokPerSec,
         activeRequests: stats.activeRequests,

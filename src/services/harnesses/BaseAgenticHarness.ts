@@ -17,7 +17,7 @@ import { COLLECTIONS, FILE_CATEGORIES } from "../../constants.ts";
 import { finalizeTextGeneration, type FinalizerContext, computeNewTurnMessages } from "./lifecycle/Finalizer.ts";
 import logger from "../../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import ToolContext from "../ToolContext.ts";
 import InternalToolRegistry from "../local-tools/InternalToolRegistry.ts";
@@ -158,7 +158,7 @@ export default class BaseAgenticHarness {
     };
 
     this.context.emit({
-      type: SSE_EVENT_TYPES.STATUS,
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: STATUS_MESSAGES.TOOL_SET_CHANGED,
       enabledCount: filteredTools.length,
       dynamicTools: dynamicEnabledArray,
@@ -234,7 +234,7 @@ export default class BaseAgenticHarness {
         state.overallOutputCharacters,
       );
       emit({
-        type: SSE_EVENT_TYPES.STATUS,
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.GENERATION_PROGRESS,
         tokPerSec: stats.tokPerSec,
         activeRequests: stats.activeRequests,
@@ -277,7 +277,7 @@ export default class BaseAgenticHarness {
     const estimatedCost = calculateTextCost(usage, pricing);
 
     emit({
-      type: SSE_EVENT_TYPES.USAGE_UPDATE,
+      type: SERVER_SENT_EVENT_TYPES.USAGE_UPDATE,
       usage,
       estimatedCost,
     });
@@ -299,7 +299,7 @@ export default class BaseAgenticHarness {
     });
     if (contextResult.truncated) {
       emit({
-        type: SSE_EVENT_TYPES.STATUS,
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.CONTEXT_TRUNCATED,
         strategy: contextResult.strategy,
         estimatedTokens: contextResult.estimatedTokens,
@@ -440,7 +440,7 @@ export default class BaseAgenticHarness {
       // Display segment tracking
       if (state.lastDisplaySegType !== "thinking") {
         state.displaySegments.push({
-          type: SSE_EVENT_TYPES.THINKING,
+          type: SERVER_SENT_EVENT_TYPES.THINKING,
           fragmentIndex: state.displayThinkingFragments.length,
         });
         state.displayThinkingFragments.push("");
@@ -457,7 +457,7 @@ export default class BaseAgenticHarness {
         );
       }
       emit({
-        type: SSE_EVENT_TYPES.THINKING,
+        type: SERVER_SENT_EVENT_TYPES.THINKING,
         content: streamChunk.content || "",
         outputCharacters: state.overallOutputCharacters,
       });
@@ -476,7 +476,7 @@ export default class BaseAgenticHarness {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
       emit({
-        type: SSE_EVENT_TYPES.TOOL_EXECUTION,
+        type: SERVER_SENT_EVENT_TYPES.TOOL_EXECUTION,
         tool: { name: streamChunk.name || "", args: {}, id: streamChunk.id || "" },
         status: "streaming",
       });
@@ -570,7 +570,7 @@ export default class BaseAgenticHarness {
           });
         }
         emit({
-          type: SSE_EVENT_TYPES.TOOL_CALL,
+          type: SERVER_SENT_EVENT_TYPES.TOOL_CALL,
           id: streamChunk.id || null,
           name: streamChunk.name,
           args: streamChunk.args || {},
@@ -602,7 +602,7 @@ export default class BaseAgenticHarness {
       state.streamedToolCalls.push({ ...toolCall });
       this._trackToolDisplaySegment(standardToolCallId);
       emit({
-        type: SSE_EVENT_TYPES.TOOL_EXECUTION,
+        type: SERVER_SENT_EVENT_TYPES.TOOL_EXECUTION,
         tool: { name: toolName, args: streamChunk.args || {}, id: standardToolCallId },
         status: "calling",
       });
@@ -651,7 +651,7 @@ export default class BaseAgenticHarness {
       return { action: "continue" };
     }
     if (streamChunk?.type === "audio") {
-      emit({ type: SSE_EVENT_TYPES.AUDIO, data: streamChunk.data, mimeType: streamChunk.mimeType });
+      emit({ type: SERVER_SENT_EVENT_TYPES.AUDIO, data: streamChunk.data, mimeType: streamChunk.mimeType });
       if (streamChunk.data) state.streamedAudioChunks.push(streamChunk.data);
       if (streamChunk.mimeType) {
         const rateMatch = streamChunk.mimeType.match(/rate=(\d+)/);
@@ -661,7 +661,7 @@ export default class BaseAgenticHarness {
     }
     if (streamChunk?.type === "status") {
       const { type: _type, ...statusRest } = streamChunk;
-      emit({ type: SSE_EVENT_TYPES.STATUS, ...statusRest });
+      emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, ...statusRest });
       return { action: "continue" };
     }
 
@@ -681,7 +681,7 @@ export default class BaseAgenticHarness {
     // Display segment tracking
     if (state.lastDisplaySegType !== "text") {
       state.displaySegments.push({
-        type: SSE_EVENT_TYPES.TEXT,
+        type: SERVER_SENT_EVENT_TYPES.TEXT,
         fragmentIndex: state.displayTextFragments.length,
       });
       state.displayTextFragments.push("");
@@ -697,7 +697,7 @@ export default class BaseAgenticHarness {
     }
     if (chunkString)
       emit({
-        type: SSE_EVENT_TYPES.CHUNK,
+        type: SERVER_SENT_EVENT_TYPES.CHUNK,
         content: chunkString,
         outputCharacters: state.overallOutputCharacters,
       });
@@ -955,7 +955,7 @@ export default class BaseAgenticHarness {
       const ttftSec = (pass.firstTokenTime - pass.start) / 1000;
       if (pass.requestId) SessionGenerationTracker.update(pass.requestId, { ttft: ttftSec });
       this.context.emit({
-        type: SSE_EVENT_TYPES.STATUS,
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.GENERATION_STARTED,
         timeToFirstToken: ttftSec,
       });
@@ -1006,7 +1006,7 @@ export default class BaseAgenticHarness {
       pass.streamedImages.push(imgRef);
     }
     emit({
-      type: SSE_EVENT_TYPES.IMAGE,
+      type: SERVER_SENT_EVENT_TYPES.IMAGE,
       ...(minioRef ? {} : { data: chunk.data }),
       mimeType: chunk.mimeType,
       minioRef,

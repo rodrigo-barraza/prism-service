@@ -1,5 +1,5 @@
-import { bootstrapEnv } from "@rodrigo-barraza/utilities-library/vault";
-await bootstrapEnv();
+import { bootstrapEnvironment } from "@rodrigo-barraza/utilities-library/vault";
+await bootstrapEnvironment();
 
 import { MongoClient } from 'mongodb';
 

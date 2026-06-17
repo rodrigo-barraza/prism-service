@@ -1,4 +1,4 @@
-import { formatCostTag, roundMs } from "@rodrigo-barraza/utilities-library";
+import { formatCostTag, roundMilliseconds } from "@rodrigo-barraza/utilities-library";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
 import { TYPES, getDefaultModels, getPricing } from "../config.ts";
@@ -121,7 +121,7 @@ const EmbeddingService = {
         outputTokens: 0, // Embeddings produce vectors, not output tokens
         tokensPerSec: calculateTokensPerSec(approxInputTokens, totalSec),
         inputCharacters,
-        totalTime: roundMs(totalSec),
+        totalTime: roundMilliseconds(totalSec),
         modalities: (() => {
           const modalities: Record<string, boolean> = { embeddingOut: true };
           if (typeof content === "string") {

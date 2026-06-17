@@ -1,4 +1,4 @@
-import { roundMs } from "@rodrigo-barraza/utilities-library";
+import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
@@ -376,9 +376,9 @@ const RequestLogger = {
       ) ?? 0,
       outputCharacters,
       timeToGeneration:
-                timeToGenerationSec !== null ? roundMs(timeToGenerationSec) : null,
-      generationTime: generationSec !== null ? roundMs(generationSec) : null,
-      totalTime: totalSec !== null ? roundMs(totalSec) : null,
+                timeToGenerationSec !== null ? roundMilliseconds(timeToGenerationSec) : null,
+      generationTime: generationSec !== null ? roundMilliseconds(generationSec) : null,
+      totalTime: totalSec !== null ? roundMilliseconds(totalSec) : null,
       requestPayload: {
                 messages: messages?.map(sanitizeMessage) ?? [],
                 ...(options?.tools
@@ -415,7 +415,7 @@ const RequestLogger = {
    * AI calls (extraction, consolidation, decomposition).
    *
    * Handles: estimateTokens, getPricing, calculateTextCost, calculateTokensPerSec,
-   * roundMs, and calls this.log().
+   * roundMilliseconds, and calls this.log().
    */
   async logBackgroundLlmCall({
     requestId,
@@ -482,7 +482,7 @@ const RequestLogger = {
       ...(Number(cacheCreationInputTokens) > 0 && { cacheCreationInputTokens: Number(cacheCreationInputTokens) }),
       tokensPerSec: calculateTokensPerSec(outputTokens as number, totalSec),
       inputCharacters: inputText.length,
-      totalTime: roundMs(totalSec),
+      totalTime: roundMilliseconds(totalSec),
       modalities: { textIn: true, textOut: true },
       requestPayload: {
         operation,

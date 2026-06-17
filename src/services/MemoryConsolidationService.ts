@@ -1,6 +1,6 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { daysSinceIso } from "@rodrigo-barraza/utilities-library";
-import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
 import type { ChatMessage } from "../types/provider.ts";
@@ -10,7 +10,7 @@ import RequestLogger from "./RequestLogger.ts";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
-import { parseJsonFromLlmResponse } from "@rodrigo-barraza/utilities-library";
+import { parseJsonFromLargeLanguageModelResponse } from "@rodrigo-barraza/utilities-library";
 import { COLLECTIONS } from "../constants.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import SettingsService from "./SettingsService.ts";
@@ -286,7 +286,7 @@ async function processBatch(
           )
         : null;
       broadcast({
-        type: SSE_EVENT_TYPES.USAGE_UPDATE,
+        type: SERVER_SENT_EVENT_TYPES.USAGE_UPDATE,
         operation: "memory:consolidate",
         usage: {
           requests: 1,
@@ -305,7 +305,7 @@ async function processBatch(
   }
 
   // Parse response with enhanced diagnostics
-  const parsed = parseJsonFromLlmResponse(result.text) as { actions?: ConsolidationAction[] } | null;
+  const parsed = parseJsonFromLargeLanguageModelResponse(result.text) as { actions?: ConsolidationAction[] } | null;
   if (!parsed) {
     const responseLength = result.text?.length || 0;
     const snippet = result.text?.substring(0, 300) || "(empty)";

@@ -1,6 +1,6 @@
 import BaseAgenticHarness from "./BaseAgenticHarness.ts";
 import logger from "../../utils/logger.ts";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import LiveFrameService from "../LiveFrameService.ts";
 
 import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
@@ -115,7 +115,7 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
     });
 
     if (options.planFirst) {
-      emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.PLAN_MODE_ENTERED });
+      emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.PLAN_MODE_ENTERED });
     }
 
     // ── Inject live vision system instruction ─────────────────
@@ -144,7 +144,7 @@ Use these images to observe the environment, notice changes, animations, or user
       state.iterations++;
 
       emit({
-        type: SSE_EVENT_TYPES.STATUS,
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.ITERATION_PROGRESS,
         iteration: state.iterations,
         maxIterations: resolvedMaxIterations,
@@ -184,7 +184,7 @@ Use these images to observe the environment, notice changes, animations, or user
           hookContext._injectedSkills.length > 0
         ) {
           emit({
-            type: SSE_EVENT_TYPES.STATUS,
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
             message: STATUS_MESSAGES.SKILLS_INJECTED,
             skills: hookContext._injectedSkills,
           });
@@ -435,7 +435,7 @@ Use these images to observe the environment, notice changes, animations, or user
           });
 
           emit({
-            type: SSE_EVENT_TYPES.STATUS,
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
             message: STATUS_MESSAGES.VALIDATION_ERRORS_DETECTED,
             count: validationFeedback.length,
           });

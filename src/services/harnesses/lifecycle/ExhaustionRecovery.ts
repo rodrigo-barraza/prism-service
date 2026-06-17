@@ -1,6 +1,6 @@
 import { expandMessagesForFunctionCall } from "../../../utils/FunctionCallingUtilities.ts";
 import SessionGenerationTracker from "../../SessionGenerationTracker.ts";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type BaseAgenticHarness from "../BaseAgenticHarness.ts";
 import type AgenticLoopState from "../../AgenticLoopState.ts";
@@ -30,7 +30,7 @@ export async function runExhaustionRecoveryPass(
 ): Promise<void> {
   const { emit, signal, options, resolvedModel, modelDefinition, provider } = context;
 
-  emit({ type: SSE_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.ITERATION_LIMIT_REACHED });
+  emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.ITERATION_LIMIT_REACHED });
 
   currentMessages.push({
     role: "system",

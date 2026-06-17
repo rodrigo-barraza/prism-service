@@ -1,4 +1,4 @@
-import { sleep, roundMs } from "@rodrigo-barraza/utilities-library";
+import { sleep, roundMilliseconds } from "@rodrigo-barraza/utilities-library";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 // ─── Custom LLM Accuracy Benchmarking ───────────────────────
 import crypto from "crypto";
@@ -421,7 +421,7 @@ async function runSingleModel(
         thinking: null,
         passed: false,
         matchMode: benchmark.matchMode || MATCH_MODES.CONTAINS,
-        latency: roundMs(latency),
+        latency: roundMilliseconds(latency),
         usage: null,
         estimatedCost: null,
         error: errorEvent.message || "Unknown error",
@@ -511,7 +511,7 @@ async function runSingleModel(
       passed,
       matchMode,
       turnCount,
-      latency: roundMs(latency),
+      latency: roundMilliseconds(latency),
       usage: (doneEvent.usage as Record<string, number>) || null,
       estimatedCost: (doneEvent.estimatedCost as number) ?? null,
       error: null,
@@ -529,7 +529,7 @@ async function runSingleModel(
       thinking: null,
       passed: false,
       matchMode: benchmark.matchMode || MATCH_MODES.CONTAINS,
-      latency: roundMs(latency),
+      latency: roundMilliseconds(latency),
       usage: null,
       estimatedCost: null,
       error: getErrorMessage(error),

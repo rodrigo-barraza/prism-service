@@ -13,7 +13,7 @@ import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import { applyDateRangeFilter, parsePaginationParams } from "../../utils/QueryBuilders.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
-import { MS_PER_MINUTE, MS_PER_HOUR, minutes } from "@rodrigo-barraza/utilities-library";
+import { MILLISECONDS_PER_MINUTE, MILLISECONDS_PER_HOUR, minutes } from "@rodrigo-barraza/utilities-library";
 
 const router = express.Router();
 const {
@@ -358,7 +358,7 @@ router.get(
     try {
       const project = req.query.project || null;
       const filter = project ? { project } : {};
-      const oneHourAgo = new Date(Date.now() - MS_PER_HOUR).toISOString();
+      const oneHourAgo = new Date(Date.now() - MILLISECONDS_PER_HOUR).toISOString();
       const fiveMinAgo = new Date(Date.now() - minutes(5)).toISOString();
 
       const [generatingCount, recentCount] = await Promise.all([
@@ -408,7 +408,7 @@ router.get(
     const sendStats = async () => {
       try {
         const filter = project ? { project } : {};
-        const oneHourAgo = new Date(Date.now() - MS_PER_HOUR).toISOString();
+        const oneHourAgo = new Date(Date.now() - MILLISECONDS_PER_HOUR).toISOString();
         const fiveMinAgo = new Date(Date.now() - minutes(5)).toISOString();
 
         const [generatingCount, recentCount] = await Promise.all([
@@ -458,7 +458,7 @@ router.get(
             );
         })
         .catch(() => {});
-    }, MS_PER_MINUTE);
+    }, MILLISECONDS_PER_MINUTE);
 
     if (ChangeStreamService.available) {
       const onEvent = (event: import("../../services/ChangeStreamService.ts").ChangeStreamEventPayload) => {

@@ -8,7 +8,7 @@ import EmbeddingService from "./EmbeddingService.ts";
 import RequestLogger from "./RequestLogger.ts";
 import logger from "../utils/logger.ts";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
-import { parseJsonFromLlmResponse } from "@rodrigo-barraza/utilities-library";
+import { parseJsonFromLargeLanguageModelResponse } from "@rodrigo-barraza/utilities-library";
 import { COLLECTIONS } from "../constants.ts";
 import SettingsService from "./SettingsService.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
@@ -227,7 +227,7 @@ ${participantList}`;
       },
     });
   }
-    const facts = parseJsonFromLlmResponse(result?.text);
+    const facts = parseJsonFromLargeLanguageModelResponse(result?.text);
   if (!Array.isArray(facts)) return [];
   // Validate each fact has the required fields
   return (facts as Record<string, unknown>[]).filter(

@@ -22,7 +22,7 @@ import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 const FILE_MUTATING_TOOLS: Set<string> = new Set([
   TOOL_NAMES.WRITE_FILE,
-  TOOL_NAMES.STR_REPLACE_FILE,
+  TOOL_NAMES.STRING_REPLACE_FILE,
   TOOL_NAMES.PATCH_FILE,
   TOOL_NAMES.MOVE_FILE,
 ]);

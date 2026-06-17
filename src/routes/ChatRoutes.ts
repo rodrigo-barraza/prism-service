@@ -1,6 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import { formatCostTag, roundMs } from "@rodrigo-barraza/utilities-library";
-import { SSE_EVENT_TYPES, STATUS_MESSAGES, DEFAULT_TOPOLOGY, DEFAULT_CONVERSATION_TITLE } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { formatCostTag, roundMilliseconds } from "@rodrigo-barraza/utilities-library";
+import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES, DEFAULT_TOPOLOGY, DEFAULT_CONVERSATION_TITLE } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response, NextFunction } from "express";
 import {
   finalizeTextGeneration,
@@ -440,7 +440,7 @@ export async function handleConversation(
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
-        emit({ type: SSE_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
+        emit({ type: SERVER_SENT_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
     return;
   }
   const {
@@ -571,7 +571,7 @@ export async function handleConversation(
       messages: context.rawMessages || [],
       options,
     });
-        emit({ type: SSE_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
+        emit({ type: SERVER_SENT_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
   }
 }
 // ─── Agent session path (agentSessionId, no conversationId) ─
@@ -586,7 +586,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
-        emit({ type: SSE_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
+        emit({ type: SERVER_SENT_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
     return;
   }
   const {
@@ -718,7 +718,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
       messages: context.rawMessages || [],
       options,
     });
-        emit({ type: SSE_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
+        emit({ type: SERVER_SENT_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
   }
 }
 // ─── Dispatch: Image API models (e.g. GPT Image 1.5, OpenAI images) ─
@@ -830,14 +830,14 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
     inputCharacters: prompt.length,
     outputCharacters: result.text ? result.text.length : 0,
     estimatedCost,
-    totalTime: roundMs(totalSec),
+    totalTime: roundMilliseconds(totalSec),
   });
   // Emit events
   if (result.text) {
-    emit({ type: SSE_EVENT_TYPES.CHUNK, content: result.text });
+    emit({ type: SERVER_SENT_EVENT_TYPES.CHUNK, content: result.text });
   }
   emit({
-    type: SSE_EVENT_TYPES.IMAGE,
+    type: SERVER_SENT_EVENT_TYPES.IMAGE,
     data: result.imageData,
     mimeType: result.mimeType || "image/png",
     minioRef,
@@ -866,7 +866,7 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
       model: resolvedModel,
       provider: providerName,
       timestamp: new Date().toISOString(),
-      totalTime: roundMs(totalSec),
+      totalTime: roundMilliseconds(totalSec),
       estimatedCost,
     });
     const meta = conversationMeta
@@ -885,7 +885,7 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
     );
   }
   emit({
-    type: SSE_EVENT_TYPES.DONE,
+    type: SERVER_SENT_EVENT_TYPES.DONE,
     usage: null,
     estimatedCost,
     totalTime: totalSec,
@@ -987,7 +987,7 @@ async function handleStreamingText(context: GenerationContext) {
     // Execute all pending tool calls
     for (const toolCall of pendingCalls) {
       emit({
-        type: SSE_EVENT_TYPES.TOOL_CALL,
+        type: SERVER_SENT_EVENT_TYPES.TOOL_CALL,
         id: toolCall.id,
         name: toolCall.name,
         args: toolCall.args,
@@ -1016,7 +1016,7 @@ async function handleStreamingText(context: GenerationContext) {
         toolCall.status = (result && typeof result === "object" && "error" in result && result.error) ? "error" : "done";
         toolCall.durationMs = durationMs;
         emit({
-          type: SSE_EVENT_TYPES.TOOL_CALL,
+          type: SERVER_SENT_EVENT_TYPES.TOOL_CALL,
           id: toolCall.id,
           name: toolCall.name,
           args: toolCall.args,
@@ -1030,7 +1030,7 @@ async function handleStreamingText(context: GenerationContext) {
         toolCall.status = "error";
         toolCall.durationMs = durationMs;
         emit({
-          type: SSE_EVENT_TYPES.TOOL_CALL,
+          type: SERVER_SENT_EVENT_TYPES.TOOL_CALL,
           id: toolCall.id,
           name: toolCall.name,
           args: toolCall.args,
@@ -1106,7 +1106,7 @@ async function handleStreamingText(context: GenerationContext) {
     // per-iteration token counts instead of relying on chunk heuristics
     if (streamState.usage) {
       emit({
-        type: SSE_EVENT_TYPES.USAGE_UPDATE,
+        type: SERVER_SENT_EVENT_TYPES.USAGE_UPDATE,
         usage: { ...(streamState.usage as Record<string, unknown>), requests: functionCallIteration + 1 },
       });
     }
@@ -1122,11 +1122,11 @@ async function handleStreamingText(context: GenerationContext) {
       `⚠️ The model's response was cut short because the **max_tokens** limit was reached ` +
       `before it could finish generating. Try increasing the **Max Tokens** setting.`;
     emit({
-      type: SSE_EVENT_TYPES.CHUNK,
+      type: SERVER_SENT_EVENT_TYPES.CHUNK,
       content: truncationWarning,
     });
     emit({
-      type: SSE_EVENT_TYPES.STATUS,
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: (STATUS_MESSAGES as Record<string, string>).MAX_TOKENS_TRUNCATED || "max_tokens_truncated",
       phase: "truncated",
     });
@@ -1218,15 +1218,15 @@ async function handleNonStreamingText(context: GenerationContext) {
   }
   // Emit chunk/thinking/toolCall events before finalization
   if (genResult.text) {
-    emit({ type: SSE_EVENT_TYPES.CHUNK, content: genResult.text });
+    emit({ type: SERVER_SENT_EVENT_TYPES.CHUNK, content: genResult.text });
   }
   if (genResult.thinking) {
-    emit({ type: SSE_EVENT_TYPES.THINKING, content: genResult.thinking });
+    emit({ type: SERVER_SENT_EVENT_TYPES.THINKING, content: genResult.thinking });
   }
   if (genResult.toolCalls && genResult.toolCalls.length > 0) {
     for (const toolCall of genResult.toolCalls) {
       emit({
-        type: SSE_EVENT_TYPES.TOOL_CALL,
+        type: SERVER_SENT_EVENT_TYPES.TOOL_CALL,
         id: toolCall.id || null,
         name: toolCall.name,
         args: toolCall.args || {},
@@ -1260,7 +1260,7 @@ async function handleNonStreamingText(context: GenerationContext) {
         );
       }
       emit({
-        type: SSE_EVENT_TYPES.IMAGE,
+        type: SERVER_SENT_EVENT_TYPES.IMAGE,
         data: image.data,
         mimeType: image.mimeType,
         minioRef,

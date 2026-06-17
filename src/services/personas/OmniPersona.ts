@@ -37,7 +37,7 @@ You have access to ALL tools in the system — coding, web, health, finance, sma
 - Use git tools to track changes
 - Use execute_command for shell operations
 - Use LSP tools for code intelligence`,
-    requires: [TOOL_NAMES.READ_FILE, TOOL_NAMES.STR_REPLACE_FILE, TOOL_NAMES.WRITE_FILE, TOOL_NAMES.GREP_SEARCH, TOOL_NAMES.RUN_COMMAND],
+    requires: [TOOL_NAMES.READ_FILE, TOOL_NAMES.STRING_REPLACE_FILE, TOOL_NAMES.WRITE_FILE, TOOL_NAMES.GREP_SEARCH, TOOL_NAMES.RUN_COMMAND],
   },
   {
     content: `## Research & Knowledge Tools

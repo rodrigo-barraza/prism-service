@@ -9,7 +9,7 @@ import ChangeStreamService from "../../services/ChangeStreamService.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
-import { MS_PER_MINUTE } from "@rodrigo-barraza/utilities-library";
+import { MILLISECONDS_PER_MINUTE } from "@rodrigo-barraza/utilities-library";
 
 const router = express.Router();
 const {
@@ -118,7 +118,7 @@ router.get(
     try {
       const { minutes: minParam = 5 } = req.query;
       const since = new Date(
-        Date.now() - parseInt(minParam as string, 10) * MS_PER_MINUTE,
+        Date.now() - parseInt(minParam as string, 10) * MILLISECONDS_PER_MINUTE,
       ).toISOString();
 
       const [rawConversations, recentRequests] = await Promise.all([

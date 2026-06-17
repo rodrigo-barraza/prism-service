@@ -87,7 +87,7 @@ const OOG_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
     content: `## Tool Tips
 - oog prefer replace_in_file over write_file for edit. safer. preserve what not need change`,
-    requires: [TOOL_NAMES.STR_REPLACE_FILE],
+    requires: [TOOL_NAMES.STRING_REPLACE_FILE],
   },
   {
     content: `- oog use search_file_contents to find pattern before make change. no surprise`,

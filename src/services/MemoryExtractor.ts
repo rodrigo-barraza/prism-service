@@ -6,8 +6,8 @@ import MemoryConsolidationService from "./MemoryConsolidationService.ts";
 import RequestLogger from "./RequestLogger.ts";
 import SettingsService from "./SettingsService.ts";
 import logger from "../utils/logger.ts";
-import { parseJsonFromLlmResponse } from "@rodrigo-barraza/utilities-library";
-import { TOOL_NAMES, SSE_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { parseJsonFromLargeLanguageModelResponse } from "@rodrigo-barraza/utilities-library";
+import { TOOL_NAMES, SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   estimateTokens,
   calculateTextCost,
@@ -297,7 +297,7 @@ export default class MemoryExtractor {
                 )
               : null;
             emit({
-              type: SSE_EVENT_TYPES.USAGE_UPDATE,
+              type: SERVER_SENT_EVENT_TYPES.USAGE_UPDATE,
               operation: "memory:extract",
               usage: {
                 requests: 1,
@@ -312,7 +312,7 @@ export default class MemoryExtractor {
         }
       }
 
-      let memories: unknown = parseJsonFromLlmResponse(result!.text);
+      let memories: unknown = parseJsonFromLargeLanguageModelResponse(result!.text);
       if (memories && typeof memories === "object" && !Array.isArray(memories)) {
         const memoriesRecord = memories as Record<string, unknown>;
         if (Array.isArray(memoriesRecord.memories)) {
@@ -443,7 +443,7 @@ export default class MemoryExtractor {
         .then((stored) => {
           if (stored?.length > 0 && context.emit) {
             context.emit({
-              type: SSE_EVENT_TYPES.STATUS,
+              type: SERVER_SENT_EVENT_TYPES.STATUS,
               message: STATUS_MESSAGES.MEMORIES_UPDATED,
               count: stored.length,
             });

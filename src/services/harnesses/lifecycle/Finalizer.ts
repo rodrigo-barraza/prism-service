@@ -1,5 +1,5 @@
-import { formatCostTag, roundMs } from "@rodrigo-barraza/utilities-library";
-import { SSE_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { formatCostTag, roundMilliseconds } from "@rodrigo-barraza/utilities-library";
+import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   calculateTextCost,
   getTotalInputTokens,
@@ -448,7 +448,7 @@ export async function finalizeTextGeneration(
     if (!signal?.aborted) {
         if (emit) {
           emit({
-            type: SSE_EVENT_TYPES.DONE,
+            type: SERVER_SENT_EVENT_TYPES.DONE,
             provider: providerName,
             model: resolvedModel,
             usage: usage || null,
@@ -456,9 +456,9 @@ export async function finalizeTextGeneration(
             tokensPerSec,
             ...(audioRef ? { audioRef } : {}),
             timeToGeneration:
-                      timeToGenerationSec != null ? roundMs(timeToGenerationSec) : null,
-                  generationTime: generationSec != null ? roundMs(generationSec) : null,
-                  totalTime: totalSec != null ? roundMs(totalSec) : null,
+                      timeToGenerationSec != null ? roundMilliseconds(timeToGenerationSec) : null,
+                  generationTime: generationSec != null ? roundMilliseconds(generationSec) : null,
+                  totalTime: totalSec != null ? roundMilliseconds(totalSec) : null,
                   ...(traceId && { traceId }),
                   ...(conversationId && { conversationId }),
           });
@@ -582,7 +582,7 @@ export function assembleMessagesToAppend(options: {
       provider: providerName,
       timestamp: new Date().toISOString(),
       usage: usage || null,
-      totalTime: totalSeconds != null ? roundMs(totalSeconds as number) : null,
+      totalTime: totalSeconds != null ? roundMilliseconds(totalSeconds as number) : null,
       tokensPerSec: tokensPerSecond,
       estimatedCost,
       ...(!hasIntermediateToolMessages &&
@@ -619,7 +619,7 @@ export function assembleMessagesToAppend(options: {
       provider: providerName,
       timestamp: new Date().toISOString(),
       usage: usage || null,
-      totalTime: totalSeconds != null ? roundMs(totalSeconds) : null,
+      totalTime: totalSeconds != null ? roundMilliseconds(totalSeconds) : null,
       tokensPerSec: tokensPerSecond,
       estimatedCost,
       generationSettings: {

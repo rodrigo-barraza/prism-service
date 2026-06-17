@@ -3,7 +3,7 @@ export {
   DOMAIN_TAGS,
   DOMAIN_KEY_TAGS,
   TOOL_NAMES,
-  SSE_EVENT_TYPES,
+  SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
   AGENT_IDS,
   AGENTLESS_AGENT,
@@ -18,7 +18,7 @@ export {
 
 export type {
   ToolName,
-  SseEventType,
+  ServerSentEventType,
   StatusMessage,
   AgentId,
   TopologyType,

@@ -12,10 +12,10 @@ process.env.VAULT_SERVICE_URL = "http://192.168.86.2:5599";
 process.env.VAULT_SERVICE_TOKEN = "***REMOVED***";
 
 try {
-  const { bootstrapEnv } = await import("@rodrigo-barraza/utilities-library/vault");
-  await bootstrapEnv();
+  const { bootstrapEnvironment } = await import("@rodrigo-barraza/utilities-library/vault");
+  await bootstrapEnvironment();
 } catch (err: any) {
-  // console.log("⚠️ bootstrapEnv failed:", err.message);
+  // console.log("⚠️ bootstrapEnvironment failed:", err.message);
 }
 
 const { getProvider } = await import("../src/providers/index.ts");
