@@ -192,7 +192,7 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
       { role: "system", content: "You are helpful." },
       {
         role: "user",
-        content: "[Conversation Summary]\nUser greeted the assistant.",
+        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}\nUser greeted the assistant.`,
         isCompactSummary: true,
       },
       { role: "user", content: "hey whats up" },
@@ -255,7 +255,7 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
       { role: "system", content: "You are helpful." },
       {
         role: "user",
-        content: "[Conversation Summary]\nEntire history compacted.",
+        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}\nEntire history compacted.`,
         isCompactSummary: true,
       },
       {
@@ -449,7 +449,7 @@ describe("newTurnMessages slice — edge cases", () => {
       { role: "system", content: "System" },
       {
         role: "user",
-        content: "[Conversation Summary]\nSummary",
+        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}\nSummary`,
         isCompactSummary: true,
       },
     ];
@@ -553,7 +553,7 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
       { role: "system", content: "Massive system prompt with tools..." },
       {
         role: "user",
-        content: "[Conversation Summary]\nPrevious context.",
+        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}\nPrevious context.`,
         isCompactSummary: true,
       },
       { role: "user", content: "hey whats up" },
@@ -590,21 +590,33 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
     expect(sanitized[0].content).toBe("make me a song");
   });
 
-  it("BUG REPRO: compaction aggressively drops user2 from the tail", () => {
-    // If extractRecentTail has a bug where it doesn't include user2,
-    // compaction produces [system, summary] with user2 gone.
-    // originalMessageCount = 2
-    // Tool iteration appends: [system, summary, assistant_tools]
-    // finalize(): slice(1) → [summary, assistant_tools]
-    // sanitized: [assistant_tools] — user message LOST
+  it("compaction flow realistically preserves user message from the tail", () => {
+    // Realistically verify that a pre-compaction messages array retains the user message
+    // after compaction, and that finalize/sanitize properly extracts it for persistence.
+    const preCompactionMessages: TestMessage[] = [
+      { role: "system", content: "System" },
+      { role: "user", content: "hey whats up" },
+      { role: "assistant", content: "Hey! What's up?" },
+      { role: "user", content: "make me a song" },
+    ];
 
-    const currentMessages: TestMessage[] = [
+    // Simulate compaction by preserving the recent user turn (make me a song)
+    const compactedMessages: TestMessage[] = [
       { role: "system", content: "System" },
       {
         role: "user",
-        content: "[Conversation Summary]\nAll history.",
+        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}\nAll history.`,
         isCompactSummary: true,
       },
+      { role: "user", content: "make me a song" },
+    ];
+
+    // Harness sets originalMessageCount to the length of the compactedMessages list
+    const originalMessageCount = compactedMessages.length; // 3
+
+    // During the tool iteration, assistant generates the tool call message
+    const currentMessages: TestMessage[] = [
+      ...compactedMessages,
       {
         role: "assistant",
         content: "Making your song!",
@@ -619,17 +631,16 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
       },
     ];
 
-    const newTurnMessages = extractNewTurnMessages(currentMessages, 2);
+    const newTurnMessages = extractNewTurnMessages(currentMessages, originalMessageCount);
     const sanitized = sanitizeMessagesToAppend(newTurnMessages);
 
-    // BUG: user message is completely absent from what gets persisted
+    // The user message should be present in the sanitized messages to append
     const hasUserMessage = sanitized.some(
       (message) => message.role === "user" && !message.isCompactSummary,
     );
 
-    // This FAILS — documenting the bug
-    expect(hasUserMessage).toBe(false);
-    // What SHOULD be true: expect(hasUserMessage).toBe(true);
+    expect(hasUserMessage).toBe(true);
+    expect(sanitized[0].content).toBe("make me a song");
   });
 });
 

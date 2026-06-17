@@ -8,6 +8,10 @@ vi.mock("../src/wrappers/MinioWrapper.ts", () => ({
     upload: vi.fn(),
     stat: vi.fn(),
     get: vi.fn(),
+    init: vi.fn(),
+    getPublicUrl: vi.fn(),
+    remove: vi.fn(),
+    listObjects: vi.fn(),
   },
 }));
 

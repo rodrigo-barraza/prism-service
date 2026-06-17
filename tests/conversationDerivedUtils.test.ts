@@ -7,7 +7,7 @@
  * Wrong cost = incorrect billing display. Wrong providers = broken model filters.
  */
 import { describe, it, expect, vi } from "vitest";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, COLLECTIONS } from "../src/constants.ts";
 
 vi.mock("../src/services/FileService.ts", () => ({
   default: {
@@ -507,6 +507,6 @@ describe("buildConversationPatchFields", () => {
     expect(fields).not.toHaveProperty("providers");
     expect(fields).not.toHaveProperty("totalCost");
     expect(fields).not.toHaveProperty("systemPrompt");
-    expect(fields).not.toHaveProperty("settings");
+    expect(fields).not.toHaveProperty(COLLECTIONS.SETTINGS);
   });
 });

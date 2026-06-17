@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { swapMessageContent, assembleMessagesToAppend as assembleMessagesToAppendReal } from "../src/services/harnesses/lifecycle/Finalizer.ts";
+import { swapMessageContent, assembleMessagesToAppend as assembleMessagesToAppendReal, sanitizeMessagesForPersistence } from "../src/services/harnesses/lifecycle/Finalizer.ts";
 import { PROMPT_DELIMITERS } from "../src/constants.ts";
 import type { MessagePayload } from "../src/services/conversation/types.ts";
 
@@ -50,14 +50,7 @@ function assembleMessagesToAppend(input: FinalizerAssemblyInput): TestMessage[] 
     providerName: input.providerName,
   }) as TestMessage[];
 
-  return messages.filter((message) => {
-    if (message.role === "user" && typeof message.content === "string") {
-      if (message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX)) return false;
-      if (message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY)) return false;
-      if (message.isCompactSummary === true) return false;
-    }
-    return true;
-  }) as TestMessage[];
+  return sanitizeMessagesForPersistence(messages) as TestMessage[];
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -183,7 +176,7 @@ describe("Finalizer message assembly", () => {
       overrideMessagesToAppend: [
         {
           role: "user",
-          content: "[Conversation Summary]\nPrevious context summary.",
+          content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}\nPrevious context summary.`,
           isCompactSummary: true,
         },
         { role: "user", content: "make a song" },

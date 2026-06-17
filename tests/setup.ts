@@ -100,7 +100,42 @@ vi.mock('../src/wrappers/MongoWrapper.ts', () => ({
 // ── Mock SettingsService to avoid DB dependency in EmbeddingService ────
 vi.mock('../src/services/SettingsService.ts', () => ({
     default: {
-    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: "elevenlabs" } }),
+        getCached: vi.fn().mockReturnValue({
+            memory: {
+                extractionProvider: 'google',
+                extractionModel: 'gemini-3-flash-preview',
+                consolidationProvider: 'google',
+                consolidationModel: 'gemini-3-flash-preview',
+                embeddingProvider: 'google',
+                embeddingModel: 'gemini-embedding-2-preview',
+            },
+            agents: {
+                subAgentProvider: 'google',
+                subAgentModel: 'gemini-3-flash-preview',
+                criticProvider: 'google',
+                criticModel: 'gemini-3-flash-preview',
+                harness: 'standard',
+                topology: 'default',
+                dynamicToolActivation: true,
+            },
+            security: {
+                allowEnvFiles: false,
+            },
+            creative: {
+                imageProvider: 'google',
+                imageModel: 'gemini-3-pro-image-preview',
+                visionProvider: 'google',
+                visionModel: 'gemini-3.5-flash',
+                textToSpeechProvider: 'elevenlabs',
+                textToSpeechModel: '',
+                speechToTextProvider: 'openai',
+                speechToTextModel: '',
+            },
+            somatic: {
+                emotionProvider: 'google',
+                emotionModel: 'gemini-3.5-flash',
+            }
+        }),
         get: vi.fn().mockResolvedValue({
             memory: {
                 extractionProvider: 'google',
@@ -110,7 +145,7 @@ vi.mock('../src/services/SettingsService.ts', () => ({
                 embeddingProvider: 'google',
                 embeddingModel: 'gemini-embedding-2-preview',
             },
-            agents: { subagentProvider: 'google', subagentModel: 'gemini-3-flash-preview' },
+            agents: { subAgentProvider: 'google', subAgentModel: 'gemini-3-flash-preview' },
         }),
         getSection: vi.fn().mockResolvedValue({
             extractionProvider: 'google',
