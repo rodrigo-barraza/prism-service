@@ -440,6 +440,7 @@ export async function finalizeTextGeneration(
       toolConfig: toolConfig || undefined,
       harness: options.harness || undefined,
       topology: options.topology || undefined,
+      reasoningStrategy: options.reasoningStrategy || undefined,
     };
 
     const finalMeta: Record<string, unknown> = {
