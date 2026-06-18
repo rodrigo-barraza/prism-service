@@ -50,61 +50,9 @@ const DIGEST_INTERACTION_RULES = `# Interaction Rules
 
 const DIGEST_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
-    content: `# Tool Use Policy
-- Use tools proactively when the user asks about nutrition, food, exercises, calories, or meal planning.`,
-  },
-  {
-    content: `- Always use calculate_caloric_needs BEFORE build_meal_plan — the meal plan needs a caloric target.`,
+    content: `- Always use calculate_caloric_needs BEFORE build_meal_plan — the meal plan needs a caloric target.
+- For dietary analysis, chain: user provides food log → analyze_nutrient_gaps → identify deficiencies → search_food_substitutes or rank_foods_by_category to fill gaps.`,
     requires: [TOOL_NAMES.CALCULATE_CALORIC_NEEDS, TOOL_NAMES.BUILD_MEAL_PLAN],
-  },
-  {
-    content: `- When the user asks about a specific food, use search_usda_nutrition for detailed data.`,
-    requires: [TOOL_NAMES.SEARCH_USDA_NUTRITION],
-  },
-  {
-    content: `- When comparing foods, use compare_food_nutrition for side-by-side analysis.`,
-    requires: [TOOL_NAMES.COMPARE_FOOD_NUTRITION],
-  },
-  {
-    content: `- For "what's high in X?" questions, use rank_foods_by_category or rank_foods_by_nutrient.`,
-    requires: [
-      TOOL_NAMES.RANK_FOODS_BY_CATEGORY,
-      TOOL_NAMES.RANK_FOODS_BY_NUTRIENT,
-    ],
-  },
-  {
-    content: `- For dietary analysis, chain: user provides food log → analyze_nutrient_gaps → identify deficiencies → search_food_substitutes or rank_foods_by_category to fill gaps.`,
-    requires: [TOOL_NAMES.ANALYZE_NUTRIENT_GAPS],
-  },
-  {
-    content: `- When the user mentions medications, proactively check drug-nutrient interactions.`,
-    requires: [
-      TOOL_NAMES.SEARCH_DRUG_NUTRIENT_INTERACTIONS,
-      TOOL_NAMES.SEARCH_FDA_DRUGS,
-    ],
-  },
-  {
-    content: `- Use search_web for current research, studies, or information not in the static databases.`,
-    requires: [TOOL_NAMES.SEARCH_WEB],
-  },
-  {
-    content: `- Use save_memory to save user stats, allergies, preferences, and goals for cross-session continuity.`,
-    requires: [TOOL_NAMES.SAVE_MEMORY],
-  },
-  {
-    content: `- When the user asks about exercises, use search_gym_exercises with appropriate filters.`,
-    requires: [TOOL_NAMES.SEARCH_GYM_EXERCISES],
-  },
-  {
-    content: `- For hydration questions, use calculate_hydration_needs with as many parameters as known.`,
-    requires: [TOOL_NAMES.CALCULATE_HYDRATION_NEEDS],
-  },
-  {
-    content: `# Agent Tool Guidelines
-- You have access to a comprehensive health and nutrition toolkit — use it.
-- Greetings and casual conversation do not require tools — respond with text.
-- When multiple tools are needed for a complete answer, chain them in a logical sequence.
-- Always explain your tool results in plain language after presenting the data.`,
   },
 ];
 
