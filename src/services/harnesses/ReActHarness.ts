@@ -20,6 +20,7 @@ import {
   checkForPlanModeEntry,
 } from "./lifecycle/PlanModeController.ts";
 import { validateAfterToolExecution } from "./lifecycle/ValidationInterceptor.ts";
+import { buildToolRetryGuidance } from "./lifecycle/ToolRetryInterceptor.ts";
 import {
   isOutputTruncated,
   injectContinuationContext,
@@ -521,6 +522,20 @@ export default class ReActHarness extends BaseAgenticHarness {
           }),
         };
         currentMessages.push(assistantMessage);
+
+        // ── Structured retry guidance on tool failure ──────────
+        // When tool calls fail, inject a system message prompting the
+        // model to analyze which arguments caused the failure and retry
+        // with corrections (Fission-GRPO pattern, arXiv 2026).
+        const retryGuidanceMessage = buildToolRetryGuidance(
+          pass.pendingToolCalls,
+          results,
+          state,
+          MAX_CONSECUTIVE_TOOL_ERRORS,
+        );
+        if (retryGuidanceMessage) {
+          currentMessages.push(retryGuidanceMessage);
+        }
 
         currentMessages = currentMessages.filter(
           (message) =>
