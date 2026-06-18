@@ -3,6 +3,7 @@ import AutoApprovalEngine from "../../AutoApprovalEngine.ts";
 import SystemPromptAssembler from "../../system-prompt/index.ts";
 import MemoryExtractor from "../../MemoryExtractor.ts";
 import ConversationEmbeddingService from "../../ConversationEmbeddingService.ts";
+import WorkflowMemoryService from "../../WorkflowMemoryService.ts";
 import CriticGate from "./CriticGate.ts";
 import type { PolicyRule } from "../../PolicyEngine.ts";
 
@@ -84,6 +85,13 @@ export function createStandardHooks({
     "afterResponse",
     ConversationEmbeddingService.createHook() as HookHandler,
     "ConversationEmbedding",
+    "inspect",
+  );
+
+  hooks.register(
+    "afterResponse",
+    WorkflowMemoryService.createHook() as HookHandler,
+    "WorkflowMemory",
     "inspect",
   );
 

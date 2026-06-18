@@ -916,6 +916,7 @@ export default class BaseAgenticHarness {
         thinking: state.streamedThinking,
         toolCalls: state.streamedToolCalls,
         messages: currentMessages,
+        sessionOutcome: state.sessionOutcome,
       })
       .catch((error: Error) =>
         logger.error(

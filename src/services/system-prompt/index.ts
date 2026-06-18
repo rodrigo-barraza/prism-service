@@ -18,6 +18,7 @@ import { ToolDocFormatter } from "./ToolDocFormatter.ts";
 import { SkillMemoryScorer } from "./SkillMemoryScorer.ts";
 import { AssemblerContext } from "./types.ts";
 import SomaticStateService from "../somatic/SomaticStateService.ts";
+import WorkflowMemoryService from "../WorkflowMemoryService.ts";
 import { PROMPT_DELIMITERS } from "../../constants.ts";
 
 export default class SystemPromptAssembler {
@@ -383,6 +384,31 @@ export default class SystemPromptAssembler {
       }
     }
 
+    // ── 10. Workflow Memory (cross-session procedural learning) ──
+    let workflowsText = "";
+    if (memoryQuery && !isDirectMode) {
+      try {
+        const workflows = await WorkflowMemoryService.retrieveRelevantWorkflows(
+          agentId,
+          context.project || null,
+          memoryQuery,
+          {
+            traceId: context.traceId,
+            agentSessionId: context.agentSessionId,
+            endpoint: "/agent",
+            username: context.username,
+          },
+        );
+        if (workflows) {
+          workflowsText = workflows;
+        }
+      } catch (error: unknown) {
+        logger.error(
+          `[SystemPromptAssembler] Workflow memory retrieval failed: ${getErrorMessage(error)}`,
+        );
+      }
+    }
+
     return {
       prompt: sections.join("\n\n"),
       platformContextMessage: platformContextSections.length > 0 ? platformContextSections.join("\n\n") : null,
@@ -390,6 +416,7 @@ export default class SystemPromptAssembler {
       skillNames,
       skillsText,
       memoriesText,
+      workflowsText,
     };
   }
 
@@ -403,6 +430,7 @@ export default class SystemPromptAssembler {
           skillNames,
           skillsText,
           memoriesText,
+          workflowsText,
         } = await this.assemble(context);
         if (!systemPrompt) return;
 
@@ -414,6 +442,7 @@ export default class SystemPromptAssembler {
           selfContextMessage,
           skillsText,
           memoriesText,
+          workflowsText,
         });
 
         logger.info(
@@ -441,6 +470,7 @@ export function injectSystemPromptContext(
     selfContextMessage?: string | null;
     skillsText?: string;
     memoriesText?: string;
+    workflowsText?: string;
     localTimeText?: string;
   }
 ): void {
@@ -450,6 +480,7 @@ export function injectSystemPromptContext(
     selfContextMessage,
     skillsText,
     memoriesText,
+    workflowsText,
     localTimeText,
   } = options;
 
@@ -518,6 +549,10 @@ export function injectSystemPromptContext(
 
     if (memoriesText) {
       systemContextBlock += `${memoriesText}\n\n`;
+    }
+
+    if (workflowsText) {
+      systemContextBlock += `${workflowsText}\n\n`;
     }
 
     if (!lastUserMessage.content.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT)) {

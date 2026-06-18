@@ -64,6 +64,12 @@ export default class AgenticLoopState {
   // ── Error budget tracking ───────────────────────────────
   toolErrorCounts: Map<string, number>;
 
+  // ── Session outcome ───────────────────────────────
+  // Set by harnesses before finalization to indicate how the
+  // session ended. Used by afterResponse hooks (e.g. AWM) to
+  // gate actions that should only run on successful completions.
+  sessionOutcome: "completed" | "exhausted" | "error" | "aborted";
+
   // ── Branch tracking (TreeOfThought) ─────────────────────
   branchesExplored: number;
   branchesBacktracked: number;
@@ -117,6 +123,7 @@ export default class AgenticLoopState {
     this.postCompactTokenCount = null;
 
     this.toolErrorCounts = new Map();
+    this.sessionOutcome = "completed";
 
     this.branchesExplored = 0;
     this.branchesBacktracked = 0;

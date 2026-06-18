@@ -658,6 +658,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
 
     // ── Exhaustion Recovery Pass ─────────────────────────────
     if (!hasCleanTextBreak && state.streamedToolCalls.length > 0 && !signal?.aborted) {
+      state.sessionOutcome = "exhausted";
       await runExhaustionRecoveryPass(this, context, state, currentMessages);
     }
 
@@ -682,6 +683,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
         buildProviderErrorMessage(loopError, state.iterations),
         context,
       );
+
+      state.sessionOutcome = "error";
 
       try {
         await this.finalize(currentMessages, hooks);
