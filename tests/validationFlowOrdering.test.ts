@@ -440,7 +440,7 @@ describe("Validation Flow Ordering", () => {
       // the assistant tool result and the validation error.
       const messagesBetween = currentMessages.slice(2);
       const hasPlanningInjection = messagesBetween.some(
-        (message) => (message as Record<string, unknown>)._isPlanningInjection === true,
+        (message) => message._isPlanningInjection === true,
       );
 
       expect(hasPlanningInjection).toBe(false);

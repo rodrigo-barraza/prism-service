@@ -15,7 +15,11 @@
  *   3. Cost values are computed correctly using calculateTextCost
  */
 import { describe, it, expect, vi } from "vitest";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, TYPES } from "../src/constants.ts";
+
+const { CODING_MEMORY_TYPES } = vi.hoisted(() => ({
+  CODING_MEMORY_TYPES: ["user", "feedback", "project", "reference"] as const,
+}));
 
 // ── Mock config.js ──────────────────────────────────────────────
 const MOCK_TEXT_PRICING = {
@@ -36,7 +40,7 @@ const MOCK_EMBEDDING_PRICING = {
 
 const configMock = {
   MONGO_DB_NAME: "prism-test",
-  TYPES: { TEXT: "text", EMBEDDING: "embedding" },
+  TYPES,
   getPricing: (_inputType, outputType) => {
     if (outputType === "embedding") return MOCK_EMBEDDING_PRICING;
     return MOCK_TEXT_PRICING;
@@ -97,7 +101,7 @@ vi.mock("../src/services/MemoryService.ts", () => ({
     store: vi.fn().mockResolvedValue({ id: "mem-1", title: "Test memory" }),
     search: vi.fn().mockResolvedValue([]),
   },
-  CODING_MEMORY_TYPES: ["user", "feedback", "project", "reference"],
+  CODING_MEMORY_TYPES,
 }));
 
 // ── Mock MemoryConsolidationService (for MemoryExtractor tests) ─

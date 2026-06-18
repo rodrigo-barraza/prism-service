@@ -128,6 +128,12 @@ export async function handleExitPlanMode(
         resolve(false);
       }, PLAN_APPROVAL_TIMEOUT_MS);
 
+      const existingApproval = pendingApprovals.get(conversationId);
+      if (existingApproval) {
+        existingApproval.resolve(false as never);
+        pendingApprovals.delete(conversationId);
+      }
+
       pendingApprovals.set(conversationId, {
         resolve: (value: boolean) => {
           clearTimeout(timeoutId);

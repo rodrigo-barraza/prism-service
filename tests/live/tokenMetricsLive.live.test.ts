@@ -18,7 +18,7 @@
  * ═══════════════════════════════════════════════════════════════
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { PROVIDERS } from "../../src/constants.ts";
+import { PROVIDERS, TYPES } from "../../src/constants.ts";
 
 const PRISM_SERVICE_URL = "http://localhost:7777";
 const LM_STUDIO_URL = "http://localhost:1234";
@@ -261,10 +261,10 @@ async function findLmStudioModel() {
       if (match) return match.key || match.id;
     }
     const loaded = models.find(
-      (m) => m.loaded_instances?.length > 0 && m.type !== "embedding",
+      (m) => m.loaded_instances?.length > 0 && m.type !== TYPES.EMBEDDING,
     );
     if (loaded) return loaded.key || loaded.id;
-    const first = models.find((m) => m.type !== "embedding");
+    const first = models.find((m) => m.type !== TYPES.EMBEDDING);
     return first ? first.key || first.id : null;
   } catch {
     return null;
@@ -331,7 +331,7 @@ describe("LM Studio — Token Metrics", () => {
     if (!lmStudioAvailable) return console.log("  ⏭ LM Studio not available");
 
     const result = await streamAndCollect(
-      "lm-studio", lmStudioModel,
+      PROVIDERS.LM_STUDIO, lmStudioModel,
       "Explain what a hash map is in 2-3 sentences.",
       { maxTokens: 300 },
     );
@@ -355,7 +355,7 @@ describe("LM Studio — Token Metrics", () => {
     if (!lmStudioAvailable) return console.log("  ⏭ LM Studio not available");
 
     const result = await streamAndCollect(
-      "lm-studio", lmStudioModel,
+      PROVIDERS.LM_STUDIO, lmStudioModel,
       "Write a haiku about the ocean.",
       { maxTokens: 200 },
     );
@@ -388,7 +388,7 @@ describe("LM Studio — Token Metrics", () => {
     if (!lmStudioAvailable) return console.log("  ⏭ LM Studio not available");
 
     const result = await streamAndCollect(
-      "lm-studio", lmStudioModel,
+      PROVIDERS.LM_STUDIO, lmStudioModel,
       "List the planets in order from the sun.",
       { maxTokens: 400 },
     );
@@ -405,7 +405,7 @@ describe("LM Studio — Token Metrics", () => {
     if (!lmStudioAvailable) return console.log("  ⏭ LM Studio not available");
 
     const result = await streamAndCollect(
-      "lm-studio", lmStudioModel,
+      PROVIDERS.LM_STUDIO, lmStudioModel,
       "What is 2+2?",
       { maxTokens: 100 },
     );
@@ -427,7 +427,7 @@ describe("LM Studio — Token Metrics", () => {
     if (!lmStudioAvailable) return console.log("  ⏭ LM Studio not available");
 
     const result = await streamAndCollect(
-      "lm-studio", lmStudioModel,
+      PROVIDERS.LM_STUDIO, lmStudioModel,
       "List the files in /tmp using shell_execute.",
       { maxTokens: 500, maxIterations: 3 },
     );

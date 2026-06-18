@@ -6,6 +6,34 @@
 
 import type { Document } from "mongodb";
 
+// ── Config Route Response Types ─────────────────────────────
+
+export interface AgentConfigResponse {
+  id: string;
+  name: string;
+  description: string;
+  custom: boolean;
+  icon: string;
+  avatar: string;
+  color: string;
+  backgroundImage: string;
+  project: string;
+  toolCount: number;
+  enabledToolNames: string[];
+  enabledByDefaultToolNames: string[];
+  coreToolsLocked: boolean;
+  canSpawnSubAgents: boolean;
+  usesDirectoryTree: boolean;
+  usesCodingGuidelines: boolean;
+}
+
+export interface ToolSchemaResponse {
+  name: string;
+  domain?: string;
+  domainKey?: string;
+  system?: boolean;
+}
+
 // ── Query Parameters ────────────────────────────────────────
 
 export interface DateRangeFilter {

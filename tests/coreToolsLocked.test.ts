@@ -12,40 +12,7 @@ import { describe, it, expect } from "vitest";
 import request from "supertest";
 import { app, TEST_SECRET } from "./setup.ts";
 import { AGENT_IDS } from "../src/services/ToolTaxonomyConstants.ts";
-
-
-/**
- * Mirrors the exact response shape returned by GET /config/agents in ConfigRoutes.ts.
- * When the route adds or removes fields, this interface must be updated in lockstep.
- */
-interface AgentConfigResponse {
-  id: string;
-  name: string;
-  description: string;
-  custom: boolean;
-  icon: string;
-  avatar: string;
-  color: string;
-  backgroundImage: string;
-  project: string;
-  toolCount: number;
-  enabledToolNames: string[];
-  enabledByDefaultToolNames: string[];
-  coreToolsLocked: boolean;
-  canSpawnSubAgents: boolean;
-  usesDirectoryTree: boolean;
-  usesCodingGuidelines: boolean;
-}
-
-/**
- * Subset of ToolSchema used for /config/tools response assertions.
- */
-interface ToolSchemaResponse {
-  name: string;
-  domain?: string;
-  domainKey?: string;
-  system?: boolean;
-}
+import type { AgentConfigResponse, ToolSchemaResponse } from "../src/types/admin.ts";
 
 function authenticatedGet(path: string) {
   return request(app)

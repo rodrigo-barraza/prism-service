@@ -43,6 +43,9 @@ import { logKVCacheHitRate } from "../lifecycle/KVCacheReporter.ts";
 import { injectToolDiscoveryNudge } from "../lifecycle/ToolDiscoveryNudge.ts";
 import { finalizePassTracker } from "../lifecycle/TrackerFinalizer.ts";
 import { handleCodexPlanningResponse } from "../lifecycle/CodexPlanningDetector.ts";
+import { maybeInjectSystemReminder, cleanupReminderCache } from "../lifecycle/SystemReminderInjector.ts";
+import { checkCostBudget } from "../lifecycle/CostBudgetEnforcer.ts";
+import { createSandboxCheckpoint, restoreSandboxCheckpoint } from "../lifecycle/SandboxExecutor.ts";
 import PlanningModeService from "../../PlanningModeService.ts";
 
 interface BeforePromptHookContext {
@@ -228,6 +231,15 @@ export async function runTreeOfThoughts(
         branchCount: adaptiveBranchCount,
       });
 
+      // ── Instruction fade-out countermeasure ─────────────────
+      maybeInjectSystemReminder(
+        currentMessages,
+        state,
+        emit,
+        agentSessionId,
+        options.reminderInterval,
+      );
+
       const passOptions: IterationPassOptions = {
         ...options,
         project,
@@ -345,6 +357,11 @@ export async function runTreeOfThoughts(
 
       harness.emitUsageUpdate();
 
+      // ── Cost budget enforcement ────────────────────────────
+      if (checkCostBudget(state, context.resolvedModel, options.maxCostDollars, emit)) {
+        break;
+      }
+
       // ── Tool execution from selected branch ─────────────────
       if (selectedPass.pendingToolCalls.length > 0) {
         const preExecutionSnapshot = currentMessages.map((message) => ({
@@ -359,6 +376,7 @@ export async function runTreeOfThoughts(
           );
 
         let results: ToolResult[] = [];
+        let sandboxCheckpointReference: string | null = null;
         if (!isApproved) {
           results = selectedPass.pendingToolCalls.map((toolCall) => ({
             name: toolCall.name,
@@ -375,6 +393,11 @@ export async function runTreeOfThoughts(
           }
 
           context._currentMessages = currentMessages;
+
+          // ── Sandbox checkpoint (git-based rollback) ────────────
+          sandboxCheckpointReference = options.enableSandbox
+            ? createSandboxCheckpoint(workspaceRoot, emit)
+            : null;
 
           results = await executeToolBatch(
             selectedPass.pendingToolCalls,
@@ -442,6 +465,11 @@ export async function runTreeOfThoughts(
 
           if (shouldRestoreCheckpoint) {
             currentMessages = preExecutionSnapshot;
+
+            // Restore filesystem to pre-execution state alongside conversation
+            if (sandboxCheckpointReference) {
+              restoreSandboxCheckpoint(workspaceRoot, sandboxCheckpointReference, emit);
+            }
 
             emit({
               type: SERVER_SENT_EVENT_TYPES.STATUS,
@@ -669,6 +697,7 @@ export async function runTreeOfThoughts(
         `strategy: ${searchStrategy}`,
     );
 
+    cleanupReminderCache(agentSessionId);
     await harness["finalize"](currentMessages, hooks);
     return { messages: currentMessages };
   } catch (loopError: unknown) {

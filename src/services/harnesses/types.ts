@@ -181,6 +181,10 @@ export interface AgenticOptions {
   skipCritic?: boolean;
   /** Skip sandbox for destructive tools. */
   skipSandbox?: boolean;
+  /** Maximum cost in dollars before the loop terminates with an exhaustion recovery. */
+  maxCostDollars?: number;
+  /** Iteration interval at which abbreviated system prompt reminders are re-injected to counteract instruction fade-out. Default: 8. */
+  reminderInterval?: number;
   [key: string]: unknown;
 }
 

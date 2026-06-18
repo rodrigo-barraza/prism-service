@@ -20,6 +20,7 @@
  * ═══════════════════════════════════════════════════════════
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { PROVIDERS, TYPES } from "../../src/constants.ts";
 
 const PRISM_SERVICE_URL = "http://localhost:7777";
 const LM_STUDIO_URL = "http://localhost:1234";
@@ -56,12 +57,12 @@ async function findTargetModel() {
 
   // Fallback: return any loaded conversational model
   const loaded = models.find(
-    (m) => m.loaded_instances?.length > 0 && m.type !== "embedding",
+    (m) => m.loaded_instances?.length > 0 && m.type !== TYPES.EMBEDDING,
   );
   if (loaded) return loaded.key || loaded.id;
 
   // Last resort: return first conversational model
-  const first = models.find((m) => m.type !== "embedding");
+  const first = models.find((m) => m.type !== TYPES.EMBEDDING);
   return first ? first.key || first.id : null;
 }
 
@@ -344,7 +345,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
   // ── Test 1: Single-turn baseline ─────────────────────────────
   it("single-turn agent generates text without looping", async () => {
     const result = await agentStream({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: [
         { role: "user", content: "What is 2 + 2? Answer in one sentence." },
@@ -383,7 +384,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     // ── Turn 1 ──
     console.log("\n  📝 Turn 1: Initial prompt…");
     const turn1 = await agentStream({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: [
         { role: "user", content: "Hello! My name is Rodrigo. What is your name?" },
@@ -403,7 +404,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     // Build multi-turn message array — exactly what the frontend does
     console.log("\n  📝 Turn 2: Follow-up prompt (the critical test)…");
     const turn2 = await agentStream({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: [
         { role: "user", content: "Hello! My name is Rodrigo. What is your name?" },
@@ -431,7 +432,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     // ── Turn 3 — triple-check stability ──
     console.log("\n  📝 Turn 3: Third consecutive turn…");
     const turn3 = await agentStream({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: [
         { role: "user", content: "Hello! My name is Rodrigo. What is your name?" },
@@ -461,7 +462,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
   // the native MCP path and has its own "Processing prompt" event.
   it("agent with tool calling completes without looping", async () => {
     const result = await agentStream({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: [
         { role: "user", content: "What files are in the current directory? Use tools to check." },
@@ -504,7 +505,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
         "x-username": "test-runner",
       },
       body: JSON.stringify({
-        provider: "lm-studio",
+        provider: PROVIDERS.LM_STUDIO,
         model: targetModel,
         messages: [
           { role: "user", content: "Write a very long essay about the history of computing." },
@@ -546,7 +547,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         followUp = await agentStream({
-          provider: "lm-studio",
+          provider: PROVIDERS.LM_STUDIO,
           model: targetModel,
           messages: [
             { role: "user", content: "Say 'hello' and nothing else." },
@@ -598,7 +599,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
 
     for (let i = 0; i < 5; i++) {
       const result = await agentStream({
-        provider: "lm-studio",
+        provider: PROVIDERS.LM_STUDIO,
         model: targetModel,
         messages: [
           { role: "user", content: `Turn ${i + 1}: What is ${i + 1} + ${i + 1}? Answer with just the number.` },
@@ -642,7 +643,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
   it("non-streaming agent endpoint returns valid JSON", async () => {
     const startTime = Date.now();
     const result = await agentJSON({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: [
         { role: "user", content: "What is 5 * 5? Answer with just the number." },
@@ -675,7 +676,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     // ── Turn 1: ask for 4 parallel workers ──
     console.log("\n  📝 Coordinator Turn 1: requesting 4 workers…");
     const turn1 = await agentStream({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: [
         {
@@ -737,7 +738,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     ];
 
     const turn2 = await agentStream({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: turn2Messages,
       agent: "CODING",
@@ -770,7 +771,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     ];
 
     const turn3 = await agentStream({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: turn3Messages,
       agent: "CODING",

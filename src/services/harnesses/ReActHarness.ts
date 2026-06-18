@@ -37,6 +37,9 @@ import { logKVCacheHitRate } from "./lifecycle/KVCacheReporter.ts";
 import { injectToolDiscoveryNudge } from "./lifecycle/ToolDiscoveryNudge.ts";
 import { finalizePassTracker } from "./lifecycle/TrackerFinalizer.ts";
 import { handleCodexPlanningResponse } from "./lifecycle/CodexPlanningDetector.ts";
+import { maybeInjectSystemReminder, cleanupReminderCache } from "./lifecycle/SystemReminderInjector.ts";
+import { checkCostBudget } from "./lifecycle/CostBudgetEnforcer.ts";
+import { createSandboxCheckpoint, restoreSandboxCheckpoint } from "./lifecycle/SandboxExecutor.ts";
 
 import PlanningModeService from "../PlanningModeService.ts";
 
@@ -181,6 +184,15 @@ export default class ReActHarness extends BaseAgenticHarness {
           maxIterations: resolvedMaxIterations,
         });
 
+        // ── Instruction fade-out countermeasure ─────────────────
+        maybeInjectSystemReminder(
+          currentMessages,
+          state,
+          emit,
+          agentSessionId,
+          options.reminderInterval,
+        );
+
         // ── beforePrompt hook (iteration 1 only) ──────────────
         if (state.iterations === 1) {
           const hookContext: BeforePromptHookContext = {
@@ -290,6 +302,11 @@ export default class ReActHarness extends BaseAgenticHarness {
 
         this.emitUsageUpdate();
 
+        // ── Cost budget enforcement ────────────────────────────
+        if (checkCostBudget(state, context.resolvedModel, options.maxCostDollars, emit)) {
+          break;
+        }
+
         // ── Tool execution ─────────────────────────────────────
         if (pass.pendingToolCalls.length > 0) {
           // Plan mode enforcement
@@ -315,6 +332,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             );
 
           let results: ToolResult[] = [];
+          let sandboxCheckpointReference: string | null = null;
           if (!isApproved) {
             results = pass.pendingToolCalls.map((toolCall) => ({
               name: toolCall.name,
@@ -334,6 +352,11 @@ export default class ReActHarness extends BaseAgenticHarness {
             // Attach currentMessages to context so ToolExecutor can pass them
             // to tools-api (needed by tools like generate_image that inspect conversation)
             context._currentMessages = currentMessages;
+
+            // ── Sandbox checkpoint (git-based rollback) ────────────
+            sandboxCheckpointReference = options.enableSandbox
+              ? createSandboxCheckpoint(workspaceRoot, emit)
+              : null;
 
             results = await executeToolBatch(
               pass.pendingToolCalls,
@@ -404,6 +427,11 @@ export default class ReActHarness extends BaseAgenticHarness {
                 };
               }),
             });
+
+            // Restore sandbox checkpoint on validation failure
+            if (sandboxCheckpointReference) {
+              restoreSandboxCheckpoint(workspaceRoot, sandboxCheckpointReference, emit);
+            }
 
             currentMessages.push({
               role: "system",
@@ -613,6 +641,7 @@ export default class ReActHarness extends BaseAgenticHarness {
       }
 
       // ── Finalization (happy path) ──────────────────────────────
+      cleanupReminderCache(agentSessionId);
       await this.finalize(currentMessages, hooks);
       return { messages: currentMessages };
     } catch (loopError: unknown) {

@@ -55,6 +55,12 @@ export async function checkAndWaitForApproval(
       resolve({ isApproved: false, reason: "timeout" });
     }, APPROVAL_TIMEOUT_MS);
 
+    const existingApproval = pendingApprovals.get(conversationId);
+    if (existingApproval) {
+      existingApproval.resolve({ isApproved: false, reason: "superseded" } as never);
+      pendingApprovals.delete(conversationId);
+    }
+
     pendingApprovals.set(conversationId, {
       resolve: (
         value: import("../../ApprovalRegistry.ts").ApprovalResolution,
