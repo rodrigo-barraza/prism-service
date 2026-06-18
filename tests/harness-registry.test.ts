@@ -117,19 +117,16 @@ describe("HarnessRegistry", () => {
     expect(HarnessRegistry.has("nonexistent")).toBe(false);
   });
 
-  it("should have TreeOfThoughtHarness registered inside HarnessRegistry", () => {
+  it("should fall back to 'standard' when requesting the legacy 'tree_of_thought' harness id", () => {
     const harnessClass = HarnessRegistry.get("tree_of_thought");
     expect(harnessClass).toBeDefined();
-    expect(harnessClass!.id).toBe("tree_of_thought");
-    expect(harnessClass!.label).toBe("Tree of Thought");
-    expect(harnessClass!.description).toContain("backtracking");
+    expect(harnessClass!.id).toBe("standard");
   });
 
-  it("should include TreeOfThoughtHarness inside the list of available harnesses", () => {
+  it("should not include tree_of_thought inside the list of available harnesses", () => {
     const harnessList = HarnessRegistry.list();
     const treeOfThoughtHarnessEntry = harnessList.find((entry) => entry.id === "tree_of_thought");
-    expect(treeOfThoughtHarnessEntry).toBeDefined();
-    expect(treeOfThoughtHarnessEntry?.label).toBe("Tree of Thought");
+    expect(treeOfThoughtHarnessEntry).toBeUndefined();
   });
 });
 

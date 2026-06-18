@@ -200,6 +200,7 @@ async function prepareGenerationContext(
     agent,
     harness,
     topology,
+    reasoningStrategy,
     // Generation options — flat at top-level (OpenAI-style)
     tools,
     temperature,
@@ -297,6 +298,7 @@ async function prepareGenerationContext(
     ...(criticModel != null && { criticModel }),
     ...(harness != null && { harness }),
     ...(topology != null && { topology }),
+    ...(reasoningStrategy != null && { reasoningStrategy }),
     ...(parallelToolCalls != null && { parallelToolCalls }),
     ...(candidateCount != null && { candidateCount }),
     ...(responseMimeType != null &&
