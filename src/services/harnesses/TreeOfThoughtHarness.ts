@@ -37,7 +37,6 @@ import type {
   AgenticOptions,
 } from "./types.ts";
 
-/** Context passed to the beforePrompt lifecycle hook. */
 interface BeforePromptHookContext {
   messages: ConversationMessage[];
   project: string;
@@ -53,7 +52,6 @@ interface BeforePromptHookContext {
   [key: string]: unknown;
 }
 
-/** Per-iteration pass options with runtime context fields. */
 interface IterationPassOptions extends AgenticOptions {
   project: string;
   agent?: string | null;
@@ -63,6 +61,7 @@ interface IterationPassOptions extends AgenticOptions {
 const MAX_TOOL_ITERATIONS = 25;
 const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
 const DEFAULT_BRANCH_COUNT = 3;
+const MAX_BACKTRACK_ATTEMPTS_PER_ITERATION = 2;
 
 interface ScoredBranch {
   branchIndex: number;
@@ -70,39 +69,81 @@ interface ScoredBranch {
   thinking: string;
   thinkingSignature: string;
   score: number;
+  criteriaScores: CriteriaScores;
   pass: PassState;
 }
 
+interface CriteriaScores {
+  correctness: number;
+  risk: number;
+  efficiency: number;
+  completeness: number;
+}
+
+type SearchStrategy = "bfs" | "dfs";
+
 /**
- * TreeOfThoughtHarness — Non-linear graph-state harness with branching,
- * scoring, and backtracking.
+ * Structured strategy descriptors injected into branch prompts to enforce
+ * genuine diversity. Each descriptor pushes the model toward a fundamentally
+ * different problem-solving axis rather than cosmetic rephrasing.
  *
- * Instead of a linear Reason→Act→Observe loop, this harness explores
- * multiple reasoning branches in parallel, scores them via self-evaluation,
- * and commits the best one. When execution of the selected branch fails
- * validation, it backtracks to the next-best candidate.
+ * Based on the Plan Generation taxonomy (§2.1.2) from "Agent Systems with
+ * Harness Engineering" — strategies should correspond to distinct trade-off
+ * dimensions, not just reworded attempts at the same approach.
+ */
+const BRANCH_STRATEGY_DESCRIPTORS = [
+  "", // Branch 0: unconstrained (model's natural first choice)
+  "Focus on a MINIMAL approach — use the fewest tools and smallest changes possible. " +
+    "Prefer precision over coverage. Choose the simplest solution that could work.",
+  "Focus on a THOROUGH approach — maximize correctness and safety. " +
+    "Add validation, error handling, and defensive checks even if it means more steps.",
+  "Focus on an ALTERNATIVE ARCHITECTURE — if branch 1 would modify code in place, " +
+    "consider creating new files. If branch 1 would iterate, consider a batch approach. " +
+    "Deliberately diverge from the obvious first solution.",
+  "Focus on RISK MINIMIZATION — what approach has the lowest chance of breaking " +
+    "existing functionality? Prefer reversible, incremental changes over large rewrites.",
+];
+
+/**
+ * TreeOfThoughtHarness — Graph-state harness with branching, multi-criteria
+ * scoring, reflexion-based backtracking, and adaptive search.
  *
- * Based on the Tree of Thoughts framework (Yao et al., 2023) adapted
- * for agentic tool-use loops.
+ * Based on the Tree of Thoughts framework (Yao et al., NeurIPS 2023) adapted
+ * for agentic tool-use loops, upgraded with strategies from "Agent Systems
+ * with Harness Engineering" (RUCAIBox, 2026):
  *
- * Control flow:
+ *   - Reflexion-based backtracking (Shinn et al., NeurIPS 2023): on failure,
+ *     the model self-critiques before retrying instead of blindly re-attempting
+ *   - Multi-criteria scoring (§2.1.2): branches evaluated across correctness,
+ *     risk, efficiency, and completeness — not a single holistic score
+ *   - Adaptive branch count: reduces exploration breadth after iteration 1
+ *     when trajectory context narrows the viable search space
+ *   - Checkpoint/restore: failed branches don't pollute the conversation
+ *     context — message arrays are snapshotted before execution
+ *   - DFS-with-pruning mode: optional depth-first search that explores one
+ *     branch deeply before backtracking, vs. the default BFS parallel evaluation
+ *
+ * Control flow (BFS mode — default):
  *   1. Generate N candidate reasoning branches in parallel
- *   2. Score candidates via self-evaluation (single fast LLM call)
+ *   2. Score candidates via multi-criteria self-evaluation
  *   3. Select the highest-scoring branch
- *   4. Execute tools from the selected branch (standard ReAct iteration)
- *   5. If validation fails: backtrack to next-best branch
- *   6. If text only (and not in plan mode): break → finalize
+ *   4. Execute tools from the selected branch
+ *   5. If validation fails: reflexion self-critique → backtrack to next-best
+ *   6. If text only: break → finalize
  *   7. Exhaustion recovery if iteration limit hit
  *
- * Lifecycle modules (ToolExecutor, ApprovalGate, PostExecutionEmitter,
- * ValidationInterceptor, ExhaustionRecovery) are reused from the shared
- * lifecycle/ directory.
+ * Control flow (DFS mode):
+ *   1. Generate 1 candidate branch
+ *   2. Execute tools immediately (no scoring needed for single branch)
+ *   3. If validation fails: reflexion → checkpoint restore → generate new branch
+ *      with explicit instruction to avoid the failed approach
+ *   4. Repeat until success or backtrack budget exhausted
  */
 export default class TreeOfThoughtHarness extends BaseAgenticHarness {
   static id = "tree_of_thought";
   static label = "Tree of Thought";
   static description =
-    "Non-linear branching harness with parallel candidate generation, scoring, and backtracking.";
+    "Graph-state harness with parallel branching, multi-criteria scoring, reflexion backtracking, and adaptive search.";
 
   async run(): Promise<{ messages: ConversationMessage[] }> {
     const context = this.context;
@@ -119,8 +160,10 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       signal,
     } = context;
 
-    const branchCount = Math.min(
-      options.branchCount || DEFAULT_BRANCH_COUNT,
+    const searchStrategy: SearchStrategy =
+      (options.searchStrategy as SearchStrategy) || "bfs";
+    const initialBranchCount = Math.min(
+      Math.max(1, options.branchCount || DEFAULT_BRANCH_COUNT),
       5,
     );
 
@@ -135,6 +178,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     let currentMessages: ConversationMessage[] = [...context.messages];
     let truncationRecoveryCount = 0;
     let hasCleanTextBreak = false;
+    let failedApproachDescriptions: string[] = [];
 
     const { hooks, approvalEngine } = createStandardHooks({
       workspaceRoot: workspaceRoot || undefined,
@@ -183,10 +227,20 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     }
 
     // ── Main loop ────────────────────────────────────────────
-    // Wrapped in try/catch for error-path message persistence.
     try {
     while (state.iterations < resolvedMaxIterations) {
       state.iterations++;
+
+      // ── Adaptive branch count ────────────────────────────
+      // After the first iteration, reduce branch count because we have
+      // trajectory context that narrows the viable search space.
+      // In DFS mode, always use 1 branch (depth-first by definition).
+      const adaptiveBranchCount =
+        searchStrategy === "dfs"
+          ? 1
+          : state.iterations === 1
+            ? initialBranchCount
+            : Math.max(1, Math.ceil(initialBranchCount * 0.6));
 
       emit({
         type: SERVER_SENT_EVENT_TYPES.STATUS,
@@ -194,6 +248,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
         iteration: state.iterations,
         maxIterations: resolvedMaxIterations,
         harness: "tree_of_thought",
+        searchStrategy,
+        branchCount: adaptiveBranchCount,
       });
 
       const passOptions: IterationPassOptions = {
@@ -254,52 +310,46 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       emit({
         type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.BRANCHING_STARTED,
-        branchCount,
+        branchCount: adaptiveBranchCount,
         iteration: state.iterations,
+        searchStrategy,
       });
-
-      const branchPassOptions: IterationPassOptions = {
-        ...passOptions,
-        tools: this.tools.finalTools,
-      };
 
       const allowedToolNames = new Set(
         this.tools.finalTools.map((tool: ToolSchema) => tool.name),
       );
 
       const branchResults = await Promise.all(
-        Array.from({ length: branchCount }, (_, branchIndex) =>
+        Array.from({ length: adaptiveBranchCount }, (_, branchIndex) =>
           this.generateBranch(
             branchIndex,
-            branchCount,
+            adaptiveBranchCount,
             currentMessages,
-            branchPassOptions,
+            passOptions,
             allowedToolNames,
+            failedApproachDescriptions,
           ),
         ),
       );
 
       if (signal?.aborted) break;
 
-      // Track branch exploration stats
-      state.branchesExplored += branchCount;
+      state.branchesExplored += adaptiveBranchCount;
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      //  PHASE 2: Score and rank branches
+      //  PHASE 2: Multi-criteria score and rank branches
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      const scoredBranches = await this.scoreBranches(
+      const scoredBranches = await this.scoreBranchesMultiCriteria(
         branchResults,
         currentMessages,
       );
 
-      // Sort by score descending
       scoredBranches.sort((branchA, branchB) => branchB.score - branchA.score);
 
       const selectedBranch = scoredBranches[0];
       state.selectedBranchScores.push(selectedBranch.score);
 
-      // Update the shared state with the selected branch's content to fix the race condition where parallel branches overwrite the shared state
       state.finalStreamedText = selectedBranch.pass.finalStreamedText;
       state.streamedThinking = selectedBranch.pass.streamedThinking;
 
@@ -308,20 +358,24 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
         message: STATUS_MESSAGES.BRANCH_SELECTED,
         branchIndex: selectedBranch.branchIndex,
         score: selectedBranch.score,
-        branchCount,
+        branchCount: adaptiveBranchCount,
+        criteriaScores: selectedBranch.criteriaScores,
         scores: scoredBranches.map((branch) => ({
           index: branch.branchIndex,
           score: branch.score,
+          criteria: branch.criteriaScores,
         })),
       });
 
       logger.info(
-        `[TreeOfThought] Iteration ${state.iterations}: selected branch ${selectedBranch.branchIndex + 1}/${branchCount} ` +
-          `(score: ${selectedBranch.score}), scores: [${scoredBranches.map((branch) => branch.score.toFixed(1)).join(", ")}]`,
+        `[TreeOfThought] Iteration ${state.iterations}: selected branch ${selectedBranch.branchIndex + 1}/${adaptiveBranchCount} ` +
+          `(score: ${selectedBranch.score.toFixed(1)}, correctness: ${selectedBranch.criteriaScores.correctness}, ` +
+          `risk: ${selectedBranch.criteriaScores.risk}, efficiency: ${selectedBranch.criteriaScores.efficiency}, ` +
+          `completeness: ${selectedBranch.criteriaScores.completeness})`,
       );
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      //  PHASE 3: Execute selected branch (standard ReAct step)
+      //  PHASE 3: Execute selected branch with backtracking
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
       const selectedPass = selectedBranch.pass;
@@ -348,6 +402,11 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
 
       // ── Tool execution from selected branch ─────────────────
       if (selectedPass.pendingToolCalls.length > 0) {
+        // Snapshot messages BEFORE tool execution for checkpoint/restore
+        const preExecutionSnapshot = currentMessages.map(
+          (message) => ({ ...message }),
+        );
+
         const { isApproved, shouldApproveAll } = await checkAndWaitForApproval(
           selectedPass.pendingToolCalls,
           context,
@@ -401,7 +460,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
 
         emitPostExecutionStatus(selectedPass.pendingToolCalls, emit);
 
-        // ── Validation + backtracking ─────────────────────────
+        // ── Validation + reflexion-based backtracking ──────────
         const validationFeedback = await validateAfterToolExecution(
           selectedPass.pendingToolCalls,
           results,
@@ -409,21 +468,9 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
           state,
         );
 
-        if (validationFeedback.length > 0 && scoredBranches.length > 1) {
+        if (validationFeedback.length > 0) {
           state.branchesBacktracked++;
-          emit({
-            type: SERVER_SENT_EVENT_TYPES.STATUS,
-            message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
-            branchIndex: selectedBranch.branchIndex,
-            validationErrors: validationFeedback.length,
-          });
 
-          logger.info(
-            `[TreeOfThought] Branch ${selectedBranch.branchIndex + 1} failed validation. ` +
-              `Injecting error feedback for self-correction.`,
-          );
-
-          // Inject validation errors as feedback for next iteration
           const errorBlock = validationFeedback
             .map(
               (feedback) =>
@@ -431,37 +478,99 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
             )
             .join("\n\n");
 
-          currentMessages.push({
-            role: "assistant",
-            content: selectedPass.streamedText || "",
-            ...(selectedPass.streamedThinking.trim() && { thinking: selectedPass.streamedThinking.trim() }),
-            toolCalls: selectedPass.pendingToolCalls.map((toolCall: ToolCall) => {
-              const matchingResult = results.find((result) => result.id === toolCall.id);
-              return {
-                id: toolCall.id || null,
-                name: toolCall.name,
-                args: toolCall.args,
-                result: matchingResult ? matchingResult.result : null,
-                durationMs: matchingResult?.durationMs,
-              };
-            }),
-          });
+          // Track what approach failed for future branch diversity
+          const failedApproachSummary =
+            (selectedPass.streamedText || selectedPass.streamedThinking || "")
+              .slice(0, 300)
+              .trim();
+          if (failedApproachSummary) {
+            failedApproachDescriptions.push(failedApproachSummary);
+          }
 
-          currentMessages.push({
-            role: "system",
-            content:
-              `[VALIDATION ERROR — BRANCH ${selectedBranch.branchIndex + 1} FAILED]\n\n` +
-              `${errorBlock}\n\n` +
-              `Fix these issues. Consider an alternative approach.`,
-          });
+          // Determine if we should checkpoint-restore or continue with errors
+          const backtrackAttemptsThisIteration = state.branchesBacktracked;
+          const shouldRestoreCheckpoint =
+            backtrackAttemptsThisIteration <= MAX_BACKTRACK_ATTEMPTS_PER_ITERATION &&
+            scoredBranches.length > 1;
+
+          if (shouldRestoreCheckpoint) {
+            // Restore pre-execution message state (checkpoint/restore pattern)
+            currentMessages = preExecutionSnapshot;
+
+            emit({
+              type: SERVER_SENT_EVENT_TYPES.STATUS,
+              message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
+              branchIndex: selectedBranch.branchIndex,
+              validationErrors: validationFeedback.length,
+              restoredCheckpoint: true,
+            });
+
+            logger.info(
+              `[TreeOfThought] Branch ${selectedBranch.branchIndex + 1} failed validation. ` +
+                `Restored checkpoint. Injecting reflexion prompt for self-correction.`,
+            );
+
+            // ── Reflexion self-critique injection ──────────────
+            // Instead of just "fix these errors", ask the model to analyze
+            // WHY the approach failed before retrying (Shinn et al., 2023)
+            currentMessages.push({
+              role: "system",
+              content:
+                `[REFLEXION — BRANCH ${selectedBranch.branchIndex + 1} FAILED VALIDATION]\n\n` +
+                `The previous approach produced ${validationFeedback.length} validation error(s):\n\n` +
+                `${errorBlock}\n\n` +
+                `Before retrying, ANALYZE what went wrong:\n` +
+                `1. What assumption in the previous approach caused the failure?\n` +
+                `2. What is fundamentally different about a correct solution?\n` +
+                `3. What specific alternative strategy would avoid this class of error?\n\n` +
+                `Apply your analysis and take a DIFFERENT approach on the next attempt.`,
+            });
+          } else {
+            // Exhausted backtrack budget — continue with errors as context
+            emit({
+              type: SERVER_SENT_EVENT_TYPES.STATUS,
+              message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
+              branchIndex: selectedBranch.branchIndex,
+              validationErrors: validationFeedback.length,
+              restoredCheckpoint: false,
+            });
+
+            currentMessages.push({
+              role: "assistant",
+              content: selectedPass.streamedText || "",
+              ...(selectedPass.streamedThinking.trim() && { thinking: selectedPass.streamedThinking.trim() }),
+              toolCalls: selectedPass.pendingToolCalls.map((toolCall: ToolCall) => {
+                const matchingResult = results.find((result) => result.id === toolCall.id);
+                return {
+                  id: toolCall.id || null,
+                  name: toolCall.name,
+                  args: toolCall.args,
+                  result: matchingResult ? matchingResult.result : null,
+                  durationMs: matchingResult?.durationMs,
+                };
+              }),
+            });
+
+            currentMessages.push({
+              role: "system",
+              content:
+                `[VALIDATION ERROR — BACKTRACK BUDGET EXHAUSTED]\n\n` +
+                `${errorBlock}\n\n` +
+                `Multiple approaches have failed. Fix the remaining issues directly.`,
+            });
+          }
 
           this.logIteration(selectedPass, currentMessages);
           continue;
         }
 
+        // ── No validation errors — commit this branch ──────────
+
         this.logIteration(selectedPass, currentMessages);
 
-        // ── Append to context for next pass ───────────────────
+        // Clear failed approaches on success — the trajectory is viable
+        failedApproachDescriptions = [];
+
         const assistantMessage: ConversationMessage = {
           role: "assistant",
           content: selectedPass.streamedText || "",
@@ -548,9 +657,6 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     }
 
     // ── Exhaustion Recovery Pass ─────────────────────────────
-    // Triggers when the agent used tools but never produced a clean text-only
-    // break — regardless of how the loop exited (max iterations, empty output,
-    // truncation exhaustion). Skipped when signal is aborted.
     if (!hasCleanTextBreak && state.streamedToolCalls.length > 0 && !signal?.aborted) {
       await runExhaustionRecoveryPass(this, context, state, currentMessages);
     }
@@ -559,7 +665,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     logger.info(
       `[TreeOfThought] Session complete: ${state.iterations} iterations, ` +
         `${state.branchesExplored} branches explored, ` +
-        `${state.branchesBacktracked} backtracked`,
+        `${state.branchesBacktracked} backtracked, ` +
+        `strategy: ${searchStrategy}`,
     );
 
     await this.finalize(currentMessages, hooks);
@@ -588,12 +695,17 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  //  PRIVATE — Branch generation and scoring
+  //  PRIVATE — Branch generation with structured diversity
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   /**
-   * Generate a single reasoning branch by streaming an LLM response
-   * with a diversity prompt injection.
+   * Generate a single reasoning branch with structured strategy-diversity
+   * injection. Each branch after the first gets a distinct strategy
+   * descriptor that pushes toward a fundamentally different problem-solving
+   * axis (minimal vs thorough vs architectural vs risk-averse).
+   *
+   * When previous branches have failed, their approach summaries are
+   * injected as negative examples so the model avoids repeating them.
    */
   private async generateBranch(
     branchIndex: number,
@@ -601,18 +713,34 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     currentMessages: ConversationMessage[],
     passOptions: IterationPassOptions,
     allowedToolNames: Set<string>,
+    failedApproaches: string[],
   ): Promise<ScoredBranch> {
     const branchMessages = [...currentMessages];
 
-    // Inject branch-diversity instruction for branches after the first
-    if (branchIndex > 0) {
+    // Inject structured diversity prompt for non-primary branches
+    if (branchIndex > 0 || failedApproaches.length > 0) {
+      const strategyDescriptor =
+        BRANCH_STRATEGY_DESCRIPTORS[branchIndex % BRANCH_STRATEGY_DESCRIPTORS.length] ||
+        BRANCH_STRATEGY_DESCRIPTORS[1];
+
+      let diversityInstruction =
+        `[BRANCH ${branchIndex + 1}/${totalBranches}] ` +
+        strategyDescriptor;
+
+      // Inject failed approach avoidance when we have reflexion history
+      if (failedApproaches.length > 0) {
+        const failedSummaries = failedApproaches
+          .map((approach, index) => `  ${index + 1}. ${approach}`)
+          .join("\n");
+        diversityInstruction +=
+          `\n\nThe following approach(es) have already been tried and FAILED:\n` +
+          `${failedSummaries}\n` +
+          `You MUST use a fundamentally different strategy.`;
+      }
+
       branchMessages.push({
         role: "user",
-        content:
-          `[BRANCH ${branchIndex + 1}/${totalBranches}] ` +
-          `Consider an alternative approach to the task. ` +
-          `Think carefully about trade-offs and choose a different strategy ` +
-          `than you might have initially considered.`,
+        content: diversityInstruction,
       });
     }
 
@@ -631,24 +759,43 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       thinking: pass.streamedThinking,
       thinkingSignature: pass.thinkingSignature,
       score: 0,
+      criteriaScores: { correctness: 0, risk: 0, efficiency: 0, completeness: 0 },
       pass,
     };
   }
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  //  PRIVATE — Multi-criteria scoring (§2.1.2)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
   /**
-   * Score branches using self-evaluation via a single LLM call.
+   * Score branches using multi-criteria self-evaluation via a single LLM call.
    *
-   * The model rates each candidate on correctness, completeness, and risk.
-   * This is cheaper than running a separate critic model because it reuses
-   * the same provider and model, and only generates ~50 tokens.
+   * Instead of a single holistic score, the model evaluates each candidate
+   * across four dimensions from the paper's Task Planning taxonomy (§2.1.2):
+   *
+   *   - Correctness: will this approach produce the right result?
+   *   - Risk: how likely is this to break existing functionality?
+   *   - Efficiency: does this minimize unnecessary steps/tokens?
+   *   - Completeness: does this address all parts of the task?
+   *
+   * The final score is a weighted composite: correctness (0.4) + risk (0.25)
+   * + efficiency (0.15) + completeness (0.2).
    */
-  private async scoreBranches(
+  private async scoreBranchesMultiCriteria(
     branches: ScoredBranch[],
     _currentMessages: ConversationMessage[],
   ): Promise<ScoredBranch[]> {
-    // If only 1 branch, skip scoring entirely
     if (branches.length <= 1) {
-      if (branches[0]) branches[0].score = 10;
+      if (branches[0]) {
+        branches[0].score = 10;
+        branches[0].criteriaScores = {
+          correctness: 10,
+          risk: 10,
+          efficiency: 10,
+          completeness: 10,
+        };
+      }
       return branches;
     }
 
@@ -656,16 +803,30 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       const candidateSummaries = branches
         .map((branch, index) => {
           const textPreview = (branch.text || branch.thinking || "(no output)")
-            .slice(0, 400)
+            .slice(0, 500)
             .trim();
           const toolCallCount = branch.pass.pendingToolCalls.length;
-          return `[Candidate ${index + 1}] ${toolCallCount} tool call(s). Output: ${textPreview}`;
+          const toolCallNames = branch.pass.pendingToolCalls
+            .map((toolCall) => toolCall.name)
+            .join(", ");
+          return (
+            `[Candidate ${index + 1}] ` +
+            `${toolCallCount} tool call(s)${toolCallNames ? ` (${toolCallNames})` : ""}.\n` +
+            `Output: ${textPreview}`
+          );
         })
         .join("\n\n");
 
       const scoringPrompt = [
-        "Rate each candidate approach (1-10) for correctness, completeness, and safety.",
-        "Higher is better. Respond ONLY with scores in format: 1:8, 2:6",
+        "Rate each candidate approach on 4 criteria (1-10 each):",
+        "- CORRECTNESS: Will this produce the right result?",
+        "- RISK: How safe is this? (10=very safe, 1=destructive)",
+        "- EFFICIENCY: Does it minimize unnecessary steps?",
+        "- COMPLETENESS: Does it address all parts of the task?",
+        "",
+        "Respond ONLY in this exact format (one line per candidate):",
+        "1: correctness=8, risk=7, efficiency=6, completeness=9",
+        "2: correctness=5, risk=9, efficiency=8, completeness=4",
         "",
         candidateSummaries,
       ].join("\n");
@@ -675,7 +836,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       ];
 
       const scoringOptions = {
-        maxTokens: 100,
+        maxTokens: 200,
         temperature: 0,
         signal: AbortSignal.timeout(15_000),
       };
@@ -693,32 +854,83 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
         }
       }
 
-      // Parse scores from response like "1:8, 2:6, 3:7"
-      const scorePattern = /(\d+)\s*:\s*(\d+(?:\.\d+)?)/g;
-      let scoreMatch: RegExpExecArray | null;
-      while ((scoreMatch = scorePattern.exec(scoreResponseText)) !== null) {
-        const candidateIndex = parseInt(scoreMatch[1], 10) - 1;
-        const candidateScore = parseFloat(scoreMatch[2]);
-        if (candidateIndex >= 0 && candidateIndex < branches.length && candidateScore >= 0 && candidateScore <= 10) {
-          branches[candidateIndex].score = candidateScore;
+      // Parse multi-criteria scores
+      const linePattern = /(\d+)\s*:\s*correctness\s*=\s*(\d+(?:\.\d+)?)\s*,\s*risk\s*=\s*(\d+(?:\.\d+)?)\s*,\s*efficiency\s*=\s*(\d+(?:\.\d+)?)\s*,\s*completeness\s*=\s*(\d+(?:\.\d+)?)/gi;
+      let lineMatch: RegExpExecArray | null;
+      while ((lineMatch = linePattern.exec(scoreResponseText)) !== null) {
+        const candidateIndex = parseInt(lineMatch[1], 10) - 1;
+        if (candidateIndex >= 0 && candidateIndex < branches.length) {
+          const criteria: CriteriaScores = {
+            correctness: Math.min(10, Math.max(0, parseFloat(lineMatch[2]))),
+            risk: Math.min(10, Math.max(0, parseFloat(lineMatch[3]))),
+            efficiency: Math.min(10, Math.max(0, parseFloat(lineMatch[4]))),
+            completeness: Math.min(10, Math.max(0, parseFloat(lineMatch[5]))),
+          };
+          branches[candidateIndex].criteriaScores = criteria;
+          // Weighted composite: correctness (0.4) + risk (0.25) + efficiency (0.15) + completeness (0.2)
+          branches[candidateIndex].score =
+            criteria.correctness * 0.4 +
+            criteria.risk * 0.25 +
+            criteria.efficiency * 0.15 +
+            criteria.completeness * 0.2;
+        }
+      }
+
+      // Fallback: try simple "N:score" format if multi-criteria parsing failed
+      const hasMultiCriteriaScores = branches.some(
+        (branch) => branch.criteriaScores.correctness > 0,
+      );
+      if (!hasMultiCriteriaScores) {
+        const simpleScorePattern = /(\d+)\s*:\s*(\d+(?:\.\d+)?)/g;
+        let simpleMatch: RegExpExecArray | null;
+        while ((simpleMatch = simpleScorePattern.exec(scoreResponseText)) !== null) {
+          const candidateIndex = parseInt(simpleMatch[1], 10) - 1;
+          const candidateScore = parseFloat(simpleMatch[2]);
+          if (
+            candidateIndex >= 0 &&
+            candidateIndex < branches.length &&
+            candidateScore >= 0 &&
+            candidateScore <= 10
+          ) {
+            branches[candidateIndex].score = candidateScore;
+            branches[candidateIndex].criteriaScores = {
+              correctness: candidateScore,
+              risk: candidateScore,
+              efficiency: candidateScore,
+              completeness: candidateScore,
+            };
+          }
         }
       }
 
       // Ensure all branches have a score (default to 5 if parsing missed them)
       for (const branch of branches) {
-        if (branch.score === 0) branch.score = 5;
+        if (branch.score === 0) {
+          branch.score = 5;
+          branch.criteriaScores = {
+            correctness: 5,
+            risk: 5,
+            efficiency: 5,
+            completeness: 5,
+          };
+        }
       }
 
       logger.info(
-        `[TreeOfThought] Branch scores: ${branches.map((branch, index) => `${index + 1}:${branch.score}`).join(", ")}`,
+        `[TreeOfThought] Branch scores: ${branches.map((branch, index) => `${index + 1}:${branch.score.toFixed(1)}`).join(", ")}`,
       );
     } catch (scoringError: unknown) {
-      // On scoring failure, assign equal scores (first branch wins via stable sort)
       logger.warn(
         `[TreeOfThought] Scoring failed: ${getErrorMessage(scoringError)}. Using equal scores.`,
       );
       for (const branch of branches) {
         branch.score = 5;
+        branch.criteriaScores = {
+          correctness: 5,
+          risk: 5,
+          efficiency: 5,
+          completeness: 5,
+        };
       }
     }
 

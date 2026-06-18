@@ -163,8 +163,10 @@ export interface AgenticOptions {
   enableCriticGate?: boolean;
   /** Model to use for CriticGate reviews (resolved from settings). */
   criticModel?: string;
-  /** Number of parallel branches for TreeOfThought harness (default: 2, max: 5). */
+  /** Number of parallel branches for TreeOfThought harness (default: 3, max: 5). */
   branchCount?: number;
+  /** Search strategy for TreeOfThought: "bfs" (parallel exploration, default) or "dfs" (depth-first with pruning). */
+  searchStrategy?: string;
   /** Enable sandbox execution with git-based rollback for destructive tools. */
   enableSandbox?: boolean;
   /** Skip CriticGate review for this session. */
