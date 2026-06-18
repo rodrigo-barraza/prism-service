@@ -1,6 +1,5 @@
 import ReActHarness from "./ReActHarness.ts";
 import VisionLanguageHarness from "./VisionLanguageHarness.ts";
-import TreeOfThoughtHarness from "./TreeOfThoughtHarness.ts";
 import type { ConversationMessage } from "./types.ts";
 
 /**
@@ -10,6 +9,9 @@ import type { ConversationMessage } from "./types.ts";
  *   1. Create a class extending BaseAgenticHarness in this directory
  *   2. Set static `id`, `label`, and `description`
  *   3. Import and register it here
+ *
+ * Note: Tree of Thoughts is not a separate harness — it's a reasoning
+ * strategy within ReActHarness (options.reasoningStrategy = "tree_of_thoughts").
  */
 
 interface HarnessConstructor {
@@ -30,7 +32,6 @@ function register(HarnessClass: HarnessConstructor) {
 // ── Built-in harnesses ───────────────────────────────────────
 register(ReActHarness as unknown as HarnessConstructor);
 register(VisionLanguageHarness as unknown as HarnessConstructor);
-register(TreeOfThoughtHarness as unknown as HarnessConstructor);
 
 const HarnessRegistry = {
   get(id: string) {

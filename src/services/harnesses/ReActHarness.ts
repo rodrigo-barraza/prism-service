@@ -1,9 +1,11 @@
 import BaseAgenticHarness from "./BaseAgenticHarness.ts";
+import { runTreeOfThoughts } from "./strategies/TreeOfThoughtsStrategy.ts";
 import logger from "../../utils/logger.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
   TOOL_NAMES,
+  REASONING_STRATEGIES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
@@ -80,11 +82,15 @@ const MAX_TOOL_ITERATIONS = 25;
 const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
 
 /**
- * ReActHarness — Reason→Act→Observe tool-use loop.
+ * ReActHarness — Reason→Act→Observe tool-use loop with pluggable reasoning strategies.
  *
  * Based on the ReAct pattern (Yao et al., 2022).
  *
- * Control flow:
+ * Reasoning strategies:
+ *   - Chain of Thought (default): single-pass sequential reasoning per iteration
+ *   - Tree of Thoughts: parallel branching, multi-criteria scoring, reflexion backtracking
+ *
+ * Control flow (Chain of Thought):
  *   1. Stream LLM response (Reason)
  *   2. If tool calls: execute → append results → loop (Act → Observe)
  *   3. If text only (and not plan mode): break → finalize
@@ -107,6 +113,15 @@ export default class ReActHarness extends BaseAgenticHarness {
     "Reason→Act→Observe tool-use loop with plan mode, approval gating, and exhaustion recovery.";
 
   async run(): Promise<{ messages: ConversationMessage[] }> {
+    // ── Strategy dispatch ──────────────────────────────────
+    const resolvedStrategy = this.context.options.reasoningStrategy;
+    if (resolvedStrategy === REASONING_STRATEGIES.TREE_OF_THOUGHTS) {
+      logger.info(
+        `[ReActHarness] Delegating to Tree of Thoughts reasoning strategy`,
+      );
+      return runTreeOfThoughts(this);
+    }
+
     const context = this.context;
     const state = this.state;
     const {
