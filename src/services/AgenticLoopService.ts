@@ -107,11 +107,12 @@ export default class AgenticLoopService {
     }
 
     // Migration: legacy "tree_of_thought" harness → standard harness + tree_of_thoughts strategy
-    if (harnessId === "tree_of_thought") {
+    if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
+      const legacyHarnessId = harnessId;
       harnessId = "standard";
       reasoningStrategy = "tree_of_thoughts";
       logger.info(
-        `[AgenticLoop] Migrated legacy harness "tree_of_thought" → harness "standard" + reasoningStrategy "tree_of_thoughts"`,
+        `[AgenticLoop] Migrated legacy harness "${legacyHarnessId}" → harness "standard" + reasoningStrategy "tree_of_thoughts"`,
       );
     }
 

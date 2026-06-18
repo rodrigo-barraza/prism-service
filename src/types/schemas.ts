@@ -106,6 +106,7 @@ export const ChatRequestSchema = z
     criticModel: z.string().nullable().optional(),
     parallelToolCalls: z.boolean().nullable().optional(),
     candidateCount: z.number().nullable().optional(),
+    branchCount: z.number().nullable().optional(),
     responseMimeType: z.string().nullable().optional(),
     store: z.boolean().nullable().optional(),
     mediaResolution: z.string().nullable().optional(),

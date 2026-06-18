@@ -33,6 +33,7 @@ import {
   assertIterationCountWithin,
   isEmptyResponse,
   getTimeout,
+  getMultiAgentTimeout,
   DEFAULT_AGENT_TIMEOUT_MS,
   type ProviderTarget,
   type AgentSSEResult,
@@ -1852,3 +1853,169 @@ describe("Suite 14: Harness-Specific Edge Cases", () => {
     }
   }, 300_000);
 });
+
+// ═══════════════════════════════════════════════════════════════
+// Suite 15: Harness Strategies, Topologies, and Mixtures
+// ═══════════════════════════════════════════════════════════════
+
+describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
+  it("15.1 — standard harness with chain_of_thought reasoningStrategy completes cleanly", async () => {
+    for (const target of providerTargets) {
+      console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [{ role: "user", content: SIMPLE_ARITHMETIC }],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 200,
+          autoApprove: true,
+          harness: "standard",
+          reasoningStrategy: "chain_of_thought",
+        },
+        { timeoutMs: getTimeout(target) },
+      );
+
+      logResult(`15.1 [${target.providerName}]`, result);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+    }
+  }, 300_000);
+
+  it("15.2 — standard harness with tree_of_thoughts reasoningStrategy resolves and functions", async () => {
+    for (const target of providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1)) {
+      console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [{ role: "user", content: TREE_OF_THOUGHT_BRANCH_PROMPT }],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 2000,
+          autoApprove: true,
+          maxIterations: 3,
+          harness: "standard",
+          reasoningStrategy: "tree_of_thoughts",
+          branchCount: 2,
+        },
+        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+      );
+
+      logResult(`15.2 [${target.providerName}]`, result);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+
+      // Verify that branching_started event was emitted (verifying tree_of_thoughts was run)
+      const branchingStartedStatuses = result.statuses.filter(
+        (status) => status.message === "branching_started",
+      );
+
+      if (isEmptyResponse(result)) {
+        console.log("  ⚠ Model returned empty — skipping branching event assertions");
+      } else {
+        expect(branchingStartedStatuses.length).toBeGreaterThanOrEqual(1);
+        expect(branchingStartedStatuses[0].branchCount).toBe(2);
+      }
+    }
+  }, 600_000);
+
+  it("15.3 — sequential topology chains sub-agent outputs cleanly", async () => {
+    for (const target of providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1)) {
+      console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [
+            {
+              role: "user",
+              content:
+                "Use team_create with sequential topology and 2 members:\n" +
+                "1. First member: Run `echo 'ping'` using shell\n" +
+                "2. Second member: Take the previous output and echo it back with shell\n\n" +
+                "Use topology 'sequential' so the second member receives the first's output.",
+            },
+          ],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 3000,
+          autoApprove: true,
+          maxIterations: 10,
+          harness: "standard",
+          reasoningStrategy: "chain_of_thought",
+          topology: "sequential",
+        },
+        { timeoutMs: getMultiAgentTimeout(target) },
+      );
+
+      logResult(`15.3 [${target.providerName}]`, result);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+
+      const allToolEvents = [...result.toolExecutions, ...result.toolCalls];
+      const teamCreateCalls = allToolEvents.filter(
+        (toolEvent) =>
+          (toolEvent.tool?.name || toolEvent.name) === "team_create" ||
+          (toolEvent.tool?.name || toolEvent.name) === "create_team",
+      );
+      expect(teamCreateCalls.length).toBeGreaterThan(0);
+    }
+  }, 600_000);
+
+  it("15.4 — mixture: standard harness with tree_of_thoughts strategy and sequential topology", async () => {
+    for (const target of providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1)) {
+      console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [
+            {
+              role: "user",
+              content:
+                "Solve this logic problem using ToT branching and sequential subagents:\n" +
+                "Use team_create with sequential topology and 2 members to analyze the branching steps.",
+            },
+          ],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 3000,
+          autoApprove: true,
+          maxIterations: 10,
+          harness: "standard",
+          reasoningStrategy: "tree_of_thoughts",
+          topology: "sequential",
+          branchCount: 2,
+        },
+        { timeoutMs: getMultiAgentTimeout(target) },
+      );
+
+      logResult(`15.4 [${target.providerName}]`, result);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+
+      if (isEmptyResponse(result)) {
+        console.log("  ⚠ Model returned empty — skipping branching event assertions");
+      } else {
+        // Verify branching_started was emitted
+        const branchingStartedStatuses = result.statuses.filter(
+          (status) => status.message === "branching_started",
+        );
+        expect(branchingStartedStatuses.length).toBeGreaterThanOrEqual(1);
+      }
+    }
+  }, 600_000);
+});
+

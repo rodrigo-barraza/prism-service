@@ -117,6 +117,7 @@ export interface AgentSSEResult {
 
 interface ConsumeOptions {
   timeoutMilliseconds?: number;
+  idleTimeoutMilliseconds?: number;
   controller?: AbortController;
 }
 
@@ -137,6 +138,7 @@ interface AgentStreamPayload {
   disabledTools?: string[];
   topology?: string;
   branchCount?: number;
+  reasoningStrategy?: string;
 }
 
 export interface TransformedAgentResponse {
@@ -213,7 +215,11 @@ function createEmptyResult(): AgentSSEResult {
  */
 export async function consumeAgentSSE(
   response: Response,
-  { timeoutMilliseconds = DEFAULT_AGENT_TIMEOUT_MS, controller }: ConsumeOptions = {},
+  {
+    timeoutMilliseconds = DEFAULT_AGENT_TIMEOUT_MS,
+    idleTimeoutMilliseconds,
+    controller,
+  }: ConsumeOptions = {},
 ): Promise<AgentSSEResult> {
   const reader = (response.body as ReadableStream<Uint8Array>).getReader();
   const decoder = new TextDecoder();
@@ -229,9 +235,11 @@ export async function consumeAgentSSE(
     reader.cancel().catch(() => {});
   }, timeoutMilliseconds);
 
+  const finalIdleTimeout = idleTimeoutMilliseconds ?? Math.max(SSE_IDLE_TIMEOUT_MS, timeoutMilliseconds / 2);
+
   const idleCheckId = setInterval(() => {
-    if (Date.now() - lastEventTime > SSE_IDLE_TIMEOUT_MS) {
-      console.warn(`  ⚠ SSE idle for ${SSE_IDLE_TIMEOUT_MS / 1000}s — aborting`);
+    if (Date.now() - lastEventTime > finalIdleTimeout) {
+      console.warn(`  ⚠ SSE idle for ${finalIdleTimeout / 1000}s — aborting`);
       result.isTimedOut = true;
       controller?.abort();
       reader.cancel().catch(() => {});
@@ -378,7 +386,11 @@ export async function agentStream(
     throw new Error(`Agent endpoint failed: ${response.status} ${errorText}`);
   }
 
-  return consumeAgentSSE(response, { timeoutMilliseconds: finalTimeout, controller });
+  return consumeAgentSSE(response, {
+    timeoutMilliseconds: finalTimeout,
+    idleTimeoutMilliseconds: Math.max(SSE_IDLE_TIMEOUT_MS, finalTimeout / 2),
+    controller,
+  });
 }
 
 /**
