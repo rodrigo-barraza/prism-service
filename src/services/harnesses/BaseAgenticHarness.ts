@@ -500,7 +500,7 @@ export default class BaseAgenticHarness {
       state.streamedThinking += streamChunk.content || "";
       pass.streamedThinking += streamChunk.content || "";
       if (state.displayThinkingFragments.length === 0 || state.lastDisplaySegType !== "thinking") {
-        logger.info(
+        logger.debug(
           `[Harness:Thinking] NEW thinking segment on iteration ${state.iterations}, ` +
           `fragments=${state.displayThinkingFragments.length}, lastSegType=${state.lastDisplaySegType}, ` +
           `contentLen=${(streamChunk.content || "").length}ch`,
