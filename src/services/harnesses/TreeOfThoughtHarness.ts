@@ -348,14 +348,14 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
 
       // ── Tool execution from selected branch ─────────────────
       if (selectedPass.pendingToolCalls.length > 0) {
-        const { approved, approveAll } = await checkAndWaitForApproval(
+        const { isApproved, shouldApproveAll } = await checkAndWaitForApproval(
           selectedPass.pendingToolCalls,
           context,
           approvalEngine,
         );
 
         let results: ToolResult[] = [];
-        if (!approved) {
+        if (!isApproved) {
           results = selectedPass.pendingToolCalls.map((toolCall) => ({
             name: toolCall.name,
             id: toolCall.id,
@@ -366,7 +366,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
             },
           }));
         } else {
-          if (approveAll) {
+          if (shouldApproveAll) {
             options.autoApprove = true;
           }
 

@@ -25,7 +25,7 @@ interface CriticGateOptions {
 }
 
 interface CriticReviewResult {
-  approved: boolean;
+  isApproved: boolean;
   reason: string;
   criticModel: string;
 }
@@ -51,12 +51,12 @@ export default class CriticGate {
 
     // Only review DANGER tier tools
     if (tier !== APPROVAL_TIERS.DANGER) {
-      return { approved: true, reason: "below_danger_tier", criticModel: activeCriticModel };
+      return { isApproved: true, reason: "below_danger_tier", criticModel: activeCriticModel };
     }
 
     // Skip if critic is explicitly disabled for this context
     if ((context.options as Record<string, unknown>).skipCritic === true) {
-      return { approved: true, reason: "critic_skipped", criticModel: activeCriticModel };
+      return { isApproved: true, reason: "critic_skipped", criticModel: activeCriticModel };
     }
 
     try {
@@ -72,7 +72,7 @@ export default class CriticGate {
       logger.warn(
         `[CriticGate] Review failed for "${toolCall.name}": ${getErrorMessage(criticError)}. Defaulting to approve.`,
       );
-      return { approved: true, reason: "critic_error_fallback", criticModel: activeCriticModel };
+      return { isApproved: true, reason: "critic_error_fallback", criticModel: activeCriticModel };
     }
   }
 
@@ -143,18 +143,18 @@ export default class CriticGate {
     const firstLine = response.split("\n")[0].trim().toUpperCase();
 
     if (firstLine.startsWith("APPROVE")) {
-      return { approved: true, reason: "critic_approved", criticModel: activeModel };
+      return { isApproved: true, reason: "critic_approved", criticModel: activeModel };
     }
 
     if (firstLine.startsWith("DENY")) {
       const denialReason = response.split("\n").slice(1).join(" ").trim() || "critic_denied";
       logger.info(`[CriticGate] DENIED: ${denialReason}`);
-      return { approved: false, reason: denialReason, criticModel: activeModel };
+      return { isApproved: false, reason: denialReason, criticModel: activeModel };
     }
 
     // Ambiguous response — default to approve
     logger.warn(`[CriticGate] Ambiguous critic response: "${response.slice(0, 100)}". Defaulting to approve.`);
-    return { approved: true, reason: "critic_parse_fallback", criticModel: activeModel };
+    return { isApproved: true, reason: "critic_parse_fallback", criticModel: activeModel };
   }
 
   /**

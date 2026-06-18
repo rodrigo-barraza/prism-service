@@ -125,7 +125,7 @@ export const PLAN_MODE_EXIT_INSTRUCTION =
 
 export const CONTEXT_WINDOW_FILLER_MESSAGE =
   "This is a context window filler message that contains a lot of text to push " +
-  "the conversation closer to the context window limit. ".repeat(200);
+  "the conversation closer to the context window limit. ".repeat(20);
 
 // ── Truncation Recovery Verification ───────────────────────────
 

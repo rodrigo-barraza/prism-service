@@ -107,7 +107,7 @@ const TIER_LABELS: Record<number, string> = {
 };
 
 export interface ApprovalResult {
-  approved: boolean;
+  isApproved: boolean;
   tier: ApprovalTier;
   tierLabel: string;
   reason: string;
@@ -155,7 +155,7 @@ export default class AutoApprovalEngine {
 
     // Full Auto mode: everything runs
     if (this.fullAuto) {
-      return { approved: true, tier, tierLabel, reason: "full_auto" };
+      return { isApproved: true, tier, tierLabel, reason: "full_auto" };
     }
 
     // ── Policy evaluation (takes precedence over tier system) ──
@@ -168,11 +168,11 @@ export default class AutoApprovalEngine {
       if (policyResult) {
         switch (policyResult.decision) {
           case "APPROVE":
-            return { approved: true, tier, tierLabel, reason: policyResult.reason };
+            return { isApproved: true, tier, tierLabel, reason: policyResult.reason };
           case "DENY":
-            return { approved: false, tier, tierLabel, reason: policyResult.reason };
+            return { isApproved: false, tier, tierLabel, reason: policyResult.reason };
           case "ASK_USER":
-            return { approved: false, tier, tierLabel, reason: policyResult.reason };
+            return { isApproved: false, tier, tierLabel, reason: policyResult.reason };
         }
       }
       // No policy matched — fall through to tier system
@@ -180,11 +180,11 @@ export default class AutoApprovalEngine {
 
     // Tier 1: always auto-approve
     if (tier === APPROVAL_TIERS.AUTO) {
-      return { approved: true, tier, tierLabel, reason: "read_only" };
+      return { isApproved: true, tier, tierLabel, reason: "read_only" };
     }
 
     // Tier 2 and 3: require approval
-    return { approved: false, tier, tierLabel, reason: "requires_approval" };
+    return { isApproved: false, tier, tierLabel, reason: "requires_approval" };
   }
   checkBatch(toolCalls: ToolCall[]): { autoApproved: ApprovedToolCall[]; needsApproval: ApprovedToolCall[] } {
     const autoApproved: ApprovedToolCall[] = [];
@@ -192,7 +192,7 @@ export default class AutoApprovalEngine {
 
     for (const toolCall of toolCalls) {
       const result = this.check(toolCall);
-      if (result.approved) {
+      if (result.isApproved) {
         autoApproved.push({ ...toolCall, _approval: result });
       } else {
         needsApproval.push({ ...toolCall, _approval: result });

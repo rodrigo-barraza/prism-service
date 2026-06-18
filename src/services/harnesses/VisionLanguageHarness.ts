@@ -334,14 +334,14 @@ Use these images to observe the environment, notice changes, animations, or user
         }
 
         // ── Approval gating ───────────────────────────────────
-        const { approved, approveAll } = await checkAndWaitForApproval(
+        const { isApproved, shouldApproveAll } = await checkAndWaitForApproval(
           pass.pendingToolCalls,
           context,
           approvalEngine,
         );
 
         let results: ToolResult[] = [];
-        if (!approved) {
+        if (!isApproved) {
           results = pass.pendingToolCalls.map((toolCall) => ({
             name: toolCall.name,
             id: toolCall.id,
@@ -352,7 +352,7 @@ Use these images to observe the environment, notice changes, animations, or user
             },
           }));
         } else {
-          if (approveAll) {
+          if (shouldApproveAll) {
             options.autoApprove = true;
           }
 

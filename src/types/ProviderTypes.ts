@@ -95,6 +95,7 @@ export interface ProviderOptions {
   prompt?: string | number;
   // Context length
   minContextLength?: number;
+  evalBatchSize?: number;
   contextLength?: number;
   _loadedContextLength?: number;
   _loadedEvalBatchSize?: number;

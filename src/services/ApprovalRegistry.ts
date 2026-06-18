@@ -9,8 +9,8 @@
 // ── Approval Entry Types ───────────────────────────────────
 
 export interface ApprovalResolution {
-  approved: boolean;
-  approveAll?: boolean;
+  isApproved: boolean;
+  shouldApproveAll?: boolean;
   reason?: string;
 }
 
@@ -29,7 +29,7 @@ export interface PendingToolApprovalEntry {
 }
 
 export interface PendingPlanApprovalEntry {
-  resolve: (approved: boolean) => void;
+  resolve: (isApproved: boolean) => void;
   type: "plan";
   tools?: string[];
   toolCalls?: PendingToolCallSummary[];
@@ -46,7 +46,7 @@ export interface QuestionAnswer {
 
 export interface QuestionResolution {
   answers: QuestionAnswer[] | null;
-  timedOut?: boolean;
+  isTimedOut?: boolean;
 }
 
 export interface QuestionDefinition {

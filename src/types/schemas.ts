@@ -89,6 +89,7 @@ export const ChatRequestSchema = z
     enabledTools: z.array(z.string()).nullable().optional(),
     disabledTools: z.array(z.string()).nullable().optional(),
     minContextLength: z.number().nullable().optional(),
+    evalBatchSize: z.number().nullable().optional(),
     forceImageGeneration: z.boolean().nullable().optional(),
     responseFormat: z.unknown().nullable().optional(),
     serviceTier: z.string().nullable().optional(),

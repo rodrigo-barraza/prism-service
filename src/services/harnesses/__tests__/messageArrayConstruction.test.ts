@@ -2657,7 +2657,7 @@ describe("Message Array Construction", () => {
             name: "exit_plan_mode",
             args: {},
             result: {
-              approved: true,
+              isApproved: true,
               message: "User has approved your plan.",
             },
           },

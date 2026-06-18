@@ -572,7 +572,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                 phase: "loading",
               };
               const loadOpts: ProviderOptions = {
-                eval_batch_size: LM_STUDIO_EVAL_BATCH_SIZE,
+                eval_batch_size: options.evalBatchSize || LM_STUDIO_EVAL_BATCH_SIZE,
               };
               if (options.minContextLength) {
                 const maxContextLength =

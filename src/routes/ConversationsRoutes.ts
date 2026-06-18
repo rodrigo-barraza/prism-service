@@ -21,7 +21,7 @@ import {
 const router = express.Router();
 router.use(requireDb);
 
-const CONVERSATION_LIST_PROJECTION = {
+const CONVERSATION_LIST_PROJECTION: import("mongodb").Document = {
   id: 1,
   project: 1,
   username: 1,
@@ -40,7 +40,7 @@ const CONVERSATION_LIST_PROJECTION = {
   modelNames: 1,
   settings: 1,
   parentAgentSessionId: 1,
-} as const;
+};
 
 interface ConversationDocument {
   _id: ObjectId;
@@ -107,7 +107,7 @@ router.get(
           .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
           .find(filter)
           .project<Omit<ConversationDocument, "messages">>(
-            CONVERSATION_LIST_PROJECTION as unknown as import("mongodb").Document
+            CONVERSATION_LIST_PROJECTION
           )
           .sort({ updatedAt: -1 })
           .limit(limit + 1)
@@ -121,7 +121,7 @@ router.get(
         return db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .find(agentFilter)
-          .project(CONVERSATION_LIST_PROJECTION as unknown as import("mongodb").Document)
+          .project(CONVERSATION_LIST_PROJECTION)
           .sort({ updatedAt: -1 })
           .limit(limit + 1)
           .toArray();
@@ -291,8 +291,8 @@ router.get(
         return res.json({
           ...chat,
           type: "direct",
-          pendingApproval: pendingApproval.pending ? pendingApproval : undefined,
-          pendingQuestion: pendingQuestion.pending ? pendingQuestion : undefined,
+          pendingApproval: pendingApproval.isPending ? pendingApproval : undefined,
+          pendingQuestion: pendingQuestion.isPending ? pendingQuestion : undefined,
         });
       }
 
@@ -314,8 +314,8 @@ router.get(
           ...agentChat,
           stats: stats || undefined,
           type: "agent",
-          pendingApproval: pendingApproval.pending ? pendingApproval : undefined,
-          pendingQuestion: pendingQuestion.pending ? pendingQuestion : undefined,
+          pendingApproval: pendingApproval.isPending ? pendingApproval : undefined,
+          pendingQuestion: pendingQuestion.isPending ? pendingQuestion : undefined,
         });
       }
 
@@ -434,7 +434,7 @@ router.patch(
         .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
         .updateOne(
           { id: conversationId, project, username },
-          { $set: setFields as any }
+          { $set: setFields as import("mongodb").UpdateFilter<ConversationDocument> }
         );
 
       if (result.matchedCount > 0) {
@@ -449,7 +449,7 @@ router.patch(
         .collection(COLLECTIONS.AGENT_CONVERSATIONS)
         .updateOne(
           { id: conversationId, project, username },
-          { $set: setFields as any }
+          { $set: setFields as import("mongodb").UpdateFilter<import("mongodb").Document> }
         );
 
       if (result.matchedCount > 0) {

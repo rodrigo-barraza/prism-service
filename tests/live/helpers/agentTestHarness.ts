@@ -13,14 +13,14 @@
 
 // ── Constants ───────────────────────────────────────────────────
 
-const PRISM_SERVICE_URL = process.env.PRISM_TEST_URL || "https://api.prism.rod.dev";
-const LM_STUDIO_URL = process.env.LM_STUDIO_TEST_URL || "https://api.prism.rod.dev/lm-studio";
-const OLLAMA_URL = process.env.OLLAMA_TEST_URL || "https://api.prism.rod.dev/ollama";
+export const PRISM_SERVICE_URL = process.env.PRISM_TEST_URL || "https://api.prism.rod.dev";
+export const LM_STUDIO_URL = process.env.LM_STUDIO_TEST_URL || "https://api.prism.rod.dev/lm-studio";
+export const OLLAMA_URL = process.env.OLLAMA_TEST_URL || "https://api.prism.rod.dev/ollama";
 
-const DEFAULT_AGENT_TIMEOUT_MS = 120_000;
-const CLOUD_AGENT_TIMEOUT_MS = 60_000;
-const MULTI_AGENT_TIMEOUT_MS = 300_000;
-const SSE_IDLE_TIMEOUT_MS = 60_000;
+export const DEFAULT_AGENT_TIMEOUT_MS = 120_000;
+export const CLOUD_AGENT_TIMEOUT_MS = 60_000;
+export const MULTI_AGENT_TIMEOUT_MS = 300_000;
+export const SSE_IDLE_TIMEOUT_MS = 60_000;
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -33,6 +33,23 @@ export interface ProviderTarget {
   timeoutMultiplier: number;
 }
 
+export interface StatusEvent {
+  type: string;
+  message?: string;
+  phase?: string;
+  progress?: number;
+  iteration?: number;
+  maxIterations?: number;
+  strategy?: string;
+  branchCount?: number;
+  branchIndex?: number;
+  score?: number;
+  scores?: number[] | Record<string, number>;
+  enabledCount?: number;
+  timeToFirstToken?: number;
+  [key: string]: unknown;
+}
+
 export interface ToolCallEvent {
   type: string;
   tool?: { name: string; args: Record<string, unknown>; id: string };
@@ -43,21 +60,13 @@ export interface ToolCallEvent {
   result?: unknown;
 }
 
-export interface StatusEvent {
-  type: string;
-  message?: string;
-  phase?: string;
-  progress?: number;
-  iteration?: number;
-  maxIterations?: number;
-  [key: string]: unknown;
-}
-
 export interface UsageData {
   inputTokens?: number;
   outputTokens?: number;
   reasoningOutputTokens?: number;
   requests?: number;
+  promptTokens?: number;
+  completionTokens?: number;
   [key: string]: unknown;
 }
 
@@ -65,32 +74,49 @@ export interface DoneEvent {
   type: string;
   usage?: UsageData;
   estimatedCost?: number;
-  [key: string]: unknown;
+}
+
+export interface TransformedSSEEvent extends StatusEvent, ToolCallEvent, DoneEvent {
+  content?: string;
+}
+
+export interface TransformedUsageUpdate {
+  type: string;
+  usage?: UsageData;
+  estimatedCost?: number;
+}
+
+export interface TransformedErrorEvent {
+  type: string;
+  message?: string;
 }
 
 export interface AgentSSEResult {
-  events: Array<Record<string, unknown>>;
+  events: TransformedSSEEvent[];
   chunks: string[];
   thinkingChunks: string[];
   statuses: StatusEvent[];
   toolCalls: ToolCallEvent[];
   toolExecutions: ToolCallEvent[];
-  usageUpdates: Array<{ type: string; usage?: UsageData; estimatedCost?: number }>;
-  errors: Array<{ type: string; message?: string }>;
+  usageUpdates: TransformedUsageUpdate[];
+  errors: TransformedErrorEvent[];
   done: DoneEvent | null;
   text: string;
   thinking: string;
   phases: Set<string>;
   promptProcessingStarts: number;
   iterationCount: number;
+  isAborted: boolean;
+  isTimedOut: boolean;
+  totalEvents: number;
+  durationMilliseconds: number;
   aborted: boolean;
   timedOut: boolean;
-  totalEvents: number;
   durationMs: number;
 }
 
 interface ConsumeOptions {
-  timeoutMs?: number;
+  timeoutMilliseconds?: number;
   controller?: AbortController;
 }
 
@@ -111,13 +137,34 @@ interface AgentStreamPayload {
   disabledTools?: string[];
   topology?: string;
   branchCount?: number;
+}
+
+export interface TransformedAgentResponse {
+  text: string;
+  thinking?: string;
+  usage?: UsageData;
+  error?: string;
+  message?: string;
   [key: string]: unknown;
 }
+
+interface TransformedLmStudioModel {
+  key?: string;
+  id?: string;
+  type?: string;
+  loaded_instances?: unknown[];
+  [key: string]: unknown;
+}
+
+interface TransformedOllamaModelsResponse {
+  models?: Array<{ name: string }>;
+}
+
 
 // ── SSE Consumer ────────────────────────────────────────────────
 
 function createEmptyResult(): AgentSSEResult {
-  return {
+  const result = {
     events: [],
     chunks: [],
     thinkingChunks: [],
@@ -132,11 +179,32 @@ function createEmptyResult(): AgentSSEResult {
     phases: new Set(),
     promptProcessingStarts: 0,
     iterationCount: 0,
-    aborted: false,
-    timedOut: false,
+    isAborted: false,
+    isTimedOut: false,
     totalEvents: 0,
-    durationMs: 0,
+    durationMilliseconds: 0,
   };
+
+  Object.defineProperty(result, "aborted", {
+    get() { return this.isAborted; },
+    set(value: boolean) { this.isAborted = value; },
+    enumerable: true,
+    configurable: true,
+  });
+  Object.defineProperty(result, "timedOut", {
+    get() { return this.isTimedOut; },
+    set(value: boolean) { this.isTimedOut = value; },
+    enumerable: true,
+    configurable: true,
+  });
+  Object.defineProperty(result, "durationMs", {
+    get() { return this.durationMilliseconds; },
+    set(value: number) { this.durationMilliseconds = value; },
+    enumerable: true,
+    configurable: true,
+  });
+
+  return result as unknown as AgentSSEResult;
 }
 
 /**
@@ -145,7 +213,7 @@ function createEmptyResult(): AgentSSEResult {
  */
 export async function consumeAgentSSE(
   response: Response,
-  { timeoutMs = DEFAULT_AGENT_TIMEOUT_MS, controller }: ConsumeOptions = {},
+  { timeoutMilliseconds = DEFAULT_AGENT_TIMEOUT_MS, controller }: ConsumeOptions = {},
 ): Promise<AgentSSEResult> {
   const reader = (response.body as ReadableStream<Uint8Array>).getReader();
   const decoder = new TextDecoder();
@@ -156,15 +224,15 @@ export async function consumeAgentSSE(
   let lastEventTime = Date.now();
 
   const timeoutId = setTimeout(() => {
-    result.timedOut = true;
+    result.isTimedOut = true;
     controller?.abort();
     reader.cancel().catch(() => {});
-  }, timeoutMs);
+  }, timeoutMilliseconds);
 
   const idleCheckId = setInterval(() => {
     if (Date.now() - lastEventTime > SSE_IDLE_TIMEOUT_MS) {
       console.warn(`  ⚠ SSE idle for ${SSE_IDLE_TIMEOUT_MS / 1000}s — aborting`);
-      result.timedOut = true;
+      result.isTimedOut = true;
       controller?.abort();
       reader.cancel().catch(() => {});
     }
@@ -184,39 +252,42 @@ export async function consumeAgentSSE(
         if (!trimmed || !trimmed.startsWith("data: ")) continue;
 
         try {
-          const event = JSON.parse(trimmed.slice(6)) as Record<string, unknown>;
+          const event = JSON.parse(trimmed.slice(6)) as TransformedSSEEvent;
           result.events.push(event);
           result.totalEvents++;
           lastEventTime = Date.now();
 
           switch (event.type) {
             case "chunk":
-              result.chunks.push(event.content as string);
-              result.text += (event.content as string) || "";
+              if (typeof event.content === "string") {
+                result.chunks.push(event.content);
+                result.text += event.content;
+              }
               break;
 
             case "thinking":
-              result.thinkingChunks.push(event.content as string);
-              result.thinking += (event.content as string) || "";
+              if (typeof event.content === "string") {
+                result.thinkingChunks.push(event.content);
+                result.thinking += event.content;
+              }
               break;
 
             case "status": {
-              const statusEvent = event as unknown as StatusEvent;
-              result.statuses.push(statusEvent);
-              if (statusEvent.phase) result.phases.add(statusEvent.phase);
+              result.statuses.push(event);
+              if (event.phase) result.phases.add(event.phase);
 
-              if (statusEvent.message === "iteration_progress") {
-                result.iterationCount = (statusEvent.iteration as number) || result.iterationCount;
+              if (event.message === "iteration_progress") {
+                result.iterationCount = event.iteration || result.iterationCount;
               }
 
               if (
-                typeof statusEvent.message === "string" &&
-                statusEvent.message.includes("Processing prompt")
+                typeof event.message === "string" &&
+                event.message.includes("Processing prompt")
               ) {
                 if (
-                  statusEvent.progress === 0 ||
-                  statusEvent.progress === undefined ||
-                  statusEvent.progress === null
+                  event.progress === 0 ||
+                  event.progress === undefined ||
+                  event.progress === null
                 ) {
                   result.promptProcessingStarts++;
                 }
@@ -225,23 +296,23 @@ export async function consumeAgentSSE(
             }
 
             case "tool_execution":
-              result.toolExecutions.push(event as unknown as ToolCallEvent);
+              result.toolExecutions.push(event);
               break;
 
             case "toolCall":
-              result.toolCalls.push(event as unknown as ToolCallEvent);
+              result.toolCalls.push(event);
               break;
 
             case "usage_update":
-              result.usageUpdates.push(event as { type: string; usage?: UsageData; estimatedCost?: number });
+              result.usageUpdates.push(event);
               break;
 
             case "error":
-              result.errors.push(event as { type: string; message?: string });
+              result.errors.push(event);
               break;
 
             case "done":
-              result.done = event as unknown as DoneEvent;
+              result.done = event;
               break;
           }
         } catch {
@@ -252,38 +323,53 @@ export async function consumeAgentSSE(
       if (result.done) break;
     }
   } catch (error: unknown) {
-    if ((error as Error).name === "AbortError") {
-      result.aborted = true;
+    if (error instanceof Error) {
+      if (error.name === "AbortError") {
+        result.isAborted = true;
+      } else {
+        result.errors.push({ type: "error", message: error.message });
+      }
     } else {
-      result.errors.push({ type: "error", message: (error as Error).message });
+      result.errors.push({ type: "error", message: String(error) });
     }
   } finally {
     clearTimeout(timeoutId);
     clearInterval(idleCheckId);
-    result.durationMs = Date.now() - startTime;
+    result.durationMilliseconds = Date.now() - startTime;
   }
 
   return result;
 }
 
-// ── Agent Stream Caller ─────────────────────────────────────────
 
 /**
  * Send an agentic request via SSE streaming and consume the full response.
  */
+const DEFAULT_MIN_CONTEXT_LENGTH = 65_000;
+const DEFAULT_EVAL_BATCH_SIZE = 4_096;
+
 export async function agentStream(
   payload: AgentStreamPayload,
-  { timeoutMs = DEFAULT_AGENT_TIMEOUT_MS }: { timeoutMs?: number } = {},
+  {
+    timeoutMilliseconds,
+    timeoutMs,
+  }: { timeoutMilliseconds?: number; timeoutMs?: number } = {},
 ): Promise<AgentSSEResult> {
+  const finalTimeout = timeoutMilliseconds ?? timeoutMs ?? DEFAULT_AGENT_TIMEOUT_MS;
+  const enrichedPayload = {
+    minContextLength: DEFAULT_MIN_CONTEXT_LENGTH,
+    evalBatchSize: DEFAULT_EVAL_BATCH_SIZE,
+    ...payload,
+  };
   const controller = new AbortController();
   const response = await fetch(`${PRISM_SERVICE_URL}/agent`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       "x-project": "agent-behavior-tests",
       "x-username": "test-runner",
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(enrichedPayload),
     signal: controller.signal,
   });
 
@@ -292,7 +378,7 @@ export async function agentStream(
     throw new Error(`Agent endpoint failed: ${response.status} ${errorText}`);
   }
 
-  return consumeAgentSSE(response, { timeoutMs, controller });
+  return consumeAgentSSE(response, { timeoutMilliseconds: finalTimeout, controller });
 }
 
 /**
@@ -300,7 +386,7 @@ export async function agentStream(
  */
 export async function agentJSON(
   payload: AgentStreamPayload,
-): Promise<Record<string, unknown>> {
+): Promise<TransformedAgentResponse> {
   const response = await fetch(`${PRISM_SERVICE_URL}/agent?stream=false`, {
     method: "POST",
     headers: {
@@ -311,10 +397,10 @@ export async function agentJSON(
     body: JSON.stringify(payload),
   });
 
-  const body = (await response.json()) as Record<string, unknown>;
+  const body = (await response.json()) as TransformedAgentResponse;
   if (!response.ok || body.error) {
     throw new Error(
-      (body.message as string) || (body.error as string) || `HTTP ${response.status}`,
+      body.message || body.error || `HTTP ${response.status}`,
     );
   }
   return body;
@@ -348,20 +434,21 @@ async function discoverLmStudioModels(): Promise<ProviderTarget[]> {
       if (!response.ok) continue;
 
       const data = (await response.json()) as {
-        models?: Array<Record<string, unknown>>;
-        data?: Array<Record<string, unknown>>;
+        models?: TransformedLmStudioModel[];
+        data?: TransformedLmStudioModel[];
       };
       const models = data.models || data.data || [];
 
       // Find loaded conversational models on this instance
       const loadedModels = models.filter(
-        (model) =>
-          ((model.loaded_instances as unknown[])?.length ?? 0) > 0 &&
-          model.type !== "embedding",
+         (model) => {
+           const loadedInstances = model.loaded_instances;
+           return Array.isArray(loadedInstances) && loadedInstances.length > 0 && model.type !== "embedding";
+         }
       );
 
       for (const loadedModel of loadedModels) {
-        const modelKey = (loadedModel.key as string) || (loadedModel.id as string);
+        const modelKey = loadedModel.key || loadedModel.id;
         if (!modelKey) continue;
 
         targets.push({
@@ -390,7 +477,7 @@ async function discoverOllamaModels(): Promise<ProviderTarget[]> {
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) return [];
-    const data = (await response.json()) as { models?: Array<{ name: string }> };
+    const data = (await response.json()) as TransformedOllamaModelsResponse;
     const models = data.models || [];
 
     if (models.length === 0) return [];
@@ -416,6 +503,7 @@ async function discoverOllamaModels(): Promise<ProviderTarget[]> {
     return [];
   }
 }
+
 
 /**
  * Build cloud provider targets from environment variables.
@@ -497,15 +585,14 @@ export async function discoverProviders(): Promise<ProviderTarget[]> {
 
 // ── Timeout Helpers ─────────────────────────────────────────────
 
-export function getTimeout(target: ProviderTarget, baseMs: number = DEFAULT_AGENT_TIMEOUT_MS): number {
-  return baseMs * target.timeoutMultiplier;
+export function getTimeout(target: ProviderTarget, baseMilliseconds: number = DEFAULT_AGENT_TIMEOUT_MS): number {
+  return baseMilliseconds * target.timeoutMultiplier;
 }
 
 export function getMultiAgentTimeout(target: ProviderTarget): number {
   return MULTI_AGENT_TIMEOUT_MS * target.timeoutMultiplier;
 }
 
-export { CLOUD_AGENT_TIMEOUT_MS, DEFAULT_AGENT_TIMEOUT_MS, MULTI_AGENT_TIMEOUT_MS };
 
 // ── Empty Response Detection ────────────────────────────────────
 
@@ -523,25 +610,31 @@ export function isEmptyResponse(result: AgentSSEResult): boolean {
 }
 
 /**
- * Retry an agent stream request up to maxRetries times when the model returns
+ * Retry an agent stream request up to maximumRetries times when the model returns
  * an empty response (0 output tokens). This handles model saturation under
  * heavy sequential test load against local models.
  */
 export async function agentStreamWithRetry(
-  payload: Parameters<typeof agentStream>[0],
-  options: { timeoutMs?: number; maxRetries?: number } = {},
+  payload: AgentStreamPayload,
+  options: {
+    timeoutMilliseconds?: number;
+    timeoutMs?: number;
+    maximumRetries?: number;
+    maxRetries?: number;
+  } = {},
 ): Promise<AgentSSEResult> {
-  const maximumRetries = options.maxRetries ?? 2;
+  const finalTimeout = options.timeoutMilliseconds ?? options.timeoutMs;
+  const finalRetries = options.maximumRetries ?? options.maxRetries ?? 2;
   let lastResult: AgentSSEResult | null = null;
 
-  for (let attemptIndex = 0; attemptIndex <= maximumRetries; attemptIndex++) {
+  for (let attemptIndex = 0; attemptIndex <= finalRetries; attemptIndex++) {
     if (attemptIndex > 0) {
-      const backoffMs = 10_000 * attemptIndex;
-      console.log(`    ↻ Retry ${attemptIndex}/${maximumRetries} after ${backoffMs / 1000}s backoff (empty response — model recovery)`);
-      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      const backoffMilliseconds = 10_000 * attemptIndex;
+      console.log(`    ↻ Retry ${attemptIndex}/${finalRetries} after ${backoffMilliseconds / 1000}s backoff (empty response — model recovery)`);
+      await new Promise((resolve) => setTimeout(resolve, backoffMilliseconds));
     }
 
-    lastResult = await agentStream(payload, { timeoutMs: options.timeoutMs });
+    lastResult = await agentStream(payload, { timeoutMilliseconds: finalTimeout });
 
     if (!isEmptyResponse(lastResult)) return lastResult;
   }
@@ -613,11 +706,11 @@ export function assertNoThinking(result: AgentSSEResult): void {
  */
 export function assertNoLoop(
   result: AgentSSEResult,
-  maxStartsAllowed: number = 2,
+  maximumStartsAllowed: number = 2,
 ): void {
-  if (result.promptProcessingStarts > maxStartsAllowed) {
+  if (result.promptProcessingStarts > maximumStartsAllowed) {
     throw new Error(
-      `Prompt processing loop detected: ${result.promptProcessingStarts} starts (max ${maxStartsAllowed})`,
+      `Prompt processing loop detected: ${result.promptProcessingStarts} starts (max ${maximumStartsAllowed})`,
     );
   }
 }
@@ -626,8 +719,8 @@ export function assertNoLoop(
  * Assert that the agent completed cleanly (done event, no timeout, no errors).
  */
 export function assertCleanCompletion(result: AgentSSEResult): void {
-  if (result.timedOut) {
-    throw new Error(`Agent timed out after ${result.durationMs}ms`);
+  if (result.isTimedOut) {
+    throw new Error(`Agent timed out after ${result.durationMilliseconds}ms`);
   }
   if (!result.done) {
     throw new Error("Agent did not emit a done event");
@@ -702,7 +795,7 @@ export function assertIterationCountWithin(
  * Log a structured test result block to the console.
  */
 export function logResult(label: string, result: AgentSSEResult): void {
-  const durationSeconds = (result.durationMs / 1000).toFixed(1);
+  const durationSeconds = (result.durationMilliseconds / 1000).toFixed(1);
   const phaseSummary = [...result.phases].join(" → ");
   const textLength = result.text.length;
   const thinkingLength = result.thinking.length;
@@ -730,7 +823,7 @@ export function logResult(label: string, result: AgentSSEResult): void {
   // Event type breakdown
   const typeCounts: Record<string, number> = {};
   for (const event of result.events) {
-    typeCounts[event.type as string] = (typeCounts[event.type as string] || 0) + 1;
+    typeCounts[event.type] = (typeCounts[event.type] || 0) + 1;
   }
   const typeBreakdown = Object.entries(typeCounts)
     .map(([eventType, eventCount]) => `${eventType}:${eventCount}`)
@@ -745,10 +838,10 @@ export function logResult(label: string, result: AgentSSEResult): void {
     console.log(`  │ Usage:          ${usageSummary.padEnd(40).slice(0, 40)}│`);
   }
 
-  if (result.timedOut) console.log(`  │ ⚠️  TIMED OUT                                        │`);
+  if (result.isTimedOut) console.log(`  │ ⚠️  TIMED OUT                                        │`);
   if (result.errors.length > 0) {
     for (const error of result.errors.slice(0, 3)) {
-      console.log(`  │ ❌ ${((error.message as string) || "unknown").slice(0, 53).padEnd(53)}│`);
+      console.log(`  │ ❌ ${(error.message || "unknown").slice(0, 53).padEnd(53)}│`);
     }
   }
   console.log(`  └${"─".repeat(59)}┘`);
@@ -770,3 +863,4 @@ export function logProviderSummary(targets: ProviderTarget[]): void {
   }
   console.log("  ╚═══════════════════════════════════════════════════════╝\n");
 }
+
