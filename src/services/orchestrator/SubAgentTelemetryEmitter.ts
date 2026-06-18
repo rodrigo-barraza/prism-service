@@ -96,7 +96,7 @@ export class SubAgentTelemetryEmitter {
     }
     return {
       type: "sub_agent_status",
-      workerId: this.subAgentId,
+      subAgentId: this.subAgentId,
       message: "generation_progress",
       outputTokens: burstTokens,
       firstChunkTime: this.burstFirstChunkTime,
@@ -195,7 +195,7 @@ export class SubAgentTelemetryEmitter {
           this.lastPhase = "generating";
           this.parentEmit({
             type: "sub_agent_status",
-            workerId: this.subAgentId,
+            subAgentId: this.subAgentId,
             message: "phase",
             phase: "generating",
           });
@@ -222,7 +222,7 @@ export class SubAgentTelemetryEmitter {
           this.lastPhase = "thinking";
           this.parentEmit({
             type: "sub_agent_status",
-            workerId: this.subAgentId,
+            subAgentId: this.subAgentId,
             message: "phase",
             phase: "thinking",
           });
@@ -250,8 +250,8 @@ export class SubAgentTelemetryEmitter {
         if (this.parentEmit) {
           this.parentEmit({
             type: "sub_agent_tool_execution",
-            workerId: this.subAgentId,
-            workerDescription: this.subAgentDescription,
+            subAgentId: this.subAgentId,
+            subAgentDescription: this.subAgentDescription,
             tool: event.tool,
             status: event.status,
           });
@@ -260,7 +260,7 @@ export class SubAgentTelemetryEmitter {
         if (this.parentEmit) {
           this.parentEmit({
             type: "sub_agent_tool_output",
-            workerId: this.subAgentId,
+            subAgentId: this.subAgentId,
             toolCallId: event.toolCallId,
             name: event.name,
             event: event.event,
@@ -289,7 +289,7 @@ export class SubAgentTelemetryEmitter {
         this.iterations = event.iteration;
       this.parentEmit({
         type: "sub_agent_status",
-        workerId: this.subAgentId,
+        subAgentId: this.subAgentId,
         message: typeof event.message === "string" ? event.message : "",
         iteration: event.iteration,
         maxIterations: event.maxIterations,
@@ -298,7 +298,7 @@ export class SubAgentTelemetryEmitter {
     if (this.parentEmit && event.message === "generation_started") {
       this.parentEmit({
         type: "sub_agent_status",
-        workerId: this.subAgentId,
+        subAgentId: this.subAgentId,
         message: "generation_started",
         timeToFirstToken: event.timeToFirstToken,
       });
@@ -307,7 +307,7 @@ export class SubAgentTelemetryEmitter {
       this.lastPhase = event.phase;
       this.parentEmit({
         type: "sub_agent_status",
-        workerId: this.subAgentId,
+        subAgentId: this.subAgentId,
         message: "phase",
         phase: event.phase,
         label: typeof event.message === "string" ? event.message : undefined,
@@ -330,7 +330,7 @@ export class SubAgentTelemetryEmitter {
       const burstTokens = estimateTokens(this.burstOutputCharacters);
       this.parentEmit({
         type: "sub_agent_status",
-        workerId: this.subAgentId,
+        subAgentId: this.subAgentId,
         message: "generation_progress",
         outputTokens: burstTokens || finalOutputTokens,
         firstChunkTime: this.burstFirstChunkTime || this.firstChunkTime,
@@ -351,7 +351,7 @@ export class SubAgentTelemetryEmitter {
     if (this.parentEmit) {
       this.parentEmit({
         type: "sub_agent_status",
-        workerId: this.subAgentId,
+        subAgentId: this.subAgentId,
         message: "complete",
         durationMs,
         toolCount: this.toolCalls.length,

@@ -378,7 +378,7 @@ export default class OrchestratorService {
     if (orchestratorContext.emit) {
       orchestratorContext.emit({
         type: "sub_agent_status",
-        workerId: agentId,
+        subAgentId: agentId,
         message: "spawned",
         description,
       });
@@ -416,7 +416,7 @@ export default class OrchestratorService {
       if (orchestratorContext.emit) {
         orchestratorContext.emit({
           type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
-          workerId: agentId,
+          subAgentId: agentId,
           message: "failed",
           error: getErrorMessage(error),
         });
