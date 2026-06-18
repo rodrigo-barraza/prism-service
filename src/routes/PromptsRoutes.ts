@@ -104,7 +104,7 @@ router.post(
         });
       }
 
-      const { title, content, tags } = parseResult.data;
+      const { title, content, tags, color } = parseResult.data;
       const now = new Date();
 
       const promptDocument = {
@@ -112,6 +112,7 @@ router.post(
         title,
         content,
         tags,
+        color,
         project: req.project,
         username: req.username,
         createdAt: now,
