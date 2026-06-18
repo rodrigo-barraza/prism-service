@@ -325,12 +325,14 @@ export const PostPromptSchema = z.object({
   title: z.string().min(1, "title is required").max(500),
   content: z.string().min(1, "content is required").max(50000),
   tags: z.array(z.string().max(100)).max(20).optional().default([]),
+  color: z.string().max(100).optional(),
 });
 
 export const PatchPromptSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   content: z.string().min(1).max(50000).optional(),
   tags: z.array(z.string().max(100)).max(20).optional(),
+  color: z.string().max(100).optional(),
 });
 
 export const GetPromptsQuerySchema = z.object({
