@@ -115,7 +115,7 @@ const TOOL_DISCOVERY_POLICY_SECTION: ToolPolicySection & {
 } = {
   content: "",
   dynamicContent: buildToolDiscoveryContent,
-  requires: [TOOL_NAMES.SEARCH_TOOLS],
+  requires: [TOOL_NAMES.SEARCH_TOOLS, TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS],
 };
 // ────────────────────────────────────────────────────────────
 // Shared Tool Policy Sections (auto-injected for all personas)
