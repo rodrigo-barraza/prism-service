@@ -246,6 +246,7 @@ async function prepareGenerationContext(
     criticModel,
     parallelToolCalls,
     candidateCount,
+    branchCount,
     responseMimeType,
     store,
     mediaResolution,
@@ -301,6 +302,7 @@ async function prepareGenerationContext(
     ...(reasoningStrategy != null && { reasoningStrategy }),
     ...(parallelToolCalls != null && { parallelToolCalls }),
     ...(candidateCount != null && { candidateCount }),
+    ...(branchCount != null && { branchCount }),
     ...(responseMimeType != null &&
       responseMimeType !== "" && { responseMimeType }),
     ...(store != null && { store }),
