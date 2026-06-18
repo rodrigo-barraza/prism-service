@@ -33,6 +33,7 @@ import PlanningModeService from "../PlanningModeService.ts";
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
 import AutoCompactionTrigger from "../compact/AutoCompactionTrigger.ts";
 import CompactionService from "../compact/CompactionService.ts";
+import MicroCompactionService from "../compact/MicroCompactionService.ts";
 import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 
 import type { ChatMessage } from "../../types/admin.ts";
@@ -224,8 +225,21 @@ export default class ReActHarness extends BaseAgenticHarness {
         resolvedPassTools.map((tool: ToolSchema) => tool.name),
       );
 
+      // ── Micro-compaction (free observation masking) ──────────
+      // Before checking if LLM-powered compaction is needed, run the
+      // zero-cost micro-compaction pass that clears old tool results.
+      // If this frees enough tokens, we skip the expensive LLM call.
+      // Based on "The Complexity Trap" (arXiv 2025): simple observation
+      // masking is as efficient as LLM summarization for context mgmt.
+      const microCompactionResult = MicroCompactionService.microcompactMessages(
+        currentMessages as ChatMessage[],
+      );
+      if (microCompactionResult.clearedResultCount > 0) {
+        currentMessages = microCompactionResult.messages as ConversationMessage[];
+      }
+
       // ── Auto-compaction trigger ─────────────────────────────
-      // Before mechanical truncation, check if we should run LLM-powered
+      // After micro-compaction, check if we still need LLM-powered
       // compaction. This produces an intelligent summary instead of
       // just dropping messages. Modeled after Claude Code's autoCompact.ts.
       const contextWindowSize = context.modelDefinition?.maxInputTokens || 128_000;
