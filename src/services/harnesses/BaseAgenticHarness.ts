@@ -36,6 +36,7 @@ import WebhookEventBus from "../WebhookEventBus.ts";
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import AgenticToolResolver from "../AgenticToolResolver.ts";
 import { ToolDocFormatter } from "../system-prompt/ToolDocFormatter.ts";
+import { getToolPolicyAddendum } from "../personas/utils.ts";
 import type AgenticLoopState from "../AgenticLoopState.ts";
 import type AgentHooks from "../AgentHooks.ts";
 import type { ChatMessage, TokenUsage } from "../../types/admin.ts";
@@ -228,6 +229,11 @@ export default class BaseAgenticHarness {
         const toolNamesList = newlyAddedToolSchemas
           .map((tool) => tool.name)
           .join(", ");
+
+        const policyAddendum = getToolPolicyAddendum(
+          newlyAddedToolSchemas.map((tool) => tool.name),
+        );
+
         currentMessages.push({
           role: "system",
           content:
@@ -235,11 +241,17 @@ export default class BaseAgenticHarness {
             `[TOOL SET UPDATED] ${newlyAddedToolSchemas.length} new tool(s) have been dynamically enabled: ${toolNamesList}\n\n` +
             `The following tools are now available with full documentation:\n\n` +
             addendumDocumentation +
+            (policyAddendum
+              ? `\n\n## Tool Usage Guidelines\n\n${policyAddendum}`
+              : "") +
             `\n</tool-update>`,
         });
 
         logger.info(
-          `[BaseAgenticHarness] Injected documentation addendum for ${newlyAddedToolSchemas.length} newly activated tools: [${toolNamesList}]`,
+          `[BaseAgenticHarness] Injected documentation addendum for ${newlyAddedToolSchemas.length} newly activated tools: [${toolNamesList}]` +
+            (policyAddendum
+              ? ` (with policy guidance)`
+              : ""),
         );
       }
     }

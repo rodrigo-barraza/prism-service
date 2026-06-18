@@ -236,3 +236,44 @@ export function buildToolPolicy(
     })
     .join("\n\n");
 }
+
+/**
+ * Returns tool policy guidance for dynamically-discovered tools.
+ *
+ * When tools are enabled mid-conversation via discover_and_enable_tools,
+ * the system prompt has already been assembled without their policy
+ * sections. This function evaluates the shared innate policy sections
+ * against the newly-enabled tool names and returns any applicable
+ * guidance text for injection into the <tool-update> addendum.
+ */
+export function getToolPolicyAddendum(
+  newlyEnabledToolNames: string[],
+): string {
+  const policyOnlySections = [
+    TASK_MANAGEMENT_POLICY_SECTION,
+    PROACTIVE_MEMORY_POLICY_SECTION,
+    AUDIO_TRACKER_POLICY_SECTION,
+  ];
+
+  const newToolSet = new Set(newlyEnabledToolNames);
+
+  const matchingSections = policyOnlySections.filter((section) => {
+    if (!section.requires || section.requires.length === 0) return false;
+    return section.requires.some((requirement) => {
+      if (requirement.endsWith("*")) {
+        const prefix = requirement.slice(0, -1);
+        return newlyEnabledToolNames.some((toolName) =>
+          toolName.startsWith(prefix),
+        );
+      }
+      return newToolSet.has(requirement);
+    });
+  });
+
+  if (matchingSections.length === 0) return "";
+
+  return matchingSections
+    .map((section) => section.content)
+    .join("\n\n");
+}
+
