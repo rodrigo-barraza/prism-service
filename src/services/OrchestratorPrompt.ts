@@ -26,6 +26,8 @@ export function getOrchestratorPromptAddendum({
 
   const defHierarchical =
     defaultTopology === TOPOLOGIES.HIERARCHICAL ? " (default)" : "";
+  const defAggregation =
+    defaultTopology === TOPOLOGIES.HIERARCHICAL_AGGREGATION ? " (default)" : "";
   const defSequential =
     defaultTopology === TOPOLOGIES.SEQUENTIAL ? " (default)" : "";
   const defPeerToPeer =
@@ -49,6 +51,7 @@ Sub-agent results and system notifications are internal signals — never thank 
 ### Your Tools
 - **create_team** — Spawn one or more sub-agents in isolated git worktrees. Supports three execution topologies via the optional \`topology\` parameter:
   - **\`hierarchical\`**${defHierarchical} — All members run in parallel. Best for independent research, implementation, or verification tasks.
+  - **\`hierarchical_aggregation\`**${defAggregation} — All members run in parallel, then a synthesis pass merges their outputs into a unified result. Best for tasks where multiple perspectives should be combined (research consolidation, multi-approach analysis).
   - **\`sequential\`**${defSequential} — Members run one-at-a-time, each receiving the previous member's output. Best for pipeline workflows where each step depends on the prior (e.g. research → implement → verify).
   - **\`peer_to_peer\`**${defPeerToPeer} — Turn-based discussion where members take turns on a shared thread. Best for debate, code review, or collaborative reasoning between specialized agents.
 - **send_message** — Continue an existing sub-agent (send a follow-up to its agent ID)
@@ -58,6 +61,7 @@ When calling create_team:
 - You can spawn up to **10 members** in a single create_team call — no need to batch.
 - For a single task, use one member: \`create_team({ name: "auth_fix", members: [{ description: "Fix null pointer", prompt: "..." }] })\`
 - For parallel tasks, use multiple members — they run concurrently in separate worktrees (hierarchical topology)
+- For aggregation, set \`topology: "hierarchical_aggregation"\` — parallel execution with a synthesis merge pass
 - For pipelines, set \`topology: "sequential"\` — each member's output feeds into the next
 - For debates or reviews, set \`topology: "peer_to_peer"\` — members take turns on a shared discussion board
 - Do not use one sub-agent to check on another. You receive results directly.

@@ -694,12 +694,13 @@ export default class OrchestratorService {
 
     const validTopologies = [
       TOPOLOGIES.HIERARCHICAL,
+      TOPOLOGIES.HIERARCHICAL_AGGREGATION,
       TOPOLOGIES.SEQUENTIAL,
       TOPOLOGIES.PEER_TO_PEER,
       "p2p",
     ];
     if (!validTopologies.includes(topology)) {
-      const errorMessage = `Invalid topology: "${topology}". Available topologies are: hierarchical, sequential, peer_to_peer.`;
+      const errorMessage = `Invalid topology: "${topology}". Available topologies are: hierarchical, hierarchical_aggregation, sequential, peer_to_peer.`;
       logger.error(`[Orchestrator] createTeam: ${errorMessage}`);
       return [{ error: errorMessage }];
     }
@@ -780,6 +781,10 @@ export default class OrchestratorService {
       const { PeerToPeerRouter } =
         await import("./orchestrator/routers/PeerToPeerRouter.ts");
       router = new PeerToPeerRouter();
+    } else if (topology === TOPOLOGIES.HIERARCHICAL_AGGREGATION) {
+      const { HierarchicalAggregationRouter } =
+        await import("./orchestrator/routers/HierarchicalAggregationRouter.ts");
+      router = new HierarchicalAggregationRouter();
     } else {
       const { HierarchicalRouter } =
         await import("./orchestrator/routers/HierarchicalRouter.ts");

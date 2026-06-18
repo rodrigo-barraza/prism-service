@@ -38,7 +38,6 @@ import { handleCodexPlanningResponse } from "./lifecycle/CodexPlanningDetector.t
 
 import PlanningModeService from "../PlanningModeService.ts";
 
-import type { ChatMessage } from "../../types/admin.ts";
 import type {
   ConversationMessage,
   ToolCall,

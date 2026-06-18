@@ -499,15 +499,21 @@ function getOrchestratorToolSchemas(
       ? TOPOLOGIES.PEER_TO_PEER
       : defaultTopology === TOPOLOGIES.SEQUENTIAL
         ? TOPOLOGIES.SEQUENTIAL
-        : TOPOLOGIES.HIERARCHICAL;
+        : defaultTopology === TOPOLOGIES.HIERARCHICAL_AGGREGATION
+          ? TOPOLOGIES.HIERARCHICAL_AGGREGATION
+          : TOPOLOGIES.HIERARCHICAL;
 
   const isHierarchical = normalizedTopology === TOPOLOGIES.HIERARCHICAL;
+  const isHierarchicalAggregation = normalizedTopology === TOPOLOGIES.HIERARCHICAL_AGGREGATION;
   const isSequential = normalizedTopology === TOPOLOGIES.SEQUENTIAL;
   const isPeerToPeer = normalizedTopology === TOPOLOGIES.PEER_TO_PEER;
 
   const hierarchicalLabel = isHierarchical
     ? `${TOPOLOGIES.HIERARCHICAL} (default)`
     : TOPOLOGIES.HIERARCHICAL;
+  const hierarchicalAggregationLabel = isHierarchicalAggregation
+    ? `${TOPOLOGIES.HIERARCHICAL_AGGREGATION} (default)`
+    : TOPOLOGIES.HIERARCHICAL_AGGREGATION;
   const sequentialLabel = isSequential
     ? `${TOPOLOGIES.SEQUENTIAL} (default)`
     : TOPOLOGIES.SEQUENTIAL;
@@ -518,6 +524,9 @@ function getOrchestratorToolSchemas(
   const hierarchicalDesc = isHierarchical
     ? "'hierarchical' (default)"
     : "'hierarchical'";
+  const hierarchicalAggregationDesc = isHierarchicalAggregation
+    ? "'hierarchical_aggregation' (default)"
+    : "'hierarchical_aggregation'";
   const sequentialDesc = isSequential
     ? "'sequential' (default)"
     : "'sequential'";
@@ -533,6 +542,7 @@ function getOrchestratorToolSchemas(
         "Spawn one or more sub-agents, each in an isolated git worktree. " +
         "Sub-agents inherit the currently enabled tools and can dynamically enable more via enable_tools. " +
         `Execution mode depends on topology: ${hierarchicalDesc} runs all members in parallel, ` +
+        `${hierarchicalAggregationDesc} runs all members in parallel then merges results via a synthesis pass, ` +
         `${sequentialDesc} runs members one-at-a-time passing each result to the next, ` +
         `${peerToPeerDesc} runs a turn-based discussion where members take turns seeing a shared thread. ` +
         "For a single task, provide one member. For parallel work, provide up to 10 members. " +
@@ -549,11 +559,13 @@ function getOrchestratorToolSchemas(
             type: "string",
             enum: [
               TOPOLOGIES.HIERARCHICAL,
+              TOPOLOGIES.HIERARCHICAL_AGGREGATION,
               TOPOLOGIES.SEQUENTIAL,
               TOPOLOGIES.PEER_TO_PEER,
             ],
             description:
               `Optional: execution topology. '${hierarchicalLabel}' — all members run in parallel. ` +
+              `'${hierarchicalAggregationLabel}' — all members run in parallel, then a synthesis pass merges their outputs into a unified result. ` +
               `'${sequentialLabel}' — members run one-at-a-time, each receiving the previous member's output. ` +
               `'${peerToPeerLabel}' — turn-based discussion where members take turns on a shared thread. ` +
               "Omit to use the system default.",

@@ -1,0 +1,222 @@
+import type {
+  TeamMember,
+  OrchestratorContext,
+  OrchestratorSpawnParams,
+  SubAgentResult,
+} from "../../../types/orchestrator.ts";
+import type { TopologyRouter } from "../TopologyRouter.ts";
+import { InstanceLoadBalancer } from "../InstanceLoadBalancer.ts";
+import { resolveModelForInstances } from "../../../utils/ModelResolution.ts";
+import {
+  getInstancesByType,
+  getInstanceType,
+} from "../../../providers/instance-registry.ts";
+import { getProvider } from "../../../providers/index.ts";
+import localModelQueue from "../../LocalModelQueue.ts";
+import logger from "../../../utils/logger.ts";
+import SettingsService from "../../SettingsService.ts";
+
+async function getSubAgentFallback(): Promise<{
+  provider: string;
+  model: string;
+} | null> {
+  try {
+    const agents = await SettingsService.getSection("agents");
+    if (agents) {
+      const provider = agents.subAgentProvider || agents.subagentProvider;
+      const model = agents.subAgentModel || agents.subagentModel;
+      if (typeof provider === "string" && typeof model === "string") {
+        return { provider, model };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function buildSynthesisPrompt(
+  teamName: string,
+  memberResults: (SubAgentResult | { error: string })[],
+): string {
+  const resultSections = memberResults.map((result, resultIndex) => {
+    if ("error" in result) {
+      return `### Sub-Agent #${resultIndex + 1}\n**Status:** Error\n**Error:** ${result.error}`;
+    }
+    const subAgentResult = result as SubAgentResult;
+    return [
+      `### Sub-Agent #${resultIndex + 1}: ${subAgentResult.description || "unnamed"}`,
+      `**Status:** ${subAgentResult.status}`,
+      subAgentResult.result
+        ? `**Output:**\n${subAgentResult.result}`
+        : "**Output:** (empty)",
+    ].join("\n");
+  });
+
+  return [
+    `You are a synthesis agent for the team "${teamName}".`,
+    `${memberResults.length} sub-agents have completed their work. Your job is to merge their outputs into a single, unified result.`,
+    "",
+    "## Sub-Agent Results",
+    "",
+    resultSections.join("\n\n---\n\n"),
+    "",
+    "## Instructions",
+    "",
+    "1. Analyze all sub-agent outputs above.",
+    "2. Identify agreements, conflicts, and complementary information.",
+    "3. Produce a single, coherent synthesis that combines the best reasoning and findings from each sub-agent.",
+    "4. If any sub-agents failed, note which ones and incorporate results from the successful ones.",
+    "5. Be concise but thorough. Do not simply concatenate the outputs — produce an integrated result.",
+  ].join("\n");
+}
+
+export class HierarchicalAggregationRouter implements TopologyRouter {
+  async execute(
+    teamName: string,
+    members: TeamMember[],
+    orchestratorContext: OrchestratorContext,
+    spawnSubAgent: (
+      assignment: OrchestratorSpawnParams,
+    ) => Promise<SubAgentResult | { error: string }>,
+  ): Promise<(SubAgentResult | { error: string })[]> {
+    const { providerName, resolvedModel } = orchestratorContext;
+    logger.info(
+      `[HierarchicalAggregationRouter] createTeam: batch assignment of ${members.length} sub-agent(s) with synthesis pass...`,
+    );
+
+    // ── Phase 1: Parallel execution (identical to HierarchicalRouter) ────
+
+    const isLocal = localModelQueue.isLocal(providerName);
+    const providerType = getInstanceType(providerName) || providerName;
+    let siblings = getInstancesByType(providerType);
+    let instanceModelOverrides = new Map<string, string>();
+
+    if (isLocal && siblings.length > 1) {
+      const { usable, modelOverrides } = await resolveModelForInstances(
+        resolvedModel,
+        siblings,
+      );
+      instanceModelOverrides = modelOverrides;
+      if (usable.length > 0) {
+        siblings = usable;
+      } else {
+        logger.warn(
+          `[HierarchicalAggregationRouter] Model "${resolvedModel}" not available on any ${providerType} instance`,
+        );
+        siblings = [];
+      }
+    }
+
+    const assignments: OrchestratorSpawnParams[] = [];
+    const orchestratorFallback = await getSubAgentFallback();
+
+    for (const member of members) {
+      let assignedProvider = providerName;
+      let assignedModel = member.model || resolvedModel;
+
+      if (isLocal && siblings.length > 0) {
+        const assigned = InstanceLoadBalancer.selectAndReserveInstance(
+          siblings,
+          providerName,
+          instanceModelOverrides,
+          assignedModel,
+          new Map(),
+        );
+        if (assigned) {
+          assignedProvider = assigned.provider;
+          assignedModel = assigned.model;
+        } else if (orchestratorFallback) {
+          assignedProvider = orchestratorFallback.provider;
+          assignedModel = orchestratorFallback.model;
+        }
+      }
+
+      assignments.push({
+        description: member.description,
+        prompt: member.prompt,
+        files: member.files,
+        model: member.model,
+        agent: member.agent,
+        assignedProvider,
+        assignedModel,
+        orchestratorContext,
+      });
+    }
+
+    const spawnPromises = assignments.map((assignment) =>
+      spawnSubAgent(assignment),
+    );
+    const memberResults = await Promise.all(spawnPromises);
+
+    // ── Phase 2: Synthesis pass (GoT aggregation) ────────────────────
+
+    const successfulResults = memberResults.filter(
+      (result) => !("error" in result),
+    );
+
+    if (successfulResults.length === 0) {
+      logger.warn(
+        `[HierarchicalAggregationRouter] All ${memberResults.length} sub-agents failed — skipping synthesis pass`,
+      );
+      return memberResults;
+    }
+
+    if (successfulResults.length === 1) {
+      logger.info(
+        `[HierarchicalAggregationRouter] Only 1 sub-agent succeeded — skipping synthesis pass`,
+      );
+      return memberResults;
+    }
+
+    logger.info(
+      `[HierarchicalAggregationRouter] Running synthesis pass over ${successfulResults.length} successful sub-agent results...`,
+    );
+
+    try {
+      const synthesisPrompt = buildSynthesisPrompt(teamName, memberResults);
+      const provider = getProvider(providerName);
+
+      if (!provider) {
+        logger.error(
+          `[HierarchicalAggregationRouter] Provider "${providerName}" not found for synthesis pass`,
+        );
+        return memberResults;
+      }
+
+      const synthesisResult = await provider.generateText(
+        [{ role: "user", content: synthesisPrompt }],
+        resolvedModel,
+        { maxTokens: 8192 },
+      );
+
+      const synthesisSubAgentResult: SubAgentResult = {
+        agent_id: `synthesis-${teamName}-${Date.now()}`,
+        description: `Synthesis pass for team "${teamName}"`,
+        status: "completed",
+        summary: `Aggregated ${successfulResults.length} sub-agent results into a unified synthesis`,
+        result: synthesisResult.text,
+        toolUses: 0,
+        iterations: 1,
+        durationMs: 0,
+        messages: [],
+        diff: { additions: 0, deletions: 0, files: [] },
+      };
+
+      logger.info(
+        `[HierarchicalAggregationRouter] Synthesis pass complete (${synthesisResult.usage.inputTokens} input, ${synthesisResult.usage.outputTokens} output tokens)`,
+      );
+
+      return [...memberResults, synthesisSubAgentResult];
+    } catch (synthesisError: unknown) {
+      const errorMessage =
+        synthesisError instanceof Error
+          ? synthesisError.message
+          : String(synthesisError);
+      logger.error(
+        `[HierarchicalAggregationRouter] Synthesis pass failed: ${errorMessage}`,
+      );
+      return memberResults;
+    }
+  }
+}
