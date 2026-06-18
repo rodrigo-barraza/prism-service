@@ -112,8 +112,8 @@ async function streamAndCollect(provider, model, prompt, {
     timedOut: false,
     // Worker tracking
     toolCalls: [],
-    workerProgressEvents: {},   // workerId → progress[]
-    workerCompleteEvents: [],
+    subAgentProgressEvents: {},   // subAgentId → progress[]
+    subAgentCompleteEvents: [],
   };
 
   const startTime = performance.now();
@@ -165,12 +165,12 @@ async function streamAndCollect(provider, model, prompt, {
         if (event.type === "tool_execution" || event.type === "toolCall") {
           result.toolCalls.push(event);
         }
-        // Per-worker generation_progress (coordinator path)
-        if (event.type === "worker_status" && event.message === "generation_progress") {
-          if (!result.workerProgressEvents[event.workerId]) {
-            result.workerProgressEvents[event.workerId] = [];
+        // Per-subagent generation_progress (coordinator path)
+        if (event.type === "sub_agent_status" && event.message === "generation_progress") {
+          if (!result.subAgentProgressEvents[event.subAgentId]) {
+            result.subAgentProgressEvents[event.subAgentId] = [];
           }
-          result.workerProgressEvents[event.workerId].push({
+          result.subAgentProgressEvents[event.subAgentId].push({
             timestamp: performance.now(),
             tokPerSec: event.tokPerSec,
             outputTokens: event.outputTokens,
@@ -178,8 +178,8 @@ async function streamAndCollect(provider, model, prompt, {
             totalTokens: event.totalTokens,
           });
         }
-        if (event.type === "worker_status" && event.message === "complete") {
-          result.workerCompleteEvents.push(event);
+        if (event.type === "sub_agent_status" && event.message === "complete") {
+          result.subAgentCompleteEvents.push(event);
         }
       }
     }
@@ -624,22 +624,22 @@ describe.each([
     );
     console.log(`     team_create calls: ${teamCreateCalls.length}`);
 
-    // ─── Per-worker validation ────────────────────────────────
-    const workerIds = Object.keys(result.workerProgressEvents);
-    console.log(`     Workers with progress: ${workerIds.length}`);
-    console.log(`     Worker completions: ${result.workerCompleteEvents.length}`);
+    // ─── Per-subagent validation ────────────────────────────────
+    const subAgentIds = Object.keys(result.subAgentProgressEvents);
+    console.log(`     Sub-agents with progress: ${subAgentIds.length}`);
+    console.log(`     Sub-agent completions: ${result.subAgentCompleteEvents.length}`);
 
-    if (teamCreateCalls.length > 0 && workerIds.length > 0) {
-      for (const wId of workerIds) {
-        const wProgress = result.workerProgressEvents[wId];
-        expect(wProgress.length).toBeGreaterThan(0);
+    if (teamCreateCalls.length > 0 && subAgentIds.length > 0) {
+      for (const subAgentId of subAgentIds) {
+        const progressList = result.subAgentProgressEvents[subAgentId];
+        expect(progressList.length).toBeGreaterThan(0);
 
         // Each worker must have tracked output tokens
-        const wLast = wProgress[wProgress.length - 1];
+        const wLast = progressList[progressList.length - 1];
         expect(wLast.outputTokens).toBeGreaterThan(0);
 
-        // Per-worker tok/s
-        const wWithTokPerSec = wProgress.filter(
+        // Per-subagent tok/s
+        const wWithTokPerSec = progressList.filter(
           (e) => e.tokPerSec != null && e.tokPerSec > 0,
         );
         const peakTokPerSec = wWithTokPerSec.length > 0
@@ -647,19 +647,19 @@ describe.each([
           : 0;
 
         console.log(
-          `     Worker ${wId.slice(0, 8)}: ` +
-          `${wProgress.length} progress, ` +
+          `     Sub-agent ${subAgentId.slice(0, 8)}: ` +
+          `${progressList.length} progress, ` +
           `${wLast.outputTokens} out tokens, ` +
           `peak ${peakTokPerSec.toFixed(1)} tok/s`,
         );
       }
 
       // Worker completions should have usage data
-      for (const wComplete of result.workerCompleteEvents) {
-        expect(wComplete.workerId).toBeDefined();
+      for (const subAgentComplete of result.subAgentCompleteEvents) {
+        expect(subAgentComplete.subAgentId).toBeDefined();
         console.log(
-          `     Worker ${wComplete.workerId?.slice(0, 8)} completed` +
-          (wComplete.usage ? ` — out: ${wComplete.usage.outputTokens}` : ""),
+          `     Sub-agent ${subAgentComplete.subAgentId?.slice(0, 8)} completed` +
+          (subAgentComplete.usage ? ` — out: ${subAgentComplete.usage.outputTokens}` : ""),
         );
       }
     } else {
@@ -693,15 +693,15 @@ describe.each([
 
       // When workers were active, coordinator's aggregate tok/s should
       // include worker contributions (total output = orchestrator + workers)
-      if (workerIds.length > 0) {
+      if (subAgentIds.length > 0) {
         // Coordinator outputTokens should be >= sum of worker outputTokens
         // (it also includes orchestrator's own tokens)
-        const workerTotalOut = result.workerCompleteEvents.reduce(
+        const workerTotalOut = result.subAgentCompleteEvents.reduce(
           (sum, wc) => sum + (wc.usage?.outputTokens || 0), 0,
         );
-        console.log(`     Coordinator total out: ${last.outputTokens}, Worker sum: ${workerTotalOut}`);
+        console.log(`     Coordinator total out: ${last.outputTokens}, Sub-agent sum: ${workerTotalOut}`);
         expect(last.outputTokens).toBeGreaterThanOrEqual(workerTotalOut);
-        console.log(`  ✅ Aggregate: coordinator out (${last.outputTokens}) >= worker sum (${workerTotalOut})`);
+        console.log(`  ✅ Aggregate: coordinator out (${last.outputTokens}) >= sub-agent sum (${workerTotalOut})`);
       }
     }
 

@@ -53,17 +53,17 @@ function getSessionTokenStats(messages: any[]) {
       output += m._streamingOutputTokens;
       liveStreamingTokens = m._streamingOutputTokens;
     }
-    // Worker generation progress
-    if (m._workerGenerationProgress) {
-      for (const wp of Object.values(m._workerGenerationProgress) as any[]) {
-        if (wp.outputTokens > 0) output += wp.outputTokens;
+    // Sub-agent live generation progress (keyed by subAgentId)
+    if (m._subAgentGenerationProgress) {
+      for (const progress of Object.values(m._subAgentGenerationProgress) as any[]) {
+        if (progress.outputTokens > 0) output += progress.outputTokens;
       }
     }
-    // Completed worker tokens
-    if (m._workerTokens) {
-      input += m._workerTokens.input || 0;
-      output += m._workerTokens.output || 0;
-      requests += m._workerTokens.requests || 0;
+    // Completed sub-agent tokens
+    if (m._subAgentTokens) {
+      input += m._subAgentTokens.input || 0;
+      output += m._subAgentTokens.output || 0;
+      requests += m._subAgentTokens.requests || 0;
     }
   }
   return {
@@ -130,9 +130,9 @@ async function streamAgentRequest(prompt: string, options: any = {}) {
   let doneEvent = null;
   const statusEvents = [];
   const usageUpdateEvents = [];
-  const workerStatusEvents = [];
-  const workerCompleteEvents = [];
-  const workerProgressEvents = [];
+  const subAgentStatusEvents = [];
+  const subAgentCompleteEvents = [];
+  const subAgentProgressEvents = [];
 
   // Track outputTokens from each chunk/thinking SSE event
   let lastChunkOutputTokens = 0;
@@ -183,10 +183,10 @@ async function streamAgentRequest(prompt: string, options: any = {}) {
           case "usage_update":
             usageUpdateEvents.push(data);
             break;
-          case "worker_status":
-            workerStatusEvents.push(data);
-            if (data.message === "complete") workerCompleteEvents.push(data);
-            if (data.message === "generation_progress") workerProgressEvents.push(data);
+          case "sub_agent_status":
+            subAgentStatusEvents.push(data);
+            if (data.message === "complete") subAgentCompleteEvents.push(data);
+            if (data.message === "generation_progress") subAgentProgressEvents.push(data);
             break;
           case "error":
             console.error(`  ❌  SSE error: ${data.message || JSON.stringify(data)}`);
@@ -205,7 +205,7 @@ async function streamAgentRequest(prompt: string, options: any = {}) {
   return {
     events, chunkCount, thinkingChunkCount, toolExecutions,
     doneEvent, statusEvents, usageUpdateEvents,
-    workerStatusEvents, workerCompleteEvents, workerProgressEvents,
+    subAgentStatusEvents, subAgentCompleteEvents, subAgentProgressEvents,
     lastChunkOutputTokens, lastThinkingOutputTokens, maxOutputTokensFromChunks,
     sessionId,
   };
@@ -353,7 +353,7 @@ Do NOT do the work yourself. Use create_team immediately.`;
     enabledTools: ["read_file", "write_file", "list_dir", "execute_command", "create_team", "send_message", "stop_agent"],
   });
 
-  const { chunkCount, thinkingChunkCount, doneEvent, usageUpdateEvents, workerCompleteEvents, workerProgressEvents: _workerProgressEvents, workerStatusEvents, maxOutputTokensFromChunks } = result;
+  const { chunkCount, thinkingChunkCount, doneEvent, usageUpdateEvents, subAgentCompleteEvents, subAgentProgressEvents: _subAgentProgressEvents, subAgentStatusEvents, maxOutputTokensFromChunks } = result;
 
   logSection("B1. SSE Event Summary");
   log("📊", `Total SSE events: ${result.events.length}`);
@@ -361,8 +361,8 @@ Do NOT do the work yourself. Use create_team immediately.`;
   log("🧠", `Thinking chunks: ${thinkingChunkCount}`);
   log("🔧", `Tool executions: ${result.toolExecutions.length}`);
   log("📦", `usage_update events: ${usageUpdateEvents.length}`);
-  log("👷", `Worker status events: ${workerStatusEvents.length}`);
-  log("👷", `  ↳ complete: ${workerCompleteEvents.length}`);
+  log("👷", `Sub-agent status events: ${subAgentStatusEvents.length}`);
+  log("👷", `  ↳ complete: ${subAgentCompleteEvents.length}`);
   log(doneEvent ? "✅" : "❌", `Done event: ${doneEvent ? "received" : "MISSING"}`);
 
   if (!doneEvent) { console.error("\n❌ No done event — aborting."); return; }
@@ -374,28 +374,28 @@ Do NOT do the work yourself. Use create_team immediately.`;
   log("📤", `outputTokens:  ${providerUsage.outputTokens}`);
   log("🔄", `requests:      ${providerUsage.requests}`);
 
-  // ── B3: Worker accumulation ──
-  logSection("B3. Worker Token Accumulation");
-  const workerTokens = { input: 0, output: 0, requests: 0 };
-  for (const ev of workerCompleteEvents) {
+  // ── B3: Sub-agent accumulation ──
+  logSection("B3. Sub-Agent Token Accumulation");
+  const subAgentTokens = { input: 0, output: 0, requests: 0 };
+  for (const ev of subAgentCompleteEvents) {
     if (ev.usage) {
-      workerTokens.input += ev.usage.inputTokens || 0;
-      workerTokens.output += ev.usage.outputTokens || 0;
-      workerTokens.requests += ev.usage.requests || 1;
-      log("📦", `Worker ${ev.workerId}: in=${ev.usage.inputTokens}, out=${ev.usage.outputTokens}`);
+      subAgentTokens.input += ev.usage.inputTokens || 0;
+      subAgentTokens.output += ev.usage.outputTokens || 0;
+      subAgentTokens.requests += ev.usage.requests || 1;
+      log("📦", `Sub-agent ${ev.subAgentId}: in=${ev.usage.inputTokens}, out=${ev.usage.outputTokens}`);
     }
   }
-  log("📊", `Total worker tokens: in=${workerTokens.input}, out=${workerTokens.output}, reqs=${workerTokens.requests}`);
+  log("📊", `Total sub-agent tokens: in=${subAgentTokens.input}, out=${subAgentTokens.output}, reqs=${subAgentTokens.requests}`);
 
-  // ── B4: Finalized with workers ──
-  logSection("B4. getSessionTokenStats() — Finalized with Workers");
+  // ── B4: Finalized with sub-agents ──
+  logSection("B4. getSessionTokenStats() — Finalized with Sub-agents");
   const userMsg = { role: "user", content: "" };
-  const coordMsg = { role: "assistant", content: "", usage: providerUsage, _workerTokens: workerTokens };
+  const coordMsg = { role: "assistant", content: "", usage: providerUsage, _subAgentTokens: subAgentTokens };
   const stats = getSessionTokenStats([userMsg, coordMsg]);
-  const expectedIn = getTotalInputTokens(providerUsage) + workerTokens.input;
-  const expectedOut = (providerUsage.outputTokens || 0) + workerTokens.output;
-  passFail("input = coord + workers", stats.totalTokens.input, expectedIn);
-  passFail("output = coord + workers", stats.totalTokens.output, expectedOut);
+  const expectedIn = getTotalInputTokens(providerUsage) + subAgentTokens.input;
+  const expectedOut = (providerUsage.outputTokens || 0) + subAgentTokens.output;
+  passFail("input = coord + sub-agents", stats.totalTokens.input, expectedIn);
+  passFail("output = coord + sub-agents", stats.totalTokens.output, expectedOut);
   passFail("total = in + out", stats.totalTokens.total, expectedIn + expectedOut);
 
   // ── B5: usage_update events ──
@@ -453,17 +453,17 @@ function testPureUnitTests() {
   passFail("output = 200+300+150", mStats.totalTokens.output, 650);
   passFail("requests = 3", mStats.requestCount, 3);
 
-  // C4: Worker accumulation
-  logSection("C4. Worker Token Accumulation");
+  // C4: Sub-agent accumulation
+  logSection("C4. Sub-Agent Token Accumulation");
   const wMsg = {
     role: "assistant", content: "",
     usage: { inputTokens: 1000, outputTokens: 200 },
-    _workerTokens: { input: 5000, output: 800, requests: 3 },
+    _subAgentTokens: { input: 5000, output: 800, requests: 3 },
   };
   const wStats = getSessionTokenStats([{ role: "user", content: "" }, wMsg]);
-  passFail("input = coord(1000) + workers(5000)", wStats.totalTokens.input, 6000);
-  passFail("output = coord(200) + workers(800)", wStats.totalTokens.output, 1000);
-  passFail("requests = coord(1) + workers(3)", wStats.requestCount, 4);
+  passFail("input = coord(1000) + sub-agents(5000)", wStats.totalTokens.input, 6000);
+  passFail("output = coord(200) + sub-agents(800)", wStats.totalTokens.output, 1000);
+  passFail("requests = coord(1) + sub-agents(3)", wStats.requestCount, 4);
 }
 
 // ── Main ────────────────────────────────────────────────────
