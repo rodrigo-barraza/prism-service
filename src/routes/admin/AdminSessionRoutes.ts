@@ -92,7 +92,7 @@ sessionRouter.get(
         }
       }
 
-      const workerRequestCount = requests.filter(
+      const subAgentRequestCount = requests.filter(
         (requestItem) => requestItem.agentSessionId !== sessionId,
       ).length;
 
@@ -124,7 +124,7 @@ sessionRouter.get(
       res.json({
         agentSessionId: sessionId,
         requestCount: requests.length,
-        workerRequestCount,
+        subAgentRequestCount,
         totalCost,
         totalInputTokens,
         totalOutputTokens,

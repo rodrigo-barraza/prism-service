@@ -449,7 +449,7 @@ export async function finalizeTextGeneration(
 
     if (parentAgentSessionId) {
       finalMeta.parentAgentSessionId = parentAgentSessionId;
-      finalMeta.isWorker = true;
+      finalMeta.isSubAgent = true;
     }
     if (parentConversationId) {
       finalMeta.parentConversationId = parentConversationId;

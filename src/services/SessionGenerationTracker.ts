@@ -46,7 +46,7 @@ interface ActiveRequest {
   provider: string;
   model: string;
   source: string;
-  workerId: string | null;
+  subAgentId: string | null;
 }
 
 interface SessionAccumulator {
@@ -60,7 +60,7 @@ interface RegisterOptions {
   provider?: string;
   model?: string;
   source?: string;
-  workerId?: string | null;
+  subAgentId?: string | null;
 }
 
 interface UpdateParams {
@@ -107,7 +107,7 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
       provider,
       model,
       source = "orchestrator",
-      workerId = null,
+      subAgentId = null,
     }: RegisterOptions = {},
   ) {
     if (!agentSessionId || !requestId) return;
@@ -126,7 +126,7 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
       provider: provider || "any",
       model: model || "any",
       source,
-      workerId: workerId ?? null,
+      subAgentId: subAgentId ?? null,
     };
 
     activeRequests.set(requestId, entry);

@@ -438,7 +438,7 @@ export default class BaseAgenticHarness {
       provider: providerName,
       model: resolvedModel,
       source: parentAgentSessionId ? "sub-agent" : "orchestrator",
-      workerId: parentAgentSessionId ? agentSessionId : null,
+      subAgentId: parentAgentSessionId ? agentSessionId : null,
     });
   }
 

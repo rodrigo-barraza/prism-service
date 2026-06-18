@@ -320,7 +320,7 @@ const ConversationService: ConversationServiceInterface = {
       }
     }
 
-    const workerRequestCount = requests.filter(
+    const subAgentRequestCount = requests.filter(
       (reservation) => reservation.agentSessionId !== sessionId,
     ).length;
 
@@ -349,7 +349,7 @@ const ConversationService: ConversationServiceInterface = {
     return {
       agentSessionId: sessionId,
       requestCount: requests.length,
-      workerRequestCount,
+      subAgentRequestCount,
       totalCost,
       totalInputTokens,
       totalOutputTokens,
