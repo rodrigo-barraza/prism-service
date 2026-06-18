@@ -30,7 +30,21 @@ vi.mock("../src/services/SettingsService.ts", () => ({
   },
 }));
 
+// Mock getProvider
+const mockGenerateText = vi.fn().mockResolvedValue({
+  text: "Synthesized results summary.",
+  usage: { inputTokens: 100, outputTokens: 50 },
+});
+
+vi.mock("../src/providers/index.ts", () => ({
+  getProvider: vi.fn().mockImplementation(() => ({
+    generateText: mockGenerateText,
+  })),
+  providers: {},
+}));
+
 import { HierarchicalRouter } from "../src/services/orchestrator/routers/HierarchicalRouter.ts";
+import { HierarchicalAggregationRouter } from "../src/services/orchestrator/routers/HierarchicalAggregationRouter.ts";
 import { SequentialRouter } from "../src/services/orchestrator/routers/SequentialRouter.ts";
 import { PeerToPeerRouter } from "../src/services/orchestrator/routers/PeerToPeerRouter.ts";
 import { GitWorktreeHelper } from "../src/services/orchestrator/GitWorktreeHelper.ts";
@@ -441,6 +455,132 @@ describe("Topology Routers Test Suite", () => {
 
       const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
       expect(results).toHaveLength(2);
+    });
+  });
+
+  describe("HierarchicalAggregationRouter", () => {
+    it("should execute all members concurrently and run a synthesis pass", async () => {
+      const router = new HierarchicalAggregationRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+      ];
+
+      mockGenerateText.mockClear();
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(results).toHaveLength(3);
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
+      expect(mockGenerateText).toHaveBeenCalledTimes(1);
+
+      const synthesisResult = results[2] as SubAgentResult;
+      expect(synthesisResult.agent_id).toContain("synthesis-test-team");
+      expect(synthesisResult.status).toBe("completed");
+      expect(synthesisResult.result).toBe("Synthesized results summary.");
+      expect(synthesisResult.summary).toContain("Aggregated 2 sub-agent results");
+    });
+
+    it("should skip synthesis pass if all sub-agents fail", async () => {
+      const router = new HierarchicalAggregationRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+      ];
+
+      mockGenerateText.mockClear();
+      spawnSubAgentMock.mockResolvedValue({
+        status: "failed",
+        error: "Execution error",
+      });
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(results).toHaveLength(2);
+      expect(mockGenerateText).not.toHaveBeenCalled();
+    });
+
+    it("should skip synthesis pass if only one sub-agent succeeds", async () => {
+      const router = new HierarchicalAggregationRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+      ];
+
+      mockGenerateText.mockClear();
+      spawnSubAgentMock
+        .mockResolvedValueOnce({
+          agent_id: "agent-a",
+          status: "completed",
+          result: "Task A finished",
+          summary: "Done A",
+          toolUses: 1,
+          durationMs: 50,
+          iterations: 1,
+          messages: [],
+        })
+        .mockResolvedValueOnce({
+          status: "failed",
+          error: "Task B failed",
+        });
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(results).toHaveLength(2);
+      expect(mockGenerateText).not.toHaveBeenCalled();
+    });
+
+    it("should handle synthesis generation failure gracefully and return raw results", async () => {
+      const router = new HierarchicalAggregationRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+      ];
+
+      mockGenerateText.mockClear();
+      mockGenerateText.mockRejectedValueOnce(new Error("Inference error"));
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(results).toHaveLength(2);
+    });
+
+    it("should use fallback summary when a successful sub-agent has a null/empty result", async () => {
+      const router = new HierarchicalAggregationRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+      ];
+
+      mockGenerateText.mockClear();
+      spawnSubAgentMock
+        .mockResolvedValueOnce({
+          agent_id: "agent-a",
+          status: "completed",
+          result: null,
+          summary: "Done A",
+          toolUses: 5,
+          toolNames: { write_file: 5 },
+          iterations: 3,
+          durationMs: 100,
+          messages: [],
+        })
+        .mockResolvedValueOnce({
+          agent_id: "agent-b",
+          status: "completed",
+          result: "Task B finished",
+          summary: "Done B",
+          toolUses: 1,
+          durationMs: 50,
+          iterations: 1,
+          messages: [],
+        });
+
+      await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(mockGenerateText).toHaveBeenCalledTimes(1);
+      const promptArg = mockGenerateText.mock.calls[0][0][0].content;
+      expect(promptArg).toContain("Agent completed 3 iterations using write_file (5×) but did not produce a final summary.");
     });
   });
 });
