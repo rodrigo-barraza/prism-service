@@ -403,7 +403,7 @@ describe("AgenticLoopService", () => {
       expect.any(String), 
       expect.objectContaining({
         source: "sub-agent",
-        workerId: "worker-456"
+        subAgentId: "worker-456"
       })
     );
 

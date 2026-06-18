@@ -90,9 +90,9 @@ async function consumeAgentSSE(response, { timeoutMs = AGENT_TIMEOUT_MS, control
     // ── Tok/s tracking fields ────────────────────────────
     generationProgressEvents: [],   // { tokPerSec, activeRequests, outputTokens }
     usageUpdateEvents: [],          // { usage }
-    workerStatusEvents: [],         // all worker_status events
-    workerGenerationProgress: {},   // workerId → { tokPerSec, outputTokens }[]
-    workerCompleteEvents: [],       // worker completion events with usage
+    subAgentStatusEvents: [],       // all sub_agent_status events
+    subAgentGenerationProgress: {}, // subAgentId → { tokPerSec, outputTokens }[]
+    subAgentCompleteEvents: [],     // sub-agent completion events with usage
   };
 
   const startTime = Date.now();
@@ -166,14 +166,14 @@ async function consumeAgentSSE(response, { timeoutMs = AGENT_TIMEOUT_MS, control
             case "toolCall":
               result.toolCalls.push(event);
               break;
-            case "worker_status":
-              result.workerStatusEvents.push(event);
-              // Capture per-worker generation_progress
+            case "sub_agent_status":
+              result.subAgentStatusEvents.push(event);
+              // Capture per-subagent generation_progress
               if (event.message === "generation_progress") {
-                if (!result.workerGenerationProgress[event.workerId]) {
-                  result.workerGenerationProgress[event.workerId] = [];
+                if (!result.subAgentGenerationProgress[event.subAgentId]) {
+                  result.subAgentGenerationProgress[event.subAgentId] = [];
                 }
-                result.workerGenerationProgress[event.workerId].push({
+                result.subAgentGenerationProgress[event.subAgentId].push({
                   tokPerSec: event.tokPerSec,
                   activeRequests: event.activeRequests,
                   outputTokens: event.outputTokens,
@@ -184,7 +184,7 @@ async function consumeAgentSSE(response, { timeoutMs = AGENT_TIMEOUT_MS, control
                 });
               }
               if (event.message === "complete") {
-                result.workerCompleteEvents.push(event);
+                result.subAgentCompleteEvents.push(event);
               }
               break;
             case "error":
@@ -250,7 +250,7 @@ function logTokPerSecResult(label, result) {
   const peakTokPerSec = progEvents.reduce(
     (max, e) => (e.tokPerSec != null && e.tokPerSec > max ? e.tokPerSec : max), 0,
   );
-  const workerIds = Object.keys(result.workerGenerationProgress);
+  const subAgentIds = Object.keys(result.subAgentGenerationProgress);
 
   console.log(`\n  ┌─ ${label} ${"─".repeat(Math.max(1, 55 - label.length))}┐`);
   console.log(`  │ Duration:            ${dur.padEnd(37)}│`);
@@ -263,8 +263,8 @@ function logTokPerSecResult(label, result) {
   console.log(`  │ Last inputTokens:    ${lastProg?.inputTokens ?? "N/A".padEnd(37)}│`);
   console.log(`  │ Last totalTokens:    ${lastProg?.totalTokens ?? "N/A".padEnd(37)}│`);
   console.log(`  │ Last avgTtft:        ${lastProg?.avgTtft != null ? lastProg.avgTtft.toFixed(3) + "s" : "N/A".padEnd(37)}│`);
-  console.log(`  │ Worker IDs tracked:  ${workerIds.length > 0 ? workerIds.join(", ").slice(0, 37) : "none".padEnd(37)}│`);
-  console.log(`  │ Worker completions:  ${String(result.workerCompleteEvents.length).padEnd(37)}│`);
+  console.log(`  │ Sub-agent IDs tracked: ${subAgentIds.length > 0 ? subAgentIds.join(", ").slice(0, 37) : "none".padEnd(37)}│`);
+  console.log(`  │ Sub-agent completions: ${String(result.subAgentCompleteEvents.length).padEnd(37)}│`);
   console.log(`  │ usage_update events: ${String(result.usageUpdateEvents.length).padEnd(37)}│`);
   if (result.errors.length > 0) {
     for (const e of result.errors.slice(0, 3)) {
@@ -273,14 +273,14 @@ function logTokPerSecResult(label, result) {
   }
   if (result.timedOut) console.log(`  │ ⚠️  TIMED OUT                                        │`);
 
-  // Per-worker tok/s summary
-  for (const wId of workerIds) {
-    const wProg = result.workerGenerationProgress[wId];
-    const wPeak = wProg.reduce(
+  // Per-subagent tok/s summary
+  for (const subAgentId of subAgentIds) {
+    const progressList = result.subAgentGenerationProgress[subAgentId];
+    const peakRate = progressList.reduce(
       (max, e) => (e.tokPerSec != null && e.tokPerSec > max ? e.tokPerSec : max), 0,
     );
-    const wLast = wProg[wProg.length - 1];
-    console.log(`  │ Worker ${wId.slice(0, 10).padEnd(10)}: ${wProg.length} events, peak=${wPeak > 0 ? wPeak.toFixed(1) : "N/A"} tok/s, last=${wLast?.tokPerSec?.toFixed(1) ?? "N/A"} tok/s│`);
+    const lastEvent = progressList[progressList.length - 1];
+    console.log(`  │ Sub-agent ${subAgentId.slice(0, 10).padEnd(10)}: ${progressList.length} events, peak=${peakRate > 0 ? peakRate.toFixed(1) : "N/A"} tok/s, last=${lastEvent?.tokPerSec?.toFixed(1) ?? "N/A"} tok/s│`);
   }
   console.log(`  └${"─".repeat(59)}┘`);
 }
@@ -424,9 +424,9 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
   // The critical test: spawn 4 parallel workers and validate that:
   // a) The coordinator's generation_progress aggregates all workers via
   //    SessionGenerationTracker.getSessionStats(parentSessionId)
-  // b) Each worker's generation_progress is forwarded as worker_status
-  //    events for per-worker tok/s display in MessageList toolCallItem
-  it("coordinator with 4 workers reports combined and per-worker tok/s", async () => {
+  // b) Each worker's generation_progress is forwarded as sub_agent_status
+  //    events for per-subagent tok/s display in MessageList toolCallItem
+  it("coordinator with 4 workers reports combined and per-subagent tok/s", async () => {
     const sessionId = crypto.randomUUID();
     const COORDINATOR_TIMEOUT = 300_000; // 5 min — workers are sequential on local
 
@@ -482,44 +482,44 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
     );
     console.log(`     Peak activeRequests: ${maxActiveReqs}`);
 
-    // ── Per-worker tok/s (MessageList toolCallItem) ──────────
+    // ── Per-subagent tok/s (MessageList toolCallItem) ──────────
     // Check if workers were actually spawned
     const teamCreateCalls = result.toolCalls.filter(
       (t) => t.tool?.name === "team_create" || t.name === "team_create",
     );
-    const workerIds = Object.keys(result.workerGenerationProgress);
+    const subAgentIds = Object.keys(result.subAgentGenerationProgress);
 
     console.log(`     team_create calls: ${teamCreateCalls.length}`);
-    console.log(`     Workers with generation_progress: ${workerIds.length}`);
-    console.log(`     Worker completions: ${result.workerCompleteEvents.length}`);
+    console.log(`     Sub-agents with generation_progress: ${subAgentIds.length}`);
+    console.log(`     Sub-agent completions: ${result.subAgentCompleteEvents.length}`);
 
-    // If the model successfully spawned workers, validate per-worker tok/s
-    if (teamCreateCalls.length > 0 && workerIds.length > 0) {
+    // If the model successfully spawned workers, validate per-subagent tok/s
+    if (teamCreateCalls.length > 0 && subAgentIds.length > 0) {
       // Each worker that generated text should have at least 1 progress event
-      for (const wId of workerIds) {
-        const wProgress = result.workerGenerationProgress[wId];
-        expect(wProgress.length).toBeGreaterThan(0);
+      for (const subAgentId of subAgentIds) {
+        const progressList = result.subAgentGenerationProgress[subAgentId];
+        expect(progressList.length).toBeGreaterThan(0);
 
         // At least one event should have tok/s
-        const wWithTokPerSec = wProgress.filter(
+        const wWithTokPerSec = progressList.filter(
           (e) => e.tokPerSec != null && e.tokPerSec > 0,
         );
 
-        console.log(`     Worker ${wId.slice(0, 12)}: ${wProgress.length} progress events, ${wWithTokPerSec.length} with tok/s`);
+        console.log(`     Sub-agent ${subAgentId.slice(0, 12)}: ${progressList.length} progress events, ${wWithTokPerSec.length} with tok/s`);
 
         // Validate event structure — what toolCallItem would display
-        for (const event of wProgress) {
+        for (const event of progressList) {
           expect(event).toHaveProperty("tokPerSec");
           expect(event).toHaveProperty("outputTokens");
         }
       }
 
       // Worker completions should have usage data
-      for (const wComplete of result.workerCompleteEvents) {
-        expect(wComplete.workerId).toBeDefined();
+      for (const subAgentComplete of result.subAgentCompleteEvents) {
+        expect(subAgentComplete.subAgentId).toBeDefined();
         // Usage may be null for aborted workers, but should exist for completed ones
-        if (wComplete.usage) {
-          expect(typeof wComplete.usage.outputTokens).toBe("number");
+        if (subAgentComplete.usage) {
+          expect(typeof subAgentComplete.usage.outputTokens).toBe("number");
         }
       }
     } else {

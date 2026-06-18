@@ -181,7 +181,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       expect(parentEmitMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "sub_agent_status",
-          workerId: "agent-123",
+          subAgentId: "agent-123",
           message: "phase",
           phase: "thinking",
         })
@@ -192,7 +192,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       expect(parentEmitMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "sub_agent_status",
-          workerId: "agent-123",
+          subAgentId: "agent-123",
           message: "phase",
           phase: "generating",
         })
@@ -207,7 +207,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       expect(parentEmitMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "sub_agent_tool_execution",
-          workerId: "agent-123",
+          subAgentId: "agent-123",
           status: "calling",
           tool: expect.objectContaining({ name: "read_file" }),
         })
@@ -224,7 +224,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       expect(parentEmitMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "sub_agent_tool_output",
-          workerId: "agent-123",
+          subAgentId: "agent-123",
           toolCallId: "call-99",
           name: "read_file",
           data: expect.objectContaining({ text: "some code" }),

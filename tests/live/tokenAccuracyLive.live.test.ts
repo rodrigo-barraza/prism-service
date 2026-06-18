@@ -91,14 +91,14 @@ async function streamAndCollect(prompt, { maxTokens = 500, timeout = 120000, can
     progressEvents: [],
     // 1-second interval samples
     samples: [],
-    // Per-worker generation_progress events
-    workerProgressEvents: {},
+    // Per-subagent generation_progress events
+    subAgentProgressEvents: {},
     // usage_update (per-iteration)
     usageUpdates: [],
     // done event usage
     doneUsage: null,
-    // worker completion events
-    workerCompletions: [],
+    // sub-agent completion events
+    subAgentCompletions: [],
     // raw event count
     totalEvents: 0,
     // ── Real data from chunk/thinking events ──────────────────
@@ -147,21 +147,21 @@ async function streamAndCollect(prompt, { maxTokens = 500, timeout = 120000, can
           }
         }
 
-        // Per-worker progress
-        if (event.type === "worker_status" && event.message === "generation_progress") {
-          if (!result.workerProgressEvents[event.workerId]) {
-            result.workerProgressEvents[event.workerId] = [];
+        // Per-subagent progress
+        if (event.type === "sub_agent_status" && event.message === "generation_progress") {
+          if (!result.subAgentProgressEvents[event.subAgentId]) {
+            result.subAgentProgressEvents[event.subAgentId] = [];
           }
-          result.workerProgressEvents[event.workerId].push({
+          result.subAgentProgressEvents[event.subAgentId].push({
             outputTokens: event.outputTokens,
             totalOutputTokens: event.totalOutputTokens || event.outputTokens,
             tokPerSec: event.tokPerSec,
           });
         }
 
-        // Worker completions
-        if (event.type === "worker_status" && event.message === "complete") {
-          result.workerCompletions.push(event);
+        // Sub-agent completions
+        if (event.type === "sub_agent_status" && event.message === "complete") {
+          result.subAgentCompletions.push(event);
         }
 
         // usage_update
@@ -238,11 +238,11 @@ function printSampleTable(label, result) {
   const last = events[events.length - 1];
   const providerOut = result.doneUsage?.outputTokens || 0;
   const providerIn = result.doneUsage?.inputTokens || result.doneUsage?.promptTokens || 0;
-  const workerIds = Object.keys(result.workerProgressEvents);
+  const subAgentIds = Object.keys(result.subAgentProgressEvents);
   const lastOutputChars = Math.max(result.lastChunkOutputChars, result.lastThinkingOutputChars);
 
   console.log(`\n  ┌─ ${label} ${"─".repeat(Math.max(1, 53 - label.length))}┐`);
-  console.log(`  │ Progress events: ${String(events.length).padStart(5)}   Workers: ${String(workerIds.length).padStart(2)}                  │`);
+  console.log(`  │ Progress events: ${String(events.length).padStart(5)}   Sub-agents: ${String(subAgentIds.length).padStart(2)}              │`);
   console.log("  ├──────────────────────────────────────────────────────┤");
   for (const s of result.samples) {
     const t = ((s.timestamp - first.timestamp) / 1000).toFixed(1);
@@ -257,11 +257,11 @@ function printSampleTable(label, result) {
     const progressRatio = last.outputTokens / providerOut;
     console.log(`  │ Progress/Provider ratio: ${progressRatio.toFixed(4)}                       │`);
   }
-  if (workerIds.length > 0) {
-    for (const wId of workerIds) {
-      const wEvents = result.workerProgressEvents[wId];
-      const wLast = wEvents[wEvents.length - 1];
-      console.log(`  │ Worker ${wId.slice(0, 8)}: ${String(wEvents.length).padStart(3)} events, ${String(wLast?.totalOutputTokens || 0).padStart(5)} tokens   │`);
+  if (subAgentIds.length > 0) {
+    for (const subAgentId of subAgentIds) {
+      const progressList = result.subAgentProgressEvents[subAgentId];
+      const lastProgress = progressList[progressList.length - 1];
+      console.log(`  │ Sub-agent ${subAgentId.slice(0, 8)}: ${String(progressList.length).padStart(3)} events, ${String(lastProgress?.totalOutputTokens || 0).padStart(5)} tokens │`);
     }
   }
   console.log("  └──────────────────────────────────────────────────────┘\n");
@@ -388,7 +388,7 @@ describe("LM Studio — Token Accuracy (Real Data Only)", () => {
       { maxTokens: 500, timeout: 120000, canSpawnWorkers: true },
     );
 
-    const workerIds = Object.keys(result.workerProgressEvents);
+    const subAgentIds = Object.keys(result.subAgentProgressEvents);
 
     expect(result.progressEvents.length).toBeGreaterThan(0);
     const violations = checkMonotonicity(result.progressEvents);
@@ -399,17 +399,17 @@ describe("LM Studio — Token Accuracy (Real Data Only)", () => {
     expect(violations).toEqual([]);
     expect(last.outputTokens).toBeGreaterThan(0);
 
-    if (workerIds.length > 0) {
-      for (const wId of workerIds) {
-        expect(result.workerProgressEvents[wId].length).toBeGreaterThan(0);
+    if (subAgentIds.length > 0) {
+      for (const subAgentId of subAgentIds) {
+        expect(result.subAgentProgressEvents[subAgentId].length).toBeGreaterThan(0);
       }
-      const totalWorkerTokens = workerIds.reduce((sum, wId) => {
-        const wEvents = result.workerProgressEvents[wId];
-        const wLast = wEvents[wEvents.length - 1];
-        return sum + (wLast?.totalOutputTokens || 0);
+      const totalWorkerTokens = subAgentIds.reduce((sum, subAgentId) => {
+        const progressList = result.subAgentProgressEvents[subAgentId];
+        const lastProgress = progressList[progressList.length - 1];
+        return sum + (lastProgress?.totalOutputTokens || 0);
       }, 0);
 
-      console.log(`  📊 Aggregate: ${last.outputTokens}, Workers sum: ${totalWorkerTokens}`);
+      console.log(`  📊 Aggregate: ${last.outputTokens}, Sub-agents sum: ${totalWorkerTokens}`);
       expect(last.outputTokens).toBeGreaterThanOrEqual(totalWorkerTokens);
     } else {
       console.log("  ⚠ No workers spawned — model did not call create_team");
