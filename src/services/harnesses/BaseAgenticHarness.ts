@@ -172,7 +172,7 @@ export default class BaseAgenticHarness {
       this.context.modelDefinition || undefined,
       this.context.providerName,
       this.context.resolvedModel,
-      this.context.options.thinkingEnabled as boolean | undefined,
+      this.context.options?.thinkingEnabled as boolean | undefined,
     );
 
     const filteredTools = allSchemas.filter(
@@ -337,7 +337,7 @@ export default class BaseAgenticHarness {
     messages: ConversationMessage[],
     toolCount: number,
   ): ConversationMessage[] {
-    const { modelDefinition, options, emit } = this.context;
+    const { modelDefinition, options = {}, emit } = this.context;
     const preEnforceCount = messages.length;
     const contextResult = ContextWindowManager.enforce(
       messages as ChatMessage[],
