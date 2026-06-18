@@ -189,7 +189,7 @@ describe("check — standard mode", () => {
 
   it("auto-approves Tier 1 tools", () => {
     const result = engine.check({ name: "read_file", args: {}, id: "tc1" });
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.tier).toBe(APPROVAL_TIERS.AUTO);
     expect(result.tierLabel).toBe("auto");
     expect(result.reason).toBe("read_only");
@@ -197,7 +197,7 @@ describe("check — standard mode", () => {
 
   it("requires approval for Tier 2 tools", () => {
     const result = engine.check({ name: "write_file", args: {}, id: "tc2" });
-    expect(result.approved).toBe(false);
+    expect(result.isApproved).toBe(false);
     expect(result.tier).toBe(APPROVAL_TIERS.WRITE);
     expect(result.tierLabel).toBe("write");
     expect(result.reason).toBe("requires_approval");
@@ -205,7 +205,7 @@ describe("check — standard mode", () => {
 
   it("requires approval for Tier 3 tools", () => {
     const result = engine.check({ name: "execute_shell", args: {}, id: "tc3" });
-    expect(result.approved).toBe(false);
+    expect(result.isApproved).toBe(false);
     expect(result.tier).toBe(APPROVAL_TIERS.DANGER);
     expect(result.tierLabel).toBe("danger");
     expect(result.reason).toBe("requires_approval");
@@ -213,7 +213,7 @@ describe("check — standard mode", () => {
 
   it("requires approval for unknown tools (default Tier 2)", () => {
     const result = engine.check({ name: "some_new_tool", args: {}, id: "tc4" });
-    expect(result.approved).toBe(false);
+    expect(result.isApproved).toBe(false);
     expect(result.tier).toBe(APPROVAL_TIERS.WRITE);
     expect(result.reason).toBe("requires_approval");
   });
@@ -228,25 +228,25 @@ describe("check — full auto mode", () => {
 
   it("auto-approves Tier 1 tools with full_auto reason", () => {
     const result = engine.check({ name: "read_file", args: {}, id: "tc1" });
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.reason).toBe("full_auto");
   });
 
   it("auto-approves Tier 2 tools with full_auto reason", () => {
     const result = engine.check({ name: "write_file", args: {}, id: "tc2" });
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.reason).toBe("full_auto");
   });
 
   it("auto-approves Tier 3 tools with full_auto reason", () => {
     const result = engine.check({ name: "execute_shell", args: {}, id: "tc3" });
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.reason).toBe("full_auto");
   });
 
   it("auto-approves unknown tools with full_auto reason", () => {
     const result = engine.check({ name: "unknown_tool", args: {}, id: "tc4" });
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.reason).toBe("full_auto");
   });
 });
@@ -305,14 +305,14 @@ describe("checkBatch", () => {
     const { autoApproved, needsApproval } = engine.checkBatch(toolCalls);
 
     expect(autoApproved[0]._approval).toEqual({
-      approved: true,
+      isApproved: true,
       tier: APPROVAL_TIERS.AUTO,
       tierLabel: "auto",
       reason: "read_only",
     });
 
     expect(needsApproval[0]._approval).toEqual({
-      approved: false,
+      isApproved: false,
       tier: APPROVAL_TIERS.DANGER,
       tierLabel: "danger",
       reason: "requires_approval",
@@ -384,9 +384,9 @@ describe("createHook", () => {
     const engine = new AutoApprovalEngine();
     const hook = engine.createHook();
 
-    const result = await hook({ name: "read_file", args: {}, id: "tc1" }, {});
+    const result = await hook({ name: "read_file", args: {}, id: "tc1" }, {} as any);
 
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.tier).toBe(APPROVAL_TIERS.AUTO);
   });
 
@@ -394,9 +394,9 @@ describe("createHook", () => {
     const engine = new AutoApprovalEngine();
     const hook = engine.createHook();
 
-    const result = await hook({ name: "execute_shell", args: {}, id: "tc2" }, {});
+    const result = await hook({ name: "execute_shell", args: {}, id: "tc2" }, {} as any);
 
-    expect(result.approved).toBe(false);
+    expect(result.isApproved).toBe(false);
     expect(result.tier).toBe(APPROVAL_TIERS.DANGER);
   });
 
@@ -404,9 +404,9 @@ describe("createHook", () => {
     const engine = new AutoApprovalEngine({ fullAuto: true });
     const hook = engine.createHook();
 
-    const result = await hook({ name: "execute_shell", args: {}, id: "tc3" }, {});
+    const result = await hook({ name: "execute_shell", args: {}, id: "tc3" }, {} as any);
 
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.reason).toBe("full_auto");
   });
 });
@@ -418,18 +418,18 @@ describe("createHook", () => {
 describe("Constructor defaults", () => {
   it("fullAuto defaults to false", () => {
     const engine = new AutoApprovalEngine();
-    expect(engine.fullAuto).toBe(false);
+    expect((engine as any).fullAuto).toBe(false);
   });
 
   it("tierOverrides defaults to empty object", () => {
     const engine = new AutoApprovalEngine();
-    expect(engine.tierOverrides).toEqual({});
+    expect((engine as any).tierOverrides).toEqual({});
   });
 
   it("accepts empty options object", () => {
     const engine = new AutoApprovalEngine({});
-    expect(engine.fullAuto).toBe(false);
-    expect(engine.tierOverrides).toEqual({});
+    expect((engine as any).fullAuto).toBe(false);
+    expect((engine as any).tierOverrides).toEqual({});
   });
 
   it("accepts no arguments", () => {
@@ -450,7 +450,7 @@ describe("check — policy integration", () => {
       ],
     });
     const result = engine.check({ name: "read_file", args: {}, id: "tc1" });
-    expect(result.approved).toBe(false);
+    expect(result.isApproved).toBe(false);
     expect(result.reason).toContain("Denied by policy");
   });
 
@@ -461,7 +461,7 @@ describe("check — policy integration", () => {
       ],
     });
     const result = engine.check({ name: "execute_shell", args: {}, id: "tc2" });
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.reason).toContain("Approved by policy");
   });
 
@@ -472,7 +472,7 @@ describe("check — policy integration", () => {
       ],
     });
     const result = engine.check({ name: "read_file", args: {}, id: "tc3" });
-    expect(result.approved).toBe(false);
+    expect(result.isApproved).toBe(false);
     expect(result.reason).toContain("Requires approval");
   });
 
@@ -502,7 +502,7 @@ describe("check — policy integration", () => {
       args: { command: "rm -rf /" },
       id: "tc4",
     });
-    expect(rm.approved).toBe(false);
+    expect(rm.isApproved).toBe(false);
     expect(rm.reason).toContain("deny-rm");
 
     // git should be allowed
@@ -511,7 +511,7 @@ describe("check — policy integration", () => {
       args: { command: "git status" },
       id: "tc5",
     });
-    expect(git.approved).toBe(true);
+    expect(git.isApproved).toBe(true);
     expect(git.reason).toContain("allow-git");
   });
 
@@ -524,7 +524,7 @@ describe("check — policy integration", () => {
 
     // read_file has no matching policy — should fall through to Tier 1 auto-approve
     const result = engine.check({ name: "read_file", args: {}, id: "tc6" });
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.reason).toBe("read_only");
   });
 
@@ -537,7 +537,7 @@ describe("check — policy integration", () => {
     });
     const result = engine.check({ name: "execute_shell", args: {}, id: "tc7" });
     // fullAuto short-circuits before policy evaluation
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.reason).toBe("full_auto");
   });
 
@@ -550,14 +550,14 @@ describe("check — policy integration", () => {
 
     // Even Tier 1 tools should be caught by the wildcard
     const read = engine.check({ name: "read_file", args: {}, id: "tc8" });
-    expect(read.approved).toBe(false);
+    expect(read.isApproved).toBe(false);
     expect(read.reason).toContain("ask-all");
 
     const write = engine.check({ name: "write_file", args: {}, id: "tc9" });
-    expect(write.approved).toBe(false);
+    expect(write.isApproved).toBe(false);
 
     const shell = engine.check({ name: "execute_shell", args: {}, id: "tc10" });
-    expect(shell.approved).toBe(false);
+    expect(shell.isApproved).toBe(false);
   });
 
   it("policies work with checkBatch()", () => {
@@ -590,7 +590,7 @@ describe('AutoApprovalEngine adversarial', () => {
   it('should default unknown tools to Tier 2 (WRITE) — not auto-approved', () => {
     const engine = new AutoApprovalEngine();
     const result = engine.check({ name: 'completely_unknown_tool', args: {}, id: 'tc-1' });
-    expect(result.approved).toBe(false);
+    expect(result.isApproved).toBe(false);
     expect(result.tier).toBe(APPROVAL_TIERS.WRITE);
     expect(result.tierLabel).toBe('write');
   });
@@ -598,7 +598,7 @@ describe('AutoApprovalEngine adversarial', () => {
   it('should auto-approve all tools in fullAuto mode — including DANGER tier', () => {
     const engine = new AutoApprovalEngine({ fullAuto: true });
     const result = engine.check({ name: 'execute_shell', args: { command: 'rm -rf /' }, id: 'tc-1' });
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.reason).toBe('full_auto');
   });
 
@@ -607,7 +607,7 @@ describe('AutoApprovalEngine adversarial', () => {
       tierOverrides: { execute_shell: APPROVAL_TIERS.AUTO },
     });
     const result = engine.check({ name: 'execute_shell', args: {}, id: 'tc-1' });
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.tier).toBe(APPROVAL_TIERS.AUTO);
   });
 
@@ -616,7 +616,7 @@ describe('AutoApprovalEngine adversarial', () => {
       tierOverrides: { read_file: APPROVAL_TIERS.DANGER },
     });
     const result = engine.check({ name: 'read_file', args: {}, id: 'tc-1' });
-    expect(result.approved).toBe(false);
+    expect(result.isApproved).toBe(false);
     expect(result.tier).toBe(APPROVAL_TIERS.DANGER);
   });
 
@@ -627,7 +627,7 @@ describe('AutoApprovalEngine adversarial', () => {
     });
     const result = engine.check({ name: 'execute_shell', args: {}, id: 'tc-1' });
     // fullAuto returns immediately — policies are not checked
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.reason).toBe('full_auto');
   });
 
@@ -637,7 +637,7 @@ describe('AutoApprovalEngine adversarial', () => {
     });
     const result = engine.check({ name: 'read_file', args: {}, id: 'tc-1' });
     // Policy denies it even though read_file is Tier 1 AUTO
-    expect(result.approved).toBe(false);
+    expect(result.isApproved).toBe(false);
     expect(result.reason).toContain('Denied by policy');
   });
 
@@ -646,7 +646,7 @@ describe('AutoApprovalEngine adversarial', () => {
       policies: [allow('write_file')],
     });
     const result = engine.check({ name: 'write_file', args: {}, id: 'tc-1' });
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     expect(result.reason).toContain('Approved by policy');
   });
 
@@ -689,14 +689,14 @@ describe('AutoApprovalEngine adversarial', () => {
       args: { command: 'git status' },
       id: 'tc-1',
     });
-    expect(safeResult.approved).toBe(true);
+    expect(safeResult.isApproved).toBe(true);
 
     const dangerousResult = engine.check({
       name: 'execute_shell',
       args: { command: 'rm -rf /' },
       id: 'tc-2',
     });
-    expect(dangerousResult.approved).toBe(false);
+    expect(dangerousResult.isApproved).toBe(false);
   });
 });
 
@@ -727,11 +727,11 @@ describe('ApprovalRegistry adversarial', () => {
     });
 
     const entry = pendingApprovals.get('conv-1')! as PendingToolApprovalEntry;
-    entry.resolve({ approved: true });
-    entry.resolve({ approved: false }); // Double resolve
+    entry.resolve({ isApproved: true });
+    entry.resolve({ isApproved: false }); // Double resolve
 
     const result = await approvalPromise;
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
     // The promise resolved with the first value; second is ignored by Promise semantics
     expect(resolveCount).toBe(2); // Both calls execute but only first matters
   });
@@ -742,7 +742,7 @@ describe('ApprovalRegistry adversarial', () => {
   });
 
   it('should handle concurrent approvals for different conversations', () => {
-    const results: Array<{ conversationId: string; approved: boolean }> = [];
+    const results: Array<{ conversationId: string; isApproved: boolean }> = [];
 
     pendingApprovals.set('conv-a', {
       resolve: (value: ApprovalResolution) => results.push({ conversationId: 'conv-a', ...value }),
@@ -761,8 +761,8 @@ describe('ApprovalRegistry adversarial', () => {
     // Resolve in reverse order
     const entryB = pendingApprovals.get('conv-b')! as PendingToolApprovalEntry;
     const entryA = pendingApprovals.get('conv-a')! as PendingToolApprovalEntry;
-    entryB.resolve({ approved: false });
-    entryA.resolve({ approved: true });
+    entryB.resolve({ isApproved: false });
+    entryA.resolve({ isApproved: true });
 
     expect(results.length).toBe(2);
     expect(results[0].conversationId).toBe('conv-b');

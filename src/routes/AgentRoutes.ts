@@ -23,6 +23,8 @@ router.post(
   "/approve",
   asyncHandler(async (req: Request, res: Response) => {
     const { conversationId, approved, approveAll } = req.body;
+    const isApproved = approved !== false;
+    const shouldApproveAll = approveAll === true;
 
     if (!conversationId) {
       return res.status(400).json({ error: "Missing conversationId" });
@@ -30,8 +32,8 @@ router.post(
 
     const resolved = AgenticLoopService.resolveApproval(
       conversationId,
-      approved !== false,
-      { approveAll: approveAll === true },
+      isApproved,
+      { shouldApproveAll },
     );
 
     if (!resolved) {
@@ -42,10 +44,10 @@ router.post(
     }
 
     logger.info(
-      `[agent/approve] ${approved !== false ? "Approved" : "Rejected"}${approveAll ? " (all future)" : ""} for conversation ${conversationId}`,
+      `[agent/approve] ${isApproved ? "Approved" : "Rejected"}${shouldApproveAll ? " (all future)" : ""} for conversation ${conversationId}`,
     );
 
-    res.json({ ok: true, approved: approved !== false });
+    res.json({ ok: true, approved: isApproved });
   }),
 );
 

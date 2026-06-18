@@ -37,7 +37,7 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
   default: {
     getDb: vi.fn().mockReturnValue({
       collection: vi.fn().mockReturnValue({
-        insertOne: (...args) => mockInsertOne(...args),
+        insertOne: (...parameters: unknown[]) => mockInsertOne(...parameters),
       }),
     }),
     getCollection: vi.fn().mockReturnValue(null),
@@ -209,8 +209,8 @@ describe("Background Token Accuracy", () => {
 
     it("falls back to heuristic when usage is not provided at all", async () => {
       // Simulates a legacy caller that doesn't pass usage
-      const { usage: _unused, ...argsWithoutUsage } = baseArgs;
-      await RequestLogger.logBackgroundLlmCall(argsWithoutUsage);
+      const { usage: _unused, ...parametersWithoutUsage } = baseArgs;
+      await RequestLogger.logBackgroundLlmCall(parametersWithoutUsage);
 
       expect(mockInsertOne).toHaveBeenCalledTimes(1);
       const doc = mockInsertOne.mock.calls[0][0];

@@ -155,7 +155,7 @@ export async function handleExitPlanMode(
   );
   if (exitResult) {
     exitResult.result = {
-      approved: true,
+      isApproved: true,
       message: `User has approved your plan. You can now start coding. Start with updating your todo list if applicable.\n\n${planText}`,
     };
   }

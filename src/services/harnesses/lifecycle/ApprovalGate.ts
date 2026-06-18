@@ -23,13 +23,13 @@ export async function checkAndWaitForApproval(
   toolCalls: ToolCall[],
   context: AgenticContext,
   approvalEngine: AutoApprovalEngine,
-): Promise<{ approved: boolean; approveAll: boolean }> {
+): Promise<{ isApproved: boolean; shouldApproveAll: boolean }> {
   const { conversationId, emit, options } = context;
 
   const { needsApproval } = approvalEngine.checkBatch(toolCalls);
 
   if (needsApproval.length === 0 || options.autoApprove) {
-    return { approved: true, approveAll: false };
+    return { isApproved: true, shouldApproveAll: false };
   }
 
   // Emit approval_required events for each tool needing approval
@@ -47,22 +47,14 @@ export async function checkAndWaitForApproval(
   }
 
   // Wait for user approval or timeout
-  const approvalResult = await new Promise<{
-    approved: boolean;
-    approveAll?: boolean;
-    reason?: string;
-  }>((resolve) => {
+  const approvalResult = await new Promise<import("../../ApprovalRegistry.ts").ApprovalResolution>((resolve) => {
     const timeoutId = setTimeout(() => {
       pendingApprovals.delete(conversationId);
-      resolve({ approved: false, reason: "timeout" });
+      resolve({ isApproved: false, reason: "timeout" });
     }, APPROVAL_TIMEOUT_MS);
 
     pendingApprovals.set(conversationId, {
-      resolve: (value: {
-        approved: boolean;
-        approveAll?: boolean;
-        reason?: string;
-      }) => {
+      resolve: (value: import("../../ApprovalRegistry.ts").ApprovalResolution) => {
         clearTimeout(timeoutId);
         pendingApprovals.delete(conversationId);
         resolve(value);
@@ -81,17 +73,17 @@ export async function checkAndWaitForApproval(
     });
   });
 
-  if (!approvalResult?.approved) {
+  if (!approvalResult?.isApproved) {
     emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: `Tool execution rejected: ${needsApproval.map((toolCall) => toolCall.name).join(", ")}`,
     });
-    return { approved: false, approveAll: false };
+    return { isApproved: false, shouldApproveAll: false };
   }
 
-  if (approvalResult.approveAll) {
-    return { approved: true, approveAll: true };
+  if (approvalResult.shouldApproveAll) {
+    return { isApproved: true, shouldApproveAll: true };
   }
 
-  return { approved: true, approveAll: false };
+  return { isApproved: true, shouldApproveAll: false };
 }

@@ -8,7 +8,7 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
  *   beforePrompt     — Fires before each LLM call. Listeners receive (ctx) and
  *                       can mutate ctx.messages (e.g. inject system prompt context).
  *   beforeToolCall   — Fires before each tool execution. Listeners receive
- *                       (toolCall, ctx) and can return { approved: false } to block.
+ *                       (toolCall, ctx) and can return { isApproved: false } to block.
  *   afterToolCall    — Fires after each tool returns. Listeners receive
  *                       (toolCall, result, ctx).
  *   afterResponse    — Fires when the loop exits with a final response.
@@ -18,7 +18,7 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
  * Hook Categories (inspired by Antigravity SDK):
  *   inspect    — Read-only, non-blocking. Errors are logged but never propagate.
  *                Ideal for telemetry, logging, and observability.
- *   decide     — Read-only, blocking. Returns { approved: boolean }.
+ *   decide     — Read-only, blocking. Returns { isApproved: boolean }.
  *                Short-circuits on first deny. For policy enforcement & guardrails.
  *   transform  — Modifying, blocking. Can mutate context/args and return control objects.
  *                Default category for backwards compatibility.
@@ -45,7 +45,7 @@ type HookEvent =
 /**
  * Hook category determines execution semantics.
  *   inspect   — fire-and-forget, non-blocking, errors swallowed
- *   decide    — blocking, returns {approved}, short-circuits on deny
+ *   decide    — blocking, returns {isApproved}, short-circuits on deny
  *   transform — blocking, can mutate context (default for backwards compat)
  */
 type HookCategory = "inspect" | "decide" | "transform";
@@ -92,7 +92,7 @@ export default class AgentHooks {
   /**
    * Run all registered hooks for an event with category-aware execution:
    *
-   *   1. decide hooks — run sequentially, short-circuit on { approved: false }
+   *   1. decide hooks — run sequentially, short-circuit on { isApproved: false }
    *   2. transform hooks — run sequentially, merge results
    *   3. inspect hooks — fire-and-forget (errors logged, never propagate)
    */
@@ -112,7 +112,7 @@ export default class AgentHooks {
         if (hookResult && typeof hookResult === "object") {
           result = { ...result, ...hookResult };
           // Short-circuit if any decide hook denies
-          if ("approved" in hookResult && (hookResult as { approved: boolean }).approved === false) {
+          if ("isApproved" in hookResult && (hookResult as { isApproved: boolean }).isApproved === false) {
             logger.info(`[AgentHooks] Decide hook "${name}" denied on "${event}"`);
             return result;
           }

@@ -132,19 +132,19 @@ export default class AgenticLoopService {
   /** Resolve a pending approval for a conversation. */
   static resolveApproval(
     conversationId: string,
-    approved: boolean,
-    { approveAll = false }: { approveAll?: boolean } = {},
+    isApproved: boolean,
+    { shouldApproveAll = false }: { shouldApproveAll?: boolean } = {},
   ): boolean {
     const entry = pendingApprovals.get(conversationId);
     if (!entry) return false;
 
     if (entry.type === "plan") {
-      entry.resolve(approved);
+      entry.resolve(isApproved);
     } else {
       entry.resolve({
-        approved,
-        approveAll,
-        reason: approved ? "user_approved" : "user_rejected",
+        isApproved,
+        shouldApproveAll,
+        reason: isApproved ? "user_approved" : "user_rejected",
       });
     }
     return true;
@@ -152,15 +152,15 @@ export default class AgenticLoopService {
 
   /** Check if a conversation has a pending approval. */
   static getPendingApproval(conversationId: string): {
-    pending: boolean;
+    isPending: boolean;
     type?: string;
     tools?: string[];
     toolCalls?: PendingToolCallSummary[];
   } {
     const entry = pendingApprovals.get(conversationId);
-    if (!entry) return { pending: false };
+    if (!entry) return { isPending: false };
     return {
-      pending: true,
+      isPending: true,
       type: entry.type,
       tools: entry.tools,
       toolCalls: entry.toolCalls,
@@ -173,7 +173,7 @@ export default class AgenticLoopService {
   static _setPendingQuestion(
     conversationId: string,
     entry: {
-      resolve: (value: { answers: QuestionAnswer[] | null; timedOut?: boolean }) => void;
+      resolve: (value: { answers: QuestionAnswer[] | null; isTimedOut?: boolean }) => void;
       question?: string;
       questions?: QuestionDefinition[];
       choices?: string[];
@@ -196,15 +196,15 @@ export default class AgenticLoopService {
 
   /** Check if a conversation has a pending question. */
   static getPendingQuestion(conversationId: string): {
-    pending: boolean;
+    isPending: boolean;
     question?: string;
     questions?: QuestionDefinition[];
     choices?: string[];
   } {
     const entry = pendingQuestions.get(conversationId);
-    if (!entry) return { pending: false };
+    if (!entry) return { isPending: false };
     return {
-      pending: true,
+      isPending: true,
       question: entry.question,
       questions: entry.questions,
       choices: entry.choices,

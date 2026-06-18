@@ -429,7 +429,7 @@ describe("ApprovalGate", () => {
       approvalEngine as any,
     );
 
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
   });
 
   it("should auto-approve when options.autoApprove is true", async () => {
@@ -458,7 +458,7 @@ describe("ApprovalGate", () => {
       approvalEngine as any,
     );
 
-    expect(result.approved).toBe(true);
+    expect(result.isApproved).toBe(true);
   });
 });
 
@@ -918,7 +918,7 @@ describe("CriticGate", () => {
     };
 
     const reviewResult = await criticGate.review(toolCall, mockContext);
-    expect(reviewResult.approved).toBe(true);
+    expect(reviewResult.isApproved).toBe(true);
     expect(reviewResult.reason).toBe("below_danger_tier");
     expect(reviewResult.criticModel).toBe("test-model"); // default to context.resolvedModel
     expect(mockProvider.generateTextStream).not.toHaveBeenCalled();
@@ -935,7 +935,7 @@ describe("CriticGate", () => {
     mockContext.options = { skipCritic: true };
 
     const reviewResult = await criticGate.review(toolCall, mockContext);
-    expect(reviewResult.approved).toBe(true);
+    expect(reviewResult.isApproved).toBe(true);
     expect(reviewResult.reason).toBe("critic_skipped");
     expect(mockProvider.generateTextStream).not.toHaveBeenCalled();
   });
@@ -955,7 +955,7 @@ describe("CriticGate", () => {
     mockProvider.generateTextStream.mockReturnValue(mockStream);
 
     const reviewResult = await criticGate.review(toolCall, mockContext);
-    expect(reviewResult.approved).toBe(true);
+    expect(reviewResult.isApproved).toBe(true);
     expect(reviewResult.reason).toBe("critic_approved");
     expect(reviewResult.criticModel).toBe("fast-critic-model");
 
@@ -981,7 +981,7 @@ describe("CriticGate", () => {
     mockProvider.generateTextStream.mockReturnValue(mockStream);
 
     const reviewResult = await criticGate.review(toolCall, mockContext);
-    expect(reviewResult.approved).toBe(false);
+    expect(reviewResult.isApproved).toBe(false);
     expect(reviewResult.reason).toBe("Contains destructive rm -rf command targeting critical directories.");
   });
 
@@ -1000,7 +1000,7 @@ describe("CriticGate", () => {
     mockProvider.generateTextStream.mockReturnValue(mockStream);
 
     const reviewResult = await criticGate.review(toolCall, mockContext);
-    expect(reviewResult.approved).toBe(true);
+    expect(reviewResult.isApproved).toBe(true);
     expect(reviewResult.reason).toBe("critic_parse_fallback");
   });
 
@@ -1018,7 +1018,7 @@ describe("CriticGate", () => {
     });
 
     const reviewResult = await criticGate.review(toolCall, mockContext);
-    expect(reviewResult.approved).toBe(true);
+    expect(reviewResult.isApproved).toBe(true);
     expect(reviewResult.reason).toBe("critic_error_fallback");
   });
 });
