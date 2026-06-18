@@ -42,7 +42,7 @@ describe("PlanningModeService.injectPlanningInstruction", () => {
     expect(messages).toHaveLength(3);
     expect(messages[0].role).toBe("system");
     expect(messages[1].role).toBe("user");
-    expect((messages[1] as Record<string, unknown>)._isPlanningInjection).toBe(true);
+    expect(messages[1]._isPlanningInjection).toBe(true);
     expect(messages[1].content).toContain("PLANNING MODE ACTIVE");
     expect(messages[2].role).toBe("user");
     expect(messages[2].content).toBe("Build me a web app.");
@@ -55,7 +55,7 @@ describe("PlanningModeService.injectPlanningInstruction", () => {
     PlanningModeService.injectPlanningInstruction(messages);
 
     const injectionCount = messages.filter(
-      (message) => (message as Record<string, unknown>)._isPlanningInjection === true,
+      (message) => message._isPlanningInjection === true,
     ).length;
     expect(injectionCount).toBe(1);
     expect(messages).toHaveLength(3);
@@ -70,7 +70,7 @@ describe("PlanningModeService.injectPlanningInstruction", () => {
 
     expect(messages).toHaveLength(2);
     expect(messages[0].role).toBe("user");
-    expect((messages[0] as Record<string, unknown>)._isPlanningInjection).toBe(true);
+    expect(messages[0]._isPlanningInjection).toBe(true);
     expect(messages[1].content).toBe("Hello");
   });
 
@@ -80,7 +80,7 @@ describe("PlanningModeService.injectPlanningInstruction", () => {
     PlanningModeService.injectPlanningInstruction(messages);
 
     expect(messages).toHaveLength(1);
-    expect((messages[0] as Record<string, unknown>)._isPlanningInjection).toBe(true);
+    expect(messages[0]._isPlanningInjection).toBe(true);
   });
 
   it("should not inject before the system message", () => {
@@ -105,7 +105,7 @@ describe("PlanningModeService.stripPlanningInstruction", () => {
 
     expect(messages).toHaveLength(2);
     const hasInjection = messages.some(
-      (message) => (message as Record<string, unknown>)._isPlanningInjection === true,
+      (message) => message._isPlanningInjection === true,
     );
     expect(hasInjection).toBe(false);
   });

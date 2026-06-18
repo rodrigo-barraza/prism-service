@@ -8,6 +8,19 @@ import { z } from "zod";
  * unsafe manual assertions and explicit 'any' parsing.
  */
 
+const DISALLOWED_IDENTIFIER_PATTERN = /[\x00]|\.\.\/|\.\.\\/;
+
+const sanitizedString = () =>
+  z
+    .string()
+    .transform((value) => value.replace(/\x00/g, ""))
+    .pipe(
+      z.string().refine(
+        (value) => !DISALLOWED_IDENTIFIER_PATTERN.test(value),
+        { message: "String contains disallowed characters (null bytes or path traversal)" },
+      ),
+    );
+
 export const ToolSchemaSchema = z.object({
   name: z.string(),
   description: z.string(),
@@ -48,18 +61,18 @@ export const ChatMessageSchema = z.object({
 
 export const ChatRequestSchema = z
   .object({
-    provider: z.string(),
+    provider: sanitizedString(),
     model: z.string().nullable().optional(),
     messages: z.array(ChatMessageSchema),
     conversationId: z.string().nullable().optional(),
-    agentSessionId: z.string().nullable().optional(),
+    agentSessionId: sanitizedString().nullable().optional(),
     conversationMeta: z.record(z.string(), z.unknown()).nullable().optional(),
     traceId: z.string().nullable().optional(),
     project: z.string().default("any"),
     username: z.string().default("any"),
     clientIp: z.string().nullable().optional().default(null),
     agent: z.string().nullable().optional().default(null),
-    harness: z.string().nullable().optional(),
+    harness: sanitizedString().nullable().optional(),
     topology: z.string().nullable().optional(),
     reasoningStrategy: z.string().nullable().optional(),
 

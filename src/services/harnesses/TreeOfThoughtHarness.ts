@@ -34,6 +34,9 @@ import { logKVCacheHitRate } from "./lifecycle/KVCacheReporter.ts";
 import { injectToolDiscoveryNudge } from "./lifecycle/ToolDiscoveryNudge.ts";
 import { finalizePassTracker } from "./lifecycle/TrackerFinalizer.ts";
 import { handleCodexPlanningResponse } from "./lifecycle/CodexPlanningDetector.ts";
+import { maybeInjectSystemReminder, cleanupReminderCache } from "./lifecycle/SystemReminderInjector.ts";
+import { checkCostBudget } from "./lifecycle/CostBudgetEnforcer.ts";
+import { createSandboxCheckpoint, restoreSandboxCheckpoint } from "./lifecycle/SandboxExecutor.ts";
 
 import PlanningModeService from "../PlanningModeService.ts";
 
@@ -282,6 +285,15 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
           branchCount: adaptiveBranchCount,
         });
 
+        // ── Instruction fade-out countermeasure ─────────────────
+        maybeInjectSystemReminder(
+          currentMessages,
+          state,
+          emit,
+          agentSessionId,
+          options.reminderInterval,
+        );
+
         const passOptions: IterationPassOptions = {
           ...options,
           project,
@@ -400,6 +412,11 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
 
         this.emitUsageUpdate();
 
+        // ── Cost budget enforcement ────────────────────────────
+        if (checkCostBudget(state, context.resolvedModel, options.maxCostDollars, emit)) {
+          break;
+        }
+
         // ── Tool execution from selected branch ─────────────────
         if (selectedPass.pendingToolCalls.length > 0) {
           // Snapshot messages BEFORE tool execution for checkpoint/restore
@@ -415,6 +432,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
             );
 
           let results: ToolResult[] = [];
+          let sandboxCheckpointReference: string | null = null;
           if (!isApproved) {
             results = selectedPass.pendingToolCalls.map((toolCall) => ({
               name: toolCall.name,
@@ -431,6 +449,11 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
             }
 
             context._currentMessages = currentMessages;
+
+            // ── Sandbox checkpoint (git-based rollback) ────────────
+            sandboxCheckpointReference = options.enableSandbox
+              ? createSandboxCheckpoint(workspaceRoot, emit)
+              : null;
 
             results = await executeToolBatch(
               selectedPass.pendingToolCalls,
@@ -501,6 +524,11 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
             if (shouldRestoreCheckpoint) {
               // Restore pre-execution message state (checkpoint/restore pattern)
               currentMessages = preExecutionSnapshot;
+
+              // Restore filesystem to pre-execution state alongside conversation
+              if (sandboxCheckpointReference) {
+                restoreSandboxCheckpoint(workspaceRoot, sandboxCheckpointReference, emit);
+              }
 
               emit({
                 type: SERVER_SENT_EVENT_TYPES.STATUS,
@@ -742,6 +770,7 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
           `strategy: ${searchStrategy}`,
       );
 
+      cleanupReminderCache(agentSessionId);
       await this.finalize(currentMessages, hooks);
       return { messages: currentMessages };
     } catch (loopError: unknown) {

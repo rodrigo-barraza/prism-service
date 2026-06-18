@@ -19,6 +19,7 @@
  * ═══════════════════════════════════════════════════════════════
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { PROVIDERS, TYPES } from "../../src/constants.ts";
 
 const PRISM_SERVICE_URL = "http://localhost:7777";
 const LM_STUDIO_URL = "http://localhost:1234";
@@ -53,11 +54,11 @@ async function findTargetModel() {
 
   // Fallback: any loaded conversational model
   const loaded = models.find(
-    (m) => m.loaded_instances?.length > 0 && m.type !== "embedding",
+    (m) => m.loaded_instances?.length > 0 && m.type !== TYPES.EMBEDDING,
   );
   if (loaded) return loaded.key || loaded.id;
 
-  const first = models.find((m) => m.type !== "embedding");
+  const first = models.find((m) => m.type !== TYPES.EMBEDDING);
   return first ? first.key || first.id : null;
 }
 
@@ -323,7 +324,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
   // the generation_progress SSE events consumed by SettingsPanel.
   it("single-turn agent emits generation_progress with valid tok/s", async () => {
     const result = await agentStream({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: [
         { role: "user", content: "Explain what a red-black tree is in 2-3 sentences." },
@@ -380,7 +381,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
   // and emit generation_progress events even during tool argument generation.
   it("tool-calling agent emits generation_progress across multiple iterations", async () => {
     const result = await agentStream({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: [
         { role: "user", content: "What files are in /tmp? Use shell_execute to check, then list them." },
@@ -431,7 +432,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
     const COORDINATOR_TIMEOUT = 300_000; // 5 min — workers are sequential on local
 
     const result = await agentStream({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: [
         {
@@ -536,7 +537,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
   // the provider-reported usage at the end.
   it("outputTokens in generation_progress increases monotonically", async () => {
     const result = await agentStream({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: [
         { role: "user", content: "Write a short poem about the moon (4 lines)." },
@@ -585,7 +586,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
   // the separately-emitted generation_started TTFT.
   it("generation_progress includes inputTokens, totalTokens, and avgTtft", async () => {
     const result = await agentStream({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: [
         { role: "user", content: "What is the Fibonacci sequence? One paragraph." },

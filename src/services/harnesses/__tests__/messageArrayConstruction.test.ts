@@ -14,6 +14,7 @@ import type { ConversationMessage as BaseConversationMessage } from "../types.ts
 
 import { injectSystemPromptContext } from "../../system-prompt/index.ts";
 import { computeNewTurnMessages as computeNewTurnMessagesReal } from "../lifecycle/Finalizer.ts";
+import { PROMPT_DELIMITERS } from "../../../constants.ts";
 
 interface ConversationMessage extends BaseConversationMessage {
   rawContent?: string;
@@ -117,8 +118,8 @@ describe("Message Array Construction", () => {
 
     it("should place user message at index 3 with system context prepended", () => {
       expect(currentMessages[3].role).toBe("user");
-      expect(currentMessages[3].content).toContain("[System Context]");
-      expect(currentMessages[3].content).toContain("[User Message]");
+      expect(currentMessages[3].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(currentMessages[3].content).toContain(PROMPT_DELIMITERS.USER_MESSAGE);
       expect(currentMessages[3].content).toContain(
         "hey lupos, how are you feeling today?",
       );
@@ -215,7 +216,7 @@ describe("Message Array Construction", () => {
 
     it("should place user message at index 1 with system context prepended", () => {
       expect(currentMessages[1].role).toBe("user");
-      expect(currentMessages[1].content).toContain("[System Context]");
+      expect(currentMessages[1].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
       expect(currentMessages[1].rawContent).toBe(
         "What's the weather in Vancouver?",
       );
@@ -510,7 +511,7 @@ describe("Message Array Construction", () => {
         content: SOMATIC_STATE,
       });
       expect(currentMessages[5].role).toBe("user");
-      expect(currentMessages[5].content).toContain("[System Context]");
+      expect(currentMessages[5].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
       expect(currentMessages[5].content).toContain("draw me a wolf");
     });
 
@@ -683,7 +684,7 @@ describe("Message Array Construction", () => {
       // Inject a CONTEXT NOTE (used by exhaustion recovery, etc.)
       currentMessages.push({
         role: "user",
-        content: "[CONTEXT NOTE: Token budget exhausted, summarizing context]",
+        content: `${PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX} Token budget exhausted, summarizing context]`,
       });
       currentMessages.push({
         role: "assistant",
@@ -702,7 +703,7 @@ describe("Message Array Construction", () => {
         (message) =>
           message.role === "user" &&
           typeof message.content === "string" &&
-          message.content.startsWith("[CONTEXT NOTE:"),
+          message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX),
       );
       expect(contextNoteMessages).toHaveLength(0);
     });
@@ -802,10 +803,10 @@ describe("Message Array Construction", () => {
         (message) => message.role === "user",
       )!;
 
-      expect(userMessage.content).toContain("[System Context]");
-      expect(userMessage.content).toContain("[Project Skills]");
-      expect(userMessage.content).toContain("[Agent Memory]");
-      expect(userMessage.content).toContain("[User Message]");
+      expect(userMessage.content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(userMessage.content).toContain(PROMPT_DELIMITERS.PROJECT_SKILLS);
+      expect(userMessage.content).toContain(PROMPT_DELIMITERS.AGENT_MEMORY);
+      expect(userMessage.content).toContain(PROMPT_DELIMITERS.USER_MESSAGE);
       expect(userMessage.content).toContain("deploy the project");
       expect(userMessage.rawContent).toBe("deploy the project");
     });
@@ -1466,7 +1467,7 @@ describe("Message Array Construction", () => {
       currentMessages.push({
         role: "user",
         content:
-          "[Conversation Summary] Previous 15 messages summarized: User asked about...",
+          `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}] Previous 15 messages summarized: User asked about...`,
         isCompactSummary: true,
       });
 
@@ -1486,7 +1487,7 @@ describe("Message Array Construction", () => {
       // Simulate Finalizer sanitization
       const sanitizedMessages = newTurnMessages.filter((message) => {
         if (message.role === "user" && typeof message.content === "string") {
-          if (message.content.startsWith("[Conversation Summary")) return false;
+          if (message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY)) return false;
           if (message.isCompactSummary === true) return false;
         }
         return true;
@@ -1497,7 +1498,7 @@ describe("Message Array Construction", () => {
       const compactionMessages = sanitizedMessages.filter(
         (message) =>
           typeof message.content === "string" &&
-          message.content.startsWith("[Conversation Summary"),
+          message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY),
       );
       expect(compactionMessages).toHaveLength(0);
     });
@@ -2062,7 +2063,7 @@ describe("Message Array Construction", () => {
       expect(newTurnMessages[2].content).toContain("current_emotion: inspired");
 
       // Verify user message has memories injected
-      expect(newTurnMessages[3].content).toContain("[Agent Memory]");
+      expect(newTurnMessages[3].content).toContain(PROMPT_DELIMITERS.AGENT_MEMORY);
       expect(newTurnMessages[3].content).toContain("epic fantasy art");
       expect(newTurnMessages[3].rawContent).toBe(
         "draw me as a wolf warrior and say something epic",
@@ -2160,14 +2161,14 @@ describe("Message Array Construction", () => {
       const userMessageBeforeSwap = newTurnMessages.find(
         (message) => message.role === "user",
       )!;
-      expect(userMessageBeforeSwap.content).toContain("[System Context]");
+      expect(userMessageBeforeSwap.content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
       expect(userMessageBeforeSwap.rawContent).toBe("what time is it?");
 
       // After swap: content has clean text, rawContent has [System Context]
       const cloned = { ...userMessageBeforeSwap };
       swapMessageContent(cloned);
       expect(cloned.content).toBe("what time is it?");
-      expect(cloned.rawContent).toContain("[System Context]");
+      expect(cloned.rawContent).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
     });
 
     it("should no-op on already-swapped messages (rawContent starts with [System Context])", () => {
@@ -2183,7 +2184,7 @@ describe("Message Array Construction", () => {
 
       // Should remain unchanged (the guard at the top prevents double-swap)
       expect(cloned.content).toBe("what time is it?");
-      expect(cloned.rawContent).toContain("[System Context]");
+      expect(cloned.rawContent).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
     });
 
     it("should handle legacy messages without rawContent by parsing [System Context] block", () => {
@@ -2196,7 +2197,7 @@ describe("Message Array Construction", () => {
       swapMessageContent(legacyMessage);
 
       expect(legacyMessage.content).toBe("legacy question here");
-      expect(legacyMessage.rawContent).toContain("[System Context]");
+      expect(legacyMessage.rawContent).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
     });
   });
 
@@ -3470,7 +3471,7 @@ describe("Message Array Construction", () => {
 
     it("should place user message last with system context prepended", () => {
       expect(currentMessages[2].role).toBe("user");
-      expect(currentMessages[2].content).toContain("[System Context]");
+      expect(currentMessages[2].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
       expect(currentMessages[2].rawContent).toBe("hey lupos, what's up?");
     });
 

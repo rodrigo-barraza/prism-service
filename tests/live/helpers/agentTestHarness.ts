@@ -13,6 +13,8 @@
 
 // ── Constants ───────────────────────────────────────────────────
 
+import { PROVIDERS, TYPES } from "../../../src/constants.ts";
+
 export const PRISM_SERVICE_URL = process.env.PRISM_TEST_URL || "https://api.prism.rod.dev";
 export const LM_STUDIO_URL = process.env.LM_STUDIO_TEST_URL || "https://api.prism.rod.dev/lm-studio";
 export const OLLAMA_URL = process.env.OLLAMA_TEST_URL || "https://api.prism.rod.dev/ollama";
@@ -435,7 +437,7 @@ const TOOL_CALLING_SKIP_PATTERNS = [
  */
 async function discoverLmStudioModels(): Promise<ProviderTarget[]> {
   const targets: ProviderTarget[] = [];
-  const instanceIds = ["lm-studio", "lm-studio-2", "lm-studio-3", "lm-studio-4"];
+  const instanceIds = [PROVIDERS.LM_STUDIO, "lm-studio-2", "lm-studio-3", "lm-studio-4"];
 
   for (const instanceId of instanceIds) {
     try {
@@ -455,7 +457,7 @@ async function discoverLmStudioModels(): Promise<ProviderTarget[]> {
       const loadedModels = models.filter(
          (model) => {
            const loadedInstances = model.loaded_instances;
-           return Array.isArray(loadedInstances) && loadedInstances.length > 0 && model.type !== "embedding";
+           return Array.isArray(loadedInstances) && loadedInstances.length > 0 && model.type !== TYPES.EMBEDDING;
          }
       );
 
@@ -501,7 +503,7 @@ async function discoverOllamaModels(): Promise<ProviderTarget[]> {
 
     return [
       {
-        providerName: "ollama",
+        providerName: PROVIDERS.OLLAMA,
         model: conversationalModel.name,
         isLocal: true,
         supportsThinking: THINKING_MODEL_PATTERNS.some((pattern) =>
@@ -529,7 +531,7 @@ function discoverCloudProviders(): ProviderTarget[] {
 
   if (process.env.OPENAI_API_KEY) {
     targets.push({
-      providerName: "openai",
+      providerName: PROVIDERS.OPENAI,
       model: "gpt-4.1-mini",
       isLocal: false,
       supportsThinking: false,
@@ -540,7 +542,7 @@ function discoverCloudProviders(): ProviderTarget[] {
 
   if (process.env.ANTHROPIC_API_KEY) {
     targets.push({
-      providerName: "anthropic",
+      providerName: PROVIDERS.ANTHROPIC,
       model: "claude-sonnet-4-20250514",
       isLocal: false,
       supportsThinking: true,
@@ -551,7 +553,7 @@ function discoverCloudProviders(): ProviderTarget[] {
 
   if (process.env.GOOGLE_API_KEY) {
     targets.push({
-      providerName: "google",
+      providerName: PROVIDERS.GOOGLE,
       model: "gemini-2.5-flash",
       isLocal: false,
       supportsThinking: true,
@@ -876,3 +878,29 @@ export function logProviderSummary(targets: ProviderTarget[]): void {
   console.log("  ╚═══════════════════════════════════════════════════════╝\n");
 }
 
+// ── Model Discovery Helpers ─────────────────────────────────────────
+
+/**
+ * Filter loaded conversational models from an LM Studio model list.
+ * Excludes embedding models and models without active loaded instances.
+ */
+export function filterLoadedConversationalModels(
+  models: TransformedLmStudioModel[],
+): TransformedLmStudioModel[] {
+  return models.filter(
+    (model) =>
+      Array.isArray(model.loaded_instances) &&
+      model.loaded_instances.length > 0 &&
+      model.type !== TYPES.EMBEDDING,
+  );
+}
+
+/**
+ * Find the first loaded conversational model from an LM Studio model list.
+ * Returns undefined if no suitable model is found.
+ */
+export function findFirstConversationalModel(
+  models: TransformedLmStudioModel[],
+): TransformedLmStudioModel | undefined {
+  return filterLoadedConversationalModels(models)[0];
+}

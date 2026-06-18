@@ -15,6 +15,7 @@
  * Run:  npx vitest run tests/live/tokenAccuracyLive.test.js --config vitest.live.config.js
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { PROVIDERS, TYPES } from "../../src/constants.ts";
 
 const PRISM_SERVICE_URL = "http://localhost:7777";
 const LM_STUDIO_URL = "http://localhost:1234";
@@ -38,10 +39,10 @@ async function findTargetModel() {
     if (match) return match.key || match.id;
   }
   const loaded = models.find(
-    (m) => m.loaded_instances?.length > 0 && m.type !== "embedding",
+    (m) => m.loaded_instances?.length > 0 && m.type !== TYPES.EMBEDDING,
   );
   if (loaded) return loaded.key || loaded.id;
-  const first = models.find((m) => m.type !== "embedding");
+  const first = models.find((m) => m.type !== TYPES.EMBEDDING);
   return first ? first.key || first.id : null;
 }
 
@@ -65,7 +66,7 @@ async function streamAndCollect(prompt, { maxTokens = 500, timeout = 120000, can
       "x-username": "test-runner",
     },
     body: JSON.stringify({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: targetModel,
       messages: [{ role: "user", content: prompt }],
       agent: "CODING",
