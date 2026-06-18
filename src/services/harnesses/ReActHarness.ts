@@ -241,34 +241,51 @@ export default class ReActHarness extends BaseAgenticHarness {
           resolvedPassTools.map((tool: ToolSchema) => tool.name),
         );
 
-        // ── Micro-compaction (free observation masking) ──────────
-        // Before checking if LLM-powered compaction is needed, run the
-        // zero-cost micro-compaction pass that clears old tool results.
-        // If this frees enough tokens, we skip the expensive LLM call.
-        // Based on "The Complexity Trap" (arXiv 2025): simple observation
-        // masking is as efficient as LLM summarization for context mgmt.
-        const microCompactionResult =
-          MicroCompactionService.microcompactMessages(
-            currentMessages as ChatMessage[],
-          );
-        if (microCompactionResult.clearedResultCount > 0) {
-          currentMessages =
-            microCompactionResult.messages as ConversationMessage[];
-        }
-
-        // ── Auto-compaction trigger ─────────────────────────────
-        // After micro-compaction, check if we still need LLM-powered
-        // compaction. This produces an intelligent summary instead of
-        // just dropping messages. Modeled after Claude Code's autoCompact.ts.
+        // ── Context pressure estimation ──────────────────────────
         const contextWindowSize =
           context.modelDefinition?.maxInputTokens || 128_000;
         const maxOutputTokens = options.maxTokens || 8192;
-        const preEnforceTokenEstimate = ContextWindowManager.estimateTokens(
+        const availableInputBudget = contextWindowSize - maxOutputTokens;
+        let currentTokenEstimate = ContextWindowManager.estimateTokens(
           currentMessages as ChatMessage[],
         );
+        const contextPressureRatio =
+          availableInputBudget > 0
+            ? currentTokenEstimate / availableInputBudget
+            : 0;
 
+        // ── Micro-compaction (gated by context pressure) ────────
+        // Only run micro-compaction when context usage exceeds 70%
+        // of the available input budget. Running it unconditionally
+        // on every iteration mutates tool results in the middle of
+        // the prompt prefix, invalidating the LLM's KV cache and
+        // forcing a full re-prefill of all tokens on iteration 2+.
+        // Gating preserves the append-only prefix property that KV
+        // caching requires while still freeing tokens when needed.
+        if (contextPressureRatio > 0.7) {
+          const microCompactionResult =
+            MicroCompactionService.microcompactMessages(
+              currentMessages as ChatMessage[],
+            );
+          if (microCompactionResult.clearedResultCount > 0) {
+            currentMessages =
+              microCompactionResult.messages as ConversationMessage[];
+            currentTokenEstimate = ContextWindowManager.estimateTokens(
+              currentMessages as ChatMessage[],
+            );
+            logger.info(
+              `[ReActHarness] Micro-compaction at ${(contextPressureRatio * 100).toFixed(0)}% context pressure — ` +
+                `freed ~${microCompactionResult.freedTokens} tokens`,
+            );
+          }
+        }
+
+        // ── Auto-compaction trigger ─────────────────────────────
+        // After potential micro-compaction, check if LLM-powered
+        // compaction is also needed. This produces an intelligent
+        // summary instead of just dropping messages.
         const autoCompactEvaluation = AutoCompactionTrigger.evaluate(
-          preEnforceTokenEstimate,
+          currentTokenEstimate,
           contextWindowSize,
           maxOutputTokens,
           currentMessages.length,
@@ -355,6 +372,22 @@ export default class ReActHarness extends BaseAgenticHarness {
             inputTokens: finalInputTokens,
           });
         }
+
+        // ── KV cache hit rate logging ──────────────────────────
+        const cachedInputTokens = pass.usage.cacheReadInputTokens || 0;
+        const totalPromptTokens = finalInputTokens + cachedInputTokens;
+        if (state.iterations > 1 || cachedInputTokens > 0) {
+          const cacheHitPercentage =
+            totalPromptTokens > 0
+              ? ((cachedInputTokens / totalPromptTokens) * 100).toFixed(1)
+              : "0.0";
+          logger.info(
+            `[ReActHarness] Iteration ${state.iterations} KV cache: ` +
+              `input=${finalInputTokens}, cached=${cachedInputTokens}, ` +
+              `total=${totalPromptTokens}, hit=${cacheHitPercentage}%`,
+          );
+        }
+
         this.emitGenerationProgress();
         SessionGenerationTracker.complete(passRequestId);
 
