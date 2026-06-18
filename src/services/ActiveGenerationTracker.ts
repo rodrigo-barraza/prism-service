@@ -4,7 +4,12 @@ let activeCount = 0;
 
 const ActiveGenerationTracker = {
   /** Increment the active generation counter. */
-  increment(metadata?: { agent?: string | null; model?: string | null; provider?: string | null; conversationId?: string | null }) {
+  increment(metadata?: {
+    agent?: string | null;
+    model?: string | null;
+    provider?: string | null;
+    conversationId?: string | null;
+  }) {
     activeCount++;
     WebhookEventBus.emit("generation.started", {
       activeCount,
@@ -27,4 +32,3 @@ const ActiveGenerationTracker = {
 };
 
 export default ActiveGenerationTracker;
-

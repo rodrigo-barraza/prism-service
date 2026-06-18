@@ -14,10 +14,20 @@ import FileService from "../FileService.ts";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
 import { COLLECTIONS, FILE_CATEGORIES } from "../../constants.ts";
-import { finalizeTextGeneration, type FinalizerContext, computeNewTurnMessages } from "./lifecycle/Finalizer.ts";
+import {
+  finalizeTextGeneration,
+  type FinalizerContext,
+  computeNewTurnMessages,
+} from "./lifecycle/Finalizer.ts";
 import logger from "../../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+  TOOL_NAMES,
+  CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST,
+  CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import ToolContext from "../ToolContext.ts";
 import InternalToolRegistry from "../local-tools/InternalToolRegistry.ts";
@@ -99,8 +109,12 @@ export default class BaseAgenticHarness {
   //  DYNAMIC TOOL SET MUTATION
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  private static readonly CORE_AGENTIC_SET = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
-  private static readonly CORE_ORCHESTRATOR_SET = new Set<string>(CORE_ORCHESTRATOR_TOOLS_LIST);
+  private static readonly CORE_AGENTIC_SET = new Set<string>(
+    CORE_AGENTIC_TOOLS_LIST,
+  );
+  private static readonly CORE_ORCHESTRATOR_SET = new Set<string>(
+    CORE_ORCHESTRATOR_TOOLS_LIST,
+  );
 
   private static readonly toolDocFormatter = new ToolDocFormatter();
 
@@ -116,30 +130,35 @@ export default class BaseAgenticHarness {
    *
    * Returns true if the tool set was mutated.
    */
-  protected checkAndApplyToolSetChanges(currentMessages?: ConversationMessage[]): boolean {
+  protected checkAndApplyToolSetChanges(
+    currentMessages?: ConversationMessage[],
+  ): boolean {
     const sessionId = this.context.agentSessionId;
     const toolContextStore = ToolContext.getStore(sessionId);
     if (!toolContextStore.get("toolSetDirty")) return false;
 
     toolContextStore.delete("toolSetDirty");
 
-    const dynamicEnabledArray = toolContextStore.get("dynamicEnabledTools") as string[] | null;
+    const dynamicEnabledArray = toolContextStore.get("dynamicEnabledTools") as
+      | string[]
+      | null;
     if (!Array.isArray(dynamicEnabledArray)) return false;
 
     const dynamicEnabledSet = new Set(dynamicEnabledArray);
 
     const previousToolNames = new Set(
-      (this.tools.finalTools as Array<{ name: string }>).map((tool) => tool.name),
+      (this.tools.finalTools as Array<{ name: string }>).map(
+        (tool) => tool.name,
+      ),
     );
 
     const allSchemas = [
       ...ToolOrchestratorService.getToolSchemas(),
-      ...ToolOrchestratorService.getMCPToolSchemas().map(
-        (mcpTool) => {
-          const { _mcpServer, _mcpOriginalName, ...schema } = mcpTool as unknown as Record<string, unknown>;
-          return schema as { name: string; [key: string]: unknown };
-        },
-      ),
+      ...ToolOrchestratorService.getMCPToolSchemas().map((mcpTool) => {
+        const { _mcpServer, _mcpOriginalName, ...schema } =
+          mcpTool as unknown as Record<string, unknown>;
+        return schema as { name: string; [key: string]: unknown };
+      }),
     ] as Array<{ name: string; [key: string]: unknown }>;
 
     const isSubAgent = !!this.context.parentAgentSessionId;
@@ -148,7 +167,8 @@ export default class BaseAgenticHarness {
         dynamicEnabledSet.has(tool.name) ||
         tool.name.startsWith("mcp__") ||
         BaseAgenticHarness.CORE_AGENTIC_SET.has(tool.name) ||
-        (!isSubAgent && BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name)) ||
+        (!isSubAgent &&
+          BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name)) ||
         InternalToolRegistry.has(tool.name),
     ) as unknown as ResolvedTools["finalTools"];
 
@@ -165,7 +185,12 @@ export default class BaseAgenticHarness {
     });
 
     // Compute newly added tools and inject documentation addendum
-    const newlyAddedToolSchemas = (filteredTools as unknown as Array<{ name: string; [key: string]: unknown }>).filter(
+    const newlyAddedToolSchemas = (
+      filteredTools as unknown as Array<{
+        name: string;
+        [key: string]: unknown;
+      }>
+    ).filter(
       (tool) =>
         !previousToolNames.has(tool.name) &&
         !BaseAgenticHarness.CORE_AGENTIC_SET.has(tool.name) &&
@@ -174,15 +199,18 @@ export default class BaseAgenticHarness {
     );
 
     if (currentMessages && newlyAddedToolSchemas.length > 0) {
-      const addendumDocumentation = BaseAgenticHarness.toolDocFormatter.buildToolDescriptions(
-        newlyAddedToolSchemas.map((tool) => tool.name),
-        undefined,
-        undefined,
-        newlyAddedToolSchemas.map((tool) => tool.name),
-      );
+      const addendumDocumentation =
+        BaseAgenticHarness.toolDocFormatter.buildToolDescriptions(
+          newlyAddedToolSchemas.map((tool) => tool.name),
+          undefined,
+          undefined,
+          newlyAddedToolSchemas.map((tool) => tool.name),
+        );
 
       if (addendumDocumentation) {
-        const toolNamesList = newlyAddedToolSchemas.map((tool) => tool.name).join(", ");
+        const toolNamesList = newlyAddedToolSchemas
+          .map((tool) => tool.name)
+          .join(", ");
         currentMessages.push({
           role: "system",
           content:
@@ -273,7 +301,9 @@ export default class BaseAgenticHarness {
     const { emit } = this.context;
     const state = this.state;
     const usage = { ...state.overallUsage, requests: state.iterations };
-    const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[this.context.resolvedModel];
+    const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[
+      this.context.resolvedModel
+    ];
     const estimatedCost = calculateTextCost(usage, pricing);
 
     emit({
@@ -292,11 +322,14 @@ export default class BaseAgenticHarness {
   ): ConversationMessage[] {
     const { modelDefinition, options, emit } = this.context;
     const preEnforceCount = messages.length;
-    const contextResult = ContextWindowManager.enforce(messages as ChatMessage[], {
-      maxInputTokens: modelDefinition?.maxInputTokens || 128_000,
-      maxOutputTokens: options.maxTokens || 8192,
-      toolCount,
-    });
+    const contextResult = ContextWindowManager.enforce(
+      messages as ChatMessage[],
+      {
+        maxInputTokens: modelDefinition?.maxInputTokens || 128_000,
+        maxOutputTokens: options.maxTokens || 8192,
+        toolCount,
+      },
+    );
     if (contextResult.truncated) {
       emit({
         type: SERVER_SENT_EVENT_TYPES.STATUS,
@@ -331,9 +364,12 @@ export default class BaseAgenticHarness {
     passOptions: AgenticOptions,
   ): AsyncIterable<unknown> {
     const { provider, resolvedModel, modelDefinition, signal } = this.context;
-    const expandedMessages = expandMessagesForFunctionCall(messages as ChatMessage[], {
-      filterDeleted: false,
-    });
+    const expandedMessages = expandMessagesForFunctionCall(
+      messages as ChatMessage[],
+      {
+        filterDeleted: false,
+      },
+    );
     return modelDefinition?.liveAPI && provider.generateTextStreamLive
       ? provider.generateTextStreamLive(expandedMessages, resolvedModel, {
           ...passOptions,
@@ -357,10 +393,15 @@ export default class BaseAgenticHarness {
     allowedToolNames: Set<string>,
   ): Promise<void> {
     for await (const chunk of stream) {
-      const result = await this.processStreamChunk(chunk, pass, allowedToolNames);
+      const result = await this.processStreamChunk(
+        chunk,
+        pass,
+        allowedToolNames,
+      );
       if (result.action === "break") {
         const returnable = stream as AsyncGenerator<unknown>;
-        if (typeof returnable.return === "function") returnable.return(undefined);
+        if (typeof returnable.return === "function")
+          returnable.return(undefined);
         break;
       }
     }
@@ -370,8 +411,12 @@ export default class BaseAgenticHarness {
 
   /** Register a request with SessionGenerationTracker. */
   registerTrackerRequest(passRequestId: string): void {
-    const { providerName, resolvedModel, parentAgentSessionId, agentSessionId } =
-      this.context;
+    const {
+      providerName,
+      resolvedModel,
+      parentAgentSessionId,
+      agentSessionId,
+    } = this.context;
     SessionGenerationTracker.register(this.trackerSessionId, passRequestId, {
       provider: providerName,
       model: resolvedModel,
@@ -427,7 +472,7 @@ export default class BaseAgenticHarness {
 
     // ── Stop reason (truncation detection) ───────────────
     if (streamChunk?.type === "stopReason") {
-      pass.stopReason = streamChunk.stopReason as string || undefined;
+      pass.stopReason = (streamChunk.stopReason as string) || undefined;
       return { action: "continue" };
     }
 
@@ -477,7 +522,11 @@ export default class BaseAgenticHarness {
       this._recordTiming(pass);
       emit({
         type: SERVER_SENT_EVENT_TYPES.TOOL_EXECUTION,
-        tool: { name: streamChunk.name || "", args: {}, id: streamChunk.id || "" },
+        tool: {
+          name: streamChunk.name || "",
+          args: {},
+          id: streamChunk.id || "",
+        },
         status: "streaming",
       });
       this.maybeEmitProgress();
@@ -514,7 +563,8 @@ export default class BaseAgenticHarness {
       // Native MCP tool calls: pass through directly
       if (streamChunk.native) {
         const toolName = streamChunk.name || "";
-        const toolCallId = streamChunk.id || `ntc-${state.streamedToolCalls.length}`;
+        const toolCallId =
+          streamChunk.id || `ntc-${state.streamedToolCalls.length}`;
 
         if (streamChunk.status === "calling") {
           state.streamedToolCalls.push({
@@ -539,7 +589,10 @@ export default class BaseAgenticHarness {
             model: this.context.resolvedModel,
             iteration: this.state.iterations,
           });
-        } else if (streamChunk.status === "done" || streamChunk.status === "error") {
+        } else if (
+          streamChunk.status === "done" ||
+          streamChunk.status === "error"
+        ) {
           const existing = state.streamedToolCalls.find(
             (toolCall) =>
               (streamChunk.id && toolCall.id === streamChunk.id) ||
@@ -589,7 +642,8 @@ export default class BaseAgenticHarness {
         return { action: "skip" };
       }
 
-      const standardToolCallId = streamChunk.id || `toolCall-${state.streamedToolCalls.length}`;
+      const standardToolCallId =
+        streamChunk.id || `toolCall-${state.streamedToolCalls.length}`;
       const toolCall: ToolCall = {
         id: standardToolCallId,
         responsesItemId: streamChunk.responsesItemId || undefined,
@@ -603,7 +657,11 @@ export default class BaseAgenticHarness {
       this._trackToolDisplaySegment(standardToolCallId);
       emit({
         type: SERVER_SENT_EVENT_TYPES.TOOL_EXECUTION,
-        tool: { name: toolName, args: streamChunk.args || {}, id: standardToolCallId },
+        tool: {
+          name: toolName,
+          args: streamChunk.args || {},
+          id: standardToolCallId,
+        },
         status: "calling",
       });
       WebhookEventBus.emit("request.tool_call.started", {
@@ -651,7 +709,11 @@ export default class BaseAgenticHarness {
       return { action: "continue" };
     }
     if (streamChunk?.type === "audio") {
-      emit({ type: SERVER_SENT_EVENT_TYPES.AUDIO, data: streamChunk.data, mimeType: streamChunk.mimeType });
+      emit({
+        type: SERVER_SENT_EVENT_TYPES.AUDIO,
+        data: streamChunk.data,
+        mimeType: streamChunk.mimeType,
+      });
       if (streamChunk.data) state.streamedAudioChunks.push(streamChunk.data);
       if (streamChunk.mimeType) {
         const rateMatch = streamChunk.mimeType.match(/rate=(\d+)/);
@@ -674,7 +736,9 @@ export default class BaseAgenticHarness {
     pass.streamedText += rawChunkString;
     // Strip tool call XML markup leaked by some local models
     const cleanedPassText = stripToolCallMarkup(pass.streamedText);
-    const chunkString = cleanedPassText.slice((pass.finalStreamedText || "").length);
+    const chunkString = cleanedPassText.slice(
+      (pass.finalStreamedText || "").length,
+    );
     pass.finalStreamedText = cleanedPassText;
     state.finalStreamedText = cleanedPassText;
     if (state.planModeActive) state.planModeText += chunkString;
@@ -808,6 +872,11 @@ export default class BaseAgenticHarness {
   ): Promise<void> {
     const context = this.context;
     const state = this.state;
+
+    if (context.signal?.aborted) {
+      state.sessionOutcome = "aborted";
+    }
+
     const { agentSessionId, conversationId, project, username } = context;
     const requestStart = context.requestStart ?? performance.now();
 
@@ -864,7 +933,9 @@ export default class BaseAgenticHarness {
 
     // Persist sub-agent snapshots for orchestrator sessions
     if (
-      state.streamedToolCalls.some((toolCall) => toolCall.name === TOOL_NAMES.CREATE_TEAM) &&
+      state.streamedToolCalls.some(
+        (toolCall) => toolCall.name === TOOL_NAMES.CREATE_TEAM,
+      ) &&
       conversationId
     ) {
       try {
@@ -905,7 +976,9 @@ export default class BaseAgenticHarness {
           );
         }
       } catch (error: unknown) {
-        logger.error(`[AgenticLoop] Failed to persist sub-agents: ${errorMessage(error)}`);
+        logger.error(
+          `[AgenticLoop] Failed to persist sub-agents: ${errorMessage(error)}`,
+        );
       }
     }
 
@@ -929,7 +1002,9 @@ export default class BaseAgenticHarness {
     currentMessages.push({
       role: "assistant",
       content: state.finalStreamedText.trim(),
-      ...(state.streamedThinking.trim() && { thinking: state.streamedThinking.trim() }),
+      ...(state.streamedThinking.trim() && {
+        thinking: state.streamedThinking.trim(),
+      }),
       ...(state.streamedImages.length > 0 && { images: state.streamedImages }),
       ...(state.streamedToolCalls.length > 0 && {
         toolCalls: state.streamedToolCalls.map((toolCall) => ({
@@ -954,7 +1029,8 @@ export default class BaseAgenticHarness {
     if (!pass.firstTokenTime) {
       pass.firstTokenTime = performance.now();
       const ttftSec = (pass.firstTokenTime - pass.start) / 1000;
-      if (pass.requestId) SessionGenerationTracker.update(pass.requestId, { ttft: ttftSec });
+      if (pass.requestId)
+        SessionGenerationTracker.update(pass.requestId, { ttft: ttftSec });
       this.context.emit({
         type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.GENERATION_STARTED,

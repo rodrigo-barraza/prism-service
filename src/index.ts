@@ -21,13 +21,16 @@ import {
   MINIO_ACCESS_KEY,
   MINIO_SECRET_KEY,
   MINIO_BUCKET_NAME,
-  } from "../config.ts";
+} from "../config.ts";
 import MongoWrapper from "./wrappers/MongoWrapper.ts";
 import MinioWrapper from "./wrappers/MinioWrapper.ts";
 import ChangeStreamService from "./services/ChangeStreamService.ts";
 import MemoryConsolidationService from "./services/MemoryConsolidationService.ts";
 import BackgroundHousekeepingService from "./services/BackgroundHousekeepingService.ts";
-import { installShutdownHandlers, registerCleanup } from "./utils/CleanupRegistry.ts";
+import {
+  installShutdownHandlers,
+  registerCleanup,
+} from "./utils/CleanupRegistry.ts";
 
 // Install process-level shutdown handlers (SIGTERM, SIGINT → runCleanupFunctions)
 installShutdownHandlers();
@@ -204,10 +207,8 @@ setupWebSocket(wss);
 
 // Start
 (async () => {
-    await MongoWrapper.createClient(MONGO_DB_NAME, MONGO_URI as string);
+  await MongoWrapper.createClient(MONGO_DB_NAME, MONGO_URI as string);
   await MemoryService.ensureIndexes();
-
-
 
   // ── Ensure collection indexes ──────────────────────────────────
   // Critical for $lookup aggregation performance (conversations ↔ requests).
@@ -224,51 +225,83 @@ setupWebSocket(wss);
         db.collection(COLLECTIONS.REQUESTS).createIndex({ conversationId: 1 }),
         db.collection(COLLECTIONS.REQUESTS).createIndex({ traceId: 1 }),
         db.collection(COLLECTIONS.REQUESTS).createIndex({ timestamp: -1 }),
-        db.collection(COLLECTIONS.REQUESTS).createIndex({ project: 1, timestamp: -1 }),
+        db
+          .collection(COLLECTIONS.REQUESTS)
+          .createIndex({ project: 1, timestamp: -1 }),
         // requests — agent session joins (admin traces, session detail)
         db.collection(COLLECTIONS.REQUESTS).createIndex({ agentSessionId: 1 }),
         // requests — parent session hierarchy traversal (7+ query sites use $in on this field)
-        db.collection(COLLECTIONS.REQUESTS).createIndex({ parentAgentSessionId: 1 }),
+        db
+          .collection(COLLECTIONS.REQUESTS)
+          .createIndex({ parentAgentSessionId: 1 }),
         // requests — per-user stats aggregation
-        db.collection(COLLECTIONS.REQUESTS).createIndex({ username: 1, timestamp: -1 }),
+        db
+          .collection(COLLECTIONS.REQUESTS)
+          .createIndex({ username: 1, timestamp: -1 }),
         // requests — tool stats aggregation (multikey on array field)
         db.collection(COLLECTIONS.REQUESTS).createIndex({ toolApiNames: 1 }),
         // requests — model/provider breakdown aggregation
-        db.collection(COLLECTIONS.REQUESTS).createIndex({ model: 1, provider: 1 }),
+        db
+          .collection(COLLECTIONS.REQUESTS)
+          .createIndex({ model: 1, provider: 1 }),
         // requests — endpoint breakdown aggregation
         db.collection(COLLECTIONS.REQUESTS).createIndex({ endpoint: 1 }),
         // requests — success/failure filtering with time range
-        db.collection(COLLECTIONS.REQUESTS).createIndex({ success: 1, timestamp: -1 }),
+        db
+          .collection(COLLECTIONS.REQUESTS)
+          .createIndex({ success: 1, timestamp: -1 }),
         // conversations — used by findOne lookups and list queries
-        db.collection(COLLECTIONS.MODEL_CONVERSATIONS).createIndex({ id: 1 }, { unique: true }),
-        db.collection(COLLECTIONS.MODEL_CONVERSATIONS).createIndex({ updatedAt: -1 }),
+        db
+          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
+          .createIndex({ id: 1 }, { unique: true }),
+        db
+          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
+          .createIndex({ updatedAt: -1 }),
         db
           .collection(COLLECTIONS.MODEL_CONVERSATIONS)
           .createIndex({ project: 1, username: 1, updatedAt: -1 }),
-        db.collection(COLLECTIONS.MODEL_CONVERSATIONS).createIndex({ traceId: 1 }),
+        db
+          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
+          .createIndex({ traceId: 1 }),
         // conversations — admin workspace filter
-        db.collection(COLLECTIONS.MODEL_CONVERSATIONS).createIndex({ workspaceRoot: 1 }),
+        db
+          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
+          .createIndex({ workspaceRoot: 1 }),
         // conversations — stale isGenerating cleanup + stats count
-        db.collection(COLLECTIONS.MODEL_CONVERSATIONS).createIndex({ isGenerating: 1, updatedAt: -1 }),
+        db
+          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
+          .createIndex({ isGenerating: 1, updatedAt: -1 }),
 
         // agent_sessions — same indexes as conversations
         db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .createIndex({ id: 1 }, { unique: true }),
-        db.collection(COLLECTIONS.AGENT_CONVERSATIONS).createIndex({ updatedAt: -1 }),
+        db
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+          .createIndex({ updatedAt: -1 }),
         db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .createIndex({ project: 1, username: 1, updatedAt: -1 }),
         // agent_sessions — admin workspace filter
-        db.collection(COLLECTIONS.AGENT_CONVERSATIONS).createIndex({ workspaceRoot: 1 }),
+        db
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+          .createIndex({ workspaceRoot: 1 }),
         // agent_sessions — stale isGenerating cleanup + stats count
-        db.collection(COLLECTIONS.AGENT_CONVERSATIONS).createIndex({ isGenerating: 1, updatedAt: -1 }),
+        db
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+          .createIndex({ isGenerating: 1, updatedAt: -1 }),
 
         // workflows — used by conversationIds lookup
-        db.collection(COLLECTIONS.WORKFLOWS).createIndex({ id: 1 }, { unique: true }),
+        db
+          .collection(COLLECTIONS.WORKFLOWS)
+          .createIndex({ id: 1 }, { unique: true }),
         // benchmarks
-        db.collection(COLLECTIONS.BENCHMARKS).createIndex({ id: 1 }, { unique: true }),
-        db.collection(COLLECTIONS.BENCHMARKS).createIndex({ project: 1, updatedAt: -1 }),
+        db
+          .collection(COLLECTIONS.BENCHMARKS)
+          .createIndex({ id: 1 }, { unique: true }),
+        db
+          .collection(COLLECTIONS.BENCHMARKS)
+          .createIndex({ project: 1, updatedAt: -1 }),
         db
           .collection(COLLECTIONS.BENCHMARK_RUNS)
           .createIndex({ id: 1 }, { unique: true }),
@@ -276,35 +309,68 @@ setupWebSocket(wss);
           .collection(COLLECTIONS.BENCHMARK_RUNS)
           .createIndex({ benchmarkId: 1, project: 1, startedAt: -1 }),
         // synthesis
-        db.collection(COLLECTIONS.SYNTHESIS).createIndex({ id: 1 }, { unique: true }),
+        db
+          .collection(COLLECTIONS.SYNTHESIS)
+          .createIndex({ id: 1 }, { unique: true }),
         db
           .collection(COLLECTIONS.SYNTHESIS)
           .createIndex({ project: 1, username: 1, updatedAt: -1 }),
-        db.collection(COLLECTIONS.AGENT_SKILLS).createIndex({ project: 1, username: 1 }),
+        db
+          .collection(COLLECTIONS.AGENT_SKILLS)
+          .createIndex({ project: 1, username: 1 }),
         // agent_rules
-        db.collection(COLLECTIONS.AGENT_RULES).createIndex({ project: 1, username: 1, agent: 1 }),
+        db
+          .collection(COLLECTIONS.AGENT_RULES)
+          .createIndex({ project: 1, username: 1, agent: 1 }),
         // mcp_servers
-        db.collection(COLLECTIONS.MCP_SERVERS).createIndex({ project: 1, username: 1 }),
+        db
+          .collection(COLLECTIONS.MCP_SERVERS)
+          .createIndex({ project: 1, username: 1 }),
         // mcp_servers — compound for enabled filter (5+ query sites)
         db
           .collection(COLLECTIONS.MCP_SERVERS)
           .createIndex({ project: 1, username: 1, enabled: 1 }),
         // workspaces
-        db.collection(COLLECTIONS.WORKSPACES).createIndex({ project: 1, username: 1 }),
-        db.collection(COLLECTIONS.WORKSPACES).createIndex({ id: 1 }, { unique: true }),
+        db
+          .collection(COLLECTIONS.WORKSPACES)
+          .createIndex({ project: 1, username: 1 }),
+        db
+          .collection(COLLECTIONS.WORKSPACES)
+          .createIndex({ id: 1 }, { unique: true }),
         // prompts
-        db.collection(COLLECTIONS.PROMPTS).createIndex({ project: 1, username: 1, updatedAt: -1 }),
-        db.collection(COLLECTIONS.PROMPTS).createIndex({ id: 1 }, { unique: true }),
+        db
+          .collection(COLLECTIONS.PROMPTS)
+          .createIndex({ project: 1, username: 1, updatedAt: -1 }),
+        db
+          .collection(COLLECTIONS.PROMPTS)
+          .createIndex({ id: 1 }, { unique: true }),
         // webhook_subscriptions
-        db.collection(COLLECTIONS.WEBHOOK_SUBSCRIPTIONS).createIndex({ id: 1 }, { unique: true }),
-        db.collection(COLLECTIONS.WEBHOOK_SUBSCRIPTIONS).createIndex({ enabled: 1 }),
+        db
+          .collection(COLLECTIONS.WEBHOOK_SUBSCRIPTIONS)
+          .createIndex({ id: 1 }, { unique: true }),
+        db
+          .collection(COLLECTIONS.WEBHOOK_SUBSCRIPTIONS)
+          .createIndex({ enabled: 1 }),
         // somatic_state — unique per agent
-        db.collection(COLLECTIONS.SOMATIC_STATE).createIndex({ agentId: 1 }, { unique: true }),
+        db
+          .collection(COLLECTIONS.SOMATIC_STATE)
+          .createIndex({ agentId: 1 }, { unique: true }),
+        // workflow_memories — retrieval query index
+        db
+          .collection(COLLECTIONS.WORKFLOW_MEMORIES)
+          .createIndex({ agent: 1, project: 1, createdAt: -1 }),
+        // workflow_memories — uniqueness per session
+        db
+          .collection(COLLECTIONS.WORKFLOW_MEMORIES)
+          .createIndex(
+            { conversationId: 1, agentSessionId: 1 },
+            { unique: true },
+          ),
       ]);
       logger.success("Database indexes ensured");
     }
   } catch (error: unknown) {
-        logger.error(`Failed to ensure indexes: ${errorMessage(error)}`);
+    logger.error(`Failed to ensure indexes: ${errorMessage(error)}`);
   }
 
   // Clear any stale isGenerating flags left over from a previous crash/restart
@@ -330,10 +396,10 @@ setupWebSocket(wss);
       }
     }
   } catch (error: unknown) {
-        logger.error(`Failed to clear stale isGenerating flags: ${errorMessage(error)}`);
+    logger.error(
+      `Failed to clear stale isGenerating flags: ${errorMessage(error)}`,
+    );
   }
-
-
 
   // Load custom agents from database into the persona registry
   try {
@@ -341,7 +407,7 @@ setupWebSocket(wss);
       await import("./services/AgentPersonaRegistry.js");
     await AgentPersonaRegistryCustom.loadCustomAgents();
   } catch (error: unknown) {
-        logger.warn(`Custom agent loading failed: ${errorMessage(error)}`);
+    logger.warn(`Custom agent loading failed: ${errorMessage(error)}`);
   }
 
   // Initialize Change Streams (requires replica set — graceful fallback)
@@ -355,7 +421,7 @@ setupWebSocket(wss);
       await import("./services/AgentPersonaRegistry.js");
     const mcpDb = MongoWrapper.getDb(MONGO_DB_NAME);
     const codingProject =
-            AgentPersonaRegistryMCP.get(AGENT_IDS.CODING)?.project || "coding";
+      AgentPersonaRegistryMCP.get(AGENT_IDS.CODING)?.project || "coding";
     if (mcpDb) {
       // Seed default MCP servers from environment variable if provided
       if (process.env.DEFAULT_MCP_SERVERS) {
@@ -363,7 +429,17 @@ setupWebSocket(wss);
           const defaults = JSON.parse(process.env.DEFAULT_MCP_SERVERS);
           if (Array.isArray(defaults)) {
             for (const serverConfig of defaults) {
-              const { name, displayName, transport, url, command, args, env, headers, enabled } = serverConfig;
+              const {
+                name,
+                displayName,
+                transport,
+                url,
+                command,
+                args,
+                env,
+                headers,
+                enabled,
+              } = serverConfig;
               if (!name || !transport) continue;
 
               await mcpDb.collection(COLLECTIONS.MCP_SERVERS).updateOne(
@@ -382,27 +458,31 @@ setupWebSocket(wss);
                     headers: headers || {},
                     enabled: enabled !== false,
                     updatedAt: new Date(),
-                  }
+                  },
                 },
-                { upsert: true }
+                { upsert: true },
               );
             }
-            logger.info(`Seeded ${defaults.length} default MCP server(s) from environment`);
+            logger.info(
+              `Seeded ${defaults.length} default MCP server(s) from environment`,
+            );
           }
         } catch (seedError: unknown) {
-          logger.warn(`Failed to parse/seed DEFAULT_MCP_SERVERS: ${errorMessage(seedError)}`);
+          logger.warn(
+            `Failed to parse/seed DEFAULT_MCP_SERVERS: ${errorMessage(seedError)}`,
+          );
         }
       }
 
       await MCPClientService.connectAllFromDB(mcpDb, codingProject, "admin");
     }
   } catch (error: unknown) {
-        logger.warn(`MCP auto-connect failed: ${errorMessage(error)}`);
+    logger.warn(`MCP auto-connect failed: ${errorMessage(error)}`);
   }
 
   // ── Scheduled Memory Consolidation ─────────────────
   // Runs every 24 hours, consolidates memories for all active projects and agents.
-    const { hours } = await import("@rodrigo-barraza/utilities-library");
+  const { hours } = await import("@rodrigo-barraza/utilities-library");
   const CONSOLIDATION_INTERVAL_MS = hours(24);
   const consolidationInterval = setInterval(async () => {
     try {
@@ -410,19 +490,21 @@ setupWebSocket(wss);
       if (!db) return;
 
       // Find all distinct projects with at least some memories
-      const projects = await db.collection(COLLECTIONS.MEMORIES).distinct("project");
+      const projects = await db
+        .collection(COLLECTIONS.MEMORIES)
+        .distinct("project");
 
       // Process projects sequentially — each consolidation loads the full
       // memory corpus with embeddings (~12KB/memory). Running them concurrently
       // compounds heap usage and can cause OOM on large collections.
-            for ( const project of projects) {
+      for (const project of projects) {
         // Find all distinct agents within this project
         const agents = await db
           .collection(COLLECTIONS.MEMORIES)
           .distinct("agent", { project });
         if (!agents.length) continue;
 
-                for ( const agent of agents) {
+        for (const agent of agents) {
           const count = await db
             .collection(COLLECTIONS.MEMORIES)
             .countDocuments({ project, agent });
@@ -440,14 +522,14 @@ setupWebSocket(wss);
             });
           } catch (error: unknown) {
             logger.error(
-                            `[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${errorMessage(error)}`,
+              `[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${errorMessage(error)}`,
             );
           }
         }
       }
     } catch (error: unknown) {
       logger.error(
-                `[AutoDream] Scheduled consolidation sweep failed: ${errorMessage(error)}`,
+        `[AutoDream] Scheduled consolidation sweep failed: ${errorMessage(error)}`,
       );
     }
   }, CONSOLIDATION_INTERVAL_MS);
@@ -458,44 +540,59 @@ setupWebSocket(wss);
 
   // ── Scheduled Tasks Background Daemon ──────────────────
   try {
-    const { default: ScheduledTaskService } = await import("./services/ScheduledTaskService.ts");
+    const { default: ScheduledTaskService } =
+      await import("./services/ScheduledTaskService.ts");
     await ScheduledTaskService.init();
     registerCleanup(async () => ScheduledTaskService.destroy());
   } catch (error: unknown) {
-    logger.error("Failed to initialize Scheduled Tasks daemon: " + errorMessage(error));
+    logger.error(
+      "Failed to initialize Scheduled Tasks daemon: " + errorMessage(error),
+    );
   }
 
   // ── Conversation Timers Background Daemon ──────────────
   try {
-    const { default: ConversationTimerService } = await import("./services/ConversationTimerService.ts");
+    const { default: ConversationTimerService } =
+      await import("./services/ConversationTimerService.ts");
     await ConversationTimerService.init();
     registerCleanup(async () => ConversationTimerService.destroy());
   } catch (error: unknown) {
-    logger.error("Failed to initialize Conversation Timers daemon: " + errorMessage(error));
+    logger.error(
+      "Failed to initialize Conversation Timers daemon: " + errorMessage(error),
+    );
   }
 
   // ── Webhook Dispatcher ─────────────────────────────────────
   try {
-    const { default: WebhookDispatcher } = await import("./services/WebhookDispatcher.ts");
+    const { default: WebhookDispatcher } =
+      await import("./services/WebhookDispatcher.ts");
     await WebhookDispatcher.init();
     registerCleanup(async () => WebhookDispatcher.destroy());
   } catch (error: unknown) {
-    logger.error("Failed to initialize Webhook Dispatcher: " + errorMessage(error));
+    logger.error(
+      "Failed to initialize Webhook Dispatcher: " + errorMessage(error),
+    );
   }
 
   // ── Somatic State Service ──────────────────────────────────
   try {
-    const { default: SomaticStateService } = await import("./services/somatic/SomaticStateService.ts");
+    const { default: SomaticStateService } =
+      await import("./services/somatic/SomaticStateService.ts");
     SomaticStateService.initialize();
     registerCleanup(async () => SomaticStateService.persistAll());
   } catch (error: unknown) {
-    logger.error("Failed to initialize Somatic State Service: " + errorMessage(error));
+    logger.error(
+      "Failed to initialize Somatic State Service: " + errorMessage(error),
+    );
   }
 
   // ── Background Housekeeping ────────────────────────────────
   // Boot-time run: clean up orphans from previous crashes
-  BackgroundHousekeepingService.run({ trigger: "boot" }).catch((error: unknown) =>
-    logger.error(`[Housekeeping] Boot-time run failed: ${errorMessage(error)}`),
+  BackgroundHousekeepingService.run({ trigger: "boot" }).catch(
+    (error: unknown) =>
+      logger.error(
+        `[Housekeeping] Boot-time run failed: ${errorMessage(error)}`,
+      ),
   );
 
   // Scheduled run: every 6h (independent of consolidation interval)
@@ -503,7 +600,9 @@ setupWebSocket(wss);
   const housekeepingInterval = setInterval(() => {
     BackgroundHousekeepingService.run({ trigger: "scheduled" }).catch(
       (error: unknown) =>
-        logger.error(`[Housekeeping] Scheduled run failed: ${errorMessage(error)}`),
+        logger.error(
+          `[Housekeeping] Scheduled run failed: ${errorMessage(error)}`,
+        ),
     );
   }, HOUSEKEEPING_INTERVAL_MS);
   registerCleanup(async () => clearInterval(housekeepingInterval));

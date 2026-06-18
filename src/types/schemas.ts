@@ -39,7 +39,7 @@ export const ChatMessageSchema = z.object({
         id: z.string().optional(),
         name: z.string(),
         args: z.record(z.string(), z.unknown()),
-      })
+      }),
     )
     .optional(),
   thinking: z.string().optional(),
@@ -130,13 +130,21 @@ export const PostCustomToolSchema = z.object({
   code: z.string().optional().default(""),
   endpoint: z.string().optional().default(""),
   method: z.string().optional().default("GET"),
-  parameters: z.array(z.object({
-    name: z.string(),
-    type: z.string().optional(),
-    description: z.string().optional(),
-    required: z.boolean().optional(),
-  })).optional().default([]),
-  execution: z.enum(["sandboxed", "privileged"]).optional().default("sandboxed"),
+  parameters: z
+    .array(
+      z.object({
+        name: z.string(),
+        type: z.string().optional(),
+        description: z.string().optional(),
+        required: z.boolean().optional(),
+      }),
+    )
+    .optional()
+    .default([]),
+  execution: z
+    .enum(["sandboxed", "privileged"])
+    .optional()
+    .default("sandboxed"),
   enabled: z.boolean().optional().default(true),
 });
 
@@ -146,12 +154,16 @@ export const PutCustomToolSchema = z.object({
   code: z.string().optional(),
   endpoint: z.string().optional(),
   method: z.string().optional(),
-  parameters: z.array(z.object({
-    name: z.string(),
-    type: z.string().optional(),
-    description: z.string().optional(),
-    required: z.boolean().optional(),
-  })).optional(),
+  parameters: z
+    .array(
+      z.object({
+        name: z.string(),
+        type: z.string().optional(),
+        description: z.string().optional(),
+        required: z.boolean().optional(),
+      }),
+    )
+    .optional(),
   execution: z.enum(["sandboxed", "privileged"]).optional(),
   enabled: z.boolean().optional(),
 });
@@ -197,7 +209,10 @@ export const DeleteFavoritesQuerySchema = z.object({
 export const PostMcpServerSchema = z.object({
   name: z.string().min(1, "name is required"),
   displayName: z.string().optional(),
-  transport: z.enum(["stdio", "sse", "streamable-http"]).optional().default("stdio"),
+  transport: z
+    .enum(["stdio", "sse", "streamable-http"])
+    .optional()
+    .default("stdio"),
   command: z.string().optional().default(""),
   args: z.array(z.string()).optional().default([]),
   env: z.record(z.string(), z.string()).optional().default({}),
@@ -227,7 +242,9 @@ export const GetConversationsQuerySchema = z.object({
 });
 
 export const PostConversationMessagesBodySchema = z.object({
-  messages: z.array(ChatMessageSchema).nonempty("messages must be a non-empty array"),
+  messages: z
+    .array(ChatMessageSchema)
+    .nonempty("messages must be a non-empty array"),
   conversationMeta: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
@@ -260,7 +277,8 @@ export const PatchSynthesisBodySchema = z.object({
   seedMessages: z.array(ChatMessageSchema).optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
   conversationId: z.string().nullable().optional(),
-});export const PostSkillSchema = z.object({
+});
+export const PostSkillSchema = z.object({
   name: z.string().min(1, "name is required"),
   description: z.string().optional().default(""),
   content: z.string().optional().default(""),

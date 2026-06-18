@@ -30,7 +30,9 @@ interface SkillDocument {
  * Generate an embedding vector for skill content.
  * Combines name + description + content for richer semantic representation.
  */
-async function generateSkillEmbedding(skill: Pick<SkillDocument, "name" | "description" | "content">) {
+async function generateSkillEmbedding(
+  skill: Pick<SkillDocument, "name" | "description" | "content">,
+) {
   const text = [skill.name, skill.description, skill.content]
     .filter(Boolean)
     .join("\n");
@@ -60,7 +62,12 @@ router.get(
         .project<SkillDocument>({ embedding: 0 })
         .toArray();
 
-      res.json(skills.map((skill) => ({ ...skill, id: skill._id ? skill._id.toString() : "" })));
+      res.json(
+        skills.map((skill) => ({
+          ...skill,
+          id: skill._id ? skill._id.toString() : "",
+        })),
+      );
     } catch (error: unknown) {
       next(error);
     }
@@ -96,11 +103,15 @@ router.post(
       try {
         document.embedding = await generateSkillEmbedding(document);
       } catch (error: unknown) {
-        logger.warn(`[Skills] Embedding generation failed: ${getErrorMessage(error)}`);
+        logger.warn(
+          `[Skills] Embedding generation failed: ${getErrorMessage(error)}`,
+        );
         document.embedding = null;
       }
 
-      const result = await db.collection<SkillDocument>(COLLECTION).insertOne(document);
+      const result = await db
+        .collection<SkillDocument>(COLLECTION)
+        .insertOne(document);
 
       logger.info(`Skill created: ${document.name} (${result.insertedId})`);
       const { embedding: _, ...response } = document;
@@ -124,7 +135,9 @@ router.put(
 
       const updates: Partial<SkillDocument> = {
         ...(validated.name !== undefined && { name: validated.name }),
-        ...(validated.description !== undefined && { description: validated.description }),
+        ...(validated.description !== undefined && {
+          description: validated.description,
+        }),
         ...(validated.content !== undefined && { content: validated.content }),
         ...(validated.enabled !== undefined && { enabled: validated.enabled }),
         updatedAt: new Date(),

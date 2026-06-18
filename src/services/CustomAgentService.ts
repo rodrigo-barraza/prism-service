@@ -72,10 +72,19 @@ const CustomAgentService = {
       identity: data.identity || "",
       guidelines: data.guidelines || "",
       toolPolicy: data.toolPolicy || "",
-      availableTools: Array.isArray(data.availableTools) ? data.availableTools : Array.isArray(data.enabledTools) ? data.enabledTools : [],
-      enabledByDefaultTools: Array.isArray(data.enabledByDefaultTools) ? data.enabledByDefaultTools : [],
+      availableTools: Array.isArray(data.availableTools)
+        ? data.availableTools
+        : Array.isArray(data.enabledTools)
+          ? data.enabledTools
+          : [],
+      enabledByDefaultTools: Array.isArray(data.enabledByDefaultTools)
+        ? data.enabledByDefaultTools
+        : [],
       policies: Array.isArray(data.policies) ? data.policies : [],
-      platformRules: typeof data.platformRules === 'object' && data.platformRules !== null ? data.platformRules : {},
+      platformRules:
+        typeof data.platformRules === "object" && data.platformRules !== null
+          ? data.platformRules
+          : {},
       hasSomaticState: data.hasSomaticState || false,
       usesDirectoryTree: data.usesDirectoryTree || false,
       usesCodingGuidelines: data.usesCodingGuidelines || false,
@@ -94,7 +103,10 @@ const CustomAgentService = {
     if (!collection) throw new Error("Database not available");
 
     // If name changed, re-derive agentId and verify uniqueness
-    const setFields: Record<string, unknown> = { ...updates, updatedAt: new Date().toISOString() };
+    const setFields: Record<string, unknown> = {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
     if (updates.name) {
       const newAgentId = deriveAgentId(updates.name as string);
       const conflictingAgent = await collection.findOne({

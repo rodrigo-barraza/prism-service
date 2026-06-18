@@ -150,7 +150,8 @@ export default class PolicyEngine {
 
     // Sort policies by priority (specific deny first, wildcard allow last)
     const sorted = [...policies].sort(
-      (firstRule, secondRule) => getPriority(firstRule) - getPriority(secondRule),
+      (firstRule, secondRule) =>
+        getPriority(firstRule) - getPriority(secondRule),
     );
 
     for (const rule of sorted) {

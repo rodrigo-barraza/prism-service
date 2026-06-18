@@ -1,6 +1,9 @@
 import BaseAgenticHarness from "./BaseAgenticHarness.ts";
 import logger from "../../utils/logger.ts";
-import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
 import { executeToolBatch } from "./lifecycle/ToolExecutor.ts";
@@ -198,16 +201,18 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       agentSessionId,
       agentContext: options.agentContext,
       enabledTools: this.tools.resolvedEnabledTools,
-      resolvedToolNames: this.tools.finalTools.map((tool: ToolSchema) => tool.name),
+      resolvedToolNames: this.tools.finalTools.map(
+        (tool: ToolSchema) => tool.name,
+      ),
       workspaceRoot: workspaceRoot || undefined,
     };
     await hooks.run("beforePrompt", hookContext);
 
     const assembledSystemMessage =
       currentMessages.find(
-        (message) => message.role === "system" && message._isIdentityPrompt === true,
-      ) ||
-      currentMessages.find((message) => message.role === "system");
+        (message) =>
+          message.role === "system" && message._isIdentityPrompt === true,
+      ) || currentMessages.find((message) => message.role === "system");
     if (assembledSystemMessage?.content) {
       context.conversationMeta = {
         ...(context.conversationMeta || {}),
@@ -228,451 +233,478 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
 
     // ── Main loop ────────────────────────────────────────────
     try {
-    while (state.iterations < resolvedMaxIterations) {
-      state.iterations++;
+      while (state.iterations < resolvedMaxIterations) {
+        state.iterations++;
 
-      // ── Adaptive branch count ────────────────────────────
-      // After the first iteration, reduce branch count because we have
-      // trajectory context that narrows the viable search space.
-      // In DFS mode, always use 1 branch (depth-first by definition).
-      const adaptiveBranchCount =
-        searchStrategy === "dfs"
-          ? 1
-          : state.iterations === 1
-            ? initialBranchCount
-            : Math.max(1, Math.ceil(initialBranchCount * 0.6));
+        // ── Adaptive branch count ────────────────────────────
+        // After the first iteration, reduce branch count because we have
+        // trajectory context that narrows the viable search space.
+        // In DFS mode, always use 1 branch (depth-first by definition).
+        const adaptiveBranchCount =
+          searchStrategy === "dfs"
+            ? 1
+            : state.iterations === 1
+              ? initialBranchCount
+              : Math.max(1, Math.ceil(initialBranchCount * 0.6));
 
-      emit({
-        type: SERVER_SENT_EVENT_TYPES.STATUS,
-        message: STATUS_MESSAGES.ITERATION_PROGRESS,
-        iteration: state.iterations,
-        maxIterations: resolvedMaxIterations,
-        harness: "tree_of_thought",
-        searchStrategy,
-        branchCount: adaptiveBranchCount,
-      });
+        emit({
+          type: SERVER_SENT_EVENT_TYPES.STATUS,
+          message: STATUS_MESSAGES.ITERATION_PROGRESS,
+          iteration: state.iterations,
+          maxIterations: resolvedMaxIterations,
+          harness: "tree_of_thought",
+          searchStrategy,
+          branchCount: adaptiveBranchCount,
+        });
 
-      const passOptions: IterationPassOptions = {
-        ...options,
-        project,
-        agent,
-        username,
-        tools: this.tools.finalTools,
-      };
+        const passOptions: IterationPassOptions = {
+          ...options,
+          project,
+          agent,
+          username,
+          tools: this.tools.finalTools,
+        };
 
-      // ── Auto-compaction trigger ─────────────────────────────
-      const contextWindowSize = context.modelDefinition?.maxInputTokens || 128_000;
-      const maxOutputTokens = options.maxTokens || 8192;
-      const preEnforceTokenEstimate = ContextWindowManager.estimateTokens(
-        currentMessages as ChatMessage[],
-      );
-
-      const autoCompactEvaluation = AutoCompactionTrigger.evaluate(
-        preEnforceTokenEstimate,
-        contextWindowSize,
-        maxOutputTokens,
-        currentMessages.length,
-      );
-
-      if (autoCompactEvaluation.shouldCompact) {
-        const compactionResult = await CompactionService.compactConversation(
+        // ── Auto-compaction trigger ─────────────────────────────
+        const contextWindowSize =
+          context.modelDefinition?.maxInputTokens || 128_000;
+        const maxOutputTokens = options.maxTokens || 8192;
+        const preEnforceTokenEstimate = ContextWindowManager.estimateTokens(
           currentMessages as ChatMessage[],
-          {
-            project: project || "",
-            username: username || "",
-            agentSessionId,
-            traceId: traceId || null,
-            agent: agent || null,
-            emit,
-            signal: signal || undefined,
-          },
         );
 
-        if (compactionResult) {
-          currentMessages = compactionResult.compactedMessages as ConversationMessage[];
-          state.originalMessageCount = currentMessages.length;
-          state.compactionPerformed = true;
-          state.preCompactTokenCount = compactionResult.preCompactTokenCount;
-          state.postCompactTokenCount = compactionResult.postCompactTokenCount;
-        }
-      }
-
-      // ── Context window enforcement ─────────────────────────
-      currentMessages = this.enforceContextWindow(
-        currentMessages,
-        this.tools.finalTools.length,
-      );
-
-      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      //  PHASE 1: Generate candidate branches
-      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-      emit({
-        type: SERVER_SENT_EVENT_TYPES.STATUS,
-        message: STATUS_MESSAGES.BRANCHING_STARTED,
-        branchCount: adaptiveBranchCount,
-        iteration: state.iterations,
-        searchStrategy,
-      });
-
-      const allowedToolNames = new Set(
-        this.tools.finalTools.map((tool: ToolSchema) => tool.name),
-      );
-
-      const branchResults = await Promise.all(
-        Array.from({ length: adaptiveBranchCount }, (_, branchIndex) =>
-          this.generateBranch(
-            branchIndex,
-            adaptiveBranchCount,
-            currentMessages,
-            passOptions,
-            allowedToolNames,
-            failedApproachDescriptions,
-          ),
-        ),
-      );
-
-      if (signal?.aborted) break;
-
-      state.branchesExplored += adaptiveBranchCount;
-
-      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      //  PHASE 2: Multi-criteria score and rank branches
-      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-      const scoredBranches = await this.scoreBranchesMultiCriteria(
-        branchResults,
-        currentMessages,
-      );
-
-      scoredBranches.sort((branchA, branchB) => branchB.score - branchA.score);
-
-      const selectedBranch = scoredBranches[0];
-      state.selectedBranchScores.push(selectedBranch.score);
-
-      state.finalStreamedText = selectedBranch.pass.finalStreamedText;
-      state.streamedThinking = selectedBranch.pass.streamedThinking;
-
-      emit({
-        type: SERVER_SENT_EVENT_TYPES.STATUS,
-        message: STATUS_MESSAGES.BRANCH_SELECTED,
-        branchIndex: selectedBranch.branchIndex,
-        score: selectedBranch.score,
-        branchCount: adaptiveBranchCount,
-        criteriaScores: selectedBranch.criteriaScores,
-        scores: scoredBranches.map((branch) => ({
-          index: branch.branchIndex,
-          score: branch.score,
-          criteria: branch.criteriaScores,
-        })),
-      });
-
-      logger.info(
-        `[TreeOfThought] Iteration ${state.iterations}: selected branch ${selectedBranch.branchIndex + 1}/${adaptiveBranchCount} ` +
-          `(score: ${selectedBranch.score.toFixed(1)}, correctness: ${selectedBranch.criteriaScores.correctness}, ` +
-          `risk: ${selectedBranch.criteriaScores.risk}, efficiency: ${selectedBranch.criteriaScores.efficiency}, ` +
-          `completeness: ${selectedBranch.criteriaScores.completeness})`,
-      );
-
-      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      //  PHASE 3: Execute selected branch with backtracking
-      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-      const selectedPass = selectedBranch.pass;
-
-      // Finalize tracker for the selected pass
-      if (selectedPass.usage.outputTokens > 0 && selectedPass.requestId) {
-        SessionGenerationTracker.update(selectedPass.requestId, {
-          outputTokens: selectedPass.usage.outputTokens,
-        });
-      }
-      const finalInputTokens =
-        selectedPass.usage.inputTokens || selectedPass.usage.promptTokens || 0;
-      if (finalInputTokens > 0 && selectedPass.requestId) {
-        SessionGenerationTracker.update(selectedPass.requestId, {
-          inputTokens: finalInputTokens,
-        });
-      }
-      this.emitGenerationProgress();
-      if (selectedPass.requestId) {
-        SessionGenerationTracker.complete(selectedPass.requestId);
-      }
-
-      this.emitUsageUpdate();
-
-      // ── Tool execution from selected branch ─────────────────
-      if (selectedPass.pendingToolCalls.length > 0) {
-        // Snapshot messages BEFORE tool execution for checkpoint/restore
-        const preExecutionSnapshot = currentMessages.map(
-          (message) => ({ ...message }),
+        const autoCompactEvaluation = AutoCompactionTrigger.evaluate(
+          preEnforceTokenEstimate,
+          contextWindowSize,
+          maxOutputTokens,
+          currentMessages.length,
         );
 
-        const { isApproved, shouldApproveAll } = await checkAndWaitForApproval(
-          selectedPass.pendingToolCalls,
-          context,
-          approvalEngine,
-        );
-
-        let results: ToolResult[] = [];
-        if (!isApproved) {
-          results = selectedPass.pendingToolCalls.map((toolCall) => ({
-            name: toolCall.name,
-            id: toolCall.id,
-            result: {
-              success: false,
-              error: "USER_REJECTED",
-              message: "Tool execution was manually rejected by the user.",
+        if (autoCompactEvaluation.shouldCompact) {
+          const compactionResult = await CompactionService.compactConversation(
+            currentMessages as ChatMessage[],
+            {
+              project: project || "",
+              username: username || "",
+              agentSessionId,
+              traceId: traceId || null,
+              agent: agent || null,
+              emit,
+              signal: signal || undefined,
             },
-          }));
-        } else {
-          if (shouldApproveAll) {
-            options.autoApprove = true;
-          }
-
-          context._currentMessages = currentMessages;
-
-          results = await executeToolBatch(
-            selectedPass.pendingToolCalls,
-            context,
-            this.tools,
-            hooks,
-            state,
           );
+
+          if (compactionResult) {
+            currentMessages =
+              compactionResult.compactedMessages as ConversationMessage[];
+            state.originalMessageCount = currentMessages.length;
+            state.compactionPerformed = true;
+            state.preCompactTokenCount = compactionResult.preCompactTokenCount;
+            state.postCompactTokenCount =
+              compactionResult.postCompactTokenCount;
+          }
         }
 
-        // ── Post-execution processing ─────────────────────────
-        await processToolResultMedia(
-          selectedPass.pendingToolCalls,
-          results,
-          state,
-          selectedPass,
-          emit,
-          context,
+        // ── Context window enforcement ─────────────────────────
+        currentMessages = this.enforceContextWindow(
+          currentMessages,
+          this.tools.finalTools.length,
         );
 
-        trackToolErrors(
-          selectedPass.pendingToolCalls,
-          results,
-          state,
-          MAX_CONSECUTIVE_TOOL_ERRORS,
-          emit,
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  PHASE 1: Generate candidate branches
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        emit({
+          type: SERVER_SENT_EVENT_TYPES.STATUS,
+          message: STATUS_MESSAGES.BRANCHING_STARTED,
+          branchCount: adaptiveBranchCount,
+          iteration: state.iterations,
+          searchStrategy,
+        });
+
+        const allowedToolNames = new Set(
+          this.tools.finalTools.map((tool: ToolSchema) => tool.name),
         );
 
-        emitPostExecutionStatus(selectedPass.pendingToolCalls, emit);
-
-        // ── Validation + reflexion-based backtracking ──────────
-        const validationFeedback = await validateAfterToolExecution(
-          selectedPass.pendingToolCalls,
-          results,
-          context,
-          state,
+        const branchResults = await Promise.all(
+          Array.from({ length: adaptiveBranchCount }, (_, branchIndex) =>
+            this.generateBranch(
+              branchIndex,
+              adaptiveBranchCount,
+              currentMessages,
+              passOptions,
+              allowedToolNames,
+              failedApproachDescriptions,
+            ),
+          ),
         );
 
-        if (validationFeedback.length > 0) {
-          state.branchesBacktracked++;
+        if (signal?.aborted) break;
 
-          const errorBlock = validationFeedback
-            .map(
-              (feedback) =>
-                `### ${feedback.filePath} (${feedback.validatorType})\n${feedback.rawOutput}`,
-            )
-            .join("\n\n");
+        state.branchesExplored += adaptiveBranchCount;
 
-          // Track what approach failed for future branch diversity
-          const failedApproachSummary =
-            (selectedPass.streamedText || selectedPass.streamedThinking || "")
-              .slice(0, 300)
-              .trim();
-          if (failedApproachSummary) {
-            failedApproachDescriptions.push(failedApproachSummary);
-          }
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  PHASE 2: Multi-criteria score and rank branches
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-          // Determine if we should checkpoint-restore or continue with errors
-          const backtrackAttemptsThisIteration = state.branchesBacktracked;
-          const shouldRestoreCheckpoint =
-            backtrackAttemptsThisIteration <= MAX_BACKTRACK_ATTEMPTS_PER_ITERATION &&
-            scoredBranches.length > 1;
+        const scoredBranches = await this.scoreBranchesMultiCriteria(
+          branchResults,
+          currentMessages,
+        );
 
-          if (shouldRestoreCheckpoint) {
-            // Restore pre-execution message state (checkpoint/restore pattern)
-            currentMessages = preExecutionSnapshot;
+        scoredBranches.sort(
+          (branchA, branchB) => branchB.score - branchA.score,
+        );
 
-            emit({
-              type: SERVER_SENT_EVENT_TYPES.STATUS,
-              message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
-              branchIndex: selectedBranch.branchIndex,
-              validationErrors: validationFeedback.length,
-              restoredCheckpoint: true,
-            });
+        const selectedBranch = scoredBranches[0];
+        state.selectedBranchScores.push(selectedBranch.score);
 
-            logger.info(
-              `[TreeOfThought] Branch ${selectedBranch.branchIndex + 1} failed validation. ` +
-                `Restored checkpoint. Injecting reflexion prompt for self-correction.`,
+        state.finalStreamedText = selectedBranch.pass.finalStreamedText;
+        state.streamedThinking = selectedBranch.pass.streamedThinking;
+
+        emit({
+          type: SERVER_SENT_EVENT_TYPES.STATUS,
+          message: STATUS_MESSAGES.BRANCH_SELECTED,
+          branchIndex: selectedBranch.branchIndex,
+          score: selectedBranch.score,
+          branchCount: adaptiveBranchCount,
+          criteriaScores: selectedBranch.criteriaScores,
+          scores: scoredBranches.map((branch) => ({
+            index: branch.branchIndex,
+            score: branch.score,
+            criteria: branch.criteriaScores,
+          })),
+        });
+
+        logger.info(
+          `[TreeOfThought] Iteration ${state.iterations}: selected branch ${selectedBranch.branchIndex + 1}/${adaptiveBranchCount} ` +
+            `(score: ${selectedBranch.score.toFixed(1)}, correctness: ${selectedBranch.criteriaScores.correctness}, ` +
+            `risk: ${selectedBranch.criteriaScores.risk}, efficiency: ${selectedBranch.criteriaScores.efficiency}, ` +
+            `completeness: ${selectedBranch.criteriaScores.completeness})`,
+        );
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  PHASE 3: Execute selected branch with backtracking
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        const selectedPass = selectedBranch.pass;
+
+        // Finalize tracker for the selected pass
+        if (selectedPass.usage.outputTokens > 0 && selectedPass.requestId) {
+          SessionGenerationTracker.update(selectedPass.requestId, {
+            outputTokens: selectedPass.usage.outputTokens,
+          });
+        }
+        const finalInputTokens =
+          selectedPass.usage.inputTokens ||
+          selectedPass.usage.promptTokens ||
+          0;
+        if (finalInputTokens > 0 && selectedPass.requestId) {
+          SessionGenerationTracker.update(selectedPass.requestId, {
+            inputTokens: finalInputTokens,
+          });
+        }
+        this.emitGenerationProgress();
+        if (selectedPass.requestId) {
+          SessionGenerationTracker.complete(selectedPass.requestId);
+        }
+
+        this.emitUsageUpdate();
+
+        // ── Tool execution from selected branch ─────────────────
+        if (selectedPass.pendingToolCalls.length > 0) {
+          // Snapshot messages BEFORE tool execution for checkpoint/restore
+          const preExecutionSnapshot = currentMessages.map((message) => ({
+            ...message,
+          }));
+
+          const { isApproved, shouldApproveAll } =
+            await checkAndWaitForApproval(
+              selectedPass.pendingToolCalls,
+              context,
+              approvalEngine,
             );
 
-            // ── Reflexion self-critique injection ──────────────
-            // Instead of just "fix these errors", ask the model to analyze
-            // WHY the approach failed before retrying (Shinn et al., 2023)
-            currentMessages.push({
-              role: "system",
-              content:
-                `[REFLEXION — BRANCH ${selectedBranch.branchIndex + 1} FAILED VALIDATION]\n\n` +
-                `The previous approach produced ${validationFeedback.length} validation error(s):\n\n` +
-                `${errorBlock}\n\n` +
-                `Before retrying, ANALYZE what went wrong:\n` +
-                `1. What assumption in the previous approach caused the failure?\n` +
-                `2. What is fundamentally different about a correct solution?\n` +
-                `3. What specific alternative strategy would avoid this class of error?\n\n` +
-                `Apply your analysis and take a DIFFERENT approach on the next attempt.`,
-            });
+          let results: ToolResult[] = [];
+          if (!isApproved) {
+            results = selectedPass.pendingToolCalls.map((toolCall) => ({
+              name: toolCall.name,
+              id: toolCall.id,
+              result: {
+                success: false,
+                error: "USER_REJECTED",
+                message: "Tool execution was manually rejected by the user.",
+              },
+            }));
           } else {
-            // Exhausted backtrack budget — continue with errors as context
-            emit({
-              type: SERVER_SENT_EVENT_TYPES.STATUS,
-              message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
-              branchIndex: selectedBranch.branchIndex,
-              validationErrors: validationFeedback.length,
-              restoredCheckpoint: false,
-            });
+            if (shouldApproveAll) {
+              options.autoApprove = true;
+            }
 
-            currentMessages.push({
-              role: "assistant",
-              content: selectedPass.streamedText || "",
-              ...(selectedPass.streamedThinking.trim() && { thinking: selectedPass.streamedThinking.trim() }),
-              toolCalls: selectedPass.pendingToolCalls.map((toolCall: ToolCall) => {
-                const matchingResult = results.find((result) => result.id === toolCall.id);
+            context._currentMessages = currentMessages;
+
+            results = await executeToolBatch(
+              selectedPass.pendingToolCalls,
+              context,
+              this.tools,
+              hooks,
+              state,
+            );
+          }
+
+          // ── Post-execution processing ─────────────────────────
+          await processToolResultMedia(
+            selectedPass.pendingToolCalls,
+            results,
+            state,
+            selectedPass,
+            emit,
+            context,
+          );
+
+          trackToolErrors(
+            selectedPass.pendingToolCalls,
+            results,
+            state,
+            MAX_CONSECUTIVE_TOOL_ERRORS,
+            emit,
+          );
+
+          emitPostExecutionStatus(selectedPass.pendingToolCalls, emit);
+
+          // ── Validation + reflexion-based backtracking ──────────
+          const validationFeedback = await validateAfterToolExecution(
+            selectedPass.pendingToolCalls,
+            results,
+            context,
+            state,
+          );
+
+          if (validationFeedback.length > 0) {
+            state.branchesBacktracked++;
+
+            const errorBlock = validationFeedback
+              .map(
+                (feedback) =>
+                  `### ${feedback.filePath} (${feedback.validatorType})\n${feedback.rawOutput}`,
+              )
+              .join("\n\n");
+
+            // Track what approach failed for future branch diversity
+            const failedApproachSummary = (
+              selectedPass.streamedText ||
+              selectedPass.streamedThinking ||
+              ""
+            )
+              .slice(0, 300)
+              .trim();
+            if (failedApproachSummary) {
+              failedApproachDescriptions.push(failedApproachSummary);
+            }
+
+            // Determine if we should checkpoint-restore or continue with errors
+            const backtrackAttemptsThisIteration = state.branchesBacktracked;
+            const shouldRestoreCheckpoint =
+              backtrackAttemptsThisIteration <=
+                MAX_BACKTRACK_ATTEMPTS_PER_ITERATION &&
+              scoredBranches.length > 1;
+
+            if (shouldRestoreCheckpoint) {
+              // Restore pre-execution message state (checkpoint/restore pattern)
+              currentMessages = preExecutionSnapshot;
+
+              emit({
+                type: SERVER_SENT_EVENT_TYPES.STATUS,
+                message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
+                branchIndex: selectedBranch.branchIndex,
+                validationErrors: validationFeedback.length,
+                restoredCheckpoint: true,
+              });
+
+              logger.info(
+                `[TreeOfThought] Branch ${selectedBranch.branchIndex + 1} failed validation. ` +
+                  `Restored checkpoint. Injecting reflexion prompt for self-correction.`,
+              );
+
+              // ── Reflexion self-critique injection ──────────────
+              // Instead of just "fix these errors", ask the model to analyze
+              // WHY the approach failed before retrying (Shinn et al., 2023)
+              currentMessages.push({
+                role: "system",
+                content:
+                  `[REFLEXION — BRANCH ${selectedBranch.branchIndex + 1} FAILED VALIDATION]\n\n` +
+                  `The previous approach produced ${validationFeedback.length} validation error(s):\n\n` +
+                  `${errorBlock}\n\n` +
+                  `Before retrying, ANALYZE what went wrong:\n` +
+                  `1. What assumption in the previous approach caused the failure?\n` +
+                  `2. What is fundamentally different about a correct solution?\n` +
+                  `3. What specific alternative strategy would avoid this class of error?\n\n` +
+                  `Apply your analysis and take a DIFFERENT approach on the next attempt.`,
+              });
+            } else {
+              // Exhausted backtrack budget — continue with errors as context
+              emit({
+                type: SERVER_SENT_EVENT_TYPES.STATUS,
+                message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
+                branchIndex: selectedBranch.branchIndex,
+                validationErrors: validationFeedback.length,
+                restoredCheckpoint: false,
+              });
+
+              currentMessages.push({
+                role: "assistant",
+                content: selectedPass.streamedText || "",
+                ...(selectedPass.streamedThinking.trim() && {
+                  thinking: selectedPass.streamedThinking.trim(),
+                }),
+                toolCalls: selectedPass.pendingToolCalls.map(
+                  (toolCall: ToolCall) => {
+                    const matchingResult = results.find(
+                      (result) => result.id === toolCall.id,
+                    );
+                    return {
+                      id: toolCall.id || null,
+                      name: toolCall.name,
+                      args: toolCall.args,
+                      result: matchingResult ? matchingResult.result : null,
+                      durationMs: matchingResult?.durationMs,
+                    };
+                  },
+                ),
+              });
+
+              currentMessages.push({
+                role: "system",
+                content:
+                  `[VALIDATION ERROR — BACKTRACK BUDGET EXHAUSTED]\n\n` +
+                  `${errorBlock}\n\n` +
+                  `Multiple approaches have failed. Fix the remaining issues directly.`,
+              });
+            }
+
+            this.logIteration(selectedPass, currentMessages);
+            continue;
+          }
+
+          // ── No validation errors — commit this branch ──────────
+
+          this.logIteration(selectedPass, currentMessages);
+
+          // Clear failed approaches on success — the trajectory is viable
+          failedApproachDescriptions = [];
+
+          const assistantMessage: ConversationMessage = {
+            role: "assistant",
+            content: selectedPass.streamedText || "",
+            ...(selectedPass.streamedThinking.trim() && {
+              thinking: selectedPass.streamedThinking.trim(),
+            }),
+            ...(selectedPass.thinkingSignature && {
+              thinkingSignature: selectedPass.thinkingSignature,
+            }),
+            toolCalls: selectedPass.pendingToolCalls.map(
+              (toolCall: ToolCall) => {
+                const matchingResult = results.find(
+                  (result) => result.id === toolCall.id,
+                );
                 return {
                   id: toolCall.id || null,
+                  responsesItemId: toolCall.responsesItemId || undefined,
                   name: toolCall.name,
                   args: toolCall.args,
+                  thoughtSignature: toolCall.thoughtSignature || undefined,
+                  reasoningItem: toolCall.reasoningItem || undefined,
                   result: matchingResult ? matchingResult.result : null,
                   durationMs: matchingResult?.durationMs,
                 };
-              }),
-            });
+              },
+            ),
+          };
+          currentMessages.push(assistantMessage);
 
-            currentMessages.push({
-              role: "system",
-              content:
-                `[VALIDATION ERROR — BACKTRACK BUDGET EXHAUSTED]\n\n` +
-                `${errorBlock}\n\n` +
-                `Multiple approaches have failed. Fix the remaining issues directly.`,
-            });
+          currentMessages = currentMessages.filter(
+            (message) =>
+              !(
+                message.role === "assistant" &&
+                !message.content?.trim() &&
+                (!message.toolCalls || message.toolCalls.length === 0)
+              ),
+          );
+
+          this.checkAndApplyToolSetChanges(currentMessages);
+
+          continue;
+        }
+
+        // ── No tools — final text response ──────────────────────
+        if (selectedPass.streamedText || selectedPass.streamedThinking.trim()) {
+          this.logIteration(selectedPass, currentMessages);
+          hasCleanTextBreak = true;
+          break;
+        }
+
+        // ── Empty output — check for truncation recovery ─────────
+        if (isOutputTruncated(selectedPass)) {
+          truncationRecoveryCount++;
+          const configuredMaxTokens = context.options.maxTokens || "default";
+          logger.warn(
+            `[TreeOfThought] Max tokens truncation detected on iteration ${state.iterations} — ` +
+              `Recovery attempt ${truncationRecoveryCount}/${MAX_OUTPUT_TRUNCATION_RECOVERIES}.`,
+          );
+
+          if (truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES) {
+            const escalatedMaxTokens = injectContinuationContext(
+              currentMessages,
+              selectedPass,
+              context,
+              truncationRecoveryCount,
+            );
+            context.options.maxTokens = escalatedMaxTokens;
+            this.logIteration(selectedPass, currentMessages);
+            continue;
           }
 
-          this.logIteration(selectedPass, currentMessages);
-          continue;
-        }
-
-        // ── No validation errors — commit this branch ──────────
-
-        this.logIteration(selectedPass, currentMessages);
-
-        // Clear failed approaches on success — the trajectory is viable
-        failedApproachDescriptions = [];
-
-        const assistantMessage: ConversationMessage = {
-          role: "assistant",
-          content: selectedPass.streamedText || "",
-          ...(selectedPass.streamedThinking.trim() && {
-            thinking: selectedPass.streamedThinking.trim(),
-          }),
-          ...(selectedPass.thinkingSignature && {
-            thinkingSignature: selectedPass.thinkingSignature,
-          }),
-          toolCalls: selectedPass.pendingToolCalls.map((toolCall: ToolCall) => {
-            const matchingResult = results.find(
-              (result) => result.id === toolCall.id,
-            );
-            return {
-              id: toolCall.id || null,
-              responsesItemId: toolCall.responsesItemId || undefined,
-              name: toolCall.name,
-              args: toolCall.args,
-              thoughtSignature: toolCall.thoughtSignature || undefined,
-              reasoningItem: toolCall.reasoningItem || undefined,
-              result: matchingResult ? matchingResult.result : null,
-              durationMs: matchingResult?.durationMs,
-            };
-          }),
-        };
-        currentMessages.push(assistantMessage);
-
-        currentMessages = currentMessages.filter(
-          (message) =>
-            !(
-              message.role === "assistant" &&
-              !message.content?.trim() &&
-              (!message.toolCalls || message.toolCalls.length === 0)
-            ),
-        );
-
-        this.checkAndApplyToolSetChanges(currentMessages);
-
-        continue;
-      }
-
-      // ── No tools — final text response ──────────────────────
-      if (selectedPass.streamedText || selectedPass.streamedThinking.trim()) {
-        this.logIteration(selectedPass, currentMessages);
-        hasCleanTextBreak = true;
-        break;
-      }
-
-      // ── Empty output — check for truncation recovery ─────────
-      if (isOutputTruncated(selectedPass)) {
-        truncationRecoveryCount++;
-        const configuredMaxTokens = context.options.maxTokens || "default";
-        logger.warn(
-          `[TreeOfThought] Max tokens truncation detected on iteration ${state.iterations} — ` +
-            `Recovery attempt ${truncationRecoveryCount}/${MAX_OUTPUT_TRUNCATION_RECOVERIES}.`,
-        );
-
-        if (truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES) {
-          const escalatedMaxTokens = injectContinuationContext(
-            currentMessages,
-            selectedPass,
-            context,
-            truncationRecoveryCount,
+          const exhaustionMessage = buildExhaustedRecoveryMessage(
+            MAX_OUTPUT_TRUNCATION_RECOVERIES,
+            configuredMaxTokens,
           );
-          context.options.maxTokens = escalatedMaxTokens;
+          injectErrorAsConversationMessage(
+            currentMessages,
+            exhaustionMessage,
+            context,
+          );
           this.logIteration(selectedPass, currentMessages);
-          continue;
+          break;
         }
 
-        const exhaustionMessage = buildExhaustedRecoveryMessage(
-          MAX_OUTPUT_TRUNCATION_RECOVERIES,
-          configuredMaxTokens,
+        logger.warn(
+          `[TreeOfThought] Empty model output on iteration ${state.iterations}. Breaking.`,
         );
-        injectErrorAsConversationMessage(currentMessages, exhaustionMessage, context);
         this.logIteration(selectedPass, currentMessages);
         break;
       }
 
-      logger.warn(
-        `[TreeOfThought] Empty model output on iteration ${state.iterations}. Breaking.`,
+      // ── Exhaustion Recovery Pass ─────────────────────────────
+      if (
+        !hasCleanTextBreak &&
+        state.streamedToolCalls.length > 0 &&
+        !signal?.aborted
+      ) {
+        state.sessionOutcome = "exhausted";
+        await runExhaustionRecoveryPass(this, context, state, currentMessages);
+      }
+
+      // ── Finalization (happy path) ──────────────────────────────
+      logger.info(
+        `[TreeOfThought] Session complete: ${state.iterations} iterations, ` +
+          `${state.branchesExplored} branches explored, ` +
+          `${state.branchesBacktracked} backtracked, ` +
+          `strategy: ${searchStrategy}`,
       );
-      this.logIteration(selectedPass, currentMessages);
-      break;
-    }
 
-    // ── Exhaustion Recovery Pass ─────────────────────────────
-    if (!hasCleanTextBreak && state.streamedToolCalls.length > 0 && !signal?.aborted) {
-      state.sessionOutcome = "exhausted";
-      await runExhaustionRecoveryPass(this, context, state, currentMessages);
-    }
-
-    // ── Finalization (happy path) ──────────────────────────────
-    logger.info(
-      `[TreeOfThought] Session complete: ${state.iterations} iterations, ` +
-        `${state.branchesExplored} branches explored, ` +
-        `${state.branchesBacktracked} backtracked, ` +
-        `strategy: ${searchStrategy}`,
-    );
-
-    await this.finalize(currentMessages, hooks);
-    return { messages: currentMessages };
-
+      await this.finalize(currentMessages, hooks);
+      return { messages: currentMessages };
     } catch (loopError: unknown) {
       logger.error(
         `[TreeOfThought] Loop error on iteration ${state.iterations}: ${loopError instanceof Error ? loopError.message : String(loopError)}. Persisting ${currentMessages.length - state.originalMessageCount} accumulated message(s).`,
@@ -723,12 +755,12 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     // Inject structured diversity prompt for non-primary branches
     if (branchIndex > 0 || failedApproaches.length > 0) {
       const strategyDescriptor =
-        BRANCH_STRATEGY_DESCRIPTORS[branchIndex % BRANCH_STRATEGY_DESCRIPTORS.length] ||
-        BRANCH_STRATEGY_DESCRIPTORS[1];
+        BRANCH_STRATEGY_DESCRIPTORS[
+          branchIndex % BRANCH_STRATEGY_DESCRIPTORS.length
+        ] || BRANCH_STRATEGY_DESCRIPTORS[1];
 
       let diversityInstruction =
-        `[BRANCH ${branchIndex + 1}/${totalBranches}] ` +
-        strategyDescriptor;
+        `[BRANCH ${branchIndex + 1}/${totalBranches}] ` + strategyDescriptor;
 
       // Inject failed approach avoidance when we have reflexion history
       if (failedApproaches.length > 0) {
@@ -748,7 +780,10 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
     }
 
     const pass = this.createPassState(passOptions);
-    const requestIdBase = this.context.requestId || this.context.agentSessionId || crypto.randomUUID();
+    const requestIdBase =
+      this.context.requestId ||
+      this.context.agentSessionId ||
+      crypto.randomUUID();
     const passRequestId = `${requestIdBase}-iter-${this.state.iterations}-branch-${branchIndex}`;
     pass.requestId = passRequestId;
     this.registerTrackerRequest(passRequestId);
@@ -762,7 +797,12 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       thinking: pass.streamedThinking,
       thinkingSignature: pass.thinkingSignature,
       score: 0,
-      criteriaScores: { correctness: 0, risk: 0, efficiency: 0, completeness: 0 },
+      criteriaScores: {
+        correctness: 0,
+        risk: 0,
+        efficiency: 0,
+        completeness: 0,
+      },
       pass,
     };
   }
@@ -858,7 +898,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       }
 
       // Parse multi-criteria scores
-      const linePattern = /(\d+)\s*:\s*correctness\s*=\s*(\d+(?:\.\d+)?)\s*,\s*risk\s*=\s*(\d+(?:\.\d+)?)\s*,\s*efficiency\s*=\s*(\d+(?:\.\d+)?)\s*,\s*completeness\s*=\s*(\d+(?:\.\d+)?)/gi;
+      const linePattern =
+        /(\d+)\s*:\s*correctness\s*=\s*(\d+(?:\.\d+)?)\s*,\s*risk\s*=\s*(\d+(?:\.\d+)?)\s*,\s*efficiency\s*=\s*(\d+(?:\.\d+)?)\s*,\s*completeness\s*=\s*(\d+(?:\.\d+)?)/gi;
       let lineMatch: RegExpExecArray | null;
       while ((lineMatch = linePattern.exec(scoreResponseText)) !== null) {
         const candidateIndex = parseInt(lineMatch[1], 10) - 1;
@@ -886,7 +927,9 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       if (!hasMultiCriteriaScores) {
         const simpleScorePattern = /(\d+)\s*:\s*(\d+(?:\.\d+)?)/g;
         let simpleMatch: RegExpExecArray | null;
-        while ((simpleMatch = simpleScorePattern.exec(scoreResponseText)) !== null) {
+        while (
+          (simpleMatch = simpleScorePattern.exec(scoreResponseText)) !== null
+        ) {
           const candidateIndex = parseInt(simpleMatch[1], 10) - 1;
           const candidateScore = parseFloat(simpleMatch[2]);
           if (

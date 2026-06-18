@@ -27,7 +27,9 @@ export function extractDiscoverableDomains(): string[] {
   const schemas = ToolOrchestratorService.getClientToolSchemas();
   const domainSet = new Set<string>();
   for (const schema of schemas) {
-    const domain = (schema as Record<string, unknown>).domain as string | undefined;
+    const domain = (schema as Record<string, unknown>).domain as
+      | string
+      | undefined;
     if (domain && isDiscoverableDomain(domain)) {
       domainSet.add(domain);
     }
@@ -44,7 +46,9 @@ export function extractDomainKeywords(maxPerDomain = 4): Map<string, string[]> {
   const schemas = ToolOrchestratorService.getClientToolSchemas();
   const domainToolKeywords = new Map<string, string[]>();
   for (const schema of schemas) {
-    const domain = (schema as Record<string, unknown>).domain as string | undefined;
+    const domain = (schema as Record<string, unknown>).domain as
+      | string
+      | undefined;
     const toolName = schema.name as string;
     if (domain && isDiscoverableDomain(domain) && toolName) {
       if (!domainToolKeywords.has(domain)) {
@@ -76,7 +80,9 @@ function buildToolDiscoveryContent(): string {
   const domainKeywords = extractDomainKeywords(4);
   const triggerExampleLines = [...domainKeywords.entries()]
     .map(([domain, keywords]) => {
-      const quotedKeywords = keywords.map((keyword) => `"${keyword}"`).join(", ");
+      const quotedKeywords = keywords
+        .map((keyword) => `"${keyword}"`)
+        .join(", ");
       return `- ${quotedKeywords} → search for ${domain} tools`;
     })
     .join("\n");
@@ -104,7 +110,9 @@ ${domainList}
 ${triggerExampleLines}`;
 }
 
-const TOOL_DISCOVERY_POLICY_SECTION: ToolPolicySection & { dynamicContent?: () => string } = {
+const TOOL_DISCOVERY_POLICY_SECTION: ToolPolicySection & {
+  dynamicContent?: () => string;
+} = {
   content: "",
   dynamicContent: buildToolDiscoveryContent,
   requires: [TOOL_NAMES.SEARCH_TOOLS],
@@ -148,7 +156,9 @@ export function buildToolPolicy(
 
   return filtered
     .map((section) => {
-      const dynamicSection = section as ToolPolicySection & { dynamicContent?: () => string };
+      const dynamicSection = section as ToolPolicySection & {
+        dynamicContent?: () => string;
+      };
       if (dynamicSection.dynamicContent) return dynamicSection.dynamicContent();
       return section.content;
     })

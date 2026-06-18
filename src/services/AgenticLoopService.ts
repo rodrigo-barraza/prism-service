@@ -2,7 +2,13 @@ import { DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
 import AgenticToolResolver from "./AgenticToolResolver.ts";
 import AgenticLoopState from "./AgenticLoopState.ts";
 import HarnessRegistry from "./harnesses/HarnessRegistry.ts";
-import { pendingApprovals, pendingQuestions, type PendingToolCallSummary, type QuestionDefinition, type QuestionAnswer } from "./ApprovalRegistry.ts";
+import {
+  pendingApprovals,
+  pendingQuestions,
+  type PendingToolCallSummary,
+  type QuestionDefinition,
+  type QuestionAnswer,
+} from "./ApprovalRegistry.ts";
 import SessionGenerationTracker from "./SessionGenerationTracker.ts";
 import ToolContext from "./ToolContext.ts";
 import logger from "../utils/logger.ts";
@@ -55,7 +61,9 @@ export default class AgenticLoopService {
     // If dynamicEnabledTools is not in ToolContext, populate it with the resolved tools
     const toolContextStore = ToolContext.getStore(agentSessionId);
     if (!toolContextStore.has("dynamicEnabledTools")) {
-      const initialNames = resolvedTools.resolvedEnabledTools || resolvedTools.finalTools.map((tool) => tool.name);
+      const initialNames =
+        resolvedTools.resolvedEnabledTools ||
+        resolvedTools.finalTools.map((tool) => tool.name);
       ToolContext.set(agentSessionId, "dynamicEnabledTools", initialNames);
     }
 
@@ -74,13 +82,18 @@ export default class AgenticLoopService {
           await import("./SettingsService.js");
         const agentSettings = await SettingsService.getSection("agents");
         if (!harnessId) harnessId = agentSettings?.harness || "standard";
-        if (!topologyId) topologyId = agentSettings?.topology || DEFAULT_TOPOLOGY;
+        if (!topologyId)
+          topologyId = agentSettings?.topology || DEFAULT_TOPOLOGY;
 
         // CriticGate: auto-enable from settings when a critic model is configured
         // and the request didn't explicitly set enableCriticGate.
-        if (options.enableCriticGate === undefined && agentSettings?.criticModel) {
+        if (
+          options.enableCriticGate === undefined &&
+          agentSettings?.criticModel
+        ) {
           options.enableCriticGate = true;
-          options.criticModel = options.criticModel || agentSettings.criticModel;
+          options.criticModel =
+            options.criticModel || agentSettings.criticModel;
         }
       } catch {
         if (!harnessId) harnessId = "standard";
@@ -173,7 +186,10 @@ export default class AgenticLoopService {
   static _setPendingQuestion(
     conversationId: string,
     entry: {
-      resolve: (value: { answers: QuestionAnswer[] | null; isTimedOut?: boolean }) => void;
+      resolve: (value: {
+        answers: QuestionAnswer[] | null;
+        isTimedOut?: boolean;
+      }) => void;
       question?: string;
       questions?: QuestionDefinition[];
       choices?: string[];
@@ -219,6 +235,10 @@ export default class AgenticLoopService {
     label: string;
     description: string;
   }> {
-    return HarnessRegistry.list() as Array<{ id: string; label: string; description: string }>;
+    return HarnessRegistry.list() as Array<{
+      id: string;
+      label: string;
+      description: string;
+    }>;
   }
 }

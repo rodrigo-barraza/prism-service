@@ -1,4 +1,7 @@
-import type { SubAgentResult, SubAgentState } from "../../types/orchestrator.ts";
+import type {
+  SubAgentResult,
+  SubAgentState,
+} from "../../types/orchestrator.ts";
 import type { ConversationMessage } from "../harnesses/types.ts";
 
 /*
@@ -14,7 +17,9 @@ export function getLastAssistantText(messages: ConversationMessage[]): string {
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index];
     if (message.role !== "assistant") continue;
-    const text = (typeof message.content === "string" ? message.content : "").trim();
+    const text = (
+      typeof message.content === "string" ? message.content : ""
+    ).trim();
     if (text) return text;
   }
   return "";
@@ -41,7 +46,9 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
   // on the live messages array, then falls back to telemetry.output (streamed
   // chunks). subAgent.messages is nulled after the loop to release memory, so
   // we use subAgent.output directly as the primary text source.
-  const lastText = (subAgent.output || "").trim() || getLastAssistantText(subAgent.messages || []);
+  const lastText =
+    (subAgent.output || "").trim() ||
+    getLastAssistantText(subAgent.messages || []);
 
   // Aggregate tool call names into { name: count } for frontend badge display
   const toolNames: Record<string, number> = {};
@@ -64,7 +71,9 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
     durationMs: subAgent.durationMs || 0,
     // Include full conversation for frontend MessageList rendering.
     // Strip system messages — they're large and not useful for display.
-    messages: (subAgent.messages || []).filter((message) => message.role !== "system"),
+    messages: (subAgent.messages || []).filter(
+      (message) => message.role !== "system",
+    ),
   };
 
   if (subAgent.diff?.hasChanges) {
@@ -86,7 +95,9 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
  * to inject at least some useful context into the Shared Discussion Board
  * instead of the useless boilerplate summary ("Agent X completed").
  */
-export function buildToolCallFallbackSummary(agentResult: SubAgentResult): string | null {
+export function buildToolCallFallbackSummary(
+  agentResult: SubAgentResult,
+): string | null {
   if (agentResult.toolUses === 0 && !agentResult.iterations) return null;
 
   const toolBreakdown = agentResult.toolNames
@@ -95,9 +106,10 @@ export function buildToolCallFallbackSummary(agentResult: SubAgentResult): strin
         .join(", ")
     : null;
 
-  const iterationLabel = agentResult.iterations === 1
-    ? "1 iteration"
-    : `${agentResult.iterations} iterations`;
+  const iterationLabel =
+    agentResult.iterations === 1
+      ? "1 iteration"
+      : `${agentResult.iterations} iterations`;
 
   if (toolBreakdown) {
     return (

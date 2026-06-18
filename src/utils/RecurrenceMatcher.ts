@@ -20,18 +20,18 @@ export interface RecurrenceRule {
 export function matchRecurrenceRule(
   rule: RecurrenceRule,
   startDateInput: Date,
-  targetDateInput: Date
+  targetDateInput: Date,
 ): boolean {
   // Normalize dates to midnight local time for precise date comparisons
   const startDate = new Date(
     startDateInput.getFullYear(),
     startDateInput.getMonth(),
-    startDateInput.getDate()
+    startDateInput.getDate(),
   );
   const targetDate = new Date(
     targetDateInput.getFullYear(),
     targetDateInput.getMonth(),
-    targetDateInput.getDate()
+    targetDateInput.getDate(),
   );
 
   // If target date is before the start date, it cannot match
@@ -44,7 +44,9 @@ export function matchRecurrenceRule(
   switch (rule.frequency) {
     case "daily": {
       const differenceInMs = targetDate.getTime() - startDate.getTime();
-      const differenceInDays = Math.floor(differenceInMs / (24 * 60 * 60 * 1000));
+      const differenceInDays = Math.floor(
+        differenceInMs / (24 * 60 * 60 * 1000),
+      );
       return differenceInDays % interval === 0;
     }
 
@@ -57,7 +59,9 @@ export function matchRecurrenceRule(
       targetSunday.setDate(targetDate.getDate() - targetDate.getDay());
 
       const differenceInMs = targetSunday.getTime() - startSunday.getTime();
-      const differenceInWeeks = Math.floor(differenceInMs / (7 * 24 * 60 * 60 * 1000));
+      const differenceInWeeks = Math.floor(
+        differenceInMs / (7 * 24 * 60 * 60 * 1000),
+      );
 
       if (differenceInWeeks % interval !== 0) {
         return false;
@@ -84,7 +88,8 @@ export function matchRecurrenceRule(
     }
 
     case "yearly": {
-      const differenceInYears = targetDate.getFullYear() - startDate.getFullYear();
+      const differenceInYears =
+        targetDate.getFullYear() - startDate.getFullYear();
 
       if (differenceInYears % interval !== 0) {
         return false;
@@ -112,7 +117,7 @@ function matchMonthlyOrYearlyDayRule(
   rule: RecurrenceRule,
   targetDate: Date,
   isYearly: boolean = false,
-  startDate?: Date
+  startDate?: Date,
 ): boolean {
   const type = isYearly ? rule.yearlyType : rule.monthlyType;
 
@@ -136,7 +141,7 @@ function matchMonthlyOrYearlyDayRule(
       const lastDayOfMonth = new Date(
         targetDate.getFullYear(),
         targetDate.getMonth() + 1,
-        0
+        0,
       ).getDate();
       return dayOfMonth >= lastDayOfMonth - 6 && dayOfMonth <= lastDayOfMonth;
     }
@@ -147,13 +152,14 @@ function matchMonthlyOrYearlyDayRule(
   // Default is dayOfMonth specific date.
   // When no dayOfMonth is set, infer from the recurrence start date
   // so that "every year on Feb 29" works without requiring explicit config.
-  const dayOfMonthRule = rule.dayOfMonth ?? (startDate ? startDate.getDate() : 1);
+  const dayOfMonthRule =
+    rule.dayOfMonth ?? (startDate ? startDate.getDate() : 1);
 
   if (dayOfMonthRule === -1) {
     const nextDay = new Date(
       targetDate.getFullYear(),
       targetDate.getMonth(),
-      targetDate.getDate() + 1
+      targetDate.getDate() + 1,
     );
     return nextDay.getMonth() !== targetDate.getMonth();
   }
@@ -163,7 +169,7 @@ function matchMonthlyOrYearlyDayRule(
   const lastDayOfTargetMonth = new Date(
     targetDate.getFullYear(),
     targetDate.getMonth() + 1,
-    0
+    0,
   ).getDate();
 
   const effectiveDayRule = Math.min(dayOfMonthRule, lastDayOfTargetMonth);

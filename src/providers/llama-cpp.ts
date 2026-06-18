@@ -1,4 +1,10 @@
-import { ProviderOptions, ChatMessage, Provider, GenerateTextResult, StreamChunk } from "../types/provider.ts";
+import {
+  ProviderOptions,
+  ChatMessage,
+  Provider,
+  GenerateTextResult,
+  StreamChunk,
+} from "../types/provider.ts";
 // ─────────────────────────────────────────────────────────────
 // llama.cpp Provider (llama-server)
 // ─────────────────────────────────────────────────────────────
@@ -76,7 +82,10 @@ interface HealthResponse {
 }
 
 // ── Provider ─────────────────────────────────────────────────
-export function createLlamaCppProvider(baseUrl: string, instanceId: string = "llama-cpp"): Provider {
+export function createLlamaCppProvider(
+  baseUrl: string,
+  instanceId: string = "llama-cpp",
+): Provider {
   const getBaseUrl = () => baseUrl;
 
   return {
@@ -91,7 +100,10 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
       options: ProviderOptions = {},
     ): Promise<GenerateTextResult> {
       const baseUrl = getBaseUrl();
-      logger.provider("llama.cpp", `generateText model=${model} baseUrl=${baseUrl}`);
+      logger.provider(
+        "llama.cpp",
+        `generateText model=${model} baseUrl=${baseUrl}`,
+      );
       try {
         // Expand video attachments to image frames (ffmpeg) before message prep
         await expandVideoToFrames(messages);
@@ -105,7 +117,8 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
           model,
           ...buildPayloadParams(options),
           // llama.cpp extension: top_k
-          ...(options.topK !== undefined && options.topK > 0 && { top_k: options.topK }),
+          ...(options.topK !== undefined &&
+            options.topK > 0 && { top_k: options.topK }),
           // llama.cpp extension: min_p sampling
           ...(options.minP !== undefined && { min_p: options.minP }),
           // llama.cpp extension: repeat_penalty
@@ -127,7 +140,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
           `${baseUrl}/v1/chat/completions`,
           payload,
         );
-        const data = await response.json() as LlamaCppCompletionResponse;
+        const data = (await response.json()) as LlamaCppCompletionResponse;
         const { text, thinking, usage, toolCalls } =
           processNonStreamingResponse(data, {
             thinkingEnabled: options.thinkingEnabled,
@@ -152,14 +165,22 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
           result.toolCalls = toolCalls.map((toolCall) => ({
             id: toolCall.id || "",
             name: toolCall.name,
-            args: typeof toolCall.args === "object" && toolCall.args !== null ? (toolCall.args as Record<string, unknown>) : {},
+            args:
+              typeof toolCall.args === "object" && toolCall.args !== null
+                ? (toolCall.args as Record<string, unknown>)
+                : {},
             thoughtSignature: toolCall.thoughtSignature || undefined,
           }));
         }
         return result;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("llama-cpp", getErrorMessage(error), 500, error);
+        throw new ProviderError(
+          "llama-cpp",
+          getErrorMessage(error),
+          500,
+          error,
+        );
       }
     },
 
@@ -171,7 +192,10 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
       options: ProviderOptions = {},
     ): AsyncGenerator<StreamChunk, void, unknown> {
       const baseUrl = getBaseUrl();
-      logger.provider("llama.cpp", `generateTextStream model=${model} baseUrl=${baseUrl}`);
+      logger.provider(
+        "llama.cpp",
+        `generateTextStream model=${model} baseUrl=${baseUrl}`,
+      );
       try {
         // Expand video attachments to image frames (ffmpeg) before message prep
         await expandVideoToFrames(messages);
@@ -185,7 +209,8 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
           model,
           ...buildPayloadParams(options),
           // llama.cpp extension: top_k
-          ...(options.topK !== undefined && options.topK > 0 && { top_k: options.topK }),
+          ...(options.topK !== undefined &&
+            options.topK > 0 && { top_k: options.topK }),
           // llama.cpp extension: min_p sampling
           ...(options.minP !== undefined && { min_p: options.minP }),
           // llama.cpp extension: repeat_penalty
@@ -249,7 +274,12 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
       } catch (error: unknown) {
         if (error instanceof Error && error.name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("llama-cpp", getErrorMessage(error), 500, error);
+        throw new ProviderError(
+          "llama-cpp",
+          getErrorMessage(error),
+          500,
+          error,
+        );
       }
     },
 
@@ -262,9 +292,15 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
       prompt: string = "Describe this image.",
       model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["llama-cpp"],
       systemPrompt?: string,
-    ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }> {
+    ): Promise<{
+      text: string;
+      usage: { inputTokens: number; outputTokens: number };
+    }> {
       const baseUrl = getBaseUrl();
-      logger.provider("llama.cpp", `captionImage model=${model} baseUrl=${baseUrl}`);
+      logger.provider(
+        "llama.cpp",
+        `captionImage model=${model} baseUrl=${baseUrl}`,
+      );
       try {
         const content = [
           { type: "text", text: prompt },
@@ -290,7 +326,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
           },
         );
 
-        const data = await response.json() as OpenAICompletionResponse;
+        const data = (await response.json()) as OpenAICompletionResponse;
         const text = data.choices?.[0]?.message?.content || "";
         const usage: TokenUsage = {
           inputTokens: data.usage?.prompt_tokens || 0,
@@ -305,7 +341,12 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
         };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("llama-cpp", getErrorMessage(error), 500, error);
+        throw new ProviderError(
+          "llama-cpp",
+          getErrorMessage(error),
+          500,
+          error,
+        );
       }
     },
 
@@ -331,7 +372,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
           const errorText = await response.text();
           throw new Error(`API error: ${response.status} ${errorText}`);
         }
-        const data = await response.json() as LlamaCppModelsResponse;
+        const data = (await response.json()) as LlamaCppModelsResponse;
         // Normalize to our standard { models: [...] } format
         const models = (data.data || []).map((model: LlamaCppModel) => ({
           key: model.id,
@@ -342,7 +383,12 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
         return { models };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("llama-cpp", getErrorMessage(error), 500, error);
+        throw new ProviderError(
+          "llama-cpp",
+          getErrorMessage(error),
+          500,
+          error,
+        );
       }
     },
 
@@ -357,7 +403,7 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
           method: "GET",
           signal: AbortSignal.timeout(3000),
         });
-        const data = await response.json() as HealthResponse;
+        const data = (await response.json()) as HealthResponse;
         return {
           ok: response.ok,
           status: response.ok
@@ -367,7 +413,11 @@ export function createLlamaCppProvider(baseUrl: string, instanceId: string = "ll
           slotsProcessing: data.slots_processing ?? null,
         };
       } catch (error: unknown) {
-        return { ok: false, status: "unreachable", error: getErrorMessage(error) };
+        return {
+          ok: false,
+          status: "unreachable",
+          error: getErrorMessage(error),
+        };
       }
     },
   };

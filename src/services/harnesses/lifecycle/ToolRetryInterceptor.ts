@@ -1,8 +1,16 @@
 import logger from "../../../utils/logger.ts";
-import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
-import type { ToolCall, ToolResult, ConversationMessage, EmitFunction } from "../types.ts";
+import type {
+  ToolCall,
+  ToolResult,
+  ConversationMessage,
+  EmitFunction,
+} from "../types.ts";
 
 /**
  * ToolRetryInterceptor — structured retry guidance on tool failure.
@@ -62,7 +70,9 @@ export function buildToolRetryGuidance(
 
   for (const toolCall of toolCalls) {
     const matchingResult = results.find(
-      (result) => result.id === toolCall.id || (!result.id && result.name === toolCall.name),
+      (result) =>
+        result.id === toolCall.id ||
+        (!result.id && result.name === toolCall.name),
     );
 
     if (!matchingResult) continue;
@@ -72,7 +82,8 @@ export function buildToolRetryGuidance(
 
     if (!hasError) continue;
 
-    const consecutiveFailureCount = state.toolErrorCounts.get(toolCall.name) || 0;
+    const consecutiveFailureCount =
+      state.toolErrorCounts.get(toolCall.name) || 0;
 
     // Skip tools that have already hit the circuit breaker — trackToolErrors
     // already handles those with a "skipping" warning
@@ -82,25 +93,31 @@ export function buildToolRetryGuidance(
       toolName: toolCall.name,
       toolCallId: toolCall.id,
       originalArguments: toolCall.args,
-      errorMessage: resultPayload?.error || resultPayload?.message || "Unknown error",
+      errorMessage:
+        resultPayload?.error || resultPayload?.message || "Unknown error",
       consecutiveFailureCount,
     });
   }
 
   if (failedToolCalls.length === 0) return null;
 
-  const retryGuidanceBlocks = failedToolCalls.map((failedToolCall) => {
-    const argumentSummary = formatArgumentSummary(failedToolCall.originalArguments);
-    const attemptLabel = failedToolCall.consecutiveFailureCount > 1
-      ? ` (attempt ${failedToolCall.consecutiveFailureCount})`
-      : "";
+  const retryGuidanceBlocks = failedToolCalls
+    .map((failedToolCall) => {
+      const argumentSummary = formatArgumentSummary(
+        failedToolCall.originalArguments,
+      );
+      const attemptLabel =
+        failedToolCall.consecutiveFailureCount > 1
+          ? ` (attempt ${failedToolCall.consecutiveFailureCount})`
+          : "";
 
-    return (
-      `### \`${failedToolCall.toolName}\`${attemptLabel}\n` +
-      `**Error:** ${failedToolCall.errorMessage}\n` +
-      `**Original arguments:**\n${argumentSummary}`
-    );
-  }).join("\n\n");
+      return (
+        `### \`${failedToolCall.toolName}\`${attemptLabel}\n` +
+        `**Error:** ${failedToolCall.errorMessage}\n` +
+        `**Original arguments:**\n${argumentSummary}`
+      );
+    })
+    .join("\n\n");
 
   const retryMessage: ConversationMessage = {
     role: "system",
@@ -133,13 +150,17 @@ function formatArgumentSummary(
 
   if (argumentEntries.length === 0) return "  (no arguments)\n";
 
-  return argumentEntries
-    .map(([key, value]) => {
-      const stringifiedValue = typeof value === "string" ? value : JSON.stringify(value);
-      const truncatedValue = stringifiedValue.length > 200
-        ? `${stringifiedValue.slice(0, 200)}…`
-        : stringifiedValue;
-      return `  - \`${key}\`: ${truncatedValue}`;
-    })
-    .join("\n") + "\n";
+  return (
+    argumentEntries
+      .map(([key, value]) => {
+        const stringifiedValue =
+          typeof value === "string" ? value : JSON.stringify(value);
+        const truncatedValue =
+          stringifiedValue.length > 200
+            ? `${stringifiedValue.slice(0, 200)}…`
+            : stringifiedValue;
+        return `  - \`${key}\`: ${truncatedValue}`;
+      })
+      .join("\n") + "\n"
+  );
 }

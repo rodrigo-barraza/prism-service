@@ -4,7 +4,12 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import { FILE_CATEGORIES } from "../../constants.ts";
 import type { ChatMessage } from "../../types/admin.ts";
-import type { MessagePayload, ConversationSettings, ConversationPatchInput, ConversationPatchFields } from "./types.ts";
+import type {
+  MessagePayload,
+  ConversationSettings,
+  ConversationPatchInput,
+  ConversationPatchFields,
+} from "./types.ts";
 
 interface ConversationDocument {
   id: string;
@@ -30,7 +35,10 @@ export async function extractFiles(
 
     // Handle images
     if (message.images && message.images.length > 0) {
-      const category = message.role === "assistant" ? FILE_CATEGORIES.GENERATIONS : FILE_CATEGORIES.UPLOADS;
+      const category =
+        message.role === "assistant"
+          ? FILE_CATEGORIES.GENERATIONS
+          : FILE_CATEGORIES.UPLOADS;
       const newImages: string[] = [];
       for (const rawImage of message.images) {
         if (typeof rawImage !== "string") {
@@ -68,7 +76,10 @@ export async function extractFiles(
       typeof updated.audio === "string" &&
       updated.audio.startsWith("data:")
     ) {
-      const category = updated.role === "assistant" ? FILE_CATEGORIES.GENERATIONS : FILE_CATEGORIES.UPLOADS;
+      const category =
+        updated.role === "assistant"
+          ? FILE_CATEGORIES.GENERATIONS
+          : FILE_CATEGORIES.UPLOADS;
       try {
         const { ref } = await FileService.uploadFile(
           updated.audio,
@@ -90,7 +101,9 @@ export async function extractFiles(
 /**
  * Compute input/output modalities from messages for lightweight querying.
  */
-export function computeModalities(messages: ChatMessage[]): Record<string, boolean> {
+export function computeModalities(
+  messages: ChatMessage[],
+): Record<string, boolean> {
   const modalities = {
     textIn: false,
     textOut: false,
@@ -106,7 +119,10 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
     thinking: false,
   };
 
-  const WEB_SEARCH_NAMES: Set<string> = new Set([TOOL_NAMES.SEARCH_WEB, TOOL_NAMES.SEARCH_WEB_PREVIEW]);
+  const WEB_SEARCH_NAMES: Set<string> = new Set([
+    TOOL_NAMES.SEARCH_WEB,
+    TOOL_NAMES.SEARCH_WEB_PREVIEW,
+  ]);
   const CODE_EXEC_NAMES: Set<string> = new Set([TOOL_NAMES.CODE_EXECUTION]);
   const VIDEO_EXTENSIONS = [".mp4", ".mov", ".avi", ".webm"];
 
@@ -115,11 +131,16 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
     const isUser = chatMessage.role === "user";
     const isAssistant = chatMessage.role === "assistant";
     if (chatMessage.content && (isUser || isAssistant)) {
-      if (isUser && !(chatMessage as Record<string, unknown>).liveTranscription) modalities.textIn = true;
+      if (isUser && !(chatMessage as Record<string, unknown>).liveTranscription)
+        modalities.textIn = true;
       if (isAssistant) modalities.textOut = true;
     }
     // Tool calls are structured text output
-    if (isAssistant && chatMessage.toolCalls && chatMessage.toolCalls.length > 0) {
+    if (
+      isAssistant &&
+      chatMessage.toolCalls &&
+      chatMessage.toolCalls.length > 0
+    ) {
       modalities.textOut = true;
     }
 
@@ -134,7 +155,9 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
           imageReference.endsWith(".txt");
         const isVideoReference =
           imageReference.startsWith("data:video/") ||
-          VIDEO_EXTENSIONS.some((extension) => imageReference.endsWith(extension));
+          VIDEO_EXTENSIONS.some((extension) =>
+            imageReference.endsWith(extension),
+          );
         if (isDocumentReference) {
           modalities.docIn = true;
         } else if (isVideoReference) {
@@ -147,7 +170,10 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
     }
 
     // Standalone image field (not from images array)
-    if ((chatMessage as Record<string, unknown>).image && !chatMessage.images?.length) {
+    if (
+      (chatMessage as Record<string, unknown>).image &&
+      !chatMessage.images?.length
+    ) {
       if (isUser) modalities.imageIn = true;
       if (isAssistant) modalities.imageOut = true;
     }
@@ -158,7 +184,13 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
     }
 
     // Documents array (separate from image-based document detection)
-    if (((chatMessage as Record<string, unknown>).documents as string[] | undefined)?.length) {
+    if (
+      (
+        (chatMessage as Record<string, unknown>).documents as
+          | string[]
+          | undefined
+      )?.length
+    ) {
       modalities.docIn = true;
     }
 
@@ -208,16 +240,22 @@ export function computeModalities(messages: ChatMessage[]): Record<string, boole
   return modalities;
 }
 
-
 /**
  * Extract unique providers from messages and settings.
  */
-export function extractProviders(messages: ChatMessage[], settings: ConversationSettings | null): string[] {
+export function extractProviders(
+  messages: ChatMessage[],
+  settings: ConversationSettings | null,
+): string[] {
   const providers = new Set<string>();
   for (const chatMessage of messages || []) {
     if (chatMessage.deleted) continue;
     if ((chatMessage as Record<string, unknown>).provider) {
-      providers.add(((chatMessage as Record<string, unknown>).provider as string).toLowerCase());
+      providers.add(
+        (
+          (chatMessage as Record<string, unknown>).provider as string
+        ).toLowerCase(),
+      );
     }
   }
   if (settings?.provider) providers.add(settings.provider.toLowerCase());
@@ -247,7 +285,9 @@ export function buildConversationPatchFields({
   systemPrompt,
   settings,
 }: ConversationPatchInput): ConversationPatchFields {
-  const setFields: ConversationPatchFields = { updatedAt: new Date().toISOString() };
+  const setFields: ConversationPatchFields = {
+    updatedAt: new Date().toISOString(),
+  };
   if (title !== undefined) setFields.title = title;
   if (messages !== undefined) {
     setFields.messages = messages;
@@ -279,11 +319,21 @@ export function buildConversationPatchFields({
  */
 export function enrichConversationsWithRequestCosts(
   conversations: ConversationDocument[],
-  requestLogCosts: Array<{ _id: string; totalCost: number; requestErrorCount?: number }>,
+  requestLogCosts: Array<{
+    _id: string;
+    totalCost: number;
+    requestErrorCount?: number;
+  }>,
 ): void {
   if (conversations.length === 0) return;
   const costMap = new Map(
-    requestLogCosts.map((costEntry) => [costEntry._id, { totalCost: costEntry.totalCost, requestErrorCount: costEntry.requestErrorCount || 0 }]),
+    requestLogCosts.map((costEntry) => [
+      costEntry._id,
+      {
+        totalCost: costEntry.totalCost,
+        requestErrorCount: costEntry.requestErrorCount || 0,
+      },
+    ]),
   );
   for (const conversation of conversations) {
     const conversationId = conversation.id;
@@ -307,7 +357,11 @@ export function enrichConversationsWithRequestCosts(
  */
 export function enrichSingleConversationCost(
   conversation: ConversationDocument,
-  requestLogAggregation: Array<{ _id: string; totalCost: number; requestErrorCount?: number }>,
+  requestLogAggregation: Array<{
+    _id: string;
+    totalCost: number;
+    requestErrorCount?: number;
+  }>,
 ): void {
   if (requestLogAggregation.length > 0) {
     if (requestLogAggregation[0].totalCost > 0) {
@@ -317,7 +371,8 @@ export function enrichSingleConversationCost(
       );
     }
     if ((requestLogAggregation[0].requestErrorCount || 0) > 0) {
-      conversation.requestErrorCount = requestLogAggregation[0].requestErrorCount;
+      conversation.requestErrorCount =
+        requestLogAggregation[0].requestErrorCount;
     }
   }
 }

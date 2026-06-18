@@ -8,13 +8,19 @@ import type { TopologyRouter } from "../TopologyRouter.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import { InstanceLoadBalancer } from "../InstanceLoadBalancer.ts";
 import { resolveModelForInstances } from "../../../utils/ModelResolution.ts";
-import { getInstancesByType, getInstanceType } from "../../../providers/instance-registry.ts";
+import {
+  getInstancesByType,
+  getInstanceType,
+} from "../../../providers/instance-registry.ts";
 import localModelQueue from "../../LocalModelQueue.ts";
 import logger from "../../../utils/logger.ts";
 import SettingsService from "../../SettingsService.ts";
 import { GitWorktreeHelper } from "../GitWorktreeHelper.ts";
 
-async function getSubAgentFallback(): Promise<{ provider: string; model: string } | null> {
+async function getSubAgentFallback(): Promise<{
+  provider: string;
+  model: string;
+} | null> {
   try {
     const agents = await SettingsService.getSection("agents");
     if (agents) {
@@ -41,7 +47,7 @@ export class SequentialRouter implements TopologyRouter {
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
     logger.info(
-      `[SequentialRouter] Starting sequential team execution of ${members.length} member(s)...`
+      `[SequentialRouter] Starting sequential team execution of ${members.length} member(s)...`,
     );
 
     const isLocal = localModelQueue.isLocal(providerName);
@@ -53,7 +59,9 @@ export class SequentialRouter implements TopologyRouter {
 
     for (let index = 0; index < members.length; index++) {
       const member = members[index];
-      logger.info(`[SequentialRouter] Running step ${index + 1}/${members.length}: ${member.description}`);
+      logger.info(
+        `[SequentialRouter] Running step ${index + 1}/${members.length}: ${member.description}`,
+      );
 
       // 1. Resolve instance for this step
       let siblings = getInstancesByType(providerType);
@@ -64,14 +72,14 @@ export class SequentialRouter implements TopologyRouter {
       if (isLocal && siblings.length > 1) {
         const { usable, modelOverrides } = await resolveModelForInstances(
           assignedModel,
-          siblings
+          siblings,
         );
         instanceModelOverrides = modelOverrides;
         if (usable.length > 0) {
           siblings = usable;
         } else {
           logger.warn(
-            `[SequentialRouter] Model "${assignedModel}" not available on any ${providerType} instance`
+            `[SequentialRouter] Model "${assignedModel}" not available on any ${providerType} instance`,
           );
           siblings = [];
         }
@@ -83,7 +91,7 @@ export class SequentialRouter implements TopologyRouter {
           providerName,
           instanceModelOverrides,
           assignedModel,
-          new Map()
+          new Map(),
         );
         if (assigned) {
           assignedProvider = assigned.provider;
@@ -116,43 +124,54 @@ export class SequentialRouter implements TopologyRouter {
       results.push(spawnResult);
 
       if ("error" in spawnResult) {
-        logger.error(`[SequentialRouter] Step ${index + 1} failed: ${spawnResult.error}. Aborting sequence.`);
+        logger.error(
+          `[SequentialRouter] Step ${index + 1} failed: ${spawnResult.error}. Aborting sequence.`,
+        );
         break;
       }
 
       if (spawnResult.status === "failed") {
-        logger.error(`[SequentialRouter] Step ${index + 1} failed. Aborting sequence.`);
+        logger.error(
+          `[SequentialRouter] Step ${index + 1} failed. Aborting sequence.`,
+        );
         break;
       }
 
       // 4. Merge changes back to main branch so subsequent worktrees inherit them (only if files changed)
-      const hasFileChanges = spawnResult.status === "completed"
-        && spawnResult.agent_id
-        && spawnResult.diff;
+      const hasFileChanges =
+        spawnResult.status === "completed" &&
+        spawnResult.agent_id &&
+        spawnResult.diff;
 
       if (hasFileChanges) {
         const subAgentId = spawnResult.agent_id!;
         const branchName = `orchestrator/${subAgentId}`;
-        const workspaceRoot = GitWorktreeHelper.getDefaultWorkspaceRoot(orchestratorContext.workspaceRoot ?? undefined);
-        const repositoryPath = GitWorktreeHelper.resolveRepositoryPath(workspaceRoot, member.files || []);
+        const workspaceRoot = GitWorktreeHelper.getDefaultWorkspaceRoot(
+          orchestratorContext.workspaceRoot ?? undefined,
+        );
+        const repositoryPath = GitWorktreeHelper.resolveRepositoryPath(
+          workspaceRoot,
+          member.files || [],
+        );
 
-        logger.info(`[SequentialRouter] Merging branch ${branchName} back into main repo`);
+        logger.info(
+          `[SequentialRouter] Merging branch ${branchName} back into main repo`,
+        );
         const mergeResult = await GitWorktreeHelper.mergeWorktree(
           repositoryPath,
           branchName,
-          `chore(sequence): merge work from sequential sub-agent ${subAgentId}`
+          `chore(sequence): merge work from sequential sub-agent ${subAgentId}`,
         );
 
         if (mergeResult.error) {
           const errorMessage = `Failed to merge branch for ${subAgentId}: ${mergeResult.error}`;
           logger.error(`[SequentialRouter] ${errorMessage}`);
-          return [
-            ...results,
-            { error: errorMessage }
-          ];
+          return [...results, { error: errorMessage }];
         }
       } else if (spawnResult.status === "completed") {
-        logger.info(`[SequentialRouter] No file changes from step ${index + 1} — skipping merge step`);
+        logger.info(
+          `[SequentialRouter] No file changes from step ${index + 1} — skipping merge step`,
+        );
       }
 
       // 5. Accumulate text result for the next agent

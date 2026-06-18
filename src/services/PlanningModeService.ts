@@ -59,7 +59,9 @@ export default class PlanningModeService {
     }
 
     // Insert AFTER the system message but BEFORE any user messages
-    const systemIndex = messages.findIndex((message) => message.role === "system");
+    const systemIndex = messages.findIndex(
+      (message) => message.role === "system",
+    );
     const insertionIndex = systemIndex >= 0 ? systemIndex + 1 : 0;
 
     messages.splice(insertionIndex, 0, {
@@ -84,9 +86,7 @@ export default class PlanningModeService {
     );
     if (injectionIndex >= 0) {
       messages.splice(injectionIndex, 1);
-      logger.info(
-        "[PlanningMode] Stripped planning instruction message",
-      );
+      logger.info("[PlanningMode] Stripped planning instruction message");
     }
   }
   static extractSteps(planText: string): string[] {
@@ -99,4 +99,3 @@ export default class PlanningModeService {
     return steps;
   }
 }
-

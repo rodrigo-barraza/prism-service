@@ -21,7 +21,9 @@ const TRUNCATABLE_ARRAY_KEYS = [
   "commodities",
 ];
 
-function isTruncatableResult(value: unknown): value is object | string | number | boolean | null | undefined {
+function isTruncatableResult(
+  value: unknown,
+): value is object | string | number | boolean | null | undefined {
   return typeof value !== "function" && typeof value !== "symbol";
 }
 
@@ -31,7 +33,10 @@ function isTruncatableResult(value: unknown): value is object | string | number 
  * The full result is still stored in the DB and shown in the UI;
  * this only affects what gets re-sent to the model.
  */
-export function truncateToolResult(result: object | string | number | boolean | null | undefined, maxChars = 8000): object | string | number | boolean | null | undefined {
+export function truncateToolResult(
+  result: object | string | number | boolean | null | undefined,
+  maxChars = 8000,
+): object | string | number | boolean | null | undefined {
   if (!result || typeof result !== "object") return result;
 
   // Also handle top-level arrays (e.g. tides, earthquakes)
@@ -39,7 +44,9 @@ export function truncateToolResult(result: object | string | number | boolean | 
     const sliced = result.slice(0, 10);
     sliced.push({ _truncated: `Showing 10 of ${result.length}` });
     const serialized = JSON.stringify(sliced);
-    return serialized.length > maxChars ? serialized.slice(0, maxChars) + "…}" : sliced;
+    return serialized.length > maxChars
+      ? serialized.slice(0, maxChars) + "…}"
+      : sliced;
   }
 
   // If result has a known array wrapper, cap items at 10
@@ -69,7 +76,10 @@ interface ExpandedToolCall {
   args?: unknown;
   responsesItemId?: string;
   thoughtSignature?: string;
-  reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> };
+  reasoningItem?: {
+    id: string;
+    summary: Array<{ type: string; text: string }>;
+  };
 }
 
 interface ExpandedMessage {
@@ -100,14 +110,20 @@ export function expandMessagesForFunctionCall(
     ? messages.filter(
         (messageItem) =>
           !messageItem.deleted &&
-          (messageItem.role !== "assistant" || messageItem.content?.toString().trim() || messageItem.toolCalls?.length),
+          (messageItem.role !== "assistant" ||
+            messageItem.content?.toString().trim() ||
+            messageItem.toolCalls?.length),
       )
     : messages;
 
   return filtered.flatMap((message) => {
     // Expand assistant messages with toolCalls into
     // [assistant(tool_calls), tool(result1), tool(result2), ...]
-    if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
+    if (
+      message.role === "assistant" &&
+      message.toolCalls &&
+      message.toolCalls.length > 0
+    ) {
       const assistantMessage: ExpandedMessage = {
         role: "assistant",
         content: message.content?.toString().trim() || null,
@@ -136,7 +152,8 @@ export function expandMessagesForFunctionCall(
         .map((toolCall: ToolCallEntry) => {
           let finalResult = toolCall.result;
           if (
-            (toolCall.name === TOOL_NAMES.CREATE_TEAM || toolCall.name === "team_create") &&
+            (toolCall.name === TOOL_NAMES.CREATE_TEAM ||
+              toolCall.name === "team_create") &&
             Array.isArray(toolCall.result)
           ) {
             finalResult = toolCall.result.map((subAgentResult) => {
@@ -148,7 +165,9 @@ export function expandMessagesForFunctionCall(
             });
           }
 
-          const truncatableResult = isTruncatableResult(finalResult) ? finalResult : undefined;
+          const truncatableResult = isTruncatableResult(finalResult)
+            ? finalResult
+            : undefined;
 
           return {
             role: "tool",
@@ -181,16 +200,33 @@ export function expandMessagesForFunctionCall(
     return [
       {
         role: message.role,
-        ...(message.content?.toString().trim() ? { content: message.content } : { content: " " }),
-        ...(message.images && message.images.length > 0 ? { images: message.images } : {}),
-        ...(message.video && message.video.length > 0 ? { video: message.video } : {}),
-        ...(message.audio && (Array.isArray(message.audio) ? message.audio.length > 0 : message.audio) ? { audio: message.audio } : {}),
+        ...(message.content?.toString().trim()
+          ? { content: message.content }
+          : { content: " " }),
+        ...(message.images && message.images.length > 0
+          ? { images: message.images }
+          : {}),
+        ...(message.video && message.video.length > 0
+          ? { video: message.video }
+          : {}),
+        ...(message.audio &&
+        (Array.isArray(message.audio)
+          ? message.audio.length > 0
+          : message.audio)
+          ? { audio: message.audio }
+          : {}),
         ...(message.pdf && message.pdf.length > 0 ? { pdf: message.pdf } : {}),
         ...(message.role === "assistant" && message.thinking
           ? { thinking: message.thinking }
           : {}),
-        ...(message.role === "assistant" && (message as ChatMessage & { thinkingSignature?: string }).thinkingSignature
-          ? { thinkingSignature: (message as ChatMessage & { thinkingSignature?: string }).thinkingSignature }
+        ...(message.role === "assistant" &&
+        (message as ChatMessage & { thinkingSignature?: string })
+          .thinkingSignature
+          ? {
+              thinkingSignature: (
+                message as ChatMessage & { thinkingSignature?: string }
+              ).thinkingSignature,
+            }
           : {}),
       },
     ];

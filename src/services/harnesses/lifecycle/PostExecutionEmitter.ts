@@ -1,9 +1,18 @@
 import logger from "../../../utils/logger.ts";
 import { TOOL_NAMES } from "../../ToolTaxonomyConstants.ts";
-import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
-import type { ToolCall, ToolResult, PassState, EmitFunction, AgenticContext } from "../types.ts";
+import type {
+  ToolCall,
+  ToolResult,
+  PassState,
+  EmitFunction,
+  AgenticContext,
+} from "../types.ts";
 import FileService from "../../FileService.ts";
 import WebhookEventBus from "../../WebhookEventBus.ts";
 import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
@@ -40,7 +49,10 @@ export function emitPostExecutionStatus(
         toolCall.name.includes("_task") || toolCall.name.startsWith("task_"),
     )
   ) {
-    emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.TASKS_UPDATED });
+    emit({
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: STATUS_MESSAGES.TASKS_UPDATED,
+    });
   }
 
   if (
@@ -52,11 +64,17 @@ export function emitPostExecutionStatus(
         toolCall.name === TOOL_NAMES.STOP_AGENT,
     )
   ) {
-    emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.SUB_AGENTS_UPDATED });
+    emit({
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
+    });
   }
 
   if (toolCalls.some((toolCall) => toolCall.name === TOOL_NAMES.SAVE_MEMORY)) {
-    emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.MEMORIES_UPDATED });
+    emit({
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: STATUS_MESSAGES.MEMORIES_UPDATED,
+    });
   }
 }
 
@@ -71,7 +89,9 @@ export async function processToolResultMedia(
 ): Promise<void> {
   for (const toolCall of toolCalls) {
     const toolResult = results.find(
-      (result) => result.id === toolCall.id || (!result.id && result.name === toolCall.name),
+      (result) =>
+        result.id === toolCall.id ||
+        (!result.id && result.name === toolCall.name),
     );
     const resultObject = toolResult?.result as ToolResultPayload | null;
     const hasError = !!resultObject?.error;
@@ -82,7 +102,10 @@ export async function processToolResultMedia(
       const mimeType = audioResult.mimeType || "audio/wav";
       const dataUrl = `data:${mimeType};base64,${audioResult.data}`;
       try {
-        const uploadResult = await FileService.uploadFile(dataUrl, FILE_CATEGORIES.GENERATIONS);
+        const uploadResult = await FileService.uploadFile(
+          dataUrl,
+          FILE_CATEGORIES.GENERATIONS,
+        );
         if (resultObject) {
           resultObject.audioRef = uploadResult.ref;
           delete resultObject.audio;
@@ -94,7 +117,10 @@ export async function processToolResultMedia(
           minioRef: uploadResult.ref,
         });
       } catch (uploadError) {
-        logger.error(`[PostExecutionEmitter] Failed to upload audio:`, uploadError);
+        logger.error(
+          `[PostExecutionEmitter] Failed to upload audio:`,
+          uploadError,
+        );
       }
     }
 
@@ -136,7 +162,8 @@ export async function processToolResultMedia(
     const imageResult = resultObject?.image;
     if (imageResult?.data) {
       const toolImgRef =
-        imageResult.minioRef || `data:${imageResult.mimeType};base64,${imageResult.data}`;
+        imageResult.minioRef ||
+        `data:${imageResult.mimeType};base64,${imageResult.data}`;
       state.streamedImages.push(toolImgRef);
       pass.streamedImages.push(toolImgRef);
       emit({
@@ -160,7 +187,9 @@ export function trackToolErrors(
 ): void {
   for (const toolCall of toolCalls) {
     const toolResult = results.find(
-      (result) => result.id === toolCall.id || (!result.id && result.name === toolCall.name),
+      (result) =>
+        result.id === toolCall.id ||
+        (!result.id && result.name === toolCall.name),
     );
     const hasError = !!(toolResult?.result as ToolResultPayload)?.error;
 

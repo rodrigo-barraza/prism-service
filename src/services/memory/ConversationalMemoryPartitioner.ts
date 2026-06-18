@@ -39,7 +39,9 @@ export function partitionConversationalMemories(
  * Identify stale conversational agent memories using type-aware thresholds.
  * Only fast-decaying categories (gaming, work, achievement) are flagged.
  */
-export function findStaleConversationalMemories(memories: MemoryDoc[]): MemoryDoc[] {
+export function findStaleConversationalMemories(
+  memories: MemoryDoc[],
+): MemoryDoc[] {
   return memories.filter((memory) => {
     const threshold = CONVERSATIONAL_STALENESS_CONFIG[memory.type];
     if (!threshold) return false; // durable types (personal, preference, etc.) are never stale

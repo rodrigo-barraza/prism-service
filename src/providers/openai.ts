@@ -13,7 +13,10 @@ import {
   getDefaultModels,
   getModelByName,
 } from "../config.ts";
-import { convertToolsToOpenAI, normalizeUsage } from "../utils/openai-compat.ts";
+import {
+  convertToolsToOpenAI,
+  normalizeUsage,
+} from "../utils/openai-compat.ts";
 import type { TokenUsage } from "../types/admin.ts";
 import {
   getDataUrlMimeType,
@@ -39,7 +42,11 @@ const PRIORITY_TOOL_NAMES = new Set([
 
 function useResponsesAPI(model: string): boolean {
   const modelDefinition = getModelByName(model);
-  return modelDefinition !== null && "responsesAPI" in modelDefinition && (modelDefinition as { responsesAPI?: boolean }).responsesAPI === true;
+  return (
+    modelDefinition !== null &&
+    "responsesAPI" in modelDefinition &&
+    (modelDefinition as { responsesAPI?: boolean }).responsesAPI === true
+  );
 }
 
 /**
@@ -48,9 +55,9 @@ function useResponsesAPI(model: string): boolean {
  * are prioritized to the front so the agent can always dynamically discover
  * and enable additional tools even when the full catalog exceeds the limit.
  */
-function truncateToolsForChatCompletions<T extends { type: string; function?: { name: string } }>(
-  tools: T[],
-): T[] {
+function truncateToolsForChatCompletions<
+  T extends { type: string; function?: { name: string } },
+>(tools: T[]): T[] {
   if (tools.length <= OPENAI_CHAT_COMPLETIONS_MAX_TOOLS) return tools;
 
   const priorityTools: T[] = [];
@@ -65,13 +72,17 @@ function truncateToolsForChatCompletions<T extends { type: string; function?: { 
     }
   }
 
-  const slotsForRemaining = OPENAI_CHAT_COMPLETIONS_MAX_TOOLS - priorityTools.length;
-  const truncated = [...priorityTools, ...remainingTools.slice(0, slotsForRemaining)];
+  const slotsForRemaining =
+    OPENAI_CHAT_COMPLETIONS_MAX_TOOLS - priorityTools.length;
+  const truncated = [
+    ...priorityTools,
+    ...remainingTools.slice(0, slotsForRemaining),
+  ];
 
   logger.warn(
     `[OpenAI] Truncated tool count from ${tools.length} to ${truncated.length} ` +
-    `(Chat Completions API max: ${OPENAI_CHAT_COMPLETIONS_MAX_TOOLS}). ` +
-    `Priority tools preserved: ${priorityTools.map((tool) => tool.function?.name).join(", ") || "none"}`,
+      `(Chat Completions API max: ${OPENAI_CHAT_COMPLETIONS_MAX_TOOLS}). ` +
+      `Priority tools preserved: ${priorityTools.map((tool) => tool.function?.name).join(", ") || "none"}`,
   );
 
   return truncated;
@@ -101,7 +112,10 @@ export interface OpenAIMessage {
     args: Record<string, unknown>;
     result?: unknown;
     responsesItemId?: string;
-    reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> };
+    reasoningItem?: {
+      id: string;
+      summary: Array<{ type: string; text: string }>;
+    };
   }>;
   tool_call_id?: string;
   id?: string;
@@ -117,9 +131,17 @@ export interface OpenAIMessage {
  * @see https://platform.openai.com/docs/guides/structured-outputs
  */
 const OPENAI_ALLOWED_SCHEMA_KEYWORDS = new Set([
-  "type", "properties", "required", "additionalProperties",
-  "items", "enum", "const", "description",
-  "anyOf", "$defs", "$ref",
+  "type",
+  "properties",
+  "required",
+  "additionalProperties",
+  "items",
+  "enum",
+  "const",
+  "description",
+  "anyOf",
+  "$defs",
+  "$ref",
 ]);
 
 /**
@@ -131,7 +153,10 @@ const OPENAI_ALLOWED_SCHEMA_KEYWORDS = new Set([
  * - Forbidden keywords (pattern, minimum, maximum, default, etc.) must be stripped
  * - `anyOf` branches must each be independently valid
  */
-function sanitizeSchemaForOpenAI(schema: unknown, isInsidePropertiesMap = false): unknown {
+function sanitizeSchemaForOpenAI(
+  schema: unknown,
+  isInsidePropertiesMap = false,
+): unknown {
   if (!schema || typeof schema !== "object") return schema;
 
   if (Array.isArray(schema)) {
@@ -145,14 +170,21 @@ function sanitizeSchemaForOpenAI(schema: unknown, isInsidePropertiesMap = false)
     // Inside a `properties` map, keys are user-defined field names (e.g. "count", "name"),
     // NOT JSON Schema keywords — so we skip the allowlist filter and recurse into each
     // property schema. At all other levels, strip unrecognized keywords.
-    if (!isInsidePropertiesMap && !OPENAI_ALLOWED_SCHEMA_KEYWORDS.has(key)) continue;
+    if (!isInsidePropertiesMap && !OPENAI_ALLOWED_SCHEMA_KEYWORDS.has(key))
+      continue;
 
     // When we encounter the schema keyword "properties" at the SCHEMA level (not inside
     // a properties map), its value is a map of field-name → schema. We recurse with
     // isInsidePropertiesMap = true so field names aren't filtered by the allowlist.
     // If we're ALREADY inside a properties map and a field is named "properties",
     // it's just a regular field name whose value is a schema — recurse normally.
-    if (!isInsidePropertiesMap && key === "properties" && value && typeof value === "object" && !Array.isArray(value)) {
+    if (
+      !isInsidePropertiesMap &&
+      key === "properties" &&
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    ) {
       cleaned[key] = sanitizeSchemaForOpenAI(value, true);
     } else {
       cleaned[key] = sanitizeSchemaForOpenAI(value);
@@ -161,8 +193,8 @@ function sanitizeSchemaForOpenAI(schema: unknown, isInsidePropertiesMap = false)
 
   // Sanitize anyOf branches (each must be a valid strict-mode schema)
   if (Array.isArray(cleaned.anyOf)) {
-    cleaned.anyOf = (cleaned.anyOf as unknown[]).map(
-      (branch: unknown) => sanitizeSchemaForOpenAI(branch),
+    cleaned.anyOf = (cleaned.anyOf as unknown[]).map((branch: unknown) =>
+      sanitizeSchemaForOpenAI(branch),
     );
   }
 
@@ -170,7 +202,10 @@ function sanitizeSchemaForOpenAI(schema: unknown, isInsidePropertiesMap = false)
   // Only apply at the schema level, NOT when processing a properties map (where keys are
   // field names). A field named "properties" would trigger `cleaned.properties !== undefined`
   // and corrupt the map with injected additionalProperties/required keys.
-  if (!isInsidePropertiesMap && (cleaned.type === "object" || cleaned.properties !== undefined)) {
+  if (
+    !isInsidePropertiesMap &&
+    (cleaned.type === "object" || cleaned.properties !== undefined)
+  ) {
     cleaned.additionalProperties = false;
 
     if (!cleaned.properties || typeof cleaned.properties !== "object") {
@@ -179,7 +214,9 @@ function sanitizeSchemaForOpenAI(schema: unknown, isInsidePropertiesMap = false)
     } else {
       const propertiesMap = cleaned.properties as Record<string, unknown>;
       const propertyKeys = Object.keys(propertiesMap);
-      const originalRequired = Array.isArray(cleaned.required) ? cleaned.required as string[] : [];
+      const originalRequired = Array.isArray(cleaned.required)
+        ? (cleaned.required as string[])
+        : [];
       const newRequired = [...originalRequired];
 
       for (const propertyKey of propertyKeys) {
@@ -188,13 +225,21 @@ function sanitizeSchemaForOpenAI(schema: unknown, isInsidePropertiesMap = false)
 
           // Make newly-required properties nullable via anyOf (not array type)
           const propertySchema = propertiesMap[propertyKey];
-          if (propertySchema && typeof propertySchema === "object" && !Array.isArray(propertySchema)) {
-            const typedPropertySchema = propertySchema as Record<string, unknown>;
+          if (
+            propertySchema &&
+            typeof propertySchema === "object" &&
+            !Array.isArray(propertySchema)
+          ) {
+            const typedPropertySchema = propertySchema as Record<
+              string,
+              unknown
+            >;
 
             // Skip if it already has anyOf (it's already a union type)
             if (!typedPropertySchema.anyOf) {
               if (typeof typedPropertySchema.type === "string") {
-                const { type: originalType, ...restProperties } = typedPropertySchema;
+                const { type: originalType, ...restProperties } =
+                  typedPropertySchema;
                 propertiesMap[propertyKey] = {
                   anyOf: [
                     { type: originalType, ...restProperties },
@@ -205,17 +250,24 @@ function sanitizeSchemaForOpenAI(schema: unknown, isInsidePropertiesMap = false)
               // If type is already an array (from source schema), convert to anyOf
               else if (Array.isArray(typedPropertySchema.type)) {
                 const types = typedPropertySchema.type as string[];
-                const { type: _discardedType, ...restProperties } = typedPropertySchema;
+                const { type: _discardedType, ...restProperties } =
+                  typedPropertySchema;
                 if (!types.includes("null")) {
                   propertiesMap[propertyKey] = {
                     anyOf: [
-                      ...types.map((typeValue: string) => ({ type: typeValue, ...restProperties })),
+                      ...types.map((typeValue: string) => ({
+                        type: typeValue,
+                        ...restProperties,
+                      })),
                       { type: "null" },
                     ],
                   };
                 } else {
                   propertiesMap[propertyKey] = {
-                    anyOf: types.map((typeValue: string) => ({ type: typeValue, ...(typeValue !== "null" ? restProperties : {}) })),
+                    anyOf: types.map((typeValue: string) => ({
+                      type: typeValue,
+                      ...(typeValue !== "null" ? restProperties : {}),
+                    })),
                   };
                 }
               }
@@ -235,7 +287,10 @@ function sanitizeSchemaForOpenAI(schema: unknown, isInsidePropertiesMap = false)
     const types = cleaned.type as string[];
     const { type: _discardedType, ...restProperties } = cleaned;
     return {
-      anyOf: types.map((typeValue: string) => ({ type: typeValue, ...(typeValue !== "null" ? restProperties : {}) })),
+      anyOf: types.map((typeValue: string) => ({
+        type: typeValue,
+        ...(typeValue !== "null" ? restProperties : {}),
+      })),
     };
   }
 
@@ -247,15 +302,22 @@ function sanitizeSchemaForOpenAI(schema: unknown, isInsidePropertiesMap = false)
  * Input:  [{ name, description, parameters }]
  * Output: [{ type: "function", name, description, parameters }]
  */
-function convertToolsToResponsesAPI(tools?: ToolSchema[] | null): OpenAI.Responses.Tool[] | null {
+function convertToolsToResponsesAPI(
+  tools?: ToolSchema[] | null,
+): OpenAI.Responses.Tool[] | null {
   if (!tools || !Array.isArray(tools) || tools.length === 0) return null;
-  return tools.map((tool: ToolSchema): OpenAI.Responses.Tool => ({
-    type: "function" as const,
-    name: tool.name,
-    description: tool.description || "",
-    parameters: sanitizeSchemaForOpenAI(tool.parameters || {}) as Record<string, unknown>,
-    strict: true,
-  }));
+  return tools.map(
+    (tool: ToolSchema): OpenAI.Responses.Tool => ({
+      type: "function" as const,
+      name: tool.name,
+      description: tool.description || "",
+      parameters: sanitizeSchemaForOpenAI(tool.parameters || {}) as Record<
+        string,
+        unknown
+      >,
+      strict: true,
+    }),
+  );
 }
 
 /** Narrow any errors into ProviderError for all catch blocks. */
@@ -263,10 +325,16 @@ function toProviderError(error: unknown): never {
   let message = String(error);
   let status = 500;
   if (error && typeof error === "object") {
-    if ("message" in error && typeof (error as { message: unknown }).message === "string") {
+    if (
+      "message" in error &&
+      typeof (error as { message: unknown }).message === "string"
+    ) {
       message = (error as { message: string }).message;
     }
-    if ("status" in error && typeof (error as { status: unknown }).status === "number") {
+    if (
+      "status" in error &&
+      typeof (error as { status: unknown }).status === "number"
+    ) {
       status = (error as { status: number }).status;
     }
   }
@@ -284,12 +352,15 @@ function asErrorRecord(error: unknown): ErrorRecord {
   return error as ErrorRecord;
 }
 export function normalizeResponsesUsage(
-  rawUsage: {
-    input_tokens?: number;
-    output_tokens?: number;
-    input_tokens_details?: { cached_tokens?: number };
-    output_tokens_details?: { reasoning_tokens?: number };
-  } | null | undefined
+  rawUsage:
+    | {
+        input_tokens?: number;
+        output_tokens?: number;
+        input_tokens_details?: { cached_tokens?: number };
+        output_tokens_details?: { reasoning_tokens?: number };
+      }
+    | null
+    | undefined,
 ): TokenUsage {
   const usage: TokenUsage = {
     inputTokens: rawUsage?.input_tokens ?? 0,
@@ -309,150 +380,160 @@ export function normalizeResponsesUsage(
 
   return usage;
 }
-function prepareOpenAIMessages(messages: OpenAIMessage[]): OpenAI.Chat.ChatCompletionMessageParam[] {
-  return messages.map((message: OpenAIMessage): OpenAI.Chat.ChatCompletionMessageParam => {
-    // Tool result messages — include tool_call_id for correlation
-    if (message.role === "tool") {
-      return {
-        role: "tool",
-        tool_call_id: message.tool_call_id || message.id || "",
-        content:
-          typeof message.content === "string"
-            ? message.content
-            : JSON.stringify(message.content ?? ""),
-      };
-    }
+function prepareOpenAIMessages(
+  messages: OpenAIMessage[],
+): OpenAI.Chat.ChatCompletionMessageParam[] {
+  return messages.map(
+    (message: OpenAIMessage): OpenAI.Chat.ChatCompletionMessageParam => {
+      // Tool result messages — include tool_call_id for correlation
+      if (message.role === "tool") {
+        return {
+          role: "tool",
+          tool_call_id: message.tool_call_id || message.id || "",
+          content:
+            typeof message.content === "string"
+              ? message.content
+              : JSON.stringify(message.content ?? ""),
+        };
+      }
 
-    // Assistant messages with tool calls — include tool_calls in OpenAI format
-    if (message.role === "assistant") {
-      if (message.toolCalls && message.toolCalls.length > 0) {
+      // Assistant messages with tool calls — include tool_calls in OpenAI format
+      if (message.role === "assistant") {
+        if (message.toolCalls && message.toolCalls.length > 0) {
+          return {
+            role: "assistant",
+            ...(message.name ? { name: message.name } : {}),
+            content: message.content?.trim() || null,
+            tool_calls: message.toolCalls.map((toolCall, i) => ({
+              id: toolCall.id || `call_${i}`,
+              type: "function" as const,
+              function: {
+                name: toolCall.name,
+                arguments:
+                  typeof toolCall.args === "string"
+                    ? toolCall.args
+                    : JSON.stringify(toolCall.args || {}),
+              },
+            })),
+          };
+        }
         return {
           role: "assistant",
           ...(message.name ? { name: message.name } : {}),
-          content: message.content?.trim() || null,
-          tool_calls: message.toolCalls.map((toolCall, i) => ({
-            id: toolCall.id || `call_${i}`,
-            type: "function" as const,
-            function: {
-              name: toolCall.name,
-              arguments:
-                typeof toolCall.args === "string"
-                  ? toolCall.args
-                  : JSON.stringify(toolCall.args || {}),
-            },
-          })),
+          content: message.content ?? "",
         };
       }
-      return {
-        role: "assistant",
-        ...(message.name ? { name: message.name } : {}),
-        content: message.content ?? "",
-      };
-    }
 
-    if (message.role === "system") {
-      return {
-        role: "system",
-        ...(message.name ? { name: message.name } : {}),
-        content: message.content ?? "",
-      };
-    }
+      if (message.role === "system") {
+        return {
+          role: "system",
+          ...(message.name ? { name: message.name } : {}),
+          content: message.content ?? "",
+        };
+      }
 
-    if (message.role === "developer") {
-      return {
-        role: "developer",
-        ...(message.name ? { name: message.name } : {}),
-        content: message.content ?? "",
-      };
-    }
+      if (message.role === "developer") {
+        return {
+          role: "developer",
+          ...(message.name ? { name: message.name } : {}),
+          content: message.content ?? "",
+        };
+      }
 
-    // User messages (can be multimodal)
-    if (message.images && message.images.length > 0) {
-      const content: OpenAI.Chat.ChatCompletionContentPart[] = [];
-      for (const mediaRef of message.images) {
-        const urlType = getUrlType(mediaRef);
+      // User messages (can be multimodal)
+      if (message.images && message.images.length > 0) {
+        const content: OpenAI.Chat.ChatCompletionContentPart[] = [];
+        for (const mediaRef of message.images) {
+          const urlType = getUrlType(mediaRef);
 
-        if (urlType === "data") {
-          // Base64 data URL — use MIME type to route
-          const mime = getDataUrlMimeType(mediaRef);
-          if (mime && mime.startsWith("image/")) {
-            content.push({ type: "image_url", image_url: { url: mediaRef } });
-          } else if (mime === "application/pdf") {
-            content.push({
-              type: "file",
-              file: { file_data: mediaRef, filename: "document.pdf" },
-            } as OpenAI.Chat.ChatCompletionContentPart);
-          } else if (
-            mime &&
-            (mime.startsWith("text/") || mime === "application/json")
-          ) {
-            // Decode text files and inline as text
-            try {
-              const base64 = mediaRef.split(";base64,")[1];
-              const decoded = Buffer.from(base64, "base64").toString("utf-8");
+          if (urlType === "data") {
+            // Base64 data URL — use MIME type to route
+            const mime = getDataUrlMimeType(mediaRef);
+            if (mime && mime.startsWith("image/")) {
+              content.push({ type: "image_url", image_url: { url: mediaRef } });
+            } else if (mime === "application/pdf") {
               content.push({
-                type: "text",
-                text: `[Attached file (${mime})]:\n${decoded}`,
-              });
-            } catch {
+                type: "file",
+                file: { file_data: mediaRef, filename: "document.pdf" },
+              } as OpenAI.Chat.ChatCompletionContentPart);
+            } else if (
+              mime &&
+              (mime.startsWith("text/") || mime === "application/json")
+            ) {
+              // Decode text files and inline as text
+              try {
+                const base64 = mediaRef.split(";base64,")[1];
+                const decoded = Buffer.from(base64, "base64").toString("utf-8");
+                content.push({
+                  type: "text",
+                  text: `[Attached file (${mime})]:\n${decoded}`,
+                });
+              } catch {
+                content.push({
+                  type: "text",
+                  text: `[Attached file (${mime}): unable to decode]`,
+                });
+              }
+            } else {
+              // Other data URL file types
               content.push({
-                type: "text",
-                text: `[Attached file (${mime}): unable to decode]`,
-              });
+                type: "file",
+                file: { file_data: mediaRef, filename: "attachment" },
+              } as OpenAI.Chat.ChatCompletionContentPart);
+            }
+          } else if (urlType === "http") {
+            // HTTP(S) URL — the Chat Completions API accepts URLs in image_url
+            const inferredType = inferMimeFromUrl(mediaRef);
+            if (inferredType === "image") {
+              content.push({ type: "image_url", image_url: { url: mediaRef } });
+            } else {
+              // Chat Completions file type via URL — use file_data with the URL
+              content.push({
+                type: "file",
+                file: { file_data: mediaRef, filename: "attachment" },
+              } as OpenAI.Chat.ChatCompletionContentPart);
             }
           } else {
-            // Other data URL file types
-            content.push({
-              type: "file",
-              file: { file_data: mediaRef, filename: "attachment" },
-            } as OpenAI.Chat.ChatCompletionContentPart);
+            // Unknown ref type (e.g. minio://) — skip with warning
+            logger.warn(
+              `[openai] Skipping unresolved media ref in Chat Completions input: ${mediaRef.substring(0, 60)}...`,
+            );
           }
-        } else if (urlType === "http") {
-          // HTTP(S) URL — the Chat Completions API accepts URLs in image_url
-          const inferredType = inferMimeFromUrl(mediaRef);
-          if (inferredType === "image") {
-            content.push({ type: "image_url", image_url: { url: mediaRef } });
-          } else {
-            // Chat Completions file type via URL — use file_data with the URL
-            content.push({
-              type: "file",
-              file: { file_data: mediaRef, filename: "attachment" },
-            } as OpenAI.Chat.ChatCompletionContentPart);
-          }
-        } else {
-          // Unknown ref type (e.g. minio://) — skip with warning
-          logger.warn(
-            `[openai] Skipping unresolved media ref in Chat Completions input: ${mediaRef.substring(0, 60)}...`,
-          );
         }
+        if (message.content) {
+          content.push({ type: "text", text: message.content });
+        }
+        return {
+          role: "user",
+          ...(message.name ? { name: message.name } : {}),
+          content,
+        };
       }
-      if (message.content) {
-        content.push({ type: "text", text: message.content });
-      }
+
       return {
         role: "user",
         ...(message.name ? { name: message.name } : {}),
-        content,
+        content: message.content ?? "",
       };
-    }
-
-    return {
-      role: "user",
-      ...(message.name ? { name: message.name } : {}),
-      content: message.content ?? "",
-    };
-  });
+    },
+  );
 }
 
 /**
  * Convert messages to Responses API input format.
  * System messages become developer messages; images use input_image, PDFs use input_file.
  */
-export function prepareResponsesInput(messages: OpenAIMessage[]): OpenAI.Responses.ResponseInputItem[] {
+export function prepareResponsesInput(
+  messages: OpenAIMessage[],
+): OpenAI.Responses.ResponseInputItem[] {
   const result: OpenAI.Responses.ResponseInputItem[] = [];
   for (const message of messages) {
     // Assistant message with tool calls → expand into function_call items
-    if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
+    if (
+      message.role === "assistant" &&
+      message.toolCalls &&
+      message.toolCalls.length > 0
+    ) {
       // If the assistant also produced text, include it first
       if (message.content?.trim()) {
         result.push({
@@ -478,7 +559,9 @@ export function prepareResponsesInput(messages: OpenAIMessage[]): OpenAI.Respons
           } else if (toolCall.id && toolCall.id.startsWith("call_")) {
             functionCallId = toolCall.id.replace(/^call_/, "fc_");
           } else {
-            const secureRandomString = Math.random().toString(36).substring(2, 10);
+            const secureRandomString = Math.random()
+              .toString(36)
+              .substring(2, 10);
             functionCallId = `fc_${toolCall.id || secureRandomString}`;
           }
         }
@@ -499,10 +582,15 @@ export function prepareResponsesInput(messages: OpenAIMessage[]): OpenAI.Respons
       // is hit by the non-streaming generateText route which bypasses expansion.
       for (const toolCall of message.toolCalls) {
         if (toolCall.result !== undefined) {
-          const outputCallId = toolCall.id || (toolCall.responsesItemId?.startsWith("fc") ? toolCall.responsesItemId : `fc_${toolCall.responsesItemId || ""}`);
-          const resultString = typeof toolCall.result === "string"
-            ? toolCall.result
-            : JSON.stringify(toolCall.result);
+          const outputCallId =
+            toolCall.id ||
+            (toolCall.responsesItemId?.startsWith("fc")
+              ? toolCall.responsesItemId
+              : `fc_${toolCall.responsesItemId || ""}`);
+          const resultString =
+            typeof toolCall.result === "string"
+              ? toolCall.result
+              : JSON.stringify(toolCall.result);
           result.push({
             type: "function_call_output",
             call_id: outputCallId,
@@ -527,7 +615,10 @@ export function prepareResponsesInput(messages: OpenAIMessage[]): OpenAI.Respons
     }
 
     // Standard message (system, user, assistant without tools)
-    const role = message.role === "system" ? ("developer" as const) : (message.role as "developer" | "user" | "assistant");
+    const role =
+      message.role === "system"
+        ? ("developer" as const)
+        : (message.role as "developer" | "user" | "assistant");
     const nameObject = message.name ? { name: message.name } : {};
 
     if (message.images && message.images.length > 0) {
@@ -539,7 +630,11 @@ export function prepareResponsesInput(messages: OpenAIMessage[]): OpenAI.Respons
           // Base64 data URL — use MIME type to route
           const mime = getDataUrlMimeType(mediaRef);
           if (mime && mime.startsWith("image/")) {
-            content.push({ type: "input_image", image_url: mediaRef, detail: "auto" });
+            content.push({
+              type: "input_image",
+              image_url: mediaRef,
+              detail: "auto",
+            });
           } else if (
             mime === "application/pdf" ||
             mime ===
@@ -580,7 +675,11 @@ export function prepareResponsesInput(messages: OpenAIMessage[]): OpenAI.Respons
           // HTTP(S) URL — infer type from extension, use URL-based fields
           const inferredType = inferMimeFromUrl(mediaRef);
           if (inferredType === "image") {
-            content.push({ type: "input_image", image_url: mediaRef, detail: "auto" });
+            content.push({
+              type: "input_image",
+              image_url: mediaRef,
+              detail: "auto",
+            });
           } else {
             content.push({ type: "input_file", file_url: mediaRef });
           }
@@ -629,7 +728,11 @@ const openaiProvider = {
       toProviderError(error);
     }
   },
-  async _generateTextResponses(messages: OpenAIMessage[], model: string, options: ProviderOptions) {
+  async _generateTextResponses(
+    messages: OpenAIMessage[],
+    model: string,
+    options: ProviderOptions,
+  ) {
     const input = prepareResponsesInput(messages);
     const payload: OpenAI.Responses.ResponseCreateParamsNonStreaming & {
       seed?: number;
@@ -644,7 +747,10 @@ const openaiProvider = {
       reasoning.effort = options.reasoningEffort as ReasoningEffort;
     }
     if (options.reasoningSummary) {
-      reasoning.summary = options.reasoningSummary as "auto" | "concise" | "detailed";
+      reasoning.summary = options.reasoningSummary as
+        | "auto"
+        | "concise"
+        | "detailed";
     } else if (reasoning.effort) {
       reasoning.summary = "auto";
     }
@@ -663,12 +769,16 @@ const openaiProvider = {
 
     // Seed for reproducibility
     if (options.seed !== undefined) {
-      payload.seed = typeof options.seed === "number" ? options.seed : parseInt(String(options.seed), 10);
+      payload.seed =
+        typeof options.seed === "number"
+          ? options.seed
+          : parseInt(String(options.seed), 10);
     }
 
     // Service tier: auto / default / priority
     if (options.serviceTier) {
-      payload.service_tier = options.serviceTier as OpenAI.Responses.ResponseCreateParamsNonStreaming["service_tier"];
+      payload.service_tier =
+        options.serviceTier as OpenAI.Responses.ResponseCreateParamsNonStreaming["service_tier"];
     }
 
     // Response format (JSON mode) — maps to text.format for Responses API
@@ -706,9 +816,14 @@ const openaiProvider = {
     }
 
     // Custom function calling tools
-    const customTools = convertToolsToResponsesAPI(options.tools as ToolSchema[] | null | undefined);
+    const customTools = convertToolsToResponsesAPI(
+      options.tools as ToolSchema[] | null | undefined,
+    );
     if (customTools) {
-      payload.tools = [...((payload.tools as OpenAI.Responses.Tool[]) || []), ...customTools];
+      payload.tools = [
+        ...((payload.tools as OpenAI.Responses.Tool[]) || []),
+        ...customTools,
+      ];
     }
 
     // Parallel tool calls — defaults to true; set false for sequential FC
@@ -726,7 +841,9 @@ const openaiProvider = {
       payload.top_logprobs = options.topLogprobs;
     }
 
-    logger.info(`[OpenAI/Responses] Sending non-stream payload: ${JSON.stringify(payload)}`);
+    logger.info(
+      `[OpenAI/Responses] Sending non-stream payload: ${JSON.stringify(payload)}`,
+    );
 
     const { data: response, response: rawResponse } = await getClient()
       .responses.create(payload)
@@ -737,10 +854,22 @@ const openaiProvider = {
 
     // Collect tool calls and images from output items
     const images: Array<{ type: string; data: string; mimeType: string }> = [];
-    const toolCalls: Array<{ id: string; responsesItemId?: string; name: string; args: Record<string, unknown>; reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> } }> = [];
+    const toolCalls: Array<{
+      id: string;
+      responsesItemId?: string;
+      name: string;
+      args: Record<string, unknown>;
+      reasoningItem?: {
+        id: string;
+        summary: Array<{ type: string; text: string }>;
+      };
+    }> = [];
     if (response.output) {
       // Track pending reasoning items to pair with subsequent function calls
-      const pendingReasoningItems: Array<{ id: string; summary: Array<{ type: string; text: string }> }> = [];
+      const pendingReasoningItems: Array<{
+        id: string;
+        summary: Array<{ type: string; text: string }>;
+      }> = [];
       for (const item of response.output) {
         if (item.type === "image_generation_call" && item.result) {
           images.push({
@@ -749,7 +878,10 @@ const openaiProvider = {
             mimeType: "image/png",
           });
         } else if (item.type === "reasoning") {
-          const reasoningOutputItem = item as unknown as { id: string; summary?: Array<{ type: string; text: string }> };
+          const reasoningOutputItem = item as unknown as {
+            id: string;
+            summary?: Array<{ type: string; text: string }>;
+          };
           if (reasoningOutputItem.id) {
             pendingReasoningItems.push({
               id: reasoningOutputItem.id,
@@ -769,7 +901,9 @@ const openaiProvider = {
             responsesItemId: item.id,
             name: item.name,
             args,
-            ...(pairedReasoningItem ? { reasoningItem: pairedReasoningItem } : {}),
+            ...(pairedReasoningItem
+              ? { reasoningItem: pairedReasoningItem }
+              : {}),
           });
         }
       }
@@ -784,10 +918,18 @@ const openaiProvider = {
     if (rateLimits) result.rateLimits = rateLimits;
     return result;
   },
-  async _generateTextChatCompletions(messages: OpenAIMessage[], model: string, options: ProviderOptions) {
+  async _generateTextChatCompletions(
+    messages: OpenAIMessage[],
+    model: string,
+    options: ProviderOptions,
+  ) {
     const modelDefinition = getModelByName(model);
     const isReasoning =
-      (modelDefinition && "thinking" in modelDefinition && (modelDefinition as { thinking?: boolean }).thinking === true) || model.includes("o1") || model.includes("o3");
+      (modelDefinition &&
+        "thinking" in modelDefinition &&
+        (modelDefinition as { thinking?: boolean }).thinking === true) ||
+      model.includes("o1") ||
+      model.includes("o3");
     const prepared = prepareOpenAIMessages(messages);
     const payload: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
       model,
@@ -796,7 +938,8 @@ const openaiProvider = {
     if (isReasoning) {
       if (options.maxTokens) payload.max_completion_tokens = options.maxTokens;
       if (options.reasoningEffort) {
-        payload.reasoning_effort = options.reasoningEffort as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming["reasoning_effort"];
+        payload.reasoning_effort =
+          options.reasoningEffort as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming["reasoning_effort"];
       }
     } else {
       if (options.temperature !== undefined)
@@ -807,18 +950,23 @@ const openaiProvider = {
       if (options.presencePenalty !== undefined)
         payload.presence_penalty = options.presencePenalty;
       if (options.stopSequences !== undefined)
-        payload.stop = options.stopSequences as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming["stop"];
+        payload.stop =
+          options.stopSequences as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming["stop"];
       if (options.maxTokens) payload.max_completion_tokens = options.maxTokens;
     }
 
     // Seed for reproducibility
     if (options.seed !== undefined) {
-      payload.seed = typeof options.seed === "number" ? options.seed : parseInt(String(options.seed), 10);
+      payload.seed =
+        typeof options.seed === "number"
+          ? options.seed
+          : parseInt(String(options.seed), 10);
     }
 
     // Service tier: auto / default / priority
     if (options.serviceTier) {
-      payload.service_tier = options.serviceTier as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming["service_tier"];
+      payload.service_tier =
+        options.serviceTier as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming["service_tier"];
     }
 
     // Response format (JSON mode)
@@ -827,13 +975,20 @@ const openaiProvider = {
     }
 
     if (options.webSearch) {
-      payload.tools = [{ type: "web_search" } as unknown as OpenAI.Chat.ChatCompletionTool];
+      payload.tools = [
+        { type: "web_search" } as unknown as OpenAI.Chat.ChatCompletionTool,
+      ];
     }
 
     // Custom function calling tools — truncate to 128 max for Chat Completions API
-    const customTools = convertToolsToOpenAI(options.tools as ToolSchema[] | null | undefined) as OpenAI.Chat.ChatCompletionTool[] | null;
+    const customTools = convertToolsToOpenAI(
+      options.tools as ToolSchema[] | null | undefined,
+    ) as OpenAI.Chat.ChatCompletionTool[] | null;
     if (customTools) {
-      const allTools = [...((payload.tools as OpenAI.Chat.ChatCompletionTool[]) || []), ...customTools];
+      const allTools = [
+        ...((payload.tools as OpenAI.Chat.ChatCompletionTool[]) || []),
+        ...customTools,
+      ];
       payload.tools = truncateToolsForChatCompletions(allTools);
     }
 
@@ -875,7 +1030,10 @@ const openaiProvider = {
     } catch (error: unknown) {
       const errorObject = asErrorRecord(error);
       // Retry once after stripping unsupported parameters (e.g. gpt-5-nano rejects temperature)
-      if (errorObject.status === 400 && errorObject.message?.includes("Unsupported")) {
+      if (
+        errorObject.status === 400 &&
+        errorObject.message?.includes("Unsupported")
+      ) {
         const unsupportedParams = [
           "temperature",
           "top_p",
@@ -923,11 +1081,22 @@ const openaiProvider = {
         yield* this._streamChatCompletions(messages, model, options);
       }
     } catch (error: unknown) {
-      if (error && typeof error === "object" && "name" in error && (error instanceof Error && error.name === "AbortError")) return;
+      if (
+        error &&
+        typeof error === "object" &&
+        "name" in error &&
+        error instanceof Error &&
+        error.name === "AbortError"
+      )
+        return;
       toProviderError(error);
     }
   },
-  async *_streamResponses(messages: OpenAIMessage[], model: string, options: ProviderOptions) {
+  async *_streamResponses(
+    messages: OpenAIMessage[],
+    model: string,
+    options: ProviderOptions,
+  ) {
     const input = prepareResponsesInput(messages);
     const payload: OpenAI.Responses.ResponseCreateParamsStreaming & {
       seed?: number;
@@ -942,7 +1111,10 @@ const openaiProvider = {
       reasoning.effort = options.reasoningEffort as ReasoningEffort;
     }
     if (options.reasoningSummary) {
-      reasoning.summary = options.reasoningSummary as "auto" | "concise" | "detailed";
+      reasoning.summary = options.reasoningSummary as
+        | "auto"
+        | "concise"
+        | "detailed";
     } else if (reasoning.effort) {
       reasoning.summary = "auto";
     }
@@ -961,12 +1133,16 @@ const openaiProvider = {
 
     // Seed for reproducibility
     if (options.seed !== undefined) {
-      payload.seed = typeof options.seed === "number" ? options.seed : parseInt(String(options.seed), 10);
+      payload.seed =
+        typeof options.seed === "number"
+          ? options.seed
+          : parseInt(String(options.seed), 10);
     }
 
     // Service tier: auto / default / priority
     if (options.serviceTier) {
-      payload.service_tier = options.serviceTier as OpenAI.Responses.ResponseCreateParamsStreaming["service_tier"];
+      payload.service_tier =
+        options.serviceTier as OpenAI.Responses.ResponseCreateParamsStreaming["service_tier"];
     }
 
     // Response format (JSON mode) — maps to text.format for Responses API
@@ -1004,9 +1180,14 @@ const openaiProvider = {
     }
 
     // Custom function calling tools
-    const customTools = convertToolsToResponsesAPI(options.tools as ToolSchema[] | null | undefined);
+    const customTools = convertToolsToResponsesAPI(
+      options.tools as ToolSchema[] | null | undefined,
+    );
     if (customTools) {
-      payload.tools = [...((payload.tools as OpenAI.Responses.Tool[]) || []), ...customTools];
+      payload.tools = [
+        ...((payload.tools as OpenAI.Responses.Tool[]) || []),
+        ...customTools,
+      ];
     }
 
     // Parallel tool calls — defaults to true; set false for sequential FC
@@ -1024,7 +1205,9 @@ const openaiProvider = {
       payload.top_logprobs = options.topLogprobs;
     }
 
-    logger.info(`[OpenAI/Responses] Sending stream payload: ${JSON.stringify(payload)}`);
+    logger.info(
+      `[OpenAI/Responses] Sending stream payload: ${JSON.stringify(payload)}`,
+    );
 
     const { data: streamData, response: rawStreamResponse } = await getClient()
       .responses.create(payload, {
@@ -1035,10 +1218,16 @@ const openaiProvider = {
     let usage = null;
     // Track function names from output_item.added events; the arguments.done
     // event may not include the name property (known OpenAI SDK issue).
-    const pendingFunctions: Record<string, { name: string; callId: string; args: string }> = {};
+    const pendingFunctions: Record<
+      string,
+      { name: string; callId: string; args: string }
+    > = {};
     // Track reasoning output items so we can pair them with subsequent function calls.
     // The Responses API emits reasoning items before their paired function_call items.
-    const pendingReasoningItems: Array<{ id: string; summary: Array<{ type: string; text: string }> }> = [];
+    const pendingReasoningItems: Array<{
+      id: string;
+      summary: Array<{ type: string; text: string }>;
+    }> = [];
     const reasoningSummaryAccumulator: Record<string, string> = {};
     for await (const event of streamData) {
       if (options.signal?.aborted) break;
@@ -1049,16 +1238,22 @@ const openaiProvider = {
       }
       // Reasoning / thinking summary delta — also accumulate for reasoning item reconstruction
       if (event.type === "response.reasoning_summary_text.delta") {
-        const typedEvent = event as OpenAI.Responses.ResponseReasoningSummaryTextDeltaEvent;
+        const typedEvent =
+          event as OpenAI.Responses.ResponseReasoningSummaryTextDeltaEvent;
         const itemId = (typedEvent as unknown as { item_id?: string }).item_id;
         if (itemId) {
-          reasoningSummaryAccumulator[itemId] = (reasoningSummaryAccumulator[itemId] || "") + (typedEvent.delta || "");
+          reasoningSummaryAccumulator[itemId] =
+            (reasoningSummaryAccumulator[itemId] || "") +
+            (typedEvent.delta || "");
         }
         yield { type: "thinking", content: typedEvent.delta || "" };
       }
       // Image generation completed
       if (event.type === "response.image_generation_call.completed") {
-        const typedEvent = event as OpenAI.Responses.ResponseImageGenCallCompletedEvent & { result?: string };
+        const typedEvent =
+          event as OpenAI.Responses.ResponseImageGenCallCompletedEvent & {
+            result?: string;
+          };
         if (typedEvent.result) {
           yield {
             type: "image",
@@ -1069,9 +1264,13 @@ const openaiProvider = {
       }
       // Track reasoning and function call metadata from output_item.added
       if (event.type === "response.output_item.added") {
-        const typedEvent = event as OpenAI.Responses.ResponseOutputItemAddedEvent;
+        const typedEvent =
+          event as OpenAI.Responses.ResponseOutputItemAddedEvent;
         if (typedEvent.item?.type === "reasoning") {
-          const reasoningItem = typedEvent.item as unknown as { id: string; summary?: Array<{ type: string; text: string }> };
+          const reasoningItem = typedEvent.item as unknown as {
+            id: string;
+            summary?: Array<{ type: string; text: string }>;
+          };
           if (reasoningItem.id) {
             pendingReasoningItems.push({
               id: reasoningItem.id,
@@ -1079,7 +1278,8 @@ const openaiProvider = {
             });
           }
         } else if (typedEvent.item?.type === "function_call") {
-          const item = typedEvent.item as OpenAI.Responses.ResponseFunctionToolCall;
+          const item =
+            typedEvent.item as OpenAI.Responses.ResponseFunctionToolCall;
           if (item.id) {
             pendingFunctions[item.id] = {
               name: item.name,
@@ -1087,14 +1287,19 @@ const openaiProvider = {
               args: "",
             };
             if (item.name && item.call_id) {
-              yield { type: "toolCallStart", id: item.call_id, name: item.name };
+              yield {
+                type: "toolCallStart",
+                id: item.call_id,
+                name: item.name,
+              };
             }
           }
         }
       }
       // Accumulate argument deltas (keyed by item_id)
       if (event.type === "response.function_call_arguments.delta") {
-        const typedEvent = event as OpenAI.Responses.ResponseFunctionCallArgumentsDeltaEvent;
+        const typedEvent =
+          event as OpenAI.Responses.ResponseFunctionCallArgumentsDeltaEvent;
         const entry = pendingFunctions[typedEvent.item_id];
         const partial = typedEvent.delta || "";
         if (entry) {
@@ -1108,10 +1313,14 @@ const openaiProvider = {
       }
       // Function call completed (Responses API)
       if (event.type === "response.function_call_arguments.done") {
-        const typedEvent = event as OpenAI.Responses.ResponseFunctionCallArgumentsDoneEvent & { call_id?: string };
+        const typedEvent =
+          event as OpenAI.Responses.ResponseFunctionCallArgumentsDoneEvent & {
+            call_id?: string;
+          };
         const tracked = pendingFunctions[typedEvent.item_id];
         const name = tracked?.name || typedEvent.name || "unknown";
-        const callId = tracked?.callId || typedEvent.call_id || typedEvent.item_id;
+        const callId =
+          tracked?.callId || typedEvent.call_id || typedEvent.item_id;
         let args: Record<string, unknown> = {};
         try {
           args = JSON.parse(typedEvent.arguments || tracked?.args || "{}");
@@ -1121,13 +1330,18 @@ const openaiProvider = {
         // Pop the most recent pending reasoning item and finalize its summary
         // text from the accumulated deltas. This pairs the reasoning item with
         // this function call for referential integrity on subsequent turns.
-        let pairedReasoningItem: { id: string; summary: Array<{ type: string; text: string }> } | undefined;
+        let pairedReasoningItem:
+          | { id: string; summary: Array<{ type: string; text: string }> }
+          | undefined;
         if (pendingReasoningItems.length > 0) {
           pairedReasoningItem = pendingReasoningItems.shift();
           if (pairedReasoningItem) {
-            const accumulatedText = reasoningSummaryAccumulator[pairedReasoningItem.id];
+            const accumulatedText =
+              reasoningSummaryAccumulator[pairedReasoningItem.id];
             if (accumulatedText) {
-              pairedReasoningItem.summary = [{ type: "summary_text", text: accumulatedText }];
+              pairedReasoningItem.summary = [
+                { type: "summary_text", text: accumulatedText },
+              ];
               delete reasoningSummaryAccumulator[pairedReasoningItem.id];
             }
           }
@@ -1139,7 +1353,9 @@ const openaiProvider = {
           responsesItemId: typedEvent.item_id,
           name,
           args,
-          ...(pairedReasoningItem ? { reasoningItem: pairedReasoningItem } : {}),
+          ...(pairedReasoningItem
+            ? { reasoningItem: pairedReasoningItem }
+            : {}),
         };
         // Clean up
         delete pendingFunctions[typedEvent.item_id];
@@ -1151,10 +1367,19 @@ const openaiProvider = {
           usage = normalizeResponsesUsage(typedEvent.response.usage);
         }
         // Detect max_tokens truncation (Responses API uses "incomplete" status)
-        const responseRecord = typedEvent.response as unknown as Record<string, unknown>;
+        const responseRecord = typedEvent.response as unknown as Record<
+          string,
+          unknown
+        >;
         const responseStatus = responseRecord?.status;
         const incompleteReason = responseRecord?.incomplete_details;
-        if (responseStatus === "incomplete" || (incompleteReason && typeof incompleteReason === "object" && (incompleteReason as Record<string, unknown>).reason === "max_output_tokens")) {
+        if (
+          responseStatus === "incomplete" ||
+          (incompleteReason &&
+            typeof incompleteReason === "object" &&
+            (incompleteReason as Record<string, unknown>).reason ===
+              "max_output_tokens")
+        ) {
           yield { type: "stopReason", stopReason: "length" };
         }
       }
@@ -1168,10 +1393,18 @@ const openaiProvider = {
       yield { type: "rateLimits", rateLimits };
     }
   },
-  async *_streamChatCompletions(messages: OpenAIMessage[], model: string, options: ProviderOptions) {
+  async *_streamChatCompletions(
+    messages: OpenAIMessage[],
+    model: string,
+    options: ProviderOptions,
+  ) {
     const modelDefinition = getModelByName(model);
     const isReasoning =
-      (modelDefinition && "thinking" in modelDefinition && (modelDefinition as { thinking?: boolean }).thinking === true) || model.includes("o1") || model.includes("o3");
+      (modelDefinition &&
+        "thinking" in modelDefinition &&
+        (modelDefinition as { thinking?: boolean }).thinking === true) ||
+      model.includes("o1") ||
+      model.includes("o3");
     const prepared = prepareOpenAIMessages(messages);
     const payload: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
       model,
@@ -1182,7 +1415,8 @@ const openaiProvider = {
     if (isReasoning) {
       if (options.maxTokens) payload.max_completion_tokens = options.maxTokens;
       if (options.reasoningEffort) {
-        payload.reasoning_effort = options.reasoningEffort as OpenAI.Chat.ChatCompletionCreateParamsStreaming["reasoning_effort"];
+        payload.reasoning_effort =
+          options.reasoningEffort as OpenAI.Chat.ChatCompletionCreateParamsStreaming["reasoning_effort"];
       }
     } else {
       if (options.temperature !== undefined)
@@ -1193,18 +1427,23 @@ const openaiProvider = {
       if (options.presencePenalty !== undefined)
         payload.presence_penalty = options.presencePenalty;
       if (options.stopSequences !== undefined)
-        payload.stop = options.stopSequences as OpenAI.Chat.ChatCompletionCreateParamsStreaming["stop"];
+        payload.stop =
+          options.stopSequences as OpenAI.Chat.ChatCompletionCreateParamsStreaming["stop"];
       if (options.maxTokens) payload.max_completion_tokens = options.maxTokens;
     }
 
     // Seed for reproducibility
     if (options.seed !== undefined) {
-      payload.seed = typeof options.seed === "number" ? options.seed : parseInt(String(options.seed), 10);
+      payload.seed =
+        typeof options.seed === "number"
+          ? options.seed
+          : parseInt(String(options.seed), 10);
     }
 
     // Service tier: auto / default / priority
     if (options.serviceTier) {
-      payload.service_tier = options.serviceTier as OpenAI.Chat.ChatCompletionCreateParamsStreaming["service_tier"];
+      payload.service_tier =
+        options.serviceTier as OpenAI.Chat.ChatCompletionCreateParamsStreaming["service_tier"];
     }
 
     // Response format (JSON mode)
@@ -1213,13 +1452,20 @@ const openaiProvider = {
     }
 
     if (options.webSearch) {
-      payload.tools = [{ type: "web_search" } as unknown as OpenAI.Chat.ChatCompletionTool];
+      payload.tools = [
+        { type: "web_search" } as unknown as OpenAI.Chat.ChatCompletionTool,
+      ];
     }
 
     // Custom function calling tools — truncate to 128 max for Chat Completions API
-    const customTools = convertToolsToOpenAI(options.tools as ToolSchema[] | null | undefined) as OpenAI.Chat.ChatCompletionTool[] | null;
+    const customTools = convertToolsToOpenAI(
+      options.tools as ToolSchema[] | null | undefined,
+    ) as OpenAI.Chat.ChatCompletionTool[] | null;
     if (customTools) {
-      const allTools = [...((payload.tools as OpenAI.Chat.ChatCompletionTool[]) || []), ...customTools];
+      const allTools = [
+        ...((payload.tools as OpenAI.Chat.ChatCompletionTool[]) || []),
+        ...customTools,
+      ];
       payload.tools = truncateToolsForChatCompletions(allTools);
     }
 
@@ -1237,7 +1483,10 @@ const openaiProvider = {
     } catch (error: unknown) {
       const errorObject = asErrorRecord(error);
       // Retry once after stripping unsupported parameters (e.g. gpt-5-nano rejects temperature)
-      if (errorObject.status === 400 && errorObject.message?.includes("Unsupported")) {
+      if (
+        errorObject.status === 400 &&
+        errorObject.message?.includes("Unsupported")
+      ) {
         const unsupportedParams = [
           "temperature",
           "top_p",
@@ -1279,7 +1528,10 @@ const openaiProvider = {
     let usage = null;
     let lastFinishReason: string | null = null;
     // Accumulate tool calls across chunks
-    const pendingToolCalls: Record<number, { id: string; name: string; args: string; startEmitted: boolean }> = {};
+    const pendingToolCalls: Record<
+      number,
+      { id: string; name: string; args: string; startEmitted: boolean }
+    > = {};
 
     for await (const chunk of stream) {
       if (options.signal?.aborted) break;
@@ -1310,14 +1562,23 @@ const openaiProvider = {
             };
           }
           if (toolCall.id) pendingToolCalls[index].id = toolCall.id;
-          if (toolCall.function?.name) pendingToolCalls[index].name = toolCall.function.name;
+          if (toolCall.function?.name)
+            pendingToolCalls[index].name = toolCall.function.name;
           if (toolCall.function?.arguments) {
             pendingToolCalls[index].args += toolCall.function.arguments;
             deltaChars += toolCall.function.arguments.length;
           }
-          if (!pendingToolCalls[index].startEmitted && pendingToolCalls[index].name && pendingToolCalls[index].id) {
+          if (
+            !pendingToolCalls[index].startEmitted &&
+            pendingToolCalls[index].name &&
+            pendingToolCalls[index].id
+          ) {
             pendingToolCalls[index].startEmitted = true;
-            yield { type: "toolCallStart", id: pendingToolCalls[index].id, name: pendingToolCalls[index].name };
+            yield {
+              type: "toolCallStart",
+              id: pendingToolCalls[index].id,
+              name: pendingToolCalls[index].name,
+            };
           }
         }
         // Yield progress event so generation throughput tracking stays
@@ -1359,15 +1620,23 @@ const openaiProvider = {
     }
   },
 
-  async generateSpeech(text: string, voice: string = DEFAULT_VOICES.openai, options: ProviderOptions = {}) {
+  async generateSpeech(
+    text: string,
+    voice: string = DEFAULT_VOICES.openai,
+    options: ProviderOptions = {},
+  ) {
     logger.provider("OpenAI", `generateSpeech voice=${voice}`);
     try {
-      const payload: OpenAI.Audio.SpeechCreateParams & { instructions?: string } = {
+      const payload: OpenAI.Audio.SpeechCreateParams & {
+        instructions?: string;
+      } = {
         model:
           options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).openai,
         voice: voice as OpenAI.Audio.SpeechCreateParams["voice"],
         input: text,
-        response_format: (options.format as "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm") || "mp3",
+        response_format:
+          (options.format as "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm") ||
+          "mp3",
       };
       if (options.instructions) {
         payload.instructions = options.instructions;
@@ -1379,7 +1648,11 @@ const openaiProvider = {
     }
   },
 
-  async generateImage(prompt: string, images: Array<string | { imageData: string; mimeType?: string }> = [], model: string = MODELS.GPT_IMAGE_15.name) {
+  async generateImage(
+    prompt: string,
+    images: Array<string | { imageData: string; mimeType?: string }> = [],
+    model: string = MODELS.GPT_IMAGE_15.name,
+  ) {
     logger.provider(
       "OpenAI",
       `generateImage model=${model} images=${images.length}`,
@@ -1401,7 +1674,11 @@ const openaiProvider = {
           }
           imageBuffer = Buffer.from(base64Match[2], "base64");
           mimeType = base64Match[1];
-        } else if (lastImage && typeof lastImage === "object" && "imageData" in lastImage) {
+        } else if (
+          lastImage &&
+          typeof lastImage === "object" &&
+          "imageData" in lastImage
+        ) {
           // Object format: { imageData: base64, mimeType }
           imageBuffer = Buffer.from(lastImage.imageData, "base64");
           mimeType = lastImage.mimeType || "image/png";
@@ -1431,7 +1708,10 @@ const openaiProvider = {
       }
 
       const firstImage = response.data?.[0];
-      const imageData = firstImage?.b64_json || (firstImage as unknown as Record<string, unknown>)?.b64 || (response as unknown as Record<string, unknown>)?.b64;
+      const imageData =
+        firstImage?.b64_json ||
+        (firstImage as unknown as Record<string, unknown>)?.b64 ||
+        (response as unknown as Record<string, unknown>)?.b64;
       if (!imageData) {
         throw new Error("No image data received from OpenAI");
       }
@@ -1455,10 +1735,12 @@ const openaiProvider = {
     try {
       const content: OpenAI.Chat.ChatCompletionContentPart[] = [
         { type: "text" as const, text: prompt },
-        ...images.map((image: string): OpenAI.Chat.ChatCompletionContentPartImage => ({
-          type: "image_url" as const,
-          image_url: { url: image },
-        })),
+        ...images.map(
+          (image: string): OpenAI.Chat.ChatCompletionContentPartImage => ({
+            type: "image_url" as const,
+            image_url: { url: image },
+          }),
+        ),
       ];
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
       if (systemPrompt) {
@@ -1508,10 +1790,11 @@ const openaiProvider = {
       const file = await toFile(audioBuffer, `audio.${ext}`, {
         type: mimeType,
       });
-      const payload: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsNonStreaming = {
-        file,
-        model,
-      };
+      const payload: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsNonStreaming =
+        {
+          file,
+          model,
+        };
       if (options.language) payload.language = options.language;
       if (options.prompt) payload.prompt = options.prompt as string;
 

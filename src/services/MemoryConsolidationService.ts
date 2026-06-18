@@ -22,7 +22,10 @@ import {
 import { TYPES, getPricing } from "../config.ts";
 
 // ── Extracted sub-modules ───────────────────────────────────
-import { findClusters, CONVERSATIONAL_CLUSTER_THRESHOLD } from "./memory/ClusterDetection.ts";
+import {
+  findClusters,
+  CONVERSATIONAL_CLUSTER_THRESHOLD,
+} from "./memory/ClusterDetection.ts";
 import {
   CONSOLIDATION_PROMPT,
   CONVERSATIONAL_CONSOLIDATION_PROMPT,
@@ -105,9 +108,15 @@ async function applyActions(
             // All memories in a merge share the same about/source (partitioned)
             const primary = sources[0];
             // Collect all unique sources for the mergedSources attribution chain
-            const uniqueSources = new Map<string, { sourceUserId: string; sourceUsername: string }>();
+            const uniqueSources = new Map<
+              string,
+              { sourceUserId: string; sourceUsername: string }
+            >();
             for (const source of sources) {
-              if (source.sourceUserId && !uniqueSources.has(source.sourceUserId)) {
+              if (
+                source.sourceUserId &&
+                !uniqueSources.has(source.sourceUserId)
+              ) {
                 uniqueSources.set(source.sourceUserId, {
                   sourceUserId: source.sourceUserId,
                   sourceUsername: source.sourceUsername || "",
@@ -165,7 +174,6 @@ async function applyActions(
   return results;
 }
 
-
 // ─── Single Batch LLM Call ───────────────────────────────────────────────────
 /**
  * Run a single LLM consolidation call for one batch.
@@ -221,14 +229,10 @@ async function processBatch(
   let result: { text?: string; usage?: Record<string, number> } | null = null;
 
   try {
-    result = await provider.generateText(
-      aiMessages,
-      consolidationModel,
-      {
-        maxTokens: LLM_MAX_OUTPUT_TOKENS,
-        temperature: 0.1,
-      },
-    ) as unknown as { text?: string; usage?: Record<string, number> };
+    result = (await provider.generateText(aiMessages, consolidationModel, {
+      maxTokens: LLM_MAX_OUTPUT_TOKENS,
+      temperature: 0.1,
+    })) as unknown as { text?: string; usage?: Record<string, number> };
   } catch (error: unknown) {
     llmSuccess = false;
     llmError = getErrorMessage(error);
@@ -305,7 +309,9 @@ async function processBatch(
   }
 
   // Parse response with enhanced diagnostics
-  const parsed = parseJsonFromLargeLanguageModelResponse(result.text) as { actions?: ConsolidationAction[] } | null;
+  const parsed = parseJsonFromLargeLanguageModelResponse(result.text) as {
+    actions?: ConsolidationAction[];
+  } | null;
   if (!parsed) {
     const responseLength = result.text?.length || 0;
     const snippet = result.text?.substring(0, 300) || "(empty)";
@@ -377,11 +383,11 @@ const MemoryConsolidationService = {
         }
       : { embedding: 1, id: 1, type: 1, title: 1, content: 1, createdAt: 1 };
 
-    const allMemories = await db
+    const allMemories = (await db
       .collection(COLLECTIONS.MEMORIES)
       .find(query)
       .project(projection)
-      .toArray() as MemoryDoc[];
+      .toArray()) as MemoryDoc[];
 
     if (allMemories.length < 2) {
       logger.info(
@@ -405,7 +411,9 @@ const MemoryConsolidationService = {
     const provider = getProvider(consolidationProvider);
 
     // Build a lookup map for metadata preservation during merges
-    const memoryLookup = new Map<string, MemoryDoc>(allMemories.map((message) => [message.id, message]));
+    const memoryLookup = new Map<string, MemoryDoc>(
+      allMemories.map((message) => [message.id, message]),
+    );
 
     const allActions: ConsolidationAction[] = [];
     let batches: ConsolidationBatch[] = [];
@@ -616,7 +624,9 @@ const MemoryConsolidationService = {
           ...consolidationResult,
         });
       } catch (error: unknown) {
-        logger.warn(`[MemoryConsolidation] Broadcast failed: ${getErrorMessage(error)}`);
+        logger.warn(
+          `[MemoryConsolidation] Broadcast failed: ${getErrorMessage(error)}`,
+        );
       }
     }
     return consolidationResult;

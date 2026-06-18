@@ -17,7 +17,7 @@ router.get(
       const settings = await SettingsService.get();
       res.json(settings);
     } catch (error: unknown) {
-            logger.error(`GET /settings error: ${getErrorMessage(error)}`);
+      logger.error(`GET /settings error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -41,7 +41,7 @@ router.put(
       const updated = await SettingsService.update(data);
       res.json(updated);
     } catch (error: unknown) {
-            logger.error(`PUT /settings error: ${getErrorMessage(error)}`);
+      logger.error(`PUT /settings error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),

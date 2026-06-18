@@ -5,7 +5,11 @@ import EmbeddingService from "./EmbeddingService.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import type { AgenticContext, ConversationMessage, ToolCall } from "./harnesses/types.ts";
+import type {
+  AgenticContext,
+  ConversationMessage,
+  ToolCall,
+} from "./harnesses/types.ts";
 
 // ────────────────────────────────────────────────────────────
 // WorkflowMemoryService — Agent Workflow Memory (AWM)
@@ -76,13 +80,21 @@ function extractWorkflowTrajectory(
 
     for (const toolCall of message.toolCalls) {
       const toolCallRecord = toolCall as ToolCall & { result?: unknown };
-      const resultObject = toolCallRecord.result as Record<string, unknown> | null;
-      const hasError = !!(resultObject && typeof resultObject === "object" && resultObject.error);
+      const resultObject = toolCallRecord.result as Record<
+        string,
+        unknown
+      > | null;
+      const hasError = !!(
+        resultObject &&
+        typeof resultObject === "object" &&
+        resultObject.error
+      );
 
       const keyArguments: Record<string, string> = {};
       if (toolCallRecord.args) {
         for (const [key, value] of Object.entries(toolCallRecord.args)) {
-          const stringifiedValue = typeof value === "string" ? value : JSON.stringify(value);
+          const stringifiedValue =
+            typeof value === "string" ? value : JSON.stringify(value);
           if (stringifiedValue.length <= 100) {
             keyArguments[key] = stringifiedValue;
           } else {
@@ -132,7 +144,10 @@ const WorkflowMemoryService = {
    * Runs as fire-and-forget (inspect category).
    */
   createHook() {
-    return async (context: AgenticContext, output: { messages?: ConversationMessage[]; sessionOutcome?: string }) => {
+    return async (
+      context: AgenticContext,
+      output: { messages?: ConversationMessage[]; sessionOutcome?: string },
+    ) => {
       WorkflowMemoryService.extractAndPersist(context, output).catch(
         (error: unknown) =>
           logger.error(
@@ -149,7 +164,8 @@ const WorkflowMemoryService = {
     context: AgenticContext,
     output: { messages?: ConversationMessage[]; sessionOutcome?: string },
   ): Promise<void> {
-    const { conversationId, agentSessionId, project, username, agent } = context;
+    const { conversationId, agentSessionId, project, username, agent } =
+      context;
 
     if (!conversationId || !agentSessionId) return;
     if (!AgentPersonaRegistry.isAgentProject(project)) return;
@@ -169,7 +185,8 @@ const WorkflowMemoryService = {
 
     const userMessages = messages.filter((message) => message.role === "user");
     const firstUserMessage = userMessages[0];
-    if (!firstUserMessage || typeof firstUserMessage.content !== "string") return;
+    if (!firstUserMessage || typeof firstUserMessage.content !== "string")
+      return;
     const userRequest = firstUserMessage.content.slice(0, 500);
 
     const trajectory = extractWorkflowTrajectory(messages, userRequest);
@@ -178,14 +195,18 @@ const WorkflowMemoryService = {
     const database = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!database) return;
 
-    const workflowCollection = database.collection(COLLECTIONS.WORKFLOW_MEMORIES);
+    const workflowCollection = database.collection(
+      COLLECTIONS.WORKFLOW_MEMORIES,
+    );
 
     const existingWorkflow = await workflowCollection.findOne({
       conversationId,
       agentSessionId,
     });
     if (existingWorkflow) {
-      const existingCreatedAt = existingWorkflow.createdAt as string | undefined;
+      const existingCreatedAt = existingWorkflow.createdAt as
+        | string
+        | undefined;
       if (existingCreatedAt) {
         const elapsed = Date.now() - new Date(existingCreatedAt).getTime();
         if (elapsed < WORKFLOW_COOLDOWN_MILLISECONDS) return;
@@ -254,7 +275,9 @@ const WorkflowMemoryService = {
     const database = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!database) return null;
 
-    const workflowCollection = database.collection(COLLECTIONS.WORKFLOW_MEMORIES);
+    const workflowCollection = database.collection(
+      COLLECTIONS.WORKFLOW_MEMORIES,
+    );
 
     const workflowCount = await workflowCollection.countDocuments({
       agent,
@@ -272,19 +295,31 @@ const WorkflowMemoryService = {
       agent,
     });
 
-    const maximumResults = options.maximumResults || MAXIMUM_WORKFLOWS_PER_QUERY;
+    const maximumResults =
+      options.maximumResults || MAXIMUM_WORKFLOWS_PER_QUERY;
 
     const allWorkflows = await workflowCollection
       .find(
         { agent, project },
-        { projection: { summary: 1, embedding: 1, userRequest: 1, stepCount: 1, createdAt: 1 } },
+        {
+          projection: {
+            summary: 1,
+            embedding: 1,
+            userRequest: 1,
+            stepCount: 1,
+            createdAt: 1,
+          },
+        },
       )
       .sort({ createdAt: -1 })
       .limit(50)
       .toArray();
 
     const scoredWorkflows = allWorkflows
-      .filter((workflow) => Array.isArray(workflow.embedding) && workflow.embedding.length > 0)
+      .filter(
+        (workflow) =>
+          Array.isArray(workflow.embedding) && workflow.embedding.length > 0,
+      )
       .map((workflow) => ({
         summary: workflow.summary as string,
         userRequest: workflow.userRequest as string,
@@ -305,7 +340,8 @@ const WorkflowMemoryService = {
         `### Past Workflow (similarity: ${(scored.score * 100).toFixed(0)}%)\n` +
         scored.summary;
 
-      if (totalCharacters + block.length > WORKFLOW_TEXT_MAXIMUM_CHARACTERS) break;
+      if (totalCharacters + block.length > WORKFLOW_TEXT_MAXIMUM_CHARACTERS)
+        break;
       totalCharacters += block.length;
       workflowBlocks.push(block);
     }

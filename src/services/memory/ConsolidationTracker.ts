@@ -69,7 +69,9 @@ export async function recordHistory(
   const mergeCount = actions
     .filter((action) => action.type === "merge")
     .reduce((sum, action) => sum + (action.sourceIds?.length || 0), 0);
-  const deleteCount = actions.filter((action) => action.type === "delete").length;
+  const deleteCount = actions.filter(
+    (action) => action.type === "delete",
+  ).length;
   await db.collection(HISTORY_COLLECTION).insertOne({
     project,
     runAt: new Date().toISOString(),

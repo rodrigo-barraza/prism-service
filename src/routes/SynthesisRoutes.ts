@@ -3,7 +3,10 @@ import express, { Request, Response, NextFunction } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
-import { PostSynthesisBodySchema, PatchSynthesisBodySchema } from "../types/index.ts";
+import {
+  PostSynthesisBodySchema,
+  PatchSynthesisBodySchema,
+} from "../types/index.ts";
 
 const router = express.Router();
 router.use(requireDb);
@@ -47,7 +50,8 @@ router.get(
 
       res.json(runs);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`Error fetching synthesis runs: ${errorMessage}`);
       next(error);
     }
@@ -77,7 +81,8 @@ router.get(
 
       res.json(run);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`Error fetching synthesis run: ${errorMessage}`);
       next(error);
     }
@@ -134,7 +139,8 @@ router.post(
 
       res.json(document);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`Error creating synthesis run: ${errorMessage}`);
       next(error);
     }
@@ -173,10 +179,7 @@ router.patch(
 
       const result = await db
         .collection<SynthesisDocument>(COLLECTION)
-        .updateOne(
-          { id: runId, project, username },
-          { $set: setFields },
-        );
+        .updateOne({ id: runId, project, username }, { $set: setFields });
 
       if (result.matchedCount === 0) {
         return res.status(404).json({ error: "Synthesis run not found" });
@@ -188,7 +191,8 @@ router.patch(
 
       res.json(updated);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`Error patching synthesis run: ${errorMessage}`);
       next(error);
     }
@@ -218,7 +222,8 @@ router.delete(
 
       res.json({ success: true, id: runId });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`Error deleting synthesis run: ${errorMessage}`);
       next(error);
     }

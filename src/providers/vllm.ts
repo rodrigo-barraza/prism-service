@@ -1,4 +1,10 @@
-import { ProviderOptions, ChatMessage, Provider, GenerateTextResult, StreamChunk } from "../types/provider.ts";
+import {
+  ProviderOptions,
+  ChatMessage,
+  Provider,
+  GenerateTextResult,
+  StreamChunk,
+} from "../types/provider.ts";
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 import type { TokenUsage } from "../types/admin.ts";
@@ -36,15 +42,20 @@ import type { InputMessage } from "../utils/openai-compat.ts";
 // FIXME(vllm-qwen3.6): Temporary model list — delete with the patch above
 const MODELS_REQUIRING_SYSTEM_REWRITE_TEMPORARY_PATCH = ["qwen3.6"];
 
-function requiresSystemMessageRewriteTemporaryPatch(modelName: string): boolean {
+function requiresSystemMessageRewriteTemporaryPatch(
+  modelName: string,
+): boolean {
   const normalizedModelName = modelName.toLowerCase();
-  return MODELS_REQUIRING_SYSTEM_REWRITE_TEMPORARY_PATCH.some(
-    (pattern) => normalizedModelName.includes(pattern),
+  return MODELS_REQUIRING_SYSTEM_REWRITE_TEMPORARY_PATCH.some((pattern) =>
+    normalizedModelName.includes(pattern),
   );
 }
 
 // FIXME(vllm-qwen3.6): Temporary rewriter — delete with the patch above
-function rewriteNonLeadingSystemMessages(messages: InputMessage[], modelName: string): InputMessage[] {
+function rewriteNonLeadingSystemMessages(
+  messages: InputMessage[],
+  modelName: string,
+): InputMessage[] {
   if (!requiresSystemMessageRewriteTemporaryPatch(modelName)) return messages;
 
   let hasPassedLeadingSystemBlock = false;
@@ -82,7 +93,10 @@ interface VllmModelsResponse {
 }
 
 // ── Provider ─────────────────────────────────────────────────
-export function createVllmProvider(baseUrl: string, instanceId: string = "vllm"): Provider {
+export function createVllmProvider(
+  baseUrl: string,
+  instanceId: string = "vllm",
+): Provider {
   const getBaseUrl = () => baseUrl;
 
   return {
@@ -96,7 +110,10 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
       const baseUrl = getBaseUrl();
       logger.provider("vLLM", `generateText model=${model} baseUrl=${baseUrl}`);
       try {
-        const rewrittenMessages = rewriteNonLeadingSystemMessages(messages as InputMessage[], model);
+        const rewrittenMessages = rewriteNonLeadingSystemMessages(
+          messages as InputMessage[],
+          model,
+        );
         const prepared = prepareOpenAICompatMessages(rewrittenMessages, {
           mediaStrategy: MEDIA_STRATEGIES.FULL_MULTIMODAL,
         });
@@ -106,7 +123,8 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           model,
           ...buildPayloadParams(options),
           // vLLM extensions: top_k, min_p, repetition_penalty
-          ...(options.topK !== undefined && options.topK > 0 && { top_k: options.topK }),
+          ...(options.topK !== undefined &&
+            options.topK > 0 && { top_k: options.topK }),
           ...(options.minP !== undefined && { min_p: options.minP }),
           ...(options.repeatPenalty !== undefined &&
             options.repeatPenalty !== 1 && {
@@ -152,7 +170,10 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           result.toolCalls = toolCalls.map((toolCall) => ({
             id: toolCall.id || "",
             name: toolCall.name,
-            args: typeof toolCall.args === "object" && toolCall.args !== null ? (toolCall.args as Record<string, unknown>) : {},
+            args:
+              typeof toolCall.args === "object" && toolCall.args !== null
+                ? (toolCall.args as Record<string, unknown>)
+                : {},
             thoughtSignature: toolCall.thoughtSignature || undefined,
           }));
         }
@@ -176,7 +197,10 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
         `generateTextStream model=${model} baseUrl=${baseUrl}`,
       );
       try {
-        const rewrittenMessages = rewriteNonLeadingSystemMessages(messages as InputMessage[], model);
+        const rewrittenMessages = rewriteNonLeadingSystemMessages(
+          messages as InputMessage[],
+          model,
+        );
         const prepared = prepareOpenAICompatMessages(rewrittenMessages, {
           mediaStrategy: MEDIA_STRATEGIES.FULL_MULTIMODAL,
         });
@@ -186,7 +210,8 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           model,
           ...buildPayloadParams(options),
           // vLLM extensions: top_k, min_p, repetition_penalty
-          ...(options.topK !== undefined && options.topK > 0 && { top_k: options.topK }),
+          ...(options.topK !== undefined &&
+            options.topK > 0 && { top_k: options.topK }),
           ...(options.minP !== undefined && { min_p: options.minP }),
           ...(options.repeatPenalty !== undefined &&
             options.repeatPenalty !== 1 && {
@@ -243,7 +268,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           }
         }
       } catch (error: unknown) {
-        if ((error instanceof Error && error.name === "AbortError")) return; // Client disconnected
+        if (error instanceof Error && error.name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
         throw new ProviderError("vllm", getErrorMessage(error), 500, error);
       }
@@ -254,7 +279,10 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
       prompt: string = "Describe this image.",
       model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["vllm"],
       systemPrompt?: string,
-    ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }> {
+    ): Promise<{
+      text: string;
+      usage: { inputTokens: number; outputTokens: number };
+    }> {
       const baseUrl = getBaseUrl();
       logger.provider("vLLM", `captionImage model=${model} baseUrl=${baseUrl}`);
       try {
@@ -282,7 +310,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           },
         );
 
-        const data = await response.json() as OpenAICompletionResponse;
+        const data = (await response.json()) as OpenAICompletionResponse;
         const text = data.choices?.[0]?.message?.content || "";
         const usage: TokenUsage = {
           inputTokens: data.usage?.prompt_tokens || 0,
@@ -308,7 +336,11 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
      * vLLM also exposes /v2/embed, but /v1/embeddings keeps the response
      * contract identical to the OpenAI provider.
      */
-    async generateEmbedding(content: string | string[], model: string, options: ProviderOptions = {}) {
+    async generateEmbedding(
+      content: string | string[],
+      model: string,
+      options: ProviderOptions = {},
+    ) {
       const baseUrl = getBaseUrl();
       logger.provider(
         "vLLM",
@@ -325,7 +357,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           `${baseUrl}/v1/embeddings`,
           payload,
         );
-        const data = await response.json() as VllmEmbeddingResponse;
+        const data = (await response.json()) as VllmEmbeddingResponse;
 
         const embedding = data.data?.[0]?.embedding;
         if (!embedding) {
@@ -361,7 +393,7 @@ export function createVllmProvider(baseUrl: string, instanceId: string = "vllm")
           const errorText = await response.text();
           throw new Error(`API error: ${response.status} ${errorText}`);
         }
-        const data = await response.json() as VllmModelsResponse;
+        const data = (await response.json()) as VllmModelsResponse;
         const models = (data.data || []).map((modelItem: VllmModel) => ({
           key: modelItem.id,
           display_name: modelItem.id,

@@ -17,7 +17,11 @@
  */
 
 import logger from "../../../utils/logger.ts";
-import type { ConversationMessage, PassState, AgenticContext } from "../types.ts";
+import type {
+  ConversationMessage,
+  PassState,
+  AgenticContext,
+} from "../types.ts";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 /** Maximum number of auto-continuation attempts before giving up. */
@@ -73,8 +77,12 @@ export function injectContinuationContext(
     currentMessages.push({
       role: "assistant",
       content: truncatedContent,
-      ...(pass.streamedThinking.trim() && { thinking: pass.streamedThinking.trim() }),
-      ...(pass.thinkingSignature && { thinkingSignature: pass.thinkingSignature }),
+      ...(pass.streamedThinking.trim() && {
+        thinking: pass.streamedThinking.trim(),
+      }),
+      ...(pass.thinkingSignature && {
+        thinkingSignature: pass.thinkingSignature,
+      }),
     });
   }
 
@@ -84,7 +92,10 @@ export function injectContinuationContext(
   });
 
   const baseMaxTokens = context.options.maxTokens || DEFAULT_MAX_TOKENS;
-  const escalatedMaxTokens = calculateEscalatedMaxTokens(baseMaxTokens, recoveryAttempt);
+  const escalatedMaxTokens = calculateEscalatedMaxTokens(
+    baseMaxTokens,
+    recoveryAttempt,
+  );
 
   logger.info(
     `[OutputTruncationRecovery] Recovery attempt ${recoveryAttempt}/${MAX_OUTPUT_TRUNCATION_RECOVERIES}: ` +

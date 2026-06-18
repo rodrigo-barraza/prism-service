@@ -5,7 +5,10 @@ import type { Request, Response, NextFunction } from "express";
 import { COLLECTIONS, COST_SUM_EXPR } from "../../constants.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
-import { applyDateRangeFilter, parsePaginationParams } from "../../utils/QueryBuilders.ts";
+import {
+  applyDateRangeFilter,
+  parsePaginationParams,
+} from "../../utils/QueryBuilders.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
 
 const router = express.Router();
@@ -37,7 +40,9 @@ router.get(
         workspace,
       } = req.query;
 
-      const { skip, limit, page, sortDirection } = parsePaginationParams(req.query);
+      const { skip, limit, page, sortDirection } = parsePaginationParams(
+        req.query,
+      );
 
       const filter: Record<string, unknown> = {};
       if (project) filter.project = project;
@@ -80,8 +85,12 @@ router.get(
 
       if (success !== undefined) {
         const successValues = String(success).split(",").filter(Boolean);
-        if (successValues.length === 1) filter.success = successValues[0] === "true";
-        else if (successValues.length > 1) filter.success = { $in: successValues.map((value: string) => value === "true") };
+        if (successValues.length === 1)
+          filter.success = successValues[0] === "true";
+        else if (successValues.length > 1)
+          filter.success = {
+            $in: successValues.map((value: string) => value === "true"),
+          };
       }
 
       applyDateRangeFilter(filter, from as string, to as string);
@@ -115,7 +124,8 @@ router.get(
       const document = await req.db
         .collection(REQUESTS_COLLECTION)
         .findOne({ requestId: req.params.id });
-      if (!document) return res.status(404).json({ error: "Request not found" });
+      if (!document)
+        return res.status(404).json({ error: "Request not found" });
 
       res.json(document);
     } catch (error: unknown) {
@@ -206,7 +216,9 @@ router.get(
 
       res.json({ conversations, workflows, traces });
     } catch (error: unknown) {
-      logger.error(`Admin /requests/:id/associations error: ${getErrorMessage(error)}`);
+      logger.error(
+        `Admin /requests/:id/associations error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),

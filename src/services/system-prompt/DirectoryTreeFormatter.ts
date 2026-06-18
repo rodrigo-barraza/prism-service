@@ -2,7 +2,10 @@ import logger from "../../utils/logger.ts";
 import { createAbortController } from "../../utils/AbortController.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import { TOOLS_SERVICE_URL } from "../../../config.ts";
-import { DIRECTORY_CACHE_TTL_MS, DIRECTORY_FETCH_TIMEOUT_MS } from "../../constants.ts";
+import {
+  DIRECTORY_CACHE_TTL_MS,
+  DIRECTORY_FETCH_TIMEOUT_MS,
+} from "../../constants.ts";
 import { DirectoryData } from "./types.ts";
 
 export class DirectoryTreeFormatter {
@@ -31,7 +34,10 @@ export class DirectoryTreeFormatter {
 
     try {
       const controller = createAbortController();
-      const timeout = setTimeout(() => controller.abort(), DIRECTORY_FETCH_TIMEOUT_MS);
+      const timeout = setTimeout(
+        () => controller.abort(),
+        DIRECTORY_FETCH_TIMEOUT_MS,
+      );
 
       const url = `${TOOLS_SERVICE_URL}/filesystem/list?path=${encodeURIComponent(this.workspaceRoot)}&depth=2`;
       const response = await fetch(url, { signal: controller.signal });
@@ -44,7 +50,7 @@ export class DirectoryTreeFormatter {
         return "";
       }
 
-      const data = await response.json() as DirectoryData;
+      const data = (await response.json()) as DirectoryData;
       const tree = this._formatDirectoryTree(data);
       this._directoryCache = tree;
       this._directoryCacheTime = now;

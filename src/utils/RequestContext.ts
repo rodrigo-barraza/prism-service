@@ -19,5 +19,11 @@ export interface RequestContextStore {
 
 export const requestContext = new AsyncLocalStorage<RequestContextStore>();
 export function getRequestContext(): RequestContextStore {
-  return requestContext.getStore() || { project: "any", username: "any", clientIp: null };
+  return (
+    requestContext.getStore() || {
+      project: "any",
+      username: "any",
+      clientIp: null,
+    }
+  );
 }

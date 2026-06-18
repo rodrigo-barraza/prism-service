@@ -250,59 +250,59 @@ export interface Provider {
   generateText(
     messages: ChatMessage[],
     model?: string,
-    options?: ProviderOptions
+    options?: ProviderOptions,
   ): Promise<GenerateTextResult>;
   generateTextStream(
     messages: ChatMessage[],
     model?: string,
-    options?: ProviderOptions
+    options?: ProviderOptions,
   ): AsyncGenerator<StreamChunk, void, unknown>;
   generateTextStreamLive?(
     messages: ChatMessage[],
     model?: string,
-    options?: ProviderOptions
+    options?: ProviderOptions,
   ): AsyncGenerator<StreamChunk, void, unknown>;
   generateImage?(
     prompt: string,
     images?: Array<string | { imageData: string; mimeType?: string }>,
     model?: string,
-    systemPrompt?: string
+    systemPrompt?: string,
   ): Promise<GenerateImageResult>;
   captionImage?(
     images: string[],
     prompt?: string,
     model?: string,
-    systemPrompt?: string
+    systemPrompt?: string,
   ): Promise<CaptionResult>;
   generateEmbedding?(
     content: EmbeddingContent,
     model: string,
-    options?: ProviderOptions
+    options?: ProviderOptions,
   ): Promise<EmbeddingResult>;
   listModels?(): Promise<ListModelsResult>;
   checkHealth?(): Promise<HealthCheckResult>;
   generateSpeech?(
     text: string,
     voice?: string,
-    options?: ProviderOptions
+    options?: ProviderOptions,
   ): Promise<SpeechResult>;
   generateSpeechStream?(
     textStream: AsyncIterable<string>,
     voice?: string,
-    options?: ProviderOptions
+    options?: ProviderOptions,
   ): AsyncGenerator<Buffer | Uint8Array, void, unknown>;
   transcribeAudio?(
     audioBuffer: Buffer,
     mimeType: string,
     model?: string,
-    options?: ProviderOptions
+    options?: ProviderOptions,
   ): Promise<TranscriptionResult>;
   unloadModelByKey?(modelKey: string): Promise<void>;
   ensureModelLoaded?(
     modelKey: string,
     options?: ProviderOptions,
     signal?: AbortSignal,
-    onStatus?: (status: string) => void
+    onStatus?: (status: string) => void,
   ): Promise<EnsureModelLoadedResult>;
   unloadModel?(modelId: string): Promise<void>;
 }

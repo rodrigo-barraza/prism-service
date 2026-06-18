@@ -23,10 +23,17 @@ export async function discoverDescendantSessionIds(
       ...additionalFilter,
     });
 
-  const allSessionIds = new Set([rootSessionId, ...conversationSessionIds.filter(Boolean)]);
+  const allSessionIds = new Set([
+    rootSessionId,
+    ...conversationSessionIds.filter(Boolean),
+  ]);
   let frontier = [...allSessionIds];
 
-  for (let depth = 0; depth < MAX_SESSION_DEPTH && frontier.length > 0; depth++) {
+  for (
+    let depth = 0;
+    depth < MAX_SESSION_DEPTH && frontier.length > 0;
+    depth++
+  ) {
     const childIds = await database
       .collection(COLLECTIONS.REQUESTS)
       .distinct("agentSessionId", {

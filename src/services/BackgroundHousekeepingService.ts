@@ -15,7 +15,10 @@
 
 import { readdir, stat, rm } from "node:fs/promises";
 import { resolve } from "node:path";
-import { MILLISECONDS_PER_DAY, hours } from "@rodrigo-barraza/utilities-library";
+import {
+  MILLISECONDS_PER_DAY,
+  hours,
+} from "@rodrigo-barraza/utilities-library";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
@@ -113,13 +116,13 @@ async function clearStaleSessions(): Promise<HousekeepingSessionResult> {
       .collection(COLLECTIONS.MODEL_CONVERSATIONS)
       .updateMany(
         { isGenerating: true, updatedAt: { $lt: cutoff } },
-        { $set: { isGenerating: false } }
+        { $set: { isGenerating: false } },
       ),
     db
       .collection(COLLECTIONS.AGENT_CONVERSATIONS)
       .updateMany(
         { isGenerating: true, updatedAt: { $lt: cutoff } },
-        { $set: { isGenerating: false } }
+        { $set: { isGenerating: false } },
       ),
   ]);
 
@@ -140,7 +143,7 @@ async function pruneOldRequestLogs(): Promise<number> {
   if (!db) return 0;
 
   const cutoff = new Date(
-    Date.now() - REQUEST_LOG_MAX_AGE_DAYS * MILLISECONDS_PER_DAY
+    Date.now() - REQUEST_LOG_MAX_AGE_DAYS * MILLISECONDS_PER_DAY,
   ).toISOString();
   const result = await db.collection(COLLECTIONS.REQUESTS).deleteMany({
     timestamp: { $lt: cutoff },
@@ -156,7 +159,11 @@ async function pruneOldRequestLogs(): Promise<number> {
  * Objects under these prefixes are NOT conversation-scoped and must never be
  * treated as orphans based on conversation ID matching.
  */
-const STRUCTURAL_PREFIXES: Set<string> = new Set([FILE_CATEGORIES.PROJECTS, FILE_CATEGORIES.UPLOADS, FILE_CATEGORIES.GENERATIONS]);
+const STRUCTURAL_PREFIXES: Set<string> = new Set([
+  FILE_CATEGORIES.PROJECTS,
+  FILE_CATEGORIES.UPLOADS,
+  FILE_CATEGORIES.GENERATIONS,
+]);
 
 /**
  * Find MinIO objects that no longer have matching MongoDB references.
@@ -189,7 +196,10 @@ async function pruneMinioOrphans(): Promise<number> {
     // List MinIO objects with the conversation-scoped prefix pattern
     // Convention: conversation objects are stored as {conversationId}/{filename}
     // FileService objects use: projects/{project}/{user}/{category}/{uuid}.{ext}
-    const objects = (await MinioWrapper.listObjects("").catch(() => [])) as (string | { name?: string })[];
+    const objects = (await MinioWrapper.listObjects("").catch(() => [])) as (
+      | string
+      | { name?: string }
+    )[];
     if (objects.length === 0) return 0;
 
     // Group objects by their top-level prefix — only check prefixes that are
@@ -206,7 +216,10 @@ async function pruneMinioOrphans(): Promise<number> {
     // Remove orphaned prefixes
     for (const prefix of prefixes) {
       const orphanedObjects = objects.filter((orphanedObject) => {
-        const name = typeof orphanedObject === "string" ? orphanedObject : orphanedObject?.name;
+        const name =
+          typeof orphanedObject === "string"
+            ? orphanedObject
+            : orphanedObject?.name;
         return name ? name.startsWith(`${prefix}/`) : false;
       });
       for (const object of orphanedObjects) {
@@ -222,7 +235,9 @@ async function pruneMinioOrphans(): Promise<number> {
       }
     }
   } catch (error: unknown) {
-    logger.warn(`[Housekeeping] MinIO orphan scan failed: ${getErrorMessage(error)}`);
+    logger.warn(
+      `[Housekeeping] MinIO orphan scan failed: ${getErrorMessage(error)}`,
+    );
   }
 
   return removed;
@@ -235,7 +250,9 @@ const BackgroundHousekeepingService = {
    * Run all housekeeping tasks.
    * Safe to call at any time — each task is independent and failure-tolerant.
    */
-  async run({ trigger = "boot" }: { trigger?: string } = {}): Promise<HousekeepingResult> {
+  async run({
+    trigger = "boot",
+  }: { trigger?: string } = {}): Promise<HousekeepingResult> {
     const startTime = performance.now();
     logger.info(`[Housekeeping] Starting (trigger: ${trigger})…`);
 
@@ -247,17 +264,19 @@ const BackgroundHousekeepingService = {
       results.worktrees = worktrees;
       if (worktrees.pruned.length > 0) {
         logger.info(
-          `[Housekeeping] Pruned ${worktrees.pruned.length} orphaned worktree(s): ${worktrees.pruned.join(", ")}`
+          `[Housekeeping] Pruned ${worktrees.pruned.length} orphaned worktree(s): ${worktrees.pruned.join(", ")}`,
         );
       }
       if (worktrees.errors.length > 0) {
         logger.warn(
-          `[Housekeeping] Worktree errors: ${worktrees.errors.join("; ")}`
+          `[Housekeeping] Worktree errors: ${worktrees.errors.join("; ")}`,
         );
       }
     } catch (error: unknown) {
       results.worktrees = { error: getErrorMessage(error) };
-      logger.error(`[Housekeeping] Worktree pruning failed: ${getErrorMessage(error)}`);
+      logger.error(
+        `[Housekeeping] Worktree pruning failed: ${getErrorMessage(error)}`,
+      );
     }
 
     // 2. Clear stale sessions
@@ -268,12 +287,14 @@ const BackgroundHousekeepingService = {
         sessions.conversationsCleared + sessions.agentSessionsCleared;
       if (total > 0) {
         logger.info(
-          `[Housekeeping] Cleared ${total} stale isGenerating flag(s)`
+          `[Housekeeping] Cleared ${total} stale isGenerating flag(s)`,
         );
       }
     } catch (error: unknown) {
       results.staleSessions = { error: getErrorMessage(error) };
-      logger.error(`[Housekeeping] Session cleanup failed: ${getErrorMessage(error)}`);
+      logger.error(
+        `[Housekeeping] Session cleanup failed: ${getErrorMessage(error)}`,
+      );
     }
 
     // 3. Prune old request logs
@@ -282,13 +303,13 @@ const BackgroundHousekeepingService = {
       results.requestLogs = { deleted: deletedLogs };
       if (deletedLogs > 0) {
         logger.info(
-          `[Housekeeping] Pruned ${deletedLogs} request log(s) older than ${REQUEST_LOG_MAX_AGE_DAYS} days`
+          `[Housekeeping] Pruned ${deletedLogs} request log(s) older than ${REQUEST_LOG_MAX_AGE_DAYS} days`,
         );
       }
     } catch (error: unknown) {
       results.requestLogs = { error: getErrorMessage(error) };
       logger.error(
-        `[Housekeeping] Request log pruning failed: ${getErrorMessage(error)}`
+        `[Housekeeping] Request log pruning failed: ${getErrorMessage(error)}`,
       );
     }
 
@@ -298,13 +319,13 @@ const BackgroundHousekeepingService = {
       results.minioOrphans = { removed: minioOrphans };
       if (minioOrphans > 0) {
         logger.info(
-          `[Housekeeping] Removed ${minioOrphans} orphaned MinIO object(s)`
+          `[Housekeeping] Removed ${minioOrphans} orphaned MinIO object(s)`,
         );
       }
     } catch (error: unknown) {
       results.minioOrphans = { error: getErrorMessage(error) };
       logger.error(
-        `[Housekeeping] MinIO orphan cleanup failed: ${getErrorMessage(error)}`
+        `[Housekeeping] MinIO orphan cleanup failed: ${getErrorMessage(error)}`,
       );
     }
 

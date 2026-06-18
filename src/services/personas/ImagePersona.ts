@@ -71,7 +71,8 @@ export const ImagePersona: Persona = {
   type: "creative",
   project: "prism-chat",
   displayOrder: 3,
-  description: "An inspiring and highly skilled AI artist for creating visual assets, exploring artistic styles, and finding creative inspiration.",
+  description:
+    "An inspiring and highly skilled AI artist for creating visual assets, exploring artistic styles, and finding creative inspiration.",
   icon: "Palette",
   color: "#ec4899",
   identity: () => {

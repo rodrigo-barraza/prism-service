@@ -49,7 +49,9 @@ export async function evictIdleSecondaryModel(
           );
       }
     } catch (error: unknown) {
-      logger.warn(`[Orchestrator] VRAM eviction error: ${getErrorMessage(error)}`);
+      logger.warn(
+        `[Orchestrator] VRAM eviction error: ${getErrorMessage(error)}`,
+      );
     }
   } else {
     logger.info(

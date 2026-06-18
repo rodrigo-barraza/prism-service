@@ -1,9 +1,17 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES, DOMAINS, CORE_AGENTIC_TOOLS, CORE_ORCHESTRATOR_TOOLS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  TOOL_NAMES,
+  DOMAINS,
+  CORE_AGENTIC_TOOLS,
+  CORE_ORCHESTRATOR_TOOLS,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import SettingsService from "../SettingsService.ts";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
-import { getCurrentDynamicTools, persistDynamicTools } from "./utils/DynamicToolHelpers.ts";
+import {
+  getCurrentDynamicTools,
+  persistDynamicTools,
+} from "./utils/DynamicToolHelpers.ts";
 
 import { getGlobalToolOrchestratorService } from "../../types/GlobalToolOrchestratorRegistry.ts";
 
@@ -26,7 +34,7 @@ const enableTools = {
       "REQUIRED after search_tools: Activate tools discovered by search_tools so you can call them. " +
       "You MUST call this after search_tools returns results where isEnabled is false — without " +
       "calling enable_tools first, discovered tools CANNOT be used. Accepts exact tool names " +
-      "(e.g. \"get_weather\") or domain prefixes (e.g. \"domain:Finance\", \"domainKey:health\") to " +
+      '(e.g. "get_weather") or domain prefixes (e.g. "domain:Finance", "domainKey:health") to ' +
       "activate an entire domain at once. The newly enabled tools become available on the NEXT " +
       "iteration — you do not need to call them in the same turn. Core cognitive tools (memory, " +
       "tasks, planning) are always available.",
@@ -38,7 +46,7 @@ const enableTools = {
           items: { type: "string" },
           description:
             "Tool names or domain prefixes to enable. " +
-            "Examples: [\"get_weather\", \"get_weather_forecast\"] or [\"domain:Weather & Environment\"].",
+            'Examples: ["get_weather", "get_weather_forecast"] or ["domain:Weather & Environment"].',
         },
       },
       required: ["tools"],
@@ -47,7 +55,10 @@ const enableTools = {
   labels: ["tools", "activation", "meta"],
   domain: DOMAINS.CORE_DISCOVER.displayName,
 
-  async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: InternalToolContext,
+  ) {
     const sessionId = context.agentSessionId;
     if (!sessionId) {
       return { error: "No active agent session ID in context." };
@@ -56,14 +67,21 @@ const enableTools = {
     const agentSettings = await SettingsService.getSection("agents");
     if (agentSettings?.dynamicToolActivation === false) {
       return {
-        error: "Dynamic tool activation is disabled in settings. " +
+        error:
+          "Dynamic tool activation is disabled in settings. " +
           "An administrator can enable it in Settings → Agent Defaults.",
       };
     }
 
     const requestedToolEntries = toolArguments.tools;
-    if (!Array.isArray(requestedToolEntries) || requestedToolEntries.length === 0) {
-      return { error: "'tools' must be a non-empty array of tool names or domain prefixes." };
+    if (
+      !Array.isArray(requestedToolEntries) ||
+      requestedToolEntries.length === 0
+    ) {
+      return {
+        error:
+          "'tools' must be a non-empty array of tool names or domain prefixes.",
+      };
     }
 
     const clientSchemas = getToolOrchestratorService().getClientToolSchemas();
@@ -74,7 +92,8 @@ const enableTools = {
 
     if (resolvedRequestedNames.size === 0) {
       return {
-        error: "None of the requested entries resolved to valid tool names. " +
+        error:
+          "None of the requested entries resolved to valid tool names. " +
           "Check spelling or use search_tools to discover available tools.",
       };
     }
@@ -93,7 +112,8 @@ const enableTools = {
     if (newlyActivatedTools.length === 0) {
       return {
         success: true,
-        message: "All requested tools are already enabled and available — you can call them directly right now.",
+        message:
+          "All requested tools are already enabled and available — you can call them directly right now.",
         enabledToolCount: mergedToolSet.size,
       };
     }
@@ -121,7 +141,7 @@ const disableTools = {
     emoji: ["🔒", "🧰"],
     description:
       "Dynamically disable tools from this session to reduce token usage and tool interference. " +
-      "Accepts exact tool names or domain prefixes (e.g. \"domain:Finance\"). " +
+      'Accepts exact tool names or domain prefixes (e.g. "domain:Finance"). ' +
       "Core cognitive tools (memory, tasks, planning, orchestration) cannot be disabled.",
     parameters: {
       type: "object",
@@ -131,7 +151,7 @@ const disableTools = {
           items: { type: "string" },
           description:
             "Tool names or domain prefixes to disable. " +
-            "Examples: [\"get_weather\"] or [\"domain:Weather & Environment\"].",
+            'Examples: ["get_weather"] or ["domain:Weather & Environment"].',
         },
       },
       required: ["tools"],
@@ -140,7 +160,10 @@ const disableTools = {
   labels: ["tools", "activation", "meta"],
   domain: DOMAINS.CORE_DISCOVER.displayName,
 
-  async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: InternalToolContext,
+  ) {
     const sessionId = context.agentSessionId;
     if (!sessionId) {
       return { error: "No active agent session ID in context." };
@@ -149,14 +172,21 @@ const disableTools = {
     const agentSettings = await SettingsService.getSection("agents");
     if (agentSettings?.dynamicToolActivation === false) {
       return {
-        error: "Dynamic tool activation is disabled in settings. " +
+        error:
+          "Dynamic tool activation is disabled in settings. " +
           "An administrator can enable it in Settings → Agent Defaults.",
       };
     }
 
     const requestedToolEntries = toolArguments.tools;
-    if (!Array.isArray(requestedToolEntries) || requestedToolEntries.length === 0) {
-      return { error: "'tools' must be a non-empty array of tool names or domain prefixes." };
+    if (
+      !Array.isArray(requestedToolEntries) ||
+      requestedToolEntries.length === 0
+    ) {
+      return {
+        error:
+          "'tools' must be a non-empty array of tool names or domain prefixes.",
+      };
     }
 
     const clientSchemas = getToolOrchestratorService().getClientToolSchemas();
@@ -200,7 +230,8 @@ const disableTools = {
     return {
       success: true,
       disabled: removedTools,
-      protectedSkipped: protectedToolsSkipped.length > 0 ? protectedToolsSkipped : undefined,
+      protectedSkipped:
+        protectedToolsSkipped.length > 0 ? protectedToolsSkipped : undefined,
       totalEnabled: mergedToolSet.size,
       message:
         `Disabled ${removedTools.length} tool(s).` +

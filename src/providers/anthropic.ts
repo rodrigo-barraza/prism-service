@@ -188,9 +188,10 @@ async function prepareMessages(messages: ChatMessage[]) {
         if (message.role === "system") {
           return {
             role: "user",
-            content: typeof message.content === "string"
-              ? message.content
-              : JSON.stringify(message.content),
+            content:
+              typeof message.content === "string"
+                ? message.content
+                : JSON.stringify(message.content),
           };
         }
 
@@ -850,8 +851,7 @@ const anthropicProvider = {
         streamPayload.thinking = { type: "adaptive" };
         if (options.reasoningEffort) {
           streamPayload.output_config = {
-            ...((streamPayload.output_config as Record<string, unknown>) ||
-              {}),
+            ...((streamPayload.output_config as Record<string, unknown>) || {}),
             effort: options.reasoningEffort,
           };
         }
@@ -940,8 +940,16 @@ const anthropicProvider = {
           }
 
           // Custom tool_use start — emit early disclosure before argument streaming
-          if (block?.type === "tool_use" && currentBlockName && currentToolUseId) {
-            yield { type: "toolCallStart", id: currentToolUseId, name: currentBlockName };
+          if (
+            block?.type === "tool_use" &&
+            currentBlockName &&
+            currentToolUseId
+          ) {
+            yield {
+              type: "toolCallStart",
+              id: currentToolUseId,
+              name: currentBlockName,
+            };
           }
 
           // Code execution tool result

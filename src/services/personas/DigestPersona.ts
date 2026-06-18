@@ -67,7 +67,10 @@ const DIGEST_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
   {
     content: `- For "what's high in X?" questions, use rank_foods_by_category or rank_foods_by_nutrient.`,
-    requires: [TOOL_NAMES.RANK_FOODS_BY_CATEGORY, TOOL_NAMES.RANK_FOODS_BY_NUTRIENT],
+    requires: [
+      TOOL_NAMES.RANK_FOODS_BY_CATEGORY,
+      TOOL_NAMES.RANK_FOODS_BY_NUTRIENT,
+    ],
   },
   {
     content: `- For dietary analysis, chain: user provides food log → analyze_nutrient_gaps → identify deficiencies → search_food_substitutes or rank_foods_by_category to fill gaps.`,
@@ -75,7 +78,10 @@ const DIGEST_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
   {
     content: `- When the user mentions medications, proactively check drug-nutrient interactions.`,
-    requires: [TOOL_NAMES.SEARCH_DRUG_NUTRIENT_INTERACTIONS, TOOL_NAMES.SEARCH_FDA_DRUGS],
+    requires: [
+      TOOL_NAMES.SEARCH_DRUG_NUTRIENT_INTERACTIONS,
+      TOOL_NAMES.SEARCH_FDA_DRUGS,
+    ],
   },
   {
     content: `- Use search_web for current research, studies, or information not in the static databases.`,
@@ -115,7 +121,8 @@ export const DigestPersona: Persona = {
   id: AGENT_IDS.DIGEST,
   name: "Digest",
   type: "",
-  description: "An evidence-based nutrition and exercise coach that calculates caloric needs, designs customized meal plans, and tracks fitness targets.",
+  description:
+    "An evidence-based nutrition and exercise coach that calculates caloric needs, designs customized meal plans, and tracks fitness targets.",
   project: "prism-chat",
   identity: () => {
     const sections = [
@@ -129,7 +136,8 @@ export const DigestPersona: Persona = {
   },
   guidelines: "",
   interactionRules: "",
-  toolPolicy: (context) => buildToolPolicy(DIGEST_TOOL_POLICY_SECTIONS, context),
+  toolPolicy: (context) =>
+    buildToolPolicy(DIGEST_TOOL_POLICY_SECTIONS, context),
   availableTools: DIGEST_AVAILABLE_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,

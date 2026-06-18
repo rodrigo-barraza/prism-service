@@ -12,12 +12,13 @@ import type { ConversationMessage } from "./types.ts";
  *   3. Import and register it here
  */
 
-
 interface HarnessConstructor {
   id: string;
   label: string;
   description: string;
-  new (...args: unknown[]): { run(): Promise<{ messages: ConversationMessage[] }> };
+  new (...args: unknown[]): {
+    run(): Promise<{ messages: ConversationMessage[] }>;
+  };
 }
 
 const registry = new Map<string, HarnessConstructor>();
@@ -30,7 +31,6 @@ function register(HarnessClass: HarnessConstructor) {
 register(ReActHarness as unknown as HarnessConstructor);
 register(VisionLanguageHarness as unknown as HarnessConstructor);
 register(TreeOfThoughtHarness as unknown as HarnessConstructor);
-
 
 const HarnessRegistry = {
   get(id: string) {

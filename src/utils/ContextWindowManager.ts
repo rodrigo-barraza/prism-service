@@ -74,10 +74,14 @@ function estimateMessageTokens(message: ChatMessage): number {
   if (message.toolCalls && Array.isArray(message.toolCalls)) {
     for (const toolCall of message.toolCalls) {
       tokens += estimateTokens(toolCall.name || "");
-      tokens += estimateTokens(toolCall.args ? JSON.stringify(toolCall.args) : "");
+      tokens += estimateTokens(
+        toolCall.args ? JSON.stringify(toolCall.args) : "",
+      );
       if (toolCall.result) {
         tokens += estimateTokens(
-          typeof toolCall.result === "string" ? toolCall.result : JSON.stringify(toolCall.result),
+          typeof toolCall.result === "string"
+            ? toolCall.result
+            : JSON.stringify(toolCall.result),
         );
       }
     }
@@ -141,14 +145,17 @@ function truncateToolResults(
   return messages.map((message, i) => {
     // Never truncate tool results in recent (protected) messages
     if (i >= protectionIndex) return message;
-    if (message.role !== "assistant" || !message.toolCalls?.length) return message;
+    if (message.role !== "assistant" || !message.toolCalls?.length)
+      return message;
 
     const truncated = { ...message };
     truncated.toolCalls = message.toolCalls.map((toolCall: ToolCallEntry) => {
       if (!toolCall.result) return toolCall;
 
       const resultString =
-        typeof toolCall.result === "string" ? toolCall.result : JSON.stringify(toolCall.result);
+        typeof toolCall.result === "string"
+          ? toolCall.result
+          : JSON.stringify(toolCall.result);
       if (resultString.length <= AGGRESSIVE_TOOL_RESULT_CAP) return toolCall;
 
       return {
@@ -187,7 +194,11 @@ function compressOldAssistantMessages(
 
   return messages.map((message, i) => {
     // Never compress system messages, user messages, or protected recent messages
-    if (message.role === "system" || message.role === "user" || i >= protectionIndex) {
+    if (
+      message.role === "system" ||
+      message.role === "user" ||
+      i >= protectionIndex
+    ) {
       return message;
     }
 
@@ -197,20 +208,25 @@ function compressOldAssistantMessages(
 
       // Keep a short summary of what the assistant did
       const toolNames =
-        message.toolCalls?.map((toolCall: ToolCallEntry) => toolCall.name).join(", ") || "";
-      const contentString = typeof message.content === "string" ? message.content : "";
+        message.toolCalls
+          ?.map((toolCall: ToolCallEntry) => toolCall.name)
+          .join(", ") || "";
+      const contentString =
+        typeof message.content === "string" ? message.content : "";
       const contentPreview = contentString.slice(0, 200);
 
       compressed.content = `[Earlier response${toolNames ? ` — used: ${toolNames}` : ""}]${contentPreview ? `\n${contentPreview}...` : ""}`;
       compressed.thinking = undefined;
 
       if (compressed.toolCalls) {
-        compressed.toolCalls = compressed.toolCalls.map((toolCall: ToolCallEntry) => ({
-          ...toolCall,
-          result: toolCall.result
-            ? "[result truncated for context budget]"
-            : undefined,
-        }));
+        compressed.toolCalls = compressed.toolCalls.map(
+          (toolCall: ToolCallEntry) => ({
+            ...toolCall,
+            result: toolCall.result
+              ? "[result truncated for context budget]"
+              : undefined,
+          }),
+        );
       }
 
       return compressed;
@@ -233,7 +249,10 @@ function compressOldAssistantMessages(
  * Keeps the system prompt, first user message (for task context),
  * and the most recent N turns.
  */
-function slidingWindowTruncation(messages: ChatMessage[], maxTokens: number): ChatMessage[] {
+function slidingWindowTruncation(
+  messages: ChatMessage[],
+  maxTokens: number,
+): ChatMessage[] {
   if (messages.length <= 3) return messages;
 
   // Always keep: system message, first user message
@@ -292,7 +311,6 @@ function slidingWindowTruncation(messages: ChatMessage[], maxTokens: number): Ch
   return [...head, ...tail];
 }
 
-
 // ────────────────────────────────────────────────────────────
 // Public API
 // ────────────────────────────────────────────────────────────
@@ -304,7 +322,10 @@ export default class ContextWindowManager {
    * Applies truncation strategies in order of aggressiveness until
    * the estimated token count fits within the model's context window.
    */
-  static enforce(messages: ChatMessage[], options: EnforceOptions = {}): EnforceResult {
+  static enforce(
+    messages: ChatMessage[],
+    options: EnforceOptions = {},
+  ): EnforceResult {
     const {
       maxInputTokens = 128_000,
       maxOutputTokens = MIN_OUTPUT_RESERVE,
@@ -347,7 +368,8 @@ export default class ContextWindowManager {
     );
 
     // Strategy 0: Micro-compaction — clear old compactable tool results entirely
-    const microCompactionResult = MicroCompactionService.microcompactMessages(messages);
+    const microCompactionResult =
+      MicroCompactionService.microcompactMessages(messages);
     let result = microCompactionResult.messages;
     currentTokens = estimateTotalTokens(result);
 

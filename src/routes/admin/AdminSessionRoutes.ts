@@ -4,7 +4,10 @@ import type { Request, Response, NextFunction } from "express";
 import { COLLECTIONS } from "../../constants.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
-import { applyDateRangeFilter, parsePaginationParams } from "../../utils/QueryBuilders.ts";
+import {
+  applyDateRangeFilter,
+  parsePaginationParams,
+} from "../../utils/QueryBuilders.ts";
 import { discoverDescendantSessionIds } from "../../utils/SessionDiscovery.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
 
@@ -21,7 +24,10 @@ sessionRouter.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionId = req.params.id as string;
-      const allSessionIds = await discoverDescendantSessionIds(req.db, sessionId);
+      const allSessionIds = await discoverDescendantSessionIds(
+        req.db,
+        sessionId,
+      );
 
       const requests = await req.db
         .collection(REQUESTS_COLLECTION)
@@ -68,7 +74,8 @@ sessionRouter.get(
         totalInputTokens += requestItem.inputTokens || 0;
         totalOutputTokens += requestItem.outputTokens || 0;
         totalCacheReadInputTokens += requestItem.cacheReadInputTokens || 0;
-        totalCacheCreationInputTokens += requestItem.cacheCreationInputTokens || 0;
+        totalCacheCreationInputTokens +=
+          requestItem.cacheCreationInputTokens || 0;
         totalReasoningOutputTokens += requestItem.reasoningOutputTokens || 0;
         if (requestItem.provider) providers.add(requestItem.provider);
         if (requestItem.model) models.add(requestItem.model);
@@ -91,12 +98,16 @@ sessionRouter.get(
 
       const createdAt = (requests as Record<string, unknown>[]).reduce(
         (min: string | null, requestItem) =>
-          !min || (requestItem.timestamp as string) < min ? (requestItem.timestamp as string) : min,
+          !min || (requestItem.timestamp as string) < min
+            ? (requestItem.timestamp as string)
+            : min,
         null as string | null,
       );
       const updatedAt = (requests as Record<string, unknown>[]).reduce(
         (max: string | null, requestItem) =>
-          !max || (requestItem.timestamp as string) > max ? (requestItem.timestamp as string) : max,
+          !max || (requestItem.timestamp as string) > max
+            ? (requestItem.timestamp as string)
+            : max,
         null as string | null,
       );
 
@@ -104,7 +115,8 @@ sessionRouter.get(
         createdAt && updatedAt
           ? Math.max(
               0,
-              (new Date(updatedAt as string).getTime() - new Date(createdAt as string).getTime()) /
+              (new Date(updatedAt as string).getTime() -
+                new Date(createdAt as string).getTime()) /
                 1000,
             )
           : 0;
@@ -130,7 +142,9 @@ sessionRouter.get(
         updatedAt,
       });
     } catch (error: unknown) {
-      logger.error(`Admin /sessions/:id/stats error: ${getErrorMessage(error)}`);
+      logger.error(
+        `Admin /sessions/:id/stats error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),
@@ -142,7 +156,10 @@ sessionRouter.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rootSessionId = req.params.id as string;
-      const allSessionIds = await discoverDescendantSessionIds(req.db, rootSessionId);
+      const allSessionIds = await discoverDescendantSessionIds(
+        req.db,
+        rootSessionId,
+      );
 
       const requests = await req.db
         .collection(REQUESTS_COLLECTION)
@@ -183,7 +200,9 @@ sessionRouter.get(
         requests,
       });
     } catch (error: unknown) {
-      logger.error(`Admin /sessions/:id/requests error: ${getErrorMessage(error)}`);
+      logger.error(
+        `Admin /sessions/:id/requests error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),
@@ -203,7 +222,9 @@ agentSessionRouter.get(
         sort = "updatedAt",
       } = req.query;
 
-      const { skip, limit, page, sortDirection } = parsePaginationParams(req.query);
+      const { skip, limit, page, sortDirection } = parsePaginationParams(
+        req.query,
+      );
 
       const queryFilter: Record<string, unknown> = {};
       if (project) queryFilter.project = project;
@@ -216,7 +237,12 @@ agentSessionRouter.get(
           { agent: regex },
         ];
       }
-      applyDateRangeFilter(queryFilter, from as string, to as string, "updatedAt");
+      applyDateRangeFilter(
+        queryFilter,
+        from as string,
+        to as string,
+        "updatedAt",
+      );
 
       const [sessionDocuments, totalSessionsCount] = await Promise.all([
         req.db
@@ -228,7 +254,9 @@ agentSessionRouter.get(
           .skip(skip)
           .limit(limit)
           .toArray(),
-        req.db.collection(COLLECTIONS.AGENT_CONVERSATIONS).countDocuments(queryFilter),
+        req.db
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+          .countDocuments(queryFilter),
       ]);
 
       if (sessionDocuments.length > 0) {
@@ -272,10 +300,14 @@ agentSessionRouter.get(
 
             if (costAggregation.length > 0) {
               const costMap = new Map(
-                costAggregation.map((costEntry) => [costEntry._id, costEntry.totalCost])
+                costAggregation.map((costEntry) => [
+                  costEntry._id,
+                  costEntry.totalCost,
+                ]),
               );
               for (const session of sessionDocuments) {
-                const sessionId = (session as Record<string, unknown>).id as string;
+                const sessionId = (session as Record<string, unknown>)
+                  .id as string;
                 const requestLogCost = costMap.get(sessionId);
                 if (requestLogCost !== undefined && requestLogCost > 0) {
                   (session as Record<string, unknown>).totalCost = Math.max(
@@ -288,14 +320,21 @@ agentSessionRouter.get(
           } catch (costError: unknown) {
             logger.warn(
               `Failed to enrich admin agent session costs: ${
-                costError instanceof Error ? costError.message : String(costError)
-              }`
+                costError instanceof Error
+                  ? costError.message
+                  : String(costError)
+              }`,
             );
           }
         }
       }
 
-      res.json({ data: sessionDocuments, total: totalSessionsCount, page, limit });
+      res.json({
+        data: sessionDocuments,
+        total: totalSessionsCount,
+        page,
+        limit,
+      });
     } catch (error: unknown) {
       logger.error(`Admin /agent-sessions error: ${getErrorMessage(error)}`);
       next(error);
@@ -317,7 +356,9 @@ agentSessionRouter.get(
 
       res.json(document);
     } catch (error: unknown) {
-      logger.error(`Admin /agent-sessions/:id error: ${getErrorMessage(error)}`);
+      logger.error(
+        `Admin /agent-sessions/:id error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),

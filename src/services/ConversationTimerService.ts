@@ -55,14 +55,18 @@ const ConversationTimerService = {
       clearInterval(tickerInterval);
     }
 
-    logger.info("[ConversationTimers] Starting background timer daemon (1s interval)...");
+    logger.info(
+      "[ConversationTimers] Starting background timer daemon (1s interval)...",
+    );
 
     tickerInterval = setInterval(() => {
       if (isTickInProgress) return;
       isTickInProgress = true;
       this.tick()
         .catch((error: unknown) => {
-          logger.error(`[ConversationTimers] Daemon tick error: ${getErrorMessage(error)}`);
+          logger.error(
+            `[ConversationTimers] Daemon tick error: ${getErrorMessage(error)}`,
+          );
         })
         .finally(() => {
           isTickInProgress = false;
@@ -109,13 +113,20 @@ const ConversationTimerService = {
     if (mode === "one_shot") {
       const seconds = data.durationSeconds ?? 0;
       if (seconds <= 0 || seconds > 86400) {
-        throw new Error("One-shot duration must be between 1 and 86400 seconds (24 hours).");
+        throw new Error(
+          "One-shot duration must be between 1 and 86400 seconds (24 hours).",
+        );
       }
       firesAt = new Date(now.getTime() + seconds * 1000).toISOString();
     } else {
       // For recurring timers, check cron pattern syntax
-      if (!data.cronExpression || data.cronExpression.trim().split(/\s+/).length !== 5) {
-        throw new Error("A valid 5-field cron expression is required for recurring reminders.");
+      if (
+        !data.cronExpression ||
+        data.cronExpression.trim().split(/\s+/).length !== 5
+      ) {
+        throw new Error(
+          "A valid 5-field cron expression is required for recurring reminders.",
+        );
       }
       // Calculate first fire time as next minute boundary
       const nextMinute = new Date(now.getTime() + 60 * 1000);
@@ -140,8 +151,14 @@ const ConversationTimerService = {
       updatedAt: timestamp,
     };
 
-    await database.collection(COLLECTIONS.CONVERSATION_TIMERS).insertOne(timer as unknown as import("mongodb").OptionalUnlessRequiredId<ConversationTimer>);
-    logger.info(`[ConversationTimers] Scheduled ${mode} timer ${timer.id} for conversation ${timer.conversationId}`);
+    await database
+      .collection(COLLECTIONS.CONVERSATION_TIMERS)
+      .insertOne(
+        timer as unknown as import("mongodb").OptionalUnlessRequiredId<ConversationTimer>,
+      );
+    logger.info(
+      `[ConversationTimers] Scheduled ${mode} timer ${timer.id} for conversation ${timer.conversationId}`,
+    );
 
     return timer;
   },
@@ -149,16 +166,22 @@ const ConversationTimerService = {
   /**
    * Cancel an active timer by changing its status to "cancelled".
    */
-  async cancelTimer(timerId: string, project: string, username: string): Promise<boolean> {
+  async cancelTimer(
+    timerId: string,
+    project: string,
+    username: string,
+  ): Promise<boolean> {
     const database = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!database) {
       throw new Error("Database connection unavailable");
     }
 
-    const result = await database.collection(COLLECTIONS.CONVERSATION_TIMERS).updateOne(
-      { id: timerId, project, username, status: "active" },
-      { $set: { status: "cancelled", updatedAt: new Date().toISOString() } }
-    );
+    const result = await database
+      .collection(COLLECTIONS.CONVERSATION_TIMERS)
+      .updateOne(
+        { id: timerId, project, username, status: "active" },
+        { $set: { status: "cancelled", updatedAt: new Date().toISOString() } },
+      );
 
     const isCancelled = (result.modifiedCount ?? 0) > 0;
     if (isCancelled) {
@@ -170,7 +193,11 @@ const ConversationTimerService = {
   /**
    * List all active timers for a specific conversation.
    */
-  async listActiveTimers(conversationId: string, project: string, username: string): Promise<ConversationTimer[]> {
+  async listActiveTimers(
+    conversationId: string,
+    project: string,
+    username: string,
+  ): Promise<ConversationTimer[]> {
     const database = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!database) return [];
 
@@ -221,22 +248,30 @@ const ConversationTimerService = {
         }
 
         if (!conversation) {
-          logger.warn(`[ConversationTimers] Conversation ${timer.conversationId} not found in agent or model collections. Expiring timer.`);
-          await database.collection(COLLECTIONS.CONVERSATION_TIMERS).updateOne(
-            { id: timer.id },
-            { $set: { status: "expired", updatedAt: nowTimestamp } }
+          logger.warn(
+            `[ConversationTimers] Conversation ${timer.conversationId} not found in agent or model collections. Expiring timer.`,
           );
+          await database
+            .collection(COLLECTIONS.CONVERSATION_TIMERS)
+            .updateOne(
+              { id: timer.id },
+              { $set: { status: "expired", updatedAt: nowTimestamp } },
+            );
           continue;
         }
 
         // Cooperative Deferral (Self-Healing Concurrency)
         // If the conversation is currently generating a response, skip execution on this second
         if (conversation.isGenerating === true) {
-          logger.debug(`[ConversationTimers] Conversation ${timer.conversationId} is currently generating. Deferring timer ${timer.id}.`);
+          logger.debug(
+            `[ConversationTimers] Conversation ${timer.conversationId} is currently generating. Deferring timer ${timer.id}.`,
+          );
           continue;
         }
 
-        logger.info(`[ConversationTimers] Firing due timer ${timer.id} for conversation ${timer.conversationId} in collection ${collection}.`);
+        logger.info(
+          `[ConversationTimers] Firing due timer ${timer.id} for conversation ${timer.conversationId} in collection ${collection}.`,
+        );
 
         // Compute current minute key (to avoid cron double-fires in the same minute)
         const currentMinuteKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}T${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -244,16 +279,24 @@ const ConversationTimerService = {
         if (timer.mode === "recurring" && timer.cronExpression) {
           // Check if date matches cron
           const isCronDue = matchCron(timer.cronExpression, now);
-          const hasAlreadyRunThisMinute = timer.lastFiredMinuteKey === currentMinuteKey;
+          const hasAlreadyRunThisMinute =
+            timer.lastFiredMinuteKey === currentMinuteKey;
 
           if (!isCronDue || hasAlreadyRunThisMinute) {
             // If it's not due for cron matching, or already run this minute, update firesAt to next minute boundary
             const nextMinute = new Date(now.getTime() + 60 * 1000);
             nextMinute.setSeconds(0, 0);
-            await database.collection(COLLECTIONS.CONVERSATION_TIMERS).updateOne(
-              { id: timer.id },
-              { $set: { firesAt: nextMinute.toISOString(), updatedAt: nowTimestamp } }
-            );
+            await database
+              .collection(COLLECTIONS.CONVERSATION_TIMERS)
+              .updateOne(
+                { id: timer.id },
+                {
+                  $set: {
+                    firesAt: nextMinute.toISOString(),
+                    updatedAt: nowTimestamp,
+                  },
+                },
+              );
             continue;
           }
         }
@@ -285,17 +328,21 @@ const ConversationTimerService = {
 
         // Atomic claim: only proceed if the timer is still in the expected state.
         // This prevents a second tick (or cluster node) from firing the same timer.
-        const claimedTimer = await database.collection(COLLECTIONS.CONVERSATION_TIMERS).findOneAndUpdate(
-          {
-            id: timer.id,
-            status: "active",
-            iterationCount: timer.iterationCount,
-          },
-          { $set: updates }
-        );
+        const claimedTimer = await database
+          .collection(COLLECTIONS.CONVERSATION_TIMERS)
+          .findOneAndUpdate(
+            {
+              id: timer.id,
+              status: "active",
+              iterationCount: timer.iterationCount,
+            },
+            { $set: updates },
+          );
 
         if (!claimedTimer) {
-          logger.debug(`[ConversationTimers] Timer ${timer.id} was already claimed by another tick. Skipping.`);
+          logger.debug(
+            `[ConversationTimers] Timer ${timer.id} was already claimed by another tick. Skipping.`,
+          );
           continue;
         }
 
@@ -312,7 +359,7 @@ const ConversationTimerService = {
             mode: "one_shot",
             id: { $ne: timer.id },
           },
-          { $set: { status: "cancelled", updatedAt: nowTimestamp } }
+          { $set: { status: "cancelled", updatedAt: nowTimestamp } },
         );
 
         // 2. Append timer fired message to the conversation
@@ -329,16 +376,24 @@ const ConversationTimerService = {
           timer.username,
           [reminderMessage],
           null,
-          { collection }
+          { collection },
         );
 
         // 3. Trigger AgenticLoopService in the background
-        this.executeAgenticLoop(timer, conversation as unknown as Record<string, unknown>, reminderMessage, collection).catch((error: unknown) => {
-          logger.error(`[ConversationTimers] Background loop failed for timer ${timer.id}: ${getErrorMessage(error)}`);
+        this.executeAgenticLoop(
+          timer,
+          conversation as unknown as Record<string, unknown>,
+          reminderMessage,
+          collection,
+        ).catch((error: unknown) => {
+          logger.error(
+            `[ConversationTimers] Background loop failed for timer ${timer.id}: ${getErrorMessage(error)}`,
+          );
         });
- 
       } catch (error: unknown) {
-        logger.error(`[ConversationTimers] Error processing due timer ${timer.id}: ${getErrorMessage(error)}`);
+        logger.error(
+          `[ConversationTimers] Error processing due timer ${timer.id}: ${getErrorMessage(error)}`,
+        );
       }
     }
   },
@@ -350,12 +405,14 @@ const ConversationTimerService = {
     timer: ConversationTimer,
     conversation: Record<string, unknown>,
     reminderMessage: ConversationMessage,
-    collection: string = COLLECTIONS.AGENT_CONVERSATIONS
+    collection: string = COLLECTIONS.AGENT_CONVERSATIONS,
   ): Promise<void> {
     const database = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!database) return;
 
-    logger.info(`[ConversationTimers] Spawning background agent loop for session: ${timer.conversationId}`);
+    logger.info(
+      `[ConversationTimers] Spawning background agent loop for session: ${timer.conversationId}`,
+    );
 
     const settings = (conversation.settings || {}) as ConversationSettings;
     const providerName = settings.provider || "";
@@ -364,7 +421,9 @@ const ConversationTimerService = {
     const workspaceRoot = settings.workspaceRoot || null;
 
     if (!providerName || !resolvedModel) {
-      throw new Error(`Invalid model/provider settings on conversation: ${timer.conversationId}`);
+      throw new Error(
+        `Invalid model/provider settings on conversation: ${timer.conversationId}`,
+      );
     }
 
     const provider = getProvider(providerName);
@@ -374,7 +433,8 @@ const ConversationTimerService = {
       throw new Error(`LLM provider ${providerName} is unavailable`);
     }
 
-    const traceId = (conversation.traceId as string | undefined) || crypto.randomUUID();
+    const traceId =
+      (conversation.traceId as string | undefined) || crypto.randomUUID();
     const requestId = crypto.randomUUID();
 
     // Reconstruct the message list for the agentic harness
@@ -385,7 +445,9 @@ const ConversationTimerService = {
 
     // Standard logging emitter for background execution
     const mockEmit = (event: SseEvent) => {
-      logger.debug(`[ConversationTimers][BackgroundAgent][${timer.conversationId}][Event] type=${event.type}`);
+      logger.debug(
+        `[ConversationTimers][BackgroundAgent][${timer.conversationId}][Event] type=${event.type}`,
+      );
     };
 
     // Ensure the conversation is marked as generating
@@ -394,12 +456,13 @@ const ConversationTimerService = {
       timer.project,
       timer.username,
       true,
-      { collection, agent: agent || undefined }
+      { collection, agent: agent || undefined },
     );
 
     try {
       await AgenticLoopService.runAgenticLoop({
-        provider: provider as unknown as import("./harnesses/types.ts").LLMProvider,
+        provider:
+          provider as unknown as import("./harnesses/types.ts").LLMProvider,
         providerName,
         resolvedModel,
         modelDefinition,
@@ -411,13 +474,20 @@ const ConversationTimerService = {
           planFirst: false,
           autoApprove: true,
           minContextLength: 120_000,
-          ...(settings.toolConfig?.enabledTools && { enabledTools: settings.toolConfig.enabledTools }),
-          ...(settings.toolConfig?.disabledTools && { disabledTools: settings.toolConfig.disabledTools }),
+          ...(settings.toolConfig?.enabledTools && {
+            enabledTools: settings.toolConfig.enabledTools,
+          }),
+          ...(settings.toolConfig?.disabledTools && {
+            disabledTools: settings.toolConfig.disabledTools,
+          }),
         },
         agentSessionId: crypto.randomUUID(),
         conversationId: timer.conversationId,
         userMessage: reminderMessage,
-        conversationMeta: { title: (conversation.title as string) || "Background Agent", settings },
+        conversationMeta: {
+          title: (conversation.title as string) || "Background Agent",
+          settings,
+        },
         traceId,
         project: timer.project,
         username: timer.username,
@@ -429,9 +499,13 @@ const ConversationTimerService = {
         emit: mockEmit,
       });
 
-      logger.success(`[ConversationTimers] Background loop completed successfully for conversation ${timer.conversationId}`);
+      logger.success(
+        `[ConversationTimers] Background loop completed successfully for conversation ${timer.conversationId}`,
+      );
     } catch (error: unknown) {
-      logger.error(`[ConversationTimers] Background loop error on conversation ${timer.conversationId}: ${getErrorMessage(error)}`);
+      logger.error(
+        `[ConversationTimers] Background loop error on conversation ${timer.conversationId}: ${getErrorMessage(error)}`,
+      );
       throw error;
     } finally {
       // Always clear isGenerating — both success and error paths.
@@ -442,7 +516,7 @@ const ConversationTimerService = {
         timer.project,
         timer.username,
         false,
-        { collection }
+        { collection },
       ).catch(() => {});
     }
   },

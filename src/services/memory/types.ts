@@ -55,7 +55,11 @@ export interface ProcessBatchOptions {
   agentSessionId?: string | null;
   broadcast?: ((event: Record<string, unknown>) => void) | null;
   systemPrompt?: string;
-  inputBuilder?: (clusters: MemoryDoc[][], stale: MemoryDoc[], meta?: PartitionMeta) => string | null;
+  inputBuilder?: (
+    clusters: MemoryDoc[][],
+    stale: MemoryDoc[],
+    meta?: PartitionMeta,
+  ) => string | null;
 }
 
 /** Options for applyActions */

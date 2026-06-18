@@ -28,7 +28,11 @@ export interface ChatMessage {
   content?: string | ChatMessageContent[];
   name?: string;
   images?: string[];
-  toolCalls?: Array<{ id?: string | null; name: string; args?: Record<string, unknown> | unknown }>;
+  toolCalls?: Array<{
+    id?: string | null;
+    name: string;
+    args?: Record<string, unknown> | unknown;
+  }>;
   thinking?: string;
   thinkingSignature?: string;
   /** Tool result correlation — maps this message to the tool_use that produced it. */
@@ -64,13 +68,17 @@ export interface ProviderOptions {
   thinkingEnabled?: boolean;
   thinkingLevel?: string;
   thinkingBudget?: number | string;
-  reasoningEffort?: 'none' | 'low' | 'medium' | 'high';
+  reasoningEffort?: "none" | "low" | "medium" | "high";
   signal?: AbortSignal;
   webSearch?: boolean | string;
   webFetch?: boolean;
   codeExecution?: boolean;
   urlContext?: boolean;
-  tools?: Array<{ name: string; description?: string; parameters?: Record<string, unknown> }>;
+  tools?: Array<{
+    name: string;
+    description?: string;
+    parameters?: Record<string, unknown>;
+  }>;
   _retryAttempt?: number;
   reasoningSummary?: boolean | string;
   verbosity?: string;

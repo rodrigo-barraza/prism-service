@@ -1,6 +1,16 @@
 import { ProviderOptions } from "../types/ProviderTypes.ts";
 import type { GenerateTextResult } from "../types/provider.ts";
-import { GoogleGenAI, Modality, type Content, type Part, type GenerateContentConfig, type ThinkingLevel, type LiveServerMessage, MediaResolution, ServiceTier } from "@google/genai";
+import {
+  GoogleGenAI,
+  Modality,
+  type Content,
+  type Part,
+  type GenerateContentConfig,
+  type ThinkingLevel,
+  type LiveServerMessage,
+  MediaResolution,
+  ServiceTier,
+} from "@google/genai";
 import crypto from "crypto";
 import { Readable } from "stream";
 import { ProviderError } from "../utils/errors.ts";
@@ -41,9 +51,15 @@ interface GoogleToolDeclaration {
   }>;
 }
 
-interface GoogleSearchTool { googleSearch: Record<string, never> }
-interface GoogleCodeExecutionTool { codeExecution: Record<string, never> }
-interface GoogleUrlContextTool { urlContext: Record<string, never> }
+interface GoogleSearchTool {
+  googleSearch: Record<string, never>;
+}
+interface GoogleCodeExecutionTool {
+  codeExecution: Record<string, never>;
+}
+interface GoogleUrlContextTool {
+  urlContext: Record<string, never>;
+}
 
 export type GoogleToolConfigEntry =
   | GoogleToolDeclaration
@@ -114,7 +130,11 @@ function isSafetyBlockError(error: unknown): boolean {
     message.includes("response was blocked")
   );
 }
-function addWavHeader(buffer: Buffer, sampleRate: number = 24000, channelCount: number = 1): Buffer {
+function addWavHeader(
+  buffer: Buffer,
+  sampleRate: number = 24000,
+  channelCount: number = 1,
+): Buffer {
   const headerLength = 44;
   const dataLength = buffer.length;
   const fileSize = dataLength + headerLength - 8;
@@ -197,7 +217,14 @@ function sanitizeSchemaForGoogle(
  * Output: [{ functionDeclarations: [...] }]
  */
 export function convertToolsToGoogle(
-  tools: Array<{ name: string; description?: string; parameters?: Record<string, unknown> }> | null | undefined,
+  tools:
+    | Array<{
+        name: string;
+        description?: string;
+        parameters?: Record<string, unknown>;
+      }>
+    | null
+    | undefined,
 ): GoogleToolDeclaration[] | null {
   if (!tools || !Array.isArray(tools) || tools.length === 0) return null;
   return [
@@ -205,7 +232,10 @@ export function convertToolsToGoogle(
       functionDeclarations: tools.map((tool) => ({
         name: tool.name,
         description: tool.description || "",
-        parameters: sanitizeSchemaForGoogle(tool.parameters || {}) as Record<string, unknown>,
+        parameters: sanitizeSchemaForGoogle(tool.parameters || {}) as Record<
+          string,
+          unknown
+        >,
       })),
     },
   ];
@@ -216,25 +246,41 @@ export function convertToolsToGoogle(
  * Centralizes the repeated config-building pattern across generateText,
  * generateTextStream, and generateTextStreamLive.
  */
-function buildGenerateConfig(options: ProviderOptions, modelDefinition: ModelDefinition | null | undefined): GenerateContentConfig {
+function buildGenerateConfig(
+  options: ProviderOptions,
+  modelDefinition: ModelDefinition | null | undefined,
+): GenerateContentConfig {
   const config: GenerateContentConfig = {};
 
-  if (options.temperature !== undefined) config.temperature = options.temperature;
+  if (options.temperature !== undefined)
+    config.temperature = options.temperature;
   if (options.topP !== undefined) config.topP = options.topP;
   if (options.topK !== undefined) config.topK = options.topK;
-  if (options.presencePenalty !== undefined) config.presencePenalty = options.presencePenalty;
-  if (options.frequencyPenalty !== undefined) config.frequencyPenalty = options.frequencyPenalty;
-  if (options.stopSequences !== undefined) config.stopSequences = options.stopSequences;
-  if (options.maxTokens !== undefined && options.maxTokens !== null && options.maxTokens > 0) {
+  if (options.presencePenalty !== undefined)
+    config.presencePenalty = options.presencePenalty;
+  if (options.frequencyPenalty !== undefined)
+    config.frequencyPenalty = options.frequencyPenalty;
+  if (options.stopSequences !== undefined)
+    config.stopSequences = options.stopSequences;
+  if (
+    options.maxTokens !== undefined &&
+    options.maxTokens !== null &&
+    options.maxTokens > 0
+  ) {
     config.maxOutputTokens = options.maxTokens;
   }
   if (options.seed !== undefined) config.seed = parseInt(String(options.seed));
-  if (options.responseMimeType) config.responseMimeType = options.responseMimeType;
-  else if (options.responseFormat === "json_object") config.responseMimeType = "application/json";
-  if (options.candidateCount !== undefined && options.candidateCount > 1) config.candidateCount = options.candidateCount;
-  if (options.mediaResolution) config.mediaResolution = options.mediaResolution as MediaResolution;
+  if (options.responseMimeType)
+    config.responseMimeType = options.responseMimeType;
+  else if (options.responseFormat === "json_object")
+    config.responseMimeType = "application/json";
+  if (options.candidateCount !== undefined && options.candidateCount > 1)
+    config.candidateCount = options.candidateCount;
+  if (options.mediaResolution)
+    config.mediaResolution = options.mediaResolution as MediaResolution;
   if (options.responseLogprobs === true) config.responseLogprobs = true;
-  if (options.logprobs && options.logprobs > 0) config.logprobs = options.logprobs;
+  if (options.logprobs && options.logprobs > 0)
+    config.logprobs = options.logprobs;
   if (options.serviceTier && options.serviceTier !== "auto") {
     config.serviceTier = options.serviceTier as ServiceTier;
   }
@@ -248,10 +294,16 @@ function buildGenerateConfig(options: ProviderOptions, modelDefinition: ModelDef
       config.thinkingConfig = { thinkingBudget: 0 };
     } else {
       config.thinkingConfig = { includeThoughts: true };
-      if (options.thinkingBudget !== undefined && options.thinkingBudget !== "") {
-        config.thinkingConfig.thinkingBudget = parseInt(String(options.thinkingBudget));
+      if (
+        options.thinkingBudget !== undefined &&
+        options.thinkingBudget !== ""
+      ) {
+        config.thinkingConfig.thinkingBudget = parseInt(
+          String(options.thinkingBudget),
+        );
       } else if (options.thinkingLevel && modelDefinition?.thinkingLevels) {
-        config.thinkingConfig.thinkingLevel = options.thinkingLevel as ThinkingLevel;
+        config.thinkingConfig.thinkingLevel =
+          options.thinkingLevel as ThinkingLevel;
       }
     }
   }
@@ -264,7 +316,9 @@ function buildGenerateConfig(options: ProviderOptions, modelDefinition: ModelDef
   return config;
 }
 
-async function convertMessages(messages: ConversationMessage[]): Promise<Content[]> {
+async function convertMessages(
+  messages: ConversationMessage[],
+): Promise<Content[]> {
   const result: Content[] = [];
 
   for (let i = 0; i < messages.length; i++) {
@@ -343,7 +397,9 @@ async function convertMessages(messages: ConversationMessage[]): Promise<Content
     // Assistant messages with tool calls — include functionCall parts
     if (item.role === "assistant" && item.toolCalls) {
       for (const toolCall of item.toolCalls) {
-        const functionCallPart: Part = { functionCall: { name: toolCall.name, args: toolCall.args || {} } };
+        const functionCallPart: Part = {
+          functionCall: { name: toolCall.name, args: toolCall.args || {} },
+        };
         // Preserve thoughtSignature (sibling of functionCall, required by Gemini)
         if (toolCall.thoughtSignature) {
           functionCallPart.thoughtSignature = toolCall.thoughtSignature;
@@ -389,7 +445,9 @@ const googleProvider = {
     logger.provider("Google", `generateText model=${model}`);
     try {
       const contents = await convertMessages(messages);
-      const modelDefinition = Object.values(MODELS).find((modelDefinitionItem) => modelDefinitionItem.name === model) as ModelDefinition | undefined;
+      const modelDefinition = Object.values(MODELS).find(
+        (modelDefinitionItem) => modelDefinitionItem.name === model,
+      ) as ModelDefinition | undefined;
       const config = buildGenerateConfig(options, modelDefinition);
 
       // Web search
@@ -405,7 +463,10 @@ const googleProvider = {
 
       // For models that output images, set responseModalities explicitly.
       // These models REQUIRE ["TEXT", "IMAGE"] — ["TEXT"] alone returns 0 tokens.
-      if (modelDefinition?.outputTypes && (modelDefinition.outputTypes as string[]).includes(TYPES.IMAGE)) {
+      if (
+        modelDefinition?.outputTypes &&
+        (modelDefinition.outputTypes as string[]).includes(TYPES.IMAGE)
+      ) {
         config.responseModalities = options.forceImageGeneration
           ? ["IMAGE"]
           : ["TEXT", "IMAGE"];
@@ -418,8 +479,16 @@ const googleProvider = {
       });
 
       // Check for function calls, images, and text in the response
-      interface ToolCallResult { id: string; name: string; args: Record<string, unknown>; thoughtSignature?: string }
-      interface ImageResult { data: string; mimeType: string }
+      interface ToolCallResult {
+        id: string;
+        name: string;
+        args: Record<string, unknown>;
+        thoughtSignature?: string;
+      }
+      interface ImageResult {
+        data: string;
+        mimeType: string;
+      }
       const toolCalls: ToolCallResult[] = [];
       const textParts: string[] = [];
       const images: ImageResult[] = [];
@@ -430,11 +499,12 @@ const googleProvider = {
             id: `google-toolCall-${crypto.randomUUID()}`,
             name: part.functionCall.name || "any",
             args: (part.functionCall.args || {}) as Record<string, unknown>,
-            thoughtSignature: (part as PartWithThoughtSignature).thoughtSignature,
+            thoughtSignature: (part as PartWithThoughtSignature)
+              .thoughtSignature,
           });
         } else if (part.text) {
           textParts.push(part.text);
-                } else if (part.inlineData && images.length < maxImages) {
+        } else if (part.inlineData && images.length < maxImages) {
           images.push({
             data: part.inlineData.data || "",
             mimeType: part.inlineData.mimeType || "image/png",
@@ -447,9 +517,12 @@ const googleProvider = {
         usage: {
           inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
           outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
-          ...(response.usageMetadata?.cachedContentTokenCount ? {
-            cacheReadInputTokens: response.usageMetadata.cachedContentTokenCount,
-          } : {}),
+          ...(response.usageMetadata?.cachedContentTokenCount
+            ? {
+                cacheReadInputTokens:
+                  response.usageMetadata.cachedContentTokenCount,
+              }
+            : {}),
         },
       };
       if (toolCalls.length > 0) result.toolCalls = toolCalls;
@@ -460,7 +533,9 @@ const googleProvider = {
       // should return an empty result, not a 500. This lets consumers
       // handle "no image generated" gracefully and preserves the conversation.
       if (isSafetyBlockError(error)) {
-        logger.error(`[Google] Content safety block: ${getErrorMessage(error)}`);
+        logger.error(
+          `[Google] Content safety block: ${getErrorMessage(error)}`,
+        );
         return {
           text: "",
           usage: { inputTokens: 0, outputTokens: 0 },
@@ -479,7 +554,9 @@ const googleProvider = {
     logger.provider("Google", `generateTextStream model=${model}`);
     try {
       const contents = await convertMessages(messages);
-      const modelDefinition = Object.values(MODELS).find((modelDefinitionItem) => modelDefinitionItem.name === model) as ModelDefinition | undefined;
+      const modelDefinition = Object.values(MODELS).find(
+        (modelDefinitionItem) => modelDefinitionItem.name === model,
+      ) as ModelDefinition | undefined;
       const config = buildGenerateConfig(options, modelDefinition);
 
       // Build tools array based on enabled options
@@ -495,7 +572,10 @@ const googleProvider = {
       if (tools.length > 0) config.tools = tools;
 
       // For models that output images, set responseModalities explicitly.
-      if (modelDefinition?.outputTypes && (modelDefinition.outputTypes as string[]).includes(TYPES.IMAGE)) {
+      if (
+        modelDefinition?.outputTypes &&
+        (modelDefinition.outputTypes as string[]).includes(TYPES.IMAGE)
+      ) {
         config.responseModalities = options.forceImageGeneration
           ? ["IMAGE"]
           : ["TEXT", "IMAGE"];
@@ -528,13 +608,14 @@ const googleProvider = {
                 id: `google-toolCall-${crypto.randomUUID()}`,
                 name: part.functionCall.name || "any",
                 args: (part.functionCall.args || {}) as Record<string, unknown>,
-                thoughtSignature: (part as PartWithThoughtSignature).thoughtSignature,
+                thoughtSignature: (part as PartWithThoughtSignature)
+                  .thoughtSignature,
               };
             } else if (part.thought && part.text) {
               yield { type: "thinking", content: part.text };
             } else if (part.text) {
               yield part.text;
-                        } else if (part.inlineData && imageCount < maxImages) {
+            } else if (part.inlineData && imageCount < maxImages) {
               imageCount++;
               yield {
                 type: "image",
@@ -562,9 +643,12 @@ const googleProvider = {
           usage = {
             inputTokens: chunk.usageMetadata.promptTokenCount ?? 0,
             outputTokens: chunk.usageMetadata.candidatesTokenCount ?? 0,
-            ...(chunk.usageMetadata.cachedContentTokenCount ? {
-              cacheReadInputTokens: chunk.usageMetadata.cachedContentTokenCount,
-            } : {}),
+            ...(chunk.usageMetadata.cachedContentTokenCount
+              ? {
+                  cacheReadInputTokens:
+                    chunk.usageMetadata.cachedContentTokenCount,
+                }
+              : {}),
           };
         }
       }
@@ -578,7 +662,7 @@ const googleProvider = {
         yield { type: "usage", usage: { inputTokens: 0, outputTokens: 0 } };
       }
     } catch (error: unknown) {
-      if ((error instanceof Error && error.name === "AbortError")) return;
+      if (error instanceof Error && error.name === "AbortError") return;
       if (isSafetyBlockError(error)) {
         logger.error(
           `[Google] Content safety block (stream): ${getErrorMessage(error)}`,
@@ -601,10 +685,20 @@ const googleProvider = {
    * Bridges the event-driven Live API into an async generator matching
    * the same interface as generateTextStream().
    */
-  async *generateTextStreamLive(messages: ConversationMessage[], model: string, options: ProviderOptions = {}) {
-    logger.provider("Google", `generateTextStreamLive (Live API) model=${model}`);
-    const modelDefinition = Object.values(MODELS).find((modelDefinitionItem) => modelDefinitionItem.name === model) as ModelDefinition | undefined;
-    let session: Awaited<ReturnType<GoogleGenAI["live"]["connect"]>> | null = null;
+  async *generateTextStreamLive(
+    messages: ConversationMessage[],
+    model: string,
+    options: ProviderOptions = {},
+  ) {
+    logger.provider(
+      "Google",
+      `generateTextStreamLive (Live API) model=${model}`,
+    );
+    const modelDefinition = Object.values(MODELS).find(
+      (modelDefinitionItem) => modelDefinitionItem.name === model,
+    ) as ModelDefinition | undefined;
+    let session: Awaited<ReturnType<GoogleGenAI["live"]["connect"]>> | null =
+      null;
     try {
       // ── Build Live API config ────────────────────────────────────
       // This model ONLY supports AUDIO output modality.
@@ -614,21 +708,30 @@ const googleProvider = {
         outputAudioTranscription: {},
       };
 
-      if (options.temperature !== undefined) liveConfig.temperature = options.temperature;
+      if (options.temperature !== undefined)
+        liveConfig.temperature = options.temperature;
       if (options.topP !== undefined) liveConfig.topP = options.topP;
       if (options.topK !== undefined) liveConfig.topK = options.topK;
-      if (options.maxTokens !== undefined && options.maxTokens !== null && options.maxTokens > 0) {
+      if (
+        options.maxTokens !== undefined &&
+        options.maxTokens !== null &&
+        options.maxTokens > 0
+      ) {
         liveConfig.maxOutputTokens = options.maxTokens;
       }
 
       const supportsThinking = modelDefinition?.thinking === true;
-      if (
-        supportsThinking &&
-        options.thinkingEnabled !== false
-      ) {
-        const thinkingConfig: Record<string, unknown> = { includeThoughts: true };
-        if (options.thinkingBudget !== undefined && options.thinkingBudget !== "") {
-          thinkingConfig.thinkingBudget = parseInt(String(options.thinkingBudget));
+      if (supportsThinking && options.thinkingEnabled !== false) {
+        const thinkingConfig: Record<string, unknown> = {
+          includeThoughts: true,
+        };
+        if (
+          options.thinkingBudget !== undefined &&
+          options.thinkingBudget !== ""
+        ) {
+          thinkingConfig.thinkingBudget = parseInt(
+            String(options.thinkingBudget),
+          );
         } else if (options.thinkingLevel && modelDefinition?.thinkingLevels) {
           thinkingConfig.thinkingLevel = options.thinkingLevel;
         }
@@ -643,7 +746,9 @@ const googleProvider = {
       if (tools.length > 0) liveConfig.tools = tools;
 
       // System instruction from messages[0] if role === "system"
-      const systemMessage = messages.find((message) => message.role === "system");
+      const systemMessage = messages.find(
+        (message) => message.role === "system",
+      );
       if (systemMessage?.content) {
         liveConfig.systemInstruction = systemMessage.content;
       }
@@ -757,9 +862,14 @@ const googleProvider = {
                   usage: {
                     inputTokens: user.promptTokenCount ?? 0,
                     outputTokens: user.responseTokenCount ?? 0,
-                    ...((user as Record<string, unknown>).cachedContentTokenCount ? {
-                      cacheReadInputTokens: (user as Record<string, unknown>).cachedContentTokenCount as number,
-                    } : {}),
+                    ...((user as Record<string, unknown>)
+                      .cachedContentTokenCount
+                      ? {
+                          cacheReadInputTokens: (
+                            user as Record<string, unknown>
+                          ).cachedContentTokenCount as number,
+                        }
+                      : {}),
                   },
                 });
               }
@@ -773,11 +883,15 @@ const googleProvider = {
           },
           onerror: (e: unknown) => {
             const errorObject = e as Record<string, unknown> | null;
-            const innerError = (errorObject?.error ?? null) as Record<string, unknown> | null;
-            const errorMessage = (innerError?.message as string) || (errorObject?.message as string) || "unknown error";
-            logger.error(
-              `[Google Live API] Error: ${errorMessage}`,
-            );
+            const innerError = (errorObject?.error ?? null) as Record<
+              string,
+              unknown
+            > | null;
+            const errorMessage =
+              (innerError?.message as string) ||
+              (errorObject?.message as string) ||
+              "unknown error";
+            logger.error(`[Google Live API] Error: ${errorMessage}`);
             done = true;
             enqueue({
               type: "error",
@@ -797,7 +911,11 @@ const googleProvider = {
         const item = await dequeue();
         if (item?.type === "setupComplete") break;
         if (item?.type === "error")
-          throw new ProviderError("google", item.message || "Unknown error", 500);
+          throw new ProviderError(
+            "google",
+            item.message || "Unknown error",
+            500,
+          );
         if (item?.type === "done") return;
       }
 
@@ -851,7 +969,11 @@ const googleProvider = {
         if (!item || item.type === "done") break;
 
         if (item.type === "error") {
-          throw new ProviderError("google", item.message || "Unknown error", 500);
+          throw new ProviderError(
+            "google",
+            item.message || "Unknown error",
+            500,
+          );
         }
 
         if (item.type === "text") {
@@ -873,7 +995,7 @@ const googleProvider = {
         }
       }
     } catch (error: unknown) {
-      if ((error instanceof Error && error.name === "AbortError")) return;
+      if (error instanceof Error && error.name === "AbortError") return;
       if (error instanceof ProviderError) throw error;
       throw new ProviderError("google", getErrorMessage(error), 500, error);
     } finally {
@@ -940,9 +1062,12 @@ const googleProvider = {
       const usage = {
         inputTokens: response.usageMetadata?.promptTokenCount || 0,
         outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
-        ...(response.usageMetadata?.cachedContentTokenCount ? {
-          cacheReadInputTokens: response.usageMetadata.cachedContentTokenCount,
-        } : {}),
+        ...(response.usageMetadata?.cachedContentTokenCount
+          ? {
+              cacheReadInputTokens:
+                response.usageMetadata.cachedContentTokenCount,
+            }
+          : {}),
       };
       return { text: response.text, usage };
     } catch (error: unknown) {
@@ -1020,7 +1145,11 @@ const googleProvider = {
     }
   },
 
-  async generateSpeech(text: string, voice: string = DEFAULT_VOICES.google, options: ProviderOptions = {}) {
+  async generateSpeech(
+    text: string,
+    voice: string = DEFAULT_VOICES.google,
+    options: ProviderOptions = {},
+  ) {
     logger.provider("Google", `generateSpeech voice=${voice}`);
     try {
       const config: GenerateContentConfig = {
@@ -1035,16 +1164,16 @@ const googleProvider = {
         },
       };
 
-      const speechModel = (options.model as string) || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).google;
+      const speechModel =
+        (options.model as string) ||
+        getDefaultModels(TYPES.TEXT, TYPES.AUDIO).google;
       const speechText = options.prompt ? `${options.prompt}\n\n${text}` : text;
       const response = await getClient().models.generateContent({
         model: speechModel,
         contents: [
           {
             role: "user",
-            parts: [
-              { text: speechText },
-            ],
+            parts: [{ text: speechText }],
           },
         ],
         config,
@@ -1115,9 +1244,12 @@ const googleProvider = {
         usage: {
           inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
           outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
-          ...(response.usageMetadata?.cachedContentTokenCount ? {
-            cacheReadInputTokens: response.usageMetadata.cachedContentTokenCount,
-          } : {}),
+          ...(response.usageMetadata?.cachedContentTokenCount
+            ? {
+                cacheReadInputTokens:
+                  response.usageMetadata.cachedContentTokenCount,
+              }
+            : {}),
         },
       };
     } catch (error: unknown) {
@@ -1125,7 +1257,11 @@ const googleProvider = {
     }
   },
 
-  async generateEmbedding(content: unknown, model?: string, options: ProviderOptions = {}) {
+  async generateEmbedding(
+    content: unknown,
+    model?: string,
+    options: ProviderOptions = {},
+  ) {
     const resolvedModel =
       model ||
       getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)?.google ||

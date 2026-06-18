@@ -107,7 +107,7 @@ router.get(
           .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
           .find(filter)
           .project<Omit<ConversationDocument, "messages">>(
-            CONVERSATION_LIST_PROJECTION
+            CONVERSATION_LIST_PROJECTION,
           )
           .sort({ updatedAt: -1 })
           .limit(limit + 1)
@@ -128,10 +128,11 @@ router.get(
       };
 
       if (type === "all") {
-        const [fetchedModelConversations, fetchedAgentConversations] = await Promise.all([
-          fetchModelConversations(),
-          fetchAgentConversations(),
-        ]);
+        const [fetchedModelConversations, fetchedAgentConversations] =
+          await Promise.all([
+            fetchModelConversations(),
+            fetchAgentConversations(),
+          ]);
         modelConversations = fetchedModelConversations;
         agentConversations = fetchedAgentConversations;
       } else if (type === "direct") {
@@ -184,7 +185,11 @@ router.get(
 
           const costAggregation = await db
             .collection(COLLECTIONS.REQUESTS)
-            .aggregate<{ _id: string; totalCost: number; requestErrorCount: number }>([
+            .aggregate<{
+              _id: string;
+              totalCost: number;
+              requestErrorCount: number;
+            }>([
               {
                 $match: {
                   ...matchCondition,
@@ -204,7 +209,10 @@ router.get(
             ])
             .toArray();
 
-          enrichConversationsWithRequestCosts(conversations as ConversationDocument[], costAggregation);
+          enrichConversationsWithRequestCosts(
+            conversations as ConversationDocument[],
+            costAggregation,
+          );
         } catch (costError: unknown) {
           logger.warn(
             `Failed to enrich ${isAgentType ? "agent session" : "conversation"} costs: ${costError instanceof Error ? costError.message : String(costError)}`,
@@ -219,21 +227,31 @@ router.get(
 
       // Merge and sort in memory by updatedAt descending
       const merged = [
-        ...modelConversations.map((conversation) => ({ ...conversation, type: "direct" as const })),
-        ...agentConversations.map((session) => ({ ...session, type: "agent" as const })),
+        ...modelConversations.map((conversation) => ({
+          ...conversation,
+          type: "direct" as const,
+        })),
+        ...agentConversations.map((session) => ({
+          ...session,
+          type: "agent" as const,
+        })),
       ] as (Document & { type: string })[];
       merged.sort(
         (firstConversation, secondConversation) =>
-          new Date(secondConversation.updatedAt as string).getTime() - new Date(firstConversation.updatedAt as string).getTime()
+          new Date(secondConversation.updatedAt as string).getTime() -
+          new Date(firstConversation.updatedAt as string).getTime(),
       );
 
       const hasMore = merged.length > limit;
       const items = hasMore ? merged.slice(0, limit) : merged;
-      const nextCursor = hasMore ? (items[items.length - 1].updatedAt as string) : null;
+      const nextCursor = hasMore
+        ? (items[items.length - 1].updatedAt as string)
+        : null;
 
       res.json({ items, nextCursor, hasMore });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`Error fetching unified conversations: ${errorMessage}`);
       next(error);
     }
@@ -265,7 +283,11 @@ router.get(
         try {
           const costAggregation = await db
             .collection(COLLECTIONS.REQUESTS)
-            .aggregate<{ _id: string; totalCost: number; requestErrorCount: number }>([
+            .aggregate<{
+              _id: string;
+              totalCost: number;
+              requestErrorCount: number;
+            }>([
               {
                 $match: { conversationId, project, username },
               },
@@ -286,13 +308,19 @@ router.get(
           // Non-fatal — fall back to document-level totalCost
         }
 
-        const pendingApproval = AgenticLoopService.getPendingApproval(conversationId);
-        const pendingQuestion = AgenticLoopService.getPendingQuestion(conversationId);
+        const pendingApproval =
+          AgenticLoopService.getPendingApproval(conversationId);
+        const pendingQuestion =
+          AgenticLoopService.getPendingQuestion(conversationId);
         return res.json({
           ...chat,
           type: "direct",
-          pendingApproval: pendingApproval.isPending ? pendingApproval : undefined,
-          pendingQuestion: pendingQuestion.isPending ? pendingQuestion : undefined,
+          pendingApproval: pendingApproval.isPending
+            ? pendingApproval
+            : undefined,
+          pendingQuestion: pendingQuestion.isPending
+            ? pendingQuestion
+            : undefined,
         });
       }
 
@@ -307,21 +335,28 @@ router.get(
           project,
           username,
         );
-        const pendingApproval = AgenticLoopService.getPendingApproval(conversationId);
-        const pendingQuestion = AgenticLoopService.getPendingQuestion(conversationId);
+        const pendingApproval =
+          AgenticLoopService.getPendingApproval(conversationId);
+        const pendingQuestion =
+          AgenticLoopService.getPendingQuestion(conversationId);
 
         return res.json({
           ...agentChat,
           stats: stats || undefined,
           type: "agent",
-          pendingApproval: pendingApproval.isPending ? pendingApproval : undefined,
-          pendingQuestion: pendingQuestion.isPending ? pendingQuestion : undefined,
+          pendingApproval: pendingApproval.isPending
+            ? pendingApproval
+            : undefined,
+          pendingQuestion: pendingQuestion.isPending
+            ? pendingQuestion
+            : undefined,
         });
       }
 
       res.status(404).json({ error: "Conversation not found" });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`Error fetching specific conversation: ${errorMessage}`);
       next(error);
     }
@@ -347,7 +382,8 @@ router.get(
 
       res.json(workflows);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`Error fetching conversation workflows: ${errorMessage}`);
       next(error);
     }
@@ -397,12 +433,13 @@ router.post(
         username,
         messages as import("../types/admin.ts").ChatMessage[],
         conversationMeta || null,
-        { collection: isAgent ? COLLECTIONS.AGENT_CONVERSATIONS : undefined }
+        { collection: isAgent ? COLLECTIONS.AGENT_CONVERSATIONS : undefined },
       );
 
       res.json({ ...conversation, type: isAgent ? "agent" : "direct" });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`Error appending messages to conversation: ${errorMessage}`);
       next(error);
     }
@@ -427,14 +464,18 @@ router.patch(
         return res.status(400).json({ error: parsed.error.format() });
       }
 
-      const setFields = buildConversationPatchFields(parsed.data as unknown as ConversationPatchInput);
+      const setFields = buildConversationPatchFields(
+        parsed.data as unknown as ConversationPatchInput,
+      );
 
       // Try updating conversations first
       let result = await db
         .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
         .updateOne(
           { id: conversationId, project, username },
-          { $set: setFields as import("mongodb").UpdateFilter<ConversationDocument> }
+          {
+            $set: setFields as import("mongodb").UpdateFilter<ConversationDocument>,
+          },
         );
 
       if (result.matchedCount > 0) {
@@ -445,12 +486,14 @@ router.patch(
       }
 
       // Try updating agent sessions next
-      result = await db
-        .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-        .updateOne(
-          { id: conversationId, project, username },
-          { $set: setFields as import("mongodb").UpdateFilter<import("mongodb").Document> }
-        );
+      result = await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).updateOne(
+        { id: conversationId, project, username },
+        {
+          $set: setFields as import("mongodb").UpdateFilter<
+            import("mongodb").Document
+          >,
+        },
+      );
 
       if (result.matchedCount > 0) {
         const session = await db
@@ -461,7 +504,8 @@ router.patch(
 
       res.status(404).json({ error: "Conversation not found" });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`Error patching conversation: ${errorMessage}`);
       next(error);
     }
@@ -501,7 +545,8 @@ router.delete(
 
       res.status(404).json({ error: "Conversation not found" });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`Error deleting conversation: ${errorMessage}`);
       next(error);
     }
@@ -519,9 +564,13 @@ router.get(
     const username = req.username || "any";
     const conversationId = req.params.id as string;
 
-    const activeTimers = await ConversationTimerService.listActiveTimers(conversationId, project, username);
+    const activeTimers = await ConversationTimerService.listActiveTimers(
+      conversationId,
+      project,
+      username,
+    );
     res.json(activeTimers);
-  })
+  }),
 );
 
 /**
@@ -535,9 +584,13 @@ router.post(
     const username = req.username || "any";
     const timerId = req.params.timerId as string;
 
-    const wasCancelled = await ConversationTimerService.cancelTimer(timerId, project, username);
+    const wasCancelled = await ConversationTimerService.cancelTimer(
+      timerId,
+      project,
+      username,
+    );
     res.json({ success: wasCancelled });
-  })
+  }),
 );
 
 export default router;

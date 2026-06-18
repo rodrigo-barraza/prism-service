@@ -122,7 +122,9 @@ const SettingsService = {
     ) as SettingsData;
     return _cache;
   },
-  async getSection<K extends keyof SettingsData>(section: K): Promise<SettingsData[K]> {
+  async getSection<K extends keyof SettingsData>(
+    section: K,
+  ): Promise<SettingsData[K]> {
     const settings = await this.get();
     return settings[section] || DEFAULTS[section];
   },

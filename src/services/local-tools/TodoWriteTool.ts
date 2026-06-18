@@ -1,5 +1,8 @@
 import logger from "../../utils/logger.ts";
-import { SERVER_SENT_EVENT_TYPES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  TOOL_NAMES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
 interface TodoItemInput {
@@ -96,9 +99,14 @@ export default {
 
     const stats: TodoStats = {
       total: normalized.length,
-      pending: normalized.filter((todoItem) => todoItem.status === "pending").length,
-      in_progress: normalized.filter((todoItem) => todoItem.status === "in_progress").length,
-      completed: normalized.filter((todoItem) => todoItem.status === "completed").length,
+      pending: normalized.filter((todoItem) => todoItem.status === "pending")
+        .length,
+      in_progress: normalized.filter(
+        (todoItem) => todoItem.status === "in_progress",
+      ).length,
+      completed: normalized.filter(
+        (todoItem) => todoItem.status === "completed",
+      ).length,
     };
 
     logger.info(
@@ -106,7 +114,11 @@ export default {
     );
 
     if (context._emit) {
-      context._emit({ type: SERVER_SENT_EVENT_TYPES.TODO_UPDATE, items: normalized, stats });
+      context._emit({
+        type: SERVER_SENT_EVENT_TYPES.TODO_UPDATE,
+        items: normalized,
+        stats,
+      });
     }
 
     return { acknowledged: true, items: normalized, stats };

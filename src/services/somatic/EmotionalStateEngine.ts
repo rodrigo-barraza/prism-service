@@ -48,8 +48,7 @@ export class EmotionalStateEngine {
       this.emotions[emotion] -= Math.max(proportional, linearDecay);
 
       if (baselineEmotion && emotion === baselineEmotion) {
-        this.emotions[emotion] +=
-          baselinePull * (100 - this.emotions[emotion]);
+        this.emotions[emotion] += baselinePull * (100 - this.emotions[emotion]);
       }
 
       if (this.emotions[emotion] < zeroClamp) {
@@ -73,7 +72,8 @@ export class EmotionalStateEngine {
       inertiaFactor = 1 - emotionalInertia * (inertiaValue / 100);
     }
 
-    const adjustedIntensity = intensity * sensitivity * volatility * inertiaFactor;
+    const adjustedIntensity =
+      intensity * sensitivity * volatility * inertiaFactor;
 
     const currentValue = this.emotions[emotion];
     const headroom = 100 - currentValue;
@@ -92,9 +92,9 @@ export class EmotionalStateEngine {
   getDominantEmotion(): DominantEmotionResult {
     const { threshold, dyadThreshold } = this.personality;
 
-    const sorted = (Object.entries(this.emotions) as [PrimaryEmotion, number][]).sort(
-      ([, firstValue], [, secondValue]) => secondValue - firstValue,
-    );
+    const sorted = (
+      Object.entries(this.emotions) as [PrimaryEmotion, number][]
+    ).sort(([, firstValue], [, secondValue]) => secondValue - firstValue);
 
     const [topName, topValue] = sorted[0];
     const [secondName, secondValue] = sorted[1];

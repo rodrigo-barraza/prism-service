@@ -1,5 +1,8 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  TOOL_NAMES,
+  DOMAINS,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 import type { QuestionDefinition } from "../ApprovalRegistry.ts";
 
@@ -122,9 +125,17 @@ export default {
   labels: ["coding"],
   domain: DOMAINS.CORE_USER.displayName,
 
-  async execute(toolArguments: Record<string, unknown>, context: AskUserContext) {
-    const questionContext = typeof toolArguments.context === "string" ? toolArguments.context : undefined;
-    const questions = Array.isArray(toolArguments.questions) ? toolArguments.questions as QuestionInput[] : undefined;
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: AskUserContext,
+  ) {
+    const questionContext =
+      typeof toolArguments.context === "string"
+        ? toolArguments.context
+        : undefined;
+    const questions = Array.isArray(toolArguments.questions)
+      ? (toolArguments.questions as QuestionInput[])
+      : undefined;
 
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
       return {
@@ -135,7 +146,10 @@ export default {
     // ── Normalize into questions array ─────────────────
     const seen = new Set<string>();
     for (const questionInput of questions) {
-      if (!questionInput.question || typeof questionInput.question !== "string") {
+      if (
+        !questionInput.question ||
+        typeof questionInput.question !== "string"
+      ) {
         return {
           error:
             "Each question in the 'questions' array must have a non-empty 'question' string",
@@ -164,21 +178,22 @@ export default {
     if (questions.length > 4) {
       return { error: "Maximum 4 questions per call" };
     }
-    const normalizedQuestions: NormalizedQuestion[] = questions.map((questionInput) => ({
-      question: questionInput.question,
-      header: (questionInput.header || "").slice(0, 16) || null,
-      options: (questionInput.options || []).slice(0, 6).map((item) => ({
-        label: item.label,
-        preview: item.preview || null,
-      })),
-      multiSelect: !!questionInput.multiSelect,
-    }));
+    const normalizedQuestions: NormalizedQuestion[] = questions.map(
+      (questionInput) => ({
+        question: questionInput.question,
+        header: (questionInput.header || "").slice(0, 16) || null,
+        options: (questionInput.options || []).slice(0, 6).map((item) => ({
+          label: item.label,
+          preview: item.preview || null,
+        })),
+        multiSelect: !!questionInput.multiSelect,
+      }),
+    );
 
     const sessionId = context.agentSessionId;
     if (!sessionId) {
       return {
-        error:
-          "No conversation — ask_user_question requires an active session",
+        error: "No conversation — ask_user_question requires an active session",
       };
     }
 

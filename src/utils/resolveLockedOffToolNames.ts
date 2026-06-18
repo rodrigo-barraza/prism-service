@@ -1,6 +1,9 @@
 import SettingsService from "../services/SettingsService.ts";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
-import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  TOOL_NAMES,
+  DOMAINS,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 /**
  * Resolves tool names that should be excluded from the system prompt
@@ -22,9 +25,15 @@ export async function resolveLockedOffToolNames(): Promise<Set<string>> {
   const memorySettings = await SettingsService.getSection("memory");
   const creativeSettings = await SettingsService.getSection("creative");
 
-  const hasExtraction = Boolean(memorySettings?.extractionProvider && memorySettings?.extractionModel);
-  const hasConsolidation = Boolean(memorySettings?.consolidationProvider && memorySettings?.consolidationModel);
-  const hasEmbedding = Boolean(memorySettings?.embeddingProvider && memorySettings?.embeddingModel);
+  const hasExtraction = Boolean(
+    memorySettings?.extractionProvider && memorySettings?.extractionModel,
+  );
+  const hasConsolidation = Boolean(
+    memorySettings?.consolidationProvider && memorySettings?.consolidationModel,
+  );
+  const hasEmbedding = Boolean(
+    memorySettings?.embeddingProvider && memorySettings?.embeddingModel,
+  );
   const hasAllMemoryModels = hasExtraction && hasConsolidation && hasEmbedding;
 
   if (!hasAllMemoryModels) lockedOff.add(TOOL_NAMES.SAVE_MEMORY);
@@ -32,10 +41,20 @@ export async function resolveLockedOffToolNames(): Promise<Set<string>> {
   if (!hasConsolidation) lockedOff.add(TOOL_NAMES.CONSOLIDATE_MEMORIES);
   if (!hasEmbedding) lockedOff.add(TOOL_NAMES.SEARCH_MEMORIES);
 
-  const hasImageModel = Boolean(creativeSettings?.imageProvider && creativeSettings?.imageModel);
-  const hasVisionModel = Boolean(creativeSettings?.visionProvider && creativeSettings?.visionModel);
-  const hasTextToSpeech = Boolean(creativeSettings?.textToSpeechProvider && creativeSettings?.textToSpeechModel);
-  const hasSpeechToText = Boolean(creativeSettings?.speechToTextProvider && creativeSettings?.speechToTextModel);
+  const hasImageModel = Boolean(
+    creativeSettings?.imageProvider && creativeSettings?.imageModel,
+  );
+  const hasVisionModel = Boolean(
+    creativeSettings?.visionProvider && creativeSettings?.visionModel,
+  );
+  const hasTextToSpeech = Boolean(
+    creativeSettings?.textToSpeechProvider &&
+    creativeSettings?.textToSpeechModel,
+  );
+  const hasSpeechToText = Boolean(
+    creativeSettings?.speechToTextProvider &&
+    creativeSettings?.speechToTextModel,
+  );
 
   if (!hasImageModel) lockedOff.add(TOOL_NAMES.GENERATE_IMAGE);
   if (!hasVisionModel) lockedOff.add(TOOL_NAMES.DESCRIBE_IMAGE);
@@ -45,7 +64,8 @@ export async function resolveLockedOffToolNames(): Promise<Set<string>> {
   // Workspace agent connectivity — mirrors the client's isAgentServed check.
   // If no workspace agent is connected, lock off all workspace-domain tools
   // (the same set the client locks off when currentWorkspace.isAgentServed is false).
-  const isWorkspaceAgentConnected = await ToolOrchestratorService.isWorkspaceAgentConnected();
+  const isWorkspaceAgentConnected =
+    await ToolOrchestratorService.isWorkspaceAgentConnected();
   if (!isWorkspaceAgentConnected) {
     const allSchemas = ToolOrchestratorService.getClientToolSchemas();
     for (const tool of allSchemas) {

@@ -99,12 +99,12 @@ const SkillService = {
 
 
    */
-    async list({ project, limit = 50 }: Record<string, unknown> = {}) {
+  async list({ project, limit = 50 }: Record<string, unknown> = {}) {
     const collection = getCollection();
     if (!collection) return { skills: [], total: 0 };
 
     const filter: Record<string, unknown> = {};
-        if (project) filter.project = project;
+    if (project) filter.project = project;
 
     const skills = await collection
       .find(filter)
@@ -178,7 +178,11 @@ const SkillService = {
     // Warn about unresolved variables
     const unresolvedMatch = prompt.match(/\{\{(\w+)\}\}/g);
     const unresolved = unresolvedMatch
-      ? [...new Set(unresolvedMatch.map((message: string) => message.slice(2, -2)))]
+      ? [
+          ...new Set(
+            unresolvedMatch.map((message: string) => message.slice(2, -2)),
+          ),
+        ]
       : [];
 
     // Increment usage counter

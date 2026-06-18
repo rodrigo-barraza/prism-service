@@ -1,13 +1,25 @@
-export type PrimaryEmotion = "joy" | "trust" | "fear" | "surprise" | "sadness" | "disgust" | "anger" | "anticipation";
+export type PrimaryEmotion =
+  | "joy"
+  | "trust"
+  | "fear"
+  | "surprise"
+  | "sadness"
+  | "disgust"
+  | "anger"
+  | "anticipation";
 
 export const PRIMARY_EMOTIONS: PrimaryEmotion[] = [
-  "joy", "trust", "fear", "surprise", "sadness", "disgust", "anger", "anticipation",
+  "joy",
+  "trust",
+  "fear",
+  "surprise",
+  "sadness",
+  "disgust",
+  "anger",
+  "anticipation",
 ];
 
-export const VALID_EMOTIONS: string[] = [
-  ...PRIMARY_EMOTIONS,
-  "neutral",
-];
+export const VALID_EMOTIONS: string[] = [...PRIMARY_EMOTIONS, "neutral"];
 
 export const PLUTCHIK_OPPOSITES: Record<PrimaryEmotion, PrimaryEmotion> = {
   joy: "sadness",
@@ -382,16 +394,23 @@ export const ALCOHOL_DESCRIPTIONS: Record<number, string> = {
 
 export const SOMATIC_KEYWORDS = {
   food: /\b(pizza|burger|taco|food|eat|eating|ramen|snack|cookie|lunch|dinner|breakfast|feast|delicious|yum|yummy|hungry|starving)\b|🍔|🍕|🌮|🍜|🍪/i,
-  drink: /\b(water|soda|juice|tea|drink|drinking|sips|hydrate|coffee|fluid|quenched|thirsty|dehydrated)\b|🥛|🥤|🧃|☕/i,
+  drink:
+    /\b(water|soda|juice|tea|drink|drinking|sips|hydrate|coffee|fluid|quenched|thirsty|dehydrated)\b|🥛|🥤|🧃|☕/i,
   rest: /\b(sleep|nap|tired|rest|goodnight|bed|exhausted|sleepy|lazy)\b|😴|💤/i,
   work: /\b(work|coding|code|gaming|game|study|studying|running|run|push|exertion|labor|exercise|typing|testing)\b/i,
   sick: /\b(poison|bleach|trash|vomit|sick|flu|covid|ill|illness|disease|nausea|pain|hurt|stomachache)\b|🤢|🤮|😷/i,
-  alcohol: /\b(beer|wine|whiskey|vodka|alcohol|drunk|party|shots|tipsy|inebriated|cocktail|booze)\b|🍺|🍻|🍷|🥃|🍸/i,
-  substance: /\b(weed|marijuana|joint|smoke|high|stoned|baked|blunt|vape|trip|tripping|acid|shrooms|mushroom|cbd|thc|substance|intoxicated)\b|🌿|🚬|🍄|🌀/i,
-  bathroom: /\b(toilet|bathroom|restroom|pee|poop|piss|shit|flush|lavatory|washroom)\b|🚽|🧻/i,
+  alcohol:
+    /\b(beer|wine|whiskey|vodka|alcohol|drunk|party|shots|tipsy|inebriated|cocktail|booze)\b|🍺|🍻|🍷|🥃|🍸/i,
+  substance:
+    /\b(weed|marijuana|joint|smoke|high|stoned|baked|blunt|vape|trip|tripping|acid|shrooms|mushroom|cbd|thc|substance|intoxicated)\b|🌿|🚬|🍄|🌀/i,
+  bathroom:
+    /\b(toilet|bathroom|restroom|pee|poop|piss|shit|flush|lavatory|washroom)\b|🚽|🧻/i,
 };
 
-export const EMOTION_CLASSIFICATION_PROMPT = (validEmotionsList: string, textToClassify: string): string =>
+export const EMOTION_CLASSIFICATION_PROMPT = (
+  validEmotionsList: string,
+  textToClassify: string,
+): string =>
   `Classify the emotion of the following text. Output EXACTLY ONE word from this list:
 ${validEmotionsList}
 

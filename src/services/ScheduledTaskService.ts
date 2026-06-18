@@ -8,7 +8,10 @@ import { getModelByName } from "../config.ts";
 import logger from "../utils/logger.ts";
 import { SseEvent } from "../types/SseTypes.ts";
 import { ConversationMessage } from "./harnesses/types.ts";
-import { RecurrenceRule, matchRecurrenceRule } from "../utils/RecurrenceMatcher.ts";
+import {
+  RecurrenceRule,
+  matchRecurrenceRule,
+} from "../utils/RecurrenceMatcher.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 export interface ScheduledTask {
@@ -20,7 +23,14 @@ export interface ScheduledTask {
   agent: string | null;
   provider: string;
   model: string;
-  scheduleType: "hourly" | "daily" | "weekly" | "cron" | "trigger" | "once" | "custom";
+  scheduleType:
+    | "hourly"
+    | "daily"
+    | "weekly"
+    | "cron"
+    | "trigger"
+    | "once"
+    | "custom";
   scheduleTime?: string; // "HH:MM" e.g. "09:00"
   scheduleDay?: number; // 0-6 (Sunday to Saturday)
   scheduleDate?: string; // "YYYY-MM-DD" e.g. "2026-05-25"
@@ -63,7 +73,10 @@ function matchCronField(pattern: string, value: number): boolean {
   return parseInt(pattern, 10) === value;
 }
 
-export function matchCron(expression: string, date: Date = new Date()): boolean {
+export function matchCron(
+  expression: string,
+  date: Date = new Date(),
+): boolean {
   const parts = expression.trim().split(/\s+/);
   if (parts.length !== 5) return false;
   const [min, hour, dom, month, dow] = parts;
@@ -96,17 +109,23 @@ const ScheduledTaskService = {
     const secondsToNextMinute = 60 - new Date().getSeconds();
     setTimeout(() => {
       this.tick().catch((error: unknown) =>
-        logger.error(`[ScheduledTasks] Initial tick error: ${getErrorMessage(error)}`),
+        logger.error(
+          `[ScheduledTasks] Initial tick error: ${getErrorMessage(error)}`,
+        ),
       );
- 
+
       tickingInterval = setInterval(() => {
         this.tick().catch((error: unknown) =>
-          logger.error(`[ScheduledTasks] Tick error: ${getErrorMessage(error)}`),
+          logger.error(
+            `[ScheduledTasks] Tick error: ${getErrorMessage(error)}`,
+          ),
         );
       }, 60000);
     }, secondsToNextMinute * 1000);
 
-    logger.success("[ScheduledTasks] Background Scheduler Daemon started successfully.");
+    logger.success(
+      "[ScheduledTasks] Background Scheduler Daemon started successfully.",
+    );
   },
 
   /**
@@ -154,18 +173,34 @@ const ScheduledTaskService = {
         } else if (task.scheduleType === "daily" && task.scheduleTime) {
           const [sh, sm] = task.scheduleTime.split(":").map(Number);
           isDue = currentHour === sh && currentMin === sm;
-        } else if (task.scheduleType === "weekly" && task.scheduleTime && task.scheduleDay != null) {
+        } else if (
+          task.scheduleType === "weekly" &&
+          task.scheduleTime &&
+          task.scheduleDay != null
+        ) {
           const [sh, sm] = task.scheduleTime.split(":").map(Number);
-          isDue = currentDay === task.scheduleDay && currentHour === sh && currentMin === sm;
-        } else if (task.scheduleType === "once" && task.scheduleTime && task.scheduleDate) {
+          isDue =
+            currentDay === task.scheduleDay &&
+            currentHour === sh &&
+            currentMin === sm;
+        } else if (
+          task.scheduleType === "once" &&
+          task.scheduleTime &&
+          task.scheduleDate
+        ) {
           const [sh, sm] = task.scheduleTime.split(":").map(Number);
           const [yr, mn, dy] = task.scheduleDate.split("-").map(Number);
-          isDue = now.getFullYear() === yr &&
-                  (now.getMonth() + 1) === mn &&
-                  now.getDate() === dy &&
-                  currentHour === sh &&
-                  currentMin === sm;
-        } else if (task.scheduleType === "custom" && task.recurrenceRule && task.scheduleTime) {
+          isDue =
+            now.getFullYear() === yr &&
+            now.getMonth() + 1 === mn &&
+            now.getDate() === dy &&
+            currentHour === sh &&
+            currentMin === sm;
+        } else if (
+          task.scheduleType === "custom" &&
+          task.recurrenceRule &&
+          task.scheduleTime
+        ) {
           const [sh, sm] = task.scheduleTime.split(":").map(Number);
           const isTimeMatch = currentHour === sh && currentMin === sm;
           if (isTimeMatch) {
@@ -177,36 +212,48 @@ const ScheduledTaskService = {
         }
 
         if (isDue) {
-          logger.info(`[ScheduledTasks] Task "${task.name}" (${task.id}) is due to run.`);
-          
+          logger.info(
+            `[ScheduledTasks] Task "${task.name}" (${task.id}) is due to run.`,
+          );
+
           const updateFields: Record<string, unknown> = {
             lastRunMinute: minuteKey,
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
           };
           if (task.scheduleType === "once") {
             updateFields.enabled = false;
           }
- 
+
           // Atomically claim this task for this minute — prevents double execution
           // in multi-instance cluster setups. Only the first instance to update
           // will get a non-null result; subsequent instances skip.
-          const claimResult = await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOneAndUpdate(
-            { id: task.id, lastRunMinute: { $ne: minuteKey } },
-            { $set: updateFields },
-          );
+          const claimResult = await db
+            .collection(COLLECTIONS.SCHEDULED_TASKS)
+            .findOneAndUpdate(
+              { id: task.id, lastRunMinute: { $ne: minuteKey } },
+              { $set: updateFields },
+            );
 
           if (!claimResult) {
-            logger.info(`[ScheduledTasks] Task "${task.name}" already claimed by another instance.`);
+            logger.info(
+              `[ScheduledTasks] Task "${task.name}" already claimed by another instance.`,
+            );
             continue;
           }
- 
+
           // Trigger execution in the background asynchronously
-          this.executeTask(task, undefined, { username: task.username || "system" }).catch((error: unknown) =>
-            logger.error(`[ScheduledTasks] Execution failed for task "${task.name}": ${getErrorMessage(error)}`),
+          this.executeTask(task, undefined, {
+            username: task.username || "system",
+          }).catch((error: unknown) =>
+            logger.error(
+              `[ScheduledTasks] Execution failed for task "${task.name}": ${getErrorMessage(error)}`,
+            ),
           );
         }
       } catch (error: unknown) {
-        logger.error(`[ScheduledTasks] Failed to parse/check task "${task.name}": ${getErrorMessage(error)}`);
+        logger.error(
+          `[ScheduledTasks] Failed to parse/check task "${task.name}": ${getErrorMessage(error)}`,
+        );
       }
     }
   },
@@ -218,25 +265,32 @@ const ScheduledTaskService = {
   async executeTask(
     task: ScheduledTask,
     payload?: Record<string, unknown>,
-    { username = "system", agentSessionId }: { username?: string; agentSessionId?: string } = {},
+    {
+      username = "system",
+      agentSessionId,
+    }: { username?: string; agentSessionId?: string } = {},
   ): Promise<{ agentSessionId: string }> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
     const resolvedSessionId = agentSessionId || crypto.randomUUID();
     if (!task.agent) {
-      throw new Error(`Scheduled task "${task.name}" is missing a required agent identifier`);
+      throw new Error(
+        `Scheduled task "${task.name}" is missing a required agent identifier`,
+      );
     }
     const traceId = crypto.randomUUID();
     const nowISO = new Date().toISOString();
 
-    logger.info(`[ScheduledTasks] Executing task "${task.name}" under Session ID: ${resolvedSessionId} (user: ${username})`);
+    logger.info(
+      `[ScheduledTasks] Executing task "${task.name}" under Session ID: ${resolvedSessionId} (user: ${username})`,
+    );
 
     // Determine default workspace root path if available
     let workspacePath: string | null = null;
     try {
       const workspaceDoc = await db.collection(COLLECTIONS.WORKSPACES).findOne({
-        name: task.project
+        name: task.project,
       });
       if (workspaceDoc?.path) {
         workspacePath = workspaceDoc.path as string;
@@ -304,7 +358,8 @@ const ScheduledTaskService = {
     // 3. Trigger AgenticLoopService
     try {
       await AgenticLoopService.runAgenticLoop({
-        provider: provider as unknown as import("./harnesses/types.ts").LLMProvider,
+        provider:
+          provider as unknown as import("./harnesses/types.ts").LLMProvider,
         providerName: task.provider,
         resolvedModel: task.model,
         modelDefinition,
@@ -315,8 +370,12 @@ const ScheduledTaskService = {
           functionCallingEnabled: true,
           planFirst: false,
           autoApprove: true,
-          ...(task.toolConfig?.enabledTools && { enabledTools: task.toolConfig.enabledTools }),
-          ...(task.toolConfig?.disabledTools && { disabledTools: task.toolConfig.disabledTools }),
+          ...(task.toolConfig?.enabledTools && {
+            enabledTools: task.toolConfig.enabledTools,
+          }),
+          ...(task.toolConfig?.disabledTools && {
+            disabledTools: task.toolConfig.disabledTools,
+          }),
         },
         agentSessionId: resolvedSessionId,
         conversationId: resolvedSessionId,
@@ -338,24 +397,34 @@ const ScheduledTaskService = {
         emit: mockEmit,
       });
 
-      logger.success(`[ScheduledTasks] Task "${task.name}" completed execution successfully.`);
-    } catch (error: unknown) {
-      logger.error(`[ScheduledTasks] Agent loop error for task "${task.name}": ${getErrorMessage(error)}`);
-      
-      // Ensure the generated session is not stuck as "generating"
-      await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).updateOne(
-        { id: resolvedSessionId },
-        { $set: { isGenerating: false, updatedAt: new Date().toISOString() } },
-      ).catch((cleanupError: unknown) =>
-        logger.warn(`[ScheduledTasks] Failed to reset isGenerating for session ${resolvedSessionId}: ${getErrorMessage(cleanupError)}`),
+      logger.success(
+        `[ScheduledTasks] Task "${task.name}" completed execution successfully.`,
       );
+    } catch (error: unknown) {
+      logger.error(
+        `[ScheduledTasks] Agent loop error for task "${task.name}": ${getErrorMessage(error)}`,
+      );
+
+      // Ensure the generated session is not stuck as "generating"
+      await db
+        .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+        .updateOne(
+          { id: resolvedSessionId },
+          {
+            $set: { isGenerating: false, updatedAt: new Date().toISOString() },
+          },
+        )
+        .catch((cleanupError: unknown) =>
+          logger.warn(
+            `[ScheduledTasks] Failed to reset isGenerating for session ${resolvedSessionId}: ${getErrorMessage(cleanupError)}`,
+          ),
+        );
 
       throw error;
     }
 
     return { agentSessionId: resolvedSessionId };
   },
-
 
   /**
    * Determine if a project name is a client UI project (vs a registered workspace
@@ -365,26 +434,40 @@ const ScheduledTaskService = {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!project || !db) return true;
 
-    const workspaceExists = await db.collection(COLLECTIONS.WORKSPACES).findOne({ name: project });
+    const workspaceExists = await db
+      .collection(COLLECTIONS.WORKSPACES)
+      .findOne({ name: project });
     if (workspaceExists) return false;
 
-    const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.ts");
-    const agentProjects = AgentPersonaRegistry.list().map((entry) => {
-      const persona = AgentPersonaRegistry.get(entry.id);
-      return persona?.project;
-    }).filter(Boolean);
+    const { default: AgentPersonaRegistry } =
+      await import("./AgentPersonaRegistry.ts");
+    const agentProjects = AgentPersonaRegistry.list()
+      .map((entry) => {
+        const persona = AgentPersonaRegistry.get(entry.id);
+        return persona?.project;
+      })
+      .filter(Boolean);
 
     return !agentProjects.includes(project);
   },
 
-  async _getQueryFilter(id: string, project: string, username: string): Promise<Record<string, unknown>> {
+  async _getQueryFilter(
+    id: string,
+    project: string,
+    username: string,
+  ): Promise<Record<string, unknown>> {
     const isClientProject = await this._isClientProject(project);
 
     const filter: Record<string, unknown> = { id };
     if (!isClientProject) {
       filter.project = project;
     }
-    if (username && username !== "any" && username !== "all" && !isClientProject) {
+    if (
+      username &&
+      username !== "any" &&
+      username !== "all" &&
+      !isClientProject
+    ) {
       filter.username = username;
     }
     return filter;
@@ -400,7 +483,12 @@ const ScheduledTaskService = {
     if (!isClientProject) {
       query.project = project;
     }
-    if (username && username !== "any" && username !== "all" && !isClientProject) {
+    if (
+      username &&
+      username !== "any" &&
+      username !== "all" &&
+      !isClientProject
+    ) {
       query.username = username;
     }
 
@@ -422,7 +510,11 @@ const ScheduledTaskService = {
       .toArray()) as unknown as ScheduledTask[];
   },
 
-  async createTask(data: Omit<ScheduledTask, "id" | "createdAt" | "updatedAt"> & { username: string }): Promise<ScheduledTask> {
+  async createTask(
+    data: Omit<ScheduledTask, "id" | "createdAt" | "updatedAt"> & {
+      username: string;
+    },
+  ): Promise<ScheduledTask> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
@@ -438,7 +530,12 @@ const ScheduledTaskService = {
     return task;
   },
 
-  async updateTask(id: string, project: string, username: string, updates: Partial<ScheduledTask>): Promise<ScheduledTask> {
+  async updateTask(
+    id: string,
+    project: string,
+    username: string,
+    updates: Partial<ScheduledTask>,
+  ): Promise<ScheduledTask> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
@@ -451,11 +548,13 @@ const ScheduledTaskService = {
     delete cleanUpdates.createdAt;
 
     const filter = await this._getQueryFilter(id, project, username);
-    const result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOneAndUpdate(
-      filter,
-      { $set: cleanUpdates },
-      { returnDocument: "after" }
-    );
+    const result = await db
+      .collection(COLLECTIONS.SCHEDULED_TASKS)
+      .findOneAndUpdate(
+        filter,
+        { $set: cleanUpdates },
+        { returnDocument: "after" },
+      );
 
     if (!result) {
       throw new Error(`Scheduled Task not found: ${id}`);
@@ -464,33 +563,50 @@ const ScheduledTaskService = {
     return result as unknown as ScheduledTask;
   },
 
-  async deleteTask(id: string, project: string, username: string): Promise<boolean> {
+  async deleteTask(
+    id: string,
+    project: string,
+    username: string,
+  ): Promise<boolean> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
     const filter = await this._getQueryFilter(id, project, username);
-    let result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).deleteOne(filter);
+    let result = await db
+      .collection(COLLECTIONS.SCHEDULED_TASKS)
+      .deleteOne(filter);
     if ((result.deletedCount ?? 0) === 0) {
       const nameFilter = { ...filter };
       delete nameFilter.id;
       nameFilter.name = id;
-      result = await db.collection(COLLECTIONS.SCHEDULED_TASKS).deleteOne(nameFilter);
+      result = await db
+        .collection(COLLECTIONS.SCHEDULED_TASKS)
+        .deleteOne(nameFilter);
     }
     return (result.deletedCount ?? 0) > 0;
   },
 
-  async triggerTask(id: string, project: string, username: string, payload?: Record<string, unknown>): Promise<{ success: boolean; agentSessionId: string }> {
+  async triggerTask(
+    id: string,
+    project: string,
+    username: string,
+    payload?: Record<string, unknown>,
+  ): Promise<{ success: boolean; agentSessionId: string }> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
     const filter = await this._getQueryFilter(id, project, username);
-    let task = (await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOne(filter)) as unknown as ScheduledTask;
+    let task = (await db
+      .collection(COLLECTIONS.SCHEDULED_TASKS)
+      .findOne(filter)) as unknown as ScheduledTask;
     if (!task) {
       // Fallback: look up by name
       const nameFilter = { ...filter };
       delete nameFilter.id;
       nameFilter.name = id;
-      task = (await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOne(nameFilter)) as unknown as ScheduledTask;
+      task = (await db
+        .collection(COLLECTIONS.SCHEDULED_TASKS)
+        .findOne(nameFilter)) as unknown as ScheduledTask;
     }
     if (!task) {
       throw new Error(`Scheduled Task not found: ${id}`);
@@ -499,16 +615,17 @@ const ScheduledTaskService = {
     const agentSessionId = crypto.randomUUID();
 
     // Fire-and-forget background execution with the pre-generated session ID
-    this.executeTask(
-      { ...task, id: task.id },
-      payload,
-      { username, agentSessionId },
-    ).catch((error: unknown) => {
-      logger.error(`[ScheduledTasks] Manual trigger failed for task "${task.name}": ${getErrorMessage(error)}`);
+    this.executeTask({ ...task, id: task.id }, payload, {
+      username,
+      agentSessionId,
+    }).catch((error: unknown) => {
+      logger.error(
+        `[ScheduledTasks] Manual trigger failed for task "${task.name}": ${getErrorMessage(error)}`,
+      );
     });
 
     return { success: true, agentSessionId };
-  }
+  },
 };
 
 export default ScheduledTaskService;

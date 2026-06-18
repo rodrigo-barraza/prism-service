@@ -7,7 +7,10 @@
 import { Agent } from "undici";
 import { getDataUrlMimeType } from "./media.ts";
 import { ThinkTagParser, extractThinkTags } from "./ThinkTagParser.ts";
-import type { ProviderOptions, ChatMessageContent } from "../types/ProviderTypes.ts";
+import type {
+  ProviderOptions,
+  ChatMessageContent,
+} from "../types/ProviderTypes.ts";
 import type { TokenUsage, ToolCallEntry } from "../types/admin.ts";
 
 // ─── Streaming fetch dispatcher ─────────────────────────────
@@ -164,7 +167,9 @@ interface ToolInput {
   parameters?: Record<string, unknown>;
 }
 
-export function convertToolsToOpenAI(tools: ToolInput[] | undefined | null): OpenAIToolFunction[] | null {
+export function convertToolsToOpenAI(
+  tools: ToolInput[] | undefined | null,
+): OpenAIToolFunction[] | null {
   if (!tools || !Array.isArray(tools) || tools.length === 0) return null;
   return tools.map((tool) => ({
     type: "function" as const,
@@ -216,12 +221,15 @@ export function buildPayloadParams(
  * Handles both nested OpenAI format ({ function: { name, arguments } })
  * and flat llama.cpp format ({ name, arguments }).
  */
-export function extractToolCallsFromMessage(message: OpenAIMessage | null | undefined): ToolCallEntry[] | null {
+export function extractToolCallsFromMessage(
+  message: OpenAIMessage | null | undefined,
+): ToolCallEntry[] | null {
   if (!message?.tool_calls || message.tool_calls.length === 0) return null;
 
   return message.tool_calls.map((toolCall) => {
     const functionName = toolCall.function?.name || toolCall.name || "";
-    const functionArguments = toolCall.function?.arguments || toolCall.arguments || "{}";
+    const functionArguments =
+      toolCall.function?.arguments || toolCall.arguments || "{}";
     let args: Record<string, unknown> = {};
     try {
       args = JSON.parse(functionArguments);
@@ -247,7 +255,9 @@ export function extractToolCallsFromMessage(message: OpenAIMessage | null | unde
  * The cache field uses the same key as Anthropic (cacheReadInputTokens) so
  * CostCalculator, RequestLogger, and console logging handle it uniformly.
  */
-export function normalizeUsage(rawUsage: OpenAIUsage | null | undefined): TokenUsage {
+export function normalizeUsage(
+  rawUsage: OpenAIUsage | null | undefined,
+): TokenUsage {
   const usage: TokenUsage = {
     inputTokens: rawUsage?.prompt_tokens ?? 0,
     outputTokens: rawUsage?.completion_tokens ?? 0,
@@ -305,7 +315,10 @@ interface ExpandVideoOptions {
  * Call this BEFORE prepareOpenAICompatMessages() for providers that need
  * video-as-frames support.
  */
-export async function expandVideoToFrames(messages: InputMessage[], options: ExpandVideoOptions = {}): Promise<InputMessage[]> {
+export async function expandVideoToFrames(
+  messages: InputMessage[],
+  options: ExpandVideoOptions = {},
+): Promise<InputMessage[]> {
   const { extractVideoFrames, getDataUrlMimeType } = await import("./media.js");
 
   for (const message of messages) {
@@ -339,13 +352,19 @@ export async function expandVideoToFrames(messages: InputMessage[], options: Exp
 
     const allFrames: string[] = [];
     for (const videoDataUrl of videoUrls) {
-      const frames = await extractVideoFrames(videoDataUrl, options) as string[];
+      const frames = (await extractVideoFrames(
+        videoDataUrl,
+        options,
+      )) as string[];
       allFrames.push(...frames);
     }
 
     if (allFrames.length > 0) {
       // Prepend frames to images array (model card recommends media before text)
-      messageWithVideo.images = [...allFrames, ...(messageWithVideo.images || [])];
+      messageWithVideo.images = [
+        ...allFrames,
+        ...(messageWithVideo.images || []),
+      ];
     }
   }
 
@@ -359,7 +378,9 @@ export async function expandVideoToFrames(messages: InputMessage[], options: Exp
  */
 export function prepareOpenAICompatMessages(
   messages: InputMessage[],
-  { mediaStrategy = MEDIA_STRATEGIES.IMAGES_ONLY }: { mediaStrategy?: string } = {},
+  {
+    mediaStrategy = MEDIA_STRATEGIES.IMAGES_ONLY,
+  }: { mediaStrategy?: string } = {},
 ): PreparedMessage[] {
   return messages.map((message, _i) => {
     const base: { role: string; name?: string } = { role: message.role };
@@ -371,27 +392,37 @@ export function prepareOpenAICompatMessages(
         role: "tool",
         tool_call_id: message.tool_call_id || message.id || "",
         content:
-          typeof message.content === "string" ? message.content : JSON.stringify(message.content),
+          typeof message.content === "string"
+            ? message.content
+            : JSON.stringify(message.content),
       } as PreparedMessage;
     }
 
     // Assistant messages with tool calls — include tool_calls in OpenAI format
-    if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
+    if (
+      message.role === "assistant" &&
+      message.toolCalls &&
+      message.toolCalls.length > 0
+    ) {
       return {
         ...base,
         // Per OpenAI spec, content must be null when tool_calls are present
-        content: (typeof message.content === "string" ? message.content.trim() : "") || null,
-        tool_calls: message.toolCalls.map((toolCall: ToolCallEntry, i: number) => ({
-          id: toolCall.id || `call_${i}`,
-          type: "function",
-          function: {
-            name: toolCall.name,
-            arguments:
-              typeof toolCall.args === "string"
-                ? toolCall.args
-                : JSON.stringify(toolCall.args || {}),
-          },
-        })),
+        content:
+          (typeof message.content === "string" ? message.content.trim() : "") ||
+          null,
+        tool_calls: message.toolCalls.map(
+          (toolCall: ToolCallEntry, i: number) => ({
+            id: toolCall.id || `call_${i}`,
+            type: "function",
+            function: {
+              name: toolCall.name,
+              arguments:
+                typeof toolCall.args === "string"
+                  ? toolCall.args
+                  : JSON.stringify(toolCall.args || {}),
+            },
+          }),
+        ),
       } as PreparedMessage;
     }
 
@@ -407,12 +438,13 @@ export function prepareOpenAICompatMessages(
       }
     } else {
       // Full media handling (vllm, llama-cpp)
-      const mediaFields: Array<{ key: string; values: string[] | undefined }> = [
-        { key: "images", values: message.images },
-        { key: "audio", values: message.audio },
-        { key: "video", values: message.video },
-        { key: "pdf", values: message.pdf },
-      ];
+      const mediaFields: Array<{ key: string; values: string[] | undefined }> =
+        [
+          { key: "images", values: message.images },
+          { key: "audio", values: message.audio },
+          { key: "video", values: message.video },
+          { key: "pdf", values: message.pdf },
+        ];
       for (const { values: array } of mediaFields) {
         if (!array || array.length === 0) continue;
 
@@ -475,14 +507,19 @@ export function prepareOpenAICompatMessages(
     }
 
     if (content.length > 0) {
-        const textContent = typeof message.content === "string" ? message.content : "";
-        if (textContent) {
-          content.push({ type: "text", text: textContent });
-        }
+      const textContent =
+        typeof message.content === "string" ? message.content : "";
+      if (textContent) {
+        content.push({ type: "text", text: textContent });
+      }
       return { ...base, content } as PreparedMessage;
     }
 
-    return { ...base, content: (typeof message.content === "string" ? message.content : "") || "" } as PreparedMessage;
+    return {
+      ...base,
+      content:
+        (typeof message.content === "string" ? message.content : "") || "",
+    } as PreparedMessage;
   });
 }
 
@@ -510,7 +547,8 @@ export function processNonStreamingResponse(
   }
 
   // Check native reasoning fields first, fall back to <think> tag parsing
-  const nativeThinking = message?.reasoning_content || message?.reasoning || null;
+  const nativeThinking =
+    message?.reasoning_content || message?.reasoning || null;
   const { thinking: tagThinking, text } = extractThinkTags(rawText);
   const thinking = nativeThinking || tagThinking;
 
@@ -633,14 +671,23 @@ export async function* parseSSEStream(
               if (toolCall.id) pendingToolCalls[index].id = toolCall.id;
               const chunkName = toolCall.function?.name || toolCall.name;
               if (chunkName) pendingToolCalls[index].name = chunkName;
-              const chunkArgs = toolCall.function?.arguments || toolCall.arguments;
+              const chunkArgs =
+                toolCall.function?.arguments || toolCall.arguments;
               if (chunkArgs) {
                 pendingToolCalls[index].args += chunkArgs;
                 deltaChars += chunkArgs.length;
               }
-              if (!pendingToolCalls[index].startEmitted && pendingToolCalls[index].name && pendingToolCalls[index].id) {
+              if (
+                !pendingToolCalls[index].startEmitted &&
+                pendingToolCalls[index].name &&
+                pendingToolCalls[index].id
+              ) {
                 pendingToolCalls[index].startEmitted = true;
-                yield { type: "toolCallStart" as const, id: pendingToolCalls[index].id, name: pendingToolCalls[index].name };
+                yield {
+                  type: "toolCallStart" as const,
+                  id: pendingToolCalls[index].id,
+                  name: pendingToolCalls[index].name,
+                };
               }
             }
             // Yield a lightweight progress event so the generation tracker
@@ -698,15 +745,22 @@ export async function* parseSSEStream(
       usageYielded = true;
       if (usage) {
         yield { type: "usage", usage };
-      } else if (partialOutputCharacters > 0 || partialReasoningCharacters > 0) {
+      } else if (
+        partialOutputCharacters > 0 ||
+        partialReasoningCharacters > 0
+      ) {
         const estimatedOutputTokens = Math.ceil(partialOutputCharacters / 4);
-        const estimatedReasoningTokens = Math.ceil(partialReasoningCharacters / 4);
+        const estimatedReasoningTokens = Math.ceil(
+          partialReasoningCharacters / 4,
+        );
         yield {
           type: "usage",
           usage: {
             inputTokens: 0,
             outputTokens: estimatedOutputTokens + estimatedReasoningTokens,
-            ...(estimatedReasoningTokens > 0 && { reasoningOutputTokens: estimatedReasoningTokens }),
+            ...(estimatedReasoningTokens > 0 && {
+              reasoningOutputTokens: estimatedReasoningTokens,
+            }),
           },
         };
       }

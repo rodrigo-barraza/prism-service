@@ -5,10 +5,18 @@ import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import ToolContext from "./ToolContext.ts";
 
 import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
-import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST, TOOL_NAMES, DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST,
+  CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST,
+  TOOL_NAMES,
+  DEFAULT_TOPOLOGY,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TYPES } from "../config.ts";
 import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
-import { THINKING_PATTERNS, LOCAL_PROVIDER_TYPES } from "./local-provider/constants.ts";
+import {
+  THINKING_PATTERNS,
+  LOCAL_PROVIDER_TYPES,
+} from "./local-provider/constants.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -67,13 +75,23 @@ export default class AgenticToolResolver {
    * Handles MCP tools, disabledBuiltIns mode, prefix expansion,
    * and native provider tool collision prevention.
    */
-  static async resolve({ options, agent, project: _project, username: _username, modelDefinition, agentSessionId, providerName, resolvedModel }: ResolveParams) {
+  static async resolve({
+    options,
+    agent,
+    project: _project,
+    username: _username,
+    modelDefinition,
+    agentSessionId,
+    providerName,
+    resolvedModel,
+  }: ResolveParams) {
     // Ensure tool schemas are loaded from tools-api (lazy init — if tools-api
     // was unreachable at boot, this fetches on-demand before proceeding)
     await ToolOrchestratorService.ensureSchemas();
     const settings = await SettingsService.getSection("agents");
     const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
-    const toolsApiSchemas = ToolOrchestratorService.getToolSchemas(defaultTopology);
+    const toolsApiSchemas =
+      ToolOrchestratorService.getToolSchemas(defaultTopology);
 
     const dynamicTools: ToolSchema[] = [...toolsApiSchemas];
 
@@ -94,12 +112,19 @@ export default class AgenticToolResolver {
     let resolvedEnabledTools: string[] | null = options.enabledTools || null;
     let shouldApplyDisabledFilter = false;
     if (agentSessionId) {
-      const dynamicTools = ToolContext.get<string[]>(agentSessionId, "dynamicEnabledTools");
+      const dynamicTools = ToolContext.get<string[]>(
+        agentSessionId,
+        "dynamicEnabledTools",
+      );
       if (Array.isArray(dynamicTools) && dynamicTools.length > 0) {
         resolvedEnabledTools = dynamicTools;
         // Apply client-side disabledTools to the dynamic set so user UI
         // toggles are respected even after enable_tools has been called
-        if (options.disabledTools && Array.isArray(options.disabledTools) && options.disabledTools.length > 0) {
+        if (
+          options.disabledTools &&
+          Array.isArray(options.disabledTools) &&
+          options.disabledTools.length > 0
+        ) {
           const clientDisabledSet = new Set(options.disabledTools);
           resolvedEnabledTools = resolvedEnabledTools.filter(
             (toolName) => !clientDisabledSet.has(toolName),
@@ -123,10 +148,11 @@ export default class AgenticToolResolver {
       const baseTools = rawBaseTools?.includes("*") ? null : rawBaseTools;
 
       if (baseTools) {
-        const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+        const clientSchemas =
+          ToolOrchestratorService.getClientToolSchemas(defaultTopology);
         const expandedSet = new Set<string>();
         for (const entry of baseTools) {
-        if (entry.startsWith("domain:")) {
+          if (entry.startsWith("domain:")) {
             const domain = entry.slice(7);
             for (const tool of clientSchemas) {
               if (tool.domain === domain) expandedSet.add(tool.name);
@@ -158,7 +184,10 @@ export default class AgenticToolResolver {
         if (persona.availableTools.includes("*")) {
           // Even with wildcard availableTools, if enabledByDefaultTools is set,
           // use it as the initial subset (agent can still enable_tools to get more)
-          if (persona.enabledByDefaultTools !== undefined && !persona.enabledByDefaultTools.includes("*")) {
+          if (
+            persona.enabledByDefaultTools !== undefined &&
+            !persona.enabledByDefaultTools.includes("*")
+          ) {
             resolvedEnabledTools = persona.enabledByDefaultTools;
             logger.info(
               `[AgenticLoop] Persona "${agent}" uses wildcard availableTools with ${resolvedEnabledTools.length} enabledByDefaultTools`,
@@ -171,13 +200,14 @@ export default class AgenticToolResolver {
         } else {
           // enabledByDefaultTools: ["*"] means "enable everything in availableTools"
           // enabledByDefaultTools: undefined also falls back to availableTools (backward-compatible)
-          const useFullAvailable = persona.enabledByDefaultTools === undefined
-            || persona.enabledByDefaultTools.includes("*");
+          const useFullAvailable =
+            persona.enabledByDefaultTools === undefined ||
+            persona.enabledByDefaultTools.includes("*");
           resolvedEnabledTools = useFullAvailable
             ? persona.availableTools
             : persona.enabledByDefaultTools!;
           logger.info(
-            `[AgenticLoop] Using persona "${agent}" ${useFullAvailable ? 'availableTools (all enabled)' : 'enabledByDefaultTools'}: [${resolvedEnabledTools!.join(", ")}]`,
+            `[AgenticLoop] Using persona "${agent}" ${useFullAvailable ? "availableTools (all enabled)" : "enabledByDefaultTools"}: [${resolvedEnabledTools!.join(", ")}]`,
           );
         }
       }
@@ -186,13 +216,18 @@ export default class AgenticToolResolver {
     let finalTools = dynamicTools;
     if (resolvedEnabledTools && Array.isArray(resolvedEnabledTools)) {
       const hasPrefixed = resolvedEnabledTools.some(
-        (entry) => entry.startsWith("domain:") || entry.startsWith("domainKey:"),
+        (entry) =>
+          entry.startsWith("domain:") || entry.startsWith("domainKey:"),
       );
 
       let enabledSet: Set<string>;
       if (hasPrefixed) {
-        const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
-        enabledSet = resolveToolEntriesToSet(resolvedEnabledTools, clientSchemas);
+        const clientSchemas =
+          ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+        enabledSet = resolveToolEntriesToSet(
+          resolvedEnabledTools,
+          clientSchemas,
+        );
         logger.info(
           `[AgenticLoop] Expanded ${resolvedEnabledTools.length} enabledTools entries → ${enabledSet.size} unique tools`,
         );
@@ -203,31 +238,49 @@ export default class AgenticToolResolver {
       const resolvedPersona = agent ? AgentPersonaRegistry.get(agent) : null;
       const isCoreToolsLocked = resolvedPersona?.coreToolsLocked ?? true;
 
-      const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
+      const clientSchemas =
+        ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
       const systemTools = new Set<string>(
         clientSchemas
-          .filter((toolSchema) => toolSchema.system === true && !CORE_ORCHESTRATOR_TOOLS.has(toolSchema.name as string))
-          .map((toolSchema) => toolSchema.name as string)
+          .filter(
+            (toolSchema) =>
+              toolSchema.system === true &&
+              !CORE_ORCHESTRATOR_TOOLS.has(toolSchema.name as string),
+          )
+          .map((toolSchema) => toolSchema.name as string),
       );
 
-      const clientDisabledSet = shouldApplyDisabledFilter && options.disabledTools && Array.isArray(options.disabledTools) && options.disabledTools.length > 0
-        ? new Set<string>(options.disabledTools)
-        : null;
+      const clientDisabledSet =
+        shouldApplyDisabledFilter &&
+        options.disabledTools &&
+        Array.isArray(options.disabledTools) &&
+        options.disabledTools.length > 0
+          ? new Set<string>(options.disabledTools)
+          : null;
 
       const shouldBypassOrchestratorTools = !options.isSubAgent;
-      finalTools = finalTools.filter(
-        (tool) => {
-          if (clientDisabledSet?.has(tool.name)) return false;
-          if (enabledSet.has(tool.name)) return true;
-          if (isCoreToolsLocked && (CORE_AGENTIC_TOOLS.has(tool.name) || systemTools.has(tool.name))) return true;
-          if (shouldBypassOrchestratorTools && CORE_ORCHESTRATOR_TOOLS.has(tool.name)) return true;
-          if (PRISM_LOCAL_TOOL_NAMES.has(tool.name)) return true;
-          return false;
-        },
-      );
+      finalTools = finalTools.filter((tool) => {
+        if (clientDisabledSet?.has(tool.name)) return false;
+        if (enabledSet.has(tool.name)) return true;
+        if (
+          isCoreToolsLocked &&
+          (CORE_AGENTIC_TOOLS.has(tool.name) || systemTools.has(tool.name))
+        )
+          return true;
+        if (
+          shouldBypassOrchestratorTools &&
+          CORE_ORCHESTRATOR_TOOLS.has(tool.name)
+        )
+          return true;
+        if (PRISM_LOCAL_TOOL_NAMES.has(tool.name)) return true;
+        return false;
+      });
 
       if (resolvedPersona?.blockedTools?.length) {
-        const disabledSet = resolveToolEntriesToSet(resolvedPersona.blockedTools, clientSchemas);
+        const disabledSet = resolveToolEntriesToSet(
+          resolvedPersona.blockedTools,
+          clientSchemas,
+        );
         finalTools = finalTools.filter(
           (tool) => !disabledSet.has(tool.name) || enabledSet.has(tool.name),
         );
@@ -239,15 +292,21 @@ export default class AgenticToolResolver {
 
     // ── Native tool collision prevention ────────────────────────
     if (options.webSearch) {
-      finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.SEARCH_WEB);
+      finalTools = finalTools.filter(
+        (tool) => tool.name !== TOOL_NAMES.SEARCH_WEB,
+      );
     }
 
     if (modelDefinition?.outputTypes?.includes(TYPES.IMAGE)) {
-      finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.GENERATE_IMAGE);
+      finalTools = finalTools.filter(
+        (tool) => tool.name !== TOOL_NAMES.GENERATE_IMAGE,
+      );
     }
 
     if (modelDefinition?.inputTypes?.includes(TYPES.IMAGE)) {
-      finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.DESCRIBE_IMAGE);
+      finalTools = finalTools.filter(
+        (tool) => tool.name !== TOOL_NAMES.DESCRIBE_IMAGE,
+      );
     }
 
     // When the model has native thinking as a built-in capability, the think
@@ -263,9 +322,7 @@ export default class AgenticToolResolver {
       finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.THINK);
     }
 
-    logger.info(
-      `[AgenticToolResolver] Final: ${finalTools.length} tools`,
-    );
+    logger.info(`[AgenticToolResolver] Final: ${finalTools.length} tools`);
     return { finalTools, resolvedEnabledTools };
   }
 
@@ -306,9 +363,17 @@ export default class AgenticToolResolver {
     }
 
     // Name-based detection for local provider models not in the static registry
-    if (providerName && resolvedModel && LOCAL_PROVIDER_TYPES.has(providerName)) {
+    if (
+      providerName &&
+      resolvedModel &&
+      LOCAL_PROVIDER_TYPES.has(providerName)
+    ) {
       const modelNameLowercase = resolvedModel.toLowerCase();
-      if (THINKING_PATTERNS.some((pattern) => modelNameLowercase.includes(pattern))) {
+      if (
+        THINKING_PATTERNS.some((pattern) =>
+          modelNameLowercase.includes(pattern),
+        )
+      ) {
         return true;
       }
     }
@@ -320,4 +385,3 @@ export default class AgenticToolResolver {
     return false;
   }
 }
-

@@ -24,7 +24,7 @@ router.post(
       const result = await FileService.uploadFile(data);
       res.json(result);
     } catch (error: unknown) {
-            logger.error(`File upload error: ${getErrorMessage(error)}`);
+      logger.error(`File upload error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -55,7 +55,7 @@ router.get(
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       result.stream.pipe(res);
     } catch (error: unknown) {
-            logger.error(`File retrieval error: ${getErrorMessage(error)}`);
+      logger.error(`File retrieval error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),

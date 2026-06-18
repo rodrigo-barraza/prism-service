@@ -58,13 +58,23 @@ export function createSseEmitter(res: Response, signal: AbortSignal) {
  * Build a flat JSON response from collected SSE events.
  * Used by non-streaming callers (?stream=false).
  */
-export function buildJsonResponseFromEvents(events: SseEvent[], requestBody: ChatRequest) {
+export function buildJsonResponseFromEvents(
+  events: SseEvent[],
+  requestBody: ChatRequest,
+) {
   const errorEvent = events.find((e: SseEvent) => e.type === "error");
   if (errorEvent) {
-    return { error: new ProviderError("server", errorEvent.message || "Unknown error", 500) };
+    return {
+      error: new ProviderError(
+        "server",
+        errorEvent.message || "Unknown error",
+        500,
+      ),
+    };
   }
 
-  const doneEvent = events.find((e: SseEvent) => e.type === "done") || ({} as SseEvent);
+  const doneEvent =
+    events.find((e: SseEvent) => e.type === "done") || ({} as SseEvent);
   const text = events
     .filter((e: SseEvent) => e.type === "chunk")
     .map((e: SseEvent) => e.content)
@@ -82,14 +92,20 @@ export function buildJsonResponseFromEvents(events: SseEvent[], requestBody: Cha
     }));
 
   const toolCalls = events
-    .filter((e: SseEvent) => e.type === "tool_execution" && e.status === "calling")
+    .filter(
+      (e: SseEvent) => e.type === "tool_execution" && e.status === "calling",
+    )
     .map((e: SseEvent) => ({
       name: e.tool?.name,
       args: e.tool?.args,
     }));
 
   const toolResults = events
-    .filter((e: SseEvent) => e.type === "tool_execution" && (e.status === "done" || e.status === "error"))
+    .filter(
+      (e: SseEvent) =>
+        e.type === "tool_execution" &&
+        (e.status === "done" || e.status === "error"),
+    )
     .map((e: SseEvent) => ({
       name: e.tool?.name,
       args: e.tool?.args,
@@ -134,7 +150,11 @@ export async function handleSseRequest(
   req: Request,
   res: Response,
   params: ChatRequest,
-  handler: (params: ChatRequest, onEvent: (event: SseEvent) => void, context: { signal: AbortSignal }) => Promise<void> = handleConversation,
+  handler: (
+    params: ChatRequest,
+    onEvent: (event: SseEvent) => void,
+    context: { signal: AbortSignal },
+  ) => Promise<void> = handleConversation,
 ) {
   initSseResponse(res);
 
@@ -149,11 +169,13 @@ export async function handleSseRequest(
   const connectionStartTime = Date.now();
   const controller = createAbortController();
   res.on("close", () => {
-    const durationSeconds = ((Date.now() - connectionStartTime) / 1000).toFixed(1);
+    const durationSeconds = ((Date.now() - connectionStartTime) / 1000).toFixed(
+      1,
+    );
     logger.warn(
       `[SSE] Connection closed after ${durationSeconds}s — ` +
-      `writableFinished=${res.writableFinished}, destroyed=${res.destroyed}, ` +
-      `socket.destroyed=${req.socket?.destroyed}`,
+        `writableFinished=${res.writableFinished}, destroyed=${res.destroyed}, ` +
+        `socket.destroyed=${req.socket?.destroyed}`,
     );
     if (!res.writableFinished) controller.abort();
   });
@@ -174,12 +196,15 @@ export async function handleJsonRequest(
   res: Response,
   next: NextFunction,
   params: ChatRequest,
-  handler: (params: ChatRequest, onEvent: (event: SseEvent) => void) => Promise<void> = handleConversation,
+  handler: (
+    params: ChatRequest,
+    onEvent: (event: SseEvent) => void,
+  ) => Promise<void> = handleConversation,
 ) {
-    const events: SseEvent[] = [];
+  const events: SseEvent[] = [];
   await handler(params, (event: SseEvent) => events.push(event));
 
-    const { error, response } = buildJsonResponseFromEvents(events, req.body);
+  const { error, response } = buildJsonResponseFromEvents(events, req.body);
   if (error) return next(error);
 
   res.json(response);

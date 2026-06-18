@@ -3,7 +3,10 @@ import { TYPES } from "../../config.ts";
 import { HuggingFaceMetadata, ModelEntry } from "./types.ts";
 import { formatParams } from "./nameParsers.ts";
 
-const _hfCache = new Map<string, { data: HuggingFaceMetadata | null; timestamp: number }>();
+const _hfCache = new Map<
+  string,
+  { data: HuggingFaceMetadata | null; timestamp: number }
+>();
 const HF_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 /**
@@ -11,17 +14,22 @@ const HF_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
  * Returns null on any failure (gated models, network errors, etc.).
  * Results are cached in-memory with a 30-minute TTL.
  */
-export async function fetchHuggingFaceMetadata(modelId: string): Promise<HuggingFaceMetadata | null> {
+export async function fetchHuggingFaceMetadata(
+  modelId: string,
+): Promise<HuggingFaceMetadata | null> {
   const cached = _hfCache.get(modelId);
   if (cached && Date.now() - cached.timestamp < HF_CACHE_TTL_MS) {
     return cached.data;
   }
 
   try {
-    const response = await fetch(`https://huggingface.co/api/models/${modelId}`, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(5000),
-    });
+    const response = await fetch(
+      `https://huggingface.co/api/models/${modelId}`,
+      {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(5000),
+      },
+    );
     if (!response.ok) {
       _hfCache.set(modelId, { data: null, timestamp: Date.now() });
       return null;
@@ -51,10 +59,15 @@ export async function fetchHuggingFaceMetadata(modelId: string): Promise<Hugging
  * Enrich a model entry with HuggingFace metadata if the model ID
  * looks like a HF model path (has a slash: "org/model-name").
  */
-export async function enrichWithHuggingFace(entry: ModelEntry, modelKey: string): Promise<ModelEntry> {
+export async function enrichWithHuggingFace(
+  entry: ModelEntry,
+  modelKey: string,
+): Promise<ModelEntry> {
   if (!modelKey.includes("/")) return entry;
 
-  const huggingFaceMeta = await fetchHuggingFaceMetadata(modelKey).catch(() => null);
+  const huggingFaceMeta = await fetchHuggingFaceMetadata(modelKey).catch(
+    () => null,
+  );
   if (!huggingFaceMeta) return entry;
 
   // Vision/video/audio override from HF tags
@@ -68,21 +81,30 @@ export async function enrichWithHuggingFace(entry: ModelEntry, modelKey: string)
       entry.inputTypes.push(TYPES.IMAGE);
     }
   }
-  if (huggingFaceMeta.pipelineTag === "video-text-to-text" || huggingFaceMeta.tags.includes("video")) {
+  if (
+    huggingFaceMeta.pipelineTag === "video-text-to-text" ||
+    huggingFaceMeta.tags.includes("video")
+  ) {
     if (!entry.inputTypes.includes(TYPES.VIDEO)) {
       entry.inputTypes.push(TYPES.VIDEO);
     }
   }
-  if (huggingFaceMeta.pipelineTag === "audio-text-to-text" || huggingFaceMeta.tags.includes("audio")) {
+  if (
+    huggingFaceMeta.pipelineTag === "audio-text-to-text" ||
+    huggingFaceMeta.tags.includes("audio")
+  ) {
     if (!entry.inputTypes.includes(TYPES.AUDIO)) {
       entry.inputTypes.push(TYPES.AUDIO);
     }
   }
 
   // Metadata overrides
-  if (huggingFaceMeta.totalParams) entry.params = formatParams(huggingFaceMeta.totalParams) || undefined;
-  if (huggingFaceMeta.totalSize) entry.size = formatBytes(huggingFaceMeta.totalSize);
-  if (huggingFaceMeta.architectures?.length > 0) entry.architecture = huggingFaceMeta.architectures[0];
+  if (huggingFaceMeta.totalParams)
+    entry.params = formatParams(huggingFaceMeta.totalParams) || undefined;
+  if (huggingFaceMeta.totalSize)
+    entry.size = formatBytes(huggingFaceMeta.totalSize);
+  if (huggingFaceMeta.architectures?.length > 0)
+    entry.architecture = huggingFaceMeta.architectures[0];
   if (huggingFaceMeta.author) entry.publisher = huggingFaceMeta.author;
 
   return entry;

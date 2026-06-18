@@ -34,7 +34,7 @@ async function* parseNdjsonStream(body: ReadableStream<Uint8Array>) {
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
 
-            for ( const line of lines) {
+      for (const line of lines) {
         if (!line.trim()) continue;
         try {
           const chunk = JSON.parse(line);
@@ -42,7 +42,9 @@ async function* parseNdjsonStream(body: ReadableStream<Uint8Array>) {
             yield chunk.result;
           }
         } catch (error: unknown) {
-                    logger.warn(`[Inworld] NDJSON parse error: ${getErrorMessage(error)}`);
+          logger.warn(
+            `[Inworld] NDJSON parse error: ${getErrorMessage(error)}`,
+          );
         }
       }
     }
@@ -51,7 +53,7 @@ async function* parseNdjsonStream(body: ReadableStream<Uint8Array>) {
   }
 }
 
-const inworldProvider = ({
+const inworldProvider = {
   name: "inworld",
 
   /**
@@ -68,7 +70,7 @@ const inworldProvider = ({
     try {
       const apiKey = getApiKey();
       const model =
-                options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld;
+        options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld;
 
       const isTtsTwo = model.startsWith("inworld-tts-2");
 
@@ -101,7 +103,9 @@ const inworldProvider = ({
 
       // Collect base64 audio chunks from the NDJSON stream into a Node Readable
       async function* audioChunks() {
-        for await ( const result of parseNdjsonStream(response.body as ReadableStream<Uint8Array>)) {
+        for await (const result of parseNdjsonStream(
+          response.body as ReadableStream<Uint8Array>,
+        )) {
           if (result.audioContent) {
             yield Buffer.from(result.audioContent, "base64");
           }
@@ -112,7 +116,7 @@ const inworldProvider = ({
       return { stream, contentType: "audio/mpeg" };
     } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
-            throw new ProviderError("inworld", getErrorMessage(error), 500, error);
+      throw new ProviderError("inworld", getErrorMessage(error), 500, error);
     }
   },
 
@@ -134,12 +138,12 @@ const inworldProvider = ({
 
     const apiKey = getApiKey();
     const model =
-            options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld;
+      options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld;
 
     // Accumulate all text from the async iterator first, since
     // Inworld's API is request-level streaming (not input-level).
     let fullText = "";
-        for await ( const chunk of textStream) {
+    for await (const chunk of textStream) {
       fullText += chunk;
     }
 
@@ -181,19 +185,21 @@ const inworldProvider = ({
         );
       }
 
-      for await ( const result of parseNdjsonStream(response.body as ReadableStream<Uint8Array>)) {
+      for await (const result of parseNdjsonStream(
+        response.body as ReadableStream<Uint8Array>,
+      )) {
         if (result.audioContent) {
           yield Buffer.from(result.audioContent, "base64");
         }
       }
     } catch (error: unknown) {
-            if ((error instanceof Error && error.name === "AbortError")) return;
+      if (error instanceof Error && error.name === "AbortError") return;
       if (error instanceof ProviderError) throw error;
-            throw new ProviderError("inworld", getErrorMessage(error), 500, error);
+      throw new ProviderError("inworld", getErrorMessage(error), 500, error);
     } finally {
       controller.abort();
     }
   },
-});
+};
 
 export default inworldProvider;

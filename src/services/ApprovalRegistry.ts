@@ -35,7 +35,9 @@ export interface PendingPlanApprovalEntry {
   toolCalls?: PendingToolCallSummary[];
 }
 
-export type PendingApprovalEntry = PendingToolApprovalEntry | PendingPlanApprovalEntry;
+export type PendingApprovalEntry =
+  | PendingToolApprovalEntry
+  | PendingPlanApprovalEntry;
 
 // ── Question Entry Types ───────────────────────────────────
 

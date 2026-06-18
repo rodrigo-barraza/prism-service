@@ -1,5 +1,10 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES, DOMAINS, DEFAULT_USERNAME, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  TOOL_NAMES,
+  DOMAINS,
+  DEFAULT_USERNAME,
+  DEFAULT_PROJECT,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
@@ -35,11 +40,13 @@ const setTimer = {
       properties: {
         prompt: {
           type: "string",
-          description: "The instruction or context to inject back into this conversation when the timer fires.",
+          description:
+            "The instruction or context to inject back into this conversation when the timer fires.",
         },
         durationSeconds: {
           type: "number",
-          description: "Number of seconds to wait before firing (30–599). Must be under 10 minutes.",
+          description:
+            "Number of seconds to wait before firing (30–599). Must be under 10 minutes.",
         },
       },
       required: ["prompt", "durationSeconds"],
@@ -48,10 +55,17 @@ const setTimer = {
   labels: ["timer", "wait", "defer"],
   domain: DOMAINS.CORE_SCHEDULE.displayName,
 
-  async execute(toolArguments: Record<string, unknown>, context: ReminderContext) {
-    const prompt = typeof toolArguments.prompt === "string" ? toolArguments.prompt : undefined;
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: ReminderContext,
+  ) {
+    const prompt =
+      typeof toolArguments.prompt === "string"
+        ? toolArguments.prompt
+        : undefined;
     const durationSeconds =
-      typeof toolArguments.durationSeconds === "number" || typeof toolArguments.durationSeconds === "string"
+      typeof toolArguments.durationSeconds === "number" ||
+      typeof toolArguments.durationSeconds === "string"
         ? Number(toolArguments.durationSeconds)
         : undefined;
     const conversationId = context.agentSessionId;
@@ -66,15 +80,21 @@ const setTimer = {
       return { error: "'prompt' is a required string parameter." };
     }
 
-    if (durationSeconds === undefined || durationSeconds < TIMER_MINIMUM_SECONDS || durationSeconds > TIMER_MAXIMUM_SECONDS) {
+    if (
+      durationSeconds === undefined ||
+      durationSeconds < TIMER_MINIMUM_SECONDS ||
+      durationSeconds > TIMER_MAXIMUM_SECONDS
+    ) {
       return {
-        error: `'durationSeconds' must be between ${TIMER_MINIMUM_SECONDS} and ${TIMER_MAXIMUM_SECONDS} seconds. ` +
+        error:
+          `'durationSeconds' must be between ${TIMER_MINIMUM_SECONDS} and ${TIMER_MAXIMUM_SECONDS} seconds. ` +
           `For longer scheduled reminders or recurring events, use create_cron_job instead.`,
       };
     }
 
     try {
-      const { default: ConversationTimerService } = await import("../ConversationTimerService.js");
+      const { default: ConversationTimerService } =
+        await import("../ConversationTimerService.js");
       const timer = await ConversationTimerService.createTimer({
         conversationId,
         project,
@@ -83,7 +103,9 @@ const setTimer = {
         durationSeconds,
       });
 
-      logger.info(`[ReminderTools] set_timer created timer ${timer.id} (${durationSeconds}s) for conversation ${conversationId}`);
+      logger.info(
+        `[ReminderTools] set_timer created timer ${timer.id} (${durationSeconds}s) for conversation ${conversationId}`,
+      );
 
       return {
         success: true,
@@ -129,10 +151,18 @@ const listTimers = {
     }
 
     try {
-      const { default: ConversationTimerService } = await import("../ConversationTimerService.js");
-      const activeTimers = await ConversationTimerService.listActiveTimers(conversationId, project, username);
+      const { default: ConversationTimerService } =
+        await import("../ConversationTimerService.js");
+      const activeTimers = await ConversationTimerService.listActiveTimers(
+        conversationId,
+        project,
+        username,
+      );
       const oneShotTimers = activeTimers.filter(
-        (timer) => timer.mode === "one_shot" && (timer.durationSeconds === undefined || timer.durationSeconds < CRON_MINIMUM_DELAY_SECONDS),
+        (timer) =>
+          timer.mode === "one_shot" &&
+          (timer.durationSeconds === undefined ||
+            timer.durationSeconds < CRON_MINIMUM_DELAY_SECONDS),
       );
 
       return {
@@ -173,8 +203,14 @@ const cancelTimer = {
   labels: ["timer", "wait"],
   domain: DOMAINS.CORE_SCHEDULE.displayName,
 
-  async execute(toolArguments: Record<string, unknown>, context: ReminderContext) {
-    const timerId = typeof toolArguments.timerId === "string" ? toolArguments.timerId : undefined;
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: ReminderContext,
+  ) {
+    const timerId =
+      typeof toolArguments.timerId === "string"
+        ? toolArguments.timerId
+        : undefined;
     const project = context.project || DEFAULT_PROJECT;
     const username = context.username || DEFAULT_USERNAME;
 
@@ -183,8 +219,13 @@ const cancelTimer = {
     }
 
     try {
-      const { default: ConversationTimerService } = await import("../ConversationTimerService.js");
-      const wasCancelled = await ConversationTimerService.cancelTimer(timerId, project, username);
+      const { default: ConversationTimerService } =
+        await import("../ConversationTimerService.js");
+      const wasCancelled = await ConversationTimerService.cancelTimer(
+        timerId,
+        project,
+        username,
+      );
 
       if (!wasCancelled) {
         return {

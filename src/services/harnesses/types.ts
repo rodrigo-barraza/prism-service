@@ -42,7 +42,10 @@ export interface ToolCall {
   responsesItemId?: string;
   thoughtSignature?: string;
   /** OpenAI Responses API reasoning output item paired with this function call. */
-  reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> };
+  reasoningItem?: {
+    id: string;
+    summary: Array<{ type: string; text: string }>;
+  };
   /** Populated by AutoApprovalEngine during beforeToolCall hook. */
   _approval?: { tier: string; tierLabel: string };
   result?: unknown;
@@ -107,7 +110,10 @@ export interface ValidationFeedback {
 
 // ── SSE Emission ────────────────────────────────────────────
 
-export type EmitFunction = (event: { type: string; [key: string]: unknown }) => void;
+export type EmitFunction = (event: {
+  type: string;
+  [key: string]: unknown;
+}) => void;
 
 // ── LLM Provider ────────────────────────────────────────────
 
@@ -263,7 +269,10 @@ export interface StreamChunk {
   id?: string;
   responsesItemId?: string;
   /** OpenAI Responses API reasoning output item paired with this tool call. */
-  reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> };
+  reasoningItem?: {
+    id: string;
+    summary: Array<{ type: string; text: string }>;
+  };
   name?: string;
   args?: Record<string, unknown>;
   thoughtSignature?: string;

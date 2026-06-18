@@ -13,7 +13,7 @@ export const MATCH_MODES = {
   REGEX: "regex",
 } as const;
 
-export type MatchMode = typeof MATCH_MODES[keyof typeof MATCH_MODES];
+export type MatchMode = (typeof MATCH_MODES)[keyof typeof MATCH_MODES];
 
 // ── Assertions ──────────────────────────────────────────────
 

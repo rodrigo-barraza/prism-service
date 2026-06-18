@@ -1,4 +1,7 @@
-import { AGENT_IDS, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  AGENT_IDS,
+  DEFAULT_PROJECT,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import { daysSinceIso } from "@rodrigo-barraza/utilities-library";
 import crypto from "crypto";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
@@ -103,7 +106,7 @@ async function generateEmbedding(text: string, options: EmbedOptions = {}) {
   return EmbeddingService.embed(text, { source: "memory", ...options });
 }
 function memoryAgeDays(createdAt: string) {
-    return daysSinceIso(createdAt);
+  return daysSinceIso(createdAt);
 }
 /**
  * Human-readable age string. Models are poor at date arithmetic —
@@ -144,21 +147,24 @@ async function extractFactsFromConversation(
   participants: Record<string, unknown>[],
   meta: Record<string, unknown> = {},
 ): Promise<ExtractedFact[]> {
-    const endpoint = meta.endpoint || null;
-    const agent = meta.agent || null;
+  const endpoint = meta.endpoint || null;
+  const agent = meta.agent || null;
   const { provider: extractionProvider, model: extractionModel } =
     await getExtractionConfig();
   const provider = getProvider(extractionProvider);
   const requestId = crypto.randomUUID();
   const requestStart = performance.now();
-    const participantList = participants
+  const participantList = participants
     .map(
       (participant: Record<string, unknown>) =>
         `- ID: ${participant.id}, Username: ${participant.username}, Display: ${participant.displayName || participant.username}`,
     )
     .join("\n");
-    const conversationText = messages
-    .map((message: Record<string, unknown>) => `${message.name || message.role}: ${message.content}`)
+  const conversationText = messages
+    .map(
+      (message: Record<string, unknown>) =>
+        `${message.name || message.role}: ${message.content}`,
+    )
     .join("\n");
   const systemPrompt = `You are a memory extraction system. Analyze the conversation and extract notable personal facts about the participants. Focus on:
 - Personal information (location, occupation, hobbies, pets, family)
@@ -201,16 +207,16 @@ ${participantList}`;
     });
   } catch (error: unknown) {
     success = false;
-        errorMessage = getErrorMessage(error);
+    errorMessage = getErrorMessage(error);
     throw error;
   } finally {
     RequestLogger.logBackgroundLlmCall({
       requestId,
-      endpoint: (endpoint as string | null),
+      endpoint: endpoint as string | null,
       operation: "memory:extract",
       project: (meta.project as string) || null,
       username: (meta.username as string) || "system",
-      agent: (agent as string | null),
+      agent: agent as string | null,
       provider: extractionProvider,
       model: extractionModel,
       traceId: (meta.traceId as string) || null,
@@ -227,11 +233,11 @@ ${participantList}`;
       },
     });
   }
-    const facts = parseJsonFromLargeLanguageModelResponse(result?.text);
+  const facts = parseJsonFromLargeLanguageModelResponse(result?.text);
   if (!Array.isArray(facts)) return [];
   // Validate each fact has the required fields
   return (facts as Record<string, unknown>[]).filter(
-        (fact: Record<string, unknown>) =>
+    (fact: Record<string, unknown>) =>
       fact.fact &&
       fact.aboutUserId &&
       fact.aboutUsername &&
@@ -271,25 +277,25 @@ const MemoryService = {
     if (!content) throw new Error("MemoryService.store requires content");
     // Validate type for CODING agent
     if (agent === AGENT_IDS.CODING) {
-            type = CODING_MEMORY_TYPES.includes(type as string) ? type : "project";
+      type = CODING_MEMORY_TYPES.includes(type as string) ? type : "project";
     }
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     const embedText = title ? `${title}: ${content}` : content;
     // Generate embedding if not provided
     if (!embedding) {
       const embedOpts: EmbedOptions = { project };
-            if (traceId) embedOpts.traceId = traceId;
-            if (agentSessionId) embedOpts.agentSessionId = agentSessionId;
-            if (endpoint) embedOpts.endpoint = endpoint;
-            if (agent) embedOpts.agent = agent;
-            if (username) embedOpts.username = username;
-            embedding = await generateEmbedding(embedText, embedOpts);
+      if (traceId) embedOpts.traceId = traceId;
+      if (agentSessionId) embedOpts.agentSessionId = agentSessionId;
+      if (endpoint) embedOpts.endpoint = endpoint;
+      if (agent) embedOpts.agent = agent;
+      if (username) embedOpts.username = username;
+      embedding = await generateEmbedding(embedText, embedOpts);
     }
     // Duplicate detection — compare against existing memories for the same agent
     const dedupFilter: Record<string, unknown> = { agent };
-        if (project) dedupFilter.project = project;
-        if (metadata.guildId) dedupFilter.guildId = metadata.guildId;
-        if (metadata.aboutUserId) dedupFilter.aboutUserId = metadata.aboutUserId;
+    if (project) dedupFilter.project = project;
+    if (metadata.guildId) dedupFilter.guildId = metadata.guildId;
+    if (metadata.aboutUserId) dedupFilter.aboutUserId = metadata.aboutUserId;
     const existing = await collection
       .find(dedupFilter)
       .project({ embedding: 1 })
@@ -298,11 +304,16 @@ const MemoryService = {
       .toArray();
     const isDuplicate = existing.some((document: Record<string, unknown>) => {
       if (!document.embedding) return false;
-            return cosineSimilarity(embedding as number[], document.embedding as number[]) > DUPLICATE_THRESHOLD;
+      return (
+        cosineSimilarity(
+          embedding as number[],
+          document.embedding as number[],
+        ) > DUPLICATE_THRESHOLD
+      );
     });
     if (isDuplicate) {
       logger.info(
-                `[MemoryService] Skipping duplicate for ${agent}: "${(title || content).substring(0, 60)}"`,
+        `[MemoryService] Skipping duplicate for ${agent}: "${(title || content).substring(0, 60)}"`,
       );
       return null;
     }
@@ -326,7 +337,7 @@ const MemoryService = {
     };
     await collection.insertOne(memory);
     logger.info(
-            `[MemoryService] Stored [${agent}/${memory.type}] "${(title || content).substring(0, 60)}"`,
+      `[MemoryService] Stored [${agent}/${memory.type}] "${(title || content).substring(0, 60)}"`,
     );
     return memory;
   },
@@ -342,7 +353,7 @@ const MemoryService = {
     endpoint,
   }: MemoryExtractAndStoreParams) {
     // Extract facts from the conversation via AI
-        const facts = await extractFactsFromConversation(messages, participants, {
+    const facts = await extractFactsFromConversation(messages, participants, {
       project,
       traceId,
       endpoint,
@@ -358,9 +369,9 @@ const MemoryService = {
       `[MemoryService] Extracted ${facts.length} fact(s), generating embeddings...`,
     );
     const storedMemories: Record<string, unknown>[] = [];
-    for ( const fact of facts) {
+    for (const fact of facts) {
       try {
-                const embedding = await generateEmbedding(fact.fact, {
+        const embedding = await generateEmbedding(fact.fact, {
           project,
           traceId,
           endpoint,
@@ -392,7 +403,9 @@ const MemoryService = {
           );
         }
       } catch (error: unknown) {
-                logger.error(`[MemoryService] Failed to store fact: ${getErrorMessage(error)}`);
+        logger.error(
+          `[MemoryService] Failed to store fact: ${getErrorMessage(error)}`,
+        );
       }
     }
     return storedMemories;
@@ -419,19 +432,19 @@ const MemoryService = {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     // Generate embedding for the search query
     const embeddingOpts: EmbedOptions = {};
-        if (traceId) embeddingOpts.traceId = traceId;
-        if (agentSessionId) embeddingOpts.agentSessionId = agentSessionId;
-        if (project) embeddingOpts.project = project;
-        if (endpoint) embeddingOpts.endpoint = endpoint;
-        if (agent) embeddingOpts.agent = agent;
-        if (username) embeddingOpts.username = username;
-        const queryEmbedding = await generateEmbedding(queryText, embeddingOpts);
+    if (traceId) embeddingOpts.traceId = traceId;
+    if (agentSessionId) embeddingOpts.agentSessionId = agentSessionId;
+    if (project) embeddingOpts.project = project;
+    if (endpoint) embeddingOpts.endpoint = endpoint;
+    if (agent) embeddingOpts.agent = agent;
+    if (username) embeddingOpts.username = username;
+    const queryEmbedding = await generateEmbedding(queryText, embeddingOpts);
     // Build the filter — always scoped by agent
     const filter: Record<string, unknown> = { agent };
-        if (project) filter.project = project;
-        if (guildId) filter.guildId = guildId;
-        if (userIds && userIds.length > 0) {
-            filter.aboutUserId = { $in: userIds };
+    if (project) filter.project = project;
+    if (guildId) filter.guildId = guildId;
+    if (userIds && userIds.length > 0) {
+      filter.aboutUserId = { $in: userIds };
     }
     // Fetch all memories matching the filter
     const memories = await collection
@@ -453,43 +466,61 @@ const MemoryService = {
     if (memories.length === 0) return [];
     // Compute cosine similarity and sort
     const scored = memories
-      .filter((memory: Record<string, unknown>) => memory.embedding && (memory.embedding as number[]).length > 0)
+      .filter(
+        (memory: Record<string, unknown>) =>
+          memory.embedding && (memory.embedding as number[]).length > 0,
+      )
       .map((memory: Record<string, unknown>) => ({
         id: memory._id,
         type: memory.type || "other",
-                title: memory.title || (memory.content ? (memory.content as string).substring(0, 60) : "untitled"),
+        title:
+          memory.title ||
+          (memory.content
+            ? (memory.content as string).substring(0, 60)
+            : "untitled"),
         content: memory.content || "",
         aboutUserId: memory.aboutUserId,
         aboutUsername: memory.aboutUsername,
         confidence: memory.confidence,
         createdAt: memory.createdAt,
-                age: memoryAge(memory.createdAt as string),
-                ageDays: memoryAgeDays(memory.createdAt as string),
-                score: cosineSimilarity(queryEmbedding as number[], memory.embedding as number[]),
+        age: memoryAge(memory.createdAt as string),
+        ageDays: memoryAgeDays(memory.createdAt as string),
+        score: cosineSimilarity(
+          queryEmbedding as number[],
+          memory.embedding as number[],
+        ),
       }))
       .filter((message) => message.score > RELEVANCE_THRESHOLD)
       .sort((firstItem, secondItem) => secondItem.score - firstItem.score)
-            .slice(0, limit);
+      .slice(0, limit);
     logger.info(
       `[MemoryService] Search found ${scored.length} relevant memories for ${agent} (from ${memories.length} total)`,
     );
     return scored;
   },
   // ── List ────────────────────────────────────────────────────────────────────
-  async list({ agent, project, guildId, userId, limit = 50, skip = 0, type }: MemoryListParams) {
+  async list({
+    agent,
+    project,
+    guildId,
+    userId,
+    limit = 50,
+    skip = 0,
+    type,
+  }: MemoryListParams) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     const filter: Record<string, unknown> = {};
-        if (agent) filter.agent = agent;
-        if (project) filter.project = project;
-        if (guildId) filter.guildId = guildId;
-        if (userId) filter.aboutUserId = userId;
-        if (type) filter.type = type;
+    if (agent) filter.agent = agent;
+    if (project) filter.project = project;
+    if (guildId) filter.guildId = guildId;
+    if (userId) filter.aboutUserId = userId;
+    if (type) filter.type = type;
     const [memories, total] = await Promise.all([
       collection
         .find(filter, { projection: { embedding: 0 } })
         .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit)
+        .skip(skip)
+        .limit(limit)
         .toArray(),
       collection.countDocuments(filter),
     ]);
@@ -534,10 +565,12 @@ const MemoryService = {
   // ── Update ─────────────────────────────────────────────────────────────────
   async update(memoryId: string, { title, content, type }: MemoryUpdateParams) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
-    const $set: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-        if (title !== undefined) $set.title = title;
-        if (content !== undefined) $set.content = content;
-        if (type !== undefined) $set.type = type;
+    const $set: Record<string, unknown> = {
+      updatedAt: new Date().toISOString(),
+    };
+    if (title !== undefined) $set.title = title;
+    if (content !== undefined) $set.content = content;
+    if (type !== undefined) $set.type = type;
     // Re-generate embedding if content changed
     if (content !== undefined) {
       const document = await collection.findOne(
@@ -545,8 +578,10 @@ const MemoryService = {
         { projection: { project: 1, title: 1 } },
       );
       const embedText =
-        title || document?.title ? `${title || document?.title}: ${content}` : content;
-            $set.embedding = await generateEmbedding(embedText, {
+        title || document?.title
+          ? `${title || document?.title}: ${content}`
+          : content;
+      $set.embedding = await generateEmbedding(embedText, {
         project: document?.project,
       });
     }
@@ -560,11 +595,11 @@ const MemoryService = {
    */
   formatForPrompt(memories: Record<string, unknown>[]) {
     if (!memories || memories.length === 0) return "";
-        return memories
+    return memories
       .map((memory: Record<string, unknown>) => {
         const badge = `[${memory.type}]`;
         const age = memory.age !== "today" ? ` (${memory.age})` : "";
-                const caveat = freshnessCaveat(memory.createdAt as string);
+        const caveat = freshnessCaveat(memory.createdAt as string);
         return `- ${badge} **${memory.title}**${age}: ${memory.content}${caveat}`;
       })
       .join("\n");

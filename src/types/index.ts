@@ -90,7 +90,6 @@ export type {
   TeamMemberResult,
 } from "./orchestrator.ts";
 
-
 export type {
   DateRangeFilter,
   AdminQueryParams,
@@ -109,10 +108,7 @@ export type {
   ChatMessage,
 } from "./admin.ts";
 
-export {
-  MATCH_MODES,
-  COMPARATORS,
-} from "./benchmark.ts";
+export { MATCH_MODES, COMPARATORS } from "./benchmark.ts";
 
 export type {
   MatchMode,

@@ -80,7 +80,12 @@ interface BenchmarkEvent {
   name?: string;
   args?: Record<string, unknown>;
   result?: unknown;
-  tool?: { id?: string; name?: string; args?: Record<string, unknown>; result?: unknown };
+  tool?: {
+    id?: string;
+    name?: string;
+    args?: Record<string, unknown>;
+    result?: unknown;
+  };
   [key: string]: unknown;
 }
 
@@ -172,7 +177,10 @@ function evaluate(
       return norm(response).includes(norm(expected));
   }
 }
-function evaluateAssertions(response: string, benchmark: BenchmarkDoc): boolean {
+function evaluateAssertions(
+  response: string,
+  benchmark: BenchmarkDoc,
+): boolean {
   const assertions = benchmark.assertions;
   if (!assertions || assertions.length === 0) {
     return false;
@@ -181,16 +189,27 @@ function evaluateAssertions(response: string, benchmark: BenchmarkDoc): boolean 
   if (operator === "OR") {
     // Disjunction: ANY assertion must pass
     return assertions.some((assertion) =>
-      evaluate(response, assertion.expectedValue, assertion.matchMode || MATCH_MODES.CONTAINS),
+      evaluate(
+        response,
+        assertion.expectedValue,
+        assertion.matchMode || MATCH_MODES.CONTAINS,
+      ),
     );
   }
   // Conjunction (AND): ALL assertions must pass
   return assertions.every((assertion) =>
-    evaluate(response, assertion.expectedValue, assertion.matchMode || MATCH_MODES.CONTAINS),
+    evaluate(
+      response,
+      assertion.expectedValue,
+      assertion.matchMode || MATCH_MODES.CONTAINS,
+    ),
   );
 }
 // ─── behavioral assertions ──────────────────────────────────
-const COMPARATORS: Record<string, (firstValue: number, secondValue: number) => boolean> = {
+const COMPARATORS: Record<
+  string,
+  (firstValue: number, secondValue: number) => boolean
+> = {
   gte: (firstValue, secondValue) => firstValue >= secondValue,
   lte: (firstValue, secondValue) => firstValue <= secondValue,
   gt: (firstValue, secondValue) => firstValue > secondValue,
@@ -205,7 +224,10 @@ interface ExecutionData {
   turnCount: number;
 }
 
-function evaluateSingleAgentAssertion(assertion: AgentAssertion, executionData: ExecutionData): boolean {
+function evaluateSingleAgentAssertion(
+  assertion: AgentAssertion,
+  executionData: ExecutionData,
+): boolean {
   const { type, operator, operand } = assertion;
   switch (type) {
     case "replied":
@@ -235,7 +257,10 @@ function evaluateSingleAgentAssertion(assertion: AgentAssertion, executionData: 
       return false;
   }
 }
-function evaluateAgentAssertions(benchmark: BenchmarkDoc, executionData: ExecutionData): boolean {
+function evaluateAgentAssertions(
+  benchmark: BenchmarkDoc,
+  executionData: ExecutionData,
+): boolean {
   const assertions = benchmark.agentAssertions;
   if (!assertions || assertions.length === 0) {
     return true; // No agent assertions = pass by default
@@ -300,7 +325,10 @@ async function runSingleModel(
   model: ModelEntry,
   project: string | null,
   username: string,
-  { signal, onEvent }: { signal?: AbortSignal; onEvent?: (event: BenchmarkEvent) => void } = {},
+  {
+    signal,
+    onEvent,
+  }: { signal?: AbortSignal; onEvent?: (event: BenchmarkEvent) => void } = {},
 ): Promise<ModelResult> {
   // Config flags carried on every result for stats differentiation
   const configFlags = {
@@ -339,7 +367,8 @@ async function runSingleModel(
   logger.info(`[benchmark] ▶ Running ${model.provider}/${model.model}`);
   try {
     const events: BenchmarkEvent[] = [];
-    const handler = (model.agent || model.toolsEnabled) ? handleAgent : handleConversation;
+    const handler =
+      model.agent || model.toolsEnabled ? handleAgent : handleConversation;
     await handler(
       {
         provider: model.provider,
@@ -395,7 +424,9 @@ async function runSingleModel(
             `[benchmark]   ✅ ${model.model} done — usage: ${JSON.stringify(benchmarkEvent.usage || null)}, cost: ${benchmarkEvent.estimatedCost ?? "N/A"}`,
           );
         } else {
-          logger.info(`[benchmark]   📨 ${model.model} event: ${benchmarkEvent.type}`);
+          logger.info(
+            `[benchmark]   📨 ${model.model} event: ${benchmarkEvent.type}`,
+          );
         }
       },
       { signal },
@@ -438,7 +469,8 @@ async function runSingleModel(
         `[benchmark]   ⚠ ${model.model} produced NO text — chunk count: ${events.filter((e) => e.type === "chunk").length}, all events: ${JSON.stringify(eventTypes)}`,
       );
     }
-    const doneEvent = events.find((e) => e.type === "done") || {} as BenchmarkEvent;
+    const doneEvent =
+      events.find((e) => e.type === "done") || ({} as BenchmarkEvent);
     const matchMode = benchmark.matchMode || MATCH_MODES.CONTAINS;
     // Extract thinking content (emitted as type: "thinking")
     const thinkingText = events
@@ -519,7 +551,9 @@ async function runSingleModel(
     };
   } catch (error: unknown) {
     const latency = (performance.now() - start) / 1000;
-    logger.error(`[benchmark]   💥 ${model.model} threw: ${getErrorMessage(error)}`);
+    logger.error(
+      `[benchmark]   💥 ${model.model} threw: ${getErrorMessage(error)}`,
+    );
     return {
       provider: model.provider,
       model: model.model,
@@ -551,7 +585,13 @@ const BenchmarkService = {
     modelTargets: ModelTarget[] | null,
     project: string | null,
     username: string,
-    { onRunStart, onModelStart, onModelComplete, onEvent, signal }: RunBenchmarkCallbacks = {},
+    {
+      onRunStart,
+      onModelStart,
+      onModelComplete,
+      onEvent,
+      signal,
+    }: RunBenchmarkCallbacks = {},
   ) {
     // Resolve target models
     let models: ModelEntry[];
@@ -689,9 +729,15 @@ const BenchmarkService = {
     const results = bucketOutputs.flat();
     const completedAt = new Date().toISOString();
     const wasAborted = signal?.aborted || aborted;
-    const passed = results.filter((benchmarkResult) => benchmarkResult.passed).length;
-    const failed = results.filter((benchmarkResult) => !benchmarkResult.passed && !benchmarkResult.error).length;
-    const errored = results.filter((benchmarkResult) => benchmarkResult.error).length;
+    const passed = results.filter(
+      (benchmarkResult) => benchmarkResult.passed,
+    ).length;
+    const failed = results.filter(
+      (benchmarkResult) => !benchmarkResult.passed && !benchmarkResult.error,
+    ).length;
+    const errored = results.filter(
+      (benchmarkResult) => benchmarkResult.error,
+    ).length;
     const totalCost = results.reduce(
       (sum, benchmarkResult) => sum + (benchmarkResult.estimatedCost || 0),
       0,
@@ -726,7 +772,11 @@ const BenchmarkService = {
     return run;
   },
   // ── CRUD Helpers ────────────────────────────────────────────
-  async create(data: BenchmarkCreateData, project: string | null, username: string) {
+  async create(
+    data: BenchmarkCreateData,
+    project: string | null,
+    username: string,
+  ) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
     const now = new Date().toISOString();
@@ -771,7 +821,9 @@ const BenchmarkService = {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
     await db.collection(BENCHMARKS_COLLECTION).deleteOne({ id, project });
-    await db.collection(RUNS_COLLECTION).deleteMany({ benchmarkId: id, project });
+    await db
+      .collection(RUNS_COLLECTION)
+      .deleteMany({ benchmarkId: id, project });
   },
   async getRuns(benchmarkId: string, project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);

@@ -58,7 +58,8 @@ router.get(
         .toArray();
 
       // Enrich with live connection status
-      const connectedServers = MCPClientService.getConnectedServers() as ConnectedServerInfo[];
+      const connectedServers =
+        MCPClientService.getConnectedServers() as ConnectedServerInfo[];
       const connectedMap = new Map<string, ConnectedServerInfo>(
         connectedServers.map((server) => [server.name, server]),
       );
@@ -236,7 +237,9 @@ router.post(
         return res.status(404).json({ error: "MCP server not found" });
       }
 
-      const result = await MCPClientService.connect(server as unknown as MCPServerConfig);
+      const result = await MCPClientService.connect(
+        server as unknown as MCPServerConfig,
+      );
       res.json({
         success: true,
         serverName: result.serverName,
@@ -248,10 +251,13 @@ router.post(
       });
     } catch (error: unknown) {
       const serverId = req.params.id as string;
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`MCP connect failed for ${serverId}: ${errorMessage}`);
       logger.error(`MCP connection failed: ${errorMessage}`);
-      res.status(502).json({ error: `MCP server connection failed: ${errorMessage}` });
+      res
+        .status(502)
+        .json({ error: `MCP server connection failed: ${errorMessage}` });
     }
   }),
 );

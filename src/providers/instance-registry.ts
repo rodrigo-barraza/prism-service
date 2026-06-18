@@ -6,14 +6,17 @@ import {
   PROVIDER_VLLM,
   PROVIDER_OLLAMA,
   PROVIDER_LLAMA_CPP,
-  } from "../../config.ts";
+} from "../../config.ts";
 
 // Import factories
 import { createLmStudioProvider } from "./lm-studio.ts";
 import { createOllamaProvider } from "./ollama.ts";
 import { createVllmProvider } from "./vllm.ts";
 import { createLlamaCppProvider } from "./llama-cpp.ts";
-import { InstanceEntry, ProviderInstanceConfig } from "../types/ProviderTypes.ts";
+import {
+  InstanceEntry,
+  ProviderInstanceConfig,
+} from "../types/ProviderTypes.ts";
 
 // ── Factory map ─────────────────────────────────────────────
 const FACTORIES = {
@@ -43,7 +46,6 @@ const PROVIDER_ARRAYS = {
  * @property {object} provider      - The instantiated provider object
  */
 
-
 const registry = new Map<string, InstanceEntry>();
 function registerType(type: string, instances: ProviderInstanceConfig[]) {
   const factory = FACTORIES[type as keyof typeof FACTORIES];
@@ -55,7 +57,12 @@ function registerType(type: string, instances: ProviderInstanceConfig[]) {
 
     const instanceNumber = i + 1;
     const id = instanceNumber === 1 ? type : `${type}-${instanceNumber}`;
-    const maxConcurrency = Math.max(1, typeof concurrency === 'number' ? concurrency : parseInt(String(concurrency), 10) || 1);
+    const maxConcurrency = Math.max(
+      1,
+      typeof concurrency === "number"
+        ? concurrency
+        : parseInt(String(concurrency), 10) || 1,
+    );
     const provider = factory(url, id);
 
     const entry: InstanceEntry = {
@@ -78,7 +85,7 @@ function registerType(type: string, instances: ProviderInstanceConfig[]) {
 }
 
 // ── Register all instances from secrets ─────────────────────
-for ( const [type, instances] of Object.entries(PROVIDER_ARRAYS)) {
+for (const [type, instances] of Object.entries(PROVIDER_ARRAYS)) {
   registerType(type, instances);
 }
 

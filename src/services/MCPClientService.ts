@@ -43,7 +43,10 @@ export interface MCPServerConfig {
 
 interface MCPConnection {
   client: Client;
-  transport: StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport;
+  transport:
+    | StdioClientTransport
+    | StreamableHTTPClientTransport
+    | SSEClientTransport;
   tools: MCPToolSchema[];
   mcpTools: MCPRawTool[];
   config: MCPServerConfig;
@@ -115,13 +118,20 @@ registerCleanup(async () => {
  * Convert an MCP tool schema (JSON Schema) to OpenAI function-calling format.
  * Namespaces the tool name with the server prefix.
  */
-function mcpToolToSchema(serverName: string, mcpTool: MCPRawTool): MCPToolSchema {
+function mcpToolToSchema(
+  serverName: string,
+  mcpTool: MCPRawTool,
+): MCPToolSchema {
   // Extract domain/labels from _meta (MCP-standard extension point) as fallback.
   // Top-level custom fields get stripped by the MCP SDK's Zod validation,
   // but _meta is an official passthrough record that survives parsing.
   const meta = mcpTool._meta || {};
-  const domain = mcpTool.domain || (typeof meta.domain === "string" ? meta.domain : undefined);
-  const labels = mcpTool.labels || (Array.isArray(meta.labels) ? meta.labels as string[] : undefined);
+  const domain =
+    mcpTool.domain ||
+    (typeof meta.domain === "string" ? meta.domain : undefined);
+  const labels =
+    mcpTool.labels ||
+    (Array.isArray(meta.labels) ? (meta.labels as string[]) : undefined);
 
   return {
     name: `${MCP_PREFIX}${serverName}${MCP_DELIMITER}${mcpTool.name}`,
@@ -139,7 +149,9 @@ function mcpToolToSchema(serverName: string, mcpTool: MCPRawTool): MCPToolSchema
  * Parse a namespaced MCP tool name back into { serverName, toolName }.
  * Returns null if the name doesn't match the MCP pattern.
  */
-function parseMCPToolName(fullName: string): { serverName: string; toolName: string } | null {
+function parseMCPToolName(
+  fullName: string,
+): { serverName: string; toolName: string } | null {
   if (!fullName.startsWith(MCP_PREFIX)) return null;
   const rest = fullName.slice(MCP_PREFIX.length);
   const delimiterIndex = rest.indexOf(MCP_DELIMITER);
@@ -153,7 +165,9 @@ function parseMCPToolName(fullName: string): { serverName: string; toolName: str
 /**
  * Create the appropriate transport based on server config.
  */
-function createTransport(config: MCPServerConfig): StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport {
+function createTransport(
+  config: MCPServerConfig,
+): StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport {
   if (config.transport === "stdio") {
     return new StdioClientTransport({
       command: config.command!,
@@ -256,7 +270,9 @@ const MCPClientService = {
     try {
       await conn.client.close();
     } catch (error: unknown) {
-      logger.warn(`[MCP] Error closing "${serverName}": ${getErrorMessage(error)}`);
+      logger.warn(
+        `[MCP] Error closing "${serverName}": ${getErrorMessage(error)}`,
+      );
     }
 
     // For stdio, ensure child process is killed
@@ -285,7 +301,11 @@ const MCPClientService = {
   /**
    * Call a tool on a connected MCP server.
    */
-  async callTool(serverName: string, toolName: string, args: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+  async callTool(
+    serverName: string,
+    toolName: string,
+    args: Record<string, unknown> = {},
+  ): Promise<Record<string, unknown>> {
     const conn = connections.get(serverName);
     if (!conn) {
       return { error: `MCP server "${serverName}" is not connected` };
@@ -432,8 +452,14 @@ const MCPClientService = {
       }));
       return { resources, serverName, count: resources.length };
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorCode = (error instanceof Error && "code" in error && typeof error.code === "number") ? error.code : undefined;
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorCode =
+        error instanceof Error &&
+        "code" in error &&
+        typeof error.code === "number"
+          ? error.code
+          : undefined;
       // Some servers don't implement resources — that's fine
       if (
         errorMessage.includes("not supported") ||
@@ -466,13 +492,13 @@ const MCPClientService = {
       const result = await conn.client.readResource({ uri });
       // MCP returns { contents: [{ uri, mimeType?, text?, blob? }] }
       const contents = (result.contents || []).map((content) => {
-        const hasText = 'text' in content && typeof content.text === 'string';
+        const hasText = "text" in content && typeof content.text === "string";
         return {
           uri: content.uri,
           mimeType: content.mimeType || null,
           text: hasText ? (content as { text: string }).text : null,
           // Don't return raw blob data — too large for LLM context
-          hasBlob: 'blob' in content && !!content.blob,
+          hasBlob: "blob" in content && !!content.blob,
         };
       });
 
@@ -513,7 +539,9 @@ const MCPClientService = {
 
     // Apply auth to config based on transport type
     if (updatedConfig.transport === "streamable-http") {
-      const headers: Record<string, string> = { ...(updatedConfig.headers || {}) };
+      const headers: Record<string, string> = {
+        ...(updatedConfig.headers || {}),
+      };
 
       if (auth.token) {
         headers["Authorization"] = `Bearer ${auth.token}`;
@@ -572,10 +600,10 @@ const MCPClientService = {
     if (!db) return;
 
     try {
-      const servers = await db
+      const servers = (await db
         .collection(COLLECTIONS.MCP_SERVERS)
         .find({ project, username, enabled: true })
-        .toArray() as unknown as MCPServerConfig[];
+        .toArray()) as unknown as MCPServerConfig[];
 
       if (servers.length === 0) return;
 
@@ -596,7 +624,9 @@ const MCPClientService = {
         }
       }
     } catch (error: unknown) {
-      logger.warn(`[MCP] Auto-connect DB query failed: ${getErrorMessage(error)}`);
+      logger.warn(
+        `[MCP] Auto-connect DB query failed: ${getErrorMessage(error)}`,
+      );
     }
   },
 

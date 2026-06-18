@@ -11,11 +11,12 @@ import AgentPersonaRegistry from "../../services/AgentPersonaRegistry.ts";
 import ToolOrchestratorService from "../../services/ToolOrchestratorService.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
-import { applyDateRangeFilter, parsePaginationParams } from "../../utils/QueryBuilders.ts";
-import requireDb from "../../middleware/RequireDbMiddleware.ts";
 import {
-  hours as hoursToMs,
-} from "@rodrigo-barraza/utilities-library";
+  applyDateRangeFilter,
+  parsePaginationParams,
+} from "../../utils/QueryBuilders.ts";
+import requireDb from "../../middleware/RequireDbMiddleware.ts";
+import { hours as hoursToMs } from "@rodrigo-barraza/utilities-library";
 
 const router = express.Router();
 const {
@@ -26,7 +27,9 @@ const {
 
 router.use(requireDb);
 
-async function buildMatchFilter(req: Request): Promise<Record<string, unknown>> {
+async function buildMatchFilter(
+  req: Request,
+): Promise<Record<string, unknown>> {
   const { from, to, project, agent, provider, model, workspace } = req.query;
   const match: Record<string, unknown> = {};
 
@@ -131,14 +134,22 @@ router.get(
       if (provider) {
         const providerNames = String(provider).split(",").filter(Boolean);
         if (providerNames.length === 1) convMatch.providers = providerNames[0];
-        else if (providerNames.length > 1) convMatch.providers = { $in: providerNames };
+        else if (providerNames.length > 1)
+          convMatch.providers = { $in: providerNames };
       }
       if (model) {
         const modelNames = String(model).split(",").filter(Boolean);
-        if (modelNames.length === 1) convMatch["messages.model"] = modelNames[0];
-        else if (modelNames.length > 1) convMatch["messages.model"] = { $in: modelNames };
+        if (modelNames.length === 1)
+          convMatch["messages.model"] = modelNames[0];
+        else if (modelNames.length > 1)
+          convMatch["messages.model"] = { $in: modelNames };
       }
-      applyDateRangeFilter(convMatch, from as string, to as string, "createdAt");
+      applyDateRangeFilter(
+        convMatch,
+        from as string,
+        to as string,
+        "createdAt",
+      );
 
       const traceMatch = { ...match, traceId: { $ne: null } };
 
@@ -154,8 +165,14 @@ router.get(
       const [resultDocs, toolCallResult, traceResult, conversationCount] =
         await Promise.all([
           req.db.collection(REQUESTS_COLLECTION).aggregate(pipeline).toArray(),
-          req.db.collection(REQUESTS_COLLECTION).aggregate(toolCallPipeline).toArray(),
-          req.db.collection(REQUESTS_COLLECTION).aggregate(traceCountPipeline).toArray(),
+          req.db
+            .collection(REQUESTS_COLLECTION)
+            .aggregate(toolCallPipeline)
+            .toArray(),
+          req.db
+            .collection(REQUESTS_COLLECTION)
+            .aggregate(traceCountPipeline)
+            .toArray(),
           req.db.collection(CONVERSATIONS_COLLECTION).countDocuments(convMatch),
         ]);
       const result = (resultDocs[0] || {}) as Record<string, unknown>;
@@ -247,14 +264,22 @@ router.get(
       if (provider) {
         const providerNames = String(provider).split(",").filter(Boolean);
         if (providerNames.length === 1) convMatch.providers = providerNames[0];
-        else if (providerNames.length > 1) convMatch.providers = { $in: providerNames };
+        else if (providerNames.length > 1)
+          convMatch.providers = { $in: providerNames };
       }
       if (model) {
         const modelNames = String(model).split(",").filter(Boolean);
-        if (modelNames.length === 1) convMatch["messages.model"] = modelNames[0];
-        else if (modelNames.length > 1) convMatch["messages.model"] = { $in: modelNames };
+        if (modelNames.length === 1)
+          convMatch["messages.model"] = modelNames[0];
+        else if (modelNames.length > 1)
+          convMatch["messages.model"] = { $in: modelNames };
       }
-      applyDateRangeFilter(convMatch, from as string, to as string, "updatedAt");
+      applyDateRangeFilter(
+        convMatch,
+        from as string,
+        to as string,
+        "updatedAt",
+      );
 
       const convPipeline: Record<string, unknown>[] = [
         ...(Object.keys(convMatch).length ? [{ $match: convMatch }] : []),
@@ -271,9 +296,18 @@ router.get(
       const [results, workflowCounts, convCounts, traceCounts] =
         await Promise.all([
           req.db.collection(REQUESTS_COLLECTION).aggregate(pipeline).toArray(),
-          req.db.collection(WORKFLOWS_COLLECTION).aggregate(workflowPipeline).toArray(),
-          req.db.collection(CONVERSATIONS_COLLECTION).aggregate(convPipeline).toArray(),
-          req.db.collection(REQUESTS_COLLECTION).aggregate(tracePipeline).toArray(),
+          req.db
+            .collection(WORKFLOWS_COLLECTION)
+            .aggregate(workflowPipeline)
+            .toArray(),
+          req.db
+            .collection(CONVERSATIONS_COLLECTION)
+            .aggregate(convPipeline)
+            .toArray(),
+          req.db
+            .collection(REQUESTS_COLLECTION)
+            .aggregate(tracePipeline)
+            .toArray(),
         ]);
 
       const wfMap: Record<string, number> = {};
@@ -432,15 +466,23 @@ router.get(
 
       const [results, convCounts, traceCounts] = await Promise.all([
         req.db.collection(REQUESTS_COLLECTION).aggregate(pipeline).toArray(),
-        req.db.collection(REQUESTS_COLLECTION).aggregate(convCountPipeline).toArray(),
-        req.db.collection(REQUESTS_COLLECTION).aggregate(traceCountPipeline).toArray(),
+        req.db
+          .collection(REQUESTS_COLLECTION)
+          .aggregate(convCountPipeline)
+          .toArray(),
+        req.db
+          .collection(REQUESTS_COLLECTION)
+          .aggregate(traceCountPipeline)
+          .toArray(),
       ]);
 
       // Build lookup maps keyed by "model|provider"
       const convCountMap: Record<string, number> = {};
       for (const entry of convCounts) {
         const key = `${(entry._id as { model: string }).model}|${(entry._id as { provider: string }).provider}`;
-        convCountMap[key] = (entry as { conversationCount: number }).conversationCount;
+        convCountMap[key] = (
+          entry as { conversationCount: number }
+        ).conversationCount;
       }
 
       const traceCountMap: Record<string, number> = {};
@@ -503,7 +545,9 @@ router.get(
               $sum: {
                 $cond: [
                   { $gt: ["$toolCount", 0] },
-                  { $divide: [{ $ifNull: ["$estimatedCost", 0] }, "$toolCount"] },
+                  {
+                    $divide: [{ $ifNull: ["$estimatedCost", 0] }, "$toolCount"],
+                  },
                   0,
                 ],
               },
@@ -521,7 +565,9 @@ router.get(
               $sum: {
                 $cond: [
                   { $gt: ["$toolCount", 0] },
-                  { $divide: [{ $ifNull: ["$outputTokens", 0] }, "$toolCount"] },
+                  {
+                    $divide: [{ $ifNull: ["$outputTokens", 0] }, "$toolCount"],
+                  },
                   0,
                 ],
               },
@@ -739,7 +785,7 @@ router.get(
       for (const row of byProjectProvider) {
         const proj = row._id.project || "any";
         if (!providersByProject[proj]) providersByProject[proj] = [];
-        (providersByProject)[proj].push({
+        providersByProject[proj].push({
           provider: row._id.provider || "any",
           totalCost: row.totalCost,
           totalInputTokens: row.totalInputTokens,
@@ -753,7 +799,7 @@ router.get(
       for (const row of byProjectEndpoint) {
         const proj = row._id.project || "any";
         if (!endpointsByProject[proj]) endpointsByProject[proj] = [];
-        (endpointsByProject)[proj].push({
+        endpointsByProject[proj].push({
           endpoint: row._id.endpoint || "any",
           totalCost: row.totalCost,
           totalInputTokens: row.totalInputTokens,
@@ -767,7 +813,7 @@ router.get(
       for (const row of byProjectModel) {
         const proj = row._id.project || "any";
         if (!modelsByProject[proj]) modelsByProject[proj] = [];
-        (modelsByProject)[proj].push({
+        modelsByProject[proj].push({
           model: row._id.model || "any",
           provider: row._id.provider || "any",
           totalCost: row.totalCost,
@@ -844,55 +890,151 @@ router.get(
   "/timeline",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { hours = 24, from, to, project, agent, granularity: requestedGranularity } = req.query;
+      const {
+        hours = 24,
+        from,
+        to,
+        project,
+        agent,
+        granularity: requestedGranularity,
+      } = req.query;
 
       let sinceDate: Date;
       let untilDate: Date | undefined;
       if (typeof from === "string") {
         sinceDate = new Date(from);
       } else {
-        sinceDate = new Date(Date.now() - hoursToMs(parseInt(hours as string, 10)));
+        sinceDate = new Date(
+          Date.now() - hoursToMs(parseInt(hours as string, 10)),
+        );
       }
       if (typeof to === "string") {
         untilDate = new Date(to);
       }
 
-      const spanMs = (untilDate ? untilDate.getTime() : Date.now()) - sinceDate.getTime();
+      const spanMs =
+        (untilDate ? untilDate.getTime() : Date.now()) - sinceDate.getTime();
 
       // ── Granularity tier definitions (ordered finest → coarsest) ──
-      const TIER_KEYS = ["1s", "5s", "15s", "30s", "1min", "5min", "15min", "1hr", "4hr", "1day", "1week"];
+      const TIER_KEYS = [
+        "1s",
+        "5s",
+        "15s",
+        "30s",
+        "1min",
+        "5min",
+        "15min",
+        "1hr",
+        "4hr",
+        "1day",
+        "1week",
+      ];
       const TIER_INDEX: Record<string, number> = {};
-      TIER_KEYS.forEach((key, index) => { TIER_INDEX[key] = index; });
+      TIER_KEYS.forEach((key, index) => {
+        TIER_INDEX[key] = index;
+      });
 
       const MINUTES_MS = 60_000;
       const HOURS_MS = 3_600_000;
       const DAYS_MS = 86_400_000;
 
       const SPAN_RULES = [
-        { maxSpanMs: 2 * MINUTES_MS, defaultGranularity: "1s", minGranularity: "1s", maxGranularity: "15s" },
-        { maxSpanMs: 10 * MINUTES_MS, defaultGranularity: "5s", minGranularity: "1s", maxGranularity: "1min" },
-        { maxSpanMs: 30 * MINUTES_MS, defaultGranularity: "15s", minGranularity: "5s", maxGranularity: "5min" },
-        { maxSpanMs: 1 * HOURS_MS, defaultGranularity: "30s", minGranularity: "15s", maxGranularity: "5min" },
-        { maxSpanMs: 6 * HOURS_MS, defaultGranularity: "1min", minGranularity: "15s", maxGranularity: "15min" },
-        { maxSpanMs: 1 * DAYS_MS, defaultGranularity: "5min", minGranularity: "1min", maxGranularity: "1hr" },
-        { maxSpanMs: 3 * DAYS_MS, defaultGranularity: "15min", minGranularity: "5min", maxGranularity: "1day" },
-        { maxSpanMs: 7 * DAYS_MS, defaultGranularity: "1day", minGranularity: "1hr", maxGranularity: "1day" },
-        { maxSpanMs: 14 * DAYS_MS, defaultGranularity: "1day", minGranularity: "4hr", maxGranularity: "1day" },
-        { maxSpanMs: 30 * DAYS_MS, defaultGranularity: "1day", minGranularity: "4hr", maxGranularity: "1week" },
-        { maxSpanMs: 90 * DAYS_MS, defaultGranularity: "1day", minGranularity: "1day", maxGranularity: "1week" },
-        { maxSpanMs: Infinity, defaultGranularity: "1week", minGranularity: "1day", maxGranularity: "1week" },
+        {
+          maxSpanMs: 2 * MINUTES_MS,
+          defaultGranularity: "1s",
+          minGranularity: "1s",
+          maxGranularity: "15s",
+        },
+        {
+          maxSpanMs: 10 * MINUTES_MS,
+          defaultGranularity: "5s",
+          minGranularity: "1s",
+          maxGranularity: "1min",
+        },
+        {
+          maxSpanMs: 30 * MINUTES_MS,
+          defaultGranularity: "15s",
+          minGranularity: "5s",
+          maxGranularity: "5min",
+        },
+        {
+          maxSpanMs: 1 * HOURS_MS,
+          defaultGranularity: "30s",
+          minGranularity: "15s",
+          maxGranularity: "5min",
+        },
+        {
+          maxSpanMs: 6 * HOURS_MS,
+          defaultGranularity: "1min",
+          minGranularity: "15s",
+          maxGranularity: "15min",
+        },
+        {
+          maxSpanMs: 1 * DAYS_MS,
+          defaultGranularity: "5min",
+          minGranularity: "1min",
+          maxGranularity: "1hr",
+        },
+        {
+          maxSpanMs: 3 * DAYS_MS,
+          defaultGranularity: "15min",
+          minGranularity: "5min",
+          maxGranularity: "1day",
+        },
+        {
+          maxSpanMs: 7 * DAYS_MS,
+          defaultGranularity: "1day",
+          minGranularity: "1hr",
+          maxGranularity: "1day",
+        },
+        {
+          maxSpanMs: 14 * DAYS_MS,
+          defaultGranularity: "1day",
+          minGranularity: "4hr",
+          maxGranularity: "1day",
+        },
+        {
+          maxSpanMs: 30 * DAYS_MS,
+          defaultGranularity: "1day",
+          minGranularity: "4hr",
+          maxGranularity: "1week",
+        },
+        {
+          maxSpanMs: 90 * DAYS_MS,
+          defaultGranularity: "1day",
+          minGranularity: "1day",
+          maxGranularity: "1week",
+        },
+        {
+          maxSpanMs: Infinity,
+          defaultGranularity: "1week",
+          minGranularity: "1day",
+          maxGranularity: "1week",
+        },
       ];
 
-      const matchingRule = SPAN_RULES.find((rule) => spanMs <= rule.maxSpanMs) || SPAN_RULES[SPAN_RULES.length - 1];
+      const matchingRule =
+        SPAN_RULES.find((rule) => spanMs <= rule.maxSpanMs) ||
+        SPAN_RULES[SPAN_RULES.length - 1];
       const minimumIndex = TIER_INDEX[matchingRule.minGranularity] ?? 0;
-      const maximumIndex = TIER_INDEX[matchingRule.maxGranularity] ?? TIER_KEYS.length - 1;
-      const validGranularities = TIER_KEYS.slice(minimumIndex, maximumIndex + 1);
+      const maximumIndex =
+        TIER_INDEX[matchingRule.maxGranularity] ?? TIER_KEYS.length - 1;
+      const validGranularities = TIER_KEYS.slice(
+        minimumIndex,
+        maximumIndex + 1,
+      );
       const defaultGranularity = matchingRule.defaultGranularity;
 
       let granularity: string;
-      if (typeof requestedGranularity === "string" && validGranularities.includes(requestedGranularity)) {
+      if (
+        typeof requestedGranularity === "string" &&
+        validGranularities.includes(requestedGranularity)
+      ) {
         granularity = requestedGranularity;
-      } else if (typeof requestedGranularity === "string" && !validGranularities.includes(requestedGranularity)) {
+      } else if (
+        typeof requestedGranularity === "string" &&
+        !validGranularities.includes(requestedGranularity)
+      ) {
         res.status(400).json({
           error: `Invalid granularity "${requestedGranularity}" for this time span. Valid options: ${validGranularities.join(", ")}`,
         });
@@ -916,12 +1058,57 @@ router.get(
             $cond: [
               {
                 $lt: [
-                  { $multiply: [{ $floor: { $divide: [{ $second: { $toDate: "$timestamp" } }, interval] } }, interval] },
+                  {
+                    $multiply: [
+                      {
+                        $floor: {
+                          $divide: [
+                            { $second: { $toDate: "$timestamp" } },
+                            interval,
+                          ],
+                        },
+                      },
+                      interval,
+                    ],
+                  },
                   10,
                 ],
               },
-              { $concat: ["0", { $toString: { $multiply: [{ $floor: { $divide: [{ $second: { $toDate: "$timestamp" } }, interval] } }, interval] } }] },
-              { $toString: { $multiply: [{ $floor: { $divide: [{ $second: { $toDate: "$timestamp" } }, interval] } }, interval] } },
+              {
+                $concat: [
+                  "0",
+                  {
+                    $toString: {
+                      $multiply: [
+                        {
+                          $floor: {
+                            $divide: [
+                              { $second: { $toDate: "$timestamp" } },
+                              interval,
+                            ],
+                          },
+                        },
+                        interval,
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                $toString: {
+                  $multiply: [
+                    {
+                      $floor: {
+                        $divide: [
+                          { $second: { $toDate: "$timestamp" } },
+                          interval,
+                        ],
+                      },
+                    },
+                    interval,
+                  ],
+                },
+              },
             ],
           },
         ],
@@ -940,12 +1127,57 @@ router.get(
             $cond: [
               {
                 $lt: [
-                  { $multiply: [{ $floor: { $divide: [{ $minute: { $toDate: "$timestamp" } }, interval] } }, interval] },
+                  {
+                    $multiply: [
+                      {
+                        $floor: {
+                          $divide: [
+                            { $minute: { $toDate: "$timestamp" } },
+                            interval,
+                          ],
+                        },
+                      },
+                      interval,
+                    ],
+                  },
                   10,
                 ],
               },
-              { $concat: ["0", { $toString: { $multiply: [{ $floor: { $divide: [{ $minute: { $toDate: "$timestamp" } }, interval] } }, interval] } }] },
-              { $toString: { $multiply: [{ $floor: { $divide: [{ $minute: { $toDate: "$timestamp" } }, interval] } }, interval] } },
+              {
+                $concat: [
+                  "0",
+                  {
+                    $toString: {
+                      $multiply: [
+                        {
+                          $floor: {
+                            $divide: [
+                              { $minute: { $toDate: "$timestamp" } },
+                              interval,
+                            ],
+                          },
+                        },
+                        interval,
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                $toString: {
+                  $multiply: [
+                    {
+                      $floor: {
+                        $divide: [
+                          { $minute: { $toDate: "$timestamp" } },
+                          interval,
+                        ],
+                      },
+                    },
+                    interval,
+                  ],
+                },
+              },
             ],
           },
         ],
@@ -964,12 +1196,57 @@ router.get(
             $cond: [
               {
                 $lt: [
-                  { $multiply: [{ $floor: { $divide: [{ $hour: { $toDate: "$timestamp" } }, interval] } }, interval] },
+                  {
+                    $multiply: [
+                      {
+                        $floor: {
+                          $divide: [
+                            { $hour: { $toDate: "$timestamp" } },
+                            interval,
+                          ],
+                        },
+                      },
+                      interval,
+                    ],
+                  },
                   10,
                 ],
               },
-              { $concat: ["0", { $toString: { $multiply: [{ $floor: { $divide: [{ $hour: { $toDate: "$timestamp" } }, interval] } }, interval] } }] },
-              { $toString: { $multiply: [{ $floor: { $divide: [{ $hour: { $toDate: "$timestamp" } }, interval] } }, interval] } },
+              {
+                $concat: [
+                  "0",
+                  {
+                    $toString: {
+                      $multiply: [
+                        {
+                          $floor: {
+                            $divide: [
+                              { $hour: { $toDate: "$timestamp" } },
+                              interval,
+                            ],
+                          },
+                        },
+                        interval,
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                $toString: {
+                  $multiply: [
+                    {
+                      $floor: {
+                        $divide: [
+                          { $hour: { $toDate: "$timestamp" } },
+                          interval,
+                        ],
+                      },
+                    },
+                    interval,
+                  ],
+                },
+              },
             ],
           },
         ],
@@ -985,7 +1262,17 @@ router.get(
               unit: "day",
               amount: {
                 $mod: [
-                  { $add: [{ $subtract: [{ $dayOfWeek: { $toDate: "$timestamp" } }, 2] }, 7] },
+                  {
+                    $add: [
+                      {
+                        $subtract: [
+                          { $dayOfWeek: { $toDate: "$timestamp" } },
+                          2,
+                        ],
+                      },
+                      7,
+                    ],
+                  },
                   7,
                 ],
               },
@@ -998,7 +1285,13 @@ router.get(
       let groupId: Record<string, unknown>;
       switch (granularity) {
         case "1s":
-          groupId = { $dateToString: { format: "%Y-%m-%dT%H:%M:%S", date: { $toDate: "$timestamp" }, timezone: "UTC" } };
+          groupId = {
+            $dateToString: {
+              format: "%Y-%m-%dT%H:%M:%S",
+              date: { $toDate: "$timestamp" },
+              timezone: "UTC",
+            },
+          };
           break;
         case "5s":
           groupId = floorSecondsExpr(5);
@@ -1010,7 +1303,13 @@ router.get(
           groupId = floorSecondsExpr(30);
           break;
         case "1min":
-          groupId = { $dateToString: { format: "%Y-%m-%dT%H:%M", date: { $toDate: "$timestamp" }, timezone: "UTC" } };
+          groupId = {
+            $dateToString: {
+              format: "%Y-%m-%dT%H:%M",
+              date: { $toDate: "$timestamp" },
+              timezone: "UTC",
+            },
+          };
           break;
         case "5min":
           groupId = floorMinutesExpr(5);
@@ -1034,7 +1333,9 @@ router.get(
           groupId = { $substr: ["$timestamp", 0, 10] };
       }
 
-      const timeMatch: Record<string, string> = { $gte: sinceDate.toISOString() };
+      const timeMatch: Record<string, string> = {
+        $gte: sinceDate.toISOString(),
+      };
       if (untilDate) timeMatch.$lte = untilDate!.toISOString();
 
       const matchFilter = await buildMatchFilter(req);
@@ -1080,7 +1381,11 @@ router.get(
           cost: r.cost,
           avgLatency: r.avgLatency ? Math.round(r.avgLatency as number) : 0,
           successRate:
-            (r.requests as number) > 0 ? Math.round(((r.successes as number) / (r.requests as number)) * 100) : 100,
+            (r.requests as number) > 0
+              ? Math.round(
+                  ((r.successes as number) / (r.requests as number)) * 100,
+                )
+              : 100,
         })),
       });
     } catch (error: unknown) {
@@ -1137,7 +1442,9 @@ router.get(
           const persona = AgentPersonaRegistry.get(agentId);
           const models = ((r._models || []) as string[]).filter(Boolean);
           const providers = ((r._providers || []) as string[]).filter(Boolean);
-          const conversationIds = ((r._convIds || []) as string[]).filter(Boolean);
+          const conversationIds = ((r._convIds || []) as string[]).filter(
+            Boolean,
+          );
           const traceIds = ((r._traceIds || []) as string[]).filter(Boolean);
 
           return {

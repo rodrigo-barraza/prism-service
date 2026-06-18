@@ -67,19 +67,44 @@ export interface OpenAICompatRawModel {
 
 export interface GenericProvider {
   listModels?: () => Promise<ListModelsResponse>;
-  checkHealth?: () => Promise<{ ok: boolean; status: string; [key: string]: unknown }>;
-  loadModel?: (modelKey: string, options?: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown>;
+  checkHealth?: () => Promise<{
+    ok: boolean;
+    status: string;
+    [key: string]: unknown;
+  }>;
+  loadModel?: (
+    modelKey: string,
+    options?: Record<string, unknown>,
+    signal?: AbortSignal,
+  ) => Promise<unknown>;
   unloadModel?: (modelInstanceId: string) => Promise<unknown>;
   ensureModelLoaded?: (
     modelKey: string,
     options?: Record<string, unknown>,
     signal?: AbortSignal,
-    onStatus?: (status: unknown) => void
+    onStatus?: (status: unknown) => void,
   ) => Promise<unknown>;
-  generateText?: (messages: unknown, model: string, options?: Record<string, unknown>) => Promise<unknown>;
-  generateTextStream?: (messages: unknown, model: string, options?: Record<string, unknown>) => AsyncGenerator<unknown>;
-  generateEmbedding?: (content: string, model: string, options?: Record<string, unknown>) => Promise<unknown>;
-  captionImage?: (images: unknown, prompt: unknown, model: string, systemPrompt?: unknown) => Promise<unknown>;
+  generateText?: (
+    messages: unknown,
+    model: string,
+    options?: Record<string, unknown>,
+  ) => Promise<unknown>;
+  generateTextStream?: (
+    messages: unknown,
+    model: string,
+    options?: Record<string, unknown>,
+  ) => AsyncGenerator<unknown>;
+  generateEmbedding?: (
+    content: string,
+    model: string,
+    options?: Record<string, unknown>,
+  ) => Promise<unknown>;
+  captionImage?: (
+    images: unknown,
+    prompt: unknown,
+    model: string,
+    systemPrompt?: unknown,
+  ) => Promise<unknown>;
 }
 
 export interface HuggingFaceMetadata {

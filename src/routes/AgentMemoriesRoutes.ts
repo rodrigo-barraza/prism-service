@@ -1,4 +1,7 @@
-import { AGENT_IDS, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  AGENT_IDS,
+  DEFAULT_PROJECT,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import MemoryService from "../services/MemoryService.ts";
@@ -46,7 +49,7 @@ router.post(
       const { embedding: _emb, ...safe } = result;
       res.json(safe);
     } catch (error: unknown) {
-            logger.error(`[agent-memories] POST ${getErrorMessage(error)}`);
+      logger.error(`[agent-memories] POST ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -65,7 +68,7 @@ router.get(
       const agent = req.query.agent || null;
       const limit = parseInt(req.query.limit as string) || 100;
       const skip = parseInt(req.query.skip as string) || 0;
-      const type = req.query.type as string || null;
+      const type = (req.query.type as string) || null;
 
       const result = await MemoryService.list({
         agent: agent as string,
@@ -76,7 +79,7 @@ router.get(
       });
       res.json(result);
     } catch (error: unknown) {
-            logger.error(`[agent-memories] ${getErrorMessage(error)}`);
+      logger.error(`[agent-memories] ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -96,7 +99,7 @@ router.delete(
       }
       res.json({ success: true });
     } catch (error: unknown) {
-            logger.error(`[agent-memories] DELETE ${getErrorMessage(error)}`);
+      logger.error(`[agent-memories] DELETE ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -114,7 +117,7 @@ router.get(
       const combos = await MemoryService.discoverCombos();
       res.json({ combos });
     } catch (error: unknown) {
-            logger.error(`[agent-memories] DISCOVER ${getErrorMessage(error)}`);
+      logger.error(`[agent-memories] DISCOVER ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -137,7 +140,7 @@ router.get(
       );
       res.json({ history });
     } catch (error: unknown) {
-            logger.error(`[agent-memories] HISTORY ${getErrorMessage(error)}`);
+      logger.error(`[agent-memories] HISTORY ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -164,7 +167,7 @@ router.post(
       });
       res.json(result);
     } catch (error: unknown) {
-            logger.error(`[agent-memories] CONSOLIDATE ${getErrorMessage(error)}`);
+      logger.error(`[agent-memories] CONSOLIDATE ${getErrorMessage(error)}`);
       next(error);
     }
   }),

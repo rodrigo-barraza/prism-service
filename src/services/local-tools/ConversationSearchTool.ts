@@ -1,12 +1,16 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  TOOL_NAMES,
+  DOMAINS,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
 
 // Use the taxonomy constant when available, fall back to string literal
 // until prism-service refreshes its utilities-library dependency.
 const SEARCH_CONVERSATIONS_NAME =
-  (TOOL_NAMES as Record<string, string>).SEARCH_CONVERSATIONS || "search_conversations";
+  (TOOL_NAMES as Record<string, string>).SEARCH_CONVERSATIONS ||
+  "search_conversations";
 
 // ────────────────────────────────────────────────────────────
 // ConversationSearchTool — semantic search across past agent conversations
@@ -45,8 +49,7 @@ const searchConversations = {
         },
         limit: {
           type: "number",
-          description:
-            "Maximum number of results to return. Default: 10.",
+          description: "Maximum number of results to return. Default: 10.",
         },
       },
       required: ["query"],
@@ -54,16 +57,23 @@ const searchConversations = {
   },
   labels: ["coding", "memory"],
   domain: DOMAINS.CORE_HARNESS.displayName,
-  async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
-    const query = typeof toolArguments.query === "string" ? toolArguments.query : "";
-    const limit = typeof toolArguments.limit === "number"
-      ? Math.min(Math.max(1, toolArguments.limit), 25)
-      : DEFAULT_SEARCH_LIMIT;
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: InternalToolContext,
+  ) {
+    const query =
+      typeof toolArguments.query === "string" ? toolArguments.query : "";
+    const limit =
+      typeof toolArguments.limit === "number"
+        ? Math.min(Math.max(1, toolArguments.limit), 25)
+        : DEFAULT_SEARCH_LIMIT;
 
     if (!query) return { error: "query is required" };
 
-    const { default: EmbeddingService } = await import("../EmbeddingService.js");
-    const { default: MongoWrapper } = await import("../../wrappers/MongoWrapper.js");
+    const { default: EmbeddingService } =
+      await import("../EmbeddingService.js");
+    const { default: MongoWrapper } =
+      await import("../../wrappers/MongoWrapper.js");
     const { MONGO_DB_NAME } = await import("../../../config.js");
     const { COLLECTIONS } = await import("../../constants.js");
 
@@ -80,7 +90,9 @@ const searchConversations = {
     });
 
     // Fetch conversations with embeddings
-    const conversationCollection = database.collection(COLLECTIONS.AGENT_CONVERSATIONS);
+    const conversationCollection = database.collection(
+      COLLECTIONS.AGENT_CONVERSATIONS,
+    );
     const filter: Record<string, unknown> = {
       summaryEmbedding: { $exists: true, $ne: null },
     };
@@ -108,27 +120,34 @@ const searchConversations = {
       return {
         count: 0,
         conversations: [],
-        message: "No conversations with embeddings found. Conversations are automatically embedded after agent sessions with 6+ messages.",
+        message:
+          "No conversations with embeddings found. Conversations are automatically embedded after agent sessions with 6+ messages.",
       };
     }
 
     // Score by cosine similarity
     const scored = candidates
-      .filter((candidate) =>
-        Array.isArray(candidate.summaryEmbedding) &&
-        (candidate.summaryEmbedding as number[]).length > 0,
+      .filter(
+        (candidate) =>
+          Array.isArray(candidate.summaryEmbedding) &&
+          (candidate.summaryEmbedding as number[]).length > 0,
       )
       .map((candidate) => ({
         conversationId: candidate.id as string,
-        title: candidate.title as string || "Untitled",
-        summary: candidate.compactionSummary as string || null,
-        agent: candidate.agent as string || null,
-        createdAt: candidate.createdAt as string || null,
-        updatedAt: candidate.updatedAt as string || null,
-        score: cosineSimilarity(queryEmbedding, candidate.summaryEmbedding as number[]),
+        title: (candidate.title as string) || "Untitled",
+        summary: (candidate.compactionSummary as string) || null,
+        agent: (candidate.agent as string) || null,
+        createdAt: (candidate.createdAt as string) || null,
+        updatedAt: (candidate.updatedAt as string) || null,
+        score: cosineSimilarity(
+          queryEmbedding,
+          candidate.summaryEmbedding as number[],
+        ),
       }))
       .filter((result) => result.score >= RELEVANCE_THRESHOLD)
-      .sort((firstResult, secondResult) => secondResult.score - firstResult.score)
+      .sort(
+        (firstResult, secondResult) => secondResult.score - firstResult.score,
+      )
       .slice(0, limit);
 
     // Enrich with linked memory counts

@@ -57,7 +57,8 @@ export function normalizeLmStudioModel(raw: LmStudioRawModel): ModelEntry {
     entry.bitsPerWeight = raw.quantization.bits_per_weight;
   if (raw.architecture) entry.architecture = raw.architecture;
   if (raw.publisher) entry.publisher = raw.publisher;
-  if (raw.loaded_instances && raw.loaded_instances.length > 0) entry.loaded = true;
+  if (raw.loaded_instances && raw.loaded_instances.length > 0)
+    entry.loaded = true;
 
   // Preserve raw for VRAM estimation
   entry._raw = raw;
@@ -91,7 +92,10 @@ export function normalizeOllamaModel(raw: OllamaRawModel): ModelEntry {
   if (details.parameter_size) entry.params = details.parameter_size;
   if (details.family) entry.architecture = details.family;
   if (raw.size) entry.size = formatBytes(raw.size);
-  if ((raw as Record<string, unknown>).loaded_instances && ((raw as Record<string, unknown>).loaded_instances as unknown[]).length > 0) {
+  if (
+    (raw as Record<string, unknown>).loaded_instances &&
+    ((raw as Record<string, unknown>).loaded_instances as unknown[]).length > 0
+  ) {
     entry.loaded = true;
   }
   entry._raw = raw;
@@ -104,7 +108,9 @@ export function normalizeOllamaModel(raw: OllamaRawModel): ModelEntry {
  * Both use the OpenAI-compatible /v1/models which returns { id, object, owned_by }.
  * Enriches with name-parsed attributes; HF enrichment is done separately.
  */
-export function normalizeOpenAICompatModel(raw: OpenAICompatRawModel): ModelEntry {
+export function normalizeOpenAICompatModel(
+  raw: OpenAICompatRawModel,
+): ModelEntry {
   const modelKey = raw.key || raw.id || "";
   const capabilities = detectCapabilities(modelKey);
 
@@ -159,7 +165,9 @@ export function normalizeVllmModel(raw: OpenAICompatRawModel): ModelEntry {
   return entry;
 }
 
-export type NormalizerFunction = (raw: LmStudioRawModel & OllamaRawModel & OpenAICompatRawModel) => ModelEntry;
+export type NormalizerFunction = (
+  raw: LmStudioRawModel & OllamaRawModel & OpenAICompatRawModel,
+) => ModelEntry;
 
 export const NORMALIZER_BY_TYPE: Record<string, NormalizerFunction> = {
   "lm-studio": normalizeLmStudioModel as NormalizerFunction,

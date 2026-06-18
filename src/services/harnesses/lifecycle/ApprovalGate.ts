@@ -47,14 +47,18 @@ export async function checkAndWaitForApproval(
   }
 
   // Wait for user approval or timeout
-  const approvalResult = await new Promise<import("../../ApprovalRegistry.ts").ApprovalResolution>((resolve) => {
+  const approvalResult = await new Promise<
+    import("../../ApprovalRegistry.ts").ApprovalResolution
+  >((resolve) => {
     const timeoutId = setTimeout(() => {
       pendingApprovals.delete(conversationId);
       resolve({ isApproved: false, reason: "timeout" });
     }, APPROVAL_TIMEOUT_MS);
 
     pendingApprovals.set(conversationId, {
-      resolve: (value: import("../../ApprovalRegistry.ts").ApprovalResolution) => {
+      resolve: (
+        value: import("../../ApprovalRegistry.ts").ApprovalResolution,
+      ) => {
         clearTimeout(timeoutId);
         pendingApprovals.delete(conversationId);
         resolve(value);

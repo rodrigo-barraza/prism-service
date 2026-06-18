@@ -20,7 +20,9 @@ import { FILE_CATEGORIES } from "../constants.ts";
  * Parses the data URL, checks decoded size, runs through compressImageForSizeLimit,
  * and reconstructs if compression changed the data.
  */
-export async function compressDataUrlIfOversized(dataUrl: string): Promise<string> {
+export async function compressDataUrlIfOversized(
+  dataUrl: string,
+): Promise<string> {
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
   if (!match) return dataUrl;
   let mimeType = match[1];
@@ -28,7 +30,10 @@ export async function compressDataUrlIfOversized(dataUrl: string): Promise<strin
   let base64Data = match[2];
   // Step 1: enforce pixel dimension limits (Anthropic rejects >8000px)
   try {
-    const dimensionResult = await constrainImageDimensions(base64Data, mimeType);
+    const dimensionResult = await constrainImageDimensions(
+      base64Data,
+      mimeType,
+    );
     if (dimensionResult.data !== base64Data) {
       base64Data = dimensionResult.data;
       mimeType = dimensionResult.mediaType;
@@ -37,7 +42,9 @@ export async function compressDataUrlIfOversized(dataUrl: string): Promise<strin
       );
     }
   } catch (error: unknown) {
-    logger.warn(`[MediaResolution] Dimension constraint failed: ${getErrorMessage(error)}`);
+    logger.warn(
+      `[MediaResolution] Dimension constraint failed: ${getErrorMessage(error)}`,
+    );
   }
   // Step 2: enforce byte-size limit
   const base64Length = base64Data.length; // Anthropic checks base64 STRING length
@@ -98,7 +105,9 @@ export async function resolveMediaReference(
       );
       storageRef = minioRef;
     } catch (error: unknown) {
-      logger.error(`[MediaResolution] Failed to upload media to MinIO: ${getErrorMessage(error)}`);
+      logger.error(
+        `[MediaResolution] Failed to upload media to MinIO: ${getErrorMessage(error)}`,
+      );
     }
     return { providerRef, storageRef };
   }
@@ -109,7 +118,9 @@ export async function resolveMediaReference(
       const key = FileService.extractKey(reference);
       const file = await FileService.getFile(key);
       if (!file) {
-        logger.warn(`[MediaResolution] Could not resolve MinIO ref: ${reference}`);
+        logger.warn(
+          `[MediaResolution] Could not resolve MinIO ref: ${reference}`,
+        );
         return { providerRef: reference, storageRef: reference };
       }
       const chunks: Buffer[] = [];
@@ -154,7 +165,9 @@ export async function resolveMediaReference(
         storageRef: reference,
       };
     } catch (error: unknown) {
-      logger.error(`[MediaResolution] Failed to fetch media URL ${reference}: ${getErrorMessage(error)}`);
+      logger.error(
+        `[MediaResolution] Failed to fetch media URL ${reference}: ${getErrorMessage(error)}`,
+      );
       return { providerRef: reference, storageRef: reference };
     }
   }
@@ -189,7 +202,11 @@ export async function resolveMessageMediaReferences(
         const storageArray: string[] = [];
         await Promise.all(
           array.map(async (reference: string, referenceIndex: number) => {
-            const resolved = await resolveMediaReference(reference, project, username);
+            const resolved = await resolveMediaReference(
+              reference,
+              project,
+              username,
+            );
             providerArray[referenceIndex] = resolved.providerRef;
             storageArray[referenceIndex] = resolved.storageRef;
           }),

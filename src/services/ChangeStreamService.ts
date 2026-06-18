@@ -2,7 +2,11 @@ import type { Db, ChangeStreamDocument } from "mongodb";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
-import { COLLECTIONS, CHANGE_STREAM_RECONNECT_MS, CHANGE_STREAM_RETRY_MS } from "../constants.ts";
+import {
+  COLLECTIONS,
+  CHANGE_STREAM_RECONNECT_MS,
+  CHANGE_STREAM_RETRY_MS,
+} from "../constants.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
@@ -33,13 +37,20 @@ export type ChangeStreamCallback = (payload: ChangeStreamEventPayload) => void;
 // ── State ───────────────────────────────────────────────────
 
 const listeners = new Set<ChangeStreamCallback>();
-const streams = new Map<string, ReturnType<ReturnType<Db["collection"]>["watch"]>>();
+const streams = new Map<
+  string,
+  ReturnType<ReturnType<Db["collection"]>["watch"]>
+>();
 
 let available = false;
 let staleGeneratingInterval: ReturnType<typeof setInterval> | null = null;
 
 // Collections to watch
-const WATCHED_COLLECTIONS = [COLLECTIONS.MODEL_CONVERSATIONS, COLLECTIONS.AGENT_CONVERSATIONS, COLLECTIONS.REQUESTS];
+const WATCHED_COLLECTIONS = [
+  COLLECTIONS.MODEL_CONVERSATIONS,
+  COLLECTIONS.AGENT_CONVERSATIONS,
+  COLLECTIONS.REQUESTS,
+];
 
 /**
  * Attempt to open a Change Stream on a single collection.
@@ -51,11 +62,20 @@ function openStream(db: Db, collectionName: string) {
     const stream = collection.watch([], { fullDocument: "updateLookup" });
 
     stream.on("change", (event: ChangeStreamDocument) => {
-      const documentKey = "documentKey" in event ? event.documentKey as Record<string, unknown> : undefined;
-      const fullDocument = "fullDocument" in event ? event.fullDocument as Record<string, unknown> | null : null;
-      const updateDescription = "updateDescription" in event ? event.updateDescription as {
-        updatedFields?: Record<string, unknown>;
-      } | null : null;
+      const documentKey =
+        "documentKey" in event
+          ? (event.documentKey as Record<string, unknown>)
+          : undefined;
+      const fullDocument =
+        "fullDocument" in event
+          ? (event.fullDocument as Record<string, unknown> | null)
+          : null;
+      const updateDescription =
+        "updateDescription" in event
+          ? (event.updateDescription as {
+              updatedFields?: Record<string, unknown>;
+            } | null)
+          : null;
 
       const payload: ChangeStreamEventPayload = {
         collection: collectionName,
@@ -70,19 +90,23 @@ function openStream(db: Db, collectionName: string) {
       };
 
       // Enrich with isGenerating state for conversations
-      if (collectionName === COLLECTIONS.MODEL_CONVERSATIONS || collectionName === COLLECTIONS.AGENT_CONVERSATIONS) {
-        if (
-          updateDescription?.updatedFields?.isGenerating !== undefined
-        ) {
-          payload.isGenerating =
-            updateDescription.updatedFields.isGenerating as boolean;
+      if (
+        collectionName === COLLECTIONS.MODEL_CONVERSATIONS ||
+        collectionName === COLLECTIONS.AGENT_CONVERSATIONS
+      ) {
+        if (updateDescription?.updatedFields?.isGenerating !== undefined) {
+          payload.isGenerating = updateDescription.updatedFields
+            .isGenerating as boolean;
         } else if (fullDocument?.isGenerating !== undefined) {
           payload.isGenerating = fullDocument.isGenerating as boolean;
         }
       }
 
       // Enrich requests with conversationId for session-scoped live updates
-      if (collectionName === COLLECTIONS.REQUESTS && fullDocument?.conversationId) {
+      if (
+        collectionName === COLLECTIONS.REQUESTS &&
+        fullDocument?.conversationId
+      ) {
         payload.conversationId = fullDocument.conversationId as string;
       }
 
@@ -185,7 +209,9 @@ const ChangeStreamService = {
           );
         if (modifiedCount > 0 || agentCleared > 0) {
           logger.info(
-            "Auto-cleared " + (modifiedCount + agentCleared) + " stale isGenerating flag(s)"
+            "Auto-cleared " +
+              (modifiedCount + agentCleared) +
+              " stale isGenerating flag(s)",
           );
         }
       } catch {

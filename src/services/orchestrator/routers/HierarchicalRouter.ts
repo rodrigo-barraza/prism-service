@@ -7,12 +7,18 @@ import type {
 import type { TopologyRouter } from "../TopologyRouter.ts";
 import { InstanceLoadBalancer } from "../InstanceLoadBalancer.ts";
 import { resolveModelForInstances } from "../../../utils/ModelResolution.ts";
-import { getInstancesByType, getInstanceType } from "../../../providers/instance-registry.ts";
+import {
+  getInstancesByType,
+  getInstanceType,
+} from "../../../providers/instance-registry.ts";
 import localModelQueue from "../../LocalModelQueue.ts";
 import logger from "../../../utils/logger.ts";
 import SettingsService from "../../SettingsService.ts";
 
-async function getSubAgentFallback(): Promise<{ provider: string; model: string } | null> {
+async function getSubAgentFallback(): Promise<{
+  provider: string;
+  model: string;
+} | null> {
   try {
     const agents = await SettingsService.getSection("agents");
     if (agents) {
@@ -39,7 +45,7 @@ export class HierarchicalRouter implements TopologyRouter {
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
     logger.info(
-      `[HierarchicalRouter] createTeam: batch assignment of ${members.length} sub-agent(s)...`
+      `[HierarchicalRouter] createTeam: batch assignment of ${members.length} sub-agent(s)...`,
     );
 
     const isLocal = localModelQueue.isLocal(providerName);
@@ -50,14 +56,14 @@ export class HierarchicalRouter implements TopologyRouter {
     if (isLocal && siblings.length > 1) {
       const { usable, modelOverrides } = await resolveModelForInstances(
         resolvedModel,
-        siblings
+        siblings,
       );
       instanceModelOverrides = modelOverrides;
       if (usable.length > 0) {
         siblings = usable;
       } else {
         logger.warn(
-          `[HierarchicalRouter] Model "${resolvedModel}" not available on any ${providerType} instance`
+          `[HierarchicalRouter] Model "${resolvedModel}" not available on any ${providerType} instance`,
         );
         siblings = [];
       }
@@ -76,7 +82,7 @@ export class HierarchicalRouter implements TopologyRouter {
           providerName,
           instanceModelOverrides,
           assignedModel,
-          new Map()
+          new Map(),
         );
         if (assigned) {
           assignedProvider = assigned.provider;
@@ -99,7 +105,9 @@ export class HierarchicalRouter implements TopologyRouter {
       });
     }
 
-    const spawnPromises = assignments.map((assignment) => spawnSubAgent(assignment));
+    const spawnPromises = assignments.map((assignment) =>
+      spawnSubAgent(assignment),
+    );
     return Promise.all(spawnPromises);
   }
 }

@@ -22,7 +22,6 @@ interface ConversationMessage extends BaseConversationMessage {
   _isErrorIndicator?: boolean;
 }
 
-
 // ── Simulate hook injection (delegates to SystemPromptAssembler.injectSystemPromptContext) ──
 function simulateBeforePromptHook(
   currentMessages: ConversationMessage[],
@@ -46,9 +45,12 @@ function computeNewTurnMessages(
   currentMessages: ConversationMessage[],
   originalMessageCount: number,
 ): any[] {
-  return computeNewTurnMessagesReal(originalMessages, currentMessages, originalMessageCount);
+  return computeNewTurnMessagesReal(
+    originalMessages,
+    currentMessages,
+    originalMessageCount,
+  );
 }
-
 
 // ────────────────────────────────────────────────────────────────
 // Test Suites
@@ -63,7 +65,8 @@ describe("Message Array Construction", () => {
     let currentMessages: ConversationMessage[];
     let originalMessageCount: number;
 
-    const LUPOS_IDENTITY = "You are Lupos, an insane recovering-drug-addicted artist wolf king...";
+    const LUPOS_IDENTITY =
+      "You are Lupos, an insane recovering-drug-addicted artist wolf king...";
     const PLATFORM_CONTEXT = [
       "Platform: Discord",
       "Server: Rod's Lab",
@@ -116,15 +119,20 @@ describe("Message Array Construction", () => {
       expect(currentMessages[3].role).toBe("user");
       expect(currentMessages[3].content).toContain("[System Context]");
       expect(currentMessages[3].content).toContain("[User Message]");
-      expect(currentMessages[3].content).toContain("hey lupos, how are you feeling today?");
-      expect(currentMessages[3].rawContent).toBe("hey lupos, how are you feeling today?");
+      expect(currentMessages[3].content).toContain(
+        "hey lupos, how are you feeling today?",
+      );
+      expect(currentMessages[3].rawContent).toBe(
+        "hey lupos, how are you feeling today?",
+      );
     });
 
     it("should persist all 4 hook-injected messages plus assistant response via finalize", () => {
       // Simulate assistant response
       currentMessages.push({
         role: "assistant",
-        content: "*stretches and looks up* Hey there! Feeling pretty curious today...",
+        content:
+          "*stretches and looks up* Hey there! Feeling pretty curious today...",
         model: "gpt-4.1",
         provider: "openai",
       });
@@ -138,10 +146,10 @@ describe("Message Array Construction", () => {
       // sliceIndex = max(0, 1 - 1) = 0 → all 5 messages should be included
       expect(newTurnMessages).toHaveLength(5);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system",   // identity
-        "system",   // platform context
-        "system",   // somatic state
-        "user",     // user message with [System Context]
+        "system", // identity
+        "system", // platform context
+        "system", // somatic state
+        "user", // user message with [System Context]
         "assistant", // response
       ]);
     });
@@ -208,7 +216,9 @@ describe("Message Array Construction", () => {
     it("should place user message at index 1 with system context prepended", () => {
       expect(currentMessages[1].role).toBe("user");
       expect(currentMessages[1].content).toContain("[System Context]");
-      expect(currentMessages[1].rawContent).toBe("What's the weather in Vancouver?");
+      expect(currentMessages[1].rawContent).toBe(
+        "What's the weather in Vancouver?",
+      );
     });
 
     it("should persist system prompt + user + assistant via finalize", () => {
@@ -318,20 +328,18 @@ describe("Message Array Construction", () => {
       expect(
         newTurnMessages.some(
           (message) =>
-            message.role === "system" &&
-            message.content === PLATFORM_CONTEXT,
+            message.role === "system" && message.content === PLATFORM_CONTEXT,
         ),
       ).toBe(true);
       expect(
         newTurnMessages.some(
           (message) =>
-            message.role === "system" &&
-            message.content === SOMATIC_STATE,
+            message.role === "system" && message.content === SOMATIC_STATE,
         ),
       ).toBe(true);
-      expect(
-        newTurnMessages.some((message) => message.role === "user"),
-      ).toBe(true);
+      expect(newTurnMessages.some((message) => message.role === "user")).toBe(
+        true,
+      );
     });
   });
 
@@ -345,7 +353,8 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Discord Agent (Lupos) — subsequent turn, somatic-only system message in history", () => {
     const LUPOS_IDENTITY = "You are Lupos, an artist wolf king...";
-    const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab\nChannel: #general";
+    const PLATFORM_CONTEXT =
+      "Platform: Discord\nServer: Rod's Lab\nChannel: #general";
     const SOMATIC_STATE = "[Somatic State — Lupos]\ncurrent_emotion: curious";
 
     it("should NOT overwrite a mid-conversation somatic system message with the identity prompt", () => {
@@ -354,7 +363,10 @@ describe("Message Array Construction", () => {
       const originalMessages: ConversationMessage[] = [
         { role: "user", content: "hey lupos" },
         { role: "assistant", content: "yo" },
-        { role: "system", content: "[Somatic State — Lupos]\ncurrent_emotion: bored" },
+        {
+          role: "system",
+          content: "[Somatic State — Lupos]\ncurrent_emotion: bored",
+        },
         { role: "user", content: "tell me something" },
       ];
       const currentMessages: ConversationMessage[] = [...originalMessages];
@@ -381,8 +393,7 @@ describe("Message Array Construction", () => {
       // The old somatic state from history should still exist (shifted right)
       const oldSomaticMessage = currentMessages.find(
         (message) =>
-          message.role === "system" &&
-          message.content?.includes("bored"),
+          message.role === "system" && message.content?.includes("bored"),
       );
       expect(oldSomaticMessage).toBeDefined();
 
@@ -441,20 +452,18 @@ describe("Message Array Construction", () => {
       expect(
         newTurnMessages.some(
           (message) =>
-            message.role === "system" &&
-            message.content === PLATFORM_CONTEXT,
+            message.role === "system" && message.content === PLATFORM_CONTEXT,
         ),
       ).toBe(true);
       expect(
         newTurnMessages.some(
           (message) =>
-            message.role === "system" &&
-            message.content === SOMATIC_STATE,
+            message.role === "system" && message.content === SOMATIC_STATE,
         ),
       ).toBe(true);
-      expect(
-        newTurnMessages.some((message) => message.role === "user"),
-      ).toBe(true);
+      expect(newTurnMessages.some((message) => message.role === "user")).toBe(
+        true,
+      );
       expect(
         newTurnMessages.some((message) => message.role === "assistant"),
       ).toBe(true);
@@ -482,12 +491,24 @@ describe("Message Array Construction", () => {
       // [4] system: somatic state (interleaved before last user)
       // [5] user: "draw me a wolf" (with [System Context])
       expect(currentMessages).toHaveLength(6);
-      expect(currentMessages[0]).toMatchObject({ role: "system", content: LUPOS_IDENTITY });
+      expect(currentMessages[0]).toMatchObject({
+        role: "system",
+        content: LUPOS_IDENTITY,
+      });
       expect(currentMessages[1]).toMatchObject({ role: "user" });
       expect(currentMessages[1].content).toBe("hey");
-      expect(currentMessages[2]).toMatchObject({ role: "assistant", content: "sup" });
-      expect(currentMessages[3]).toMatchObject({ role: "system", content: PLATFORM_CONTEXT });
-      expect(currentMessages[4]).toMatchObject({ role: "system", content: SOMATIC_STATE });
+      expect(currentMessages[2]).toMatchObject({
+        role: "assistant",
+        content: "sup",
+      });
+      expect(currentMessages[3]).toMatchObject({
+        role: "system",
+        content: PLATFORM_CONTEXT,
+      });
+      expect(currentMessages[4]).toMatchObject({
+        role: "system",
+        content: SOMATIC_STATE,
+      });
       expect(currentMessages[5].role).toBe("user");
       expect(currentMessages[5].content).toContain("[System Context]");
       expect(currentMessages[5].content).toContain("draw me a wolf");
@@ -607,7 +628,9 @@ describe("Message Array Construction", () => {
       currentMessages.push({
         role: "assistant",
         content: "",
-        toolCalls: [{ id: "call_1", name: "get_weather", args: { city: "Tokyo" } }],
+        toolCalls: [
+          { id: "call_1", name: "get_weather", args: { city: "Tokyo" } },
+        ],
       });
       // Tool result
       currentMessages.push({
@@ -632,10 +655,10 @@ describe("Message Array Construction", () => {
 
       expect(newTurnMessages).toHaveLength(5);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system",    // identity prompt
-        "user",      // user message with [System Context]
+        "system", // identity prompt
+        "user", // user message with [System Context]
         "assistant", // tool call iteration
-        "tool",      // tool result
+        "tool", // tool result
         "assistant", // final response
       ]);
     });
@@ -693,7 +716,12 @@ describe("Message Array Construction", () => {
       const originalMessages: ConversationMessage[] = [];
       const currentMessages: ConversationMessage[] = [
         { role: "system", content: "System prompt" },
-        { role: "assistant", content: "Proactive greeting.", model: "gpt-4.1", provider: "openai" },
+        {
+          role: "assistant",
+          content: "Proactive greeting.",
+          model: "gpt-4.1",
+          provider: "openai",
+        },
       ];
 
       const newTurnMessages = computeNewTurnMessages(
@@ -737,8 +765,12 @@ describe("Message Array Construction", () => {
       const platformIndex = lastUserIndex - 2;
 
       expect(currentMessages[0].content).toBe("Updated Lupos identity");
-      expect(currentMessages[platformIndex].content).toBe("Updated platform context");
-      expect(currentMessages[somaticIndex].content).toBe("Updated somatic state");
+      expect(currentMessages[platformIndex].content).toBe(
+        "Updated platform context",
+      );
+      expect(currentMessages[somaticIndex].content).toBe(
+        "Updated somatic state",
+      );
       expect(currentMessages[lastUserIndex].role).toBe("user");
 
       // Platform should come right before somatic, both before last user
@@ -761,7 +793,8 @@ describe("Message Array Construction", () => {
         systemPrompt: "You are a coding agent.",
         platformContextMessage: null,
         selfContextMessage: null,
-        skillsText: "[Project Skills]\n### deploy.sh\nRun deploy script with --env flag",
+        skillsText:
+          "[Project Skills]\n### deploy.sh\nRun deploy script with --env flag",
         memoriesText: "[Agent Memory]\nUser prefers blue-green deployments",
       });
 
@@ -792,8 +825,10 @@ describe("Message Array Construction", () => {
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Lupos, an artist wolf king...",
-        platformContextMessage: "Platform: Discord\nServer: Rod's Lab\nChannel: #art",
-        selfContextMessage: "[Somatic State — Lupos]\ncurrent_emotion: excited\narousal: 0.8",
+        platformContextMessage:
+          "Platform: Discord\nServer: Rod's Lab\nChannel: #art",
+        selfContextMessage:
+          "[Somatic State — Lupos]\ncurrent_emotion: excited\narousal: 0.8",
       });
 
       // Iteration 1: assistant calls generate_image tool
@@ -818,7 +853,8 @@ describe("Message Array Construction", () => {
       // Iteration 2: assistant responds with final text
       currentMessages.push({
         role: "assistant",
-        content: "There you go, a majestic wolf king. That's basically my self-portrait.",
+        content:
+          "There you go, a majestic wolf king. That's basically my self-portrait.",
         model: "gpt-4.1",
         provider: "openai",
       });
@@ -832,12 +868,12 @@ describe("Message Array Construction", () => {
       // Should have: system(identity) + system(platform) + system(somatic) + user + assistant(tool) + tool + assistant(final)
       expect(newTurnMessages).toHaveLength(7);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system",    // identity
-        "system",    // platform context
-        "system",    // somatic state
-        "user",      // user message
+        "system", // identity
+        "system", // platform context
+        "system", // somatic state
+        "user", // user message
         "assistant", // tool call
-        "tool",      // tool result
+        "tool", // tool result
         "assistant", // final response
       ]);
 
@@ -855,7 +891,10 @@ describe("Message Array Construction", () => {
   describe("Extended thinking (Claude-style)", () => {
     it("should preserve thinking field on assistant messages through the pipeline", () => {
       const originalMessages: ConversationMessage[] = [
-        { role: "user", content: "Explain quantum entanglement in simple terms" },
+        {
+          role: "user",
+          content: "Explain quantum entanglement in simple terms",
+        },
       ];
       const originalMessageCount = originalMessages.length;
       const currentMessages: ConversationMessage[] = [...originalMessages];
@@ -869,8 +908,10 @@ describe("Message Array Construction", () => {
       // Assistant responds with thinking + text (single iteration, no tools)
       currentMessages.push({
         role: "assistant",
-        content: "Quantum entanglement is like having two coins that always land on opposite sides.",
-        thinking: "The user wants a simplified explanation. Let me use an analogy that avoids jargon. A coin analogy works well because it captures the correlation aspect without requiring physics background.",
+        content:
+          "Quantum entanglement is like having two coins that always land on opposite sides.",
+        thinking:
+          "The user wants a simplified explanation. Let me use an analogy that avoids jargon. A coin analogy works well because it captures the correlation aspect without requiring physics background.",
         model: "claude-sonnet-4-20250514",
         provider: "anthropic",
       });
@@ -913,7 +954,8 @@ describe("Message Array Construction", () => {
       currentMessages.push({
         role: "assistant",
         content: "",
-        thinking: "I need to write a binary search. Let me create the file first.",
+        thinking:
+          "I need to write a binary search. Let me create the file first.",
         thinkingSignature: "sig_abc123_thinking_block_1",
         toolCalls: [
           {
@@ -935,7 +977,8 @@ describe("Message Array Construction", () => {
       currentMessages.push({
         role: "assistant",
         content: "I've created the binary search implementation.",
-        thinking: "The file was written successfully. Let me confirm with the user.",
+        thinking:
+          "The file was written successfully. Let me confirm with the user.",
         thinkingSignature: "sig_abc123_thinking_block_2",
         model: "claude-sonnet-4-20250514",
         provider: "anthropic",
@@ -955,7 +998,9 @@ describe("Message Array Construction", () => {
           message.role === "assistant" && message.toolCalls !== undefined,
       )!;
       expect(toolCallAssistant.thinking).toContain("binary search");
-      expect(toolCallAssistant.thinkingSignature).toBe("sig_abc123_thinking_block_1");
+      expect(toolCallAssistant.thinkingSignature).toBe(
+        "sig_abc123_thinking_block_1",
+      );
       expect(toolCallAssistant.toolCalls![0].thoughtSignature).toBe(
         "sig_abc123_tool_thought_1",
       );
@@ -964,7 +1009,9 @@ describe("Message Array Construction", () => {
       const finalAssistant = newTurnMessages.filter(
         (message) => message.role === "assistant",
       )[1];
-      expect(finalAssistant.thinkingSignature).toBe("sig_abc123_thinking_block_2");
+      expect(finalAssistant.thinkingSignature).toBe(
+        "sig_abc123_thinking_block_2",
+      );
     });
   });
 
@@ -1061,7 +1108,8 @@ describe("Message Array Construction", () => {
       currentMessages.push({
         role: "assistant",
         content: "",
-        thinking: "The user wants to see the project structure. I should use list_files to check.",
+        thinking:
+          "The user wants to see the project structure. I should use list_files to check.",
         toolCalls: [
           { id: "call_ls_1", name: "list_files", args: { path: "." } },
         ],
@@ -1077,7 +1125,8 @@ describe("Message Array Construction", () => {
       currentMessages.push({
         role: "assistant",
         content: "",
-        thinking: "Found root files. Let me also check the src directory for the full picture.",
+        thinking:
+          "Found root files. Let me also check the src directory for the full picture.",
         toolCalls: [
           { id: "call_ls_2", name: "list_files", args: { path: "src/" } },
         ],
@@ -1093,7 +1142,8 @@ describe("Message Array Construction", () => {
       currentMessages.push({
         role: "assistant",
         content: "Your project has 3 root items and 3 source files.",
-        thinking: "I now have the full picture. Let me summarize the structure.",
+        thinking:
+          "I now have the full picture. Let me summarize the structure.",
         model: "claude-sonnet-4-20250514",
         provider: "anthropic",
       });
@@ -1144,7 +1194,9 @@ describe("Message Array Construction", () => {
           {
             id: "call_img",
             name: "generate_image",
-            args: { prompt: "A dramatic sunset over mountains, oil painting style" },
+            args: {
+              prompt: "A dramatic sunset over mountains, oil painting style",
+            },
             result: '{"url": "https://cdn.example.com/sunset.png"}',
             durationMs: 12500,
           },
@@ -1283,7 +1335,8 @@ describe("Message Array Construction", () => {
             name: "edit_file",
             args: {
               path: "routes.ts",
-              content: "import { Router } from 'express';\nconst router = Router();\nrouter.get('/api/users');",
+              content:
+                "import { Router } from 'express';\nconst router = Router();\nrouter.get('/api/users');",
             },
             result: "File edited.",
             durationMs: 95,
@@ -1340,14 +1393,16 @@ describe("Message Array Construction", () => {
       // Planning injection (injected by PlanModeController)
       currentMessages.push({
         role: "system",
-        content: "Before taking action, create a plan. Outline the steps you would take.",
+        content:
+          "Before taking action, create a plan. Outline the steps you would take.",
         _isPlanningInjection: true,
       });
 
       // Assistant creates plan
       currentMessages.push({
         role: "assistant",
-        content: "Here's my plan:\n1. Extract auth logic\n2. Create AuthService\n3. Update routes",
+        content:
+          "Here's my plan:\n1. Extract auth logic\n2. Create AuthService\n3. Update routes",
         _isPlanningInjection: true,
       });
 
@@ -1361,7 +1416,8 @@ describe("Message Array Construction", () => {
       // Actual work
       currentMessages.push({
         role: "assistant",
-        content: "Done. I've refactored the auth module into a dedicated service.",
+        content:
+          "Done. I've refactored the auth module into a dedicated service.",
         model: "claude-sonnet-4-20250514",
         provider: "anthropic",
       });
@@ -1409,7 +1465,8 @@ describe("Message Array Construction", () => {
       // Context compaction (injected by ExhaustionRecovery)
       currentMessages.push({
         role: "user",
-        content: "[Conversation Summary] Previous 15 messages summarized: User asked about...",
+        content:
+          "[Conversation Summary] Previous 15 messages summarized: User asked about...",
         isCompactSummary: true,
       });
 
@@ -1557,7 +1614,10 @@ describe("Message Array Construction", () => {
             reasoningItem: {
               id: "reasoning_xyz789",
               summary: [
-                { type: "text", text: "User wants Rust news. Let me search the web." },
+                {
+                  type: "text",
+                  text: "User wants Rust news. Let me search the web.",
+                },
               ],
             },
             result: '{"results": []}',
@@ -1581,11 +1641,17 @@ describe("Message Array Construction", () => {
 
       const toolCallMessage = newTurnMessages.find(
         (message) =>
-          message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0,
+          message.role === "assistant" &&
+          message.toolCalls &&
+          message.toolCalls.length > 0,
       )!;
-      expect(toolCallMessage.toolCalls![0].responsesItemId).toBe("resp_item_abc123");
+      expect(toolCallMessage.toolCalls![0].responsesItemId).toBe(
+        "resp_item_abc123",
+      );
       expect(toolCallMessage.toolCalls![0].reasoningItem).toBeDefined();
-      expect(toolCallMessage.toolCalls![0].reasoningItem!.id).toBe("reasoning_xyz789");
+      expect(toolCallMessage.toolCalls![0].reasoningItem!.id).toBe(
+        "reasoning_xyz789",
+      );
     });
   });
 
@@ -1635,7 +1701,9 @@ describe("Message Array Construction", () => {
 
       const toolCallMessage = newTurnMessages.find(
         (message) =>
-          message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0,
+          message.role === "assistant" &&
+          message.toolCalls &&
+          message.toolCalls.length > 0,
       )!;
       expect(toolCallMessage.toolCalls![0].durationMs).toBe(8750);
     });
@@ -1895,13 +1963,17 @@ describe("Message Array Construction", () => {
   describe("Full integration: Lupos multi-iteration with thinking + tools + images", () => {
     it("should produce the complete expected messages array for MongoDB persistence", () => {
       const originalMessages: ConversationMessage[] = [
-        { role: "user", content: "draw me as a wolf warrior and say something epic" },
+        {
+          role: "user",
+          content: "draw me as a wolf warrior and say something epic",
+        },
       ];
       const originalMessageCount = originalMessages.length;
       const currentMessages: ConversationMessage[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
-        systemPrompt: "You are Lupos, an insane recovering-drug-addicted artist wolf king...",
+        systemPrompt:
+          "You are Lupos, an insane recovering-drug-addicted artist wolf king...",
         platformContextMessage:
           "Platform: Discord\nServer: Rod's Lab\nChannel: #art\nGuild ID: 123456789\nChannel ID: 987654321",
         selfContextMessage:
@@ -1925,7 +1997,8 @@ describe("Message Array Construction", () => {
               prompt:
                 "An epic wolf warrior in ornate battle armor standing on a mountain peak, dramatic sunset lighting, fantasy digital art, cinematic composition",
             },
-            result: '{"url": "https://cdn.example.com/wolf-warrior.png", "success": true}',
+            result:
+              '{"url": "https://cdn.example.com/wolf-warrior.png", "success": true}',
             durationMs: 15200,
           },
         ],
@@ -1935,7 +2008,8 @@ describe("Message Array Construction", () => {
       currentMessages.push({
         role: "assistant",
         content: "",
-        thinking: "Now I should deliver an epic voice line to go with the image.",
+        thinking:
+          "Now I should deliver an epic voice line to go with the image.",
         thinkingSignature: "sig_lupos_thinking_2",
         toolCalls: [
           {
@@ -1955,7 +2029,8 @@ describe("Message Array Construction", () => {
         role: "assistant",
         content:
           "There. You're a wolf warrior now. Pretty badass if I do say so myself. Listen to that voice line.",
-        thinking: "The image and speech are done. Let me wrap it up with some attitude.",
+        thinking:
+          "The image and speech are done. Let me wrap it up with some attitude.",
         thinkingSignature: "sig_lupos_thinking_3",
         images: ["https://cdn.example.com/wolf-warrior.png"],
         audio: "https://cdn.example.com/epic-speech.wav",
@@ -1972,10 +2047,10 @@ describe("Message Array Construction", () => {
       // Expected: system(identity) + system(platform) + system(somatic) + user + assistant(img tool) + assistant(tts tool) + assistant(final)
       expect(newTurnMessages).toHaveLength(7);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system",    // identity prompt
-        "system",    // platform context
-        "system",    // somatic state
-        "user",      // user message with memories injected
+        "system", // identity prompt
+        "system", // platform context
+        "system", // somatic state
+        "user", // user message with memories injected
         "assistant", // image generation iteration
         "assistant", // speech synthesis iteration
         "assistant", // final response
@@ -1998,17 +2073,25 @@ describe("Message Array Construction", () => {
         (message) => message.role === "assistant",
       );
       expect(assistantMessages[0].thinking).toContain("wolf warrior");
-      expect(assistantMessages[0].thinkingSignature).toBe("sig_lupos_thinking_1");
+      expect(assistantMessages[0].thinkingSignature).toBe(
+        "sig_lupos_thinking_1",
+      );
       expect(assistantMessages[0].toolCalls![0].name).toBe("generate_image");
       expect(assistantMessages[0].toolCalls![0].durationMs).toBe(15200);
 
       expect(assistantMessages[1].thinking).toContain("epic voice line");
-      expect(assistantMessages[1].thinkingSignature).toBe("sig_lupos_thinking_2");
+      expect(assistantMessages[1].thinkingSignature).toBe(
+        "sig_lupos_thinking_2",
+      );
       expect(assistantMessages[1].toolCalls![0].name).toBe("synthesize_speech");
 
       expect(assistantMessages[2].thinking).toContain("wrap it up");
-      expect(assistantMessages[2].images).toEqual(["https://cdn.example.com/wolf-warrior.png"]);
-      expect(assistantMessages[2].audio).toBe("https://cdn.example.com/epic-speech.wav");
+      expect(assistantMessages[2].images).toEqual([
+        "https://cdn.example.com/wolf-warrior.png",
+      ]);
+      expect(assistantMessages[2].audio).toBe(
+        "https://cdn.example.com/epic-speech.wav",
+      );
       expect(assistantMessages[2].model).toBe("gemini-2.5-flash");
       expect(assistantMessages[2].provider).toBe("google");
     });
@@ -2022,10 +2105,7 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("rawContent / content swap (Finalizer behavior)", () => {
     function swapMessageContent(message: ConversationMessage): void {
-      if (
-        message.role === "user" &&
-        typeof message.content === "string"
-      ) {
+      if (message.role === "user" && typeof message.content === "string") {
         if (
           message.rawContent?.startsWith("[System Context]") ||
           message.rawContent?.startsWith("[System Context - Local Time:")
@@ -2204,7 +2284,8 @@ describe("Message Array Construction", () => {
             id: "call_search_events_1",
             name: "search_events",
             args: { location: "Vancouver", dateRange: "this weekend" },
-            result: '{"events": [{"name": "Summer Jazz Festival", "date": "2026-06-21"}]}',
+            result:
+              '{"events": [{"name": "Summer Jazz Festival", "date": "2026-06-21"}]}',
             durationMs: 1800,
           },
         ],
@@ -2226,12 +2307,12 @@ describe("Message Array Construction", () => {
 
       // Verify the full chain is preserved
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system",    // identity prompt
-        "user",      // user message
+        "system", // identity prompt
+        "user", // user message
         "assistant", // search_tools call
-        "system",    // <tool-update> nudge
+        "system", // <tool-update> nudge
         "assistant", // enable_tools call
-        "system",    // [TOOL SET UPDATED] documentation addendum
+        "system", // [TOOL SET UPDATED] documentation addendum
         "assistant", // search_events call
         "assistant", // final response
       ]);
@@ -2377,7 +2458,8 @@ describe("Message Array Construction", () => {
       // Iteration 1: response truncated by max_tokens
       currentMessages.push({
         role: "assistant",
-        content: "# Comprehensive Guide to Rust\n\n## Chapter 1: Getting Started\n\nRust is a systems programming language...",
+        content:
+          "# Comprehensive Guide to Rust\n\n## Chapter 1: Getting Started\n\nRust is a systems programming language...",
         thinking: "This is a long guide. Let me structure it by chapters.",
         thinkingSignature: "sig_truncated_1",
       });
@@ -2394,7 +2476,8 @@ describe("Message Array Construction", () => {
       // Iteration 2: model continues from where it left off
       currentMessages.push({
         role: "assistant",
-        content: "## Chapter 2: Ownership and Borrowing\n\nOne of Rust's most distinctive features...",
+        content:
+          "## Chapter 2: Ownership and Borrowing\n\nOne of Rust's most distinctive features...",
         model: "claude-sonnet-4-20250514",
         provider: "anthropic",
       });
@@ -2407,10 +2490,10 @@ describe("Message Array Construction", () => {
 
       expect(newTurnMessages).toHaveLength(5);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system",    // identity prompt
-        "user",      // user message
+        "system", // identity prompt
+        "user", // user message
         "assistant", // truncated partial output
-        "system",    // continuation prompt
+        "system", // continuation prompt
         "assistant", // continued response
       ]);
 
@@ -2459,7 +2542,10 @@ describe("Message Array Construction", () => {
             {
               id: `call_edit_${iteration}`,
               name: "edit_file",
-              args: { path: `file${iteration}.ts`, content: `// refactored file ${iteration}` },
+              args: {
+                path: `file${iteration}.ts`,
+                content: `// refactored file ${iteration}`,
+              },
               result: "File edited.",
               durationMs: 150,
             },
@@ -2853,7 +2939,10 @@ describe("Message Array Construction", () => {
   describe("Chained tool discovery (multiple search passes)", () => {
     it("should persist all tool-update messages from separate discovery chains", () => {
       const originalMessages: ConversationMessage[] = [
-        { role: "user", content: "find weather data and then search for events near me" },
+        {
+          role: "user",
+          content: "find weather data and then search for events near me",
+        },
       ];
       const originalMessageCount = originalMessages.length;
       const currentMessages: ConversationMessage[] = [...originalMessages];
@@ -3011,7 +3100,9 @@ describe("Message Array Construction", () => {
       expect(docMessages).toHaveLength(2);
 
       // Verify the final response is at the end
-      expect(newTurnMessages[newTurnMessages.length - 1].content).toContain("Jazz Fest");
+      expect(newTurnMessages[newTurnMessages.length - 1].content).toContain(
+        "Jazz Fest",
+      );
     });
   });
 
@@ -3022,7 +3113,10 @@ describe("Message Array Construction", () => {
   describe("Mixed system messages in a single turn", () => {
     it("should persist validation errors, tool-update nudges, and continuation prompts together", () => {
       const originalMessages: ConversationMessage[] = [
-        { role: "user", content: "use the search API to find products, then create a report" },
+        {
+          role: "user",
+          content: "use the search API to find products, then create a report",
+        },
       ];
       const originalMessageCount = originalMessages.length;
       const currentMessages: ConversationMessage[] = [...originalMessages];
@@ -3042,7 +3136,9 @@ describe("Message Array Construction", () => {
             id: "call_st",
             name: "search_tools",
             args: { query: "products" },
-            result: { matches: [{ name: "search_products", isEnabled: false }] },
+            result: {
+              matches: [{ name: "search_products", isEnabled: false }],
+            },
           },
         ],
       });
@@ -3050,7 +3146,8 @@ describe("Message Array Construction", () => {
       // <tool-update> nudge
       currentMessages.push({
         role: "system",
-        content: "<tool-update>\nYour search found 1 tool(s) that are not yet enabled: search_products.\n</tool-update>",
+        content:
+          "<tool-update>\nYour search found 1 tool(s) that are not yet enabled: search_products.\n</tool-update>",
       });
 
       // Iteration 2: enable tools
@@ -3070,7 +3167,8 @@ describe("Message Array Construction", () => {
       // [TOOL SET UPDATED]
       currentMessages.push({
         role: "system",
-        content: "<tool-update>\n[TOOL SET UPDATED] 1 new tool(s).\n</tool-update>",
+        content:
+          "<tool-update>\n[TOOL SET UPDATED] 1 new tool(s).\n</tool-update>",
       });
 
       // Iteration 3: use tool, then write report (with validation error)
@@ -3286,7 +3384,9 @@ describe("Message Array Construction", () => {
       // Platform and somatic should appear before the user message
       const platformIdx = newTurnMessages.indexOf(platformMessage!);
       const somaticIdx = newTurnMessages.indexOf(somaticMessage!);
-      const userIdx = newTurnMessages.findIndex((message) => message.role === "user");
+      const userIdx = newTurnMessages.findIndex(
+        (message) => message.role === "user",
+      );
       expect(platformIdx).toBeLessThan(somaticIdx);
       expect(somaticIdx).toBeLessThan(userIdx);
 
@@ -3322,7 +3422,8 @@ describe("Message Array Construction", () => {
     let currentMessages: ConversationMessage[];
     let originalMessageCount: number;
 
-    const LUPOS_IDENTITY = "You are Lupos, an insane recovering-drug-addicted artist wolf king...";
+    const LUPOS_IDENTITY =
+      "You are Lupos, an insane recovering-drug-addicted artist wolf king...";
     const SOMATIC_STATE = [
       "[Somatic State — Lupos]",
       "current_emotion: curious",
@@ -3332,9 +3433,7 @@ describe("Message Array Construction", () => {
     ].join("\n");
 
     beforeEach(() => {
-      originalMessages = [
-        { role: "user", content: "hey lupos, what's up?" },
-      ];
+      originalMessages = [{ role: "user", content: "hey lupos, what's up?" }];
       originalMessageCount = originalMessages.length;
       currentMessages = [...originalMessages];
 
@@ -3391,9 +3490,9 @@ describe("Message Array Construction", () => {
 
       expect(newTurnMessages).toHaveLength(4);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system",    // identity
-        "system",    // somatic state (NO platform context between them)
-        "user",      // user message
+        "system", // identity
+        "system", // somatic state (NO platform context between them)
+        "user", // user message
         "assistant", // response
       ]);
     });
@@ -3405,14 +3504,13 @@ describe("Message Array Construction", () => {
   describe("_isIdentityPrompt tag — reliable conversationMeta.systemPrompt capture", () => {
     let currentMessages: ConversationMessage[];
 
-    const LUPOS_IDENTITY = "You are Lupos, an insane recovering-drug-addicted artist wolf king...";
+    const LUPOS_IDENTITY =
+      "You are Lupos, an insane recovering-drug-addicted artist wolf king...";
     const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab";
     const SOMATIC_STATE = "[Somatic State — Lupos]\ncurrent_emotion: amused";
 
     beforeEach(() => {
-      currentMessages = [
-        { role: "user", content: "hey lupos" },
-      ];
+      currentMessages = [{ role: "user", content: "hey lupos" }];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: LUPOS_IDENTITY,
@@ -3447,7 +3545,8 @@ describe("Message Array Construction", () => {
 
     it("should find identity prompt via _isIdentityPrompt tag even if other system messages exist", () => {
       const identityMessage = currentMessages.find(
-        (message) => message.role === "system" && message._isIdentityPrompt === true,
+        (message) =>
+          message.role === "system" && message._isIdentityPrompt === true,
       );
       expect(identityMessage).toBeDefined();
       expect(identityMessage!.content).toBe(LUPOS_IDENTITY);
@@ -3466,7 +3565,8 @@ describe("Message Array Construction", () => {
       // Simulate the harness capture logic
       const capturedMessage =
         messagesWithErrorFirst.find(
-          (message) => message.role === "system" && message._isIdentityPrompt === true,
+          (message) =>
+            message.role === "system" && message._isIdentityPrompt === true,
         ) ||
         messagesWithErrorFirst.find((message) => message.role === "system");
 
@@ -3481,11 +3581,13 @@ describe("Message Array Construction", () => {
 
       const capturedMessage =
         legacyMessages.find(
-          (message) => message.role === "system" && message._isIdentityPrompt === true,
-        ) ||
-        legacyMessages.find((message) => message.role === "system");
+          (message) =>
+            message.role === "system" && message._isIdentityPrompt === true,
+        ) || legacyMessages.find((message) => message.role === "system");
 
-      expect(capturedMessage!.content).toBe("Legacy identity prompt without tag");
+      expect(capturedMessage!.content).toBe(
+        "Legacy identity prompt without tag",
+      );
     });
   });
 
@@ -3496,7 +3598,8 @@ describe("Message Array Construction", () => {
     it("should capture identity prompt when all three system message types exist", () => {
       const LUPOS_IDENTITY = "You are Lupos...";
       const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab";
-      const SOMATIC_STATE = "[Somatic State — Lupos]\ncurrent_emotion: melancholy";
+      const SOMATIC_STATE =
+        "[Somatic State — Lupos]\ncurrent_emotion: melancholy";
 
       const currentMessages: ConversationMessage[] = [
         { role: "user", content: "hey" },
@@ -3511,9 +3614,9 @@ describe("Message Array Construction", () => {
       // Simulate the harness capture logic (same as ReActHarness line 174-185)
       const assembledSystemMessage =
         currentMessages.find(
-          (message) => message.role === "system" && message._isIdentityPrompt === true,
-        ) ||
-        currentMessages.find((message) => message.role === "system");
+          (message) =>
+            message.role === "system" && message._isIdentityPrompt === true,
+        ) || currentMessages.find((message) => message.role === "system");
 
       const conversationMeta: Record<string, unknown> = {};
       if (assembledSystemMessage?.content) {
@@ -3541,9 +3644,9 @@ describe("Message Array Construction", () => {
 
       const assembledSystemMessage =
         currentMessages.find(
-          (message) => message.role === "system" && message._isIdentityPrompt === true,
-        ) ||
-        currentMessages.find((message) => message.role === "system");
+          (message) =>
+            message.role === "system" && message._isIdentityPrompt === true,
+        ) || currentMessages.find((message) => message.role === "system");
 
       expect(assembledSystemMessage!.content).toBe(LUPOS_IDENTITY);
     });

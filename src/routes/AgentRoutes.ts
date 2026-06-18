@@ -73,9 +73,15 @@ router.post(
     }
 
     // Normalize: structured answers take priority, fall back to simple string
-    let normalizedAnswers: { answer: string | string[]; annotations?: string }[];
+    let normalizedAnswers: {
+      answer: string | string[];
+      annotations?: string;
+    }[];
     if (Array.isArray(answers) && answers.length > 0) {
-      normalizedAnswers = answers as { answer: string | string[]; annotations?: string }[];
+      normalizedAnswers = answers as {
+        answer: string | string[];
+        annotations?: string;
+      }[];
     } else if (answer !== undefined && answer !== null) {
       normalizedAnswers = [{ answer: String(answer) }];
     } else {
@@ -125,7 +131,10 @@ router.post(
       return response.status(400).json({ error: "Missing frameDataUrl" });
     }
 
-    LiveFrameService.pushFrame(conversationId as string, frameDataUrl as string);
+    LiveFrameService.pushFrame(
+      conversationId as string,
+      frameDataUrl as string,
+    );
     response.json({ ok: true });
   }),
 );

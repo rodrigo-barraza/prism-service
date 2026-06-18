@@ -59,7 +59,10 @@ export class GitWorktreeHelper {
         body: JSON.stringify(body),
       });
       if (!response.ok) {
-        const errorData = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+        const errorData = (await response.json().catch(() => ({}))) as Record<
+          string,
+          unknown
+        >;
         const errorMessage =
           typeof errorData.error === "string"
             ? errorData.error
@@ -68,7 +71,9 @@ export class GitWorktreeHelper {
       }
       return (await response.json()) as T;
     } catch (error: unknown) {
-      return { error: `Failed to reach tools-api: ${getErrorMessage(error)}` } as unknown as T;
+      return {
+        error: `Failed to reach tools-api: ${getErrorMessage(error)}`,
+      } as unknown as T;
     }
   }
 
@@ -76,28 +81,8 @@ export class GitWorktreeHelper {
     repositoryPath: string,
     branchName: string,
   ): Promise<WorktreeCreateResponse> {
-    return GitWorktreeHelper.toolsApiPost<WorktreeCreateResponse>("/agentic/git/worktree/create", {
-      path: repositoryPath,
-      branch: branchName,
-    });
-  }
-
-  static async removeWorktree(
-    repositoryPath: string,
-    worktreePath: string,
-  ): Promise<ToolsApiResponse> {
-    return GitWorktreeHelper.toolsApiPost<ToolsApiResponse>("/agentic/git/worktree/remove", {
-      path: repositoryPath,
-      worktreePath,
-    });
-  }
-
-  static async getWorktreeDiff(
-    repositoryPath: string,
-    branchName: string,
-  ): Promise<ToolsApiResponse & Partial<WorktreeDiff>> {
-    return GitWorktreeHelper.toolsApiPost<ToolsApiResponse & Partial<WorktreeDiff>>(
-      "/agentic/git/worktree/diff",
+    return GitWorktreeHelper.toolsApiPost<WorktreeCreateResponse>(
+      "/agentic/git/worktree/create",
       {
         path: repositoryPath,
         branch: branchName,
@@ -105,21 +90,54 @@ export class GitWorktreeHelper {
     );
   }
 
+  static async removeWorktree(
+    repositoryPath: string,
+    worktreePath: string,
+  ): Promise<ToolsApiResponse> {
+    return GitWorktreeHelper.toolsApiPost<ToolsApiResponse>(
+      "/agentic/git/worktree/remove",
+      {
+        path: repositoryPath,
+        worktreePath,
+      },
+    );
+  }
+
+  static async getWorktreeDiff(
+    repositoryPath: string,
+    branchName: string,
+  ): Promise<ToolsApiResponse & Partial<WorktreeDiff>> {
+    return GitWorktreeHelper.toolsApiPost<
+      ToolsApiResponse & Partial<WorktreeDiff>
+    >("/agentic/git/worktree/diff", {
+      path: repositoryPath,
+      branch: branchName,
+    });
+  }
+
   static async mergeWorktree(
     repositoryPath: string,
     branchName: string,
     message: string,
   ): Promise<ToolsApiResponse> {
-    return GitWorktreeHelper.toolsApiPost<ToolsApiResponse>("/agentic/git/worktree/merge", {
-      path: repositoryPath,
-      branch: branchName,
-      message,
-    });
+    return GitWorktreeHelper.toolsApiPost<ToolsApiResponse>(
+      "/agentic/git/worktree/merge",
+      {
+        path: repositoryPath,
+        branch: branchName,
+        message,
+      },
+    );
   }
 
-  static async cleanupWorktrees(repositoryPath: string): Promise<ToolsApiResponse> {
-    return GitWorktreeHelper.toolsApiPost<ToolsApiResponse>("/agentic/git/worktree/cleanup", {
-      path: repositoryPath,
-    });
+  static async cleanupWorktrees(
+    repositoryPath: string,
+  ): Promise<ToolsApiResponse> {
+    return GitWorktreeHelper.toolsApiPost<ToolsApiResponse>(
+      "/agentic/git/worktree/cleanup",
+      {
+        path: repositoryPath,
+      },
+    );
   }
 }

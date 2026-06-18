@@ -50,7 +50,10 @@ export default class AutoCompactionTrigger {
     contextWindowSize: number,
     maxOutputTokens: number,
   ): number {
-    const reservedForSummary = Math.min(maxOutputTokens, MAX_OUTPUT_TOKENS_FOR_SUMMARY);
+    const reservedForSummary = Math.min(
+      maxOutputTokens,
+      MAX_OUTPUT_TOKENS_FOR_SUMMARY,
+    );
     return contextWindowSize - reservedForSummary;
   }
 
@@ -86,10 +89,14 @@ export default class AutoCompactionTrigger {
       contextWindowSize,
       maxOutputTokens,
     );
-    const threshold = this.getAutoCompactThreshold(contextWindowSize, maxOutputTokens);
-    const percentUsed = effectiveContextWindow > 0
-      ? Math.round((estimatedTokens / effectiveContextWindow) * 100)
-      : 0;
+    const threshold = this.getAutoCompactThreshold(
+      contextWindowSize,
+      maxOutputTokens,
+    );
+    const percentUsed =
+      effectiveContextWindow > 0
+        ? Math.round((estimatedTokens / effectiveContextWindow) * 100)
+        : 0;
 
     const shouldCompact =
       estimatedTokens >= threshold &&

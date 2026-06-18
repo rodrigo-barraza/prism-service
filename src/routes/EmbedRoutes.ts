@@ -82,7 +82,7 @@ router.post(
         };
 
         if (images && images.length > 0) {
-                    for ( const image of images) {
+          for (const image of images) {
             const { data, mimeType } = parseDataUrl(image, "image/jpeg");
             parts.push({ inlineData: { data, mimeType } });
           }

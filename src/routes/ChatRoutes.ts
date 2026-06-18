@@ -1,6 +1,14 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import { formatCostTag, roundMilliseconds } from "@rodrigo-barraza/utilities-library";
-import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES, DEFAULT_TOPOLOGY, DEFAULT_CONVERSATION_TITLE } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  formatCostTag,
+  roundMilliseconds,
+} from "@rodrigo-barraza/utilities-library";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+  DEFAULT_TOPOLOGY,
+  DEFAULT_CONVERSATION_TITLE,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response, NextFunction } from "express";
 import {
   finalizeTextGeneration,
@@ -22,7 +30,10 @@ import {
   mergeUsage,
 } from "../utils/CostCalculator.ts";
 import type { TokenUsage } from "../types/admin.ts";
-import type { ToolCallPayload, TokenUsage as FinalizerTokenUsage } from "../services/RequestLogger.ts";
+import type {
+  ToolCallPayload,
+  TokenUsage as FinalizerTokenUsage,
+} from "../services/RequestLogger.ts";
 import logger from "../utils/logger.ts";
 import RequestLogger from "../services/RequestLogger.ts";
 import FileService from "../services/FileService.ts";
@@ -45,7 +56,11 @@ import {
 import { handleSseRequest, handleJsonRequest } from "../utils/SseUtilities.ts";
 import { SseEvent } from "../types/SseTypes.ts";
 import { ChatRequestSchema } from "../types/index.ts";
-import type { ConversationMessage, EmitFunction, ToolSchema } from "../services/harnesses/types.ts";
+import type {
+  ConversationMessage,
+  EmitFunction,
+  ToolSchema,
+} from "../services/harnesses/types.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { PROVIDERS, FILE_CATEGORIES } from "../constants.ts";
 
@@ -64,7 +79,10 @@ function injectToolsIntoSystemPrompt(
 
   const groups = new Map<string, ToolSchemaWithDomain[]>();
   for (const tool of tools) {
-    const domain = ((tool.domain as string) || "Other").replace(/^Agentic:\s*/i, "");
+    const domain = ((tool.domain as string) || "Other").replace(
+      /^Agentic:\s*/i,
+      "",
+    );
     if (!groups.has(domain)) {
       groups.set(domain, []);
     }
@@ -75,13 +93,19 @@ function injectToolsIntoSystemPrompt(
   for (const [domain, domainTools] of groups) {
     const entries = domainTools.map((tool) => {
       const description = (tool.description as string) || "";
-      const parameters = (tool.parameters as Record<string, unknown>)?.properties as Record<string, Record<string, unknown>> || {};
+      const parameters =
+        ((tool.parameters as Record<string, unknown>)?.properties as Record<
+          string,
+          Record<string, unknown>
+        >) || {};
       const parameterNames = Object.keys(parameters);
-      const required = ((tool.parameters as Record<string, unknown>)?.required || []) as string[];
+      const required = ((tool.parameters as Record<string, unknown>)
+        ?.required || []) as string[];
       const parameterString = parameterNames
         .map((parameterName) => {
           const isRequired = required.includes(parameterName);
-          const parameterDescription = (parameters[parameterName].description as string) || "";
+          const parameterDescription =
+            (parameters[parameterName].description as string) || "";
           return `  - ${parameterName}${isRequired ? " (required)" : ""}: ${parameterDescription}`;
         })
         .join("\n");
@@ -92,17 +116,23 @@ function injectToolsIntoSystemPrompt(
     sections.push(`**${domain}**\n${entries.join("\n\n")}`);
   }
 
-  const toolsSection = `\n\n## Enabled Tools (${tools.length})\n` + sections.join("\n\n");
+  const toolsSection =
+    `\n\n## Enabled Tools (${tools.length})\n` + sections.join("\n\n");
 
   const systemMessage = messages.find((message) => message.role === "system");
   if (systemMessage) {
-    if (typeof systemMessage.content === "string" && !systemMessage.content.includes("## Enabled Tools")) {
+    if (
+      typeof systemMessage.content === "string" &&
+      !systemMessage.content.includes("## Enabled Tools")
+    ) {
       systemMessage.content += toolsSection;
     }
   } else {
     messages.unshift({
       role: "system",
-      content: `You are a helpful AI assistant with access to a comprehensive suite of real-time data and utility tools. Present data clearly with relevant formatting. For questions that don't require API data, respond naturally without tool calls.` + toolsSection,
+      content:
+        `You are a helpful AI assistant with access to a comprehensive suite of real-time data and utility tools. Present data clearly with relevant formatting. For questions that don't require API data, respond naturally without tool calls.` +
+        toolsSection,
     });
   }
 }
@@ -125,8 +155,17 @@ async function prepareGenerationContext(
   const parseResult = ChatRequestSchema.safeParse(params);
   if (!parseResult.success) {
     // Custom error mappings to match the exact ones expected by existing consumers and test cases
-    if (!params || !("provider" in params) || params.provider === undefined || params.provider === null) {
-      throw new ProviderError("server", "Missing required field: provider", 400);
+    if (
+      !params ||
+      !("provider" in params) ||
+      params.provider === undefined ||
+      params.provider === null
+    ) {
+      throw new ProviderError(
+        "server",
+        "Missing required field: provider",
+        400,
+      );
     }
     if (!params || !("messages" in params) || !Array.isArray(params.messages)) {
       throw new ProviderError(
@@ -136,12 +175,12 @@ async function prepareGenerationContext(
       );
     }
     const issueMessages = parseResult.error.issues.map(
-      (issue) => `${issue.path.join(".")}: ${issue.message}`
+      (issue) => `${issue.path.join(".")}: ${issue.message}`,
     );
     throw new ProviderError(
       "server",
       `Validation failed: ${issueMessages.join("; ")}`,
-      400
+      400,
     );
   }
 
@@ -260,13 +299,17 @@ async function prepareGenerationContext(
     ...(topology != null && { topology }),
     ...(parallelToolCalls != null && { parallelToolCalls }),
     ...(candidateCount != null && { candidateCount }),
-    ...(responseMimeType != null && responseMimeType !== "" && { responseMimeType }),
+    ...(responseMimeType != null &&
+      responseMimeType !== "" && { responseMimeType }),
     ...(store != null && { store }),
-    ...(mediaResolution != null && mediaResolution !== "" && { mediaResolution }),
+    ...(mediaResolution != null &&
+      mediaResolution !== "" && { mediaResolution }),
     ...(topLogprobs != null && topLogprobs > 0 && { topLogprobs }),
     ...(responseLogprobs != null && { responseLogprobs }),
     ...(logprobs != null && logprobs > 0 && { logprobs }),
-    ...((extraParams as Record<string, unknown>).systemPrompt ? { systemPrompt: (extraParams as Record<string, unknown>).systemPrompt } : {}),
+    ...((extraParams as Record<string, unknown>).systemPrompt
+      ? { systemPrompt: (extraParams as Record<string, unknown>).systemPrompt }
+      : {}),
   };
   // When thinking is explicitly disabled, strip all thinking sub-params
   // so providers don't inadvertently enable thinking by detecting them.
@@ -289,8 +332,13 @@ async function prepareGenerationContext(
   // (e.g., temperature=0, maxTokens=16384, reasoningEffort="high").
   if (agent) {
     const agentDefaultValues = getAgentDefaults();
-    for (const [parameterKey, defaultValue] of Object.entries(agentDefaultValues)) {
-      if (options[parameterKey] === undefined || options[parameterKey] === null) {
+    for (const [parameterKey, defaultValue] of Object.entries(
+      agentDefaultValues,
+    )) {
+      if (
+        options[parameterKey] === undefined ||
+        options[parameterKey] === null
+      ) {
         options[parameterKey] = defaultValue;
       }
     }
@@ -318,7 +366,8 @@ async function prepareGenerationContext(
   // each instance (with quant-level fallback) and pick the least-busy
   // usable instance. Same model resolution logic as OrchestratorService.
   let resolvedModel =
-    requestedModel || getDefaultModels(TYPES.TEXT, TYPES.TEXT)[providerName as string];
+    requestedModel ||
+    getDefaultModels(TYPES.TEXT, TYPES.TEXT)[providerName as string];
   if (localModelQueue.isLocal(providerName)) {
     let siblings = getInstancesByType(providerName);
     // ── Model resolution (always) ──────────────────────────────
@@ -367,7 +416,7 @@ async function prepareGenerationContext(
         }
         logger.info(
           `[chat] ⚖️ Load balance: ${providerName} → ${bestId} ` +
-          `(model="${resolvedModel}", ${siblings.map((sibling) => `${sibling.id}:${sibling.concurrency - localModelQueue._getQueue(sibling.id).activeCount}free`).join(", ")})`,
+            `(model="${resolvedModel}", ${siblings.map((sibling) => `${sibling.id}:${sibling.concurrency - localModelQueue._getQueue(sibling.id).activeCount}free`).join(", ")})`,
         );
         providerName = bestId;
       }
@@ -378,7 +427,9 @@ async function prepareGenerationContext(
   // resolvedModel is set earlier (before load balancing) and may have
   // been updated to a quant variant by the model availability check.
   const modelDefinition = getModelByName(resolvedModel);
-  const isImageAPIModel = (modelDefinition as Record<string, unknown> | null)?.imageAPI && provider.generateImage;
+  const isImageAPIModel =
+    (modelDefinition as Record<string, unknown> | null)?.imageAPI &&
+    provider.generateImage;
   // ── Local GPU mutex ──────────────────────────────────────
   let localRelease: (() => void) | null = null;
   if (localModelQueue.isLocal(providerName)) {
@@ -423,7 +474,7 @@ async function prepareGenerationContext(
     // Control
     emit,
     signal,
-        localRelease,
+    localRelease,
   };
 }
 // ─── Chat / Conversation persistence path ───────────────────
@@ -438,11 +489,15 @@ export async function handleConversation(
   emit: EmitFunction,
   { signal }: { signal?: AbortSignal } = {},
 ) {
-  let context: Awaited<ReturnType<typeof prepareGenerationContext>> | null = null;
+  let context: Awaited<ReturnType<typeof prepareGenerationContext>> | null =
+    null;
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
-        emit({ type: SERVER_SENT_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
+    emit({
+      type: SERVER_SENT_EVENT_TYPES.ERROR,
+      message: getErrorMessage(error),
+    });
     return;
   }
   const {
@@ -471,7 +526,8 @@ export async function handleConversation(
       ?.filter((conversationMessage) => conversationMessage.role === "user")
       .pop();
     const titleSnippet =
-      (firstUserMessage?.content || "").slice(0, 100).trim() || DEFAULT_CONVERSATION_TITLE;
+      (firstUserMessage?.content || "").slice(0, 100).trim() ||
+      DEFAULT_CONVERSATION_TITLE;
     conversationMeta = conversationMeta || { title: titleSnippet };
   }
   const traceId = incomingTraceId || null;
@@ -494,7 +550,10 @@ export async function handleConversation(
         await handleImageAPIModel(fullContext);
         return;
       }
-      if (!context.provider.generateTextStream && !context.provider.generateText) {
+      if (
+        !context.provider.generateTextStream &&
+        !context.provider.generateText
+      ) {
         throw new ProviderError(
           providerName,
           `Provider "${providerName}" does not support text generation`,
@@ -504,10 +563,15 @@ export async function handleConversation(
       // Resolve and inject tools for /chat function calling
       if (options.functionCallingEnabled && !options.agenticLoopEnabled) {
         const useNativeMcp = LocalProviderGateway.isNativeMCP(providerName);
-        const { default: SettingsService } = await import("../services/SettingsService.ts");
+        const { default: SettingsService } =
+          await import("../services/SettingsService.ts");
         const settings = await SettingsService.getSection("agents");
-        const defaultTopology = (options.topology as string) || settings?.topology || DEFAULT_TOPOLOGY;
-        const builtInTools = ToolOrchestratorService.getToolSchemas(defaultTopology);
+        const defaultTopology =
+          (options.topology as string) ||
+          settings?.topology ||
+          DEFAULT_TOPOLOGY;
+        const builtInTools =
+          ToolOrchestratorService.getToolSchemas(defaultTopology);
         let tools = builtInTools;
         if (options.enabledTools && Array.isArray(options.enabledTools)) {
           const enabledSet = new Set(options.enabledTools as string[]);
@@ -522,10 +586,22 @@ export async function handleConversation(
         options.tools = tools;
 
         // Inject tool descriptions into the system prompt
-        injectToolsIntoSystemPrompt(fullContext.messages as Array<{ role: string; content?: string; [key: string]: unknown }>, tools as ToolSchemaWithDomain[]);
+        injectToolsIntoSystemPrompt(
+          fullContext.messages as Array<{
+            role: string;
+            content?: string;
+            [key: string]: unknown;
+          }>,
+          tools as ToolSchemaWithDomain[],
+        );
 
-        if (useNativeMcp && (modelDefinition as Record<string, unknown> | null)?.contextLength) {
-          options.contextLength = (modelDefinition as Record<string, unknown>).contextLength;
+        if (
+          useNativeMcp &&
+          (modelDefinition as Record<string, unknown> | null)?.contextLength
+        ) {
+          options.contextLength = (
+            modelDefinition as Record<string, unknown>
+          ).contextLength;
         }
 
         logger.info(
@@ -534,7 +610,9 @@ export async function handleConversation(
       }
 
       const useStreaming =
-        typeof context.provider.generateTextStream === "function" && (modelDefinition as Record<string, unknown> | null)?.streaming !== false;
+        typeof context.provider.generateTextStream === "function" &&
+        (modelDefinition as Record<string, unknown> | null)?.streaming !==
+          false;
       if (useStreaming) {
         await handleStreamingText(fullContext);
       } else {
@@ -573,7 +651,10 @@ export async function handleConversation(
       messages: context.rawMessages || [],
       options,
     });
-        emit({ type: SERVER_SENT_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
+    emit({
+      type: SERVER_SENT_EVENT_TYPES.ERROR,
+      message: getErrorMessage(error),
+    });
   }
 }
 // ─── Agent session path (agentSessionId, no conversationId) ─
@@ -583,12 +664,20 @@ export async function handleConversation(
  *
  * Used exclusively by the /agent route.
  */
-export async function handleAgent(params: Record<string, unknown>, emit: (event: SseEvent) => void, { signal }: { signal?: AbortSignal } = {}) {
-  let context: Awaited<ReturnType<typeof prepareGenerationContext>> | null = null;
+export async function handleAgent(
+  params: Record<string, unknown>,
+  emit: (event: SseEvent) => void,
+  { signal }: { signal?: AbortSignal } = {},
+) {
+  let context: Awaited<ReturnType<typeof prepareGenerationContext>> | null =
+    null;
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
-        emit({ type: SERVER_SENT_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
+    emit({
+      type: SERVER_SENT_EVENT_TYPES.ERROR,
+      message: getErrorMessage(error),
+    });
     return;
   }
   const {
@@ -609,8 +698,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
     localRelease,
   } = context;
   // ── Agent session identity ─────────────────────────────────
-  const agentSessionId =
-    incomingAgentSessionId || crypto.randomUUID();
+  const agentSessionId = incomingAgentSessionId || crypto.randomUUID();
   const conversationId = incomingConversationId || crypto.randomUUID();
   const traceId = incomingTraceId || null;
   const conversationMeta = incomingConversationMeta || null;
@@ -618,20 +706,20 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
   // Create the session document immediately via upsert so that
   // GET /agent-sessions/:id never 404s while the loop is running
   // (e.g. when the user switches away and back during generation).
-  markGenerating(
-    conversationId,
-    project,
-    username,
-    true,
-    {
-      ...getCollectionOpts(project),
-      agent: agent ?? undefined,
-      title: typeof conversationMeta?.title === "string" ? conversationMeta.title : undefined,
-    },
-  );
+  markGenerating(conversationId, project, username, true, {
+    ...getCollectionOpts(project),
+    agent: agent ?? undefined,
+    title:
+      typeof conversationMeta?.title === "string"
+        ? conversationMeta.title
+        : undefined,
+  });
   try {
     try {
-      if (!context!.provider.generateTextStream && !context!.provider.generateText) {
+      if (
+        !context!.provider.generateTextStream &&
+        !context!.provider.generateText
+      ) {
         throw new ProviderError(
           providerName,
           `Provider "${providerName}" does not support text generation`,
@@ -652,7 +740,8 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
       }
 
       await AgenticLoopService.runAgenticLoop({
-        provider: context.provider as import("../services/harnesses/types.ts").LLMProvider,
+        provider:
+          context.provider as import("../services/harnesses/types.ts").LLMProvider,
         providerName,
         resolvedModel,
         modelDefinition: context.modelDefinition,
@@ -676,7 +765,7 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
       });
     } finally {
       if (localRelease) {
-                localRelease();
+        localRelease();
         logger.info(`[agent] 🔓 Released local GPU lock for ${resolvedModel}`);
       }
       // When the SSE connection is severed (user pressed stop), abort any
@@ -685,9 +774,13 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
         try {
           const { default: OrchestratorService } =
             await import("../services/OrchestratorService.js");
-          await OrchestratorService.abortSubAgentsByConversation(conversationId);
+          await OrchestratorService.abortSubAgentsByConversation(
+            conversationId,
+          );
         } catch (cleanupError: unknown) {
-                    logger.warn(`[agent] Sub-agent cleanup failed: ${getErrorMessage(cleanupError)}`);
+          logger.warn(
+            `[agent] Sub-agent cleanup failed: ${getErrorMessage(cleanupError)}`,
+          );
         }
       }
     }
@@ -720,11 +813,20 @@ export async function handleAgent(params: Record<string, unknown>, emit: (event:
       messages: context.rawMessages || [],
       options,
     });
-        emit({ type: SERVER_SENT_EVENT_TYPES.ERROR, message: getErrorMessage(error) });
+    emit({
+      type: SERVER_SENT_EVENT_TYPES.ERROR,
+      message: getErrorMessage(error),
+    });
   }
 }
 // ─── Dispatch: Image API models (e.g. GPT Image 1.5, OpenAI images) ─
-async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGenerationContext>> & { conversationId?: string | null; conversationMeta?: Record<string, unknown> | null; traceId?: string | null }) {
+async function handleImageAPIModel(
+  context: Awaited<ReturnType<typeof prepareGenerationContext>> & {
+    conversationId?: string | null;
+    conversationMeta?: Record<string, unknown> | null;
+    traceId?: string | null;
+  },
+) {
   const {
     provider,
     providerName,
@@ -744,17 +846,16 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
     emit,
   } = context;
   // Mark conversation as generating
-  markGenerating(
-    conversationId,
-    project,
-    username,
-    true,
-    {
-      ...getCollectionOpts(project),
-      title: typeof conversationMeta?.title === "string" ? conversationMeta.title : undefined,
-    },
-  );
-  const lastUserMessage = (messages as ConversationMessage[]).filter((conversationMessage) => conversationMessage.role === "user").pop();
+  markGenerating(conversationId, project, username, true, {
+    ...getCollectionOpts(project),
+    title:
+      typeof conversationMeta?.title === "string"
+        ? conversationMeta.title
+        : undefined,
+  });
+  const lastUserMessage = (messages as ConversationMessage[])
+    .filter((conversationMessage) => conversationMessage.role === "user")
+    .pop();
   const prompt = lastUserMessage?.content || "";
   // Collect all images from the conversation
   const allImages: string[] = [];
@@ -764,7 +865,9 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
     }
   }
   if (!provider.generateImage) {
-    throw new Error(`Provider "${providerName}" does not support image generation`);
+    throw new Error(
+      `Provider "${providerName}" does not support image generation`,
+    );
   }
   const result = await provider.generateImage(
     prompt,
@@ -775,9 +878,12 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
   const totalSec = (performance.now() - requestStart) / 1000;
   // Cost calculation
   const imgPricing =
-    getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel as string] || (modelDefinition as Record<string, unknown> | null)?.pricing;
+    getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel as string] ||
+    (modelDefinition as Record<string, unknown> | null)?.pricing;
   const outputImgTokens =
-    (modelDefinition as Record<string, unknown> | null)?.imageTokensPerImage as number || (providerName === PROVIDERS.OPENAI ? 1056 : 1120);
+    ((modelDefinition as Record<string, unknown> | null)
+      ?.imageTokensPerImage as number) ||
+    (providerName === PROVIDERS.OPENAI ? 1056 : 1120);
   const estimatedCost = calculateImageCost(
     prompt,
     imgPricing,
@@ -807,14 +913,16 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
       minioRef = ref;
     } catch (uploadError: unknown) {
       logger.error(
-                `[chat/image-api] MinIO upload failed: ${getErrorMessage(uploadError)}`,
+        `[chat/image-api] MinIO upload failed: ${getErrorMessage(uploadError)}`,
       );
     }
   }
   // Estimate token counts for tracking
   const estimatedInputTokens =
     estimateTokens(prompt) +
-    allImages.length * ((modelDefinition as Record<string, unknown> | null)?.imageTokensPerImage as number || 1120);
+    allImages.length *
+      (((modelDefinition as Record<string, unknown> | null)
+        ?.imageTokensPerImage as number) || 1120);
   RequestLogger.log({
     requestId,
     endpoint: "/chat",
@@ -857,7 +965,9 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
       messagesToAppend.push({
         ...userMessage,
         role: "user",
-        timestamp: (userMessage as ConversationMessage).timestamp || new Date().toISOString(),
+        timestamp:
+          (userMessage as ConversationMessage).timestamp ||
+          new Date().toISOString(),
       } as ConversationMessage);
     }
     const assistantImages = minioRef ? [minioRef] : [];
@@ -896,7 +1006,9 @@ async function handleImageAPIModel(context: Awaited<ReturnType<typeof prepareGen
   });
 }
 
-type GenerationContext = Awaited<ReturnType<typeof prepareGenerationContext>> & {
+type GenerationContext = Awaited<
+  ReturnType<typeof prepareGenerationContext>
+> & {
   conversationId: string | null;
   conversationMeta?: Record<string, unknown> | null;
   traceId?: string | null;
@@ -924,18 +1036,16 @@ async function handleStreamingText(context: GenerationContext) {
     signal,
   } = context;
   // Mark conversation as generating
-  markGenerating(
-    conversationId,
-    project,
-    username,
-    true,
-    {
-      ...getCollectionOpts(project),
-      title: typeof conversationMeta?.title === "string" ? conversationMeta.title : undefined,
-    },
-  );
+  markGenerating(conversationId, project, username, true, {
+    ...getCollectionOpts(project),
+    title:
+      typeof conversationMeta?.title === "string"
+        ? conversationMeta.title
+        : undefined,
+  });
   const stream =
-    (modelDefinition as Record<string, unknown> | null)?.liveAPI && provider.generateTextStreamLive
+    (modelDefinition as Record<string, unknown> | null)?.liveAPI &&
+    provider.generateTextStreamLive
       ? provider.generateTextStreamLive(messages as any, resolvedModel, {
           ...options,
           signal,
@@ -973,14 +1083,20 @@ async function handleStreamingText(context: GenerationContext) {
     options.functionCallingEnabled &&
     streamState.toolCalls.length > 0 &&
     streamState.toolCalls.some(
-      (toolCall) => !toolCall.result && toolCall.status !== "done" && toolCall.status !== "error",
+      (toolCall) =>
+        !toolCall.result &&
+        toolCall.status !== "done" &&
+        toolCall.status !== "error",
     ) &&
     functionCallIteration < MAX_FUNCTIONCALL_ITERATIONS &&
     !signal?.aborted
   ) {
     functionCallIteration++;
     const pendingCalls = streamState.toolCalls.filter(
-      (toolCall) => !toolCall.result && toolCall.status !== "done" && toolCall.status !== "error",
+      (toolCall) =>
+        !toolCall.result &&
+        toolCall.status !== "done" &&
+        toolCall.status !== "error",
     );
     if (pendingCalls.length === 0) break;
     logger.info(
@@ -1015,7 +1131,13 @@ async function handleStreamingText(context: GenerationContext) {
         );
         const durationMs = Date.now() - startTime;
         toolCall.result = result;
-        toolCall.status = (result && typeof result === "object" && "error" in result && result.error) ? "error" : "done";
+        toolCall.status =
+          result &&
+          typeof result === "object" &&
+          "error" in result &&
+          result.error
+            ? "error"
+            : "done";
         toolCall.durationMs = durationMs;
         emit({
           type: SERVER_SENT_EVENT_TYPES.TOOL_CALL,
@@ -1050,9 +1172,15 @@ async function handleStreamingText(context: GenerationContext) {
         id: toolCall.id,
         name: toolCall.name,
         args: toolCall.args,
-        ...(toolCall.responsesItemId ? { responsesItemId: toolCall.responsesItemId } : {}),
-        ...(toolCall.thoughtSignature ? { thoughtSignature: toolCall.thoughtSignature } : {}),
-        ...(toolCall.reasoningItem ? { reasoningItem: toolCall.reasoningItem } : {}),
+        ...(toolCall.responsesItemId
+          ? { responsesItemId: toolCall.responsesItemId }
+          : {}),
+        ...(toolCall.thoughtSignature
+          ? { thoughtSignature: toolCall.thoughtSignature }
+          : {}),
+        ...(toolCall.reasoningItem
+          ? { reasoningItem: toolCall.reasoningItem }
+          : {}),
       })),
       ...(streamState.thinking ? { thinking: streamState.thinking } : {}),
       ...(streamState.thinkingSignature
@@ -1066,10 +1194,16 @@ async function handleStreamingText(context: GenerationContext) {
         tool_call_id: toolCall.id,
         name: toolCall.name,
         content:
-          typeof toolCall.result === "string" ? toolCall.result : JSON.stringify(toolCall.result),
+          typeof toolCall.result === "string"
+            ? toolCall.result
+            : JSON.stringify(toolCall.result),
       }));
     // Re-call provider with tool results appended
-    const updatedMessages = [...messages, assistantToolMessage, ...toolResultMsgs];
+    const updatedMessages = [
+      ...messages,
+      assistantToolMessage,
+      ...toolResultMsgs,
+    ];
     // Reset accumulators for the follow-up stream
     streamState.text = "";
     streamState.thinking = "";
@@ -1109,15 +1243,22 @@ async function handleStreamingText(context: GenerationContext) {
     if (streamState.usage) {
       emit({
         type: SERVER_SENT_EVENT_TYPES.USAGE_UPDATE,
-        usage: { ...(streamState.usage as Record<string, unknown>), requests: functionCallIteration + 1 },
+        usage: {
+          ...(streamState.usage as Record<string, unknown>),
+          requests: functionCallIteration + 1,
+        },
       });
     }
     // Update messages ref for potential next iteration
-    (messages as Record<string, unknown>[]).push(assistantToolMessage, ...toolResultMsgs);
+    (messages as Record<string, unknown>[]).push(
+      assistantToolMessage,
+      ...toolResultMsgs,
+    );
   }
   // Surface max_tokens truncation if the model produced no useful output
   const isChatTruncated =
-    (streamState.stopReason === "length" || streamState.stopReason === "max_tokens") &&
+    (streamState.stopReason === "length" ||
+      streamState.stopReason === "max_tokens") &&
     !streamState.text.trim();
   if (isChatTruncated) {
     const truncationWarning =
@@ -1129,7 +1270,9 @@ async function handleStreamingText(context: GenerationContext) {
     });
     emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
-      message: (STATUS_MESSAGES as Record<string, string>).MAX_TOKENS_TRUNCATED || "max_tokens_truncated",
+      message:
+        (STATUS_MESSAGES as Record<string, string>).MAX_TOKENS_TRUNCATED ||
+        "max_tokens_truncated",
       phase: "truncated",
     });
     streamState.text = truncationWarning;
@@ -1140,17 +1283,24 @@ async function handleStreamingText(context: GenerationContext) {
     text: streamState.text,
     thinking: streamState.thinking,
     images: streamState.images,
-    toolCalls: streamState.toolCalls.map((toolCall): ToolCallPayload => ({
-      name: toolCall.name,
-      id: toolCall.id,
-      args: toolCall.args as Record<string, unknown>,
-      ...(toolCall.thoughtSignature ? { thoughtSignature: toolCall.thoughtSignature } : {}),
-      durationMs: toolCall.durationMs,
-    })),
+    toolCalls: streamState.toolCalls.map(
+      (toolCall): ToolCallPayload => ({
+        name: toolCall.name,
+        id: toolCall.id,
+        args: toolCall.args as Record<string, unknown>,
+        ...(toolCall.thoughtSignature
+          ? { thoughtSignature: toolCall.thoughtSignature }
+          : {}),
+        durationMs: toolCall.durationMs,
+      }),
+    ),
     audioChunks: streamState.audioChunks,
     audioSampleRate: streamState.audioSampleRate,
     usage: streamState.usage as FinalizerTokenUsage | null,
-    resolvedEnabledTools: (options.tools as ToolSchema[] | undefined)?.map((toolSchema) => toolSchema.name) || null,
+    resolvedEnabledTools:
+      (options.tools as ToolSchema[] | undefined)?.map(
+        (toolSchema) => toolSchema.name,
+      ) || null,
     outputCharacters: streamState.outputCharacters,
     timeToGenerationSec: streamState.firstTokenTime
       ? (streamState.firstTokenTime - requestStart) / 1000
@@ -1178,16 +1328,13 @@ async function handleNonStreamingText(context: GenerationContext) {
     emit,
   } = context;
   // Mark conversation as generating
-  markGenerating(
-    conversationId,
-    project,
-    username,
-    true,
-    {
-      ...getCollectionOpts(project),
-      title: typeof conversationMeta?.title === "string" ? conversationMeta.title : undefined,
-    },
-  );
+  markGenerating(conversationId, project, username, true, {
+    ...getCollectionOpts(project),
+    title:
+      typeof conversationMeta?.title === "string"
+        ? conversationMeta.title
+        : undefined,
+  });
   // Track this sub-request in SessionGenerationTracker if it belongs
   // to an active agent session (e.g., tools-api calling /chat?stream=false
   // for generate_image prompt-softening or describe_image).
@@ -1223,7 +1370,10 @@ async function handleNonStreamingText(context: GenerationContext) {
     emit({ type: SERVER_SENT_EVENT_TYPES.CHUNK, content: genResult.text });
   }
   if (genResult.thinking) {
-    emit({ type: SERVER_SENT_EVENT_TYPES.THINKING, content: genResult.thinking });
+    emit({
+      type: SERVER_SENT_EVENT_TYPES.THINKING,
+      content: genResult.thinking,
+    });
   }
   if (genResult.toolCalls && genResult.toolCalls.length > 0) {
     for (const toolCall of genResult.toolCalls) {
@@ -1258,7 +1408,8 @@ async function handleNonStreamingText(context: GenerationContext) {
           );
         }
         images.push(
-          minioRef || `data:${image.mimeType || "image/png"};base64,${image.data}`,
+          minioRef ||
+            `data:${image.mimeType || "image/png"};base64,${image.data}`,
         );
       }
       emit({
@@ -1285,7 +1436,10 @@ async function handleNonStreamingText(context: GenerationContext) {
     audioChunks: [],
     audioSampleRate: 24000,
     usage: genResult.usage || { inputTokens: 0, outputTokens: 0 },
-    resolvedEnabledTools: (options.tools as ToolSchema[] | undefined)?.map((toolSchema) => toolSchema.name) || null,
+    resolvedEnabledTools:
+      (options.tools as ToolSchema[] | undefined)?.map(
+        (toolSchema) => toolSchema.name,
+      ) || null,
     outputCharacters: genResult.text ? genResult.text.length : 0,
     timeToGenerationSec: (generationStart - requestStart) / 1000,
     generationSec: (now - generationStart) / 1000,

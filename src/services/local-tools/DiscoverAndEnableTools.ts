@@ -1,10 +1,19 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  TOOL_NAMES,
+  DOMAINS,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import SettingsService from "../SettingsService.ts";
-import { extractDiscoverableDomains, extractDomainKeywords } from "../personas/utils.ts";
+import {
+  extractDiscoverableDomains,
+  extractDomainKeywords,
+} from "../personas/utils.ts";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
-import { getCurrentDynamicTools, persistDynamicTools } from "./utils/DynamicToolHelpers.ts";
+import {
+  getCurrentDynamicTools,
+  persistDynamicTools,
+} from "./utils/DynamicToolHelpers.ts";
 
 import { getGlobalToolOrchestratorService } from "../../types/GlobalToolOrchestratorRegistry.ts";
 
@@ -29,17 +38,21 @@ export interface SearchToolsResult {
   message?: string;
 }
 
-
 /**
  * Build the discover_and_enable_tools schema with dynamic descriptions
  * derived from the live tool catalog. Domain lists, query examples,
  * and the tool count are never hardcoded.
  */
 function buildDiscoverAndEnableSchema() {
-  const totalToolCount = getToolOrchestratorService().getClientToolSchemas().length;
+  const totalToolCount =
+    getToolOrchestratorService().getClientToolSchemas().length;
   const discoverableDomains = extractDiscoverableDomains();
-  const domainListLowercase = discoverableDomains.map((domain) => domain.toLowerCase()).join(", ");
-  const domainListQuoted = discoverableDomains.map((domain) => `'${domain}'`).join(", ");
+  const domainListLowercase = discoverableDomains
+    .map((domain) => domain.toLowerCase())
+    .join(", ");
+  const domainListQuoted = discoverableDomains
+    .map((domain) => `'${domain}'`)
+    .join(", ");
 
   const domainKeywords = extractDomainKeywords(2);
   const sampleKeywords = [...domainKeywords.values()]
@@ -70,8 +83,7 @@ function buildDiscoverAndEnableSchema() {
         },
         domain: {
           type: "string",
-          description:
-            `Filter by tool domain. Known domains: ${domainListQuoted}.`,
+          description: `Filter by tool domain. Known domains: ${domainListQuoted}.`,
         },
         limit: {
           type: "number",
@@ -91,14 +103,21 @@ const discoverAndEnableTools = {
   domain: DOMAINS.CORE_DISCOVER.displayName,
   labels: ["tools", "discovery", "activation", "meta"],
 
-  async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: InternalToolContext,
+  ) {
     const sessionId = context.agentSessionId;
     if (!sessionId) {
       return { error: "No active agent session ID in context." };
     }
 
-    const query = typeof toolArguments.query === "string" ? toolArguments.query : "";
-    const domain = typeof toolArguments.domain === "string" ? toolArguments.domain : undefined;
+    const query =
+      typeof toolArguments.query === "string" ? toolArguments.query : "";
+    const domain =
+      typeof toolArguments.domain === "string"
+        ? toolArguments.domain
+        : undefined;
 
     if (!query && !domain) {
       return { error: "At least one of 'query' or 'domain' is required." };
@@ -107,18 +126,21 @@ const discoverAndEnableTools = {
     const agentSettings = await SettingsService.getSection("agents");
     if (agentSettings?.dynamicToolActivation === false) {
       return {
-        error: "Dynamic tool activation is disabled in settings. " +
+        error:
+          "Dynamic tool activation is disabled in settings. " +
           "An administrator can enable it in Settings → Agent Defaults.",
       };
     }
 
     // Step 1: Search via the tools-api
-    const searchResult = await getToolOrchestratorService().executeTool(
+    const searchResult = (await getToolOrchestratorService().executeTool(
       TOOL_NAMES.SEARCH_TOOLS,
       {
         query,
         domain: domain || undefined,
-        limit: toolArguments.limit ? Math.min(Number(toolArguments.limit), 50) : 20,
+        limit: toolArguments.limit
+          ? Math.min(Number(toolArguments.limit), 50)
+          : 20,
       },
       {
         project: context.project,
@@ -126,7 +148,7 @@ const discoverAndEnableTools = {
         agentSessionId: sessionId,
         enabledTools: context.enabledTools || [],
       },
-    ) as SearchToolsResult; // Trusting the internal service return shape, but asserting safely
+    )) as SearchToolsResult; // Trusting the internal service return shape, but asserting safely
 
     const matches = searchResult.matches;
 
@@ -139,7 +161,9 @@ const discoverAndEnableTools = {
     }
 
     // Step 2: Auto-enable all discovered tools
-    const discoveredToolNames = matches.map((matchEntry) => matchEntry.name).filter(Boolean);
+    const discoveredToolNames = matches
+      .map((matchEntry) => matchEntry.name)
+      .filter(Boolean);
     const currentDynamicTools = getCurrentDynamicTools(sessionId);
     const mergedToolSet = new Set(currentDynamicTools);
     const newlyActivatedTools: string[] = [];

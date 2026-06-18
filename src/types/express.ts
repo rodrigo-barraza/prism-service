@@ -5,7 +5,12 @@
  * Eliminates `(req: Request, res: Response, next: NextFunction)` across all route files.
  */
 
-import type { Request, Response, NextFunction, ErrorRequestHandler } from "express";
+import type {
+  Request,
+  Response,
+  NextFunction,
+  ErrorRequestHandler,
+} from "express";
 
 export type { Request, Response, NextFunction, ErrorRequestHandler };
 

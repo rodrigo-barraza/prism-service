@@ -28,7 +28,6 @@ interface QuantCandidate {
   sizeBytes: number;
 }
 
-
 interface ModelResolutionResult {
   usable: InstanceEntry[];
   modelOverrides: Map<string, string>;
@@ -76,7 +75,10 @@ export function parseModelQuant(modelKey: string): ParsedQuant {
  * on a specific instance. Ranks by `size_bytes` (file size on disk) —
  * the largest file is the highest-quality quantization.
  */
-export function findBestQuantFallback(targetModel: string, availableModels: AvailableModel[]): string | null {
+export function findBestQuantFallback(
+  targetModel: string,
+  availableModels: AvailableModel[],
+): string | null {
   const { base: targetBase, quant: targetQuant } = parseModelQuant(targetModel);
 
   // Find all available models that share the same base name (any quant variant)
@@ -170,7 +172,9 @@ export async function resolveModelForInstances(
     const summary = usable
       .map((instance) => {
         const override = modelOverrides.get(instance.id);
-        return override ? `${instance.id}→"${override}"` : `${instance.id} (exact)`;
+        return override
+          ? `${instance.id}→"${override}"`
+          : `${instance.id} (exact)`;
       })
       .join(", ");
     logger.info(

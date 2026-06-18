@@ -5,7 +5,10 @@
 
 import SessionGenerationTracker from "../SessionGenerationTracker.ts";
 import { estimateTokens } from "./SubAgentResultBuilder.ts";
-import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { EmitFunction, ToolCall } from "../harnesses/types.ts";
 
 interface SubAgentTelemetryConfig {
@@ -86,8 +89,10 @@ export class SubAgentTelemetryEmitter {
     const burstTokens = estimateTokens(this.burstOutputCharacters);
     let subAgentTokensPerSecond = null;
     if (burstTokens > 1 && this.burstFirstChunkTime && this.lastChunkTime) {
-      const elapsedSeconds = (this.lastChunkTime - this.burstFirstChunkTime) / 1000;
-      if (elapsedSeconds > 0.1) subAgentTokensPerSecond = burstTokens / elapsedSeconds;
+      const elapsedSeconds =
+        (this.lastChunkTime - this.burstFirstChunkTime) / 1000;
+      if (elapsedSeconds > 0.1)
+        subAgentTokensPerSecond = burstTokens / elapsedSeconds;
     }
     return {
       type: "sub_agent_status",
@@ -104,11 +109,22 @@ export class SubAgentTelemetryEmitter {
   /** Emit aggregate session-level generation_progress from the tracker. */
   private emitAggregateProgress() {
     if (!this.parentEmit || !this.parentSessionId) return;
-    const stats = SessionGenerationTracker.getSessionStats(this.parentSessionId);
+    const stats = SessionGenerationTracker.getSessionStats(
+      this.parentSessionId,
+    );
     if (stats.totalOutputTokens > 0 || stats.activeRequests > 0) {
-      this.highWaterMarkOutputTokens = Math.max(this.highWaterMarkOutputTokens, stats.totalOutputTokens);
-      this.highWaterMarkInputTokens = Math.max(this.highWaterMarkInputTokens, stats.totalInputTokens);
-      this.highWaterMarkTotalTokens = Math.max(this.highWaterMarkTotalTokens, stats.totalTokens);
+      this.highWaterMarkOutputTokens = Math.max(
+        this.highWaterMarkOutputTokens,
+        stats.totalOutputTokens,
+      );
+      this.highWaterMarkInputTokens = Math.max(
+        this.highWaterMarkInputTokens,
+        stats.totalInputTokens,
+      );
+      this.highWaterMarkTotalTokens = Math.max(
+        this.highWaterMarkTotalTokens,
+        stats.totalTokens,
+      );
       this.parentEmit({
         type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.GENERATION_PROGRESS,
@@ -162,7 +178,8 @@ export class SubAgentTelemetryEmitter {
   createEmitFunction(): EmitFunction {
     return (event) => {
       if (event.type === "chunk") {
-        const contentString = typeof event.content === "string" ? event.content : "";
+        const contentString =
+          typeof event.content === "string" ? event.content : "";
         this.output += contentString;
         const chunkCharacters = contentString.length;
 
@@ -189,7 +206,8 @@ export class SubAgentTelemetryEmitter {
           this.emitAggregateProgress();
         }
       } else if (event.type === "thinking") {
-        const contentString = typeof event.content === "string" ? event.content : "";
+        const contentString =
+          typeof event.content === "string" ? event.content : "";
         const thinkingCharacters = contentString.length;
 
         // Reset burst counters on phase transition (generating → thinking)
@@ -264,9 +282,11 @@ export class SubAgentTelemetryEmitter {
   private handleStatusEvent(event: Record<string, unknown>) {
     if (
       this.parentEmit &&
-      (event.message === "iteration_progress" || event.message === "sub_agents_updated")
+      (event.message === "iteration_progress" ||
+        event.message === "sub_agents_updated")
     ) {
-      if (typeof event.iteration === "number") this.iterations = event.iteration;
+      if (typeof event.iteration === "number")
+        this.iterations = event.iteration;
       this.parentEmit({
         type: "sub_agent_status",
         workerId: this.subAgentId,
@@ -298,11 +318,13 @@ export class SubAgentTelemetryEmitter {
 
   private handleDoneEvent(event: Record<string, unknown>) {
     // Capture cost and usage from finalizeTextGeneration
-    this.totalCost = typeof event.estimatedCost === "number" ? event.estimatedCost : null;
+    this.totalCost =
+      typeof event.estimatedCost === "number" ? event.estimatedCost : null;
     this.usage = isUsageRecord(event.usage) ? event.usage : null;
 
     if (this.parentEmit && isUsageRecord(event.usage)) {
-      const finalTokPerSec = typeof event.tokensPerSec === "number" ? event.tokensPerSec : null;
+      const finalTokPerSec =
+        typeof event.tokensPerSec === "number" ? event.tokensPerSec : null;
       const estimatedOutput = estimateTokens(this.cumulativeOutputCharacters);
       const finalOutputTokens = event.usage.outputTokens || estimatedOutput;
       const burstTokens = estimateTokens(this.burstOutputCharacters);

@@ -27,7 +27,11 @@ const AgentPersonaRegistry = {
 
   list() {
     return [...PERSONAS.values()]
-      .sort((firstPersona, secondPersona) => (firstPersona.displayOrder ?? 100) - (secondPersona.displayOrder ?? 100))
+      .sort(
+        (firstPersona, secondPersona) =>
+          (firstPersona.displayOrder ?? 100) -
+          (secondPersona.displayOrder ?? 100),
+      )
       .map((persona) => ({
         id: persona.id,
         name: persona.name,
@@ -57,15 +61,22 @@ const AgentPersonaRegistry = {
     if (!doc?.agentId || typeof doc.agentId !== "string") return;
 
     // Reconstruct PolicyRules from serialized format
-    const rawPolicies = Array.isArray(doc.policies) ? (doc.policies as SerializedPolicy[]) : [];
+    const rawPolicies = Array.isArray(doc.policies)
+      ? (doc.policies as SerializedPolicy[])
+      : [];
     const policies: PolicyRule[] = rawPolicies.map((serializedPolicy) => {
       const rule: PolicyRule = {
         tool: serializedPolicy.tool || "*",
         decision: (serializedPolicy.decision as PolicyDecision) || "ASK_USER",
-        name: serializedPolicy.name || `${serializedPolicy.decision}(${serializedPolicy.tool})`,
+        name:
+          serializedPolicy.name ||
+          `${serializedPolicy.decision}(${serializedPolicy.tool})`,
       };
       // Reconstruct `when` predicate from pattern string
-      if (serializedPolicy.pattern && typeof serializedPolicy.pattern === "string") {
+      if (
+        serializedPolicy.pattern &&
+        typeof serializedPolicy.pattern === "string"
+      ) {
         try {
           const regex = new RegExp(serializedPolicy.pattern);
           const field = serializedPolicy.field || "command";
@@ -103,7 +114,9 @@ const AgentPersonaRegistry = {
         if (Array.isArray(raw)) {
           sections = (raw as Array<Record<string, unknown>>).map((section) => ({
             content: (section.content as string) || "",
-            ...(Array.isArray(section.requires) ? { requires: section.requires as string[] } : {}),
+            ...(Array.isArray(section.requires)
+              ? { requires: section.requires as string[] }
+              : {}),
           }));
         } else {
           const text = (raw as string) || "";
@@ -112,13 +125,22 @@ const AgentPersonaRegistry = {
 
         return buildToolPolicy(sections, personaContext);
       },
-      availableTools: Array.isArray(doc.availableTools) ? (doc.availableTools as string[]) : Array.isArray(doc.enabledTools) ? (doc.enabledTools as string[]) : [],
-      enabledByDefaultTools: Array.isArray(doc.enabledByDefaultTools) ? (doc.enabledByDefaultTools as string[]) : undefined,
+      availableTools: Array.isArray(doc.availableTools)
+        ? (doc.availableTools as string[])
+        : Array.isArray(doc.enabledTools)
+          ? (doc.enabledTools as string[])
+          : [],
+      enabledByDefaultTools: Array.isArray(doc.enabledByDefaultTools)
+        ? (doc.enabledByDefaultTools as string[])
+        : undefined,
       policies: policies.length > 0 ? policies : undefined,
       capabilities: "",
-      platformRules: typeof doc.platformRules === 'object' && doc.platformRules !== null && Object.keys(doc.platformRules as object).length > 0
-        ? doc.platformRules as Record<string, string>
-        : undefined,
+      platformRules:
+        typeof doc.platformRules === "object" &&
+        doc.platformRules !== null &&
+        Object.keys(doc.platformRules as object).length > 0
+          ? (doc.platformRules as Record<string, string>)
+          : undefined,
       hasSomaticState: (doc.hasSomaticState as boolean) || false,
       usesDirectoryTree: (doc.usesDirectoryTree as boolean) || false,
       usesCodingGuidelines: (doc.usesCodingGuidelines as boolean) || false,
@@ -146,7 +168,8 @@ const AgentPersonaRegistry = {
    */
   async loadCustomAgents() {
     try {
-      const { default: CustomAgentService } = await import("./CustomAgentService.js");
+      const { default: CustomAgentService } =
+        await import("./CustomAgentService.js");
       const agents = await CustomAgentService.list();
 
       // Clear existing custom agents first

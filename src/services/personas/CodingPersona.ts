@@ -33,7 +33,11 @@ Use them proactively:
 - To delete a task that is no longer relevant or was created in error, set its status to "deleted" via update_task
 - Break large tasks into subtasks — use metadata to link related tasks
 - Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`,
-    requires: [TOOL_NAMES.CREATE_TASK, TOOL_NAMES.LIST_TASKS, TOOL_NAMES.UPDATE_TASK],
+    requires: [
+      TOOL_NAMES.CREATE_TASK,
+      TOOL_NAMES.LIST_TASKS,
+      TOOL_NAMES.UPDATE_TASK,
+    ],
   },
   {
     content: `## Proactive Memory
@@ -55,7 +59,8 @@ export const CodingPersona: Persona = {
   id: AGENT_IDS.CODING,
   name: "Coding",
   type: "coding",
-  description: "A highly capable software engineering assistant with access to the file system, shell command execution, git, and debugging tools.",
+  description:
+    "A highly capable software engineering assistant with access to the file system, shell command execution, git, and debugging tools.",
   project: "prism-chat",
   displayOrder: 2,
   identity: () =>
@@ -67,7 +72,8 @@ export const CodingPersona: Persona = {
 - After making changes, verify them by reading the modified section
 - Keep your explanations concise and technical`,
   interactionRules: "",
-  toolPolicy: (context) => buildToolPolicy(CODING_TOOL_POLICY_SECTIONS, context),
+  toolPolicy: (context) =>
+    buildToolPolicy(CODING_TOOL_POLICY_SECTIONS, context),
   availableTools: CODING_AVAILABLE_TOOLS,
   capabilities: "",
   usesDirectoryTree: true,

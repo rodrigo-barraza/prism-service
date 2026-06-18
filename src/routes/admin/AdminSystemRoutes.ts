@@ -70,7 +70,9 @@ router.get(
     );
 
     if (ChangeStreamService.available) {
-      const onEvent = (event: import("../../services/ChangeStreamService.ts").ChangeStreamEventPayload) => {
+      const onEvent = (
+        event: import("../../services/ChangeStreamService.ts").ChangeStreamEventPayload,
+      ) => {
         try {
           res.write(
             `data: ${JSON.stringify({ type: "change", ...event })}\n\n`,
@@ -146,37 +148,45 @@ router.get(
           .toArray(),
       ]);
 
-      const conversations = rawConversations.map((record: Record<string, unknown>) => {
-        const msgs = (record.messages || []) as Record<string, unknown>[];
-        const lastMessage = msgs.length > 0 ? msgs[msgs.length - 1] : null;
-        let lastMessageText = null;
-        if (lastMessage) {
-          const content = lastMessage.content;
-          if (typeof content === "string") {
-            lastMessageText = content;
-          } else if (Array.isArray(content)) {
-            const textPart = content.find((record: Record<string, unknown>) => record.type === "text");
-            lastMessageText = textPart?.text || null;
+      const conversations = rawConversations.map(
+        (record: Record<string, unknown>) => {
+          const msgs = (record.messages || []) as Record<string, unknown>[];
+          const lastMessage = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+          let lastMessageText = null;
+          if (lastMessage) {
+            const content = lastMessage.content;
+            if (typeof content === "string") {
+              lastMessageText = content;
+            } else if (Array.isArray(content)) {
+              const textPart = content.find(
+                (record: Record<string, unknown>) => record.type === "text",
+              );
+              lastMessageText = textPart?.text || null;
+            }
           }
-        }
-        const totalCost =
-          record.totalCost ||
-          msgs.reduce((sum: number, record: Record<string, unknown>) => sum + ((record.estimatedCost as number) || 0), 0);
-        return {
-          id: record.id,
-          project: record.project,
-          username: record.username,
-          title: record.title,
-          lastActivity: record.updatedAt,
-          messageCount: msgs.length,
-          lastMessage: lastMessageText,
-          lastMessageRole: lastMessage?.role || null,
-          isGenerating: record.isGenerating || false,
-          modalities: record.modalities || null,
-          providers: record.providers || [],
-          totalCost,
-        };
-      });
+          const totalCost =
+            record.totalCost ||
+            msgs.reduce(
+              (sum: number, record: Record<string, unknown>) =>
+                sum + ((record.estimatedCost as number) || 0),
+              0,
+            );
+          return {
+            id: record.id,
+            project: record.project,
+            username: record.username,
+            title: record.title,
+            lastActivity: record.updatedAt,
+            messageCount: msgs.length,
+            lastMessage: lastMessageText,
+            lastMessageRole: lastMessage?.role || null,
+            isGenerating: record.isGenerating || false,
+            modalities: record.modalities || null,
+            providers: record.providers || [],
+            totalCost,
+          };
+        },
+      );
 
       const totalRecent = await req.db
         .collection(REQUESTS_COLLECTION)

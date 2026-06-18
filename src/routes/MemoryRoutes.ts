@@ -44,7 +44,7 @@ router.post(
 
       res.json({ memories, count: memories.length });
     } catch (error: unknown) {
-            logger.error(`[memory/extract] ${getErrorMessage(error)}`);
+      logger.error(`[memory/extract] ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -59,7 +59,13 @@ router.post(
   "/search",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { guildId, userIds, queryText, limit, traceId } = req.body as { guildId?: string, userIds?: string[], queryText: string, limit?: number, traceId?: string };
+      const { guildId, userIds, queryText, limit, traceId } = req.body as {
+        guildId?: string;
+        userIds?: string[];
+        queryText: string;
+        limit?: number;
+        traceId?: string;
+      };
 
       if (!guildId || !queryText) {
         return res.status(400).json({
@@ -80,7 +86,7 @@ router.post(
 
       res.json({ memories, count: memories.length });
     } catch (error: unknown) {
-            logger.error(`[memory/search] ${getErrorMessage(error)}`);
+      logger.error(`[memory/search] ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -94,7 +100,10 @@ router.get(
   "/list/:guildId/:userId",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { guildId, userId } = req.params as { guildId: string, userId: string };
+      const { guildId, userId } = req.params as {
+        guildId: string;
+        userId: string;
+      };
       const limit = parseInt(req.query.limit as string) || 50;
       const skip = parseInt(req.query.skip as string) || 0;
 
@@ -107,7 +116,7 @@ router.get(
       });
       res.json(result);
     } catch (error: unknown) {
-            logger.error(`[memory/list] ${getErrorMessage(error)}`);
+      logger.error(`[memory/list] ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -124,7 +133,7 @@ router.delete(
       const deleted = await MemoryService.delete(String(req.params.id));
       res.json({ deleted });
     } catch (error: unknown) {
-            logger.error(`[memory/delete] ${getErrorMessage(error)}`);
+      logger.error(`[memory/delete] ${getErrorMessage(error)}`);
       next(error);
     }
   }),

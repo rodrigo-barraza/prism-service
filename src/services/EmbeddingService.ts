@@ -1,4 +1,7 @@
-import { formatCostTag, roundMilliseconds } from "@rodrigo-barraza/utilities-library";
+import {
+  formatCostTag,
+  roundMilliseconds,
+} from "@rodrigo-barraza/utilities-library";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
 import { TYPES, getDefaultModels, getPricing } from "../config.ts";
@@ -9,7 +12,10 @@ import logger from "../utils/logger.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";
 import SettingsService from "./SettingsService.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import type { EmbeddingMultimodalPart, EmbeddingContent } from "../types/provider.ts";
+import type {
+  EmbeddingMultimodalPart,
+  EmbeddingContent,
+} from "../types/provider.ts";
 /** Resolve the current embedding provider + model from settings. */
 async function getEmbeddingConfig() {
   return SettingsService.getMemoryModelConfig("embedding");
@@ -46,9 +52,14 @@ const EmbeddingService = {
     const providerName = options.provider || embedConfig.provider;
     const resolvedModel =
       options.model ||
-      (getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING) as Record<string, string> | undefined)?.[providerName] ||
+      (
+        getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING) as
+          | Record<string, string>
+          | undefined
+      )?.[providerName] ||
       embedConfig.model;
-    let result: { embedding: number[]; dimensions: number } | undefined = undefined;
+    let result: { embedding: number[]; dimensions: number } | undefined =
+      undefined;
     let success = true;
     let errorMessage = null;
     try {
@@ -145,22 +156,24 @@ const EmbeddingService = {
         requestPayload: {
           source,
           contentType,
-                    ...(options.taskType ? { taskType: options.taskType } : {}),
-                    ...(options.dimensions ? { dimensions: options.dimensions } : {}),
+          ...(options.taskType ? { taskType: options.taskType } : {}),
+          ...(options.dimensions ? { dimensions: options.dimensions } : {}),
           ...(contentType === "text"
             ? { text: typeof content === "string" ? content : "" }
             : {}),
         },
         responsePayload: success
           ? {
-                            dimensions: result?.dimensions || null,
-            embeddingPreview: result?.embedding?.slice(0, 5) || null,
+              dimensions: result?.dimensions || null,
+              embeddingPreview: result?.embedding?.slice(0, 5) || null,
             }
           : { error: errorMessage },
       });
     }
     if (!result) {
-      throw new Error(`Embedding generation failed: ${errorMessage || "unknown error"}`);
+      throw new Error(
+        `Embedding generation failed: ${errorMessage || "unknown error"}`,
+      );
     }
     return {
       embedding: result.embedding,
