@@ -22,6 +22,7 @@ import {
   checkForPlanModeEntry,
 } from "./lifecycle/PlanModeController.ts";
 import { validateAfterToolExecution } from "./lifecycle/ValidationInterceptor.ts";
+import { buildToolRetryGuidance } from "./lifecycle/ToolRetryInterceptor.ts";
 import {
   isOutputTruncated,
   injectContinuationContext,
@@ -30,14 +31,14 @@ import {
   buildProviderErrorMessage,
   MAX_OUTPUT_TRUNCATION_RECOVERIES,
 } from "./lifecycle/OutputTruncationRecovery.ts";
+import { manageContextPressure } from "./lifecycle/ContextPressureManager.ts";
+import { logKVCacheHitRate } from "./lifecycle/KVCacheReporter.ts";
+import { injectToolDiscoveryNudge } from "./lifecycle/ToolDiscoveryNudge.ts";
+import { finalizePassTracker } from "./lifecycle/TrackerFinalizer.ts";
+import { handleCodexPlanningResponse } from "./lifecycle/CodexPlanningDetector.ts";
 
 import PlanningModeService from "../PlanningModeService.ts";
-import SessionGenerationTracker from "../SessionGenerationTracker.ts";
-import AutoCompactionTrigger from "../compact/AutoCompactionTrigger.ts";
-import CompactionService from "../compact/CompactionService.ts";
-import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 
-import type { ChatMessage } from "../../types/admin.ts";
 import type {
   ConversationMessage,
   ToolCall,
@@ -237,51 +238,15 @@ Use these images to observe the environment, notice changes, animations, or user
           resolvedPassTools.map((tool: ToolSchema) => tool.name),
         );
 
-        // ── Auto-compaction trigger ─────────────────────────────
-        const contextWindowSize =
-          context.modelDefinition?.maxInputTokens || 128_000;
-        const maxOutputTokens = options.maxTokens || 8192;
-        const preEnforceTokenEstimate = ContextWindowManager.estimateTokens(
-          currentMessages as ChatMessage[],
+        // ── Context pressure management ──────────────────────────
+        // Micro-compaction (pressure-gated) → auto-compaction → summary persistence
+        const pressureResult = await manageContextPressure(
+          currentMessages,
+          context,
+          state,
+          "VisionLanguageHarness",
         );
-
-        const autoCompactEvaluation = AutoCompactionTrigger.evaluate(
-          preEnforceTokenEstimate,
-          contextWindowSize,
-          maxOutputTokens,
-          currentMessages.length,
-        );
-
-        if (autoCompactEvaluation.shouldCompact) {
-          const compactionResult = await CompactionService.compactConversation(
-            currentMessages as ChatMessage[],
-            {
-              project: project || "",
-              username: username || "",
-              agentSessionId,
-              traceId: traceId || null,
-              agent: agent || null,
-              emit,
-              signal: signal || undefined,
-            },
-          );
-
-          if (compactionResult) {
-            currentMessages =
-              compactionResult.compactedMessages as ConversationMessage[];
-            state.originalMessageCount = currentMessages.length;
-            state.compactionPerformed = true;
-            state.preCompactTokenCount = compactionResult.preCompactTokenCount;
-            state.postCompactTokenCount =
-              compactionResult.postCompactTokenCount;
-
-            logger.info(
-              `[VisionLanguageHarness] Auto-compacted: ${compactionResult.preCompactTokenCount} → ` +
-                `${compactionResult.postCompactTokenCount} tokens ` +
-                `(${currentMessages.length} messages remain)`,
-            );
-          }
-        }
+        currentMessages = pressureResult.messages;
 
         // ── Live Vision Frame Injection ────────────────────────
         const liveFrames = LiveFrameService.getFrames(context.conversationId);
@@ -320,20 +285,9 @@ Use these images to observe the environment, notice changes, animations, or user
         await this.consumeStream(stream, pass, allowedToolNames);
 
         // ── Finalize tracker for this pass ─────────────────────
-        if (pass.usage.outputTokens > 0) {
-          SessionGenerationTracker.update(passRequestId, {
-            outputTokens: pass.usage.outputTokens,
-          });
-        }
-        const finalInputTokens =
-          pass.usage.inputTokens || pass.usage.promptTokens || 0;
-        if (finalInputTokens > 0) {
-          SessionGenerationTracker.update(passRequestId, {
-            inputTokens: finalInputTokens,
-          });
-        }
+        finalizePassTracker(pass, passRequestId);
+        logKVCacheHitRate(pass.usage, state.iterations, "VisionLanguageHarness");
         this.emitGenerationProgress();
-        SessionGenerationTracker.complete(passRequestId);
 
         if (signal?.aborted) break;
 
@@ -456,7 +410,11 @@ Use these images to observe the environment, notice changes, animations, or user
               content:
                 `[VALIDATION ERROR] Your recent edit(s) introduced ${validationFeedback.length} error(s):\n\n` +
                 `${errorBlock}\n\n` +
-                `Fix these issues before proceeding. Do not move on to other tasks until validation passes.`,
+                `Before fixing, ANALYZE what went wrong:\n` +
+                `1. What assumption in your approach caused the failure?\n` +
+                `2. What is fundamentally different about a correct solution?\n` +
+                `3. What specific change would avoid this class of error?\n\n` +
+                `Apply your analysis and fix these issues before proceeding. Do not move on to other tasks until validation passes.`,
             });
 
             emit({
@@ -519,6 +477,17 @@ Use these images to observe the environment, notice changes, animations, or user
           };
           currentMessages.push(assistantMessage);
 
+          // ── Structured retry guidance on tool failure ──────────
+          const retryGuidanceMessage = buildToolRetryGuidance(
+            pass.pendingToolCalls,
+            results,
+            state,
+            MAX_CONSECUTIVE_TOOL_ERRORS,
+          );
+          if (retryGuidanceMessage) {
+            currentMessages.push(retryGuidanceMessage);
+          }
+
           currentMessages = currentMessages.filter(
             (message) =>
               !(
@@ -526,6 +495,14 @@ Use these images to observe the environment, notice changes, animations, or user
                 !message.content?.trim() &&
                 (!message.toolCalls || message.toolCalls.length === 0)
               ),
+          );
+
+          // ── Post-search nudge for tool discovery chain ─────────
+          injectToolDiscoveryNudge(
+            pass.pendingToolCalls,
+            results,
+            currentMessages,
+            context,
           );
 
           this.checkAndApplyToolSetChanges(currentMessages);
@@ -550,6 +527,21 @@ Use these images to observe the environment, notice changes, animations, or user
             this.logIteration(pass, currentMessages);
             continue;
           }
+
+          // Handle Codex/planning models
+          const codexResult = handleCodexPlanningResponse(
+            pass,
+            currentMessages,
+            context,
+            state,
+            this.tools.finalTools,
+            "VisionLanguageHarness",
+          );
+          if (codexResult.shouldContinueLoop) {
+            this.logIteration(pass, currentMessages);
+            continue;
+          }
+
           this.logIteration(pass, currentMessages);
           hasCleanTextBreak = true;
           break;

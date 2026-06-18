@@ -5,9 +5,6 @@ import {
   STATUS_MESSAGES,
   TOOL_NAMES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import ToolContext from "../ToolContext.ts";
-import ConversationEmbeddingService from "../ConversationEmbeddingService.ts";
 
 import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
 import { executeToolBatch } from "./lifecycle/ToolExecutor.ts";
@@ -33,13 +30,13 @@ import {
   buildProviderErrorMessage,
   MAX_OUTPUT_TRUNCATION_RECOVERIES,
 } from "./lifecycle/OutputTruncationRecovery.ts";
+import { manageContextPressure } from "./lifecycle/ContextPressureManager.ts";
+import { logKVCacheHitRate } from "./lifecycle/KVCacheReporter.ts";
+import { injectToolDiscoveryNudge } from "./lifecycle/ToolDiscoveryNudge.ts";
+import { finalizePassTracker } from "./lifecycle/TrackerFinalizer.ts";
+import { handleCodexPlanningResponse } from "./lifecycle/CodexPlanningDetector.ts";
 
 import PlanningModeService from "../PlanningModeService.ts";
-import SessionGenerationTracker from "../SessionGenerationTracker.ts";
-import AutoCompactionTrigger from "../compact/AutoCompactionTrigger.ts";
-import CompactionService from "../compact/CompactionService.ts";
-import MicroCompactionService from "../compact/MicroCompactionService.ts";
-import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 
 import type { ChatMessage } from "../../types/admin.ts";
 import type {
@@ -241,104 +238,15 @@ export default class ReActHarness extends BaseAgenticHarness {
           resolvedPassTools.map((tool: ToolSchema) => tool.name),
         );
 
-        // ── Context pressure estimation ──────────────────────────
-        const contextWindowSize =
-          context.modelDefinition?.maxInputTokens || 128_000;
-        const maxOutputTokens = options.maxTokens || 8192;
-        const availableInputBudget = contextWindowSize - maxOutputTokens;
-        let currentTokenEstimate = ContextWindowManager.estimateTokens(
-          currentMessages as ChatMessage[],
+        // ── Context pressure management ──────────────────────────
+        // Micro-compaction (pressure-gated) → auto-compaction → summary persistence
+        const pressureResult = await manageContextPressure(
+          currentMessages,
+          context,
+          state,
+          "ReActHarness",
         );
-        const contextPressureRatio =
-          availableInputBudget > 0
-            ? currentTokenEstimate / availableInputBudget
-            : 0;
-
-        // ── Micro-compaction (gated by context pressure) ────────
-        // Only run micro-compaction when context usage exceeds 70%
-        // of the available input budget. Running it unconditionally
-        // on every iteration mutates tool results in the middle of
-        // the prompt prefix, invalidating the LLM's KV cache and
-        // forcing a full re-prefill of all tokens on iteration 2+.
-        // Gating preserves the append-only prefix property that KV
-        // caching requires while still freeing tokens when needed.
-        if (contextPressureRatio > 0.7) {
-          const microCompactionResult =
-            MicroCompactionService.microcompactMessages(
-              currentMessages as ChatMessage[],
-            );
-          if (microCompactionResult.clearedResultCount > 0) {
-            currentMessages =
-              microCompactionResult.messages as ConversationMessage[];
-            currentTokenEstimate = ContextWindowManager.estimateTokens(
-              currentMessages as ChatMessage[],
-            );
-            logger.info(
-              `[ReActHarness] Micro-compaction at ${(contextPressureRatio * 100).toFixed(0)}% context pressure — ` +
-                `freed ~${microCompactionResult.freedTokens} tokens`,
-            );
-          }
-        }
-
-        // ── Auto-compaction trigger ─────────────────────────────
-        // After potential micro-compaction, check if LLM-powered
-        // compaction is also needed. This produces an intelligent
-        // summary instead of just dropping messages.
-        const autoCompactEvaluation = AutoCompactionTrigger.evaluate(
-          currentTokenEstimate,
-          contextWindowSize,
-          maxOutputTokens,
-          currentMessages.length,
-        );
-
-        if (autoCompactEvaluation.shouldCompact) {
-          const compactionResult = await CompactionService.compactConversation(
-            currentMessages as ChatMessage[],
-            {
-              project: project || "",
-              username: username || "",
-              agentSessionId,
-              traceId: traceId || null,
-              agent: agent || null,
-              emit,
-              signal: signal || undefined,
-            },
-          );
-
-          if (compactionResult) {
-            currentMessages =
-              compactionResult.compactedMessages as ConversationMessage[];
-            // Recalculate originalMessageCount to match the compacted array
-            // so finalize() only persists new messages from this point on.
-            state.originalMessageCount = currentMessages.length;
-            state.compactionPerformed = true;
-            state.preCompactTokenCount = compactionResult.preCompactTokenCount;
-            state.postCompactTokenCount =
-              compactionResult.postCompactTokenCount;
-
-            // Persist compaction summary on the conversation document (fire-and-forget).
-            // ConversationEmbeddingService will use this as a free embedding source
-            // during afterResponse — no additional LLM call needed.
-            if (compactionResult.summaryText && context.conversationId) {
-              ConversationEmbeddingService.persistCompactionSummary(
-                context.conversationId,
-                project || "",
-                username || "",
-                compactionResult.summaryText,
-              ).catch((error: unknown) =>
-                logger.error(
-                  `[ReActHarness] Failed to persist compaction summary: ${errorMessage(error)}`,
-                ),
-              );
-            }
-
-            logger.info(
-              `[ReActHarness] Auto-compacted: ${compactionResult.preCompactTokenCount} → ` +
-                `${compactionResult.postCompactTokenCount} tokens ` +
-                `(${currentMessages.length} messages remain)`,
-            );
-          }
-        }
+        currentMessages = pressureResult.messages;
 
         // ── Context window enforcement ─────────────────────────
         currentMessages = this.enforceContextWindow(
@@ -360,36 +268,9 @@ export default class ReActHarness extends BaseAgenticHarness {
         await this.consumeStream(stream, pass, allowedToolNames);
 
         // ── Finalize tracker for this pass ─────────────────────
-        if (pass.usage.outputTokens > 0) {
-          SessionGenerationTracker.update(passRequestId, {
-            outputTokens: pass.usage.outputTokens,
-          });
-        }
-        const finalInputTokens =
-          pass.usage.inputTokens || pass.usage.promptTokens || 0;
-        if (finalInputTokens > 0) {
-          SessionGenerationTracker.update(passRequestId, {
-            inputTokens: finalInputTokens,
-          });
-        }
-
-        // ── KV cache hit rate logging ──────────────────────────
-        const cachedInputTokens = pass.usage.cacheReadInputTokens || 0;
-        const totalPromptTokens = finalInputTokens + cachedInputTokens;
-        if (state.iterations > 1 || cachedInputTokens > 0) {
-          const cacheHitPercentage =
-            totalPromptTokens > 0
-              ? ((cachedInputTokens / totalPromptTokens) * 100).toFixed(1)
-              : "0.0";
-          logger.info(
-            `[ReActHarness] Iteration ${state.iterations} KV cache: ` +
-              `input=${finalInputTokens}, cached=${cachedInputTokens}, ` +
-              `total=${totalPromptTokens}, hit=${cacheHitPercentage}%`,
-          );
-        }
-
+        finalizePassTracker(pass, passRequestId);
+        logKVCacheHitRate(pass.usage, state.iterations, "ReActHarness");
         this.emitGenerationProgress();
-        SessionGenerationTracker.complete(passRequestId);
 
         if (signal?.aborted) break;
 
@@ -606,76 +487,12 @@ export default class ReActHarness extends BaseAgenticHarness {
           );
 
           // ── Post-search nudge for tool discovery chain ─────────
-          // When search_tools returns results with disabled tools, inject
-          // an explicit instruction so weaker models don't stall after
-          // the search step. For lower-tier models (nano/mini/flash/haiku/lite),
-          // auto-enable the tools directly via ToolContext — the subsequent
-          // checkAndApplyToolSetChanges() call picks up the dirty flag.
-          for (const toolCall of pass.pendingToolCalls) {
-            if (toolCall.name !== TOOL_NAMES.SEARCH_TOOLS) continue;
-            const matchingResult = results.find(
-              (result) => result.id === toolCall.id,
-            );
-            const toolResultData = matchingResult?.result as
-              | Record<string, unknown>
-              | undefined;
-            const searchMatches = toolResultData?.matches as
-              | Array<{ name?: string; isEnabled?: boolean }>
-              | undefined;
-            if (!Array.isArray(searchMatches)) continue;
-
-            const disabledToolNames = searchMatches
-              .filter((matchEntry) => matchEntry.isEnabled === false)
-              .map((matchEntry) => matchEntry.name)
-              .filter(Boolean) as string[];
-
-            if (disabledToolNames.length === 0) continue;
-
-            // Heuristic: models with nano/mini/flash/haiku/lite in the name
-            // are lower-tier and benefit from auto-enable (skip the enable_tools step)
-            const modelNameLower = (context.resolvedModel || "").toLowerCase();
-            const isLowerTierModel = /\b(nano|mini|flash|haiku|lite)\b/.test(
-              modelNameLower,
-            );
-
-            if (isLowerTierModel) {
-              const sessionId = context.agentSessionId;
-              const toolContextStore = ToolContext.getStore(sessionId);
-              const currentDynamic =
-                (toolContextStore.get("dynamicEnabledTools") as string[]) || [];
-              const mergedSet = new Set(currentDynamic);
-              for (const name of disabledToolNames) mergedSet.add(name);
-              toolContextStore.set("dynamicEnabledTools", [...mergedSet]);
-              toolContextStore.set("toolSetDirty", true);
-
-              currentMessages.push({
-                role: "system",
-                content:
-                  `<tool-update>\n` +
-                  `Your search found ${disabledToolNames.length} tool(s): ` +
-                  `${disabledToolNames.join(", ")}. ` +
-                  `They have been automatically enabled and are available now — call them directly.` +
-                  `\n</tool-update>`,
-              });
-              logger.info(
-                `[ReActHarness] Auto-enabled ${disabledToolNames.length} tools for lower-tier model "${context.resolvedModel}": [${disabledToolNames.join(", ")}]`,
-              );
-            } else {
-              currentMessages.push({
-                role: "system",
-                content:
-                  `<tool-update>\n` +
-                  `Your search found ${disabledToolNames.length} tool(s) that are not yet enabled: ` +
-                  `${disabledToolNames.join(", ")}. ` +
-                  `To use them, call enable_tools with these tool names now. ` +
-                  `After enabling, you can call them on the next iteration.` +
-                  `\n</tool-update>`,
-              });
-              logger.info(
-                `[ReActHarness] Injected post-search nudge for ${disabledToolNames.length} disabled tools: [${disabledToolNames.join(", ")}]`,
-              );
-            }
-          }
+          injectToolDiscoveryNudge(
+            pass.pendingToolCalls,
+            results,
+            currentMessages,
+            context,
+          );
 
           this.checkAndApplyToolSetChanges(currentMessages);
 
@@ -700,39 +517,18 @@ export default class ReActHarness extends BaseAgenticHarness {
             continue;
           }
 
-          // Handle Codex/planning models that separate planning and action in multi-turn agentic flows
-          const isCodexModel = context.resolvedModel
-            ?.toLowerCase()
-            .includes("codex");
-          const hasToolsAvailable =
-            this.tools.finalTools && this.tools.finalTools.length > 0;
-          if (isCodexModel && hasToolsAvailable) {
-            const lastMessage = currentMessages[currentMessages.length - 1];
-            const isAlreadyPrompted =
-              lastMessage &&
-              lastMessage.role === "system" &&
-              typeof lastMessage.content === "string" &&
-              lastMessage.content.includes("If you have fully completed");
-
-            if (!isAlreadyPrompted) {
-              logger.info(
-                `[ReActHarness] Codex model planning/update detected in iteration ${state.iterations}. Continuing to action phase.`,
-              );
-              currentMessages.push({
-                role: "assistant",
-                content: pass.streamedText,
-                ...(pass.streamedThinking.trim() && {
-                  thinking: pass.streamedThinking.trim(),
-                }),
-              });
-              currentMessages.push({
-                role: "system",
-                content:
-                  "Please proceed with the next step using the appropriate tools to implement your plan. If you have fully completed the user's request, please output a final message stating that you are done without calling any tools.",
-              });
-              this.logIteration(pass, currentMessages);
-              continue;
-            }
+          // Handle Codex/planning models that separate planning and action
+          const codexResult = handleCodexPlanningResponse(
+            pass,
+            currentMessages,
+            context,
+            state,
+            this.tools.finalTools,
+            "ReActHarness",
+          );
+          if (codexResult.shouldContinueLoop) {
+            this.logIteration(pass, currentMessages);
+            continue;
           }
 
           this.logIteration(pass, currentMessages);
