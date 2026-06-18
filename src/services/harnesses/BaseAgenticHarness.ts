@@ -34,6 +34,7 @@ import InternalToolRegistry from "../local-tools/InternalToolRegistry.ts";
 
 import WebhookEventBus from "../WebhookEventBus.ts";
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
+import AgenticToolResolver from "../AgenticToolResolver.ts";
 import { ToolDocFormatter } from "../system-prompt/ToolDocFormatter.ts";
 import type AgenticLoopState from "../AgenticLoopState.ts";
 import type AgentHooks from "../AgentHooks.ts";
@@ -162,14 +163,30 @@ export default class BaseAgenticHarness {
     ] as Array<{ name: string; [key: string]: unknown }>;
 
     const isSubAgent = !!this.context.parentAgentSessionId;
+
+    // When the model has native thinking, the think tool is redundant —
+    // re-apply the same exclusion that AgenticToolResolver.resolve() does
+    // during initial resolution, so dynamic tool set mutations don't
+    // accidentally re-introduce it.
+    const hasNativeThinking = AgenticToolResolver.detectNativeThinking(
+      this.context.modelDefinition || undefined,
+      this.context.providerName,
+      this.context.resolvedModel,
+      this.context.options.thinkingEnabled as boolean | undefined,
+    );
+
     const filteredTools = allSchemas.filter(
-      (tool) =>
-        dynamicEnabledSet.has(tool.name) ||
-        tool.name.startsWith("mcp__") ||
-        BaseAgenticHarness.CORE_AGENTIC_SET.has(tool.name) ||
-        (!isSubAgent &&
-          BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name)) ||
-        InternalToolRegistry.has(tool.name),
+      (tool) => {
+        if (hasNativeThinking && tool.name === TOOL_NAMES.THINK) return false;
+        return (
+          dynamicEnabledSet.has(tool.name) ||
+          tool.name.startsWith("mcp__") ||
+          BaseAgenticHarness.CORE_AGENTIC_SET.has(tool.name) ||
+          (!isSubAgent &&
+            BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name)) ||
+          InternalToolRegistry.has(tool.name)
+        );
+      },
     ) as unknown as ResolvedTools["finalTools"];
 
     this.tools = {
