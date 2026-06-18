@@ -160,6 +160,26 @@ Use it **proactively** — do NOT wait for the user to say "remember":
   requires: [TOOL_NAMES.SAVE_MEMORY],
 };
 
+const AUDIO_TRACKER_POLICY_SECTION: ToolPolicySection = {
+  content: `## Audio Generation (generate_audio) — Tracker Workflow
+When the user asks you to create music, multi-track compositions, songs, or any audio with multiple instruments, you MUST use the **tracker workflow** — building the composition incrementally, one step at a time:
+
+1. **\`action: "init"\`** — Create a tracker session. Returns a \`sessionId\`. Set tempo, time signature, and global options here.
+2. **\`action: "add_channel"\`** — Add one instrument/channel at a time (e.g. "melody", "bass", "drums"). Pass the \`sessionId\`. Each step auto-renders a live audio preview.
+3. **\`action: "write_pattern"\`** — Write note patterns for a single channel per call. Pass \`sessionId\` and \`channelId\`. Build up the composition one instrument at a time. Each step auto-renders a live preview so the user hears progress.
+4. **\`action: "render"\`** — Final render of the complete composition.
+
+**Between each call, briefly describe what you just added and what comes next** — so the user can follow the creative process and hear each layer being built up.
+
+**NEVER try to cram an entire multi-track composition into a single generate_audio call.** Break it into incremental steps:
+- One \`add_channel\` call per instrument
+- One \`write_pattern\` call per instrument's note sequence
+- This produces live audio previews at each step, letting the user hear the piece evolve
+
+For simple single-instrument sounds (sound effects, single melodies, presets), you may omit \`action\` and use direct single-call synthesis.`,
+  requires: [TOOL_NAMES.GENERATE_AUDIO],
+};
+
 // ────────────────────────────────────────────────────────────
 // Shared Tool Policy Builder
 // ────────────────────────────────────────────────────────────
@@ -178,6 +198,7 @@ Use it **proactively** — do NOT wait for the user to say "remember":
  * - Tool Discovery (how to search for and enable tools)
  * - Task Management (proactive task tracking)
  * - Proactive Memory (auto-save user preferences)
+ * - Audio Tracker (incremental multi-track composition workflow)
  */
 export function buildToolPolicy(
   sections: ToolPolicySection[],
@@ -188,6 +209,7 @@ export function buildToolPolicy(
     TOOL_DISCOVERY_POLICY_SECTION,
     TASK_MANAGEMENT_POLICY_SECTION,
     PROACTIVE_MEMORY_POLICY_SECTION,
+    AUDIO_TRACKER_POLICY_SECTION,
     ...sections,
   ];
   const enabled = new Set(context.enabledTools || []);
