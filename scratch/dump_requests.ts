@@ -13,45 +13,14 @@ async function main() {
     const requestsCol = db.collection('requests');
     const reqs = await requestsCol.find({ conversationId: targetId }).sort({ timestamp: 1 }).toArray();
     
-    console.log(`Found ${reqs.length} documents in requests collection.`);
-    
     for (const [idx, req] of reqs.entries()) {
       console.log(`\n==================================================`);
       console.log(`REQUEST DOCUMENT ${idx + 1}`);
       console.log(`Request ID: ${req.requestId}`);
-      console.log(`Timestamp: ${req.timestamp}`);
-      console.log(`Endpoint: ${req.endpoint}`);
-      console.log(`Operation: ${req.operation}`);
-      console.log(`Provider: ${req.provider}`);
-      console.log(`Model: ${req.model}`);
-      console.log(`Success: ${req.success}`);
-      
-      const payload = req.requestPayload;
-      if (payload) {
-        if (payload.messages) {
-          console.log(`Input Messages: ${payload.messages.length}`);
-          for (const [midx, m] of payload.messages.entries()) {
-            console.log(`  Msg [${midx}]: role=${m.role}`);
-            if (m.content) {
-              console.log(`    Content (truncated): ${JSON.stringify(m.content).slice(0, 200)}`);
-            }
-          }
-        }
-      }
-      
-      const response = req.responsePayload;
-      if (response) {
-        console.log(`Response Payload:`);
-        const thinking = response.thinking || response.reasoning;
-        console.log(`  Thinking (length: ${thinking ? thinking.length : 0}):`);
-        if (thinking) {
-          console.log(`  >>>${thinking}<<<`);
-        } else {
-          console.log(`  [None]`);
-        }
-        console.log(`  Text: ${JSON.stringify(response.text)}`);
-        console.log(`  Tool Calls:`, JSON.stringify(response.toolCalls || response.tool_calls, null, 2));
-      }
+      console.log(`Stop Reason in DB: ${req.stopReason}`);
+      console.log(`Finish Reason in DB: ${req.finishReason}`);
+      // Let's print the entire raw response payload if possible
+      console.log(`Raw Response Payload:`, JSON.stringify(req.responsePayload, null, 2));
     }
   } catch (error) {
     console.error("Error:", error);
