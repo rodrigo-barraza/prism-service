@@ -14,42 +14,34 @@ import {
 import { getProvider } from "../../../providers/index.ts";
 import localModelQueue from "../../LocalModelQueue.ts";
 import logger from "../../../utils/logger.ts";
-import SettingsService from "../../SettingsService.ts";
+import { getSubAgentFallback } from "../SubAgentFallback.ts";
 
-async function getSubAgentFallback(): Promise<{
-  provider: string;
-  model: string;
-} | null> {
-  try {
-    const agents = await SettingsService.getSection("agents");
-    if (agents) {
-      const provider = agents.subAgentProvider || agents.subagentProvider;
-      const model = agents.subAgentModel || agents.subagentModel;
-      if (typeof provider === "string" && typeof model === "string") {
-        return { provider, model };
-      }
-    }
-    return null;
-  } catch {
-    return null;
-  }
+const MAXIMUM_SYNTHESIS_CHARACTERS = 120_000;
+
+function truncateResultOutput(output: string, maximumCharacters: number): string {
+  if (output.length <= maximumCharacters) return output;
+  const truncatedOutput = output.slice(0, maximumCharacters);
+  return `${truncatedOutput}\n\n[... truncated — output exceeded ${maximumCharacters.toLocaleString()} character budget]`;
 }
 
 function buildSynthesisPrompt(
   teamName: string,
   memberResults: (SubAgentResult | { error: string })[],
 ): string {
+  const characterBudgetPerMember = Math.floor(MAXIMUM_SYNTHESIS_CHARACTERS / Math.max(memberResults.length, 1));
+
   const resultSections = memberResults.map((result, resultIndex) => {
     if ("error" in result) {
       return `### Sub-Agent #${resultIndex + 1}\n**Status:** Error\n**Error:** ${result.error}`;
     }
     const subAgentResult = result as SubAgentResult;
+    const outputText = subAgentResult.result
+      ? truncateResultOutput(subAgentResult.result, characterBudgetPerMember)
+      : "(empty)";
     return [
       `### Sub-Agent #${resultIndex + 1}: ${subAgentResult.description || "unnamed"}`,
       `**Status:** ${subAgentResult.status}`,
-      subAgentResult.result
-        ? `**Output:**\n${subAgentResult.result}`
-        : "**Output:** (empty)",
+      `**Output:**\n${outputText}`,
     ].join("\n");
   });
 
@@ -184,11 +176,13 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
         return memberResults;
       }
 
+      const synthesisStartTime = Date.now();
       const synthesisResult = await provider.generateText(
         [{ role: "user", content: synthesisPrompt }],
         resolvedModel,
         { maxTokens: 8192 },
       );
+      const synthesisDurationMs = Date.now() - synthesisStartTime;
 
       const synthesisSubAgentResult: SubAgentResult = {
         agent_id: `synthesis-${teamName}-${Date.now()}`,
@@ -198,13 +192,13 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
         result: synthesisResult.text,
         toolUses: 0,
         iterations: 1,
-        durationMs: 0,
+        durationMs: synthesisDurationMs,
         messages: [],
         diff: { additions: 0, deletions: 0, files: [] },
       };
 
       logger.info(
-        `[HierarchicalAggregationRouter] Synthesis pass complete (${synthesisResult.usage.inputTokens} input, ${synthesisResult.usage.outputTokens} output tokens)`,
+        `[HierarchicalAggregationRouter] Synthesis pass complete in ${synthesisDurationMs}ms (${synthesisResult.usage.inputTokens} input, ${synthesisResult.usage.outputTokens} output tokens)`,
       );
 
       return [...memberResults, synthesisSubAgentResult];
