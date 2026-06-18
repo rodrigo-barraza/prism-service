@@ -15,6 +15,7 @@ import { getProvider } from "../../../providers/index.ts";
 import localModelQueue from "../../LocalModelQueue.ts";
 import logger from "../../../utils/logger.ts";
 import { getSubAgentFallback } from "../SubAgentFallback.ts";
+import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 
 const MAXIMUM_SYNTHESIS_CHARACTERS = 120_000;
 
@@ -37,7 +38,7 @@ function buildSynthesisPrompt(
     const subAgentResult = result as SubAgentResult;
     const outputText = subAgentResult.result
       ? truncateResultOutput(subAgentResult.result, characterBudgetPerMember)
-      : "(empty)";
+      : (buildToolCallFallbackSummary(subAgentResult) || subAgentResult.summary);
     return [
       `### Sub-Agent #${resultIndex + 1}: ${subAgentResult.description || "unnamed"}`,
       `**Status:** ${subAgentResult.status}`,
@@ -144,7 +145,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
     // ── Phase 2: Synthesis pass (GoT aggregation) ────────────────────
 
     const successfulResults = memberResults.filter(
-      (result) => !("error" in result),
+      (result) => !("error" in result) && result.status === "completed",
     );
 
     if (successfulResults.length === 0) {
