@@ -117,6 +117,48 @@ const TOOL_DISCOVERY_POLICY_SECTION: ToolPolicySection & {
   dynamicContent: buildToolDiscoveryContent,
   requires: [TOOL_NAMES.SEARCH_TOOLS],
 };
+// ────────────────────────────────────────────────────────────
+// Shared Tool Policy Sections (auto-injected for all personas)
+// ────────────────────────────────────────────────────────────
+
+const GENERAL_TOOL_PRINCIPLES_SECTION: ToolPolicySection = {
+  content: `# Tool Use Principles
+- Chain tools when a question requires multiple data sources
+- Prefer specific tools over generic web search when available
+- Use the right granularity: don't use heavy tools for simple questions`,
+};
+
+const TASK_MANAGEMENT_POLICY_SECTION: ToolPolicySection = {
+  content: `## Task Management
+You have persistent task tools (create_task, list_tasks, update_task) that survive across conversations.
+Use them proactively:
+- At the START of a session, call list_tasks to check for in-progress or pending tasks from prior sessions
+- When starting complex multi-step work (3+ files, multi-phase refactors, migrations), create a task with create_task to track progress
+- ONLY mark a task as completed when you have FULLY accomplished it — if blocked or encountering errors, keep it as in_progress
+- Always set activeForm when creating or updating to "in_progress" — a present-continuous phrase shown as a spinner (e.g. "Running tests", "Refactoring auth module")
+- After completing a task, call list_tasks to find your next task
+- To delete a task that is no longer relevant or was created in error, set its status to "deleted" via update_task
+- Break large tasks into subtasks — use metadata to link related tasks
+- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`,
+  requires: [
+    TOOL_NAMES.CREATE_TASK,
+    TOOL_NAMES.LIST_TASKS,
+    TOOL_NAMES.UPDATE_TASK,
+  ],
+};
+
+const PROACTIVE_MEMORY_POLICY_SECTION: ToolPolicySection = {
+  content: `## Proactive Memory
+You have a persistent memory tool (save_memory) that stores facts across sessions.
+Use it **proactively** — do NOT wait for the user to say "remember":
+- When the user states a preference: "I like X", "I hate Y", "I prefer Z", "I always do W"
+- When the user reveals personal info: allergies, habits, identity traits, opinions
+- When the user corrects you: save the correction so you don't repeat the mistake
+- When you learn a project convention or workflow pattern worth preserving
+- **When in doubt, save it** — over-remembering is better than forgetting
+- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`,
+  requires: [TOOL_NAMES.SAVE_MEMORY],
+};
 
 // ────────────────────────────────────────────────────────────
 // Shared Tool Policy Builder
@@ -131,15 +173,23 @@ const TOOL_DISCOVERY_POLICY_SECTION: ToolPolicySection & {
  * cannot actually call, saving tokens and preventing hallucinated
  * tool calls.
  *
- * Automatically prepends the innate Tool Discovery section so every
- * agent knows how to search for and enable tools it doesn't currently
- * have — no per-persona opt-in required.
+ * Automatically prepends shared innate sections so every agent gets
+ * them without per-persona opt-in:
+ * - Tool Discovery (how to search for and enable tools)
+ * - Task Management (proactive task tracking)
+ * - Proactive Memory (auto-save user preferences)
  */
 export function buildToolPolicy(
   sections: ToolPolicySection[],
   context: PersonaContext,
 ): string {
-  const allSections = [TOOL_DISCOVERY_POLICY_SECTION, ...sections];
+  const allSections = [
+    GENERAL_TOOL_PRINCIPLES_SECTION,
+    TOOL_DISCOVERY_POLICY_SECTION,
+    TASK_MANAGEMENT_POLICY_SECTION,
+    PROACTIVE_MEMORY_POLICY_SECTION,
+    ...sections,
+  ];
   const enabled = new Set(context.enabledTools || []);
   const enabledArray = [...enabled];
 

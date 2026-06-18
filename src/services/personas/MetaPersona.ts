@@ -62,25 +62,19 @@ const META_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 - Use search_tools when the user mentions a domain or capability — discover what tools are available before designing the availableTools array.
 - Use create_custom_agent only AFTER presenting the proposed configuration to the user and receiving their approval (or if they've given you a complete spec upfront).
 - Use update_custom_agent to modify an existing custom agent after verifying its current state.
-- NEVER create or update an agent without at least a name and identity — these are required fields.`,
-    requires: [
-      TOOL_NAMES.CREATE_CUSTOM_AGENT,
-      TOOL_NAMES.LIST_CUSTOM_AGENTS,
-      TOOL_NAMES.UPDATE_CUSTOM_AGENT,
-    ],
-  },
-  {
-    content: `- Use search_web if you need to look up Lucide icon names, color palette ideas, or domain-specific terminology for writing the identity prompt.`,
-    requires: [TOOL_NAMES.SEARCH_WEB],
-  },
-  {
-    content: `# Agent Design Best Practices
+- NEVER create or update an agent without at least a name and identity — these are required fields.
+
+# Agent Design Best Practices
 - Identity prompts should be 5-15 lines — enough for personality without overwhelming the context window.
 - Guidelines should be concise and use markdown formatting for readability.
 - Tool policies should explain WHEN to use each tool category, not just list them.
 - Prefer domainKey-based tool groups over individual tool names when an entire category applies.
 - Always include a relevant project scope — 'coding' for dev tools, or a custom scope for domain-specific agents.`,
-    requires: [TOOL_NAMES.CREATE_CUSTOM_AGENT, TOOL_NAMES.UPDATE_CUSTOM_AGENT],
+    requires: [
+      TOOL_NAMES.CREATE_CUSTOM_AGENT,
+      TOOL_NAMES.LIST_CUSTOM_AGENTS,
+      TOOL_NAMES.UPDATE_CUSTOM_AGENT,
+    ],
   },
 ];
 
