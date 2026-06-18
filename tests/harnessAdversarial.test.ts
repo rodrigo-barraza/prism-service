@@ -1218,3 +1218,346 @@ describe("Flow 10: AgenticLoopService Approval API", () => {
     });
   });
 });
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Flow 11: SystemReminderInjector — Feature Gating & Cache Isolation
+// ═══════════════════════════════════════════════════════════════════
+
+describe("Flow 11: SystemReminderInjector Feature Gating", () => {
+  const { maybeInjectSystemReminder, cleanupReminderCache } =
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require("../src/services/harnesses/lifecycle/SystemReminderInjector.ts") as typeof import("../src/services/harnesses/lifecycle/SystemReminderInjector.ts");
+
+  const LARGE_SYSTEM_PROMPT =
+    "You are a helpful assistant. You must always respond in English. " +
+    "Never use profanity. Always cite sources. Do not fabricate data. " +
+    "You should prioritize safety. Important: do not execute destructive commands. " +
+    "A".repeat(300);
+
+  function createMockState(iterationCount: number) {
+    return {
+      iterations: iterationCount,
+      overallUsage: { inputTokens: 0, outputTokens: 0 },
+    } as unknown as import("../src/services/AgenticLoopState.ts").default;
+  }
+
+  function createMockProvider(extractedBullets?: string) {
+    return {
+      generateTextStream: vi.fn(async function* () {
+        if (extractedBullets) {
+          yield extractedBullets;
+        }
+      }),
+    };
+  }
+
+  function createMockContext(
+    overrides: Record<string, unknown> = {},
+  ) {
+    const emitFunction = vi.fn();
+    const mockProvider = createMockProvider(
+      overrides.extractedBullets as string | undefined,
+    );
+
+    return {
+      options: {
+        reminderModel: overrides.reminderModel ?? undefined,
+        reminderProvider: overrides.reminderProvider ?? undefined,
+        reminderInterval: overrides.reminderInterval ?? undefined,
+      },
+      emit: emitFunction,
+      agentSessionId: (overrides.agentSessionId as string) || "test-session-" + Date.now(),
+      provider: mockProvider,
+      signal: undefined,
+      project: "test",
+      username: "test",
+      messages: [],
+      providerName: "test",
+      resolvedModel: "test-model",
+      conversationId: "test-conv",
+    } as unknown as import("../src/services/harnesses/types.ts").AgenticContext;
+  }
+
+  afterEach(() => {
+    cleanupReminderCache("test-session-gated");
+    cleanupReminderCache("test-session-active");
+    cleanupReminderCache("test-session-interval");
+    cleanupReminderCache("test-session-cache-a");
+    cleanupReminderCache("test-session-cache-b");
+  });
+
+  // ── Feature Gate: No Model = Disabled ──────────────────────────
+
+  it("should not inject when reminderModel is undefined (feature disabled)", async () => {
+    const messages = [
+      { role: "system", content: LARGE_SYSTEM_PROMPT },
+      { role: "user", content: "Hello" },
+    ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
+
+    const context = createMockContext({ agentSessionId: "test-session-gated" });
+    const state = createMockState(8);
+
+    await maybeInjectSystemReminder(messages, state, context);
+
+    expect(messages).toHaveLength(2);
+    expect(context.emit).not.toHaveBeenCalled();
+    expect(context.provider.generateTextStream).not.toHaveBeenCalled();
+  });
+
+  it("should not inject when reminderModel is empty string (feature disabled)", async () => {
+    const messages = [
+      { role: "system", content: LARGE_SYSTEM_PROMPT },
+      { role: "user", content: "Hello" },
+    ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
+
+    const context = createMockContext({
+      agentSessionId: "test-session-gated",
+      reminderModel: "",
+    });
+    const state = createMockState(8);
+
+    await maybeInjectSystemReminder(messages, state, context);
+
+    expect(messages).toHaveLength(2);
+    expect(context.emit).not.toHaveBeenCalled();
+  });
+
+  // ── Feature Gate: Model Set = Active ──────────────────────────
+
+  it("should inject when reminderModel is set and iteration matches interval", async () => {
+    const messages = [
+      { role: "system", content: LARGE_SYSTEM_PROMPT },
+      { role: "user", content: "Hello" },
+    ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
+
+    const extractedBullets =
+      "- You must always respond in English\n" +
+      "- Never use profanity\n" +
+      "- Always cite sources\n" +
+      "- Do not fabricate data\n" +
+      "- Do not execute destructive commands";
+
+    const context = createMockContext({
+      agentSessionId: "test-session-active",
+      reminderModel: "gemini-3.5-flash",
+      reminderProvider: "google",
+      extractedBullets,
+    });
+    const state = createMockState(8);
+
+    await maybeInjectSystemReminder(messages, state, context);
+
+    expect(messages).toHaveLength(3);
+    expect(messages[2].role).toBe("system");
+    expect(messages[2].content).toContain("[SYSTEM REMINDER");
+    expect(messages[2].content).toContain("Iteration 8");
+    expect(context.emit).toHaveBeenCalledOnce();
+    expect(context.provider.generateTextStream).toHaveBeenCalledOnce();
+  });
+
+  // ── Iteration Threshold ──────────────────────────────────────
+
+  it("should not inject before minimum iteration threshold (iteration 4)", async () => {
+    const messages = [
+      { role: "system", content: LARGE_SYSTEM_PROMPT },
+    ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
+
+    const context = createMockContext({
+      agentSessionId: "test-session-active",
+      reminderModel: "gemini-3.5-flash",
+    });
+    const state = createMockState(4);
+
+    await maybeInjectSystemReminder(messages, state, context);
+
+    expect(messages).toHaveLength(1);
+    expect(context.provider.generateTextStream).not.toHaveBeenCalled();
+  });
+
+  // ── Interval Matching ─────────────────────────────────────────
+
+  it("should not inject on non-interval iterations (iteration 7 with interval 8)", async () => {
+    const messages = [
+      { role: "system", content: LARGE_SYSTEM_PROMPT },
+    ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
+
+    const context = createMockContext({
+      agentSessionId: "test-session-interval",
+      reminderModel: "gemini-3.5-flash",
+      reminderInterval: 8,
+    });
+    const state = createMockState(7);
+
+    await maybeInjectSystemReminder(messages, state, context);
+
+    expect(messages).toHaveLength(1);
+  });
+
+  it("should inject on exact interval match (iteration 16 with interval 8)", async () => {
+    const extractedBullets =
+      "- You must always respond in English language only\n" +
+      "- Never use profanity or offensive language in responses\n" +
+      "- Always cite your sources when making factual claims\n" +
+      "- Do not fabricate any data or statistics whatsoever";
+
+    const messages = [
+      { role: "system", content: LARGE_SYSTEM_PROMPT },
+    ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
+
+    const context = createMockContext({
+      agentSessionId: "test-session-interval",
+      reminderModel: "gemini-3.5-flash",
+      reminderInterval: 8,
+      extractedBullets,
+    });
+    const state = createMockState(16);
+
+    await maybeInjectSystemReminder(messages, state, context);
+
+    expect(messages).toHaveLength(2);
+    expect(messages[1].content).toContain("Iteration 16");
+  });
+
+  // ── Cache Isolation ─────────────────────────────────────────
+
+  it("should cache extraction results per session and not re-call the LLM", async () => {
+    const extractedBullets = "- Cached rule one\n- Cached rule two\n- Cached rule three";
+
+    const sessionId = "test-session-cache-a";
+
+    // First injection at iteration 8
+    const messagesFirst = [
+      { role: "system", content: LARGE_SYSTEM_PROMPT },
+    ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
+
+    const contextFirst = createMockContext({
+      agentSessionId: sessionId,
+      reminderModel: "gemini-3.5-flash",
+      extractedBullets,
+    });
+    const stateFirst = createMockState(8);
+
+    await maybeInjectSystemReminder(messagesFirst, stateFirst, contextFirst);
+    expect(contextFirst.provider.generateTextStream).toHaveBeenCalledOnce();
+    expect(messagesFirst).toHaveLength(2);
+
+    // Second injection at iteration 16 — should use cache, NOT call LLM again
+    const messagesSecond = [
+      { role: "system", content: LARGE_SYSTEM_PROMPT },
+    ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
+
+    const contextSecond = createMockContext({
+      agentSessionId: sessionId,
+      reminderModel: "gemini-3.5-flash",
+      extractedBullets: "- This should NOT be used because cache hits",
+    });
+    const stateSecond = createMockState(16);
+
+    await maybeInjectSystemReminder(messagesSecond, stateSecond, contextSecond);
+    // LLM should NOT have been called for the second injection
+    expect(contextSecond.provider.generateTextStream).not.toHaveBeenCalled();
+    expect(messagesSecond).toHaveLength(2);
+    // Content should be from the FIRST extraction, not the second mock
+    expect(messagesSecond[1].content).toContain("Cached rule one");
+  });
+
+  it("should isolate caches between different sessions", async () => {
+    const sessionIdAlpha = "test-session-cache-a";
+    const sessionIdBeta = "test-session-cache-b";
+
+    // Clean both first
+    cleanupReminderCache(sessionIdAlpha);
+    cleanupReminderCache(sessionIdBeta);
+
+    // Session A extraction
+    const messagesAlpha = [
+      { role: "system", content: LARGE_SYSTEM_PROMPT },
+    ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
+    const contextAlpha = createMockContext({
+      agentSessionId: sessionIdAlpha,
+      reminderModel: "gemini-3.5-flash",
+      extractedBullets: "- Alpha must always respond in English language only\n- Alpha must never use profanity\n- Alpha must always cite sources when making claims",
+    });
+    await maybeInjectSystemReminder(messagesAlpha, createMockState(8), contextAlpha);
+    expect(messagesAlpha[1].content).toContain("Alpha must always respond");
+
+    // Session B extraction — different content
+    const messagesBeta = [
+      { role: "system", content: LARGE_SYSTEM_PROMPT },
+    ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
+    const contextBeta = createMockContext({
+      agentSessionId: sessionIdBeta,
+      reminderModel: "gemini-3.5-flash",
+      extractedBullets: "- Beta must prioritize user safety above all else\n- Beta must never execute destructive commands\n- Beta must ask for confirmation before actions",
+    });
+    await maybeInjectSystemReminder(messagesBeta, createMockState(8), contextBeta);
+    expect(messagesBeta[1].content).toContain("Beta must prioritize");
+    expect(messagesBeta[1].content).not.toContain("Alpha");
+  });
+
+  // ── Cleanup ─────────────────────────────────────────────────
+
+  it("should cleanly remove cache on cleanup without throwing", () => {
+    expect(() => cleanupReminderCache("nonexistent-session")).not.toThrow();
+    expect(() => cleanupReminderCache("")).not.toThrow();
+  });
+
+  // ── Edge: No System Prompt ──────────────────────────────────
+
+  it("should not inject when no system message exists in the conversation", async () => {
+    const messages = [
+      { role: "user", content: "Hello" },
+    ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
+
+    const context = createMockContext({
+      agentSessionId: "test-session-active",
+      reminderModel: "gemini-3.5-flash",
+      extractedBullets: "- Should not appear",
+    });
+    const state = createMockState(8);
+
+    await maybeInjectSystemReminder(messages, state, context);
+
+    expect(messages).toHaveLength(1);
+    expect(context.provider.generateTextStream).not.toHaveBeenCalled();
+  });
+
+  it("should not inject when system prompt is too short (< 200 chars)", async () => {
+    const messages = [
+      { role: "system", content: "Short prompt." },
+      { role: "user", content: "Hello" },
+    ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
+
+    const context = createMockContext({
+      agentSessionId: "test-session-active",
+      reminderModel: "gemini-3.5-flash",
+    });
+    const state = createMockState(8);
+
+    await maybeInjectSystemReminder(messages, state, context);
+
+    expect(messages).toHaveLength(2);
+  });
+
+  // ── Edge: LLM Returns Empty ──────────────────────────────────
+
+  it("should not inject when LLM extraction returns empty content", async () => {
+    const messages = [
+      { role: "system", content: LARGE_SYSTEM_PROMPT },
+    ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
+
+    const context = createMockContext({
+      agentSessionId: "test-session-active",
+      reminderModel: "gemini-3.5-flash",
+      extractedBullets: "",
+    });
+    const state = createMockState(8);
+
+    await maybeInjectSystemReminder(messages, state, context);
+
+    // LLM returned empty → extractor returns null → injector skips
+    expect(messages).toHaveLength(1);
+    expect(context.emit).not.toHaveBeenCalled();
+  });
+});

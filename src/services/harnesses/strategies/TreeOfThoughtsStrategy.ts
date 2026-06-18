@@ -232,12 +232,10 @@ export async function runTreeOfThoughts(
       });
 
       // ── Instruction fade-out countermeasure ─────────────────
-      maybeInjectSystemReminder(
+      await maybeInjectSystemReminder(
         currentMessages,
         state,
-        emit,
-        agentSessionId,
-        options.reminderInterval,
+        context,
       );
 
       const passOptions: IterationPassOptions = {
