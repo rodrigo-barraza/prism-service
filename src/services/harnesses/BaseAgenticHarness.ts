@@ -499,6 +499,13 @@ export default class BaseAgenticHarness {
       this._recordTiming(pass);
       state.streamedThinking += streamChunk.content || "";
       pass.streamedThinking += streamChunk.content || "";
+      if (state.displayThinkingFragments.length === 0 || state.lastDisplaySegType !== "thinking") {
+        logger.info(
+          `[Harness:Thinking] NEW thinking segment on iteration ${state.iterations}, ` +
+          `fragments=${state.displayThinkingFragments.length}, lastSegType=${state.lastDisplaySegType}, ` +
+          `contentLen=${(streamChunk.content || "").length}ch`,
+        );
+      }
       // Display segment tracking
       if (state.lastDisplaySegType !== "thinking") {
         state.displaySegments.push({
