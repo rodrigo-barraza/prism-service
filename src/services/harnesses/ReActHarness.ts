@@ -457,7 +457,11 @@ export default class ReActHarness extends BaseAgenticHarness {
             content:
               `[VALIDATION ERROR] Your recent edit(s) introduced ${validationFeedback.length} error(s):\n\n` +
               `${errorBlock}\n\n` +
-              `Fix these issues before proceeding. Do not move on to other tasks until validation passes.`,
+              `Before fixing, ANALYZE what went wrong:\n` +
+              `1. What assumption in your approach caused the failure?\n` +
+              `2. What is fundamentally different about a correct solution?\n` +
+              `3. What specific change would avoid this class of error?\n\n` +
+              `Apply your analysis and fix these issues before proceeding. Do not move on to other tasks until validation passes.`,
           });
 
           emit({
