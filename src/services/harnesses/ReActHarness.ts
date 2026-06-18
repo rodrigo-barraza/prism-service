@@ -716,6 +716,7 @@ export default class ReActHarness extends BaseAgenticHarness {
     // of a synthesized final summary.
     // Skipped when signal is aborted (provider would reject the call).
     if (!hasCleanTextBreak && state.streamedToolCalls.length > 0 && !signal?.aborted) {
+      state.sessionOutcome = "exhausted";
       await runExhaustionRecoveryPass(this, context, state, currentMessages);
     }
 
@@ -738,6 +739,8 @@ export default class ReActHarness extends BaseAgenticHarness {
         buildProviderErrorMessage(loopError, state.iterations),
         context,
       );
+
+      state.sessionOutcome = "error";
 
       try {
         await this.finalize(currentMessages, hooks);

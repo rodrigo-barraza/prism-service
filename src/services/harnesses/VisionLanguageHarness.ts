@@ -570,6 +570,7 @@ Use these images to observe the environment, notice changes, animations, or user
     // break — regardless of how the loop exited (max iterations, empty output,
     // truncation exhaustion). Skipped when signal is aborted.
     if (!hasCleanTextBreak && state.streamedToolCalls.length > 0 && !signal?.aborted) {
+      state.sessionOutcome = "exhausted";
       await runExhaustionRecoveryPass(this, context, state, currentMessages);
     }
 
@@ -587,6 +588,8 @@ Use these images to observe the environment, notice changes, animations, or user
         buildProviderErrorMessage(loopError, state.iterations),
         context,
       );
+
+      state.sessionOutcome = "error";
 
       try {
         await this.finalize(currentMessages, hooks);
