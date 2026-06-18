@@ -16,7 +16,6 @@ import {
 } from "./lifecycle/PostExecutionEmitter.ts";
 import { runExhaustionRecoveryPass } from "./lifecycle/ExhaustionRecovery.ts";
 import {
-  blockUnauthorizedToolCalls,
   handleExitPlanMode,
   checkForPlanModeEntry,
 } from "./lifecycle/PlanModeController.ts";
@@ -37,7 +36,6 @@ import { finalizePassTracker } from "./lifecycle/TrackerFinalizer.ts";
 import { handleCodexPlanningResponse } from "./lifecycle/CodexPlanningDetector.ts";
 
 import PlanningModeService from "../PlanningModeService.ts";
-import SessionGenerationTracker from "../SessionGenerationTracker.ts";
 
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import type {
@@ -247,8 +245,14 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       });
     }
 
+    // ── Pre-loop: planning phase (planFirst or enter_plan_mode) ─────────────
+    // Runs as a clean sequential loop BEFORE branching begins so the full ToT
+    // search space — parallel branches, multi-criteria scoring, reflexion
+    // backtracking, checkpoint/restore — is reserved for the approved implementation.
     if (state.planModeActive) {
-      PlanningModeService.injectPlanningInstruction(currentMessages);
+      const { planApproved } = await this.runPlanningPhase(currentMessages);
+      if (!planApproved) return { messages: currentMessages };
+      // planModeActive is now false, planning instruction stripped
     }
 
     // ── Main loop ────────────────────────────────────────────
@@ -257,9 +261,10 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
         state.iterations++;
 
         // ── Adaptive branch count ────────────────────────────
-        // After the first iteration, reduce branch count because we have
-        // trajectory context that narrows the viable search space.
-        // In DFS mode, always use 1 branch (depth-first by definition).
+        // After the first iteration, reduce branch count because trajectory
+        // context narrows the viable search space. In DFS mode, always 1
+        // (depth-first by definition). Plan mode never reaches this point —
+        // it completes as a pre-loop phase before branching begins.
         const adaptiveBranchCount =
           searchStrategy === "dfs"
             ? 1
@@ -282,15 +287,8 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
           project,
           agent,
           username,
+          tools: this.tools.finalTools,
         };
-        if (state.planModeActive) {
-          const planModeTools = this.tools.finalTools.filter(
-            (tool: ToolSchema) => tool.name === TOOL_NAMES.EXIT_PLAN_MODE,
-          );
-          passOptions.tools = planModeTools;
-        } else {
-          passOptions.tools = this.tools.finalTools;
-        }
 
         // ── Context pressure management ──────────────────────────
         // Micro-compaction (pressure-gated) → auto-compaction → summary persistence
@@ -389,6 +387,14 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
 
         // Finalize tracker for the selected pass
         finalizePassTracker(selectedPass, selectedPass.requestId || "");
+
+        // Finalize/complete tracker requests for non-selected branches to prevent resource leaks and stats skewing
+        for (const branch of scoredBranches) {
+          if (branch !== selectedBranch && branch.pass.requestId) {
+            finalizePassTracker(branch.pass, branch.pass.requestId);
+          }
+        }
+
         logKVCacheHitRate(selectedPass.usage, state.iterations, "TreeOfThought");
         this.emitGenerationProgress();
 
@@ -396,20 +402,6 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
 
         // ── Tool execution from selected branch ─────────────────
         if (selectedPass.pendingToolCalls.length > 0) {
-          // Plan mode enforcement
-          if (state.planModeActive) {
-            const { allBlocked } = blockUnauthorizedToolCalls(
-              selectedPass.pendingToolCalls,
-              currentMessages,
-              selectedPass,
-              state,
-            );
-            if (allBlocked) {
-              this.logIteration(selectedPass, currentMessages);
-              continue;
-            }
-          }
-
           // Snapshot messages BEFORE tool execution for checkpoint/restore
           const preExecutionSnapshot = currentMessages.map((message) => ({
             ...message,
@@ -590,7 +582,11 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
           // Clear failed approaches on success — the trajectory is viable
           failedApproachDescriptions = [];
 
-          // ── Plan mode toggling ────────────────────────────────
+          // ── Mid-execution plan mode entry (enter_plan_mode tool) ──────────
+          // If the model calls enter_plan_mode during the implementation loop,
+          // run the planning phase as a sequential sub-loop before resuming full
+          // ToT branching. This preserves the same pre-loop planning semantics
+          // for dynamically triggered plans as for planFirst sessions.
           checkForPlanModeEntry(
             selectedPass.pendingToolCalls,
             currentMessages,
@@ -598,19 +594,10 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
             emit,
           );
 
-          const exitPlanToolCall = selectedPass.pendingToolCalls.find(
-            (toolCall) => toolCall.name === TOOL_NAMES.EXIT_PLAN_MODE,
-          );
-          if (exitPlanToolCall) {
-            const { shouldContinueLoop } = await handleExitPlanMode(
-              exitPlanToolCall,
-              selectedPass,
-              results,
-              currentMessages,
-              context,
-              state,
-            );
-            if (!shouldContinueLoop) return { messages: currentMessages };
+          if (state.planModeActive) {
+            const { planApproved } = await this.runPlanningPhase(currentMessages);
+            if (!planApproved) return { messages: currentMessages };
+            // planModeActive cleared — resume full ToT branching
           }
 
           const assistantMessage: ConversationMessage = {
@@ -677,21 +664,6 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
 
         // ── No tools — final text response ──────────────────────
         if (selectedPass.streamedText || selectedPass.streamedThinking.trim()) {
-          if (state.planModeActive) {
-            currentMessages.push({
-              role: "assistant",
-              content: selectedPass.streamedText,
-              ...(selectedPass.streamedThinking.trim() && {
-                thinking: selectedPass.streamedThinking.trim(),
-              }),
-              ...(selectedPass.thinkingSignature && {
-                thinkingSignature: selectedPass.thinkingSignature,
-              }),
-            });
-            this.logIteration(selectedPass, currentMessages);
-            continue;
-          }
-
           // Handle Codex/planning models
           const codexResult = handleCodexPlanningResponse(
             selectedPass,
@@ -872,6 +844,187 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
       },
       pass,
     };
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  //  PRIVATE — Pre-loop planning phase
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /**
+   * Execute the planning phase as a sequential pre-loop before branching begins.
+   *
+   * Runs a restricted single-branch loop with only exit_plan_mode available.
+   * The model writes its plan as text, then calls exit_plan_mode to submit it
+   * for user approval. On approval, state.planModeActive is cleared and
+   * currentMessages carries the full planning context so the main ToT branching
+   * loop starts immediately with the complete tool set and full branch count.
+   *
+   * Returns { planApproved: false } on user rejection, signal abort, or planning
+   * iteration budget exhaustion — the caller should return early without entering
+   * the branching loop. Returns { planApproved: true } when the plan is approved.
+   */
+  private async runPlanningPhase(
+    currentMessages: ConversationMessage[],
+  ): Promise<{ planApproved: boolean }> {
+    const context = this.context;
+    const state = this.state;
+    const { options, project, agent, username, signal } = context;
+
+    const MAX_PLANNING_ITERATIONS = 10;
+
+    PlanningModeService.injectPlanningInstruction(currentMessages);
+
+    const planModeTools = this.tools.finalTools.filter(
+      (tool: ToolSchema) => tool.name === TOOL_NAMES.EXIT_PLAN_MODE,
+    );
+    const allowedPlanToolNames = new Set(
+      planModeTools.map((tool: ToolSchema) => tool.name),
+    );
+    const planPassOptions: IterationPassOptions = {
+      ...options,
+      project,
+      agent,
+      username,
+      tools: planModeTools,
+    };
+
+    logger.info(
+      `[TreeOfThought] Planning phase started — model will plan before full ToT branching.`,
+    );
+
+    let planningIteration = 0;
+    while (planningIteration < MAX_PLANNING_ITERATIONS) {
+      planningIteration++;
+
+      if (signal?.aborted) return { planApproved: false };
+
+      const pass = this.createPassState(planPassOptions);
+      const requestIdBase =
+        context.requestId || context.agentSessionId || crypto.randomUUID();
+      const passRequestId = `${requestIdBase}-plan-${planningIteration}`;
+      pass.requestId = passRequestId;
+      this.registerTrackerRequest(passRequestId);
+
+      const stream = this.createProviderStream(currentMessages, planPassOptions);
+      await this.consumeStream(stream, pass, allowedPlanToolNames);
+
+      finalizePassTracker(pass, passRequestId);
+      this.emitGenerationProgress();
+      this.emitUsageUpdate();
+
+      if (signal?.aborted) return { planApproved: false };
+
+      // ── exit_plan_mode: emit proposal and wait for approval ────────
+      const exitPlanToolCall = pass.pendingToolCalls.find(
+        (toolCall) => toolCall.name === TOOL_NAMES.EXIT_PLAN_MODE,
+      );
+
+      if (exitPlanToolCall) {
+        const results: ToolResult[] = [
+          {
+            name: exitPlanToolCall.name,
+            id: exitPlanToolCall.id || "",
+            result: {},
+          },
+        ];
+
+        const { shouldContinueLoop } = await handleExitPlanMode(
+          exitPlanToolCall,
+          pass,
+          results,
+          currentMessages,
+          context,
+          state,
+        );
+
+        if (!shouldContinueLoop) return { planApproved: false };
+
+        // Commit the approved planning turn so the main branching loop
+        // sees the approved plan as conversation context.
+        currentMessages.push({
+          role: "assistant",
+          content: pass.streamedText || "",
+          ...(pass.streamedThinking.trim() && {
+            thinking: pass.streamedThinking.trim(),
+          }),
+          ...(pass.thinkingSignature && {
+            thinkingSignature: pass.thinkingSignature,
+          }),
+          toolCalls: [
+            {
+              id: exitPlanToolCall.id || null,
+              name: exitPlanToolCall.name,
+              args: exitPlanToolCall.args,
+              result: results[0].result,
+            },
+          ],
+        });
+
+        logger.info(
+          `[TreeOfThought] Plan approved — entering full branching loop with ${this.tools.finalTools.length} tool(s).`,
+        );
+        return { planApproved: true };
+      }
+
+      // ── Unauthorized tool calls — block and redirect ───────────────
+      const unauthorizedCalls = pass.pendingToolCalls.filter(
+        (toolCall) => toolCall.name !== TOOL_NAMES.EXIT_PLAN_MODE,
+      );
+      if (unauthorizedCalls.length > 0) {
+        const blockedNames = unauthorizedCalls
+          .map((toolCall) => toolCall.name)
+          .join(", ");
+        logger.warn(
+          `[TreeOfThought] Planning phase: blocked ${unauthorizedCalls.length} unauthorized tool call(s): [${blockedNames}]`,
+        );
+        if (pass.streamedText) {
+          currentMessages.push({
+            role: "assistant",
+            content: pass.streamedText,
+            ...(pass.streamedThinking.trim() && {
+              thinking: pass.streamedThinking.trim(),
+            }),
+            ...(pass.thinkingSignature && {
+              thinkingSignature: pass.thinkingSignature,
+            }),
+          });
+        }
+        currentMessages.push({
+          role: "system",
+          content:
+            `You are in PLANNING MODE. Tool call(s) [${blockedNames}] were blocked — ` +
+            `only exit_plan_mode is available. Write your complete plan as text output, ` +
+            `then call exit_plan_mode to submit it for user approval.`,
+        });
+        continue;
+      }
+
+      // ── Text-only response — model is still composing its plan ─────
+      if (pass.streamedText || pass.streamedThinking.trim()) {
+        currentMessages.push({
+          role: "assistant",
+          content: pass.streamedText,
+          ...(pass.streamedThinking.trim() && {
+            thinking: pass.streamedThinking.trim(),
+          }),
+          ...(pass.thinkingSignature && {
+            thinkingSignature: pass.thinkingSignature,
+          }),
+        });
+        continue;
+      }
+
+      // ── Empty output — bail out ─────────────────────────────────────
+      logger.warn(
+        `[TreeOfThought] Planning phase iteration ${planningIteration}: empty output. Aborting planning phase.`,
+      );
+      return { planApproved: false };
+    }
+
+    logger.warn(
+      `[TreeOfThought] Planning phase exhausted ${MAX_PLANNING_ITERATIONS} iterations without exit_plan_mode call.`,
+    );
+    return { planApproved: false };
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

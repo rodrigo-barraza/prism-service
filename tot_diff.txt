@@ -1,0 +1,289 @@
+commit 1e100f484211d1bc087eacb762ca02228e2c4bb9
+Author: Rodrigo Barraza <hello@rod.dev>
+Date:   Thu Jun 18 10:33:34 2026 -0700
+
+    refactor: modularize harness lifecycle logic by extracting recurring tasks into dedicated utility services.
+
+diff --git a/src/services/harnesses/TreeOfThoughtHarness.ts b/src/services/harnesses/TreeOfThoughtHarness.ts
+index 3c26c2b..5e85900 100644
+--- a/src/services/harnesses/TreeOfThoughtHarness.ts
++++ b/src/services/harnesses/TreeOfThoughtHarness.ts
+@@ -3,6 +3,7 @@ import logger from "../../utils/logger.ts";
+ import {
+   SERVER_SENT_EVENT_TYPES,
+   STATUS_MESSAGES,
++  TOOL_NAMES,
+ } from "@rodrigo-barraza/utilities-library/taxonomy";
+ 
+ import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
+@@ -14,7 +15,13 @@ import {
+   trackToolErrors,
+ } from "./lifecycle/PostExecutionEmitter.ts";
+ import { runExhaustionRecoveryPass } from "./lifecycle/ExhaustionRecovery.ts";
++import {
++  blockUnauthorizedToolCalls,
++  handleExitPlanMode,
++  checkForPlanModeEntry,
++} from "./lifecycle/PlanModeController.ts";
+ import { validateAfterToolExecution } from "./lifecycle/ValidationInterceptor.ts";
++import { buildToolRetryGuidance } from "./lifecycle/ToolRetryInterceptor.ts";
+ import {
+   isOutputTruncated,
+   injectContinuationContext,
+@@ -23,14 +30,16 @@ import {
+   buildProviderErrorMessage,
+   MAX_OUTPUT_TRUNCATION_RECOVERIES,
+ } from "./lifecycle/OutputTruncationRecovery.ts";
++import { manageContextPressure } from "./lifecycle/ContextPressureManager.ts";
++import { logKVCacheHitRate } from "./lifecycle/KVCacheReporter.ts";
++import { injectToolDiscoveryNudge } from "./lifecycle/ToolDiscoveryNudge.ts";
++import { finalizePassTracker } from "./lifecycle/TrackerFinalizer.ts";
++import { handleCodexPlanningResponse } from "./lifecycle/CodexPlanningDetector.ts";
+ 
++import PlanningModeService from "../PlanningModeService.ts";
+ import SessionGenerationTracker from "../SessionGenerationTracker.ts";
+-import AutoCompactionTrigger from "../compact/AutoCompactionTrigger.ts";
+-import CompactionService from "../compact/CompactionService.ts";
+-import ContextWindowManager from "../../utils/ContextWindowManager.ts";
+ 
+ import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+-import type { ChatMessage } from "../../types/admin.ts";
+ import type {
+   ConversationMessage,
+   ToolCall,
+@@ -191,6 +200,13 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
+       criticModel: options.criticModel || undefined,
+     });
+ 
++    if (options.planFirst) {
++      emit({
++        type: SERVER_SENT_EVENT_TYPES.STATUS,
++        message: STATUS_MESSAGES.PLAN_MODE_ENTERED,
++      });
++    }
++
+     // ── beforePrompt hook (once) ──────────────────────────
+     const hookContext: BeforePromptHookContext = {
+       messages: currentMessages,
+@@ -231,6 +247,10 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
+       });
+     }
+ 
++    if (state.planModeActive) {
++      PlanningModeService.injectPlanningInstruction(currentMessages);
++    }
++
+     // ── Main loop ────────────────────────────────────────────
+     try {
+       while (state.iterations < resolvedMaxIterations) {
+@@ -262,49 +282,26 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
+           project,
+           agent,
+           username,
+-          tools: this.tools.finalTools,
+         };
+-
+-        // ── Auto-compaction trigger ─────────────────────────────
+-        const contextWindowSize =
+-          context.modelDefinition?.maxInputTokens || 128_000;
+-        const maxOutputTokens = options.maxTokens || 8192;
+-        const preEnforceTokenEstimate = ContextWindowManager.estimateTokens(
+-          currentMessages as ChatMessage[],
+-        );
+-
+-        const autoCompactEvaluation = AutoCompactionTrigger.evaluate(
+-          preEnforceTokenEstimate,
+-          contextWindowSize,
+-          maxOutputTokens,
+-          currentMessages.length,
+-        );
+-
+-        if (autoCompactEvaluation.shouldCompact) {
+-          const compactionResult = await CompactionService.compactConversation(
+-            currentMessages as ChatMessage[],
+-            {
+-              project: project || "",
+-              username: username || "",
+-              agentSessionId,
+-              traceId: traceId || null,
+-              agent: agent || null,
+-              emit,
+-              signal: signal || undefined,
+-            },
++        if (state.planModeActive) {
++          const planModeTools = this.tools.finalTools.filter(
++            (tool: ToolSchema) => tool.name === TOOL_NAMES.EXIT_PLAN_MODE,
+           );
+-
+-          if (compactionResult) {
+-            currentMessages =
+-              compactionResult.compactedMessages as ConversationMessage[];
+-            state.originalMessageCount = currentMessages.length;
+-            state.compactionPerformed = true;
+-            state.preCompactTokenCount = compactionResult.preCompactTokenCount;
+-            state.postCompactTokenCount =
+-              compactionResult.postCompactTokenCount;
+-          }
++          passOptions.tools = planModeTools;
++        } else {
++          passOptions.tools = this.tools.finalTools;
+         }
+ 
++        // ── Context pressure management ──────────────────────────
++        // Micro-compaction (pressure-gated) → auto-compaction → summary persistence
++        const pressureResult = await manageContextPressure(
++          currentMessages,
++          context,
++          state,
++          "TreeOfThought",
++        );
++        currentMessages = pressureResult.messages;
++
+         // ── Context window enforcement ─────────────────────────
+         currentMessages = this.enforceContextWindow(
+           currentMessages,
+@@ -391,29 +388,28 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
+         const selectedPass = selectedBranch.pass;
+ 
+         // Finalize tracker for the selected pass
+-        if (selectedPass.usage.outputTokens > 0 && selectedPass.requestId) {
+-          SessionGenerationTracker.update(selectedPass.requestId, {
+-            outputTokens: selectedPass.usage.outputTokens,
+-          });
+-        }
+-        const finalInputTokens =
+-          selectedPass.usage.inputTokens ||
+-          selectedPass.usage.promptTokens ||
+-          0;
+-        if (finalInputTokens > 0 && selectedPass.requestId) {
+-          SessionGenerationTracker.update(selectedPass.requestId, {
+-            inputTokens: finalInputTokens,
+-          });
+-        }
++        finalizePassTracker(selectedPass, selectedPass.requestId || "");
++        logKVCacheHitRate(selectedPass.usage, state.iterations, "TreeOfThought");
+         this.emitGenerationProgress();
+-        if (selectedPass.requestId) {
+-          SessionGenerationTracker.complete(selectedPass.requestId);
+-        }
+ 
+         this.emitUsageUpdate();
+ 
+         // ── Tool execution from selected branch ─────────────────
+         if (selectedPass.pendingToolCalls.length > 0) {
++          // Plan mode enforcement
++          if (state.planModeActive) {
++            const { allBlocked } = blockUnauthorizedToolCalls(
++              selectedPass.pendingToolCalls,
++              currentMessages,
++              selectedPass,
++              state,
++            );
++            if (allBlocked) {
++              this.logIteration(selectedPass, currentMessages);
++              continue;
++            }
++          }
++
+           // Snapshot messages BEFORE tool execution for checkpoint/restore
+           const preExecutionSnapshot = currentMessages.map((message) => ({
+             ...message,
+@@ -594,6 +590,29 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
+           // Clear failed approaches on success — the trajectory is viable
+           failedApproachDescriptions = [];
+ 
++          // ── Plan mode toggling ────────────────────────────────
++          checkForPlanModeEntry(
++            selectedPass.pendingToolCalls,
++            currentMessages,
++            state,
++            emit,
++          );
++
++          const exitPlanToolCall = selectedPass.pendingToolCalls.find(
++            (toolCall) => toolCall.name === TOOL_NAMES.EXIT_PLAN_MODE,
++          );
++          if (exitPlanToolCall) {
++            const { shouldContinueLoop } = await handleExitPlanMode(
++              exitPlanToolCall,
++              selectedPass,
++              results,
++              currentMessages,
++              context,
++              state,
++            );
++            if (!shouldContinueLoop) return { messages: currentMessages };
++          }
++
+           const assistantMessage: ConversationMessage = {
+             role: "assistant",
+             content: selectedPass.streamedText || "",
+@@ -623,6 +642,17 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
+           };
+           currentMessages.push(assistantMessage);
+ 
++          // ── Structured retry guidance on tool failure ──────────
++          const retryGuidanceMessage = buildToolRetryGuidance(
++            selectedPass.pendingToolCalls,
++            results,
++            state,
++            MAX_CONSECUTIVE_TOOL_ERRORS,
++          );
++          if (retryGuidanceMessage) {
++            currentMessages.push(retryGuidanceMessage);
++          }
++
+           currentMessages = currentMessages.filter(
+             (message) =>
+               !(
+@@ -632,6 +662,14 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
+               ),
+           );
+ 
++          // ── Post-search nudge for tool discovery chain ─────────
++          injectToolDiscoveryNudge(
++            selectedPass.pendingToolCalls,
++            results,
++            currentMessages,
++            context,
++          );
++
+           this.checkAndApplyToolSetChanges(currentMessages);
+ 
+           continue;
+@@ -639,6 +677,35 @@ export default class TreeOfThoughtHarness extends BaseAgenticHarness {
+ 
+         // ── No tools — final text response ──────────────────────
+         if (selectedPass.streamedText || selectedPass.streamedThinking.trim()) {
++          if (state.planModeActive) {
++            currentMessages.push({
++              role: "assistant",
++              content: selectedPass.streamedText,
++              ...(selectedPass.streamedThinking.trim() && {
++                thinking: selectedPass.streamedThinking.trim(),
++              }),
++              ...(selectedPass.thinkingSignature && {
++                thinkingSignature: selectedPass.thinkingSignature,
++              }),
++            });
++            this.logIteration(selectedPass, currentMessages);
++            continue;
++          }
++
++          // Handle Codex/planning models
++          const codexResult = handleCodexPlanningResponse(
++            selectedPass,
++            currentMessages,
++            context,
++            state,
++            this.tools.finalTools,
++            "TreeOfThought",
++          );
++          if (codexResult.shouldContinueLoop) {
++            this.logIteration(selectedPass, currentMessages);
++            continue;
++          }
++
+           this.logIteration(selectedPass, currentMessages);
+           hasCleanTextBreak = true;
+           break;
