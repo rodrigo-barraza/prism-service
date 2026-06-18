@@ -125,7 +125,7 @@ async function* parseNativeSSEStream(
             yield {
               type: "status",
               message: "Processing prompt…",
-              phase: "processing",
+              phase: "prefilling",
               progress: 0,
             };
           } else if (type === "prompt_processing.progress") {
@@ -134,14 +134,14 @@ async function* parseNativeSSEStream(
             yield {
               type: "status",
               message: `Processing prompt… ${percentage}%`,
-              phase: "processing",
+              phase: "prefilling",
               progress,
             };
           } else if (type === "prompt_processing.end") {
             yield {
               type: "status",
               message: "Processing prompt… done",
-              phase: "processing",
+              phase: "prefilling",
               progress: 1,
             };
           }
@@ -1198,7 +1198,7 @@ export function createLmStudioProvider(
       yield {
         type: "status",
         message: "Processing prompt…",
-        phase: "processing",
+        phase: "prefilling",
         progress: 0,
       };
       if (!response.body) throw new Error("No response body");
