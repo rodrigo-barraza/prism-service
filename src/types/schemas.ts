@@ -117,6 +117,8 @@ export const ChatRequestSchema = z
     workspaceRoot: z.string().nullable().optional(),
     enableCriticGate: z.boolean().nullable().optional(),
     criticModel: z.string().nullable().optional(),
+    reminderModel: z.string().nullable().optional(),
+    reminderProvider: z.string().nullable().optional(),
     parallelToolCalls: z.boolean().nullable().optional(),
     candidateCount: z.number().nullable().optional(),
     branchCount: z.number().nullable().optional(),

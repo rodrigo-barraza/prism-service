@@ -185,12 +185,10 @@ export default class ReActHarness extends BaseAgenticHarness {
         });
 
         // ── Instruction fade-out countermeasure ─────────────────
-        maybeInjectSystemReminder(
+        await maybeInjectSystemReminder(
           currentMessages,
           state,
-          emit,
-          agentSessionId,
-          options.reminderInterval,
+          context,
         );
 
         // ── beforePrompt hook (iteration 1 only) ──────────────

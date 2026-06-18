@@ -25,6 +25,8 @@ interface SettingsData {
     subAgentModel: string;
     criticProvider: string;
     criticModel: string;
+    reminderProvider: string;
+    reminderModel: string;
     harness: string;
     topology: string;
     dynamicToolActivation: boolean;
@@ -67,6 +69,8 @@ const DEFAULTS: SettingsData = {
     subAgentModel: "",
     criticProvider: "",
     criticModel: "",
+    reminderProvider: "",
+    reminderModel: "",
     harness: "standard",
     topology: DEFAULT_TOPOLOGY,
     dynamicToolActivation: true,

@@ -185,6 +185,10 @@ export interface AgenticOptions {
   maxCostDollars?: number;
   /** Iteration interval at which abbreviated system prompt reminders are re-injected to counteract instruction fade-out. Default: 8. */
   reminderInterval?: number;
+  /** Model for LLM-based system prompt distillation (instruction fade-out countermeasure). If empty, reminders are disabled. */
+  reminderModel?: string;
+  /** Provider for the reminder extraction model. */
+  reminderProvider?: string;
   [key: string]: unknown;
 }
 

@@ -10,7 +10,7 @@ import type { PassState } from "../types.ts";
  *   3. Mark the request as complete
  *
  * This ~15-line block was duplicated identically across ReActHarness,
- * TreeOfThoughtHarness, and VisionLanguageHarness.
+ * VisionLanguageHarness, and TreeOfThoughtsStrategy.
  *
  * Returns `finalInputTokens` so callers can pass it to KVCacheReporter.
  */

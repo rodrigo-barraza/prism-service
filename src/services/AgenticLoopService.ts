@@ -99,6 +99,14 @@ export default class AgenticLoopService {
           options.criticModel =
             options.criticModel || agentSettings.criticModel;
         }
+
+        // SystemReminderInjector: auto-populate from settings when a reminder model is configured
+        if (agentSettings?.reminderModel) {
+          options.reminderModel =
+            (options.reminderModel as string) || agentSettings.reminderModel;
+          options.reminderProvider =
+            (options.reminderProvider as string) || agentSettings.reminderProvider;
+        }
       } catch {
         if (!harnessId) harnessId = "standard";
         if (!topologyId) topologyId = DEFAULT_TOPOLOGY;

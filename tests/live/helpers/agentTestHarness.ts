@@ -141,6 +141,9 @@ interface AgentStreamPayload {
   topology?: string;
   branchCount?: number;
   reasoningStrategy?: string;
+  reminderModel?: string;
+  reminderProvider?: string;
+  reminderInterval?: number;
 }
 
 export interface TransformedAgentResponse {

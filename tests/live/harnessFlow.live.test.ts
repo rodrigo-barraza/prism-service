@@ -2019,3 +2019,153 @@ describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
   }, 600_000);
 });
 
+
+// ═══════════════════════════════════════════════════════════════
+// Suite 16: System Reminder Lifecycle
+// ═══════════════════════════════════════════════════════════════
+
+describe("Suite 16: System Reminder Lifecycle", () => {
+  it("16.1 — harness completes cleanly when reminderModel is NOT set (feature disabled)", async () => {
+    for (const target of providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1)) {
+      console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [{ role: "user", content: ITERATION_STRESS }],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 2000,
+          autoApprove: true,
+          maxIterations: 10,
+          // reminderModel intentionally omitted — feature should be disabled
+        },
+        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+      );
+
+      logResult(`16.1 [${target.providerName}]`, result);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+
+      // No system_reminder_injected events should fire when feature is disabled
+      const reminderStatuses = result.statuses.filter(
+        (status) => status.message === "system_reminder_injected",
+      );
+      expect(reminderStatuses).toHaveLength(0);
+      console.log(
+        `  ✓ No reminder events fired (feature disabled as expected)`,
+      );
+    }
+  }, 600_000);
+
+  it("16.2 — harness completes cleanly when reminderModel IS set (feature enabled)", async () => {
+    for (const target of providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1)) {
+      console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+
+      // Use the same provider/model as the main generation for the reminder
+      // extraction. Set a low reminderInterval so it triggers during the test.
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a helpful assistant. You must always respond in English. " +
+                "Never use profanity or offensive language. Always cite your sources " +
+                "when making factual claims. Do not fabricate data or statistics. " +
+                "You should prioritize user safety. Never execute destructive commands. " +
+                "Always ask for confirmation before irreversible actions. " +
+                "Respond concisely and avoid unnecessary verbosity. " +
+                "Use proper markdown formatting in all responses.",
+            },
+            { role: "user", content: ITERATION_STRESS },
+          ],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 2000,
+          autoApprove: true,
+          maxIterations: 10,
+          reminderModel: target.model,
+          reminderProvider: target.providerName,
+          reminderInterval: 5,
+        },
+        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+      );
+
+      logResult(`16.2 [${target.providerName}]`, result);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+
+      // Count reminder injection events — they may or may not fire depending
+      // on whether enough iterations were reached, but the harness must
+      // NOT crash regardless
+      const reminderStatuses = result.statuses.filter(
+        (status) => status.message === "system_reminder_injected",
+      );
+      const iterationStatuses = result.statuses.filter(
+        (status) => status.message === "iteration_progress",
+      );
+
+      console.log(
+        `  📊 Iterations: ${iterationStatuses.length}, ` +
+          `System reminders injected: ${reminderStatuses.length}`,
+      );
+
+      // If we reached enough iterations, verify the reminder event has metadata
+      if (reminderStatuses.length > 0) {
+        const firstReminder = reminderStatuses[0];
+        expect(firstReminder.iteration).toBeDefined();
+        expect(firstReminder.interval).toBeDefined();
+        console.log(
+          `  ✓ Reminder injected at iteration ${firstReminder.iteration} ` +
+            `(interval: ${firstReminder.interval})`,
+        );
+      }
+    }
+  }, 600_000);
+
+  it("16.3 — harness does not emit reminder events on short sessions (< 5 iterations)", async () => {
+    for (const target of providerTargets.slice(0, 1)) {
+      console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [{ role: "user", content: BRIEF_GREETING }],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 100,
+          autoApprove: true,
+          maxIterations: 3,
+          reminderModel: target.model,
+          reminderProvider: target.providerName,
+          reminderInterval: 1,
+        },
+        { timeoutMs: getTimeout(target) },
+      );
+
+      logResult(`16.3 [${target.providerName}]`, result);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+
+      // Even with reminderInterval=1, minimum threshold of 5 iterations
+      // should prevent any reminders on a short 3-iteration session
+      const reminderStatuses = result.statuses.filter(
+        (status) => status.message === "system_reminder_injected",
+      );
+      expect(reminderStatuses).toHaveLength(0);
+      console.log(
+        `  ✓ No reminder events on short session (expected, threshold not reached)`,
+      );
+    }
+  }, 300_000);
+});

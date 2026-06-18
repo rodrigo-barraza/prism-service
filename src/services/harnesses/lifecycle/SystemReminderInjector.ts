@@ -3,11 +3,12 @@ import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { extractReminderViaLLM } from "./SystemReminderExtractor.ts";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type {
   ConversationMessage,
-  EmitFunction,
+  AgenticContext,
 } from "../types.ts";
 
 /**
@@ -19,84 +20,41 @@ import type {
  * into the context window's distant prefix. This is the "instruction
  * fade-out" effect documented across all major LLM providers.
  *
- * This module extracts key behavioral constraints from the system prompt
- * on the first iteration and re-injects them as compact reminders at
- * configurable intervals (default: every 8 iterations). The reminders
- * are placed near the tail of the message array so they fall within
- * the model's recency window.
+ * This module uses the SystemReminderExtractor (LLM-based distillation)
+ * to produce a condensed (~300 token) behavioral summary on the first
+ * reminder trigger. Subsequent injections reuse the cached summary.
  *
- * The extraction is a one-time operation that produces a condensed
- * (~300 token) behavioral summary. Subsequent injections reuse the
- * same summary, adding negligible overhead to context size.
+ * Feature gating: if `options.reminderModel` is not set, the entire
+ * feature is disabled — no extraction, no injection.
  */
 
 const DEFAULT_REMINDER_INTERVAL = 8;
 const MINIMUM_ITERATIONS_BEFORE_FIRST_REMINDER = 5;
-const MAXIMUM_REMINDER_CHARACTERS = 1200;
 
-let cachedReminderContent: Map<string, string> = new Map();
-
-/**
- * Extract a condensed behavioral summary from the system prompt.
- *
- * Pulls the most critical constraints: identity, safety boundaries,
- * output format requirements, and tool usage rules. Uses heuristic
- * extraction (section headers, imperative sentences) rather than
- * an LLM call — zero latency overhead.
- */
-function extractReminderFromSystemPrompt(
-  systemPromptContent: string,
-): string {
-  const importantPatterns = [
-    /(?:you (?:must|should|are|will)|never|always|do not|important|critical|required|mandatory)[^\n.]*/gi,
-    /(?:rule|constraint|guideline|policy|requirement)[^\n.]*/gi,
-  ];
-
-  const extractedSentences: Set<string> = new Set();
-
-  for (const pattern of importantPatterns) {
-    const matches = systemPromptContent.match(pattern);
-    if (matches) {
-      for (const match of matches) {
-        const trimmedMatch = match.trim();
-        if (trimmedMatch.length > 20 && trimmedMatch.length < 200) {
-          extractedSentences.add(trimmedMatch);
-        }
-      }
-    }
-  }
-
-  if (extractedSentences.size === 0) {
-    return "";
-  }
-
-  const sortedSentences = [...extractedSentences]
-    .slice(0, 15);
-
-  let reminderText = "";
-  for (const sentence of sortedSentences) {
-    if (reminderText.length + sentence.length > MAXIMUM_REMINDER_CHARACTERS) break;
-    reminderText += `- ${sentence}\n`;
-  }
-
-  return reminderText.trim();
-}
+const cachedReminderContent: Map<string, string> = new Map();
 
 /**
  * Check whether a system reminder should be injected on this iteration.
- * If so, inject it and emit a status event.
+ * If so, extract (or re-use cached) constraints and inject them.
+ *
+ * Feature is disabled when `options.reminderModel` is not configured.
  *
  * Call this at the start of each iteration, after incrementing
  * `state.iterations` but before building the provider stream.
  */
-export function maybeInjectSystemReminder(
+export async function maybeInjectSystemReminder(
   currentMessages: ConversationMessage[],
   state: AgenticLoopState,
-  emit: EmitFunction,
-  sessionId: string,
-  reminderInterval?: number,
-): void {
-  const resolvedInterval = reminderInterval || DEFAULT_REMINDER_INTERVAL;
+  context: AgenticContext,
+): Promise<void> {
+  const { options, emit, provider, signal } = context;
+  const sessionId = context.agentSessionId || "";
+
+  // Feature gate: disabled when no reminder model is configured
+  const reminderModel = options.reminderModel as string | undefined;
+  if (!reminderModel) return;
+
+  const resolvedInterval = options.reminderInterval || DEFAULT_REMINDER_INTERVAL;
   const currentIteration = state.iterations;
 
   if (currentIteration < MINIMUM_ITERATIONS_BEFORE_FIRST_REMINDER) return;
@@ -114,7 +72,13 @@ export function maybeInjectSystemReminder(
 
     if (!systemMessage || typeof systemMessage.content !== "string") return;
 
-    reminderContent = extractReminderFromSystemPrompt(systemMessage.content);
+    reminderContent = await extractReminderViaLLM(
+      systemMessage.content,
+      provider,
+      reminderModel,
+      signal || undefined,
+    ) || undefined;
+
     if (!reminderContent) return;
 
     cachedReminderContent.set(sessionId, reminderContent);
@@ -138,7 +102,7 @@ export function maybeInjectSystemReminder(
 
   logger.info(
     `[SystemReminderInjector] Injected system reminder on iteration ${currentIteration} ` +
-      `(interval: ${resolvedInterval}, ${reminderContent.length} chars)`,
+      `(interval: ${resolvedInterval}, model: ${reminderModel}, ${reminderContent.length} chars)`,
   );
 }
 
