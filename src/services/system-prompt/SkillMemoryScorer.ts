@@ -20,7 +20,14 @@ export class SkillMemoryScorer {
     agent: string,
     project: string | null,
     queryText: string,
-    { traceId, agentSessionId, endpoint, _username, guildId, userIds }: MemoryFetchOptions = {}
+    {
+      traceId,
+      agentSessionId,
+      endpoint,
+      _username,
+      guildId,
+      userIds,
+    }: MemoryFetchOptions = {},
   ): Promise<string> {
     try {
       const memories = await MemoryService.search({
@@ -39,12 +46,12 @@ export class SkillMemoryScorer {
       if (!memories || memories.length === 0) return "";
 
       logger.info(
-        `[SystemPromptAssembler] Memory search returned ${memories.length} results for ${agent}`
+        `[SystemPromptAssembler] Memory search returned ${memories.length} results for ${agent}`,
       );
       return MemoryService.formatForPrompt(memories);
     } catch (error: unknown) {
       logger.warn(
-        `[SystemPromptAssembler] Memory fetch error: ${getErrorMessage(error)}`
+        `[SystemPromptAssembler] Memory fetch error: ${getErrorMessage(error)}`,
       );
       return "";
     }
@@ -54,7 +61,7 @@ export class SkillMemoryScorer {
     project: string | null,
     username: string,
     queryText: string,
-    { traceId, agentSessionId, endpoint, agent }: SkillFetchOptions = {}
+    { traceId, agentSessionId, endpoint, agent }: SkillFetchOptions = {},
   ): Promise<ScoredSkill[]> {
     try {
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
@@ -69,10 +76,12 @@ export class SkillMemoryScorer {
       if (skills.length === 0) return [];
 
       // If no query or no skills have embeddings, return all (graceful fallback)
-      const hasEmbeddings = skills.some((skill) => Array.isArray(skill.embedding) && skill.embedding.length > 0);
+      const hasEmbeddings = skills.some(
+        (skill) => Array.isArray(skill.embedding) && skill.embedding.length > 0,
+      );
       if (!queryText || !hasEmbeddings) {
         logger.info(
-          `[SystemPromptAssembler] Returning all ${skills.length} skills (no query or no embeddings)`
+          `[SystemPromptAssembler] Returning all ${skills.length} skills (no query or no embeddings)`,
         );
         return skills.map((skill) => ({
           name: skill.name as string,
@@ -95,7 +104,7 @@ export class SkillMemoryScorer {
         });
       } catch (error: unknown) {
         logger.warn(
-          `[SystemPromptAssembler] Query embedding failed: ${getErrorMessage(error)} — returning all skills`
+          `[SystemPromptAssembler] Query embedding failed: ${getErrorMessage(error)} — returning all skills`,
         );
         return skills.map((skill) => ({
           name: skill.name as string,
@@ -119,13 +128,13 @@ export class SkillMemoryScorer {
         .sort((firstItem, b) => b.score - firstItem.score);
 
       logger.info(
-        `[SystemPromptAssembler] Skills: ${scored.length}/${skills.length} above threshold (${scored.map((skill) => `${skill.name}:${skill.score.toFixed(2)}`).join(", ")})`
+        `[SystemPromptAssembler] Skills: ${scored.length}/${skills.length} above threshold (${scored.map((skill) => `${skill.name}:${skill.score.toFixed(2)}`).join(", ")})`,
       );
 
       return scored;
     } catch (error: unknown) {
       logger.warn(
-        `[SystemPromptAssembler] Skills fetch error: ${getErrorMessage(error)}`
+        `[SystemPromptAssembler] Skills fetch error: ${getErrorMessage(error)}`,
       );
       return [];
     }

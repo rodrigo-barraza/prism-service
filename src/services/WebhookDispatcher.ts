@@ -57,10 +57,7 @@ async function dispatchToSubscription(
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
     try {
       const controller = new AbortController();
-      timeoutHandle = setTimeout(
-        () => controller.abort(),
-        DISPATCH_TIMEOUT_MS,
-      );
+      timeoutHandle = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MS);
 
       const response = await fetch(subscription.url, {
         method: "POST",

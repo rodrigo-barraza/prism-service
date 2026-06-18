@@ -4,7 +4,10 @@ import statsRoutes from "./admin/AdminStatsRoutes.ts";
 import conversationRoutes from "./admin/AdminConversationRoutes.ts";
 import contentRoutes from "./admin/AdminContentRoutes.ts";
 import traceRoutes from "./admin/AdminTraceRoutes.ts";
-import { sessionRouter, agentSessionRouter } from "./admin/AdminSessionRoutes.ts";
+import {
+  sessionRouter,
+  agentSessionRouter,
+} from "./admin/AdminSessionRoutes.ts";
 import systemRoutes from "./admin/AdminSystemRoutes.ts";
 import lmStudioRoutes from "./admin/AdminLmStudioRoutes.ts";
 
@@ -21,4 +24,3 @@ router.use(systemRoutes);
 router.use(contentRoutes);
 
 export default router;
-

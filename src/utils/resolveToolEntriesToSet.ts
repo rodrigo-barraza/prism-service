@@ -29,7 +29,8 @@ export function resolveToolEntriesToSet(
     if (entry.startsWith("domainKey:")) {
       const domainKey = entry.slice(10);
       for (const toolSchema of schemas) {
-        if (toolSchema.domainKey === domainKey) resolvedSet.add(toolSchema.name);
+        if (toolSchema.domainKey === domainKey)
+          resolvedSet.add(toolSchema.name);
       }
     } else if (entry.startsWith("domain:")) {
       const domain = entry.slice(7);

@@ -1,4 +1,7 @@
-import { DEFAULT_TOPOLOGY, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  DEFAULT_TOPOLOGY,
+  CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
@@ -66,8 +69,12 @@ const AVAILABLE_PROVIDERS = new Set<string>([
  * Resolve availableTools entries (may contain "domain:X" / "domainKey:X" prefixes)
  * into a flat Set of concrete tool names using client schemas.
  */
-function resolveAvailableToolsToSet(availableTools: string[] | undefined, defaultTopology?: string) {
-  if (!availableTools || !Array.isArray(availableTools)) return new Set<string>();
+function resolveAvailableToolsToSet(
+  availableTools: string[] | undefined,
+  defaultTopology?: string,
+) {
+  if (!availableTools || !Array.isArray(availableTools))
+    return new Set<string>();
 
   // "*" wildcard means all tools — return null sentinel
   if (availableTools.includes("*")) return null;
@@ -77,11 +84,14 @@ function resolveAvailableToolsToSet(availableTools: string[] | undefined, defaul
   );
   if (!hasPrefixed) return new Set<string>(availableTools);
 
-  const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
+  const clientSchemas =
+    ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
   return resolveToolEntriesToSet(availableTools, clientSchemas);
 }
 
-function filterByAvailableProviders(modelsMap: Record<string, ModelOptionEntry[]>) {
+function filterByAvailableProviders(
+  modelsMap: Record<string, ModelOptionEntry[]>,
+) {
   const filtered: Record<string, ModelOptionEntry[]> = {};
   for (const [provider, models] of Object.entries(modelsMap)) {
     if (AVAILABLE_PROVIDERS.has(provider)) {
@@ -159,7 +169,9 @@ function lookupArenaScores(modelName: string) {
  * Enrich all models in a provider map with arena scores from ARENA_SCORES.
  * Merges with any existing arena data on the model (existing takes priority).
  */
-function enrichModelsWithArenaScores(modelsMap: Record<string, ModelOptionEntry[]>) {
+function enrichModelsWithArenaScores(
+  modelsMap: Record<string, ModelOptionEntry[]>,
+) {
   for (const provider of Object.keys(modelsMap)) {
     for (const model of modelsMap[provider]) {
       const scores = lookupArenaScores(model.name);
@@ -223,7 +235,9 @@ router.get(
           const enriched = { [instanceId]: models };
           enrichModelsWithArenaScores(enriched);
           const existing = textToTextModels[instanceId] || [];
-          const existingNames = new Set(existing.map((modelOptionEntry) => modelOptionEntry.name));
+          const existingNames = new Set(
+            existing.map((modelOptionEntry) => modelOptionEntry.name),
+          );
           const merged = [...existing];
           for (const model of enriched[instanceId]) {
             if (!existingNames.has(model.name)) merged.push(model);
@@ -249,10 +263,14 @@ router.get(
     const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
 
     // Build the dynamic Tool Calling system prompt
-    const schemas = ToolOrchestratorService.getToolSchemas(defaultTopology) || [];
+    const schemas =
+      ToolOrchestratorService.getToolSchemas(defaultTopology) || [];
     const toolNames = schemas
       .map((schema) => {
-        const toolSchema = schema as { name?: string; function?: { name?: string } };
+        const toolSchema = schema as {
+          name?: string;
+          function?: { name?: string };
+        };
         return toolSchema.name || toolSchema.function?.name;
       })
       .filter((name): name is string => typeof name === "string")
@@ -290,10 +308,16 @@ Guidelines:
         models: textToTextModels,
         defaults: filterDefaults(getDefaultModels(TYPES.TEXT, TYPES.TEXT)),
         recommendedDefault: resolveRecommendedDefault(
-          TYPES.TEXT, TYPES.TEXT, AVAILABLE_PROVIDERS, false,
+          TYPES.TEXT,
+          TYPES.TEXT,
+          AVAILABLE_PROVIDERS,
+          false,
         ),
         recommendedAgenticDefault: resolveRecommendedDefault(
-          TYPES.TEXT, TYPES.TEXT, AVAILABLE_PROVIDERS, true,
+          TYPES.TEXT,
+          TYPES.TEXT,
+          AVAILABLE_PROVIDERS,
+          true,
         ),
       },
       textToSpeech: {
@@ -373,7 +397,10 @@ router.get(
     const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
     const agents = AgentPersonaRegistry.list().map((first) => {
       const persona = AgentPersonaRegistry.get(first.id);
-      const resolvedTools = resolveAvailableToolsToSet(persona?.availableTools, defaultTopology);
+      const resolvedTools = resolveAvailableToolsToSet(
+        persona?.availableTools,
+        defaultTopology,
+      );
       // null sentinel means "*" wildcard → all tools
       const isWildcard = resolvedTools === null;
 
@@ -381,24 +408,30 @@ router.get(
       let finalToolNames = isWildcard ? ["*"] : [...(resolvedTools || [])];
 
       if (!isWildcard) {
-        const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
+        const clientSchemas =
+          ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
 
         // Core tool bypass: system:true tools AND CORE_AGENTIC_TOOLS members
         // This must match AgenticToolResolver.resolve() bypass logic exactly
         const isCoreToolsLocked = persona?.coreToolsLocked ?? true;
         let coreBypassToolNames: string[] = isCoreToolsLocked
           ? clientSchemas
-              .filter((tool) =>
-                tool.system === true || CORE_AGENTIC_TOOLS.has(tool.name),
+              .filter(
+                (tool) =>
+                  tool.system === true || CORE_AGENTIC_TOOLS.has(tool.name),
               )
               .map((tool) => tool.name)
           : [];
 
         // Apply persona blockedTools denylist to core bypass tools (enabledSet protects)
         if (persona?.blockedTools?.length) {
-          const disabledSet = resolveToolEntriesToSet(persona.blockedTools, clientSchemas);
+          const disabledSet = resolveToolEntriesToSet(
+            persona.blockedTools,
+            clientSchemas,
+          );
           coreBypassToolNames = coreBypassToolNames.filter(
-            (toolName) => !disabledSet.has(toolName) || resolvedTools.has(toolName),
+            (toolName) =>
+              !disabledSet.has(toolName) || resolvedTools.has(toolName),
           );
         }
 
@@ -414,12 +447,16 @@ router.get(
           defaultTopology,
         );
         if (resolvedEnabledByDefaultSet === null) {
-          finalEnabledByDefaultToolNames = isWildcard ? ["*"] : [...(resolvedTools || [])];
+          finalEnabledByDefaultToolNames = isWildcard
+            ? ["*"]
+            : [...(resolvedTools || [])];
         } else {
           finalEnabledByDefaultToolNames = [...resolvedEnabledByDefaultSet];
         }
       } else {
-        finalEnabledByDefaultToolNames = isWildcard ? ["*"] : [...(resolvedTools || [])];
+        finalEnabledByDefaultToolNames = isWildcard
+          ? ["*"]
+          : [...(resolvedTools || [])];
       }
 
       return {
@@ -436,7 +473,9 @@ router.get(
         enabledToolNames: finalToolNames,
         enabledByDefaultToolNames: finalEnabledByDefaultToolNames,
         coreToolsLocked: persona?.coreToolsLocked ?? true,
-        canSpawnSubAgents: ORCHESTRATOR_ONLY_TOOLS.includes(TOOL_NAMES.CREATE_TEAM),
+        canSpawnSubAgents: ORCHESTRATOR_ONLY_TOOLS.includes(
+          TOOL_NAMES.CREATE_TEAM,
+        ),
         usesDirectoryTree: persona?.usesDirectoryTree || false,
         usesCodingGuidelines: persona?.usesCodingGuidelines || false,
       };
@@ -455,27 +494,36 @@ router.get(
     await ToolOrchestratorService.ensureSchemas();
     const settings = await SettingsService.getSection("agents");
     const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
-    const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
+    const schemas =
+      ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
     const agentId = _req.query.agent as string | undefined;
 
     if (agentId) {
       const persona = AgentPersonaRegistry.get(agentId);
       if (persona?.availableTools) {
-        const enabledSet = resolveAvailableToolsToSet(persona.availableTools, defaultTopology);
+        const enabledSet = resolveAvailableToolsToSet(
+          persona.availableTools,
+          defaultTopology,
+        );
         const isCoreToolsLocked = persona.coreToolsLocked ?? true;
         // null = wildcard ("*") → return all schemas unfiltered
         if (enabledSet !== null) {
           let filteredSchemas = schemas.filter(
             (tool) =>
               enabledSet.has(tool.name) ||
-              (isCoreToolsLocked && (tool.system === true || CORE_AGENTIC_TOOLS.has(tool.name))),
+              (isCoreToolsLocked &&
+                (tool.system === true || CORE_AGENTIC_TOOLS.has(tool.name))),
           );
 
           // Apply persona blockedTools denylist (enabledSet protects)
           if (persona.blockedTools?.length) {
-            const disabledSet = resolveToolEntriesToSet(persona.blockedTools, schemas);
+            const disabledSet = resolveToolEntriesToSet(
+              persona.blockedTools,
+              schemas,
+            );
             filteredSchemas = filteredSchemas.filter(
-              (tool) => !disabledSet.has(tool.name) || enabledSet.has(tool.name),
+              (tool) =>
+                !disabledSet.has(tool.name) || enabledSet.has(tool.name),
             );
           }
 
@@ -500,7 +548,8 @@ router.post(
       const count = await ToolOrchestratorService.refreshSchemas();
       res.json({ ok: true, count });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       res.status(500).json({ error: errorMessage });
     }
   }),

@@ -27,7 +27,10 @@ import conversationSearchTool from "./ConversationSearchTool.ts";
 
 export interface InternalToolSchemaParameters {
   type?: string;
-  properties?: Record<string, { type: string; description?: string; items?: { type: string } }>;
+  properties?: Record<
+    string,
+    { type: string; description?: string; items?: { type: string } }
+  >;
   required?: string[];
 }
 
@@ -51,7 +54,10 @@ interface InternalTool {
   schema: InternalToolSchema;
   domain?: string;
   labels?: string[];
-  execute: (args: Record<string, unknown>, context: InternalToolContext) => Promise<unknown>;
+  execute: (
+    args: Record<string, unknown>,
+    context: InternalToolContext,
+  ) => Promise<unknown>;
 }
 
 const registry = new Map<string, InternalTool>();
@@ -104,14 +110,20 @@ function init() {
 try {
   init();
 } catch (error: unknown) {
-  logger.error(`[InternalToolRegistry] Init failed: ${error instanceof Error ? error.message : String(error)}`);
+  logger.error(
+    `[InternalToolRegistry] Init failed: ${error instanceof Error ? error.message : String(error)}`,
+  );
 }
 
 export default class InternalToolRegistry {
   static has(name: string) {
     return registry.has(name);
   }
-  static async execute(name: string, args: Record<string, unknown>, context: InternalToolContext = {}) {
+  static async execute(
+    name: string,
+    args: Record<string, unknown>,
+    context: InternalToolContext = {},
+  ) {
     const tool = registry.get(name);
     if (!tool) {
       return { error: `Unknown internal tool: ${name}` };
@@ -123,7 +135,7 @@ export default class InternalToolRegistry {
   }
   static getClientSchemas() {
     return [...registry.values()].map((tool) => ({
-            ...tool.schema,
+      ...tool.schema,
       domain: tool.domain || DOMAINS.CORE_HARNESS.displayName,
       labels: tool.labels || ["coding"],
     }));

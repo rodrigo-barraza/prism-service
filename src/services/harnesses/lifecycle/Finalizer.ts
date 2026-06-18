@@ -1,4 +1,7 @@
-import { formatCostTag, roundMilliseconds } from "@rodrigo-barraza/utilities-library";
+import {
+  formatCostTag,
+  roundMilliseconds,
+} from "@rodrigo-barraza/utilities-library";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   calculateTextCost,
@@ -11,12 +14,19 @@ import FileService from "../../FileService.ts";
 import AgentPersonaRegistry from "../../AgentPersonaRegistry.ts";
 import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
 import { resolveToolEntriesToSet } from "../../../utils/resolveToolEntriesToSet.ts";
+import { appendAndFinalize } from "../../../utils/ConversationUtilities.ts";
 import {
-  appendAndFinalize,
-} from "../../../utils/ConversationUtilities.ts";
-import { COLLECTIONS, FILE_CATEGORIES, PROMPT_DELIMITERS } from "../../../constants.ts";
+  COLLECTIONS,
+  FILE_CATEGORIES,
+  PROMPT_DELIMITERS,
+} from "../../../constants.ts";
 import logger from "../../../utils/logger.ts";
-import { TokenUsage, MessagePayload, ToolCallPayload, LlmOptions } from "../../RequestLogger.ts";
+import {
+  TokenUsage,
+  MessagePayload,
+  ToolCallPayload,
+  LlmOptions,
+} from "../../RequestLogger.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 export interface FinalizerContext {
@@ -82,7 +92,9 @@ export function swapMessageContent(message: MessagePayload) {
   if (message.role === "user" && typeof message.content === "string") {
     if (
       message.rawContent?.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT) ||
-      message.rawContent?.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX)
+      message.rawContent?.startsWith(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX,
+      )
     ) {
       return;
     }
@@ -106,7 +118,11 @@ export function swapMessageContent(message: MessagePayload) {
       }
       message.content = clean;
       message.rawContent = dirty;
-    } else if (message.content.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX)) {
+    } else if (
+      message.content.startsWith(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX,
+      )
+    ) {
       const dirty = message.content;
       let clean = message.content;
       const index = message.content.indexOf("]\n\n");
@@ -154,7 +170,7 @@ export async function finalizeTextGeneration(
     thinkingFragments,
     resolvedEnabledTools,
   }: FinalizerPayload,
-    overrideMessagesToAppend: MessagePayload[] | null = null,
+  overrideMessagesToAppend: MessagePayload[] | null = null,
 ) {
   const {
     providerName,
@@ -180,8 +196,6 @@ export async function finalizeTextGeneration(
     signal,
   } = context;
 
-
-
   // Swap content and rawContent if present to ensure the database and caller get clean text
   if (messages) {
     for (const message of messages) {
@@ -200,24 +214,29 @@ export async function finalizeTextGeneration(
   let estimatedCost: number | null = null;
   let tokensPerSec: number | null = null;
   if (usage) {
-        const imageCount = images.length;
+    const imageCount = images.length;
     if (imageCount > 0) {
       const imgPricing =
-                getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel] || (modelDefinition?.pricing as Record<string, number>);
+        getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel] ||
+        (modelDefinition?.pricing as Record<string, number>);
       if (imgPricing?.imageOutputPerMillion) {
         // Derive image tokens dynamically from the API-reported total.
         // The API's outputTokens already includes both text and image tokens,
         // so we estimate text tokens from the generated text length (~4 chars/token)
         // and attribute the remainder to images. This adapts to any resolution
         // (512px≈747tok, 1024px≈1120tok, 2048px≈1680tok, 4096px≈2520tok).
-                const estimatedTextOutputTokens = Math.ceil((text?.length || 0) / 4);
+        const estimatedTextOutputTokens = Math.ceil((text?.length || 0) / 4);
         const imageTokens = Math.max(
           0,
-                    (usage.outputTokens || 0) - estimatedTextOutputTokens,
+          (usage.outputTokens || 0) - estimatedTextOutputTokens,
         );
-                const textOutputTokens = Math.max(0, (usage.outputTokens || 0) - imageTokens);
+        const textOutputTokens = Math.max(
+          0,
+          (usage.outputTokens || 0) - imageTokens,
+        );
         const inputCost =
-                    ((usage.inputTokens || 0) / 1_000_000) * (imgPricing.inputPerMillion || 0);
+          ((usage.inputTokens || 0) / 1_000_000) *
+          (imgPricing.inputPerMillion || 0);
         const textOutCost =
           (textOutputTokens / 1_000_000) * (imgPricing.outputPerMillion || 0);
         const imageOutCost =
@@ -226,26 +245,30 @@ export async function finalizeTextGeneration(
           (inputCost + textOutCost + imageOutCost).toFixed(8),
         );
       } else {
-                const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
-                estimatedCost = calculateTextCost(usage, pricing);
+        const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
+        estimatedCost = calculateTextCost(usage, pricing);
       }
     } else {
-            const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
-            estimatedCost = calculateTextCost(usage, pricing);
+      const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
+      estimatedCost = calculateTextCost(usage, pricing);
     }
-        tokensPerSec = calculateTokensPerSec(usage.outputTokens || 0, generationSec, {
-            providerReported: usage.tokensPerSec as number | undefined,
-      fallbackSec: totalSec,
-    });
+    tokensPerSec = calculateTokensPerSec(
+      usage.outputTokens || 0,
+      generationSec,
+      {
+        providerReported: usage.tokensPerSec as number | undefined,
+        fallbackSec: totalSec,
+      },
+    );
   }
   // ── Console logging ───────────────────────────────────────────
-    const inputTokens = usage ? getTotalInputTokens(usage) : 0;
-    const outputTokens = usage?.outputTokens || 0;
+  const inputTokens = usage ? getTotalInputTokens(usage) : 0;
+  const outputTokens = usage?.outputTokens || 0;
   const tokensPerSecondString =
     tokensPerSec !== null ? tokensPerSec.toFixed(1) : "N/A";
   const cacheInfo =
-        usage?.cacheReadInputTokens || usage?.cacheCreationInputTokens
-            ? `, cache_read: ${usage.cacheReadInputTokens || 0}, cache_write: ${usage.cacheCreationInputTokens || 0}`
+    usage?.cacheReadInputTokens || usage?.cacheCreationInputTokens
+      ? `, cache_read: ${usage.cacheReadInputTokens || 0}, cache_write: ${usage.cacheCreationInputTokens || 0}`
       : "";
   logger.request(
     project || "",
@@ -254,22 +277,20 @@ export async function finalizeTextGeneration(
     `[chat] ${providerName} ${resolvedModel} — ` +
       `in: ${inputTokens} tokens, out: ${outputTokens} tokens${cacheInfo}, ` +
       `speed: ${tokensPerSecondString} tok/s, ` +
-            `ttg: ${timeToGenerationSec != null ? timeToGenerationSec.toFixed(2) + "s" : "N/A"}, ` +
-            `generation: ${generationSec != null ? generationSec.toFixed(2) + "s" : "N/A"}, ` +
-            `total: ${totalSec != null ? totalSec.toFixed(2) : "0.00"}s` +
+      `ttg: ${timeToGenerationSec != null ? timeToGenerationSec.toFixed(2) + "s" : "N/A"}, ` +
+      `generation: ${generationSec != null ? generationSec.toFixed(2) + "s" : "N/A"}, ` +
+      `total: ${totalSec != null ? totalSec.toFixed(2) : "0.00"}s` +
       formatCostTag(estimatedCost),
   );
   // ── Build WAV from accumulated PCM audio chunks ───────────────
   let audioRef: string | null = null;
-    if (audioChunks.length > 0) {
+  if (audioChunks.length > 0) {
     try {
-            const pcmBuffers = audioChunks.map((b64) =>
-                Buffer.from(b64, "base64"),
-      );
+      const pcmBuffers = audioChunks.map((b64) => Buffer.from(b64, "base64"));
       const pcmData = Buffer.concat(pcmBuffers);
       const numberOfChannels = 1;
       const bitsPerSample = 16;
-            const byteRate = audioSampleRate * numberOfChannels * (bitsPerSample / 8);
+      const byteRate = audioSampleRate * numberOfChannels * (bitsPerSample / 8);
       const blockAlign = numberOfChannels * (bitsPerSample / 8);
       const wavHeader = Buffer.alloc(44);
       wavHeader.write("RIFF", 0);
@@ -279,7 +300,7 @@ export async function finalizeTextGeneration(
       wavHeader.writeUInt32LE(16, 16);
       wavHeader.writeUInt16LE(1, 20);
       wavHeader.writeUInt16LE(numberOfChannels, 22);
-            wavHeader.writeUInt32LE(audioSampleRate, 24);
+      wavHeader.writeUInt32LE(audioSampleRate, 24);
       wavHeader.writeUInt32LE(byteRate, 28);
       wavHeader.writeUInt16LE(blockAlign, 32);
       wavHeader.writeUInt16LE(bitsPerSample, 34);
@@ -290,13 +311,13 @@ export async function finalizeTextGeneration(
       const { ref } = await FileService.uploadFile(
         dataUrl,
         FILE_CATEGORIES.GENERATIONS,
-                project as string,
+        project as string,
         username || "system",
       );
       audioRef = ref;
     } catch (error: unknown) {
       logger.error(
-                `[chat] Failed to build/upload Live API audio WAV: ${getErrorMessage(error)}`,
+        `[chat] Failed to build/upload Live API audio WAV: ${getErrorMessage(error)}`,
       );
     }
   }
@@ -304,11 +325,11 @@ export async function finalizeTextGeneration(
   // Placed after audio build so audioRef is available for modality detection.
   // Agentic requests are logged granularly per-iteration by AgenticLoopService,
   // so we only log here for non-agentic paths (chat, live).
-    if (!options.agenticLoopEnabled) {
+  if (!options.agenticLoopEnabled) {
     RequestLogger.logChatGeneration({
       requestId,
-            endpoint: modelDefinition?.liveAPI ? "/live" : "/chat",
-            operation: modelDefinition?.liveAPI ? "live" : "chat",
+      endpoint: modelDefinition?.liveAPI ? "/live" : "/chat",
+      operation: modelDefinition?.liveAPI ? "live" : "chat",
       project,
       username,
       clientIp,
@@ -374,22 +395,33 @@ export async function finalizeTextGeneration(
     });
     let toolConfig: Record<string, unknown> | undefined = undefined;
     if (resolvedEnabledTools) {
-      const existingSettings = conversationMeta?.settings as Record<string, unknown> | undefined;
-      const existingToolConfig = existingSettings?.toolConfig as Record<string, unknown> | undefined;
+      const existingSettings = conversationMeta?.settings as
+        | Record<string, unknown>
+        | undefined;
+      const existingToolConfig = existingSettings?.toolConfig as
+        | Record<string, unknown>
+        | undefined;
       const disabledTools: string[] =
         (Array.isArray(options.disabledTools) ? options.disabledTools : null) ||
-        (Array.isArray(existingToolConfig?.disabledTools) ? existingToolConfig.disabledTools as string[] : null) ||
+        (Array.isArray(existingToolConfig?.disabledTools)
+          ? (existingToolConfig.disabledTools as string[])
+          : null) ||
         [];
       let availableTools: string[] = [];
       if (agent) {
         const persona = AgentPersonaRegistry.get(agent);
         if (persona) {
-          const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
-          const resolvedAvailable = resolveToolEntriesToSet(persona.availableTools, clientSchemas);
+          const clientSchemas =
+            ToolOrchestratorService.getClientToolSchemas() || [];
+          const resolvedAvailable = resolveToolEntriesToSet(
+            persona.availableTools,
+            clientSchemas,
+          );
           availableTools = [...resolvedAvailable];
         }
       } else {
-        const clientSchemas = ToolOrchestratorService.getClientToolSchemas() || [];
+        const clientSchemas =
+          ToolOrchestratorService.getClientToolSchemas() || [];
         availableTools = clientSchemas.map((toolSchema) => toolSchema.name);
       }
       toolConfig = {
@@ -431,7 +463,8 @@ export async function finalizeTextGeneration(
     // Ensure all user messages to append are properly swapped/sanitized,
     // then filter out synthetic compaction artifacts that should never
     // reach MongoDB (context notes, compaction summaries, cleared stubs).
-    const sanitizedMessagesToAppend = sanitizeMessagesForPersistence(messagesToAppend);
+    const sanitizedMessagesToAppend =
+      sanitizeMessagesForPersistence(messagesToAppend);
 
     await appendAndFinalize(
       conversationId || "",
@@ -439,30 +472,33 @@ export async function finalizeTextGeneration(
       username as string,
       sanitizedMessagesToAppend,
       finalMeta,
-            getCollectionOpts(project),
+      getCollectionOpts(project),
     );
   }
   // ── Emit done event ───────────────────────────────────────────
   // Emitted AFTER persistence so the client's post-stream DB fetch
   // is guaranteed to see the complete, up-to-date conversation.
-    if (!signal?.aborted) {
-        if (emit) {
-          emit({
-            type: SERVER_SENT_EVENT_TYPES.DONE,
-            provider: providerName,
-            model: resolvedModel,
-            usage: usage || null,
-            estimatedCost,
-            tokensPerSec,
-            ...(audioRef ? { audioRef } : {}),
-            timeToGeneration:
-                      timeToGenerationSec != null ? roundMilliseconds(timeToGenerationSec) : null,
-                  generationTime: generationSec != null ? roundMilliseconds(generationSec) : null,
-                  totalTime: totalSec != null ? roundMilliseconds(totalSec) : null,
-                  ...(traceId && { traceId }),
-                  ...(conversationId && { conversationId }),
-          });
-        }
+  if (!signal?.aborted) {
+    if (emit) {
+      emit({
+        type: SERVER_SENT_EVENT_TYPES.DONE,
+        provider: providerName,
+        model: resolvedModel,
+        usage: usage || null,
+        estimatedCost,
+        tokensPerSec,
+        ...(audioRef ? { audioRef } : {}),
+        timeToGeneration:
+          timeToGenerationSec != null
+            ? roundMilliseconds(timeToGenerationSec)
+            : null,
+        generationTime:
+          generationSec != null ? roundMilliseconds(generationSec) : null,
+        totalTime: totalSec != null ? roundMilliseconds(totalSec) : null,
+        ...(traceId && { traceId }),
+        ...(conversationId && { conversationId }),
+      });
+    }
   }
 }
 
@@ -489,8 +525,10 @@ export function sanitizeMessagesForPersistence(
     })
     .filter((message) => {
       if (message.role === "user" && typeof message.content === "string") {
-        if (message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX)) return false;
-        if (message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY)) return false;
+        if (message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX))
+          return false;
+        if (message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY))
+          return false;
         if (message.isCompactSummary === true) return false;
       }
       if (message._isPlanningInjection === true) return false;
@@ -559,12 +597,19 @@ export function assembleMessagesToAppend(options: {
   if (overrideMessagesToAppend) {
     messagesToAppend = [...overrideMessagesToAppend];
     const hasIntermediateToolMessages = overrideMessagesToAppend.some(
-      (message) => message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0,
+      (message) =>
+        message.role === "assistant" &&
+        message.toolCalls &&
+        message.toolCalls.length > 0,
     );
     let finalThinking = thinking || "";
     if (hasIntermediateToolMessages && finalThinking) {
       for (const message of overrideMessagesToAppend) {
-        if (message.role === "assistant" && message.thinking && finalThinking.startsWith(message.thinking)) {
+        if (
+          message.role === "assistant" &&
+          message.thinking &&
+          finalThinking.startsWith(message.thinking)
+        ) {
           finalThinking = finalThinking.slice(message.thinking.length).trim();
         }
       }
@@ -582,15 +627,19 @@ export function assembleMessagesToAppend(options: {
       provider: providerName,
       timestamp: new Date().toISOString(),
       usage: usage || null,
-      totalTime: totalSeconds != null ? roundMilliseconds(totalSeconds as number) : null,
+      totalTime:
+        totalSeconds != null ? roundMilliseconds(totalSeconds as number) : null,
       tokensPerSec: tokensPerSecond,
       estimatedCost,
-      ...(!hasIntermediateToolMessages &&
-        contentSegments?.length ? { contentSegments } : {}),
-      ...(!hasIntermediateToolMessages &&
-        textFragments?.length ? { textFragments } : {}),
-      ...(!hasIntermediateToolMessages &&
-        thinkingFragments?.length ? { thinkingFragments } : {}),
+      ...(!hasIntermediateToolMessages && contentSegments?.length
+        ? { contentSegments }
+        : {}),
+      ...(!hasIntermediateToolMessages && textFragments?.length
+        ? { textFragments }
+        : {}),
+      ...(!hasIntermediateToolMessages && thinkingFragments?.length
+        ? { thinkingFragments }
+        : {}),
       generationSettings: {
         temperature,
         maxTokens,
@@ -653,13 +702,14 @@ export function computeNewTurnMessages(
     ? originalMessageCount
     : Math.max(0, originalMessageCount - 1);
 
-  return currentMessages.slice(sliceIndex).filter(
-    (message) =>
-      !(
-        message.role === "user" &&
-        typeof message.content === "string" &&
-        message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX)
-      ) && !message._alreadyPersisted,
-  );
+  return currentMessages
+    .slice(sliceIndex)
+    .filter(
+      (message) =>
+        !(
+          message.role === "user" &&
+          typeof message.content === "string" &&
+          message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX)
+        ) && !message._alreadyPersisted,
+    );
 }
-

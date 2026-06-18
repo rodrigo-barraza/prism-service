@@ -43,7 +43,10 @@ function getCollection() {
 }
 
 /** Persist the full state map to MongoDB (write-through). */
-async function persistToMongo(sessionId: string, store: Map<string, unknown>): Promise<void> {
+async function persistToMongo(
+  sessionId: string,
+  store: Map<string, unknown>,
+): Promise<void> {
   try {
     const collection = getCollection();
     if (!collection) return;
@@ -73,7 +76,9 @@ async function loadFromMongo(sessionId: string): Promise<Map<string, unknown>> {
     const collection = getCollection();
     if (!collection) return new Map();
 
-    const doc = await collection.findOne({ sessionId }) as { state?: Record<string, unknown> } | null;
+    const doc = (await collection.findOne({ sessionId })) as {
+      state?: Record<string, unknown>;
+    } | null;
     if (doc?.state && typeof doc.state === "object") {
       return new Map(Object.entries(doc.state));
     }

@@ -1,5 +1,9 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import { formatCostTag, roundMilliseconds, errorMessage } from "@rodrigo-barraza/utilities-library";
+import {
+  formatCostTag,
+  roundMilliseconds,
+  errorMessage,
+} from "@rodrigo-barraza/utilities-library";
 import express, { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
@@ -39,8 +43,6 @@ interface VoiceParams {
   clientIp?: string | null;
 }
 
-
-
 const router = express.Router();
 // ─── used by both REST and WebSocket ────────────────────────
 export async function handleVoice(
@@ -67,7 +69,9 @@ export async function handleVoice(
   } = params;
   // ── Auto-conversation: every AI request gets tracked ────────────
   let conversationId = skipConversation ? null : incomingConversationId;
-  let conversationMeta: ConversationMeta | null = skipConversation ? null : incomingConversationMeta || null;
+  let conversationMeta: ConversationMeta | null = skipConversation
+    ? null
+    : incomingConversationMeta || null;
   if (!skipConversation && !conversationId) {
     conversationId = crypto.randomUUID();
     const titleSnippet = (text || "").slice(0, 100).trim() || "TTS Request";
@@ -109,7 +113,10 @@ export async function handleVoice(
         username,
         true,
         {
-          title: typeof conversationMeta?.title === "string" ? conversationMeta.title : undefined,
+          title:
+            typeof conversationMeta?.title === "string"
+              ? conversationMeta.title
+              : undefined,
         },
       ).catch((error: Error) =>
         logger.error(`Failed to set isGenerating: ${error.message}`),
@@ -382,7 +389,10 @@ router.post(
           req.username || "any",
           true,
           {
-            title: typeof conversationMeta?.title === "string" ? conversationMeta.title : undefined,
+            title:
+              typeof conversationMeta?.title === "string"
+                ? conversationMeta.title
+                : undefined,
           },
         ).catch((error: Error) =>
           logger.error(`Failed to set isGenerating: ${error.message}`),
@@ -417,12 +427,18 @@ router.post(
       );
       const totalSec = (performance.now() - requestStart) / 1000;
       // ── Cost estimation ─────────────────────────────────────────
-      const modelDefinition = getModelByName(model) as Record<string, unknown> | null;
+      const modelDefinition = getModelByName(model) as Record<
+        string,
+        unknown
+      > | null;
       const pricing =
         modelDefinition?.pricing ||
         getPricing(TYPES.AUDIO, TYPES.TEXT)[model] ||
         null;
-      const estimatedCost = calculateAudioCost(result.usage, pricing as Record<string, number> | null);
+      const estimatedCost = calculateAudioCost(
+        result.usage,
+        pricing as Record<string, number> | null,
+      );
       // ── Logging ────────────────────────────────────────────────
       const costString = formatCostTag(estimatedCost);
       logger.request(

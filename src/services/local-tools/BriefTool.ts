@@ -1,5 +1,8 @@
 import logger from "../../utils/logger.ts";
-import { SERVER_SENT_EVENT_TYPES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  TOOL_NAMES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
 interface BriefContext extends InternalToolContext {
@@ -46,16 +49,27 @@ export default {
   labels: ["coding"],
 
   async execute(toolArguments: Record<string, unknown>, context: BriefContext) {
-    const summary = typeof toolArguments.summary === "string" ? toolArguments.summary : undefined;
-    const keyFiles = Array.isArray(toolArguments.keyFiles) ? toolArguments.keyFiles : [];
-    const openQuestions = Array.isArray(toolArguments.openQuestions) ? toolArguments.openQuestions : [];
+    const summary =
+      typeof toolArguments.summary === "string"
+        ? toolArguments.summary
+        : undefined;
+    const keyFiles = Array.isArray(toolArguments.keyFiles)
+      ? toolArguments.keyFiles
+      : [];
+    const openQuestions = Array.isArray(toolArguments.openQuestions)
+      ? toolArguments.openQuestions
+      : [];
 
     if (!summary) {
       return { error: "'summary' is required and must be a non-empty string" };
     }
 
-    const keyFileItems = keyFiles.filter(item => typeof item === "string") as string[];
-    const openQuestionItems = openQuestions.filter(item => typeof item === "string") as string[];
+    const keyFileItems = keyFiles.filter(
+      (item) => typeof item === "string",
+    ) as string[];
+    const openQuestionItems = openQuestions.filter(
+      (item) => typeof item === "string",
+    ) as string[];
 
     const brief = {
       summary,

@@ -1,5 +1,8 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  TOOL_NAMES,
+  DOMAINS,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 interface EnterPlanModeArgs {
   reason?: string;

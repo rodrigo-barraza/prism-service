@@ -15,15 +15,20 @@ let _ffmpegAvailable: boolean | null = null;
 async function isFfmpegAvailable(): Promise<boolean> {
   if (_ffmpegAvailable !== null) return _ffmpegAvailable;
   return new Promise<boolean>((resolve) => {
-    execFile("ffmpeg", ["-version"], { timeout: 5_000 }, (error: Error | null) => {
-      _ffmpegAvailable = !error;
-      if (!_ffmpegAvailable) {
-        logger.warn(
-          "[media] ffmpeg not found on PATH — GIF animation and video frame extraction will be degraded",
-        );
-      }
-      resolve(_ffmpegAvailable);
-    });
+    execFile(
+      "ffmpeg",
+      ["-version"],
+      { timeout: 5_000 },
+      (error: Error | null) => {
+        _ffmpegAvailable = !error;
+        if (!_ffmpegAvailable) {
+          logger.warn(
+            "[media] ffmpeg not found on PATH — GIF animation and video frame extraction will be degraded",
+          );
+        }
+        resolve(_ffmpegAvailable);
+      },
+    );
   });
 }
 
@@ -174,7 +179,7 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
     const scaleFactors = [0.75, 0.75, 0.75, 0.75, 0.75, 0.75];
     let cumulativeScale = 1;
 
-        for ( const factor of scaleFactors) {
+    for (const factor of scaleFactors) {
       cumulativeScale *= factor;
       const outputPath = join(
         temporaryDirectory,
@@ -195,7 +200,11 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
             outputPath,
           ],
           { timeout: 30_000 },
-          (error: Error | null, _stdout: string | Buffer, stderr: string | Buffer) => {
+          (
+            error: Error | null,
+            _stdout: string | Buffer,
+            stderr: string | Buffer,
+          ) => {
             if (error)
               reject(
                 new Error(
@@ -237,7 +246,11 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
           fallbackPath,
         ],
         { timeout: 30_000 },
-        (error: Error | null, _stdout: string | Buffer, stderr: string | Buffer) => {
+        (
+          error: Error | null,
+          _stdout: string | Buffer,
+          stderr: string | Buffer,
+        ) => {
           if (error)
             reject(
               new Error(
@@ -274,7 +287,7 @@ async function compressWithSharp(base64Data: string, maxBytes: number) {
   const qualitySteps = [85, 70, 50];
 
   // Step 1: try quality reduction (convert to JPEG)
-    for ( const quality of qualitySteps) {
+  for (const quality of qualitySteps) {
     const compressed = await sharp(buffer)
       .jpeg({ quality, mozjpeg: true })
       .toBuffer();
@@ -369,8 +382,11 @@ export function inferMimeFromUrl(url: string) {
  * keeps total image tokens ~2K, leaving room for text generation in
  * local models with limited context windows (4K-8K typical).
  */
-export async function extractVideoFrames(videoDataUrl: string, options: { fps?: number; maxFrames?: number; quality?: number } = {}) {
-    const { fps = 1, maxFrames = 8, quality = 5 } = options;
+export async function extractVideoFrames(
+  videoDataUrl: string,
+  options: { fps?: number; maxFrames?: number; quality?: number } = {},
+) {
+  const { fps = 1, maxFrames = 8, quality = 5 } = options;
 
   // ── Graceful degradation: fail fast if ffmpeg is not installed
   const hasFfmpeg = await isFfmpegAvailable();
@@ -426,7 +442,11 @@ export async function extractVideoFrames(videoDataUrl: string, options: { fps?: 
           outputPattern,
         ],
         { timeout: 30_000 },
-        (error: Error | null, _stdout: string | Buffer, stderr: string | Buffer) => {
+        (
+          error: Error | null,
+          _stdout: string | Buffer,
+          stderr: string | Buffer,
+        ) => {
           if (error) {
             reject(
               new Error(
@@ -443,7 +463,10 @@ export async function extractVideoFrames(videoDataUrl: string, options: { fps?: 
     // Read extracted frames and convert to data URLs
     const frames: string[] = [];
     for (let i = 1; i <= maxFrames; i++) {
-      const framePath = join(temporaryDirectory, `frame_${String(i).padStart(4, "0")}.jpg`);
+      const framePath = join(
+        temporaryDirectory,
+        `frame_${String(i).padStart(4, "0")}.jpg`,
+      );
       try {
         const frameBuffer = await readFile(framePath);
         const frameBase64 = frameBuffer.toString("base64");

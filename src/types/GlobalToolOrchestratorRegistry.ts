@@ -2,7 +2,9 @@ import type ToolOrchestratorServiceClass from "../services/ToolOrchestratorServi
 
 declare global {
   // eslint-disable-next-line no-var
-  var __ToolOrchestratorService: typeof ToolOrchestratorServiceClass | undefined;
+  var __ToolOrchestratorService:
+    | typeof ToolOrchestratorServiceClass
+    | undefined;
 }
 
 export function getGlobalToolOrchestratorService(): typeof ToolOrchestratorServiceClass {
@@ -13,6 +15,8 @@ export function getGlobalToolOrchestratorService(): typeof ToolOrchestratorServi
   return service;
 }
 
-export function registerGlobalToolOrchestratorService(service: typeof ToolOrchestratorServiceClass): void {
+export function registerGlobalToolOrchestratorService(
+  service: typeof ToolOrchestratorServiceClass,
+): void {
   globalThis.__ToolOrchestratorService = service;
 }

@@ -5,7 +5,11 @@
  * Covers sub-agent state, results, instance selection, and git worktree ops.
  */
 
-import type { ConversationMessage, EmitFunction, ToolCall } from "../services/harnesses/types.ts";
+import type {
+  ConversationMessage,
+  EmitFunction,
+  ToolCall,
+} from "../services/harnesses/types.ts";
 
 // ── Sub-Agent State ────────────────────────────────────────
 
@@ -130,9 +134,6 @@ export interface ToolsApiResponse {
 export interface WorktreeCreateResponse extends ToolsApiResponse {
   worktreePath?: string;
 }
-
-
-
 
 // ── Team Management ─────────────────────────────────────────
 

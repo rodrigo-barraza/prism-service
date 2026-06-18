@@ -11,9 +11,16 @@ import AgentPersonaRegistry from "../../services/AgentPersonaRegistry.ts";
 import ToolOrchestratorService from "../../services/ToolOrchestratorService.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
-import { applyDateRangeFilter, parsePaginationParams } from "../../utils/QueryBuilders.ts";
+import {
+  applyDateRangeFilter,
+  parsePaginationParams,
+} from "../../utils/QueryBuilders.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
-import { MILLISECONDS_PER_MINUTE, MILLISECONDS_PER_HOUR, minutes } from "@rodrigo-barraza/utilities-library";
+import {
+  MILLISECONDS_PER_MINUTE,
+  MILLISECONDS_PER_HOUR,
+  minutes,
+} from "@rodrigo-barraza/utilities-library";
 
 const router = express.Router();
 const {
@@ -78,7 +85,8 @@ router.get(
       const sortDir = sortDirection;
 
       const isDirectOnly = type === "direct" || agent === AGENT_IDS.NONE;
-      const isAgentOnly = agent && agent !== AGENT_IDS.NONE && agent !== AGENT_IDS.ALL;
+      const isAgentOnly =
+        agent && agent !== AGENT_IDS.NONE && agent !== AGENT_IDS.ALL;
 
       const shouldFetchConvs = !isAgentOnly;
       const shouldFetchSessions = !isDirectOnly;
@@ -115,7 +123,7 @@ router.get(
             .toArray()
             .then((result) => {
               convs = result;
-            })
+            }),
         );
       }
 
@@ -142,7 +150,7 @@ router.get(
             .toArray()
             .then((result) => {
               sessions = result;
-            })
+            }),
         );
       }
 
@@ -159,7 +167,7 @@ router.get(
             .countDocuments(filter)
             .then((result) => {
               totalConvs = result;
-            })
+            }),
         );
       }
 
@@ -170,7 +178,7 @@ router.get(
             .countDocuments(agentFilter)
             .then((result) => {
               totalSessions = result;
-            })
+            }),
         );
       }
 
@@ -180,8 +188,12 @@ router.get(
         ...convs.map((item) => ({ ...item, type: "direct" as const })),
         ...sessions.map((session) => ({ ...session, type: "agent" as const })),
       ].sort((firstItem, secondItem) => {
-        const valueA = String((firstItem as Record<string, unknown>)[sort as string] ?? "");
-        const valueB = String((secondItem as Record<string, unknown>)[sort as string] ?? "");
+        const valueA = String(
+          (firstItem as Record<string, unknown>)[sort as string] ?? "",
+        );
+        const valueB = String(
+          (secondItem as Record<string, unknown>)[sort as string] ?? "",
+        );
         if (valueA < valueB) return -sortDir;
         if (valueA > valueB) return sortDir;
         return 0;
@@ -189,7 +201,9 @@ router.get(
 
       const paginatedDocuments = merged.slice(skip, skip + limit);
 
-      const paginatedDocumentIds = paginatedDocuments.map((document) => (document as Document).id);
+      const paginatedDocumentIds = paginatedDocuments.map(
+        (document) => (document as Document).id,
+      );
       const agentSessionIds = paginatedDocuments
         .filter((document) => document.type === "agent")
         .map((document) => (document as Record<string, unknown>).id as string)
@@ -244,64 +258,80 @@ router.get(
         }
       }
 
-      const enrichedDocuments = paginatedDocuments.map((document: Record<string, unknown>) => {
-        const associatedRequests = requestLogMap.get(document.id as string) || ([] as Document[]);
-        const models = Array.from(
-          new Set(associatedRequests.map((requestItem: Document) => requestItem.model).filter(Boolean))
-        );
-        const toolDisplayNames = Array.from(
-          new Set(
-            associatedRequests
-              .flatMap((requestItem: Document) => (requestItem.toolDisplayNames as string[]) || [])
-              .filter(Boolean)
-          )
-        );
-        const toolApiNames = Array.from(
-          new Set(
-            associatedRequests
-              .flatMap((requestItem: Document) => (requestItem.toolApiNames as string[]) || [])
-              .filter(Boolean)
-          )
-        );
+      const enrichedDocuments = paginatedDocuments.map(
+        (document: Record<string, unknown>) => {
+          const associatedRequests =
+            requestLogMap.get(document.id as string) || ([] as Document[]);
+          const models = Array.from(
+            new Set(
+              associatedRequests
+                .map((requestItem: Document) => requestItem.model)
+                .filter(Boolean),
+            ),
+          );
+          const toolDisplayNames = Array.from(
+            new Set(
+              associatedRequests
+                .flatMap(
+                  (requestItem: Document) =>
+                    (requestItem.toolDisplayNames as string[]) || [],
+                )
+                .filter(Boolean),
+            ),
+          );
+          const toolApiNames = Array.from(
+            new Set(
+              associatedRequests
+                .flatMap(
+                  (requestItem: Document) =>
+                    (requestItem.toolApiNames as string[]) || [],
+                )
+                .filter(Boolean),
+            ),
+          );
 
-        let inputTokens = 0;
-        let outputTokens = 0;
-        let totalLatency = 0;
-        let tokensPerSecondSum = 0;
-        let tokensPerSecondCount = 0;
-        let aggregatedCost = 0;
+          let inputTokens = 0;
+          let outputTokens = 0;
+          let totalLatency = 0;
+          let tokensPerSecondSum = 0;
+          let tokensPerSecondCount = 0;
+          let aggregatedCost = 0;
 
-        for (const requestItem of associatedRequests) {
-          inputTokens += requestItem.inputTokens || 0;
-          outputTokens += requestItem.outputTokens || 0;
-          totalLatency += requestItem.totalTime || 0;
-          aggregatedCost += requestItem.estimatedCost || 0;
-          if (requestItem.tokensPerSec && requestItem.tokensPerSec > 0) {
-            tokensPerSecondSum += requestItem.tokensPerSec;
-            tokensPerSecondCount++;
+          for (const requestItem of associatedRequests) {
+            inputTokens += requestItem.inputTokens || 0;
+            outputTokens += requestItem.outputTokens || 0;
+            totalLatency += requestItem.totalTime || 0;
+            aggregatedCost += requestItem.estimatedCost || 0;
+            if (requestItem.tokensPerSec && requestItem.tokensPerSec > 0) {
+              tokensPerSecondSum += requestItem.tokensPerSec;
+              tokensPerSecondCount++;
+            }
           }
-        }
 
-        // Apply cost overlay for agent sessions
-        const originalCost = (document.totalCost as number) || 0;
-        const totalCost =
-          document.type === "agent" && aggregatedCost > 0
-            ? Math.max(originalCost, aggregatedCost)
-            : originalCost;
+          // Apply cost overlay for agent sessions
+          const originalCost = (document.totalCost as number) || 0;
+          const totalCost =
+            document.type === "agent" && aggregatedCost > 0
+              ? Math.max(originalCost, aggregatedCost)
+              : originalCost;
 
-        return {
-          ...document,
-          totalCost,
-          requestCount: associatedRequests.length,
-          inputTokens,
-          outputTokens,
-          models,
-          toolDisplayNames,
-          toolApiNames,
-          avgTokensPerSec: tokensPerSecondCount > 0 ? tokensPerSecondSum / tokensPerSecondCount : null,
-          totalLatency,
-        };
-      });
+          return {
+            ...document,
+            totalCost,
+            requestCount: associatedRequests.length,
+            inputTokens,
+            outputTokens,
+            models,
+            toolDisplayNames,
+            toolApiNames,
+            avgTokensPerSec:
+              tokensPerSecondCount > 0
+                ? tokensPerSecondSum / tokensPerSecondCount
+                : null,
+            totalLatency,
+          };
+        },
+      );
 
       res.json({
         data: enrichedDocuments,
@@ -321,16 +351,18 @@ router.get(
   "/filters",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const [convProjects, requestProjects, usernames, models, providers] = await Promise.all([
-        req.db.collection(CONVERSATIONS_COLLECTION).distinct("project"),
-        req.db.collection(REQUESTS_COLLECTION).distinct("project"),
-        req.db.collection(CONVERSATIONS_COLLECTION).distinct("username"),
-        req.db.collection(REQUESTS_COLLECTION).distinct("model"),
-        req.db.collection(REQUESTS_COLLECTION).distinct("provider"),
-      ]);
+      const [convProjects, requestProjects, usernames, models, providers] =
+        await Promise.all([
+          req.db.collection(CONVERSATIONS_COLLECTION).distinct("project"),
+          req.db.collection(REQUESTS_COLLECTION).distinct("project"),
+          req.db.collection(CONVERSATIONS_COLLECTION).distinct("username"),
+          req.db.collection(REQUESTS_COLLECTION).distinct("model"),
+          req.db.collection(REQUESTS_COLLECTION).distinct("provider"),
+        ]);
 
       const projects = [...new Set([...convProjects, ...requestProjects])];
-      const workspaceRoots = ToolOrchestratorService.getWorkspaceRoots() as string[];
+      const workspaceRoots =
+        ToolOrchestratorService.getWorkspaceRoots() as string[];
       const agentPersonas = AgentPersonaRegistry.list().map((persona) => ({
         id: persona.id,
         name: persona.name,
@@ -345,7 +377,9 @@ router.get(
         agents: agentPersonas,
       });
     } catch (error: unknown) {
-      logger.error(`Admin /conversations/filters error: ${getErrorMessage(error)}`);
+      logger.error(
+        `Admin /conversations/filters error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),
@@ -358,7 +392,9 @@ router.get(
     try {
       const project = req.query.project || null;
       const filter = project ? { project } : {};
-      const oneHourAgo = new Date(Date.now() - MILLISECONDS_PER_HOUR).toISOString();
+      const oneHourAgo = new Date(
+        Date.now() - MILLISECONDS_PER_HOUR,
+      ).toISOString();
       const fiveMinAgo = new Date(Date.now() - minutes(5)).toISOString();
 
       const [generatingCount, recentCount] = await Promise.all([
@@ -384,7 +420,9 @@ router.get(
         recentCount,
       });
     } catch (error: unknown) {
-      logger.error(`Admin /conversations/stats error: ${getErrorMessage(error)}`);
+      logger.error(
+        `Admin /conversations/stats error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),
@@ -408,7 +446,9 @@ router.get(
     const sendStats = async () => {
       try {
         const filter = project ? { project } : {};
-        const oneHourAgo = new Date(Date.now() - MILLISECONDS_PER_HOUR).toISOString();
+        const oneHourAgo = new Date(
+          Date.now() - MILLISECONDS_PER_HOUR,
+        ).toISOString();
         const fiveMinAgo = new Date(Date.now() - minutes(5)).toISOString();
 
         const [generatingCount, recentCount] = await Promise.all([
@@ -438,7 +478,9 @@ router.get(
           res.write(`data: ${payload}\n\n`);
         }
       } catch (error: unknown) {
-        logger.error(`SSE conversations/stream error: ${getErrorMessage(error)}`);
+        logger.error(
+          `SSE conversations/stream error: ${getErrorMessage(error)}`,
+        );
       }
     };
 
@@ -446,7 +488,8 @@ router.get(
 
     const staleCleanupInterval = setInterval(() => {
       const fiveMinAgo = new Date(Date.now() - minutes(5)).toISOString();
-      req.db.collection(CONVERSATIONS_COLLECTION)
+      req.db
+        .collection(CONVERSATIONS_COLLECTION)
         .updateMany(
           { isGenerating: true, updatedAt: { $lt: fiveMinAgo } },
           { $set: { isGenerating: false } },
@@ -461,8 +504,13 @@ router.get(
     }, MILLISECONDS_PER_MINUTE);
 
     if (ChangeStreamService.available) {
-      const onEvent = (event: import("../../services/ChangeStreamService.ts").ChangeStreamEventPayload) => {
-        if (event.collection === CONVERSATIONS_COLLECTION || event.collection === COLLECTIONS.AGENT_CONVERSATIONS) {
+      const onEvent = (
+        event: import("../../services/ChangeStreamService.ts").ChangeStreamEventPayload,
+      ) => {
+        if (
+          event.collection === CONVERSATIONS_COLLECTION ||
+          event.collection === COLLECTIONS.AGENT_CONVERSATIONS
+        ) {
           sendStats();
         }
       };
@@ -534,4 +582,3 @@ router.get(
 );
 
 export default router;
-

@@ -14,7 +14,10 @@ interface PersonalityOptions {
   isAprilFools: boolean;
 }
 
-function buildCorePersonality({ isClockCrew, isAprilFools }: PersonalityOptions): string {
+function buildCorePersonality({
+  isClockCrew,
+  isAprilFools,
+}: PersonalityOptions): string {
   const identity = isClockCrew
     ? `LuposClock, a clock-addicted artist wolf-clock, who is part of the Clock Crew.
 - There is nothing that you enjoy more than living by the blam portal, near the Clock Crew HQ.`
@@ -290,7 +293,8 @@ export const LuposPersona: Persona = {
   id: AGENT_IDS.LUPOS,
   name: "Lupos",
   type: "conversational",
-  description: "A sassy, witty, and chaotic wolf king persona who loves to roast users, chat, and generate creative images.",
+  description:
+    "A sassy, witty, and chaotic wolf king persona who loves to roast users, chat, and generate creative images.",
   project: "lupos",
   avatar: "/lupos-agent-avatar.png",
   color: "#7c3aed",

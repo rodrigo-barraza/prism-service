@@ -46,7 +46,12 @@ router.get(
         .sort({ createdAt: -1 })
         .toArray();
 
-      res.json(rules.map((rule) => ({ ...rule, id: rule._id ? rule._id.toString() : "" })));
+      res.json(
+        rules.map((rule) => ({
+          ...rule,
+          id: rule._id ? rule._id.toString() : "",
+        })),
+      );
     } catch (error: unknown) {
       next(error);
     }
@@ -79,9 +84,13 @@ router.post(
         updatedAt: new Date(),
       };
 
-      const result = await db.collection<RuleDocument>(COLLECTION).insertOne(document);
+      const result = await db
+        .collection<RuleDocument>(COLLECTION)
+        .insertOne(document);
 
-      logger.info(`Rule created: ${document.name} for agent ${document.agent} (${result.insertedId})`);
+      logger.info(
+        `Rule created: ${document.name} for agent ${document.agent} (${result.insertedId})`,
+      );
       res.status(201).json({ ...document, id: result.insertedId.toString() });
     } catch (error: unknown) {
       next(error);
@@ -102,7 +111,9 @@ router.put(
 
       const updates: Partial<RuleDocument> = {
         ...(validated.name !== undefined && { name: validated.name }),
-        ...(validated.description !== undefined && { description: validated.description }),
+        ...(validated.description !== undefined && {
+          description: validated.description,
+        }),
         ...(validated.content !== undefined && { content: validated.content }),
         ...(validated.enabled !== undefined && { enabled: validated.enabled }),
         updatedAt: new Date(),

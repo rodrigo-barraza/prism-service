@@ -1,4 +1,7 @@
-import { DEFAULT_TOPOLOGY, DEFAULT_USERNAME } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  DEFAULT_TOPOLOGY,
+  DEFAULT_USERNAME,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import { handleConversation } from "../routes/ChatRoutes.ts";
 import { handleVoice } from "../routes/AudioRoutes.ts";
 import {
@@ -97,7 +100,9 @@ export function setupWebSocket(wss: WebSocketServer) {
     const pathname = url.pathname;
 
     const project =
-      (req.headers["x-project"] as string) || url.searchParams.get("project") || "any";
+      (req.headers["x-project"] as string) ||
+      url.searchParams.get("project") ||
+      "any";
     const xfwd = req.headers["x-forwarded-for"];
     const rawIp =
       (Array.isArray(xfwd) ? xfwd[0] : xfwd)?.split(",")[0]?.trim() ||
@@ -114,11 +119,29 @@ export function setupWebSocket(wss: WebSocketServer) {
     );
 
     if (pathname === "/ws/chat") {
-      handleWebsocketChat(websocket, project, username, clientIp || "unknown", agent);
+      handleWebsocketChat(
+        websocket,
+        project,
+        username,
+        clientIp || "unknown",
+        agent,
+      );
     } else if (pathname === "/ws/text-to-audio") {
-      handleWebsocketVoice(websocket, project, username, clientIp || "unknown", agent);
+      handleWebsocketVoice(
+        websocket,
+        project,
+        username,
+        clientIp || "unknown",
+        agent,
+      );
     } else if (pathname === "/ws/live") {
-      handleWebsocketLive(websocket, project, username, clientIp || "unknown", agent);
+      handleWebsocketLive(
+        websocket,
+        project,
+        username,
+        clientIp || "unknown",
+        agent,
+      );
     } else {
       websocket.send(
         JSON.stringify({
@@ -142,7 +165,9 @@ function handleWebsocketChat(
     try {
       data = JSON.parse(rawData.toString());
     } catch {
-      websocket.send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
+      websocket.send(
+        JSON.stringify({ type: "error", message: "Invalid JSON" }),
+      );
       return;
     }
 
@@ -173,13 +198,17 @@ function handleWebsocketVoice(
     try {
       data = JSON.parse(rawData.toString());
     } catch {
-      websocket.send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
+      websocket.send(
+        JSON.stringify({ type: "error", message: "Invalid JSON" }),
+      );
       return;
     }
 
     try {
       await handleVoice(
-        { ...data, project, username, clientIp } as Parameters<typeof handleVoice>[0],
+        { ...data, project, username, clientIp } as Parameters<
+          typeof handleVoice
+        >[0],
         (chunk: Buffer | Uint8Array) => {
           if (websocket.readyState === websocket.OPEN) {
             websocket.send(chunk); // Binary audio frame
@@ -299,7 +328,9 @@ function handleWebsocketLive(
       );
       return ref;
     } catch (error: unknown) {
-      logger.error(`[Live API] Failed to build/upload WAV: ${getErrorMessage(error)}`);
+      logger.error(
+        `[Live API] Failed to build/upload WAV: ${getErrorMessage(error)}`,
+      );
       return null;
     }
   }
@@ -326,7 +357,10 @@ function handleWebsocketLive(
         liveSession = null;
       }
 
-      const model = (data.model as string) || LIVE_AUDIO_MODEL || MODELS.GEMINI_31_FLASH_LIVE.name;
+      const model =
+        (data.model as string) ||
+        LIVE_AUDIO_MODEL ||
+        MODELS.GEMINI_31_FLASH_LIVE.name;
       const clientConfig = (data.config || {}) as LiveClientConfig;
 
       activeModel = model;
@@ -362,20 +396,35 @@ function handleWebsocketLive(
             .default;
           const { MONGO_DB_NAME } = await import("../../config.js");
 
-          const SettingsService = (await import("../services/SettingsService.js")).default;
+          const SettingsService = (
+            await import("../services/SettingsService.js")
+          ).default;
           const settings = await SettingsService.getSection("agents");
-          const defaultTopology = (clientConfig.topology as string) || settings?.topology || DEFAULT_TOPOLOGY;
-          const dynamicTools = [...ToolOrchestratorService.getToolSchemas(defaultTopology)];
+          const defaultTopology =
+            (clientConfig.topology as string) ||
+            settings?.topology ||
+            DEFAULT_TOPOLOGY;
+          const dynamicTools = [
+            ...ToolOrchestratorService.getToolSchemas(defaultTopology),
+          ];
 
           const filtered = dynamicTools.filter((dynamicTool) =>
             enabledSet.has(dynamicTool.name),
           );
-          const googleFormats = convertToolsToGoogle(filtered as { name: string; description?: string; parameters?: Record<string, unknown> }[]);
+          const googleFormats = convertToolsToGoogle(
+            filtered as {
+              name: string;
+              description?: string;
+              parameters?: Record<string, unknown>;
+            }[],
+          );
           if (googleFormats) {
             tools.push(...googleFormats);
           }
         } catch (error: unknown) {
-          logger.error(`[Live API] Error loading tools: ${getErrorMessage(error)}`);
+          logger.error(
+            `[Live API] Error loading tools: ${getErrorMessage(error)}`,
+          );
         }
       }
 
@@ -477,7 +526,8 @@ function handleWebsocketLive(
                     }
                   });
                 }
-                for (const part of serverMessage.serverContent.modelTurn.parts) {
+                for (const part of serverMessage.serverContent.modelTurn
+                  .parts) {
                   if (part.thought && part.text) {
                     emit({ type: "thinking", content: part.text });
                     turnThinking += part.text;
@@ -517,20 +567,28 @@ function handleWebsocketLive(
 
               // Top-level tool calls
               if (serverMessage.toolCall?.functionCalls) {
-                const functionCalls: FunctionCallRef[] = serverMessage.toolCall.functionCalls.map(
-                  (functionCall: Record<string, unknown>) => ({
-                    id: (functionCall.id as string) || `live-toolCall-${crypto.randomUUID()}`,
-                    name: functionCall.name as string,
-                    args: (functionCall.args as Record<string, unknown>) || {},
-                  }),
-                );
+                const functionCalls: FunctionCallRef[] =
+                  serverMessage.toolCall.functionCalls.map(
+                    (functionCall: Record<string, unknown>) => ({
+                      id:
+                        (functionCall.id as string) ||
+                        `live-toolCall-${crypto.randomUUID()}`,
+                      name: functionCall.name as string,
+                      args:
+                        (functionCall.args as Record<string, unknown>) || {},
+                    }),
+                  );
                 turnToolCalls.push(...functionCalls);
 
                 // Emit calling status to the client
                 for (const functionCall of functionCalls) {
                   emit({
                     type: "tool_execution",
-                    tool: { name: functionCall.name, args: functionCall.args, id: functionCall.id },
+                    tool: {
+                      name: functionCall.name,
+                      args: functionCall.args,
+                      id: functionCall.id,
+                    },
                     status: "calling",
                   });
                 }
@@ -546,7 +604,8 @@ function handleWebsocketLive(
 
                     const results: ToolResult[] = await Promise.all(
                       functionCalls.map(async (toolCall) => {
-                        const result = await ToolOrchestratorService.executeTool(
+                        const result =
+                          (await ToolOrchestratorService.executeTool(
                             toolCall.name,
                             toolCall.args,
                             {
@@ -558,7 +617,7 @@ function handleWebsocketLive(
                               _providerName: "google",
                               _resolvedModel: activeModel,
                             },
-                          ) as Record<string, unknown>;
+                          )) as Record<string, unknown>;
                         return { id: toolCall.id, name: toolCall.name, result };
                       }),
                     );
@@ -578,13 +637,18 @@ function handleWebsocketLive(
                     const functionResponses = results.map((toolResult) => ({
                       id: toolResult.id,
                       name: toolResult.name,
-                      response: truncateToolResult(toolResult.result) as Record<string, unknown>,
+                      response: truncateToolResult(toolResult.result) as Record<
+                        string,
+                        unknown
+                      >,
                     }));
 
                     if (liveSession) {
                       liveSession.sendToolResponse({ functionResponses });
                     } else {
-                      logger.warn("[Live API] Cannot send tool response — session closed before response was ready");
+                      logger.warn(
+                        "[Live API] Cannot send tool response — session closed before response was ready",
+                      );
                     }
                   } catch (error: unknown) {
                     logger.error(
@@ -604,7 +668,8 @@ function handleWebsocketLive(
                 });
               }
               if (serverMessage.serverContent?.outputTranscription?.text) {
-                const outText = serverMessage.serverContent.outputTranscription.text;
+                const outText =
+                  serverMessage.serverContent.outputTranscription.text;
                 turnText += outText;
                 emit({
                   type: "outputTranscription",
@@ -632,8 +697,7 @@ function handleWebsocketLive(
                   turnAudioChunks.length > 0
                 ) {
                   const totalPcmBytes = turnAudioChunks.reduce(
-                    (sum, b64) =>
-                      sum + Buffer.from(b64, "base64").length,
+                    (sum, b64) => sum + Buffer.from(b64, "base64").length,
                     0,
                   );
                   // 16-bit mono → 2 bytes per sample
@@ -650,16 +714,18 @@ function handleWebsocketLive(
                   const modelDefinition = getModelByName(model);
                   const estimatedCost = calculateLiveCost(
                     turnUsage,
-                    (((modelDefinition as Record<string, unknown>)?.pricing as Record<string, number>) ?? null),
+                    ((modelDefinition as Record<string, unknown>)
+                      ?.pricing as Record<string, number>) ?? null,
                   );
 
                   const totalSec = (performance.now() - turnStart) / 1000;
                   const timeToGenerationSec = passFirstTokenTime
                     ? (passFirstTokenTime - turnStart) / 1000
                     : null;
-                  const generationSec = passFirstTokenTime && timeToGenerationSec !== null
-                    ? totalSec - timeToGenerationSec
-                    : null;
+                  const generationSec =
+                    passFirstTokenTime && timeToGenerationSec !== null
+                      ? totalSec - timeToGenerationSec
+                      : null;
 
                   RequestLogger.logChatGeneration({
                     requestId: `live-${crypto.randomUUID()}`,
@@ -754,7 +820,9 @@ function handleWebsocketLive(
                 return;
               }
             },
-            onerror: (e: Event & { error?: { message?: string }; message?: string }) => {
+            onerror: (
+              e: Event & { error?: { message?: string }; message?: string },
+            ) => {
               const errorMessage =
                 e?.error?.message || e?.message || "Live API error";
               logger.error(
@@ -795,7 +863,10 @@ function handleWebsocketLive(
         });
       } catch (error: unknown) {
         logger.error(`[Live API] Failed to connect: ${getErrorMessage(error)}`);
-        emit({ type: "error", message: `Failed to connect: ${getErrorMessage(error)}` });
+        emit({
+          type: "error",
+          message: `Failed to connect: ${getErrorMessage(error)}`,
+        });
       }
       return;
     }
@@ -842,7 +913,9 @@ function handleWebsocketLive(
         liveSession.sendRealtimeInput({ text: data.text as string });
         liveSession.sendRealtimeInput({ activityEnd: {} });
       } catch (error: unknown) {
-        logger.error(`[Live API] Failed to send text: ${getErrorMessage(error)}`);
+        logger.error(
+          `[Live API] Failed to send text: ${getErrorMessage(error)}`,
+        );
         emit({
           type: "error",
           message: `Failed to send text: ${getErrorMessage(error)}`,

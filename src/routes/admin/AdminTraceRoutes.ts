@@ -4,7 +4,10 @@ import type { Request, Response, NextFunction } from "express";
 import { COLLECTIONS, COST_SUM_EXPR } from "../../constants.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
-import { applyDateRangeFilter, parsePaginationParams } from "../../utils/QueryBuilders.ts";
+import {
+  applyDateRangeFilter,
+  parsePaginationParams,
+} from "../../utils/QueryBuilders.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
 
 const router = express.Router();
@@ -33,7 +36,9 @@ router.get(
         workspace,
       } = req.query;
 
-      const { skip, limit, page, sortDirection } = parsePaginationParams(req.query);
+      const { skip, limit, page, sortDirection } = parsePaginationParams(
+        req.query,
+      );
 
       const match: Record<string, unknown> = { traceId: { $ne: null } };
       if (project) match.project = project;
@@ -114,7 +119,12 @@ router.get(
           _tpsSum: {
             $sum: {
               $cond: [
-                { $and: [{ $ne: ["$tokensPerSec", null] }, { $gt: ["$tokensPerSec", 0] }] },
+                {
+                  $and: [
+                    { $ne: ["$tokensPerSec", null] },
+                    { $gt: ["$tokensPerSec", 0] },
+                  ],
+                },
                 "$tokensPerSec",
                 0,
               ],
@@ -123,7 +133,12 @@ router.get(
           _tpsCount: {
             $sum: {
               $cond: [
-                { $and: [{ $ne: ["$tokensPerSec", null] }, { $gt: ["$tokensPerSec", 0] }] },
+                {
+                  $and: [
+                    { $ne: ["$tokensPerSec", null] },
+                    { $gt: ["$tokensPerSec", 0] },
+                  ],
+                },
                 1,
                 0,
               ],
@@ -142,7 +157,13 @@ router.get(
             $setDifference: [
               {
                 $reduce: {
-                  input: { $filter: { input: "$_toolDisplayNames", as: "array", cond: { $isArray: "$$array" } } },
+                  input: {
+                    $filter: {
+                      input: "$_toolDisplayNames",
+                      as: "array",
+                      cond: { $isArray: "$$array" },
+                    },
+                  },
                   initialValue: [],
                   in: { $setUnion: ["$$value", "$$this"] },
                 },
@@ -154,7 +175,13 @@ router.get(
             $setDifference: [
               {
                 $reduce: {
-                  input: { $filter: { input: "$_toolApiNames", as: "array", cond: { $isArray: "$$array" } } },
+                  input: {
+                    $filter: {
+                      input: "$_toolApiNames",
+                      as: "array",
+                      cond: { $isArray: "$$array" },
+                    },
+                  },
                   initialValue: [],
                   in: { $setUnion: ["$$value", "$$this"] },
                 },
@@ -243,7 +270,10 @@ router.get(
         .collection(REQUESTS_COLLECTION)
         .find(
           { traceId: req.params.id },
-          { projection: { requestPayload: 0, responsePayload: 0 }, maxTimeMS: AGGREGATE_MAX_TIME_MS },
+          {
+            projection: { requestPayload: 0, responsePayload: 0 },
+            maxTimeMS: AGGREGATE_MAX_TIME_MS,
+          },
         )
         .toArray();
 
@@ -257,23 +287,32 @@ router.get(
         username: requests[0].username,
         requestCount: requests.length,
         totalCost: requests.reduce(
-          (sum: number, r: Record<string, unknown>) => sum + ((r.estimatedCost as number) || 0),
+          (sum: number, r: Record<string, unknown>) =>
+            sum + ((r.estimatedCost as number) || 0),
           0,
         ),
         totalInputTokens: requests.reduce(
-          (sum: number, r: Record<string, unknown>) => sum + ((r.inputTokens as number) || 0),
+          (sum: number, r: Record<string, unknown>) =>
+            sum + ((r.inputTokens as number) || 0),
           0,
         ),
         totalOutputTokens: requests.reduce(
-          (sum: number, r: Record<string, unknown>) => sum + ((r.outputTokens as number) || 0),
+          (sum: number, r: Record<string, unknown>) =>
+            sum + ((r.outputTokens as number) || 0),
           0,
         ),
         createdAt: (requests as Record<string, unknown>[]).reduce(
-          (min: string | null, r) => (!min || (r.timestamp as string) < min ? (r.timestamp as string) : min),
+          (min: string | null, r) =>
+            !min || (r.timestamp as string) < min
+              ? (r.timestamp as string)
+              : min,
           null as string | null,
         ),
         updatedAt: (requests as Record<string, unknown>[]).reduce(
-          (max: string | null, r) => (!max || (r.timestamp as string) > max ? (r.timestamp as string) : max),
+          (max: string | null, r) =>
+            !max || (r.timestamp as string) > max
+              ? (r.timestamp as string)
+              : max,
           null as string | null,
         ),
         requests,

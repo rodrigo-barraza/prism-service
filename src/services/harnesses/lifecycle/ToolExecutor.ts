@@ -49,7 +49,11 @@ export async function executeToolBatch(
         const result = await ToolOrchestratorService.executeToolStreaming(
           toolCall.name,
           toolCall.args as Record<string, unknown>,
-          (event: string, data: string | null, meta?: Record<string, unknown>) => {
+          (
+            event: string,
+            data: string | null,
+            meta?: Record<string, unknown>,
+          ) => {
             emit({
               type: SERVER_SENT_EVENT_TYPES.TOOL_OUTPUT,
               toolCallId: toolCall.id,
@@ -99,7 +103,10 @@ export async function executeToolBatch(
           workspaceRoot,
           _toolState: ToolContext.getStore(agentSessionId),
           enabledTools: tools.finalTools.map((toolSchema) => toolSchema.name),
-          _topology: typeof context.options?.topology === "string" ? context.options.topology : undefined,
+          _topology:
+            typeof context.options?.topology === "string"
+              ? context.options.topology
+              : undefined,
         },
       );
       const durationMs = Date.now() - startTime;

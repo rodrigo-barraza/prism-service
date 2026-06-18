@@ -39,17 +39,8 @@ router.get(
         });
       }
 
-      const {
-        page,
-        limit,
-        type,
-        origin,
-        search,
-        provider,
-        model,
-        from,
-        to,
-      } = parseResult.data;
+      const { page, limit, type, origin, search, provider, model, from, to } =
+        parseResult.data;
 
       const skip = (page - 1) * limit;
 

@@ -5,7 +5,10 @@ import RequestLogger from "../RequestLogger.ts";
 import logger from "../../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROMPT_DELIMITERS } from "../../constants.ts";
-import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   estimateTokens,
   calculateTextCost,
@@ -92,7 +95,9 @@ function estimateTotalTokens(messages: AdminChatMessage[]): number {
     if (message.toolCalls) {
       for (const toolCall of message.toolCalls) {
         tokens += estimateTokens(toolCall.name || "");
-        tokens += estimateTokens(toolCall.args ? JSON.stringify(toolCall.args) : "");
+        tokens += estimateTokens(
+          toolCall.args ? JSON.stringify(toolCall.args) : "",
+        );
         if (toolCall.result) {
           tokens += estimateTokens(
             typeof toolCall.result === "string"
@@ -138,16 +143,22 @@ export default class CompactionService {
     let compactionProvider: string | undefined;
     let compactionModel: string | undefined;
     try {
-      const memorySettings = await SettingsService.getSection("memory") as MemorySettingsSection;
+      const memorySettings = (await SettingsService.getSection(
+        "memory",
+      )) as MemorySettingsSection;
       compactionProvider = memorySettings?.extractionProvider;
       compactionModel = memorySettings?.extractionModel;
     } catch {
-      logger.info("[CompactionService] Settings not configured. Skipping compaction.");
+      logger.info(
+        "[CompactionService] Settings not configured. Skipping compaction.",
+      );
       return null;
     }
 
     if (!compactionProvider || !compactionModel) {
-      logger.info("[CompactionService] No compaction model configured in Settings → Memory Models. Skipping.");
+      logger.info(
+        "[CompactionService] No compaction model configured in Settings → Memory Models. Skipping.",
+      );
       return null;
     }
 
@@ -163,18 +174,21 @@ export default class CompactionService {
     const conversationText = strippedMessages
       .map((message) => {
         const role = message.role;
-        const content = typeof message.content === "string" ? message.content : "";
+        const content =
+          typeof message.content === "string" ? message.content : "";
 
         // Include tool call summaries for context
         const toolSummary = message.toolCalls?.length
-          ? `\n[Tools used: ${message.toolCalls.map((toolCall) => {
-              const resultPreview = toolCall.result
-                ? typeof toolCall.result === "string"
-                  ? toolCall.result.slice(0, 300)
-                  : JSON.stringify(toolCall.result).slice(0, 300)
-                : "";
-              return `${toolCall.name}(${resultPreview ? `→ ${resultPreview}...` : ""})`;
-            }).join(", ")}]`
+          ? `\n[Tools used: ${message.toolCalls
+              .map((toolCall) => {
+                const resultPreview = toolCall.result
+                  ? typeof toolCall.result === "string"
+                    ? toolCall.result.slice(0, 300)
+                    : JSON.stringify(toolCall.result).slice(0, 300)
+                  : "";
+                return `${toolCall.name}(${resultPreview ? `→ ${resultPreview}...` : ""})`;
+              })
+              .join(", ")}]`
           : "";
 
         return `${role}: ${content}${toolSummary}`;
@@ -184,11 +198,17 @@ export default class CompactionService {
     // ── Build summarization messages ───────────────────────────
     const summarizationMessages: ChatMessage[] = [
       { role: "system", content: COMPACTION_SYSTEM_PROMPT },
-      { role: "user", content: `Here is the conversation to summarize:\n\n${conversationText}\n\n${COMPACTION_USER_PROMPT}` },
+      {
+        role: "user",
+        content: `Here is the conversation to summarize:\n\n${conversationText}\n\n${COMPACTION_USER_PROMPT}`,
+      },
     ];
 
     // ── Call the LLM ──────────────────────────────────────────
-    options.emit?.({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.COMPACTION_STARTED });
+    options.emit?.({
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: STATUS_MESSAGES.COMPACTION_STARTED,
+    });
 
     const requestId = crypto.randomUUID();
     const requestStart = performance.now();
@@ -198,10 +218,14 @@ export default class CompactionService {
 
     try {
       const provider = getProvider(compactionProvider);
-      result = await provider.generateText(summarizationMessages, compactionModel, {
-        maxTokens: COMPACT_MAX_OUTPUT_TOKENS,
-        temperature: 0.1,
-      });
+      result = await provider.generateText(
+        summarizationMessages,
+        compactionModel,
+        {
+          maxTokens: COMPACT_MAX_OUTPUT_TOKENS,
+          temperature: 0.1,
+        },
+      );
     } catch (error: unknown) {
       success = false;
       compactionError = errorMessage(error);
@@ -209,7 +233,10 @@ export default class CompactionService {
       logger.error(
         `[CompactionService] LLM call failed (failure ${this.consecutiveFailures}/${MAX_CONSECUTIVE_COMPACT_FAILURES}): ${compactionError}`,
       );
-      options.emit?.({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.COMPACTION_FAILED });
+      options.emit?.({
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.COMPACTION_FAILED,
+      });
       return null;
     } finally {
       // Log the compaction LLM call for cost tracking
@@ -225,7 +252,9 @@ export default class CompactionService {
         model: compactionModel,
         traceId: options.traceId || null,
         agentSessionId: options.agentSessionId || null,
-        aiMessages: summarizationMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
+        aiMessages: summarizationMessages as Parameters<
+          typeof RequestLogger.logBackgroundLlmCall
+        >[0]["aiMessages"],
         resultText: result?.text || "",
         usage: realUsage,
         success,
@@ -246,7 +275,10 @@ export default class CompactionService {
       logger.warn(
         `[CompactionService] LLM returned no extractable summary. Failure ${this.consecutiveFailures}/${MAX_CONSECUTIVE_COMPACT_FAILURES}`,
       );
-      options.emit?.({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.COMPACTION_FAILED });
+      options.emit?.({
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.COMPACTION_FAILED,
+      });
       return null;
     }
 
@@ -291,7 +323,9 @@ export default class CompactionService {
     // Emit usage for the compaction call so the UI token badge updates
     if (options.emit && result?.usage) {
       try {
-        const compactPricing = getPricing(TYPES.TEXT, TYPES.TEXT)[compactionModel];
+        const compactPricing = getPricing(TYPES.TEXT, TYPES.TEXT)[
+          compactionModel
+        ];
         const compactCost = compactPricing
           ? calculateTextCost(
               {

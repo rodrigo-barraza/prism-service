@@ -54,7 +54,9 @@ type HookCategory = "inspect" | "decide" | "transform";
 // a context object, beforeToolCall receives (toolCall, ctx), afterResponse
 // receives (ctx, output), etc.). A single function type can't express this
 // without a complex generic event map, so we use a callable interface.
-type HookHandler = (...args: unknown[]) => Promise<object | void> | object | void;
+type HookHandler = (
+  ...args: unknown[]
+) => Promise<object | void> | object | void;
 
 interface RegisteredHook {
   handler: HookHandler;
@@ -96,7 +98,10 @@ export default class AgentHooks {
    *   2. transform hooks — run sequentially, merge results
    *   3. inspect hooks — fire-and-forget (errors logged, never propagate)
    */
-  async run(event: HookEvent, ...args: unknown[]): Promise<Record<string, unknown> | undefined> {
+  async run(
+    event: HookEvent,
+    ...args: unknown[]
+  ): Promise<Record<string, unknown> | undefined> {
     const hooks = this._hooks.get(event) || [];
     let result: Record<string, unknown> | undefined;
 
@@ -108,12 +113,19 @@ export default class AgentHooks {
     // Phase 1: Decide hooks (blocking, short-circuit on deny)
     for (const { handler, name } of decideHooks) {
       try {
-        const hookResult = await (handler as (...args: unknown[]) => unknown)(...args);
+        const hookResult = await (handler as (...args: unknown[]) => unknown)(
+          ...args,
+        );
         if (hookResult && typeof hookResult === "object") {
           result = { ...result, ...hookResult };
           // Short-circuit if any decide hook denies
-          if ("isApproved" in hookResult && (hookResult as { isApproved: boolean }).isApproved === false) {
-            logger.info(`[AgentHooks] Decide hook "${name}" denied on "${event}"`);
+          if (
+            "isApproved" in hookResult &&
+            (hookResult as { isApproved: boolean }).isApproved === false
+          ) {
+            logger.info(
+              `[AgentHooks] Decide hook "${name}" denied on "${event}"`,
+            );
             return result;
           }
         }
@@ -127,7 +139,9 @@ export default class AgentHooks {
     // Phase 2: Transform hooks (blocking, can mutate)
     for (const { handler, name } of transformHooks) {
       try {
-        const hookResult = await (handler as (...args: unknown[]) => unknown)(...args);
+        const hookResult = await (handler as (...args: unknown[]) => unknown)(
+          ...args,
+        );
         if (hookResult && typeof hookResult === "object") {
           result = { ...result, ...hookResult };
         }
@@ -142,8 +156,13 @@ export default class AgentHooks {
     for (const { handler, name } of inspectHooks) {
       try {
         // Don't await — fire-and-forget for non-blocking observability
-        const maybePromise = (handler as (...args: unknown[]) => unknown)(...args);
-        if (maybePromise && typeof (maybePromise as Promise<unknown>).catch === "function") {
+        const maybePromise = (handler as (...args: unknown[]) => unknown)(
+          ...args,
+        );
+        if (
+          maybePromise &&
+          typeof (maybePromise as Promise<unknown>).catch === "function"
+        ) {
           (maybePromise as Promise<unknown>).catch((error: unknown) => {
             logger.warn(
               `[AgentHooks] Inspect hook "${name}" on "${event}" failed (non-blocking): ${errorMessage(error)}`,
@@ -165,4 +184,3 @@ export default class AgentHooks {
     return (this._hooks.get(event) || []).length > 0;
   }
 }
-

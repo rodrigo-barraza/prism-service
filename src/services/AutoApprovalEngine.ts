@@ -17,7 +17,7 @@ export const APPROVAL_TIERS = {
   DANGER: 3,
 } as const;
 
-type ApprovalTier = typeof APPROVAL_TIERS[keyof typeof APPROVAL_TIERS];
+type ApprovalTier = (typeof APPROVAL_TIERS)[keyof typeof APPROVAL_TIERS];
 
 /** Default tier assignments for built-in tools */
 const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
@@ -113,7 +113,7 @@ export interface ApprovalResult {
   reason: string;
 }
 
-export interface ApprovedToolCall extends Omit<ToolCall, '_approval'> {
+export interface ApprovedToolCall extends Omit<ToolCall, "_approval"> {
   _approval: ApprovalResult;
 }
 
@@ -168,11 +168,26 @@ export default class AutoApprovalEngine {
       if (policyResult) {
         switch (policyResult.decision) {
           case "APPROVE":
-            return { isApproved: true, tier, tierLabel, reason: policyResult.reason };
+            return {
+              isApproved: true,
+              tier,
+              tierLabel,
+              reason: policyResult.reason,
+            };
           case "DENY":
-            return { isApproved: false, tier, tierLabel, reason: policyResult.reason };
+            return {
+              isApproved: false,
+              tier,
+              tierLabel,
+              reason: policyResult.reason,
+            };
           case "ASK_USER":
-            return { isApproved: false, tier, tierLabel, reason: policyResult.reason };
+            return {
+              isApproved: false,
+              tier,
+              tierLabel,
+              reason: policyResult.reason,
+            };
         }
       }
       // No policy matched — fall through to tier system
@@ -186,7 +201,10 @@ export default class AutoApprovalEngine {
     // Tier 2 and 3: require approval
     return { isApproved: false, tier, tierLabel, reason: "requires_approval" };
   }
-  checkBatch(toolCalls: ToolCall[]): { autoApproved: ApprovedToolCall[]; needsApproval: ApprovedToolCall[] } {
+  checkBatch(toolCalls: ToolCall[]): {
+    autoApproved: ApprovedToolCall[];
+    needsApproval: ApprovedToolCall[];
+  } {
     const autoApproved: ApprovedToolCall[] = [];
     const needsApproval: ApprovedToolCall[] = [];
 

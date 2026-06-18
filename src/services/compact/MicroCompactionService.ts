@@ -60,7 +60,8 @@ export interface MicroCompactionResult {
  */
 function estimateToolResultTokens(result: unknown): number {
   if (!result) return 0;
-  const resultText = typeof result === "string" ? result : JSON.stringify(result);
+  const resultText =
+    typeof result === "string" ? result : JSON.stringify(result);
   return estimateTokens(resultText);
 }
 
@@ -95,7 +96,10 @@ export default class MicroCompactionService {
     messages: ChatMessage[],
     protectedTurnCount: number = PROTECTED_RECENT_TURNS,
   ): MicroCompactionResult {
-    const protectionBoundary = findProtectionBoundary(messages, protectedTurnCount);
+    const protectionBoundary = findProtectionBoundary(
+      messages,
+      protectedTurnCount,
+    );
 
     let freedTokens = 0;
     let clearedResultCount = 0;
@@ -105,27 +109,30 @@ export default class MicroCompactionService {
       if (index >= protectionBoundary) return message;
 
       // Only process assistant messages with tool calls
-      if (message.role !== "assistant" || !message.toolCalls?.length) return message;
+      if (message.role !== "assistant" || !message.toolCalls?.length)
+        return message;
 
       let messageModified = false;
-      const compactedToolCalls = message.toolCalls.map((toolCall: ToolCallEntry) => {
-        // Skip tools not in the compactable set
-        if (!COMPACTABLE_TOOLS.has(toolCall.name)) return toolCall;
+      const compactedToolCalls = message.toolCalls.map(
+        (toolCall: ToolCallEntry) => {
+          // Skip tools not in the compactable set
+          if (!COMPACTABLE_TOOLS.has(toolCall.name)) return toolCall;
 
-        // Skip tool calls with no result or small results
-        if (!toolCall.result) return toolCall;
-        const resultTokens = estimateToolResultTokens(toolCall.result);
-        if (resultTokens < MINIMUM_RESULT_TOKEN_THRESHOLD) return toolCall;
+          // Skip tool calls with no result or small results
+          if (!toolCall.result) return toolCall;
+          const resultTokens = estimateToolResultTokens(toolCall.result);
+          if (resultTokens < MINIMUM_RESULT_TOKEN_THRESHOLD) return toolCall;
 
-        // Clear the result
-        messageModified = true;
-        freedTokens += resultTokens;
-        clearedResultCount++;
-        return {
-          ...toolCall,
-          result: CLEARED_RESULT_MARKER,
-        };
-      });
+          // Clear the result
+          messageModified = true;
+          freedTokens += resultTokens;
+          clearedResultCount++;
+          return {
+            ...toolCall,
+            result: CLEARED_RESULT_MARKER,
+          };
+        },
+      );
 
       if (!messageModified) return message;
 

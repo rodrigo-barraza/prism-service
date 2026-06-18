@@ -1,5 +1,8 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  TOOL_NAMES,
+  DOMAINS,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import MCPClientService from "../MCPClientService.ts";
 
 interface ListMcpResourcesArgs {
@@ -137,7 +140,13 @@ const mcpAuthenticate = {
   labels: ["coding", "meta"],
   async execute(args: Record<string, unknown>) {
     const authArgs = args as unknown as McpAuthenticateArgs;
-    const { server_name, token, api_key, api_key_header, env: authEnv } = authArgs;
+    const {
+      server_name,
+      token,
+      api_key,
+      api_key_header,
+      env: authEnv,
+    } = authArgs;
     if (!server_name) return { error: "'server_name' is required" };
     if (!token && !api_key && !authEnv)
       return {

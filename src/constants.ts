@@ -156,4 +156,3 @@ export const PROMPT_DELIMITERS = {
   SOMATIC_STATE: "[Somatic State",
   CONVERSATION_SUMMARY: "[Conversation Summary",
 } as const;
-

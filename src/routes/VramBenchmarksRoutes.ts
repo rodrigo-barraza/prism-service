@@ -205,7 +205,9 @@ router.get(
         machines.map((message) => ({
           hostname: message._id,
           gpu: message.gpu,
-          gpuVramGB: message.gpuVramMiB ? Math.round(message.gpuVramMiB / 1024) : null,
+          gpuVramGB: message.gpuVramMiB
+            ? Math.round(message.gpuVramMiB / 1024)
+            : null,
           gpuVendor: message.gpuVendor || null,
           gpuDriver: message.gpuDriver || null,
           cpu: message.cpu,
@@ -219,7 +221,9 @@ router.get(
         })),
       );
     } catch (error: unknown) {
-      logger.error(`GET /vram-benchmarks/machines error: ${getErrorMessage(error)}`);
+      logger.error(
+        `GET /vram-benchmarks/machines error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),
@@ -248,7 +252,9 @@ router.get(
 
       res.json(labels);
     } catch (error: unknown) {
-      logger.error(`GET /vram-benchmarks/settings error: ${getErrorMessage(error)}`);
+      logger.error(
+        `GET /vram-benchmarks/settings error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),
@@ -277,7 +283,9 @@ router.get(
 
       res.json(contexts);
     } catch (error: unknown) {
-      logger.error(`GET /vram-benchmarks/contexts error: ${getErrorMessage(error)}`);
+      logger.error(
+        `GET /vram-benchmarks/contexts error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),

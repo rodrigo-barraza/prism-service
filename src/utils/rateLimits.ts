@@ -25,7 +25,10 @@ interface HttpResponseWithHeaders {
   headers?: { get(name: string): string | null };
 }
 
-export function extractOpenAIRateLimits(response: HttpResponseWithHeaders | null | undefined, model: string) {
+export function extractOpenAIRateLimits(
+  response: HttpResponseWithHeaders | null | undefined,
+  model: string,
+) {
   if (!response?.headers) return null;
   const headers = response.headers;
 
@@ -69,7 +72,10 @@ export function extractOpenAIRateLimits(response: HttpResponseWithHeaders | null
  *   anthropic-ratelimit-tokens-reset        → TPM reset time
  *   retry-after                             → seconds to wait if 429
  */
-export function extractAnthropicRateLimits(response: HttpResponseWithHeaders | null | undefined, model: string) {
+export function extractAnthropicRateLimits(
+  response: HttpResponseWithHeaders | null | undefined,
+  model: string,
+) {
   if (!response?.headers) return null;
   const headers = response.headers;
 
@@ -93,12 +99,16 @@ export function extractAnthropicRateLimits(response: HttpResponseWithHeaders | n
     },
     inputTokens: {
       limit: safeInt(headers.get("anthropic-ratelimit-input-tokens-limit")),
-      remaining: safeInt(headers.get("anthropic-ratelimit-input-tokens-remaining")),
+      remaining: safeInt(
+        headers.get("anthropic-ratelimit-input-tokens-remaining"),
+      ),
       reset: headers.get("anthropic-ratelimit-input-tokens-reset") || null,
     },
     outputTokens: {
       limit: safeInt(headers.get("anthropic-ratelimit-output-tokens-limit")),
-      remaining: safeInt(headers.get("anthropic-ratelimit-output-tokens-remaining")),
+      remaining: safeInt(
+        headers.get("anthropic-ratelimit-output-tokens-remaining"),
+      ),
       reset: headers.get("anthropic-ratelimit-output-tokens-reset") || null,
     },
   };

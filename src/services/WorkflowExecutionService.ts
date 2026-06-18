@@ -124,7 +124,12 @@ async function resolveToDataUrl(ref: unknown): Promise<string | null> {
   if (!ref) return null;
 
   if (typeof ref === "object" && ref !== null) {
-    const mediaRef = ref as { data?: string; imageData?: string; mimeType?: string; minioRef?: string };
+    const mediaRef = ref as {
+      data?: string;
+      imageData?: string;
+      mimeType?: string;
+      minioRef?: string;
+    };
     if (mediaRef.minioRef) return resolveMinioRefToUrl(mediaRef.minioRef);
     const base64 = mediaRef.data || mediaRef.imageData;
     if (base64) {
@@ -175,7 +180,9 @@ function topologicalSort(
     adjacency[edge.sourceNodeId].push(edge.targetNodeId);
   }
 
-  const queue = nodes.filter((node) => inDegree[node.id] === 0).map((node) => node.id);
+  const queue = nodes
+    .filter((node) => inDegree[node.id] === 0)
+    .map((node) => node.id);
   const sorted: string[] = [];
 
   while (queue.length > 0) {
@@ -219,12 +226,24 @@ async function executeModelNode(
   };
 
   if (endpoint === WORKFLOW_ENDPOINTS.TEXT_TO_TEXT) {
-    const textParts = inputData.filter((datum) => datum.type === "text").map((datum) => datum.data);
-    const imageParts = inputData.filter((datum) => datum.type === "image").map((datum) => datum.data);
-    const audioParts = inputData.filter((datum) => datum.type === "audio").map((datum) => datum.data);
-    const videoParts = inputData.filter((datum) => datum.type === "video").map((datum) => datum.data);
-    const pdfParts = inputData.filter((datum) => datum.type === "pdf").map((datum) => datum.data);
-    const conversationParts = inputData.filter((datum) => datum.type === "conversation").map((datum) => datum.data);
+    const textParts = inputData
+      .filter((datum) => datum.type === "text")
+      .map((datum) => datum.data);
+    const imageParts = inputData
+      .filter((datum) => datum.type === "image")
+      .map((datum) => datum.data);
+    const audioParts = inputData
+      .filter((datum) => datum.type === "audio")
+      .map((datum) => datum.data);
+    const videoParts = inputData
+      .filter((datum) => datum.type === "video")
+      .map((datum) => datum.data);
+    const pdfParts = inputData
+      .filter((datum) => datum.type === "pdf")
+      .map((datum) => datum.data);
+    const conversationParts = inputData
+      .filter((datum) => datum.type === "conversation")
+      .map((datum) => datum.data);
     const pipedText = textParts.join("\n\n");
     const hasMedia =
       imageParts.length > 0 ||
@@ -259,10 +278,18 @@ async function executeModelNode(
         .map((message) => ({
           role: message.role,
           content: message.content || "",
-          ...(message.images && message.images.length > 0 ? { images: message.images } : {}),
-          ...(message.audio && message.audio.length > 0 ? { audio: message.audio } : {}),
-          ...(message.video && message.video.length > 0 ? { video: message.video } : {}),
-          ...(message.pdf && message.pdf.length > 0 ? { pdf: message.pdf } : {}),
+          ...(message.images && message.images.length > 0
+            ? { images: message.images }
+            : {}),
+          ...(message.audio && message.audio.length > 0
+            ? { audio: message.audio }
+            : {}),
+          ...(message.video && message.video.length > 0
+            ? { video: message.video }
+            : {}),
+          ...(message.pdf && message.pdf.length > 0
+            ? { pdf: message.pdf }
+            : {}),
         }))
         .filter(
           (message) =>
@@ -300,9 +327,15 @@ async function executeModelNode(
       finalMessages = node.messages.map((message) => ({
         role: message.role,
         content: message.content || "",
-        ...(message.images && message.images.length > 0 ? { images: message.images } : {}),
-        ...(message.audio && message.audio.length > 0 ? { audio: message.audio } : {}),
-        ...(message.video && message.video.length > 0 ? { video: message.video } : {}),
+        ...(message.images && message.images.length > 0
+          ? { images: message.images }
+          : {}),
+        ...(message.audio && message.audio.length > 0
+          ? { audio: message.audio }
+          : {}),
+        ...(message.video && message.video.length > 0
+          ? { video: message.video }
+          : {}),
         ...(message.pdf && message.pdf.length > 0 ? { pdf: message.pdf } : {}),
       }));
 
@@ -357,7 +390,9 @@ async function executeModelNode(
 
     if (toolSchemas !== null && toolSchemas !== undefined) {
       // Route through agent handler for tool-enabled runs
-      generationParams.enabledTools = toolSchemas.map((tool) => tool.function?.name || "");
+      generationParams.enabledTools = toolSchemas.map(
+        (tool) => tool.function?.name || "",
+      );
       generationParams.functionCallingEnabled = true;
       generationParams.agenticLoopEnabled = true;
       generationParams.autoApprove = true;
@@ -384,7 +419,8 @@ async function executeModelNode(
     const imageEvent = collectedEvents.find((event) => event.type === "image");
     if (imageEvent) {
       if (imageEvent.minioRef) {
-        outputs.image = (await resolveToDataUrl(imageEvent.minioRef)) || undefined;
+        outputs.image =
+          (await resolveToDataUrl(imageEvent.minioRef)) || undefined;
       } else if (imageEvent.data) {
         const mime = imageEvent.mimeType || "image/png";
         outputs.image = `data:${mime};base64,${imageEvent.data}`;
@@ -405,11 +441,20 @@ async function executeModelNode(
     const messageImages: unknown[] = [];
 
     if (conversationParts.length > 0) {
-      const conversationMessages = (conversationParts[0] as WorkflowMessage[]).filter(
-        (message) => message.content || (message.images && message.images.length > 0) || message.audio,
+      const conversationMessages = (
+        conversationParts[0] as WorkflowMessage[]
+      ).filter(
+        (message) =>
+          message.content ||
+          (message.images && message.images.length > 0) ||
+          message.audio,
       );
-      const systemMessage = conversationMessages.find((message) => message.role === "system");
-      const userMessages = conversationMessages.filter((message) => message.role === "user");
+      const systemMessage = conversationMessages.find(
+        (message) => message.role === "system",
+      );
+      const userMessages = conversationMessages.filter(
+        (message) => message.role === "user",
+      );
       const lastUser = userMessages[userMessages.length - 1];
 
       systemPrompt = (systemMessage?.content as string) || undefined;
@@ -421,11 +466,16 @@ async function executeModelNode(
         : userContent;
 
       userMessages.forEach((message) => {
-        if (message.images && message.images.length > 0) messageImages.push(...message.images);
+        if (message.images && message.images.length > 0)
+          messageImages.push(...message.images);
       });
     } else if (node.messages && node.messages.length > 0) {
-      const systemMessage = node.messages.find((message) => message.role === "system");
-      const userMessages = node.messages.filter((message) => message.role === "user");
+      const systemMessage = node.messages.find(
+        (message) => message.role === "system",
+      );
+      const userMessages = node.messages.filter(
+        (message) => message.role === "user",
+      );
       const lastUser = userMessages[userMessages.length - 1];
 
       systemPrompt = (systemMessage?.content as string) || undefined;
@@ -437,7 +487,8 @@ async function executeModelNode(
         : userContent;
 
       userMessages.forEach((message) => {
-        if (message.images && message.images.length > 0) messageImages.push(...message.images);
+        if (message.images && message.images.length > 0)
+          messageImages.push(...message.images);
       });
     } else {
       systemPrompt = undefined;
@@ -449,9 +500,7 @@ async function executeModelNode(
       if (typeof image === "string" && image.startsWith("data:")) {
         return image;
       }
-      return typeof image === "object"
-        ? image
-        : image as string;
+      return typeof image === "object" ? image : (image as string);
     });
 
     // Build messages for chat endpoint
@@ -493,7 +542,8 @@ async function executeModelNode(
     const imageEvent = collectedEvents.find((event) => event.type === "image");
     if (imageEvent) {
       if (imageEvent.minioRef) {
-        outputs.image = (await resolveToDataUrl(imageEvent.minioRef)) || undefined;
+        outputs.image =
+          (await resolveToDataUrl(imageEvent.minioRef)) || undefined;
       } else if (imageEvent.data) {
         const mime = imageEvent.mimeType || "image/png";
         outputs.image = `data:${mime};base64,${imageEvent.data}`;
@@ -513,7 +563,9 @@ async function executeModelNode(
 
     const provider = getProvider(node.provider || "");
     if (!provider.transcribeAudio) {
-      throw new Error(`Provider "${node.provider}" does not support audio transcription`);
+      throw new Error(
+        `Provider "${node.provider}" does not support audio transcription`,
+      );
     }
 
     const resolvedAudio = await resolveMediaReference(
@@ -551,7 +603,9 @@ async function executeModelNode(
 
     const provider = getProvider(node.provider || "");
     if (!provider.generateSpeech) {
-      throw new Error(`Provider "${node.provider}" does not support text-to-speech`);
+      throw new Error(
+        `Provider "${node.provider}" does not support text-to-speech`,
+      );
     }
 
     const result = await provider.generateSpeech(textData, undefined, {
@@ -598,8 +652,12 @@ async function executeModelNode(
 
     outputs.audio = audioUrl;
   } else if (endpoint === WORKFLOW_ENDPOINTS.MODALITY_TO_EMBEDDING) {
-    const textParts = inputData.filter((datum) => datum.type === "text").map((datum) => datum.data);
-    const imageParts = inputData.filter((datum) => datum.type === "image").map((datum) => datum.data);
+    const textParts = inputData
+      .filter((datum) => datum.type === "text")
+      .map((datum) => datum.data);
+    const imageParts = inputData
+      .filter((datum) => datum.type === "image")
+      .map((datum) => datum.data);
     const audioPart = inputData.find((datum) => datum.type === "audio")?.data;
 
     const pipedText = textParts.join("\n\n");
@@ -621,7 +679,10 @@ async function executeModelNode(
       const parseDataUrl = (data: string, fallbackMime: string) => {
         if (typeof data === "string" && data.includes(";base64,")) {
           const segments = data.split(";base64,");
-          return { data: segments[1], mimeType: segments[0].replace("data:", "") };
+          return {
+            data: segments[1],
+            mimeType: segments[0].replace("data:", ""),
+          };
         }
         return { data, mimeType: fallbackMime };
       };
@@ -632,7 +693,10 @@ async function executeModelNode(
           context.project || "",
           context.username || "",
         );
-        const { data, mimeType } = parseDataUrl(resolvedImage.providerRef, "image/jpeg");
+        const { data, mimeType } = parseDataUrl(
+          resolvedImage.providerRef,
+          "image/jpeg",
+        );
         parts.push({ inlineData: { data, mimeType } });
       }
 
@@ -642,7 +706,10 @@ async function executeModelNode(
           context.project || "",
           context.username || "",
         );
-        const { data, mimeType } = parseDataUrl(resolvedAudio.providerRef, "audio/mpeg");
+        const { data, mimeType } = parseDataUrl(
+          resolvedAudio.providerRef,
+          "audio/mpeg",
+        );
         parts.push({ inlineData: { data, mimeType } });
       }
 
@@ -671,7 +738,10 @@ async function executeWorkflow(
   edges: WorkflowEdge[],
   context: ExecutionContext,
   callbacks: WorkflowExecutionCallbacks,
-): Promise<{ nodeOutputs: Record<string, WorkflowOutputs>; conversationIds: string[] }> {
+): Promise<{
+  nodeOutputs: Record<string, WorkflowOutputs>;
+  conversationIds: string[];
+}> {
   const sortedIds = topologicalSort(nodes, edges);
   const nodeMap = Object.fromEntries(nodes.map((node) => [node.id, node]));
 
@@ -693,7 +763,9 @@ async function executeWorkflow(
   for (const nodeId of sortedIds) {
     // Check abort signal before each node
     if (callbacks.signal?.aborted) {
-      logger.info(`[workflow] Aborting — signal received before node ${nodeId}`);
+      logger.info(
+        `[workflow] Aborting — signal received before node ${nodeId}`,
+      );
       break;
     }
 
@@ -719,7 +791,9 @@ async function executeWorkflow(
         if (node.modality === "conversation") {
           const messages = structuredClone(node.messages || []);
 
-          const incomingConnections = edges.filter((edge) => edge.targetNodeId === nodeId);
+          const incomingConnections = edges.filter(
+            (edge) => edge.targetNodeId === nodeId,
+          );
           for (const connection of incomingConnections) {
             const sourceOutput = nodeOutputs[connection.sourceNodeId];
             if (!sourceOutput) continue;
@@ -728,7 +802,9 @@ async function executeWorkflow(
 
             const dotIndex = connection.targetModality.indexOf(".");
             if (dotIndex === -1) continue;
-            const messageIndex = parseInt(connection.targetModality.substring(0, dotIndex));
+            const messageIndex = parseInt(
+              connection.targetModality.substring(0, dotIndex),
+            );
             const modality = connection.targetModality.substring(dotIndex + 1);
 
             if (messageIndex < 0 || messageIndex >= messages.length) continue;
@@ -817,7 +893,9 @@ async function executeWorkflow(
               properties[parameter.name] = {
                 type: parameter.type || "string",
                 description: parameter.description || "",
-                ...(parameter.enum && parameter.enum.length > 0 ? { enum: parameter.enum } : {}),
+                ...(parameter.enum && parameter.enum.length > 0
+                  ? { enum: parameter.enum }
+                  : {}),
               };
               if (parameter.required) required.push(parameter.name);
             }
@@ -844,12 +922,17 @@ async function executeWorkflow(
 
       // ── Viewer nodes ───────────────────────────────────────────
       if (node.nodeType === "viewer") {
-        const incomingConnections = edges.filter((edge) => edge.targetNodeId === nodeId);
+        const incomingConnections = edges.filter(
+          (edge) => edge.targetNodeId === nodeId,
+        );
         const collectedOutputs: Record<string, unknown> = {};
 
         for (const connection of incomingConnections) {
           const sourceOutputs = nodeOutputs[connection.sourceNodeId];
-          if (sourceOutputs && sourceOutputs[connection.sourceModality] !== undefined) {
+          if (
+            sourceOutputs &&
+            sourceOutputs[connection.sourceModality] !== undefined
+          ) {
             collectedOutputs[connection.targetModality] =
               sourceOutputs[connection.sourceModality];
           }
@@ -861,12 +944,17 @@ async function executeWorkflow(
       }
 
       // ── Model nodes ────────────────────────────────────────────
-      const incomingConnections = edges.filter((edge) => edge.targetNodeId === nodeId);
+      const incomingConnections = edges.filter(
+        (edge) => edge.targetNodeId === nodeId,
+      );
       const inputData: WorkflowInputDatum[] = [];
 
       for (const connection of incomingConnections) {
         const sourceOutputs = nodeOutputs[connection.sourceNodeId];
-        if (sourceOutputs && sourceOutputs[connection.sourceModality] !== undefined) {
+        if (
+          sourceOutputs &&
+          sourceOutputs[connection.sourceModality] !== undefined
+        ) {
           inputData.push({
             type: connection.targetModality,
             data: sourceOutputs[connection.sourceModality],
@@ -877,7 +965,9 @@ async function executeWorkflow(
 
       // Separate tool inputs from regular modality inputs
       const toolInputs = inputData.filter((datum) => datum.type === "tools");
-      const regularInputData = inputData.filter((datum) => datum.type !== "tools");
+      const regularInputData = inputData.filter(
+        (datum) => datum.type !== "tools",
+      );
 
       let toolSchemas: ToolSchemaEntry[] | null = null;
       let customToolMap: Map<string, WorkflowCustomTool> | null = null;
@@ -891,7 +981,8 @@ async function executeWorkflow(
           };
           if (toolData?.schemas) toolSchemas.push(...toolData.schemas);
           if (toolData?.customMap) {
-            for (const [key, value] of toolData.customMap) customToolMap.set(key, value);
+            for (const [key, value] of toolData.customMap)
+              customToolMap.set(key, value);
           }
         }
       }
@@ -906,7 +997,9 @@ async function executeWorkflow(
       }
 
       // Execute the model
-      logger.info(`[workflow] ▶ Executing node ${nodeId} (${node.provider}/${node.modelName})`);
+      logger.info(
+        `[workflow] ▶ Executing node ${nodeId} (${node.provider}/${node.modelName})`,
+      );
       const { outputs, conversationId } = await executeModelNode(
         node,
         regularInputData,
@@ -935,7 +1028,9 @@ async function executeWorkflow(
       logger.info(`[workflow] ✅ Node ${nodeId} complete`);
     } catch (error: unknown) {
       erroredNodeIds.add(nodeId);
-      logger.error(`[workflow] ❌ Node ${nodeId} error: ${getErrorMessage(error)}`);
+      logger.error(
+        `[workflow] ❌ Node ${nodeId} error: ${getErrorMessage(error)}`,
+      );
       callbacks.onNodeError?.(nodeId, getErrorMessage(error));
       nodeOutputs[nodeId] = {};
     }

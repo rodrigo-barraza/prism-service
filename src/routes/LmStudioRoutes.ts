@@ -13,7 +13,10 @@ import type { ProviderOptions } from "../types/provider.ts";
 const router = express.Router();
 /** Resolve instance ID from request — supports ?instance=lm-studio-2 */
 function resolveInstanceId(req: Request) {
-    const id = (req.query.instance as string) || (req.body as Record<string, unknown>)?.instance || PROVIDERS.LM_STUDIO;
+  const id =
+    (req.query.instance as string) ||
+    (req.body as Record<string, unknown>)?.instance ||
+    PROVIDERS.LM_STUDIO;
   // Validate it's actually a registered instance
   if (!isInstance(id as string)) return PROVIDERS.LM_STUDIO;
   return id as string;
@@ -31,7 +34,7 @@ router.get(
       const data = await provider.listModels();
       res.json(data);
     } catch (error: unknown) {
-            logger.error(`GET /lm-studio/models error: ${getErrorMessage(error)}`);
+      logger.error(`GET /lm-studio/models error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -61,13 +64,13 @@ router.post(
       const provider = getProvider(instanceId) as LmStudioProvider;
       // Build load options from request body
       const loadOptions: ProviderOptions = {};
-            if (context_length != null) loadOptions.context_length = context_length;
-            if (flash_attention != null)
-                loadOptions.flash_attention = flash_attention;
-            if (offload_kv_cache_to_gpu != null)
-                loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
-            if (eval_batch_size != null)
-                loadOptions.eval_batch_size = eval_batch_size;
+      if (context_length != null) loadOptions.context_length = context_length;
+      if (flash_attention != null)
+        loadOptions.flash_attention = flash_attention;
+      if (offload_kv_cache_to_gpu != null)
+        loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
+      if (eval_batch_size != null)
+        loadOptions.eval_batch_size = eval_batch_size;
       // ensureModelLoaded handles: skip if already loaded, unload others, then load
       const { alreadyLoaded } = await provider.ensureModelLoaded(
         model,
@@ -81,7 +84,7 @@ router.post(
       }
       res.json({ model, alreadyLoaded: false });
     } catch (error: unknown) {
-            logger.error(`POST /lm-studio/load error: ${getErrorMessage(error)}`);
+      logger.error(`POST /lm-studio/load error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -129,13 +132,13 @@ router.post(
       send({ type: "start", model });
       // Build load options
       const loadOptions: Record<string, unknown> = {};
-            if (context_length != null) loadOptions.context_length = context_length;
-            if (flash_attention != null)
-                loadOptions.flash_attention = flash_attention;
-            if (offload_kv_cache_to_gpu != null)
-                loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
-            if (eval_batch_size != null)
-                loadOptions.eval_batch_size = eval_batch_size;
+      if (context_length != null) loadOptions.context_length = context_length;
+      if (flash_attention != null)
+        loadOptions.flash_attention = flash_attention;
+      if (offload_kv_cache_to_gpu != null)
+        loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
+      if (eval_batch_size != null)
+        loadOptions.eval_batch_size = eval_batch_size;
       if (aborted) return res.end();
       // Check if model is already loaded and unload others if needed
       // (non-streaming part — quick check + unload)
@@ -152,8 +155,8 @@ router.post(
           needsLoad = false;
         } else {
           // Unload any other loaded models first (single-model enforcement)
-                    for ( const message of models || []) {
-                        for ( const inst of message.loaded_instances || []) {
+          for (const message of models || []) {
+            for (const inst of message.loaded_instances || []) {
               send({ type: "unloading", model: message.key });
               logger.info(
                 `[load-stream] Auto-unloading ${inst.id} before loading ${model}`,
@@ -164,7 +167,7 @@ router.post(
         }
       } catch (listError: unknown) {
         logger.warn(
-                    `[load-stream] Could not check models before loading: ${getErrorMessage(listError)}`,
+          `[load-stream] Could not check models before loading: ${getErrorMessage(listError)}`,
         );
       }
       if (!needsLoad || aborted) {
@@ -190,16 +193,24 @@ router.post(
         await sleep(300);
         if (loadDone || aborted) break;
         const elapsed = Date.now() - startTime;
-        const percentage = Math.min(0.95, elapsed / (elapsed + EXPECTED_LOAD_MS));
+        const percentage = Math.min(
+          0.95,
+          elapsed / (elapsed + EXPECTED_LOAD_MS),
+        );
         if (percentage > lastPercentage + 0.005) {
           lastPercentage = percentage;
-          send({ type: "progress", progress: parseFloat(percentage.toFixed(3)) });
+          send({
+            type: "progress",
+            progress: parseFloat(percentage.toFixed(3)),
+          });
         }
       }
       await loadPromise;
       if (aborted) return res.end();
       if (loadError) {
-        logger.error(`[load-stream] loadModel failed: ${getErrorMessage(loadError)}`);
+        logger.error(
+          `[load-stream] loadModel failed: ${getErrorMessage(loadError)}`,
+        );
         send({ type: "error", message: getErrorMessage(loadError) });
       } else {
         send({ type: "progress", progress: 1 });
@@ -207,8 +218,10 @@ router.post(
         logger.info(`[load-stream] Model ${model} loaded successfully`);
       }
     } catch (error: unknown) {
-            logger.error(`POST /lm-studio/load-stream error: ${getErrorMessage(error)}`);
-            send({ type: "error", message: getErrorMessage(error) });
+      logger.error(
+        `POST /lm-studio/load-stream error: ${getErrorMessage(error)}`,
+      );
+      send({ type: "error", message: getErrorMessage(error) });
     } finally {
       if (!res.writableEnded) res.end();
     }
@@ -234,7 +247,7 @@ router.post(
       await provider.unloadModel(instance_id);
       res.json({ success: true, instance_id });
     } catch (error: unknown) {
-            logger.error(`POST /lm-studio/unload error: ${getErrorMessage(error)}`);
+      logger.error(`POST /lm-studio/unload error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -286,7 +299,7 @@ router.post(
       }
       res.json(estimate);
     } catch (error: unknown) {
-            logger.error(`POST /lm-studio/estimate error: ${getErrorMessage(error)}`);
+      logger.error(`POST /lm-studio/estimate error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),

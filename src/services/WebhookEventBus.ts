@@ -33,7 +33,9 @@ const WebhookEventBus = {
       try {
         listener(event);
       } catch (error: unknown) {
-        logger.error(`WebhookEventBus listener error: ${error instanceof Error ? error.message : String(error)}`);
+        logger.error(
+          `WebhookEventBus listener error: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
   },

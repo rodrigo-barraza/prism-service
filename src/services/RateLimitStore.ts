@@ -60,11 +60,17 @@ interface RateLimitData {
 interface ProviderGroup {
   dynamic: boolean;
   note?: string;
-  models: Record<string, RateLimitData | { rateLimits: RateLimitData; updatedAt: string }>;
+  models: Record<
+    string,
+    RateLimitData | { rateLimits: RateLimitData; updatedAt: string }
+  >;
 }
 
 class RateLimitStore {
-  private _models: Map<string, { rateLimits: RateLimitData; updatedAt: string }>;
+  private _models: Map<
+    string,
+    { rateLimits: RateLimitData; updatedAt: string }
+  >;
   private _google: typeof GOOGLE_STATIC_LIMITS;
 
   constructor() {

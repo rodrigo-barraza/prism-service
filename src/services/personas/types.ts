@@ -38,7 +38,7 @@ export interface SerializedPolicy {
   field?: string;
 }
 
-export type PlatformKey = 'discord' | 'slack' | 'teams' | 'web' | string;
+export type PlatformKey = "discord" | "slack" | "teams" | "web" | string;
 
 export interface Persona {
   id: string;
@@ -74,7 +74,10 @@ export interface Persona {
    * is injected into the system prompt. When absent, the agent has no
    * platform-specific behavior — it remains fully platform-agnostic.
    */
-  platformRules?: Record<PlatformKey, string | ((context: PersonaContext) => string)>;
+  platformRules?: Record<
+    PlatformKey,
+    string | ((context: PersonaContext) => string)
+  >;
   /** When true, the assembler injects the agent's somatic state (from agentContext.selfContext) as an interleaved system message before the last user message. */
   hasSomaticState?: boolean;
   usesDirectoryTree: boolean;

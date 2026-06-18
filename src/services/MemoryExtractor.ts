@@ -7,7 +7,11 @@ import RequestLogger from "./RequestLogger.ts";
 import SettingsService from "./SettingsService.ts";
 import logger from "../utils/logger.ts";
 import { parseJsonFromLargeLanguageModelResponse } from "@rodrigo-barraza/utilities-library";
-import { TOOL_NAMES, SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  TOOL_NAMES,
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
   estimateTokens,
   calculateTextCost,
@@ -15,7 +19,12 @@ import {
 } from "../utils/CostCalculator.ts";
 import { TYPES, getPricing } from "../config.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import type { ConversationMessage, ToolCall, EmitFunction, AgenticContext } from "./harnesses/types.ts";
+import type {
+  ConversationMessage,
+  ToolCall,
+  EmitFunction,
+  AgenticContext,
+} from "./harnesses/types.ts";
 import type { ChatMessage, GenerateTextResult } from "../types/provider.ts";
 import type { MessagePayload } from "./RequestLogger.ts";
 
@@ -175,7 +184,9 @@ export default class MemoryExtractor {
     // skip extraction — the agent's explicit memory writes take precedence.
     // This prevents duplicate or conflicting memories from the extraction
     // pipeline when the agent has already decided what to remember.
-    if (toolCalls?.some((toolCall) => toolCall.name === TOOL_NAMES.SAVE_MEMORY)) {
+    if (
+      toolCalls?.some((toolCall) => toolCall.name === TOOL_NAMES.SAVE_MEMORY)
+    ) {
       logger.info(
         `[MemoryExtractor] Skipping — main agent used save_memory this turn (mutual exclusion)`,
       );
@@ -187,7 +198,9 @@ export default class MemoryExtractor {
       let extractionProvider: string | undefined;
       let extractionModel: string | undefined;
       try {
-        const memorySettings = await SettingsService.getSection("memory") as MemorySettingsSection;
+        const memorySettings = (await SettingsService.getSection(
+          "memory",
+        )) as MemorySettingsSection;
         extractionProvider = memorySettings.extractionProvider;
         extractionModel = memorySettings.extractionModel;
       } catch {
@@ -209,7 +222,9 @@ export default class MemoryExtractor {
 
       // Build conversation text (compact format to save tokens)
       const conversationText = messages
-        .filter((message) => message.role === "user" || message.role === "assistant")
+        .filter(
+          (message) => message.role === "user" || message.role === "assistant",
+        )
         .map((message) => {
           const content = message.content || "";
           // Truncate very long messages to save tokens
@@ -245,7 +260,11 @@ export default class MemoryExtractor {
       } finally {
         // Use real API-reported usage when available; fall back to heuristic
         const realUsage = result?.usage || null;
-        const inputText = aiMessages.map((message) => typeof message.content === "string" ? message.content : "").join("\n");
+        const inputText = aiMessages
+          .map((message) =>
+            typeof message.content === "string" ? message.content : "",
+          )
+          .join("\n");
         const approxInputTokens = realUsage
           ? getTotalInputTokens(realUsage)
           : estimateTokens(inputText);
@@ -312,17 +331,29 @@ export default class MemoryExtractor {
         }
       }
 
-      let memories: unknown = parseJsonFromLargeLanguageModelResponse(result!.text);
-      if (memories && typeof memories === "object" && !Array.isArray(memories)) {
+      let memories: unknown = parseJsonFromLargeLanguageModelResponse(
+        result!.text,
+      );
+      if (
+        memories &&
+        typeof memories === "object" &&
+        !Array.isArray(memories)
+      ) {
         const memoriesRecord = memories as Record<string, unknown>;
         if (Array.isArray(memoriesRecord.memories)) {
           memories = memoriesRecord.memories;
         } else if (Array.isArray(memoriesRecord.extractedMemories)) {
           memories = memoriesRecord.extractedMemories;
-        } else if (memoriesRecord.type && memoriesRecord.title && memoriesRecord.content) {
+        } else if (
+          memoriesRecord.type &&
+          memoriesRecord.title &&
+          memoriesRecord.content
+        ) {
           memories = [memoriesRecord];
         } else {
-          const arrayKey = Object.keys(memoriesRecord).find((key) => Array.isArray(memoriesRecord[key]));
+          const arrayKey = Object.keys(memoriesRecord).find((key) =>
+            Array.isArray(memoriesRecord[key]),
+          );
           if (arrayKey) {
             memories = memoriesRecord[arrayKey];
           }
@@ -331,7 +362,7 @@ export default class MemoryExtractor {
 
       if (!Array.isArray(memories)) {
         logger.warn(
-          `[MemoryExtractor] Response was not an array or a recognized memory structure. Text: ${result!.text ? result!.text.substring(0, 200) : "empty"}`
+          `[MemoryExtractor] Response was not an array or a recognized memory structure. Text: ${result!.text ? result!.text.substring(0, 200) : "empty"}`,
         );
         return [];
       }
@@ -365,7 +396,11 @@ export default class MemoryExtractor {
           });
 
           if (storeResult) {
-            stored.push({ type, id: storeResult.id, title: memoryObject.title });
+            stored.push({
+              type,
+              id: storeResult.id,
+              title: memoryObject.title,
+            });
             logger.info(
               `[MemoryExtractor] Stored [${type}] "${memoryObject.title.substring(0, 60)}"`,
             );
@@ -375,7 +410,9 @@ export default class MemoryExtractor {
             );
           }
         } catch (error: unknown) {
-          logger.error(`[MemoryExtractor] Storage failed: ${errorMessage(error)}`);
+          logger.error(
+            `[MemoryExtractor] Storage failed: ${errorMessage(error)}`,
+          );
         }
       }
 
@@ -391,8 +428,11 @@ export default class MemoryExtractor {
           const embedTokens = stored.length * 50; // ~50 tokens per memory title+content
           // Embedding cost: input tokens only (no output tokens)
           const embedPricing = getPricing(TYPES.TEXT, TYPES.EMBEDDING);
-          const embedModel = (await SettingsService.getSection("memory") as MemorySettingsSection)
-            ?.embeddingModel;
+          const embedModel = (
+            (await SettingsService.getSection(
+              "memory",
+            )) as MemorySettingsSection
+          )?.embeddingModel;
           const embedModelPricing = embedModel
             ? embedPricing[embedModel]
             : null;
@@ -426,7 +466,10 @@ export default class MemoryExtractor {
    * Runs as fire-and-forget (non-blocking).
    */
   static createHook() {
-    return async (context: AgenticContext, { _text, messages, toolCalls }: AfterResponseOutput) => {
+    return async (
+      context: AgenticContext,
+      { _text, messages, toolCalls }: AfterResponseOutput,
+    ) => {
       // Fire-and-forget — don't block the response
       MemoryExtractor.extractAndStore({
         project: context.project,
@@ -435,7 +478,9 @@ export default class MemoryExtractor {
         traceId: context.traceId,
         agentSessionId: context.agentSessionId,
         conversationId: context.conversationId as string | null,
-        endpoint: (context as Record<string, unknown>).endpoint as string | null || "/agent",
+        endpoint:
+          ((context as Record<string, unknown>).endpoint as string | null) ||
+          "/agent",
         agent: context.agent || null,
         toolCalls: toolCalls || [],
         emit: context.emit || null,
@@ -451,7 +496,10 @@ export default class MemoryExtractor {
 
           // Build a broadcast callback from ctx.emit for consolidation notifications
           const broadcast = context.emit
-            ? (payload: Record<string, unknown>) => context.emit(payload as { type: string; [key: string]: unknown })
+            ? (payload: Record<string, unknown>) =>
+                context.emit(
+                  payload as { type: string; [key: string]: unknown },
+                )
             : undefined;
 
           // Check if consolidation should run (tracks session count)
@@ -459,7 +507,10 @@ export default class MemoryExtractor {
             project: context.project,
             username: context.username,
             broadcast,
-            endpoint: (context as Record<string, unknown>).endpoint as string | null || "/agent",
+            endpoint:
+              ((context as Record<string, unknown>).endpoint as
+                | string
+                | null) || "/agent",
             agent: context.agent || null,
             traceId: context.traceId || null,
             agentSessionId: context.agentSessionId || null,

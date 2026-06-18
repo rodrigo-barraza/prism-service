@@ -13,7 +13,12 @@ import { MinioManager } from "@rodrigo-barraza/service-library/minio";
 import logger from "../utils/logger.ts";
 
 const MinioWrapper = {
-  async init(endpoint: string, accessKey: string, secretKey: string, bucket: string) {
+  async init(
+    endpoint: string,
+    accessKey: string,
+    secretKey: string,
+    bucket: string,
+  ) {
     return MinioManager.init({
       endpoint,
       accessKey,

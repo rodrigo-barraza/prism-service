@@ -43,7 +43,10 @@ export default class CriticGate {
    * Only activates for DANGER tier tools (execute_shell, execute_python,
    * execute_javascript, execute_command). All other tools pass through.
    */
-  async review(toolCall: ToolCall, context: AgenticContext): Promise<CriticReviewResult> {
+  async review(
+    toolCall: ToolCall,
+    context: AgenticContext,
+  ): Promise<CriticReviewResult> {
     const approvalInfo = toolCall._approval as { tier: number } | undefined;
     const tier = approvalInfo?.tier ?? APPROVAL_TIERS.WRITE;
 
@@ -51,12 +54,20 @@ export default class CriticGate {
 
     // Only review DANGER tier tools
     if (tier !== APPROVAL_TIERS.DANGER) {
-      return { isApproved: true, reason: "below_danger_tier", criticModel: activeCriticModel };
+      return {
+        isApproved: true,
+        reason: "below_danger_tier",
+        criticModel: activeCriticModel,
+      };
     }
 
     // Skip if critic is explicitly disabled for this context
     if ((context.options as Record<string, unknown>).skipCritic === true) {
-      return { isApproved: true, reason: "critic_skipped", criticModel: activeCriticModel };
+      return {
+        isApproved: true,
+        reason: "critic_skipped",
+        criticModel: activeCriticModel,
+      };
     }
 
     try {
@@ -64,7 +75,11 @@ export default class CriticGate {
 
       // Use the same provider from the context to avoid a separate provider dependency.
       // The critic call is intentionally lightweight and fast.
-      const criticResponse = await this.callCriticModel(reviewPrompt, context, activeCriticModel);
+      const criticResponse = await this.callCriticModel(
+        reviewPrompt,
+        context,
+        activeCriticModel,
+      );
       return this.parseReviewResponse(criticResponse, activeCriticModel);
     } catch (criticError: unknown) {
       // On critic failure, default to allowing (fail-open for usability).
@@ -72,7 +87,11 @@ export default class CriticGate {
       logger.warn(
         `[CriticGate] Review failed for "${toolCall.name}": ${getErrorMessage(criticError)}. Defaulting to approve.`,
       );
-      return { isApproved: true, reason: "critic_error_fallback", criticModel: activeCriticModel };
+      return {
+        isApproved: true,
+        reason: "critic_error_fallback",
+        criticModel: activeCriticModel,
+      };
     }
   }
 
@@ -80,7 +99,10 @@ export default class CriticGate {
    * Build a compact review prompt for the critic model.
    */
   private buildReviewPrompt(toolCall: ToolCall): string {
-    const argsPreview = JSON.stringify(toolCall.args || {}, null, 0).slice(0, 1000);
+    const argsPreview = JSON.stringify(toolCall.args || {}, null, 0).slice(
+      0,
+      1000,
+    );
 
     return [
       "You are a code safety reviewer. An AI agent wants to execute the following tool call.",
@@ -109,9 +131,7 @@ export default class CriticGate {
   ): Promise<string> {
     const { provider } = context;
 
-    const criticMessages = [
-      { role: "user", content: prompt },
-    ];
+    const criticMessages = [{ role: "user", content: prompt }];
 
     const criticOptions = {
       maxTokens: CRITIC_MAX_TOKENS,
@@ -139,22 +159,40 @@ export default class CriticGate {
   /**
    * Parse the critic model's response into a structured result.
    */
-  private parseReviewResponse(response: string, activeModel: string): CriticReviewResult {
+  private parseReviewResponse(
+    response: string,
+    activeModel: string,
+  ): CriticReviewResult {
     const firstLine = response.split("\n")[0].trim().toUpperCase();
 
     if (firstLine.startsWith("APPROVE")) {
-      return { isApproved: true, reason: "critic_approved", criticModel: activeModel };
+      return {
+        isApproved: true,
+        reason: "critic_approved",
+        criticModel: activeModel,
+      };
     }
 
     if (firstLine.startsWith("DENY")) {
-      const denialReason = response.split("\n").slice(1).join(" ").trim() || "critic_denied";
+      const denialReason =
+        response.split("\n").slice(1).join(" ").trim() || "critic_denied";
       logger.info(`[CriticGate] DENIED: ${denialReason}`);
-      return { isApproved: false, reason: denialReason, criticModel: activeModel };
+      return {
+        isApproved: false,
+        reason: denialReason,
+        criticModel: activeModel,
+      };
     }
 
     // Ambiguous response — default to approve
-    logger.warn(`[CriticGate] Ambiguous critic response: "${response.slice(0, 100)}". Defaulting to approve.`);
-    return { isApproved: true, reason: "critic_parse_fallback", criticModel: activeModel };
+    logger.warn(
+      `[CriticGate] Ambiguous critic response: "${response.slice(0, 100)}". Defaulting to approve.`,
+    );
+    return {
+      isApproved: true,
+      reason: "critic_parse_fallback",
+      criticModel: activeModel,
+    };
   }
 
   /**

@@ -43,7 +43,9 @@ export function estimateTokens(text: string | null | undefined): number {
  * Providers like Anthropic and Google split prompt tokens into
  * new + cache_read + cache_write. This aggregates all three.
  */
-export function getTotalInputTokens(usage: TokenUsage | null | undefined): number {
+export function getTotalInputTokens(
+  usage: TokenUsage | null | undefined,
+): number {
   if (!usage) return 0;
   return (
     (usage.inputTokens || 0) +
@@ -52,7 +54,9 @@ export function getTotalInputTokens(usage: TokenUsage | null | undefined): numbe
   );
 }
 
-export function createUsageAccumulator(): Required<Omit<TokenUsage, "totalTokens">> {
+export function createUsageAccumulator(): Required<
+  Omit<TokenUsage, "totalTokens">
+> {
   return {
     inputTokens: 0,
     outputTokens: 0,
@@ -75,9 +79,13 @@ export function mergeUsage(
   if (!source) return target;
   target.inputTokens = (target.inputTokens ?? 0) + (source.inputTokens || 0);
   target.outputTokens = (target.outputTokens ?? 0) + (source.outputTokens || 0);
-  target.cacheReadInputTokens = (target.cacheReadInputTokens ?? 0) + (source.cacheReadInputTokens || 0);
-  target.cacheCreationInputTokens = (target.cacheCreationInputTokens ?? 0) + (source.cacheCreationInputTokens || 0);
-  target.reasoningOutputTokens = (target.reasoningOutputTokens ?? 0) + (source.reasoningOutputTokens || 0);
+  target.cacheReadInputTokens =
+    (target.cacheReadInputTokens ?? 0) + (source.cacheReadInputTokens || 0);
+  target.cacheCreationInputTokens =
+    (target.cacheCreationInputTokens ?? 0) +
+    (source.cacheCreationInputTokens || 0);
+  target.reasoningOutputTokens =
+    (target.reasoningOutputTokens ?? 0) + (source.reasoningOutputTokens || 0);
   return target;
 }
 
@@ -88,7 +96,10 @@ export function mergeUsage(
  * Supports Anthropic prompt caching: cache reads at reduced rate,
  * cache writes at premium rate.
  */
-export function calculateTextCost(usage: TokenUsage | null | undefined, pricing: TextPricing | null | undefined): number | null {
+export function calculateTextCost(
+  usage: TokenUsage | null | undefined,
+  pricing: TextPricing | null | undefined,
+): number | null {
   if (!pricing || !usage) return null;
 
   let cost =
@@ -124,9 +135,7 @@ export function calculateAudioCost(
   // Strategy 1: per-minute pricing
   if (pricing.perMinute && usage.durationSeconds != null) {
     const durationSeconds = Math.max(0, usage.durationSeconds);
-    return parseFloat(
-      ((durationSeconds / 60) * pricing.perMinute).toFixed(8),
-    );
+    return parseFloat(((durationSeconds / 60) * pricing.perMinute).toFixed(8));
   }
 
   // Strategy 2: token-based pricing
@@ -149,7 +158,10 @@ export function calculateAudioCost(
  * use audioInputPerMillion and output tokens should use
  * audioOutputPerMillion when available.
  */
-export function calculateLiveCost(usage: TokenUsage | null | undefined, pricing: AudioPricing | null | undefined): number | null {
+export function calculateLiveCost(
+  usage: TokenUsage | null | undefined,
+  pricing: AudioPricing | null | undefined,
+): number | null {
   if (!pricing || !usage) return null;
 
   const inputRate =

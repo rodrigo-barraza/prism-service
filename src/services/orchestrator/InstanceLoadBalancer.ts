@@ -1,5 +1,8 @@
 import logger from "../../utils/logger.ts";
-import type { InstanceAssignment, SubAgentState } from "../../types/orchestrator.ts";
+import type {
+  InstanceAssignment,
+  SubAgentState,
+} from "../../types/orchestrator.ts";
 import type { InstanceEntry } from "../../types/ProviderTypes.ts";
 
 /**
@@ -12,10 +15,14 @@ import type { InstanceEntry } from "../../types/ProviderTypes.ts";
 const instanceReservations = new Map<string, number>();
 
 export class InstanceLoadBalancer {
-  static getActiveOn(instanceId: string, activeSubAgents: Map<string, SubAgentState>): number {
+  static getActiveOn(
+    instanceId: string,
+    activeSubAgents: Map<string, SubAgentState>,
+  ): number {
     const reserved = instanceReservations.get(instanceId) || 0;
     const running = [...activeSubAgents.values()].filter(
-      (subAgent) => subAgent.providerName === instanceId && subAgent.status === "running",
+      (subAgent) =>
+        subAgent.providerName === instanceId && subAgent.status === "running",
     ).length;
     return reserved + running;
   }
@@ -30,7 +37,10 @@ export class InstanceLoadBalancer {
     // Debug: log the full instance state for tracing assignment decisions
     const stateSnapshot = siblings
       .map((sibling) => {
-        const active = InstanceLoadBalancer.getActiveOn(sibling.id, activeSubAgents);
+        const active = InstanceLoadBalancer.getActiveOn(
+          sibling.id,
+          activeSubAgents,
+        );
         return `${sibling.id}(concurrency=${sibling.concurrency}, active=${active}, free=${sibling.concurrency - active})`;
       })
       .join(", ");
@@ -64,7 +74,10 @@ export class InstanceLoadBalancer {
     // Phase 1: find the first instance with free concurrency slots
     let bestInstance: InstanceEntry | null = null;
     for (const instance of ordered) {
-      const active = InstanceLoadBalancer.getActiveOn(instance.id, activeSubAgents);
+      const active = InstanceLoadBalancer.getActiveOn(
+        instance.id,
+        activeSubAgents,
+      );
       const available = instance.concurrency - active;
       if (available > 0) {
         bestInstance = instance;
@@ -78,7 +91,10 @@ export class InstanceLoadBalancer {
     if (!bestInstance && siblings.length > 0) {
       let minActive = Infinity;
       for (const instance of ordered) {
-        const active = InstanceLoadBalancer.getActiveOn(instance.id, activeSubAgents);
+        const active = InstanceLoadBalancer.getActiveOn(
+          instance.id,
+          activeSubAgents,
+        );
         if (active < minActive) {
           minActive = active;
           bestInstance = instance;
@@ -97,7 +113,10 @@ export class InstanceLoadBalancer {
       return null;
     }
 
-    const activeCountForSelected = InstanceLoadBalancer.getActiveOn(bestInstance.id, activeSubAgents);
+    const activeCountForSelected = InstanceLoadBalancer.getActiveOn(
+      bestInstance.id,
+      activeSubAgents,
+    );
     const available = bestInstance.concurrency - activeCountForSelected;
 
     // Increment reservation synchronously so the next call sees it

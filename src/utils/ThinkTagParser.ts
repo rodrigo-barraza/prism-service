@@ -65,7 +65,10 @@ export class ThinkTagParser {
           const partialMatch = this._partialEndTag(this.buffer);
           if (partialMatch > 0) {
             // Emit everything except the potential partial tag
-            const safe = this.buffer.slice(0, this.buffer.length - partialMatch);
+            const safe = this.buffer.slice(
+              0,
+              this.buffer.length - partialMatch,
+            );
             if (safe) {
               results.push({ type: "thinking", content: safe });
             }
@@ -91,7 +94,10 @@ export class ThinkTagParser {
           // No opening tag — check for partial <think> at end
           const partialMatch = this._partialStartTag(this.buffer);
           if (partialMatch > 0) {
-            const safe = this.buffer.slice(0, this.buffer.length - partialMatch);
+            const safe = this.buffer.slice(
+              0,
+              this.buffer.length - partialMatch,
+            );
             if (safe) {
               results.push({ type: "text", content: safe });
             }
@@ -110,7 +116,11 @@ export class ThinkTagParser {
   /** Check if the end of text is a partial match for "<think>" */
   private _partialStartTag(text: string): number {
     const tag = "<think>";
-    for (let length = Math.min(tag.length - 1, text.length); length >= 1; length--) {
+    for (
+      let length = Math.min(tag.length - 1, text.length);
+      length >= 1;
+      length--
+    ) {
       if (text.endsWith(tag.slice(0, length))) {
         return length;
       }
@@ -121,7 +131,11 @@ export class ThinkTagParser {
   /** Check if the end of text is a partial match for "</think>" */
   private _partialEndTag(text: string): number {
     const tag = "</think>";
-    for (let length = Math.min(tag.length - 1, text.length); length >= 1; length--) {
+    for (
+      let length = Math.min(tag.length - 1, text.length);
+      length >= 1;
+      length--
+    ) {
       if (text.endsWith(tag.slice(0, length))) {
         return length;
       }

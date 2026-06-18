@@ -146,7 +146,8 @@ export default class AgenticLoopState {
 
     for (const segment of this.displaySegments) {
       if (segment.type === "text") {
-        const trimmed = this.displayTextFragments[segment.fragmentIndex]?.trim();
+        const trimmed =
+          this.displayTextFragments[segment.fragmentIndex]?.trim();
         if (!trimmed) continue;
         cleanSegments.push({
           type: "text",

@@ -33,7 +33,9 @@ function isTrackedMethod(name: string | symbol): boolean {
  * Wrap an async generator (generateTextStream, generateTextStreamLive)
  * so the tracker stays incremented for the entire iteration lifetime.
  */
-async function* wrapAsyncGenerator(gen: AsyncIterable<unknown>): AsyncGenerator<unknown> {
+async function* wrapAsyncGenerator(
+  gen: AsyncIterable<unknown>,
+): AsyncGenerator<unknown> {
   try {
     yield* gen;
   } finally {
@@ -61,7 +63,10 @@ function wrapProvider(provider: Provider): Provider {
         ActiveGenerationTracker.increment();
         let result: unknown;
         try {
-          result = (value as (...agent: unknown[]) => unknown).apply(target, args);
+          result = (value as (...agent: unknown[]) => unknown).apply(
+            target,
+            args,
+          );
         } catch (error: unknown) {
           // Synchronous throw (rare but possible)
           ActiveGenerationTracker.decrement();
@@ -71,7 +76,8 @@ function wrapProvider(provider: Provider): Provider {
         // Async generator — wrap the iterator
         if (
           result &&
-          typeof (result as Record<symbol, unknown>)[Symbol.asyncIterator] === "function"
+          typeof (result as Record<symbol, unknown>)[Symbol.asyncIterator] ===
+            "function"
         ) {
           return wrapAsyncGenerator(result as AsyncIterable<unknown>);
         }

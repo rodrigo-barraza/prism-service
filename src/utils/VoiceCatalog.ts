@@ -19,17 +19,19 @@ function genderLabel(gender: string): string {
 function buildInworldCatalog(model?: string): string {
   const voices = (VOICES[PROVIDERS.INWORLD] || []) as VoiceEntry[];
   const defaultVoice = DEFAULT_VOICES[PROVIDERS.INWORLD] || "Dennis";
-  const entries = voices
-    .map((voice) => {
-      const isDefault = voice.name === defaultVoice;
-      const shortDescription = voice.description
-        .split(",")[0]
-        .replace(/^(A |An )/i, "")
-        .trim();
-      return `${voice.name} (${shortDescription}, ${genderLabel(voice.gender)}${isDefault ? " — DEFAULT" : ""})`;
-    });
+  const entries = voices.map((voice) => {
+    const isDefault = voice.name === defaultVoice;
+    const shortDescription = voice.description
+      .split(",")[0]
+      .replace(/^(A |An )/i, "")
+      .trim();
+    return `${voice.name} (${shortDescription}, ${genderLabel(voice.gender)}${isDefault ? " — DEFAULT" : ""})`;
+  });
 
-  const activeModel = model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld || "inworld-tts-2";
+  const activeModel =
+    model ||
+    getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld ||
+    "inworld-tts-2";
   const isTtsTwo = activeModel.startsWith("inworld-tts-2");
 
   if (!isTtsTwo) {
@@ -116,7 +118,10 @@ function buildElevenLabsCatalog(): string {
   return `Available ElevenLabs voices: ${entries.join(", ")}.`;
 }
 
-export function getVoiceCatalogForProvider(provider: string, model?: string): string {
+export function getVoiceCatalogForProvider(
+  provider: string,
+  model?: string,
+): string {
   if (provider === PROVIDERS.INWORLD) {
     return buildInworldCatalog(model);
   }

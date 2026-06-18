@@ -152,7 +152,10 @@ export function buildConversationalBatchInput(
  * Build the LLM input for a single batch of clusters and stale memories.
  * Returns null if both arrays are empty.
  */
-export function buildBatchInput(clusterBatch: MemoryDoc[][], staleBatch: MemoryDoc[]): string | null {
+export function buildBatchInput(
+  clusterBatch: MemoryDoc[][],
+  staleBatch: MemoryDoc[],
+): string | null {
   const sections: string[] = [];
   if (clusterBatch.length > 0) {
     sections.push("## Clusters of Similar Memories\n");

@@ -1,5 +1,7 @@
 /** Format a total parameter count into a human-readable string. */
-export function formatParams(totalParams: number | null | undefined): string | null {
+export function formatParams(
+  totalParams: number | null | undefined,
+): string | null {
   if (!totalParams) return null;
   if (totalParams >= 1_000_000_000) {
     const billions = totalParams / 1_000_000_000;

@@ -147,7 +147,9 @@ router.post(
         totalLayers,
       });
     } catch (error: unknown) {
-      logger.error(`Admin /lm-studio/estimate error: ${getErrorMessage(error)}`);
+      logger.error(
+        `Admin /lm-studio/estimate error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),

@@ -1,7 +1,10 @@
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import AgentPersonaRegistry from "../AgentPersonaRegistry.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
-import { CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, isCoreDomain } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST,
+  isCoreDomain,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 
@@ -31,13 +34,22 @@ export class ToolDocFormatter {
    *   - Name + first sentence of description (capability summary)
    *   - Full parameter listing with required markers
    */
-  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string, resolvedToolNames?: string[], lockedOffToolNames?: Set<string>, compact?: boolean): string {
-    const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology) as ToolSchemaDescriptor[];
+  buildToolDescriptions(
+    enabledTools?: string[],
+    agentId?: string | null,
+    defaultTopology?: string,
+    resolvedToolNames?: string[],
+    lockedOffToolNames?: Set<string>,
+    compact?: boolean,
+  ): string {
+    const schemas = ToolOrchestratorService.getClientToolSchemas(
+      defaultTopology,
+    ) as ToolSchemaDescriptor[];
 
     if (resolvedToolNames?.length) {
       const resolvedSet = new Set(resolvedToolNames);
-      let filteredSchemas = schemas.filter(
-        (toolSchema) => resolvedSet.has(toolSchema.name),
+      let filteredSchemas = schemas.filter((toolSchema) =>
+        resolvedSet.has(toolSchema.name),
       );
       if (lockedOffToolNames?.size) {
         filteredSchemas = filteredSchemas.filter(
@@ -58,7 +70,9 @@ export class ToolDocFormatter {
     }
 
     const hasPrefixed = enabledTools.some(
-      (enabledTool) => enabledTool.startsWith("domain:") || enabledTool.startsWith("domainKey:"),
+      (enabledTool) =>
+        enabledTool.startsWith("domain:") ||
+        enabledTool.startsWith("domainKey:"),
     );
 
     const enabledSet = hasPrefixed
@@ -71,16 +85,19 @@ export class ToolDocFormatter {
     let filteredSchemas = schemas.filter(
       (toolSchema) =>
         enabledSet.has(toolSchema.name) ||
-        (isCoreToolsLocked && (
-          isCoreDomain(toolSchema.domain || "") ||
-          CORE_AGENTIC_TOOLS.has(toolSchema.name)
-        ))
+        (isCoreToolsLocked &&
+          (isCoreDomain(toolSchema.domain || "") ||
+            CORE_AGENTIC_TOOLS.has(toolSchema.name))),
     );
 
     if (persona?.blockedTools?.length) {
-      const disabledSet = resolveToolEntriesToSet(persona.blockedTools, schemas);
+      const disabledSet = resolveToolEntriesToSet(
+        persona.blockedTools,
+        schemas,
+      );
       filteredSchemas = filteredSchemas.filter(
-        (toolSchema) => !disabledSet.has(toolSchema.name) || enabledSet.has(toolSchema.name),
+        (toolSchema) =>
+          !disabledSet.has(toolSchema.name) || enabledSet.has(toolSchema.name),
       );
     }
 
@@ -93,7 +110,10 @@ export class ToolDocFormatter {
     return this._formatToolDescriptions(filteredSchemas, compact);
   }
 
-  private _formatToolDescriptions(filteredSchemas: ToolSchemaDescriptor[], compact?: boolean): string {
+  private _formatToolDescriptions(
+    filteredSchemas: ToolSchemaDescriptor[],
+    compact?: boolean,
+  ): string {
     if (filteredSchemas.length === 0) return "";
 
     // Group by domain
@@ -121,17 +141,21 @@ export class ToolDocFormatter {
 
         // In compact mode, only show required parameters
         const filteredParameterNames = compact
-          ? parameterNames.filter((parameterName) => required.includes(parameterName))
+          ? parameterNames.filter((parameterName) =>
+              required.includes(parameterName),
+            )
           : parameterNames;
 
         const parameterString = filteredParameterNames
           .map((parameterName) => {
             const isRequired = required.includes(parameterName);
-            const parameterDescription = parameters[parameterName].description || "";
+            const parameterDescription =
+              parameters[parameterName].description || "";
 
             // In compact mode, truncate parameter descriptions to first sentence
             const truncatedDescription = compact
-              ? parameterDescription.split(/(?<=[.!?])\s/)[0] || parameterDescription
+              ? parameterDescription.split(/(?<=[.!?])\s/)[0] ||
+                parameterDescription
               : parameterDescription;
 
             return `  - ${parameterName}${isRequired ? " (required)" : ""}: ${truncatedDescription}`;

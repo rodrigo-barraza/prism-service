@@ -1,4 +1,14 @@
-import { ProviderOptions, ChatMessage, Provider, GenerateTextResult, StreamChunk, ListModelsResult, EnsureModelLoadedResult, LmStudioModelEntry, LmStudioLoadConfig } from "../types/provider.ts";
+import {
+  ProviderOptions,
+  ChatMessage,
+  Provider,
+  GenerateTextResult,
+  StreamChunk,
+  ListModelsResult,
+  EnsureModelLoadedResult,
+  LmStudioModelEntry,
+  LmStudioLoadConfig,
+} from "../types/provider.ts";
 import { sleep } from "@rodrigo-barraza/utilities-library";
 // ─────────────────────────────────────────────────────────────
 // LM Studio provider — Fully native /api/v1/chat
@@ -39,7 +49,10 @@ import { PROVIDERS } from "../constants.ts";
 // message.start/delta/end, content.start/delta/end, chat.end.
 // This generator yields the same event types as parseSSEStream so both
 // paths integrate seamlessly with the rest of the pipeline.
-async function* parseNativeSSEStream(reader: ReadableStreamDefaultReader<Uint8Array>, options: ProviderOptions = {}) {
+async function* parseNativeSSEStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  options: ProviderOptions = {},
+) {
   const decoder = new TextDecoder();
   let buffer = "";
   let usage = null;
@@ -52,7 +65,7 @@ async function* parseNativeSSEStream(reader: ReadableStreamDefaultReader<Uint8Ar
   let usageYielded = false;
   try {
     while (true) {
-            if (options.signal?.aborted) {
+      if (options.signal?.aborted) {
         reader.cancel();
         break;
       }
@@ -61,7 +74,7 @@ async function* parseNativeSSEStream(reader: ReadableStreamDefaultReader<Uint8Ar
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
-      for ( const line of lines) {
+      for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith(":")) continue;
         if (!trimmed.startsWith("data: ")) continue;
@@ -197,7 +210,8 @@ async function* parseNativeSSEStream(reader: ReadableStreamDefaultReader<Uint8Ar
           }
           // ── Error event ──
           else if (type === "error") {
-            const errorMessage = json.error?.message || JSON.stringify(json.error);
+            const errorMessage =
+              json.error?.message || JSON.stringify(json.error);
             logger.warn(`[LM-Studio] Stream error: ${errorMessage}`);
             // Yield as text so the client sees the error
             yield `\n\n⚠️ **LM Studio Error:** ${errorMessage}`;
@@ -231,15 +245,22 @@ async function* parseNativeSSEStream(reader: ReadableStreamDefaultReader<Uint8Ar
       usageYielded = true;
       if (usage) {
         yield { type: "usage", usage };
-      } else if (partialOutputCharacters > 0 || partialReasoningCharacters > 0) {
+      } else if (
+        partialOutputCharacters > 0 ||
+        partialReasoningCharacters > 0
+      ) {
         const estimatedOutputTokens = Math.ceil(partialOutputCharacters / 4);
-        const estimatedReasoningTokens = Math.ceil(partialReasoningCharacters / 4);
+        const estimatedReasoningTokens = Math.ceil(
+          partialReasoningCharacters / 4,
+        );
         yield {
           type: "usage",
           usage: {
             inputTokens: 0,
             outputTokens: estimatedOutputTokens + estimatedReasoningTokens,
-            ...(estimatedReasoningTokens > 0 && { reasoningOutputTokens: estimatedReasoningTokens }),
+            ...(estimatedReasoningTokens > 0 && {
+              reasoningOutputTokens: estimatedReasoningTokens,
+            }),
           },
         };
       }
@@ -271,7 +292,9 @@ function safeParseJSON(serializedString: unknown) {
 // For the last user turn with images, we use the array format with type: "text"|"image".
 function buildNativeInput(messages: PreparedMessage[]) {
   // Separate system, conversation history, and the last user message
-  const nonSystemMessages = messages.filter((message) => message.role !== "system");
+  const nonSystemMessages = messages.filter(
+    (message) => message.role !== "system",
+  );
   if (nonSystemMessages.length === 0) return "";
   const lastUser = [...nonSystemMessages]
     .reverse()
@@ -284,14 +307,17 @@ function buildNativeInput(messages: PreparedMessage[]) {
   let historyPrefix = "";
   if (historyMessages.length > 0) {
     const lines: string[] = [];
-        for ( const message of historyMessages) {
+    for (const message of historyMessages) {
       const role = message.role === "user" ? "User" : "Assistant";
       const text =
         typeof message.content === "string"
           ? message.content
           : Array.isArray(message.content)
             ? message.content
-                .filter((item): item is { type: "text"; text: string } => item.type === "text")
+                .filter(
+                  (item): item is { type: "text"; text: string } =>
+                    item.type === "text",
+                )
                 .map((item) => item.text)
                 .join("\n")
             : "";
@@ -309,7 +335,9 @@ function buildNativeInput(messages: PreparedMessage[]) {
     const parts: Array<Record<string, unknown>> = [];
     // Prepend history as a text part if present
     let textContent = lastUser.content
-      .filter((item): item is { type: "text"; text: string } => item.type === "text")
+      .filter(
+        (item): item is { type: "text"; text: string } => item.type === "text",
+      )
       .map((item) => item.text)
       .join("\n");
     if (historyPrefix) textContent = historyPrefix + textContent;
@@ -327,18 +355,38 @@ function buildNativeInput(messages: PreparedMessage[]) {
     typeof lastUser.content === "string" ? lastUser.content : "";
   return historyPrefix ? historyPrefix + currentText : currentText;
 }
-import { AGENT_IDS, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  AGENT_IDS,
+  DEFAULT_PROJECT,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 export interface LmStudioProvider extends Provider {
   listModels(): Promise<ListModelsResult>;
-  loadModel(model: string, options?: ProviderOptions, signal?: AbortSignal): Promise<void>;
+  loadModel(
+    model: string,
+    options?: ProviderOptions,
+    signal?: AbortSignal,
+  ): Promise<void>;
   unloadModel(instanceId: string): Promise<void>;
   unloadModelByKey(modelKey: string): Promise<void>;
-  ensureModelLoaded(modelKey: string, options?: ProviderOptions, signal?: AbortSignal, onStatus?: (status: string) => void): Promise<EnsureModelLoadedResult>;
-  _streamOpenAICompat(prepared: PreparedMessage[], model: string, options: ProviderOptions, baseUrl: string): AsyncGenerator<StreamChunk, void, unknown>;
+  ensureModelLoaded(
+    modelKey: string,
+    options?: ProviderOptions,
+    signal?: AbortSignal,
+    onStatus?: (status: string) => void,
+  ): Promise<EnsureModelLoadedResult>;
+  _streamOpenAICompat(
+    prepared: PreparedMessage[],
+    model: string,
+    options: ProviderOptions,
+    baseUrl: string,
+  ): AsyncGenerator<StreamChunk, void, unknown>;
 }
 
-export function createLmStudioProvider(baseUrl: string, instanceId: string = PROVIDERS.LM_STUDIO): LmStudioProvider {
+export function createLmStudioProvider(
+  baseUrl: string,
+  instanceId: string = PROVIDERS.LM_STUDIO,
+): LmStudioProvider {
   const getBaseUrl = () => baseUrl;
   const MCP_SERVER_URL = DEFAULT_MCP_SERVER_URL;
   // ── Per-instance model load mutex (singleflight) ──────────
@@ -359,7 +407,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
     name: instanceId,
     async generateText(
       messages: ChatMessage[],
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)[PROVIDERS.LM_STUDIO],
+      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)[
+        PROVIDERS.LM_STUDIO
+      ],
       options: ProviderOptions = {},
     ): Promise<GenerateTextResult> {
       const baseUrl = getBaseUrl();
@@ -378,7 +428,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
           model,
           ...buildPayloadParams(options),
           // LM Studio extensions: top_k, min_p, repeat_penalty
-          ...(options.topK !== undefined && options.topK > 0 && { top_k: options.topK }),
+          ...(options.topK !== undefined &&
+            options.topK > 0 && { top_k: options.topK }),
           ...(options.minP !== undefined && { min_p: options.minP }),
           ...(options.repeatPenalty !== undefined &&
             options.repeatPenalty !== 1 && {
@@ -408,20 +459,30 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
           result.toolCalls = toolCalls.map((toolCall) => ({
             id: toolCall.id || "",
             name: toolCall.name,
-            args: typeof toolCall.args === "object" && toolCall.args !== null ? (toolCall.args as Record<string, unknown>) : {},
+            args:
+              typeof toolCall.args === "object" && toolCall.args !== null
+                ? (toolCall.args as Record<string, unknown>)
+                : {},
             thoughtSignature: toolCall.thoughtSignature || undefined,
           }));
         }
         return result;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
+        throw new ProviderError(
+          PROVIDERS.LM_STUDIO,
+          getErrorMessage(error),
+          500,
+          error,
+        );
       }
     },
     // ── Streaming Text Generation (SSE) ──────────────────────
     async *generateTextStream(
       messages: ChatMessage[],
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)[PROVIDERS.LM_STUDIO],
+      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)[
+        PROVIDERS.LM_STUDIO
+      ],
       options: ProviderOptions = {},
     ): AsyncGenerator<StreamChunk, void, unknown> {
       const baseUrl = getBaseUrl();
@@ -454,7 +515,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
 
             // Register synchronously BEFORE any async check
             let resolveInflight: (() => void) | undefined = undefined;
-            let rejectInflight: ((error: unknown) => void) | undefined = undefined;
+            let rejectInflight: ((error: unknown) => void) | undefined =
+              undefined;
             let isPromiseSettled = false;
             const inflightPromise = new Promise<void>((resolve, reject) => {
               resolveInflight = () => {
@@ -477,15 +539,23 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                 (modelItem) => modelItem.key === model,
               );
               const isLoaded = (entry?.loaded_instances?.length ?? 0) > 0;
-              
+
               // Capture loaded context for tool cap calculation
               if (isLoaded && entry?.loaded_instances) {
                 const loadedContext = entry.loaded_instances[0]?.config;
-                if (loadedContext && typeof loadedContext === "object" && !Array.isArray(loadedContext)) {
+                if (
+                  loadedContext &&
+                  typeof loadedContext === "object" &&
+                  !Array.isArray(loadedContext)
+                ) {
                   const configRecord = loadedContext as Record<string, unknown>;
-                  if (typeof configRecord.context_length === "number") options._loadedContextLength = configRecord.context_length;
-                  if (typeof configRecord.eval_batch_size === "number") options._loadedEvalBatchSize = configRecord.eval_batch_size;
-                  if (typeof configRecord.physical_batch_size === "number") options._loadedPhysicalBatchSize = configRecord.physical_batch_size;
+                  if (typeof configRecord.context_length === "number")
+                    options._loadedContextLength = configRecord.context_length;
+                  if (typeof configRecord.eval_batch_size === "number")
+                    options._loadedEvalBatchSize = configRecord.eval_batch_size;
+                  if (typeof configRecord.physical_batch_size === "number")
+                    options._loadedPhysicalBatchSize =
+                      configRecord.physical_batch_size;
                 }
               }
 
@@ -494,7 +564,10 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
               // BUT: skip reload if the model is already at its maximum context — reloading
               // would just load the same max again, creating an infinite unload/reload loop
               // (e.g. minContextLength=150k but model max is 32k → loads at 32k → 32k<150k → reload → 32k → …).
-              const modelMaximumContext = typeof entry?.max_context_length === "number" ? entry.max_context_length : 0;
+              const modelMaximumContext =
+                typeof entry?.max_context_length === "number"
+                  ? entry.max_context_length
+                  : 0;
               // Check both the model's theoretical max AND the GPU-constrained
               // practical max (recorded after a fallback load). Without the GPU
               // check, every agentic iteration sees loaded=65k < min=120k and
@@ -504,7 +577,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                 ? Math.min(modelMaximumContext || Infinity, gpuCeiling)
                 : modelMaximumContext;
               const alreadyAtMax =
-                effectiveMaxContext > 0 && ((options._loadedContextLength as number) || 0) >= effectiveMaxContext;
+                effectiveMaxContext > 0 &&
+                ((options._loadedContextLength as number) || 0) >=
+                  effectiveMaxContext;
 
               const isActive = (_activeRequestsCount.get(model) || 0) > 0;
               const needsReload =
@@ -515,7 +590,12 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                 !alreadyAtMax &&
                 !isActive;
 
-              if (alreadyAtMax && options.minContextLength && ((options._loadedContextLength as number) || 0) < options.minContextLength) {
+              if (
+                alreadyAtMax &&
+                options.minContextLength &&
+                ((options._loadedContextLength as number) || 0) <
+                  options.minContextLength
+              ) {
                 logger.info(
                   `[LM-Studio] Model ${model} already at max context (${options._loadedContextLength}/${effectiveMaxContext}${gpuCeiling ? ` gpu-ceiling=${gpuCeiling}` : ""}) — skipping reload (requested ${options.minContextLength})`,
                 );
@@ -528,7 +608,10 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
 
               // Proceed with unload and load
               if (needsReload && options.minContextLength) {
-                const maxContext = typeof entry?.max_context_length === "number" ? entry.max_context_length : options.minContextLength;
+                const maxContext =
+                  typeof entry?.max_context_length === "number"
+                    ? entry.max_context_length
+                    : options.minContextLength;
                 const target = Math.min(options.minContextLength, maxContext);
                 logger.info(
                   `[LM-Studio] Reloading ${model}: loaded ctx ${options._loadedContextLength} < required ${options.minContextLength}, target=${target}`,
@@ -551,7 +634,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                     );
                     continue;
                   }
-                  for (const instance of currentModelEntryItem.loaded_instances || []) {
+                  for (const instance of currentModelEntryItem.loaded_instances ||
+                    []) {
                     yield {
                       type: "status",
                       message: "Unloading previous model…",
@@ -572,15 +656,16 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                 phase: "loading",
               };
               const loadOpts: ProviderOptions = {
-                eval_batch_size: options.evalBatchSize || LM_STUDIO_EVAL_BATCH_SIZE,
+                eval_batch_size:
+                  options.evalBatchSize || LM_STUDIO_EVAL_BATCH_SIZE,
               };
               if (options.minContextLength) {
                 const maxContextLength =
-                  entry?.max_context_length ||
-                  LM_STUDIO_DEFAULT_MAX_CONTEXT;
+                  entry?.max_context_length || LM_STUDIO_DEFAULT_MAX_CONTEXT;
                 // If we already know the GPU ceiling from a previous fallback,
                 // cap here to avoid a guaranteed-to-fail load attempt.
-                const gpuCeilingForLoad = _gpuConstrainedContextLength.get(model);
+                const gpuCeilingForLoad =
+                  _gpuConstrainedContextLength.get(model);
                 const effectiveMaxForLoad = gpuCeilingForLoad
                   ? Math.min(maxContextLength, gpuCeilingForLoad)
                   : maxContextLength;
@@ -605,7 +690,10 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                 })
                 .catch((error: unknown) => {
                   loadDone = true;
-                  if ((error instanceof Error ? error.name : "") !== "AbortError") loadError = error;
+                  if (
+                    (error instanceof Error ? error.name : "") !== "AbortError"
+                  )
+                    loadError = error;
                 });
 
               const startTime = Date.now();
@@ -628,9 +716,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                 const elapsed = Date.now() - startTime;
                 const percentage = Math.min(
                   95,
-                  Math.round(
-                    (elapsed / (elapsed + EXPECTED_LOAD_MS)) * 100,
-                  ),
+                  Math.round((elapsed / (elapsed + EXPECTED_LOAD_MS)) * 100),
                 );
                 if (percentage > lastPercentage) {
                   lastPercentage = percentage;
@@ -656,10 +742,14 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
 
               if (loadError && loadOpts.context_length) {
                 const requestedContextLength = loadOpts.context_length;
-                const requestedBatchSize = loadOpts.eval_batch_size || LM_STUDIO_EVAL_BATCH_SIZE;
+                const requestedBatchSize =
+                  loadOpts.eval_batch_size || LM_STUDIO_EVAL_BATCH_SIZE;
                 const rawTiers = [
                   { contextLength: requestedContextLength, batchSize: 512 },
-                  { contextLength: 65_000, batchSize: LM_STUDIO_EVAL_BATCH_SIZE },
+                  {
+                    contextLength: 65_000,
+                    batchSize: LM_STUDIO_EVAL_BATCH_SIZE,
+                  },
                   { contextLength: 65_000, batchSize: 512 },
                 ];
 
@@ -668,8 +758,13 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                     contextLength: tier.contextLength,
                     batchSize: Math.min(tier.batchSize, requestedBatchSize),
                   }))
-                  .filter((tier, index, self) =>
-                    self.findIndex((fallbackTier) => fallbackTier.contextLength === tier.contextLength && fallbackTier.batchSize === tier.batchSize) === index
+                  .filter(
+                    (tier, index, self) =>
+                      self.findIndex(
+                        (fallbackTier) =>
+                          fallbackTier.contextLength === tier.contextLength &&
+                          fallbackTier.batchSize === tier.batchSize,
+                      ) === index,
                   );
 
                 for (const tier of fallbackTiers) {
@@ -677,7 +772,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                   if (
                     tier.contextLength >= requestedContextLength &&
                     tier.batchSize >= requestedBatchSize
-                  ) continue;
+                  )
+                    continue;
                   // Skip tiers with context >= requested (only batch changed)
                   // unless batch is actually smaller
                   if (tier.contextLength > requestedContextLength) continue;
@@ -705,7 +801,11 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                     );
                     break;
                   } catch (fallbackLoadError: unknown) {
-                    if (fallbackLoadError instanceof Error && fallbackLoadError.name === "AbortError") return;
+                    if (
+                      fallbackLoadError instanceof Error &&
+                      fallbackLoadError.name === "AbortError"
+                    )
+                      return;
                     logger.warn(
                       `[LM-Studio] Fallback load at ctx=${tier.contextLength}/batch=${tier.batchSize} also failed: ${getErrorMessage(fallbackLoadError)}`,
                     );
@@ -730,11 +830,22 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                   (modelItem) => modelItem.key === model,
                 );
                 const firstInstance = entryAfterLoad?.loaded_instances?.[0];
-                if (firstInstance && typeof firstInstance.config === "object" && firstInstance.config !== null) {
-                  const configRecord = firstInstance.config as Record<string, unknown>;
-                  if (typeof configRecord.context_length === "number") options._loadedContextLength = configRecord.context_length;
-                  if (typeof configRecord.eval_batch_size === "number") options._loadedEvalBatchSize = configRecord.eval_batch_size;
-                  if (typeof configRecord.physical_batch_size === "number") options._loadedPhysicalBatchSize = configRecord.physical_batch_size;
+                if (
+                  firstInstance &&
+                  typeof firstInstance.config === "object" &&
+                  firstInstance.config !== null
+                ) {
+                  const configRecord = firstInstance.config as Record<
+                    string,
+                    unknown
+                  >;
+                  if (typeof configRecord.context_length === "number")
+                    options._loadedContextLength = configRecord.context_length;
+                  if (typeof configRecord.eval_batch_size === "number")
+                    options._loadedEvalBatchSize = configRecord.eval_batch_size;
+                  if (typeof configRecord.physical_batch_size === "number")
+                    options._loadedPhysicalBatchSize =
+                      configRecord.physical_batch_size;
                 }
               } catch {
                 /* ignore */
@@ -757,7 +868,6 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
           const activeCount = _activeRequestsCount.get(model) || 0;
           _activeRequestsCount.set(model, activeCount + 1);
           isRequestActive = true;
-          
         } catch (loadCheckError: unknown) {
           // If model load explicitly failed, re-throw so the generator exits
           // cleanly. runSingleModel will catch it and record an error result,
@@ -767,7 +877,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
             loadCheckError.cause &&
             typeof loadCheckError.cause === "object" &&
             "type" in loadCheckError.cause &&
-            (loadCheckError.cause as { type?: unknown }).type === "model_load_failed";
+            (loadCheckError.cause as { type?: unknown }).type ===
+              "model_load_failed";
 
           if (
             isModelLoadFailed ||
@@ -777,16 +888,20 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
             throw loadCheckError;
           }
           logger.warn(
-                        `Could not check/load model before streaming: ${getErrorMessage(loadCheckError)}`,
+            `Could not check/load model before streaming: ${getErrorMessage(loadCheckError)}`,
           );
         }
-                if (options.signal?.aborted) return;
+        if (options.signal?.aborted) return;
         // Expand video attachments to image frames (ffmpeg) before message prep.
         // This lets the model analyze video content as a sequence of frames,
         // which is the standard approach for Gemma 4 and other VLMs.
         const hasVideo = messages.some((messageItem: ChatMessage) => {
           const message = messageItem as unknown as Record<string, unknown>;
-          return "video" in message && Array.isArray(message.video) && message.video.length > 0;
+          return (
+            "video" in message &&
+            Array.isArray(message.video) &&
+            message.video.length > 0
+          );
         });
         if (hasVideo) {
           yield { type: "status", message: "Extracting video frames…" };
@@ -810,7 +925,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         const hasOrchestratorTools = options.tools?.some((tool) =>
           orchestratorSet.has(tool.name),
         );
-                if (options.agent || hasOrchestratorTools) {
+        if (options.agent || hasOrchestratorTools) {
           // ── OpenAI-compat path (agentic + orchestrator) ─────────
           yield* this._streamOpenAICompat(prepared, model, options, baseUrl);
           return;
@@ -825,28 +940,38 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
           store: false,
         };
         // Extract system prompt from messages
-        const systemMessage = prepared.find((message) => message.role === "system");
+        const systemMessage = prepared.find(
+          (message) => message.role === "system",
+        );
         if (systemMessage?.content) {
-          (nativePayload as Record<string, unknown>).system_prompt = systemMessage.content;
+          (nativePayload as Record<string, unknown>).system_prompt =
+            systemMessage.content;
         }
         // Temperature & max tokens from options
         const params = buildPayloadParams(options);
         if (params.temperature != null)
-          (nativePayload as Record<string, unknown>).temperature = params.temperature;
+          (nativePayload as Record<string, unknown>).temperature =
+            params.temperature;
         if ((params as Record<string, unknown>).max_tokens)
-          (nativePayload as Record<string, unknown>).max_output_tokens = (params as Record<string, unknown>).max_tokens;
+          (nativePayload as Record<string, unknown>).max_output_tokens = (
+            params as Record<string, unknown>
+          ).max_tokens;
         // Extended sampling params for native API
-        if (params.seed != null) (nativePayload as Record<string, unknown>).seed = params.seed;
-        if (options.topK !== undefined && options.topK > 0) (nativePayload as Record<string, unknown>).top_k = options.topK;
-        if (options.minP !== undefined) (nativePayload as Record<string, unknown>).min_p = options.minP;
+        if (params.seed != null)
+          (nativePayload as Record<string, unknown>).seed = params.seed;
+        if (options.topK !== undefined && options.topK > 0)
+          (nativePayload as Record<string, unknown>).top_k = options.topK;
+        if (options.minP !== undefined)
+          (nativePayload as Record<string, unknown>).min_p = options.minP;
         if (options.repeatPenalty !== undefined && options.repeatPenalty !== 1)
-          (nativePayload as Record<string, unknown>).repeat_penalty = options.repeatPenalty;
+          (nativePayload as Record<string, unknown>).repeat_penalty =
+            options.repeatPenalty;
         // Reasoning toggle — may be rejected by models that don't support it.
         // We'll try first, and retry without reasoning if it fails.
         let useReasoning = null;
-                if (options.thinkingEnabled === false) {
+        if (options.thinkingEnabled === false) {
           useReasoning = "off";
-                  } else if (options.thinkingEnabled === true) {
+        } else if (options.thinkingEnabled === true) {
           useReasoning = "on";
         }
         if (useReasoning) {
@@ -861,12 +986,12 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
           let toolNames = options.tools.map((tool) => tool.name);
           // Cap tool count based on loaded model context
           // ~500 tokens/tool; reserve 50% of context for conversation
-                    const contextLength =
-                        options._loadedContextLength || options.contextLength || 8192;
-                    const maxTools = Math.max(1, Math.floor((contextLength * 0.5) / 500));
+          const contextLength =
+            options._loadedContextLength || options.contextLength || 8192;
+          const maxTools = Math.max(1, Math.floor((contextLength * 0.5) / 500));
           let skipMcp = false;
           // If context is too small for even 1 tool, skip MCP entirely
-                    if (contextLength < 4096) {
+          if (contextLength < 4096) {
             logger.warn(
               `[LM-Studio] Context (${contextLength}) too small for MCP tools. Minimum 4096 recommended. Skipping tools.`,
             );
@@ -877,9 +1002,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
               `[LM-Studio] Tool count (${toolNames.length}) exceeds safe limit for ctx=${contextLength}. Capping at ${maxTools}.`,
             );
             toolNames = toolNames.slice(0, maxTools);
-                        yield {
+            yield {
               type: "status",
-                            message: `Context limit (${contextLength}) — using ${maxTools} of ${options.tools.length} tools`,
+              message: `Context limit (${contextLength}) — using ${maxTools} of ${options.tools.length} tools`,
             };
           }
           if (!skipMcp) {
@@ -928,7 +1053,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
             logger.warn(
               `[LM-Studio] Model ${model} does not support reasoning config, retrying without it`,
             );
-          delete (nativePayload as Record<string, unknown>).reasoning;
+            delete (nativePayload as Record<string, unknown>).reasoning;
             nativeResponse = await makeRequest(nativePayload);
           } else {
             throw new Error(`API error: ${nativeResponse.status} ${errorText}`);
@@ -940,7 +1065,9 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         }
         if (!nativeResponse.body) throw new Error("No response body");
         const nativeReader = nativeResponse.body.getReader();
-        for await (const chunk of parseNativeSSEStream(nativeReader, { signal: options.signal })) {
+        for await (const chunk of parseNativeSSEStream(nativeReader, {
+          signal: options.signal,
+        })) {
           if (typeof chunk === "object") {
             if (chunk.type === "usage") {
               yield {
@@ -968,15 +1095,25 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         // Enrich generic network errors (e.g. Node.js undici "terminated" for
         // premature connection close) with LM Studio-specific diagnostic context.
         const rawMessage = getErrorMessage(error);
-        const errorCode = (error instanceof Error && (error as NodeJS.ErrnoException).code) || null;
-        const errorCause = (error instanceof Error && error.cause) ? getErrorMessage(error.cause) : null;
+        const errorCode =
+          (error instanceof Error && (error as NodeJS.ErrnoException).code) ||
+          null;
+        const errorCause =
+          error instanceof Error && error.cause
+            ? getErrorMessage(error.cause)
+            : null;
         const diagnosticParts = [
           `LM Studio (${instanceId}) stream error: ${rawMessage}`,
           `model=${model}`,
           errorCode && `code=${errorCode}`,
           errorCause && errorCause !== rawMessage && `cause=${errorCause}`,
         ].filter(Boolean);
-        throw new ProviderError(PROVIDERS.LM_STUDIO, diagnosticParts.join(', '), 500, error);
+        throw new ProviderError(
+          PROVIDERS.LM_STUDIO,
+          diagnosticParts.join(", "),
+          500,
+          error,
+        );
       } finally {
         if (isRequestActive) {
           const activeCount = _activeRequestsCount.get(model) || 0;
@@ -1006,7 +1143,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         messages: prepared,
         model,
         ...buildPayloadParams(options),
-        ...(options.topK !== undefined && options.topK > 0 && { top_k: options.topK }),
+        ...(options.topK !== undefined &&
+          options.topK > 0 && { top_k: options.topK }),
         ...(options.minP !== undefined && { min_p: options.minP }),
         ...(options.repeatPenalty !== undefined &&
           options.repeatPenalty !== 1 && {
@@ -1025,7 +1163,10 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         // overflow the context and LM Studio returns empty responses.
         const contextLength =
           options._loadedContextLength || options.contextLength || 8192;
-        const maxTools = Math.max(1, Math.floor(((contextLength as number) * 0.5) / 500));
+        const maxTools = Math.max(
+          1,
+          Math.floor(((contextLength as number) * 0.5) / 500),
+        );
         if (tools.length > maxTools) {
           logger.warn(
             `[LM-Studio] OpenAI-compat: tool count (${tools.length}) exceeds safe limit for ctx=${contextLength}. Capping at ${maxTools}.`,
@@ -1108,7 +1249,11 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
      * LM Studio exposes this for any loaded embedding model (e.g. Granite,
      * nomic-embed, etc.).
      */
-    async generateEmbedding(content: unknown, model: string, options: ProviderOptions = {}) {
+    async generateEmbedding(
+      content: unknown,
+      model: string,
+      options: ProviderOptions = {},
+    ) {
       const baseUrl = getBaseUrl();
       logger.provider(
         "LM Studio",
@@ -1116,29 +1261,44 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
       );
       try {
         const payload = { model, input: content };
-        if (options.dimensions) (payload as Record<string, unknown>).dimensions = options.dimensions;
+        if (options.dimensions)
+          (payload as Record<string, unknown>).dimensions = options.dimensions;
         const response = await fetchOpenAICompat(
           `${baseUrl}/v1/embeddings`,
           payload,
         );
         const data = await response.json();
-        const embedding = (data as Record<string, unknown>).data as Array<Record<string, unknown>> | undefined;
-        const firstEmbedding = embedding?.[0]?.embedding as number[] | undefined;
+        const embedding = (data as Record<string, unknown>).data as
+          | Array<Record<string, unknown>>
+          | undefined;
+        const firstEmbedding = embedding?.[0]?.embedding as
+          | number[]
+          | undefined;
         if (!firstEmbedding) {
           throw new Error("No embedding data in LM Studio response");
         }
         return { embedding: firstEmbedding, dimensions: firstEmbedding.length };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
+        throw new ProviderError(
+          PROVIDERS.LM_STUDIO,
+          getErrorMessage(error),
+          500,
+          error,
+        );
       }
     },
     async captionImage(
       images: string[],
       prompt: string = "Describe this image.",
-      model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)[PROVIDERS.LM_STUDIO],
+      model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)[
+        PROVIDERS.LM_STUDIO
+      ],
       systemPrompt?: string,
-    ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }> {
+    ): Promise<{
+      text: string;
+      usage: { inputTokens: number; outputTokens: number };
+    }> {
       const baseUrl = getBaseUrl();
       logger.provider(
         "LM Studio",
@@ -1168,9 +1328,17 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
           },
         );
         const data = await response.json();
-        const text = (data as Record<string, unknown>).choices ? ((data as Record<string, unknown>).choices as Array<Record<string, unknown>>)?.[0]?.message as Record<string, unknown> : undefined;
+        const text = (data as Record<string, unknown>).choices
+          ? ((
+              (data as Record<string, unknown>).choices as Array<
+                Record<string, unknown>
+              >
+            )?.[0]?.message as Record<string, unknown>)
+          : undefined;
         const textContent = (text?.content as string) || "";
-        const rawUsage = (data as Record<string, unknown>).usage as Record<string, number> | undefined;
+        const rawUsage = (data as Record<string, unknown>).usage as
+          | Record<string, number>
+          | undefined;
         return {
           text: textContent,
           usage: {
@@ -1180,7 +1348,12 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
+        throw new ProviderError(
+          PROVIDERS.LM_STUDIO,
+          getErrorMessage(error),
+          500,
+          error,
+        );
       }
     },
     // ── Model Management ─────────────────────────────────────
@@ -1199,7 +1372,8 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
       if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
 
       while (true) {
-        if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
+        if (signal?.aborted)
+          return { alreadyLoaded: false, contextLength: null };
 
         if (_loadInflight.has(modelKey)) {
           logger.info(
@@ -1215,14 +1389,18 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         }
 
         const { models: ensureModels } = await this.listModels();
-        if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
+        if (signal?.aborted)
+          return { alreadyLoaded: false, contextLength: null };
 
-        const modelEntry = (ensureModels || []).find((modelItem) => modelItem.key === modelKey);
+        const modelEntry = (ensureModels || []).find(
+          (modelItem) => modelItem.key === modelKey,
+        );
         const isLoaded = (modelEntry?.loaded_instances?.length ?? 0) > 0;
 
         if (isLoaded) {
           const loadedInstance = modelEntry?.loaded_instances?.[0];
-          const loadedContextValue = loadedInstance?.config?.context_length || null;
+          const loadedContextValue =
+            loadedInstance?.config?.context_length || null;
           logger.info(
             `[LM-Studio] Model ${modelKey} already loaded (ctx=${loadedContextValue})`,
           );
@@ -1274,11 +1452,14 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
                 await this.unloadModel(instance.id);
               } catch (error: unknown) {
                 // If it fails (e.g. concurrent unload), log and continue
-                logger.warn(`Failed to unload instance ${instance.id}: ${getErrorMessage(error)}`);
+                logger.warn(
+                  `Failed to unload instance ${instance.id}: ${getErrorMessage(error)}`,
+                );
               }
             }
           }
-          if (signal?.aborted) return { alreadyLoaded: false, contextLength: null };
+          if (signal?.aborted)
+            return { alreadyLoaded: false, contextLength: null };
 
           logger.info(`[LM-Studio] Loading model ${modelKey}`);
           onStatus?.("Loading model… 0%");
@@ -1304,7 +1485,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         }
       }
     },
-    
+
     /**
      * List all models available in LM Studio.
      * Uses the proprietary GET /api/v1/models endpoint.
@@ -1323,25 +1504,44 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         }
         const data = await response.json();
         const rawRecord = data as Record<string, unknown>;
-        const rawModels = (rawRecord.models || rawRecord.data || []) as Array<Record<string, unknown>>;
+        const rawModels = (rawRecord.models || rawRecord.data || []) as Array<
+          Record<string, unknown>
+        >;
         for (const model of rawModels) {
           const arch = model.architecture as string | undefined;
           const params = model.params_string as string | undefined;
           const sizeBytes = (model.size_bytes as number) || 0;
-          const bitsPerWeight = (model.quantization as Record<string, unknown>)?.bits_per_weight as number || 4;
-          model.archParams = resolveArchParams(arch ?? null, params ?? null, sizeBytes, bitsPerWeight);
+          const bitsPerWeight =
+            ((model.quantization as Record<string, unknown>)
+              ?.bits_per_weight as number) || 4;
+          model.archParams = resolveArchParams(
+            arch ?? null,
+            params ?? null,
+            sizeBytes,
+            bitsPerWeight,
+          );
           if (!model.key) model.key = String(model.id || "");
-          if (!model.display_name) model.display_name = String(model.display_name || model.id || "");
+          if (!model.display_name)
+            model.display_name = String(model.display_name || model.id || "");
           if (!model.type) model.type = "llm";
         }
         const models = rawModels as unknown as LmStudioModelEntry[];
         return { models, data: models };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
+        throw new ProviderError(
+          PROVIDERS.LM_STUDIO,
+          getErrorMessage(error),
+          500,
+          error,
+        );
       }
     },
-    async loadModel(model: string, options: ProviderOptions = {}, signal?: AbortSignal) {
+    async loadModel(
+      model: string,
+      options: ProviderOptions = {},
+      signal?: AbortSignal,
+    ) {
       // ── Singleflight: coalesce concurrent loads of the same model ──
       // LM Studio creates a NEW instance every time /api/v1/models/load
       // is called, even if the model is already loading. This gate ensures
@@ -1381,9 +1581,15 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
           }
           await response.json();
         } catch (error: unknown) {
-          if ((error instanceof Error && error.name === "AbortError")) throw error;
+          if (error instanceof Error && error.name === "AbortError")
+            throw error;
           if (error instanceof ProviderError) throw error;
-          throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
+          throw new ProviderError(
+            PROVIDERS.LM_STUDIO,
+            getErrorMessage(error),
+            500,
+            error,
+          );
         }
       })();
 
@@ -1412,7 +1618,7 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         }
       } catch (error: unknown) {
         logger.warn(
-                    `[LM-Studio] unloadModelByKey(${modelKey}) failed: ${getErrorMessage(error)}`,
+          `[LM-Studio] unloadModelByKey(${modelKey}) failed: ${getErrorMessage(error)}`,
         );
       }
     },
@@ -1432,7 +1638,12 @@ export function createLmStudioProvider(baseUrl: string, instanceId: string = PRO
         await response.json();
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-                throw new ProviderError(PROVIDERS.LM_STUDIO, getErrorMessage(error), 500, error);
+        throw new ProviderError(
+          PROVIDERS.LM_STUDIO,
+          getErrorMessage(error),
+          500,
+          error,
+        );
       }
     },
   };

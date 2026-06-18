@@ -9,7 +9,12 @@ import {
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import { resolveLockedOffToolNames } from "../../utils/resolveLockedOffToolNames.ts";
 import SettingsService from "../SettingsService.ts";
-import { AGENT_IDS, DEFAULT_TOPOLOGY, CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST, isCoreDomain } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  AGENT_IDS,
+  DEFAULT_TOPOLOGY,
+  CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST,
+  isCoreDomain,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 
@@ -42,8 +47,22 @@ export default class SystemPromptAssembler {
     return this.directoryFormatter.fetchDirectoryTree();
   }
 
-  buildToolDescriptions(enabledTools?: string[], agentId?: string | null, defaultTopology?: string, resolvedToolNames?: string[], lockedOffToolNames?: Set<string>, compact?: boolean): string {
-    return this.docFormatter.buildToolDescriptions(enabledTools, agentId, defaultTopology, resolvedToolNames, lockedOffToolNames, compact);
+  buildToolDescriptions(
+    enabledTools?: string[],
+    agentId?: string | null,
+    defaultTopology?: string,
+    resolvedToolNames?: string[],
+    lockedOffToolNames?: Set<string>,
+    compact?: boolean,
+  ): string {
+    return this.docFormatter.buildToolDescriptions(
+      enabledTools,
+      agentId,
+      defaultTopology,
+      resolvedToolNames,
+      lockedOffToolNames,
+      compact,
+    );
   }
 
   async assemble(context: AssemblerContext) {
@@ -80,9 +99,10 @@ export default class SystemPromptAssembler {
       const platformKey = context.agentContext.platform;
       const platformSection = persona.platformRules[platformKey];
       if (platformSection) {
-        const platformText = typeof platformSection === 'function'
-          ? platformSection(context)
-          : platformSection;
+        const platformText =
+          typeof platformSection === "function"
+            ? platformSection(context)
+            : platformSection;
         if (platformText) sections.push(platformText);
       }
     }
@@ -128,7 +148,8 @@ export default class SystemPromptAssembler {
         }
         if (agentContext.guildId) {
           let idsBlock = `# Discord IDs\n- Guild ID: ${agentContext.guildId}`;
-          if (agentContext.channelId) idsBlock += `\n- Channel ID: ${agentContext.channelId}`;
+          if (agentContext.channelId)
+            idsBlock += `\n- Channel ID: ${agentContext.channelId}`;
           platformContextSections.push(idsBlock);
         }
       }
@@ -158,19 +179,25 @@ export default class SystemPromptAssembler {
     // is present. This ensures prism-client Lupos gets somatic state
     // even though only Discord sends agentContext.
     if (persona?.hasSomaticState && agentId) {
-      const userMessages = context.messages?.filter((message) => message.role === "user") || [];
+      const userMessages =
+        context.messages?.filter((message) => message.role === "user") || [];
       const latestUserMessage = userMessages[userMessages.length - 1];
       if (latestUserMessage && typeof latestUserMessage.content === "string") {
-        await SomaticStateService.adaptFromMessage(agentId, latestUserMessage.content, {
-          traceId: context.traceId,
-          agentSessionId: context.agentSessionId,
-          endpoint: context.agentContext?.endpoint || "/agent",
-          project: context.project,
-          username: context.username,
-        });
+        await SomaticStateService.adaptFromMessage(
+          agentId,
+          latestUserMessage.content,
+          {
+            traceId: context.traceId,
+            agentSessionId: context.agentSessionId,
+            endpoint: context.agentContext?.endpoint || "/agent",
+            project: context.project,
+            username: context.username,
+          },
+        );
       }
 
-      const somaticMessage = await SomaticStateService.renderSystemMessage(agentId);
+      const somaticMessage =
+        await SomaticStateService.renderSystemMessage(agentId);
       if (somaticMessage) {
         selfContextSections.push(somaticMessage);
       }
@@ -189,51 +216,79 @@ export default class SystemPromptAssembler {
     {
       const lockedOffToolNames = await resolveLockedOffToolNames();
       const isCompactToolDocs = persona?.compactToolDocs === true;
-      const toolDescriptions = this.buildToolDescriptions(context.enabledTools, agentId, defaultTopology, context.resolvedToolNames, lockedOffToolNames, isCompactToolDocs);
+      const toolDescriptions = this.buildToolDescriptions(
+        context.enabledTools,
+        agentId,
+        defaultTopology,
+        context.resolvedToolNames,
+        lockedOffToolNames,
+        isCompactToolDocs,
+      );
       if (toolDescriptions) {
         let count: number;
         if (context.resolvedToolNames?.length) {
-          count = lockedOffToolNames.size > 0
-            ? context.resolvedToolNames.filter((toolName) => !lockedOffToolNames.has(toolName)).length
-            : context.resolvedToolNames.length;
+          count =
+            lockedOffToolNames.size > 0
+              ? context.resolvedToolNames.filter(
+                  (toolName) => !lockedOffToolNames.has(toolName),
+                ).length
+              : context.resolvedToolNames.length;
         } else {
-          const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
-          count = lockedOffToolNames.size > 0
-            ? schemas.filter((toolSchema) => !lockedOffToolNames.has(toolSchema.name as string)).length
-            : schemas.length;
+          const schemas =
+            ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+          count =
+            lockedOffToolNames.size > 0
+              ? schemas.filter(
+                  (toolSchema) =>
+                    !lockedOffToolNames.has(toolSchema.name as string),
+                ).length
+              : schemas.length;
           if (context.enabledTools) {
             const hasPrefixed = context.enabledTools.some(
-              (enabledTool) => enabledTool.startsWith("domain:") || enabledTool.startsWith("domainKey:"),
+              (enabledTool) =>
+                enabledTool.startsWith("domain:") ||
+                enabledTool.startsWith("domainKey:"),
             );
             const enabledSet = hasPrefixed
               ? resolveToolEntriesToSet(context.enabledTools, schemas)
               : new Set(context.enabledTools);
 
-            const countPersona = agentId ? AgentPersonaRegistry.get(agentId) : null;
-            const isCoreToolsLockedForCount = countPersona?.coreToolsLocked ?? true;
+            const countPersona = agentId
+              ? AgentPersonaRegistry.get(agentId)
+              : null;
+            const isCoreToolsLockedForCount =
+              countPersona?.coreToolsLocked ?? true;
 
             let filteredSchemas = schemas.filter(
               (toolSchema) =>
                 enabledSet.has(toolSchema.name as string) ||
-                (isCoreToolsLockedForCount && (
-                  isCoreDomain((toolSchema as Record<string, unknown>).domain as string || "") ||
-                  CORE_AGENTIC_TOOLS.has(toolSchema.name as string)
-                ))
+                (isCoreToolsLockedForCount &&
+                  (isCoreDomain(
+                    ((toolSchema as Record<string, unknown>)
+                      .domain as string) || "",
+                  ) ||
+                    CORE_AGENTIC_TOOLS.has(toolSchema.name as string))),
             );
 
             if (agentId) {
               const assemblerPersona = AgentPersonaRegistry.get(agentId);
               if (assemblerPersona?.blockedTools?.length) {
-                const disabledSet = resolveToolEntriesToSet(assemblerPersona.blockedTools, schemas);
+                const disabledSet = resolveToolEntriesToSet(
+                  assemblerPersona.blockedTools,
+                  schemas,
+                );
                 filteredSchemas = filteredSchemas.filter(
-                  (toolSchema) => !disabledSet.has(toolSchema.name as string) || enabledSet.has(toolSchema.name as string),
+                  (toolSchema) =>
+                    !disabledSet.has(toolSchema.name as string) ||
+                    enabledSet.has(toolSchema.name as string),
                 );
               }
             }
 
             if (lockedOffToolNames.size > 0) {
               filteredSchemas = filteredSchemas.filter(
-                (toolSchema) => !lockedOffToolNames.has(toolSchema.name as string),
+                (toolSchema) =>
+                  !lockedOffToolNames.has(toolSchema.name as string),
               );
             }
 
@@ -267,20 +322,25 @@ export default class SystemPromptAssembler {
       const resolvedEnabledSet = (() => {
         if (!context.enabledTools) return null;
         const hasPrefixed = context.enabledTools.some(
-          (entry) => entry.startsWith("domain:") || entry.startsWith("domainKey:"),
+          (entry) =>
+            entry.startsWith("domain:") || entry.startsWith("domainKey:"),
         );
         if (hasPrefixed) {
-          const schemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+          const schemas =
+            ToolOrchestratorService.getClientToolSchemas(defaultTopology);
           return resolveToolEntriesToSet(context.enabledTools, schemas);
         }
         return new Set(context.enabledTools);
       })();
       const orchestratorAvailable = resolvedEnabledSet
-        ? ORCHESTRATOR_ONLY_TOOLS.some((toolName: string) => resolvedEnabledSet.has(toolName))
+        ? ORCHESTRATOR_ONLY_TOOLS.some((toolName: string) =>
+            resolvedEnabledSet.has(toolName),
+          )
         : true;
 
       if (orchestratorAvailable) {
-        const allSchemas = ToolOrchestratorService.getToolSchemas(defaultTopology);
+        const allSchemas =
+          ToolOrchestratorService.getToolSchemas(defaultTopology);
         const orchestratorSet = new Set(ORCHESTRATOR_ONLY_TOOLS);
         const lockedOffSet = await resolveLockedOffToolNames();
 
@@ -292,26 +352,31 @@ export default class SystemPromptAssembler {
           enabledToolNames = context.resolvedToolNames;
         } else if (context.enabledTools?.length) {
           const hasPrefixed = context.enabledTools.some(
-            (entry) => entry.startsWith("domain:") || entry.startsWith("domainKey:"),
+            (entry) =>
+              entry.startsWith("domain:") || entry.startsWith("domainKey:"),
           );
-          const clientSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+          const clientSchemas =
+            ToolOrchestratorService.getClientToolSchemas(defaultTopology);
           const enabledSet = hasPrefixed
             ? resolveToolEntriesToSet(context.enabledTools, clientSchemas)
             : new Set(context.enabledTools);
           enabledToolNames = allSchemas
             .map((tool) => tool.name as string)
-            .filter((toolName) =>
-              enabledSet.has(toolName) ||
-              CORE_AGENTIC_TOOLS.has(toolName),
+            .filter(
+              (toolName) =>
+                enabledSet.has(toolName) || CORE_AGENTIC_TOOLS.has(toolName),
             );
         } else {
           enabledToolNames = allSchemas.map((tool) => tool.name as string);
         }
 
         const subAgentTools = enabledToolNames.filter(
-          (toolName) => !orchestratorSet.has(toolName) && !lockedOffSet.has(toolName),
+          (toolName) =>
+            !orchestratorSet.has(toolName) && !lockedOffSet.has(toolName),
         );
-        sections.push(getOrchestratorPromptAddendum({ subAgentTools, defaultTopology }));
+        sections.push(
+          getOrchestratorPromptAddendum({ subAgentTools, defaultTopology }),
+        );
       }
     }
 
@@ -354,7 +419,8 @@ export default class SystemPromptAssembler {
         skillNames.push(s.name);
         return `### ${s.name}\n${s.content}`;
       });
-      skillsText = `${PROMPT_DELIMITERS.PROJECT_SKILLS}\n` + skillBlocks.join("\n\n");
+      skillsText =
+        `${PROMPT_DELIMITERS.PROJECT_SKILLS}\n` + skillBlocks.join("\n\n");
     }
 
     // ── 9. Session Memory (embedding search) ────────────────────
@@ -411,8 +477,14 @@ export default class SystemPromptAssembler {
 
     return {
       prompt: sections.join("\n\n"),
-      platformContextMessage: platformContextSections.length > 0 ? platformContextSections.join("\n\n") : null,
-      selfContextMessage: selfContextSections.length > 0 ? selfContextSections.join("\n\n") : null,
+      platformContextMessage:
+        platformContextSections.length > 0
+          ? platformContextSections.join("\n\n")
+          : null,
+      selfContextMessage:
+        selfContextSections.length > 0
+          ? selfContextSections.join("\n\n")
+          : null,
       skillNames,
       skillsText,
       memoriesText,
@@ -463,7 +535,12 @@ export default class SystemPromptAssembler {
  * use the identical alignment algorithm without code duplication.
  */
 export function injectSystemPromptContext(
-  messages: Array<{ role: string; content?: string | unknown[] | null; _isIdentityPrompt?: boolean; [key: string]: unknown }>,
+  messages: Array<{
+    role: string;
+    content?: string | unknown[] | null;
+    _isIdentityPrompt?: boolean;
+    [key: string]: unknown;
+  }>,
   options: {
     systemPrompt: string;
     platformContextMessage?: string | null;
@@ -472,7 +549,7 @@ export function injectSystemPromptContext(
     memoriesText?: string;
     workflowsText?: string;
     localTimeText?: string;
-  }
+  },
 ): void {
   const {
     systemPrompt,
@@ -493,7 +570,11 @@ export function injectSystemPromptContext(
     messages[0].content = systemPrompt;
     messages[0]._isIdentityPrompt = true;
   } else {
-    messages.unshift({ role: "system", content: systemPrompt, _isIdentityPrompt: true });
+    messages.unshift({
+      role: "system",
+      content: systemPrompt,
+      _isIdentityPrompt: true,
+    });
   }
 
   // ── 2. Interleave platform context before the last user message ──
@@ -534,10 +615,12 @@ export function injectSystemPromptContext(
   const userMessages = messages.filter((message) => message.role === "user");
   const lastUserMessage = userMessages[userMessages.length - 1];
   if (lastUserMessage && typeof lastUserMessage.content === "string") {
-    const timeText = localTimeText || new Date().toLocaleString("en-US", {
-      dateStyle: "full",
-      timeStyle: "long",
-    });
+    const timeText =
+      localTimeText ||
+      new Date().toLocaleString("en-US", {
+        dateStyle: "full",
+        timeStyle: "long",
+      });
 
     const contextLines = [`- Local Time: ${timeText}`];
 
@@ -562,7 +645,9 @@ export function injectSystemPromptContext(
         messages[messageIndex] = {
           ...lastUserMessage,
           rawContent: originalContent,
-          content: systemContextBlock + `${PROMPT_DELIMITERS.USER_MESSAGE}\n${originalContent}`,
+          content:
+            systemContextBlock +
+            `${PROMPT_DELIMITERS.USER_MESSAGE}\n${originalContent}`,
         };
       }
     }
@@ -570,4 +655,3 @@ export function injectSystemPromptContext(
 }
 
 export { SystemPromptAssembler };
-

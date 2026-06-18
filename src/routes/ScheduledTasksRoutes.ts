@@ -15,14 +15,18 @@ const router = express.Router();
 router.get(
   "/",
   asyncHandler(async (req: Request, res: Response) => {
-    const project: string = typeof req.project === "string" ? req.project : "direct";
-    const username: string = typeof req.username === "string" ? req.username : "system";
+    const project: string =
+      typeof req.project === "string" ? req.project : "direct";
+    const username: string =
+      typeof req.username === "string" ? req.username : "system";
 
     try {
       const tasks = await ScheduledTaskService.listTasks(project, username);
       res.json(tasks);
     } catch (error: unknown) {
-      logger.error(`[ScheduledTasks][GET] Error listing tasks: ${getErrorMessage(error)}`);
+      logger.error(
+        `[ScheduledTasks][GET] Error listing tasks: ${getErrorMessage(error)}`,
+      );
       res.status(500).json({ error: "Failed to list scheduled tasks" });
     }
   }),
@@ -39,12 +43,13 @@ router.get(
       const tasks = await ScheduledTaskService.listAllTasks();
       res.json(tasks);
     } catch (error: unknown) {
-      logger.error(`[ScheduledTasks][GET /all] Error listing all tasks: ${getErrorMessage(error)}`);
+      logger.error(
+        `[ScheduledTasks][GET /all] Error listing all tasks: ${getErrorMessage(error)}`,
+      );
       res.status(500).json({ error: "Failed to list all scheduled tasks" });
     }
   }),
 );
-
 
 /**
  * POST /scheduled-tasks
@@ -53,15 +58,33 @@ router.get(
 router.post(
   "/",
   asyncHandler(async (req: Request, res: Response) => {
-    const project: string = typeof req.project === "string" ? req.project : "direct";
-    const username: string = typeof req.username === "string" ? req.username : "system";
-    let { name, prompt, agent, provider, model, scheduleType, scheduleTime, scheduleDay, scheduleDate, cronExpression, recurrenceRule, toolConfig } = req.body;
+    const project: string =
+      typeof req.project === "string" ? req.project : "direct";
+    const username: string =
+      typeof req.username === "string" ? req.username : "system";
+    let {
+      name,
+      prompt,
+      agent,
+      provider,
+      model,
+      scheduleType,
+      scheduleTime,
+      scheduleDay,
+      scheduleDate,
+      cronExpression,
+      recurrenceRule,
+      toolConfig,
+    } = req.body;
 
     provider = provider || PROVIDERS.ANTHROPIC;
     model = model || MODELS.SONNET_45.name;
 
     if (!name || !prompt || !provider || !model || !scheduleType) {
-      return res.status(400).json({ error: "Missing required fields: name, prompt, provider, model, scheduleType" });
+      return res.status(400).json({
+        error:
+          "Missing required fields: name, prompt, provider, model, scheduleType",
+      });
     }
 
     try {
@@ -81,11 +104,16 @@ router.post(
         enabled: true,
         project: project as string,
         username: username as string,
-      } as Omit<import("../services/ScheduledTaskService.ts").ScheduledTask, "id" | "createdAt" | "updatedAt"> & { username: string });
+      } as Omit<
+        import("../services/ScheduledTaskService.ts").ScheduledTask,
+        "id" | "createdAt" | "updatedAt"
+      > & { username: string });
 
       res.status(201).json(task);
     } catch (error: unknown) {
-      logger.error(`[ScheduledTasks][POST] Error creating task: ${getErrorMessage(error)}`);
+      logger.error(
+        `[ScheduledTasks][POST] Error creating task: ${getErrorMessage(error)}`,
+      );
       res.status(500).json({ error: "Failed to create scheduled task" });
     }
   }),
@@ -99,16 +127,27 @@ router.patch(
   "/:id",
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const project: string = typeof req.project === "string" ? req.project : "direct";
-    const username: string = typeof req.username === "string" ? req.username : "system";
+    const project: string =
+      typeof req.project === "string" ? req.project : "direct";
+    const username: string =
+      typeof req.username === "string" ? req.username : "system";
     const updates = req.body;
 
     try {
-      const updatedTask = await ScheduledTaskService.updateTask(id as string, project, username, updates);
+      const updatedTask = await ScheduledTaskService.updateTask(
+        id as string,
+        project,
+        username,
+        updates,
+      );
       res.json(updatedTask);
     } catch (error: unknown) {
-      logger.error(`[ScheduledTasks][PATCH] Error updating task ${id}: ${getErrorMessage(error)}`);
-      res.status(500).json({ error: getErrorMessage(error) || "Failed to update scheduled task" });
+      logger.error(
+        `[ScheduledTasks][PATCH] Error updating task ${id}: ${getErrorMessage(error)}`,
+      );
+      res.status(500).json({
+        error: getErrorMessage(error) || "Failed to update scheduled task",
+      });
     }
   }),
 );
@@ -121,14 +160,22 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const project: string = typeof req.project === "string" ? req.project : "direct";
-    const username: string = typeof req.username === "string" ? req.username : "system";
+    const project: string =
+      typeof req.project === "string" ? req.project : "direct";
+    const username: string =
+      typeof req.username === "string" ? req.username : "system";
 
     try {
-      const success = await ScheduledTaskService.deleteTask(id as string, project, username);
+      const success = await ScheduledTaskService.deleteTask(
+        id as string,
+        project,
+        username,
+      );
       res.json({ success });
     } catch (error: unknown) {
-      logger.error(`[ScheduledTasks][DELETE] Error deleting task ${id}: ${getErrorMessage(error)}`);
+      logger.error(
+        `[ScheduledTasks][DELETE] Error deleting task ${id}: ${getErrorMessage(error)}`,
+      );
       res.status(500).json({ error: "Failed to delete scheduled task" });
     }
   }),
@@ -142,16 +189,27 @@ router.post(
   "/:id/trigger",
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const project: string = typeof req.project === "string" ? req.project : "direct";
-    const username: string = typeof req.username === "string" ? req.username : "system";
+    const project: string =
+      typeof req.project === "string" ? req.project : "direct";
+    const username: string =
+      typeof req.username === "string" ? req.username : "system";
     const { payload } = req.body;
 
     try {
-      const result = await ScheduledTaskService.triggerTask(id as string, project, username, payload);
+      const result = await ScheduledTaskService.triggerTask(
+        id as string,
+        project,
+        username,
+        payload,
+      );
       res.json(result);
     } catch (error: unknown) {
-      logger.error(`[ScheduledTasks][TRIGGER] Error triggering task ${id}: ${getErrorMessage(error)}`);
-      res.status(500).json({ error: getErrorMessage(error) || "Failed to trigger scheduled task" });
+      logger.error(
+        `[ScheduledTasks][TRIGGER] Error triggering task ${id}: ${getErrorMessage(error)}`,
+      );
+      res.status(500).json({
+        error: getErrorMessage(error) || "Failed to trigger scheduled task",
+      });
     }
   }),
 );

@@ -1,5 +1,8 @@
 import logger from "../../utils/logger.ts";
-import { TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  TOOL_NAMES,
+  DOMAINS,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
@@ -85,17 +88,39 @@ const createSkill = {
   },
   labels: ["coding", "automation"],
   domain: DOMAINS.CORE_SKILL.displayName,
-  async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: InternalToolContext,
+  ) {
     const createArgs: SkillCreateArgs = {
       name: typeof toolArguments.name === "string" ? toolArguments.name : "",
-      prompt: typeof toolArguments.prompt === "string" ? toolArguments.prompt : "",
-      description: typeof toolArguments.description === "string" ? toolArguments.description : undefined,
-      steps: Array.isArray(toolArguments.steps) ? toolArguments.steps.filter(step => typeof step === "string") as string[] : undefined,
-      tools: Array.isArray(toolArguments.tools) ? toolArguments.tools.filter(tool => typeof tool === "string") as string[] : undefined,
-      maxIterations: typeof toolArguments.maxIterations === "number" ? toolArguments.maxIterations : undefined,
-      model: typeof toolArguments.model === "string" ? toolArguments.model : undefined,
+      prompt:
+        typeof toolArguments.prompt === "string" ? toolArguments.prompt : "",
+      description:
+        typeof toolArguments.description === "string"
+          ? toolArguments.description
+          : undefined,
+      steps: Array.isArray(toolArguments.steps)
+        ? (toolArguments.steps.filter(
+            (step) => typeof step === "string",
+          ) as string[])
+        : undefined,
+      tools: Array.isArray(toolArguments.tools)
+        ? (toolArguments.tools.filter(
+            (tool) => typeof tool === "string",
+          ) as string[])
+        : undefined,
+      maxIterations:
+        typeof toolArguments.maxIterations === "number"
+          ? toolArguments.maxIterations
+          : undefined,
+      model:
+        typeof toolArguments.model === "string"
+          ? toolArguments.model
+          : undefined,
     };
-    if (!createArgs.name || !createArgs.prompt) return { error: "name and prompt are required" };
+    if (!createArgs.name || !createArgs.prompt)
+      return { error: "name and prompt are required" };
     const { default: SkillService } = await import("../SkillService.js");
     return SkillService.create(createArgs);
   },
@@ -128,21 +153,25 @@ const executeSkill = {
   },
   labels: ["coding", "automation"],
   domain: DOMAINS.CORE_SKILL.displayName,
-  async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
-    const skillId = typeof toolArguments.skillId === "string" ? toolArguments.skillId : "";
-    const variables = toolArguments.variables && typeof toolArguments.variables === "object" ? toolArguments.variables as Record<string, unknown> : {};
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: InternalToolContext,
+  ) {
+    const skillId =
+      typeof toolArguments.skillId === "string" ? toolArguments.skillId : "";
+    const variables =
+      toolArguments.variables && typeof toolArguments.variables === "object"
+        ? (toolArguments.variables as Record<string, unknown>)
+        : {};
     if (!skillId) return { error: "skillId is required" };
 
     const { default: SkillService } = await import("../SkillService.js");
-    const prepared = await SkillService.prepare(
-      skillId,
-      variables,
-    );
+    const prepared = await SkillService.prepare(skillId, variables);
     if (prepared.error) return prepared;
 
     // Execute via orchestrator's create_team mechanism
     logger.info(
-      `[SkillExecute] Executing skill "${prepared.name}" (${prepared.skillId})`
+      `[SkillExecute] Executing skill "${prepared.name}" (${prepared.skillId})`,
     );
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
@@ -183,8 +212,14 @@ const listSkills = {
   },
   labels: ["coding", "automation"],
   domain: DOMAINS.CORE_SKILL.displayName,
-  async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
-    const project = typeof toolArguments.project === "string" ? toolArguments.project : context.project;
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: InternalToolContext,
+  ) {
+    const project =
+      typeof toolArguments.project === "string"
+        ? toolArguments.project
+        : context.project;
     const { default: SkillService } = await import("../SkillService.js");
     return SkillService.list({ project });
   },
@@ -206,8 +241,12 @@ const deleteSkill = {
   },
   labels: ["coding", "automation"],
   domain: DOMAINS.CORE_SKILL.displayName,
-  async execute(toolArguments: Record<string, unknown>, context: InternalToolContext) {
-    const skillId = typeof toolArguments.skillId === "string" ? toolArguments.skillId : "";
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: InternalToolContext,
+  ) {
+    const skillId =
+      typeof toolArguments.skillId === "string" ? toolArguments.skillId : "";
     if (!skillId) return { error: "skillId is required" };
     const { default: SkillService } = await import("../SkillService.js");
     return SkillService.delete(skillId);

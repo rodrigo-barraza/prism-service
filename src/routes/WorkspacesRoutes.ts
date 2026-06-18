@@ -4,7 +4,10 @@ import { basename } from "node:path";
 import { TOOLS_SERVICE_URL } from "../../config.ts";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
 import logger from "../utils/logger.ts";
-import { PutWorkspacesSchema, ValidateWorkspaceSchema } from "../types/index.ts";
+import {
+  PutWorkspacesSchema,
+  ValidateWorkspaceSchema,
+} from "../types/index.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = express.Router();
@@ -39,10 +42,16 @@ function disambiguateWorkspaceNames(workspaces: MappedWorkspace[]): void {
     for (const workspace of duplicates) {
       if (workspace.hostname) {
         workspace.name = `${workspace.name} (${workspace.hostname})`;
-      } else if (workspace.agentName && workspace.agentName !== workspace.name) {
+      } else if (
+        workspace.agentName &&
+        workspace.agentName !== workspace.name
+      ) {
         workspace.name = `${workspace.name} (${workspace.agentName})`;
       } else {
-        const parentSegment = workspace.path.split("/").filter(Boolean).slice(-2, -1)[0];
+        const parentSegment = workspace.path
+          .split("/")
+          .filter(Boolean)
+          .slice(-2, -1)[0];
         if (parentSegment) {
           workspace.name = `${workspace.name} (${parentSegment})`;
         }
@@ -82,16 +91,22 @@ router.get(
       // Refresh from tools-api to pick up agent-registered roots
       await ToolOrchestratorService.refreshWorkspaceRoots();
 
-      const workspaceRoots = ToolOrchestratorService.getWorkspaceRoots() as string[];
-      const staticWorkspaceRoots = ToolOrchestratorService.getStaticRoots() as string[];
+      const workspaceRoots =
+        ToolOrchestratorService.getWorkspaceRoots() as string[];
+      const staticWorkspaceRoots =
+        ToolOrchestratorService.getStaticRoots() as string[];
 
       let connectedAgents: WorkspaceAgent[] = [];
       try {
-        const configApiResponse = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
-          signal: AbortSignal.timeout(3000),
-        });
+        const configApiResponse = await fetch(
+          `${TOOLS_SERVICE_URL}/admin/config`,
+          {
+            signal: AbortSignal.timeout(3000),
+          },
+        );
         if (configApiResponse.ok) {
-          const workspaceConfig = (await configApiResponse.json()) as WorkspaceConfig;
+          const workspaceConfig =
+            (await configApiResponse.json()) as WorkspaceConfig;
           connectedAgents = workspaceConfig.agents || [];
         }
       } catch (error: unknown) {
@@ -109,7 +124,12 @@ router.get(
 
       const mappedWorkspaces = workspaceRoots.map((rootPath: string) => {
         const servingAgent = rootToAgentMap.get(rootPath) || null;
-        const hostInfo = (servingAgent as WorkspaceAgent & { hostInfo?: Record<string, unknown> })?.hostInfo || null;
+        const hostInfo =
+          (
+            servingAgent as WorkspaceAgent & {
+              hostInfo?: Record<string, unknown>;
+            }
+          )?.hostInfo || null;
         return {
           id: rootPath,
           name: basename(rootPath),
@@ -118,10 +138,14 @@ router.get(
           isAgentServed: !!servingAgent,
           agentId: servingAgent?.id || null,
           agentName: servingAgent?.name || null,
-          hostname: (hostInfo as Record<string, unknown>)?.hostname as string || null,
-          platform: (hostInfo as Record<string, unknown>)?.platform as string || null,
-          arch: (hostInfo as Record<string, unknown>)?.arch as string || null,
-          clientIp: (servingAgent as WorkspaceAgent & { clientIp?: string })?.clientIp || null,
+          hostname:
+            ((hostInfo as Record<string, unknown>)?.hostname as string) || null,
+          platform:
+            ((hostInfo as Record<string, unknown>)?.platform as string) || null,
+          arch: ((hostInfo as Record<string, unknown>)?.arch as string) || null,
+          clientIp:
+            (servingAgent as WorkspaceAgent & { clientIp?: string })
+              ?.clientIp || null,
         };
       });
 
@@ -151,9 +175,12 @@ router.get(
       // Fetch full config from tools-api to get agent metadata
       let agents: WorkspaceAgent[] = [];
       try {
-        const configResponse = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
-          signal: AbortSignal.timeout(3000),
-        });
+        const configResponse = await fetch(
+          `${TOOLS_SERVICE_URL}/admin/config`,
+          {
+            signal: AbortSignal.timeout(3000),
+          },
+        );
         if (configResponse.ok) {
           const config = (await configResponse.json()) as WorkspaceConfig;
           agents = config.agents || [];
@@ -173,7 +200,12 @@ router.get(
 
       const workspaces: MappedWorkspace[] = roots.map((rootPath: string) => {
         const servingAgent = rootToAgentMap.get(rootPath) || null;
-        const hostInfo = (servingAgent as WorkspaceAgent & { hostInfo?: Record<string, unknown> })?.hostInfo || null;
+        const hostInfo =
+          (
+            servingAgent as WorkspaceAgent & {
+              hostInfo?: Record<string, unknown>;
+            }
+          )?.hostInfo || null;
         return {
           id: rootPath,
           name: basename(rootPath),
@@ -182,10 +214,14 @@ router.get(
           isAgentServed: !!servingAgent,
           agentId: servingAgent?.id || null,
           agentName: servingAgent?.name || null,
-          hostname: (hostInfo as Record<string, unknown>)?.hostname as string || null,
-          platform: (hostInfo as Record<string, unknown>)?.platform as string || null,
-          arch: (hostInfo as Record<string, unknown>)?.arch as string || null,
-          clientIp: (servingAgent as WorkspaceAgent & { clientIp?: string })?.clientIp || null,
+          hostname:
+            ((hostInfo as Record<string, unknown>)?.hostname as string) || null,
+          platform:
+            ((hostInfo as Record<string, unknown>)?.platform as string) || null,
+          arch: ((hostInfo as Record<string, unknown>)?.arch as string) || null,
+          clientIp:
+            (servingAgent as WorkspaceAgent & { clientIp?: string })
+              ?.clientIp || null,
         };
       });
 
@@ -250,7 +286,9 @@ router.post(
       );
       res.json(result);
     } catch (error: unknown) {
-      logger.error(`POST /workspaces/validate error: ${getErrorMessage(error)}`);
+      logger.error(
+        `POST /workspaces/validate error: ${getErrorMessage(error)}`,
+      );
       res.status(500).json({ error: "Failed to validate workspace path" });
     }
   }),
@@ -287,9 +325,12 @@ router.get(
       );
 
       if (!toolsResponse.ok) {
-        const errorBody = (await toolsResponse.json().catch(() => ({}))) as { error?: string };
+        const errorBody = (await toolsResponse.json().catch(() => ({}))) as {
+          error?: string;
+        };
         return res.status(toolsResponse.status).json({
-          error: errorBody.error || `tools-service returned ${toolsResponse.status}`,
+          error:
+            errorBody.error || `tools-service returned ${toolsResponse.status}`,
         });
       }
 
@@ -322,10 +363,9 @@ router.get(
         ? `${TOOLS_SERVICE_URL}/agents/download/agent?platform=${encodeURIComponent(String(platform))}`
         : `${TOOLS_SERVICE_URL}/agents/download/agent`;
 
-      const toolsResponse = await fetch(
-        toolsUrl,
-        { signal: AbortSignal.timeout(60_000) },
-      );
+      const toolsResponse = await fetch(toolsUrl, {
+        signal: AbortSignal.timeout(60_000),
+      });
 
       if (!toolsResponse.ok) {
         const errorBody = (await toolsResponse.json().catch(() => ({}))) as {
@@ -339,8 +379,7 @@ router.get(
 
       res.setHeader(
         "Content-Type",
-        toolsResponse.headers.get("Content-Type") ||
-          "application/octet-stream",
+        toolsResponse.headers.get("Content-Type") || "application/octet-stream",
       );
       res.setHeader(
         "Content-Disposition",
@@ -374,9 +413,9 @@ router.get(
       logger.error(
         `GET /workspaces/download/agent error: ${getErrorMessage(error)}`,
       );
-      res
-        .status(502)
-        .json({ error: "Failed to download workspace agent from tools-service" });
+      res.status(502).json({
+        error: "Failed to download workspace agent from tools-service",
+      });
     }
   }),
 );
@@ -393,16 +432,16 @@ router.get(
       const platform = req.query.platform;
       if (!platform) {
         return res.status(400).json({
-          error: "Missing 'platform' query parameter. Supported: win-x64, linux-x64, mac-x64, mac-arm64",
+          error:
+            "Missing 'platform' query parameter. Supported: win-x64, linux-x64, mac-x64, mac-arm64",
         });
       }
 
       const toolsUrl = `${TOOLS_SERVICE_URL}/agents/download/tray-app?platform=${encodeURIComponent(String(platform))}`;
 
-      const toolsResponse = await fetch(
-        toolsUrl,
-        { signal: AbortSignal.timeout(120_000) },
-      );
+      const toolsResponse = await fetch(toolsUrl, {
+        signal: AbortSignal.timeout(120_000),
+      });
 
       if (!toolsResponse.ok) {
         const errorBody = (await toolsResponse.json().catch(() => ({}))) as {
@@ -416,8 +455,7 @@ router.get(
 
       res.setHeader(
         "Content-Type",
-        toolsResponse.headers.get("Content-Type") ||
-          "application/octet-stream",
+        toolsResponse.headers.get("Content-Type") || "application/octet-stream",
       );
       res.setHeader(
         "Content-Disposition",
@@ -450,9 +488,9 @@ router.get(
       logger.error(
         `GET /workspaces/download/tray-app error: ${getErrorMessage(error)}`,
       );
-      res
-        .status(502)
-        .json({ error: "Failed to download tray app installer from tools-service" });
+      res.status(502).json({
+        error: "Failed to download tray app installer from tools-service",
+      });
     }
   }),
 );

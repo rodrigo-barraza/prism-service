@@ -5,7 +5,12 @@ import path from "node:path";
 import fs from "node:fs";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
-import type { ToolCall, ToolResult, AgenticContext, ValidationFeedback } from "../types.ts";
+import type {
+  ToolCall,
+  ToolResult,
+  AgenticContext,
+  ValidationFeedback,
+} from "../types.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 /**
@@ -33,9 +38,9 @@ interface ValidatorConfig {
 }
 
 const EXTENSION_VALIDATORS: Record<string, ValidatorConfig> = {
-  ".ts":  { command: "npx tsc --noEmit --pretty", type: "typescript" },
+  ".ts": { command: "npx tsc --noEmit --pretty", type: "typescript" },
   ".tsx": { command: "npx tsc --noEmit --pretty", type: "typescript" },
-  ".js":  { command: "npx eslint --format compact", type: "eslint" },
+  ".js": { command: "npx eslint --format compact", type: "eslint" },
   ".jsx": { command: "npx eslint --format compact", type: "eslint" },
   ".json": { command: null, type: "json-parse" },
 };
@@ -48,7 +53,11 @@ const VALIDATION_TIMEOUT_MS = 15_000;
  */
 function extractFilePath(toolCall: ToolCall): string | null {
   const arguments_ = toolCall.args as Record<string, unknown>;
-  const rawPath = arguments_.path || arguments_.filePath || arguments_.file || arguments_.newPath;
+  const rawPath =
+    arguments_.path ||
+    arguments_.filePath ||
+    arguments_.file ||
+    arguments_.newPath;
   return typeof rawPath === "string" ? rawPath : null;
 }
 
@@ -63,9 +72,16 @@ function findNearestConfigDir(filePath: string, workspaceRoot: string): string {
 
   let currentDirectory = path.dirname(absoluteFilePath);
 
-  while (currentDirectory.startsWith(workspaceRoot) && currentDirectory !== workspaceRoot) {
-    const hasTsConfig = fs.existsSync(path.join(currentDirectory, "tsconfig.json"));
-    const hasPackageJson = fs.existsSync(path.join(currentDirectory, "package.json"));
+  while (
+    currentDirectory.startsWith(workspaceRoot) &&
+    currentDirectory !== workspaceRoot
+  ) {
+    const hasTsConfig = fs.existsSync(
+      path.join(currentDirectory, "tsconfig.json"),
+    );
+    const hasPackageJson = fs.existsSync(
+      path.join(currentDirectory, "package.json"),
+    );
     if (hasTsConfig || hasPackageJson) {
       return currentDirectory;
     }
@@ -80,7 +96,10 @@ function findNearestConfigDir(filePath: string, workspaceRoot: string): string {
 /**
  * Run inline JSON validation (no external process needed).
  */
-function validateJsonInline(filePath: string, toolResult: ToolResult): ValidationFeedback | null {
+function validateJsonInline(
+  filePath: string,
+  toolResult: ToolResult,
+): ValidationFeedback | null {
   const resultObject = toolResult.result as Record<string, unknown> | null;
   if (!resultObject || resultObject.error) return null;
 
@@ -100,13 +119,14 @@ async function runShellValidator(
 ): Promise<ValidationFeedback | null> {
   if (!validatorConfig.command) return null;
 
-  const workspaceRoot = context.workspaceRoot || ToolOrchestratorService.getWorkspaceRoot();
+  const workspaceRoot =
+    context.workspaceRoot || ToolOrchestratorService.getWorkspaceRoot();
   if (!workspaceRoot) return null;
 
   const executionCwd = findNearestConfigDir(filePath, workspaceRoot);
 
   try {
-    const shellResult = await ToolOrchestratorService.executeTool(
+    const shellResult = (await ToolOrchestratorService.executeTool(
       TOOL_NAMES.RUN_COMMAND,
       {
         command: validatorConfig.command,
@@ -121,10 +141,12 @@ async function runShellValidator(
         workspaceRoot,
         signal: context.signal || undefined,
       },
-    ) as Record<string, unknown>;
+    )) as Record<string, unknown>;
 
     const exitCode = shellResult.exitCode ?? shellResult.code ?? 0;
-    const standardOutput = (shellResult.stdout || shellResult.output || "") as string;
+    const standardOutput = (shellResult.stdout ||
+      shellResult.output ||
+      "") as string;
     const standardError = (shellResult.stderr || "") as string;
     const combinedOutput = (standardOutput + "\n" + standardError).trim();
 
@@ -134,7 +156,12 @@ async function runShellValidator(
     // Parse errors from output
     const errorLines = combinedOutput
       .split("\n")
-      .filter((line) => line.includes("error") || line.includes("Error") || line.includes("✖"))
+      .filter(
+        (line) =>
+          line.includes("error") ||
+          line.includes("Error") ||
+          line.includes("✖"),
+      )
       .slice(0, 10);
 
     if (errorLines.length === 0 && combinedOutput.length < 20) return null;
@@ -143,7 +170,8 @@ async function runShellValidator(
       toolName: TOOL_NAMES.RUN_COMMAND,
       filePath,
       validatorType: validatorConfig.type,
-      errors: errorLines.length > 0 ? errorLines : [combinedOutput.slice(0, 500)],
+      errors:
+        errorLines.length > 0 ? errorLines : [combinedOutput.slice(0, 500)],
       rawOutput: combinedOutput.slice(0, 2000),
     };
   } catch (validationError: unknown) {
@@ -172,12 +200,17 @@ export async function validateAfterToolExecution(
     if (!FILE_MUTATING_TOOLS.has(toolCall.name)) continue;
 
     const matchingResult = results.find(
-      (result) => result.id === toolCall.id || (!result.id && result.name === toolCall.name),
+      (result) =>
+        result.id === toolCall.id ||
+        (!result.id && result.name === toolCall.name),
     );
     if (!matchingResult) continue;
 
     // Skip if the tool itself errored
-    const resultObject = matchingResult.result as Record<string, unknown> | null;
+    const resultObject = matchingResult.result as Record<
+      string,
+      unknown
+    > | null;
     if (resultObject?.error) continue;
 
     const filePath = extractFilePath(toolCall);
@@ -195,7 +228,11 @@ export async function validateAfterToolExecution(
     }
 
     // Shell-based validators
-    const shellFeedback = await runShellValidator(validatorConfig, filePath, context);
+    const shellFeedback = await runShellValidator(
+      validatorConfig,
+      filePath,
+      context,
+    );
     if (shellFeedback) {
       // Override filePath to the specific file that was edited
       shellFeedback.filePath = filePath;
@@ -206,7 +243,9 @@ export async function validateAfterToolExecution(
   if (feedbackItems.length > 0) {
     logger.info(
       `[ValidationInterceptor] Found ${feedbackItems.length} validation issue(s): ` +
-        feedbackItems.map((feedback) => `${feedback.filePath} (${feedback.validatorType})`).join(", "),
+        feedbackItems
+          .map((feedback) => `${feedback.filePath} (${feedback.validatorType})`)
+          .join(", "),
     );
   }
 

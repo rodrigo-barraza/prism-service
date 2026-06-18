@@ -3,7 +3,11 @@ import { getRequestContext } from "./RequestContext.ts";
 
 const base = createLogger("prism");
 
-function buildContextTags(project: string, username: string, clientIp: string | null): string {
+function buildContextTags(
+  project: string,
+  username: string,
+  clientIp: string | null,
+): string {
   const hasProject = project && project !== "any";
   const hasUser = username && username !== "any";
 
@@ -26,7 +30,11 @@ const logger = {
 
   provider(provider: string, action: string, ...args: unknown[]) {
     const context = getRequestContext();
-    const tags = buildContextTags(context.project, context.username, context.clientIp);
+    const tags = buildContextTags(
+      context.project,
+      context.username,
+      context.clientIp,
+    );
     base.info(`[${provider}] ${action}${tags}`, ...args);
   },
 

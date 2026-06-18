@@ -26,10 +26,7 @@ import {
 } from "./types.ts";
 import { detectCapabilities } from "./detectCapabilities.ts";
 import { enrichWithHuggingFace } from "./hfMetadata.ts";
-import {
-  NORMALIZER_BY_TYPE,
-  HF_ENRICHED_TYPES,
-} from "./normalizers.ts";
+import { NORMALIZER_BY_TYPE, HF_ENRICHED_TYPES } from "./normalizers.ts";
 import { estimateVRAM, estimateVRAMForModel } from "./vramEstimation.ts";
 import { InstanceEntry } from "../../types/ProviderTypes.ts";
 
@@ -66,14 +63,18 @@ class LocalProviderGateway {
    * Check whether a provider should default thinkingEnabled=true
    * when the client doesn't explicitly set it.
    */
-  defaultsThinkingEnabled(providerOrInstanceId: string | null | undefined): boolean {
+  defaultsThinkingEnabled(
+    providerOrInstanceId: string | null | undefined,
+  ): boolean {
     if (!providerOrInstanceId) return false;
     const type =
       this.getProviderType(providerOrInstanceId) || providerOrInstanceId;
     return DEFAULT_THINKING_TYPES.has(type);
   }
 
-  supportsModelManagement(providerOrInstanceId: string | null | undefined): boolean {
+  supportsModelManagement(
+    providerOrInstanceId: string | null | undefined,
+  ): boolean {
     if (!providerOrInstanceId) return false;
     const type =
       this.getProviderType(providerOrInstanceId) || providerOrInstanceId;
@@ -85,7 +86,9 @@ class LocalProviderGateway {
    * e.g. "lm-studio-2" → "lm-studio", "ollama" → "ollama"
    * Returns null for non-local providers.
    */
-  getProviderType(providerOrInstanceId: string | null | undefined): string | null {
+  getProviderType(
+    providerOrInstanceId: string | null | undefined,
+  ): string | null {
     if (!providerOrInstanceId) return null;
     if (LOCAL_PROVIDER_TYPES.has(providerOrInstanceId))
       return providerOrInstanceId;
@@ -93,7 +96,12 @@ class LocalProviderGateway {
   }
 
   // ── Instance Enumeration ────────────────────────────────────
-  getInstances(): Array<{ id: string; type: string; instanceNumber: number; concurrency: number }> {
+  getInstances(): Array<{
+    id: string;
+    type: string;
+    instanceNumber: number;
+    concurrency: number;
+  }> {
     return listInstances().map((instance: InstanceEntry) => ({
       id: instance.id,
       type: instance.type,
@@ -122,7 +130,8 @@ class LocalProviderGateway {
 
     for (const instance of instances) {
       total += instance.concurrency;
-      byType[instance.type] = (byType[instance.type] || 0) + instance.concurrency;
+      byType[instance.type] =
+        (byType[instance.type] || 0) + instance.concurrency;
       byInstance[instance.id] = instance.concurrency;
     }
 
@@ -136,7 +145,12 @@ class LocalProviderGateway {
    * Results are normalized into a canonical format and enriched
    * with capability detection and (optionally) HuggingFace metadata.
    */
-  async discoverModels({ timeoutMs = 3000, enrich = true }: { timeoutMs?: number; enrich?: boolean } = {}): Promise<Record<string, ModelEntry[]>> {
+  async discoverModels({
+    timeoutMs = 3000,
+    enrich = true,
+  }: { timeoutMs?: number; enrich?: boolean } = {}): Promise<
+    Record<string, ModelEntry[]>
+  > {
     const instances = listInstances();
     const models: Record<string, ModelEntry[]> = {};
 
@@ -178,21 +192,32 @@ class LocalProviderGateway {
 
   async discoverModelsForInstance(
     instanceId: string,
-    { timeoutMs = 3000, enrich = true }: { timeoutMs?: number; enrich?: boolean } = {},
+    {
+      timeoutMs = 3000,
+      enrich = true,
+    }: { timeoutMs?: number; enrich?: boolean } = {},
   ): Promise<ModelEntry[]> {
     const instance = getInstance(instanceId);
     if (!instance) {
       logger.warn(`[LocalProviderGateway] Unknown instance: ${instanceId}`);
       return [];
     }
-    return this._fetchModelsForInstance(instance as InstanceEntry, timeoutMs, enrich);
+    return this._fetchModelsForInstance(
+      instance as InstanceEntry,
+      timeoutMs,
+      enrich,
+    );
   }
 
   /**
    * Internal: Fetch, normalize, and optionally enrich models for an instance.
    * @private
    */
-  async _fetchModelsForInstance(instance: InstanceEntry, timeoutMs: number, enrich: boolean): Promise<ModelEntry[]> {
+  async _fetchModelsForInstance(
+    instance: InstanceEntry,
+    timeoutMs: number,
+    enrich: boolean,
+  ): Promise<ModelEntry[]> {
     try {
       const provider = getProvider(instance.id) as GenericProvider | undefined;
       if (!provider?.listModels) return [];
@@ -215,9 +240,7 @@ class LocalProviderGateway {
       // HuggingFace enrichment for vLLM/llama.cpp (their model IDs are HF-style)
       if (enrich && HF_ENRICHED_TYPES.has(instance.type)) {
         const enriched = await Promise.allSettled(
-          normalized.map((entry) =>
-            enrichWithHuggingFace(entry, entry.name),
-          ),
+          normalized.map((entry) => enrichWithHuggingFace(entry, entry.name)),
         );
         normalized = enriched.map((r, i) =>
           r.status === "fulfilled" ? r.value : normalized[i],
@@ -234,16 +257,18 @@ class LocalProviderGateway {
   }
 
   // ── Model Search & Filter ───────────────────────────────────
-  async searchModels(filter: {
-    thinking?: boolean;
-    functionCalling?: boolean;
-    vision?: boolean;
-    video?: boolean;
-    audio?: boolean;
-    modelType?: string;
-    loaded?: boolean;
-    query?: string;
-  } = {}): Promise<Array<{ instanceId: string; model: ModelEntry }>> {
+  async searchModels(
+    filter: {
+      thinking?: boolean;
+      functionCalling?: boolean;
+      vision?: boolean;
+      video?: boolean;
+      audio?: boolean;
+      modelType?: string;
+      loaded?: boolean;
+      query?: string;
+    } = {},
+  ): Promise<Array<{ instanceId: string; model: ModelEntry }>> {
     const allModels = await this.discoverModels();
     const results: Array<{ instanceId: string; model: ModelEntry }> = [];
 
@@ -272,7 +297,7 @@ class LocalProviderGateway {
       modelType?: string;
       loaded?: boolean;
       query?: string;
-    }
+    },
   ): boolean {
     if (filter.thinking && !model.thinking) return false;
     if (filter.functionCalling && !model.tools?.includes("Tool Calling"))
@@ -374,7 +399,7 @@ class LocalProviderGateway {
    */
   async resolveProvider(
     modelName: string,
-    { timeoutMs = 3000 }: { timeoutMs?: number } = {}
+    { timeoutMs = 3000 }: { timeoutMs?: number } = {},
   ): Promise<{
     instanceId: string;
     type: string;
@@ -384,7 +409,9 @@ class LocalProviderGateway {
 
     const checks = await Promise.allSettled(
       instances.map(async (instance: InstanceEntry) => {
-        const provider = getProvider(instance.id) as GenericProvider | undefined;
+        const provider = getProvider(instance.id) as
+          | GenericProvider
+          | undefined;
         if (!provider?.listModels) return null;
 
         const result = (await withTimeoutFallback(
@@ -394,7 +421,10 @@ class LocalProviderGateway {
         )) as ListModelsResponse | null | undefined;
         const models = result?.models || result?.data || [];
         const found = models.some((modelEntry: Record<string, unknown>) => {
-          const key = (modelEntry.key || modelEntry.id || modelEntry.model || modelEntry.name) as string | undefined;
+          const key = (modelEntry.key ||
+            modelEntry.id ||
+            modelEntry.model ||
+            modelEntry.name) as string | undefined;
           return key === modelName;
         });
         return found ? instance : null;
@@ -424,13 +454,17 @@ class LocalProviderGateway {
    * For providers that expose checkHealth() (llama.cpp), uses that.
    * For others, performs a lightweight listModels() probe.
    */
-  async checkHealth(timeoutMs: number = 3000): Promise<Record<string, unknown>> {
+  async checkHealth(
+    timeoutMs: number = 3000,
+  ): Promise<Record<string, unknown>> {
     const instances = listInstances();
     const health: Record<string, unknown> = {};
 
     const results = await Promise.allSettled(
       instances.map(async (instance: InstanceEntry) => {
-        const provider = getProvider(instance.id) as GenericProvider | undefined;
+        const provider = getProvider(instance.id) as
+          | GenericProvider
+          | undefined;
 
         // Prefer native health check if available
         if (provider?.checkHealth) {
@@ -481,7 +515,12 @@ class LocalProviderGateway {
           }
         }
 
-        return { id: instance.id, type: instance.type, ok: false, status: "no_probe" };
+        return {
+          id: instance.id,
+          type: instance.type,
+          ok: false,
+          status: "no_probe",
+        };
       }),
     );
 
@@ -501,14 +540,17 @@ class LocalProviderGateway {
    * Estimate VRAM usage for a GGUF model served by a local provider.
    * Primarily useful for LM Studio models that report GGUF metadata.
    */
-  estimateVRAM(modelData: LmStudioRawModel | null | undefined, options: {
-    gpuLayers?: number;
-    contextLength?: number;
-    offloadKvCache?: boolean;
-    flashAttention?: boolean;
-    gpuTotalGiB?: number;
-    gpuBaselineGiB?: number;
-  } = {}): Record<string, unknown> | null {
+  estimateVRAM(
+    modelData: LmStudioRawModel | null | undefined,
+    options: {
+      gpuLayers?: number;
+      contextLength?: number;
+      offloadKvCache?: boolean;
+      flashAttention?: boolean;
+      gpuTotalGiB?: number;
+      gpuBaselineGiB?: number;
+    } = {},
+  ): Record<string, unknown> | null {
     return estimateVRAM(modelData, options);
   }
 
@@ -516,14 +558,18 @@ class LocalProviderGateway {
    * Estimate VRAM for a model by its key on a specific instance.
    * Fetches model metadata from the provider, then runs estimateVRAM.
    */
-  async estimateVRAMForModel(instanceId: string, modelKey: string, options: {
-    gpuLayers?: number;
-    contextLength?: number;
-    offloadKvCache?: boolean;
-    flashAttention?: boolean;
-    gpuTotalGiB?: number;
-    gpuBaselineGiB?: number;
-  } = {}): Promise<Record<string, unknown> | null> {
+  async estimateVRAMForModel(
+    instanceId: string,
+    modelKey: string,
+    options: {
+      gpuLayers?: number;
+      contextLength?: number;
+      offloadKvCache?: boolean;
+      flashAttention?: boolean;
+      gpuTotalGiB?: number;
+      gpuBaselineGiB?: number;
+    } = {},
+  ): Promise<Record<string, unknown> | null> {
     return estimateVRAMForModel(instanceId, modelKey, options);
   }
 
@@ -537,7 +583,7 @@ class LocalProviderGateway {
     instanceId: string,
     modelKey: string,
     options: Record<string, unknown> = {},
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<unknown> {
     const provider = getProvider(instanceId) as GenericProvider | undefined;
     if (!provider?.loadModel) {
@@ -555,7 +601,7 @@ class LocalProviderGateway {
     modelKey: string,
     options: Record<string, unknown> = {},
     signal?: AbortSignal,
-    onStatus?: (status: unknown) => void
+    onStatus?: (status: unknown) => void,
   ): Promise<unknown> {
     const provider = getProvider(instanceId) as GenericProvider | undefined;
     if (!provider?.ensureModelLoaded) {
@@ -566,7 +612,10 @@ class LocalProviderGateway {
     return provider.ensureModelLoaded(modelKey, options, signal, onStatus);
   }
 
-  async unloadModel(instanceId: string, modelInstanceId: string): Promise<unknown> {
+  async unloadModel(
+    instanceId: string,
+    modelInstanceId: string,
+  ): Promise<unknown> {
     const provider = getProvider(instanceId) as GenericProvider | undefined;
     if (!provider?.unloadModel) {
       throw new Error(
@@ -588,7 +637,7 @@ class LocalProviderGateway {
   applyLocalDefaults(
     providerName: string,
     options: Record<string, unknown>,
-    clientParams: Record<string, unknown> = {}
+    clientParams: Record<string, unknown> = {},
   ): Record<string, unknown> {
     if (!this.isLocal(providerName)) return options;
 
@@ -614,7 +663,7 @@ class LocalProviderGateway {
     messages: unknown,
     model: string,
     options: Record<string, unknown> = {},
-    instanceId?: string
+    instanceId?: string,
   ): Promise<unknown> {
     const provider = await this._getProviderForModel(model, instanceId);
     if (!provider.generateText) {
@@ -631,7 +680,7 @@ class LocalProviderGateway {
     messages: unknown,
     model: string,
     options: Record<string, unknown> = {},
-    instanceId?: string
+    instanceId?: string,
   ): AsyncGenerator<unknown> {
     const provider = await this._getProviderForModel(model, instanceId);
     if (!provider.generateTextStream) {
@@ -644,7 +693,7 @@ class LocalProviderGateway {
     content: string,
     model: string,
     options: Record<string, unknown> = {},
-    instanceId?: string
+    instanceId?: string,
   ): Promise<unknown> {
     const provider = await this._getProviderForModel(model, instanceId);
     if (!provider.generateEmbedding) {
@@ -658,7 +707,7 @@ class LocalProviderGateway {
     prompt: unknown,
     model: string,
     systemPrompt?: unknown,
-    instanceId?: string
+    instanceId?: string,
   ): Promise<unknown> {
     const provider = await this._getProviderForModel(model, instanceId);
     if (!provider.captionImage) {
@@ -673,7 +722,10 @@ class LocalProviderGateway {
    * Get the provider for a model, either by explicit instance or auto-routing.
    * @private
    */
-  async _getProviderForModel(model: string, instanceId?: string): Promise<GenericProvider> {
+  async _getProviderForModel(
+    model: string,
+    instanceId?: string,
+  ): Promise<GenericProvider> {
     if (instanceId) {
       const provider = getProvider(instanceId) as GenericProvider | undefined;
       if (!provider) {

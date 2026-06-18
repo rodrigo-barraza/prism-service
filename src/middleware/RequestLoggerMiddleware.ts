@@ -10,7 +10,11 @@ import { requestContext } from "../utils/RequestContext.ts";
  *   2. Logs every completed request with identity, IP, method, path,
  *      status, timing, and transfer sizes.
  */
-export function requestLoggerMiddleware(req: Request, res: Response, next: NextFunction) {
+export function requestLoggerMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
   const start = performance.now();
 
   // Resolve identity + IP early (before authMiddleware for admin/files routes)
@@ -26,7 +30,10 @@ export function requestLoggerMiddleware(req: Request, res: Response, next: NextF
     }
   }
   const forwardedFor = req.headers["x-forwarded-for"];
-  const forwardedIp = typeof forwardedFor === "string" ? forwardedFor.split(",")[0]?.trim() : null;
+  const forwardedIp =
+    typeof forwardedFor === "string"
+      ? forwardedFor.split(",")[0]?.trim()
+      : null;
   const rawIp = req.clientIp || forwardedIp || req.ip || null;
   // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1)
   const clientIp = rawIp?.replace(/^::ffff:/, "") || rawIp;
@@ -36,9 +43,14 @@ export function requestLoggerMiddleware(req: Request, res: Response, next: NextF
   res.on("finish", () => {
     // Skip SSE streaming requests — those are logged in detail by the route handlers
     const contentType = res.getHeader("content-type") || "";
-    if (typeof contentType === "string" && contentType.includes("text/event-stream")) return;
+    if (
+      typeof contentType === "string" &&
+      contentType.includes("text/event-stream")
+    )
+      return;
     // Skip binary audio streams — logged by route handler
-    if (typeof contentType === "string" && contentType.includes("audio/")) return;
+    if (typeof contentType === "string" && contentType.includes("audio/"))
+      return;
 
     const elapsed = performance.now() - start;
     // Re-read project/username in case authMiddleware set them after us
@@ -58,7 +70,10 @@ export function requestLoggerMiddleware(req: Request, res: Response, next: NextF
     // Request / response sizes (from headers — zero-cost)
     const inBytes = parseInt(req.headers["content-length"] || "0", 10);
     const outHeader = res.getHeader("content-length");
-    const outBytes = parseInt(typeof outHeader === "string" ? outHeader : "0", 10);
+    const outBytes = parseInt(
+      typeof outHeader === "string" ? outHeader : "0",
+      10,
+    );
     const totalBytes = inBytes + outBytes;
     const sizeTag = `(in: ${formatBytes(inBytes)}, out: ${formatBytes(outBytes)}, total: ${formatBytes(totalBytes)})`;
 

@@ -18,7 +18,7 @@ router.get(
       const agents = await CustomAgentService.list();
       res.json(agents);
     } catch (error: unknown) {
-            logger.error(`GET /custom-agents error: ${getErrorMessage(error)}`);
+      logger.error(`GET /custom-agents error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -44,10 +44,10 @@ router.post(
 
       res.status(201).json(created);
     } catch (error: unknown) {
-            if (getErrorMessage(error)?.includes("already exists")) {
-                return res.status(409).json({ error: getErrorMessage(error) });
+      if (getErrorMessage(error)?.includes("already exists")) {
+        return res.status(409).json({ error: getErrorMessage(error) });
       }
-            logger.error(`POST /custom-agents error: ${getErrorMessage(error)}`);
+      logger.error(`POST /custom-agents error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -85,10 +85,10 @@ router.put(
 
       res.json(updated);
     } catch (error: unknown) {
-            if (getErrorMessage(error)?.includes("already exists")) {
-                return res.status(409).json({ error: getErrorMessage(error) });
+      if (getErrorMessage(error)?.includes("already exists")) {
+        return res.status(409).json({ error: getErrorMessage(error) });
       }
-            logger.error(`PUT /custom-agents/:id error: ${getErrorMessage(error)}`);
+      logger.error(`PUT /custom-agents/:id error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -115,7 +115,9 @@ router.delete(
 
       res.json({ success: true });
     } catch (error: unknown) {
-            logger.error(`DELETE /custom-agents/:id error: ${getErrorMessage(error)}`);
+      logger.error(
+        `DELETE /custom-agents/:id error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),

@@ -4,7 +4,10 @@ import type { Request, Response, NextFunction } from "express";
 import { COLLECTIONS, COST_SUM_EXPR } from "../../constants.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
-import { applyDateRangeFilter, parsePaginationParams } from "../../utils/QueryBuilders.ts";
+import {
+  applyDateRangeFilter,
+  parsePaginationParams,
+} from "../../utils/QueryBuilders.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
 
 const router = express.Router();
@@ -33,7 +36,9 @@ router.get(
         sort = "createdAt",
       } = req.query;
 
-      const { skip, limit, page, sortDirection } = parsePaginationParams(req.query);
+      const { skip, limit, page, sortDirection } = parsePaginationParams(
+        req.query,
+      );
 
       const filter: Record<string, unknown> = {};
       if (guildId) filter.guildId = guildId;
@@ -104,8 +109,11 @@ router.get(
         return res.status(400).json({ error: "Invalid workflow ID" });
       }
 
-      const document = await req.db.collection(WORKFLOWS_COLLECTION).findOne({ _id: objectId });
-      if (!document) return res.status(404).json({ error: "Workflow not found" });
+      const document = await req.db
+        .collection(WORKFLOWS_COLLECTION)
+        .findOne({ _id: objectId });
+      if (!document)
+        return res.status(404).json({ error: "Workflow not found" });
 
       res.json(document);
     } catch (error: unknown) {
@@ -120,15 +128,7 @@ router.get(
   "/media",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const {
-        type,
-        origin,
-        search,
-        project,
-        username,
-        from,
-        to,
-      } = req.query;
+      const { type, origin, search, project, username, from, to } = req.query;
 
       const { skip, limit, page } = parsePaginationParams(req.query);
 
@@ -327,7 +327,9 @@ router.get(
         }
       }
 
-      const seenUrls = new Set(convItems.map((i: Record<string, unknown>) => i.url));
+      const seenUrls = new Set(
+        convItems.map((i: Record<string, unknown>) => i.url),
+      );
       const mergedItems = [...convItems];
       for (const item of requestGenItems) {
         if (!seenUrls.has(item.url)) {
@@ -336,11 +338,16 @@ router.get(
         }
       }
 
-      mergedItems.sort((firstItem: Record<string, unknown>, secondItem: Record<string, unknown>) => {
-        const timestampA = firstItem.timestamp || "";
-        const timestampB = secondItem.timestamp || "";
-        return timestampA < timestampB ? 1 : timestampA > timestampB ? -1 : 0;
-      });
+      mergedItems.sort(
+        (
+          firstItem: Record<string, unknown>,
+          secondItem: Record<string, unknown>,
+        ) => {
+          const timestampA = firstItem.timestamp || "";
+          const timestampB = secondItem.timestamp || "";
+          return timestampA < timestampB ? 1 : timestampA > timestampB ? -1 : 0;
+        },
+      );
 
       const total = mergedItems.length;
       const paginatedItems = mergedItems.slice(skip, skip + limit);
@@ -378,13 +385,7 @@ router.get(
   "/text",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const {
-        origin,
-        search,
-        project,
-        from,
-        to,
-      } = req.query;
+      const { origin, search, project, from, to } = req.query;
 
       const { skip, limit, page } = parsePaginationParams(req.query);
 
@@ -428,7 +429,10 @@ router.get(
         });
       }
 
-      const countPipeline: Record<string, unknown>[] = [...pipeline, { $count: "total" }];
+      const countPipeline: Record<string, unknown>[] = [
+        ...pipeline,
+        { $count: "total" },
+      ];
       const [countResult] = await req.db
         .collection(CONVERSATIONS_COLLECTION)
         .aggregate(countPipeline)

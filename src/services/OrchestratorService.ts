@@ -7,8 +7,12 @@ import {
   getInstanceType,
 } from "../providers/instance-registry.ts";
 
-
-import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES, DEFAULT_TOPOLOGY, TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+  DEFAULT_TOPOLOGY,
+  TOPOLOGIES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import localModelQueue from "./LocalModelQueue.ts";
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "./OrchestratorPrompt.ts";
@@ -53,33 +57,34 @@ type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
 // Called when the LLM invokes create_team / send_message / stop_agent
 // ────────────────────────────────────────────────────────────
 
-
 /** Max parallel sub-agents */
 const MAX_SUB_AGENTS = 10;
 
 /** Max iterations per sub-agent agentic loop */
 const MAX_SUB_AGENT_ITERATIONS = 15;
 
-
-
 /**
  * Resolve the user-configured sub-agent provider/model from settings.
  * Returns null when no sub-agent model is configured — callers should
  * keep the local provider (queuing) when this returns null.
  */
-async function getSubAgentFallback(): Promise<{ provider: string; model: string } | null> {
+async function getSubAgentFallback(): Promise<{
+  provider: string;
+  model: string;
+} | null> {
   try {
     const agents = await SettingsService.getSection("agents");
     if (agents?.subAgentProvider && agents?.subAgentModel) {
-      return { provider: agents.subAgentProvider as string, model: agents.subAgentModel as string };
+      return {
+        provider: agents.subAgentProvider as string,
+        model: agents.subAgentModel as string,
+      };
     }
     return null;
   } catch {
     return null;
   }
 }
-
-
 
 /** Active sub-agents spawned via chat tools, keyed by agentId */
 const activeSubAgents = new Map<string, SubAgentState>();
@@ -131,7 +136,8 @@ registerCleanup(async () => {
 // ────────────────────────────────────────────────────────────
 
 export default class OrchestratorService {
-  private static agenticLoopServicePromise: Promise<AgenticLoopServiceModule> | null = null;
+  private static agenticLoopServicePromise: Promise<AgenticLoopServiceModule> | null =
+    null;
   private static getAgenticLoopService() {
     if (!this.agenticLoopServicePromise) {
       this.agenticLoopServicePromise = import("./AgenticLoopService.js");
@@ -276,17 +282,25 @@ export default class OrchestratorService {
 
     const agentId = `agent-${(++agentCounter).toString(36)}-${crypto.randomUUID().slice(0, 4)}`;
     const branchName = `orchestrator/${agentId}`;
-    const workspaceRoot = GitWorktreeHelper.getDefaultWorkspaceRoot(orchestratorWorkspaceRoot ?? undefined);
+    const workspaceRoot = GitWorktreeHelper.getDefaultWorkspaceRoot(
+      orchestratorWorkspaceRoot ?? undefined,
+    );
 
     // Derive the git repository path from sub-agent files.
     // If files live under a git subdirectory (e.g. /workspace/projectA/),
     // use that as the worktree source. Otherwise fall back to workspace root.
-    const repositoryPath = GitWorktreeHelper.resolveRepositoryPath(workspaceRoot, files || []);
+    const repositoryPath = GitWorktreeHelper.resolveRepositoryPath(
+      workspaceRoot,
+      files || [],
+    );
 
     // Attempt git worktree creation — best-effort
     // Non-git workspaces gracefully degrade to shared directory mode
     let worktreePath = null;
-    const worktreeResult = await GitWorktreeHelper.createWorktree(repositoryPath, branchName);
+    const worktreeResult = await GitWorktreeHelper.createWorktree(
+      repositoryPath,
+      branchName,
+    );
     if (worktreeResult.error) {
       logger.warn(
         `[Orchestrator] Worktree creation skipped for ${agentId}: ${worktreeResult.error}. Running in workspace root.`,
@@ -411,7 +425,10 @@ export default class OrchestratorService {
 
     // Notify UI that sub-agent state changed
     if (orchestratorContext.emit) {
-      orchestratorContext.emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: STATUS_MESSAGES.SUB_AGENTS_UPDATED });
+      orchestratorContext.emit({
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
+      });
     }
 
     const subAgentResult = buildSubAgentResult(subAgentState);
@@ -426,7 +443,9 @@ export default class OrchestratorService {
     agentId: string,
     message: string,
     orchestratorContext: OrchestratorContext,
-  ): Promise<{ error: string } | { agent_id: string; status: string; message: string }> {
+  ): Promise<
+    { error: string } | { agent_id: string; status: string; message: string }
+  > {
     const subAgent = activeSubAgents.get(agentId);
     if (!subAgent) {
       return { error: `Sub-agent "${agentId}" not found` };
@@ -453,17 +472,21 @@ export default class OrchestratorService {
     subAgent.status = "running";
     subAgent.startedAt = Date.now();
 
-    logger.info(`[Orchestrator] Continuing sub-agent ${agentId} with follow-up`);
-
-    OrchestratorService._runSubAgentLoop(subAgent, message, orchestratorContext).catch(
-      (error: unknown) => {
-        logger.error(
-          `[Orchestrator] Sub-agent ${agentId} continuation error: ${getErrorMessage(error)}`,
-        );
-        subAgent.status = "failed";
-        subAgent.error = getErrorMessage(error);
-      },
+    logger.info(
+      `[Orchestrator] Continuing sub-agent ${agentId} with follow-up`,
     );
+
+    OrchestratorService._runSubAgentLoop(
+      subAgent,
+      message,
+      orchestratorContext,
+    ).catch((error: unknown) => {
+      logger.error(
+        `[Orchestrator] Sub-agent ${agentId} continuation error: ${getErrorMessage(error)}`,
+      );
+      subAgent.status = "failed";
+      subAgent.error = getErrorMessage(error);
+    });
 
     return {
       agent_id: agentId,
@@ -487,7 +510,10 @@ export default class OrchestratorService {
 
     // Clean up worktree (only if sub-agent was running in an isolated worktree)
     if (subAgent.isolated && subAgent.worktreePath) {
-      await GitWorktreeHelper.removeWorktree(subAgent.repositoryPath, subAgent.worktreePath);
+      await GitWorktreeHelper.removeWorktree(
+        subAgent.repositoryPath,
+        subAgent.worktreePath,
+      );
       subAgent.worktreePath = null;
     }
 
@@ -503,9 +529,7 @@ export default class OrchestratorService {
    * Read the output from a previously spawned sub-agent.
    * Returns the full result if completed, or partial status if still running.
    */
-  static getTaskOutput(
-    agentId: string,
-  ):
+  static getTaskOutput(agentId: string):
     | SubAgentResult
     | { error: string }
     | {
@@ -537,7 +561,9 @@ export default class OrchestratorService {
     return subAgentResult;
   }
 
-  static async abortSubAgentsByConversation(parentConversationId: string): Promise<void> {
+  static async abortSubAgentsByConversation(
+    parentConversationId: string,
+  ): Promise<void> {
     const sessionSubAgents = [...activeSubAgents.values()].filter(
       (subAgent) => subAgent.parentConversationId === parentConversationId,
     );
@@ -558,7 +584,10 @@ export default class OrchestratorService {
       // Cleanup isolated worktrees immediately
       const cleanupPromise =
         subAgent.isolated && subAgent.worktreePath
-          ? GitWorktreeHelper.removeWorktree(subAgent.repositoryPath, subAgent.worktreePath)
+          ? GitWorktreeHelper.removeWorktree(
+              subAgent.repositoryPath,
+              subAgent.worktreePath,
+            )
               .then(() => {
                 subAgent.worktreePath = null;
               })
@@ -593,7 +622,9 @@ export default class OrchestratorService {
     };
   }
 
-  static listSubAgents({ parentConversationId }: { parentConversationId?: string } = {}): Array<{
+  static listSubAgents({
+    parentConversationId,
+  }: { parentConversationId?: string } = {}): Array<{
     agentId: string;
     description: string;
     status: string;
@@ -609,7 +640,9 @@ export default class OrchestratorService {
   }> {
     let list = Array.from(activeSubAgents.values());
     if (parentConversationId) {
-      list = list.filter((subAgent) => subAgent.parentConversationId === parentConversationId);
+      list = list.filter(
+        (subAgent) => subAgent.parentConversationId === parentConversationId,
+      );
     }
     return list.map((subAgent) => ({
       agentId: subAgent.agentId,
@@ -618,7 +651,9 @@ export default class OrchestratorService {
       providerName: subAgent.providerName,
       resolvedModel: subAgent.resolvedModel,
       durationMs:
-        subAgent.status === "running" ? Date.now() - subAgent.startedAt : subAgent.durationMs,
+        subAgent.status === "running"
+          ? Date.now() - subAgent.startedAt
+          : subAgent.durationMs,
       toolUses: subAgent.toolCalls?.length || 0,
       hasChanges: subAgent.diff?.hasChanges || false,
       totalCost: subAgent.totalCost,
@@ -638,7 +673,9 @@ export default class OrchestratorService {
     for (const key of keys) {
       activeSubAgents.delete(key);
     }
-    logger.info(`[Orchestrator] Cleaned up session ${parentAgentSessionId} from active registry`);
+    logger.info(
+      `[Orchestrator] Cleaned up session ${parentAgentSessionId} from active registry`,
+    );
   }
 
   static async createTeam(
@@ -650,9 +687,17 @@ export default class OrchestratorService {
 
     const settings = await SettingsService.getSection("agents");
     const topology =
-      args.topology || orchestratorContext.topology || settings?.topology || DEFAULT_TOPOLOGY;
+      args.topology ||
+      orchestratorContext.topology ||
+      settings?.topology ||
+      DEFAULT_TOPOLOGY;
 
-    const validTopologies = [TOPOLOGIES.HIERARCHICAL, TOPOLOGIES.SEQUENTIAL, TOPOLOGIES.PEER_TO_PEER, "p2p"];
+    const validTopologies = [
+      TOPOLOGIES.HIERARCHICAL,
+      TOPOLOGIES.SEQUENTIAL,
+      TOPOLOGIES.PEER_TO_PEER,
+      "p2p",
+    ];
     if (!validTopologies.includes(topology)) {
       const errorMessage = `Invalid topology: "${topology}". Available topologies are: hierarchical, sequential, peer_to_peer.`;
       logger.error(`[Orchestrator] createTeam: ${errorMessage}`);
@@ -660,7 +705,8 @@ export default class OrchestratorService {
     }
 
     if (!args || !args.members || !Array.isArray(args.members)) {
-      const errorMessage = "Invalid or missing 'members' array in createTeam arguments.";
+      const errorMessage =
+        "Invalid or missing 'members' array in createTeam arguments.";
       logger.error(`[Orchestrator] createTeam: ${errorMessage}`);
       return [{ error: errorMessage }];
     }
@@ -674,11 +720,17 @@ export default class OrchestratorService {
     // Return an actionable error so the orchestrator LLM can retry with proper prompts.
     const membersWithMissingPrompts = args.members
       .map((member, memberIndex) => ({ member, memberIndex }))
-      .filter(({ member }) => !member.prompt || typeof member.prompt !== "string" || member.prompt.trim().length === 0);
+      .filter(
+        ({ member }) =>
+          !member.prompt ||
+          typeof member.prompt !== "string" ||
+          member.prompt.trim().length === 0,
+      );
 
     if (membersWithMissingPrompts.length > 0) {
       const missingDescriptions = membersWithMissingPrompts.map(
-        ({ member, memberIndex }) => `member[${memberIndex}] "${member.description || "(no description)"}"`
+        ({ member, memberIndex }) =>
+          `member[${memberIndex}] "${member.description || "(no description)"}"`,
       );
       const errorMessage = `${membersWithMissingPrompts.length} member(s) have missing or empty prompts: ${missingDescriptions.join(", ")}. Every member requires a non-empty 'prompt' field with a self-contained task description.`;
       logger.error(`[Orchestrator] createTeam: ${errorMessage}`);
@@ -689,10 +741,15 @@ export default class OrchestratorService {
     if (orchestratorContext.conversationId) {
       try {
         const { MONGO_DB_NAME: dbName } = await import("../../config.ts");
-        const { COLLECTIONS: collectionNames } = await import("../constants.ts");
-        const MongoWrapper = (await import("../wrappers/MongoWrapper.ts")).default;
-        const dbCollection = MongoWrapper.getCollection(dbName, collectionNames.AGENT_CONVERSATIONS);
-        
+        const { COLLECTIONS: collectionNames } =
+          await import("../constants.ts");
+        const MongoWrapper = (await import("../wrappers/MongoWrapper.ts"))
+          .default;
+        const dbCollection = MongoWrapper.getCollection(
+          dbName,
+          collectionNames.AGENT_CONVERSATIONS,
+        );
+
         if (dbCollection) {
           await dbCollection.updateOne(
             { id: orchestratorContext.conversationId },
@@ -701,28 +758,31 @@ export default class OrchestratorService {
                 "settings.agents.topology": topology,
                 updatedAt: new Date().toISOString(),
               },
-            }
+            },
           );
           logger.info(
-            `[Orchestrator] Updated session settings topology to "${topology}" for conversation ${orchestratorContext.conversationId}`
+            `[Orchestrator] Updated session settings topology to "${topology}" for conversation ${orchestratorContext.conversationId}`,
           );
         }
       } catch (databaseError: unknown) {
         logger.warn(
-          `[Orchestrator] Failed to update session settings topology in MongoDB: ${getErrorMessage(databaseError)}`
+          `[Orchestrator] Failed to update session settings topology in MongoDB: ${getErrorMessage(databaseError)}`,
         );
       }
     }
 
     let router: TopologyRouter;
     if (topology === TOPOLOGIES.SEQUENTIAL) {
-      const { SequentialRouter } = await import("./orchestrator/routers/SequentialRouter.ts");
+      const { SequentialRouter } =
+        await import("./orchestrator/routers/SequentialRouter.ts");
       router = new SequentialRouter();
     } else if (topology === TOPOLOGIES.PEER_TO_PEER || topology === "p2p") {
-      const { PeerToPeerRouter } = await import("./orchestrator/routers/PeerToPeerRouter.ts");
+      const { PeerToPeerRouter } =
+        await import("./orchestrator/routers/PeerToPeerRouter.ts");
       router = new PeerToPeerRouter();
     } else {
-      const { HierarchicalRouter } = await import("./orchestrator/routers/HierarchicalRouter.ts");
+      const { HierarchicalRouter } =
+        await import("./orchestrator/routers/HierarchicalRouter.ts");
       router = new HierarchicalRouter();
     }
 
@@ -730,12 +790,15 @@ export default class OrchestratorService {
       args.name,
       args.members,
       orchestratorContext,
-      (assignment: OrchestratorSpawnParams) => OrchestratorService.spawnFromTool(assignment),
+      (assignment: OrchestratorSpawnParams) =>
+        OrchestratorService.spawnFromTool(assignment),
     );
 
     const teamEntry = {
       agentIds: spawnResults
-        .map((result: SubAgentResult | { error: string }) => ("agent_id" in result ? result.agent_id : undefined))
+        .map((result: SubAgentResult | { error: string }) =>
+          "agent_id" in result ? result.agent_id : undefined,
+        )
         .filter(Boolean) as string[],
       createdAt: Date.now(),
     };
@@ -747,19 +810,26 @@ export default class OrchestratorService {
     return spawnResults;
   }
 
-  static async deleteTeam(teamName: string, orchestratorContext?: OrchestratorContext) {
+  static async deleteTeam(
+    teamName: string,
+    orchestratorContext?: OrchestratorContext,
+  ) {
     const parentConversationId = orchestratorContext?.conversationId;
 
     // Find all sub-agents belonging to this orchestrator session
-    const teamSubAgents = [...activeSubAgents.entries()].filter(([, subAgent]) => {
-      if (parentConversationId) {
-        return subAgent.parentConversationId === parentConversationId;
-      }
-      return false;
-    });
+    const teamSubAgents = [...activeSubAgents.entries()].filter(
+      ([, subAgent]) => {
+        if (parentConversationId) {
+          return subAgent.parentConversationId === parentConversationId;
+        }
+        return false;
+      },
+    );
 
     if (teamSubAgents.length === 0) {
-      logger.info(`[Orchestrator] deleteTeam "${teamName}": no active sub-agents found`);
+      logger.info(
+        `[Orchestrator] deleteTeam "${teamName}": no active sub-agents found`,
+      );
       return { name: teamName, deleted: true, subAgentsAborted: 0 };
     }
 
@@ -789,7 +859,10 @@ export default class OrchestratorService {
         const subAgentRepositoryPath = subAgent.repositoryPath;
         const subAgentId = subAgent.agentId;
         cleanupPromises.push(
-          GitWorktreeHelper.removeWorktree(subAgentRepositoryPath, subAgentWorktreePath)
+          GitWorktreeHelper.removeWorktree(
+            subAgentRepositoryPath,
+            subAgentWorktreePath,
+          )
             .then(() => {
               subAgent.worktreePath = null;
             })
@@ -824,7 +897,11 @@ export default class OrchestratorService {
    * Run the sub-agent's agentic loop in its isolated worktree.
    * @private
    */
-  static async _runSubAgentLoop(subAgent: SubAgentState, prompt: string, orchestratorContext: OrchestratorContext) {
+  static async _runSubAgentLoop(
+    subAgent: SubAgentState,
+    prompt: string,
+    orchestratorContext: OrchestratorContext,
+  ) {
     const { default: AgenticLoopService } =
       await OrchestratorService.getAgenticLoopService();
 
@@ -834,8 +911,9 @@ export default class OrchestratorService {
       : `- Report what you accomplished when done`;
 
     const workspaceRoots = ToolOrchestratorService.getWorkspaceRoots();
-    const hasWorkspaceSetup = Array.isArray(workspaceRoots) && workspaceRoots.length > 0;
-    
+    const hasWorkspaceSetup =
+      Array.isArray(workspaceRoots) && workspaceRoots.length > 0;
+
     let isWorkspaceAvailable = false;
     if (hasWorkspaceSetup) {
       isWorkspaceAvailable = workspaceRoots.some((rootPath) => {
@@ -890,14 +968,16 @@ export default class OrchestratorService {
     if (subAgent.enabledTools) {
       const orchestratorToolNames = new Set(ORCHESTRATOR_ONLY_TOOLS);
       subAgentEnabledTools = subAgent.enabledTools.filter(
-        (name) => !orchestratorToolNames.has(name)
+        (name) => !orchestratorToolNames.has(name),
       );
     }
 
     if (!subAgentEnabledTools) {
       const settings = await SettingsService.getSection("agents");
-      const defaultTopology = orchestratorContext.topology || settings?.topology || DEFAULT_TOPOLOGY;
-      const allToolSchemas = ToolOrchestratorService.getToolSchemas(defaultTopology);
+      const defaultTopology =
+        orchestratorContext.topology || settings?.topology || DEFAULT_TOPOLOGY;
+      const allToolSchemas =
+        ToolOrchestratorService.getToolSchemas(defaultTopology);
       const orchestratorToolNames = new Set(ORCHESTRATOR_ONLY_TOOLS);
       subAgentEnabledTools = allToolSchemas
         .map((toolSchema) => toolSchema.name)
@@ -1008,19 +1088,26 @@ export default class OrchestratorService {
     subAgent.abortController = null;
     // Remove worktree now that the diff has been collected — prevents orphaned
     // worktrees from accumulating on disk across sessions.
-    if (subAgent.status !== "stopped" && subAgent.isolated && subAgent.worktreePath) {
-      await GitWorktreeHelper.removeWorktree(subAgent.repositoryPath, subAgent.worktreePath).catch(
-        (error: unknown) =>
-          logger.warn(
-            `[Orchestrator] Post-completion worktree cleanup failed for ${subAgent.agentId}: ${getErrorMessage(error)}`,
-          ),
+    if (
+      subAgent.status !== "stopped" &&
+      subAgent.isolated &&
+      subAgent.worktreePath
+    ) {
+      await GitWorktreeHelper.removeWorktree(
+        subAgent.repositoryPath,
+        subAgent.worktreePath,
+      ).catch((error: unknown) =>
+        logger.warn(
+          `[Orchestrator] Post-completion worktree cleanup failed for ${subAgent.agentId}: ${getErrorMessage(error)}`,
+        ),
       );
     }
 
     // Transfer cost/usage/iterations captured by telemetry from streamed events
     subAgent.totalCost = telemetry.totalCost;
     subAgent.usage = telemetry.usage;
-    if (telemetry.iterations != null) subAgent.iterations = telemetry.iterations;
+    if (telemetry.iterations != null)
+      subAgent.iterations = telemetry.iterations;
 
     // Notify frontend immediately so the per-sub-agent StatusBar updates
     // from "Generating..." to a completed state.

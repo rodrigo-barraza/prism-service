@@ -37,14 +37,24 @@ You have access to ALL tools in the system — coding, web, health, finance, sma
 - Use git tools to track changes
 - Use execute_command for shell operations
 - Use LSP tools for code intelligence`,
-    requires: [TOOL_NAMES.READ_FILE, TOOL_NAMES.STRING_REPLACE_FILE, TOOL_NAMES.WRITE_FILE, TOOL_NAMES.GREP_SEARCH, TOOL_NAMES.RUN_COMMAND],
+    requires: [
+      TOOL_NAMES.READ_FILE,
+      TOOL_NAMES.STRING_REPLACE_FILE,
+      TOOL_NAMES.WRITE_FILE,
+      TOOL_NAMES.GREP_SEARCH,
+      TOOL_NAMES.RUN_COMMAND,
+    ],
   },
   {
     content: `## Research & Knowledge Tools
 - Use search_web for current information
 - Use Wikipedia, arXiv, and knowledge tools for research
 - Use trend tools for social and market trends`,
-    requires: [TOOL_NAMES.SEARCH_WEB, TOOL_NAMES.GET_WIKIPEDIA_SUMMARY, TOOL_NAMES.GET_TRENDS],
+    requires: [
+      TOOL_NAMES.SEARCH_WEB,
+      TOOL_NAMES.GET_WIKIPEDIA_SUMMARY,
+      TOOL_NAMES.GET_TRENDS,
+    ],
   },
   {
     content: `## Data & Compute Tools
@@ -63,7 +73,11 @@ You have access to ALL tools in the system — coding, web, health, finance, sma
     content: `## Health & Lifestyle Tools
 - Use nutrition tools for dietary analysis
 - Use exercise tools for fitness planning`,
-    requires: [TOOL_NAMES.SEARCH_USDA_NUTRITION, TOOL_NAMES.SEARCH_GYM_EXERCISES, TOOL_NAMES.RANK_FOODS_BY_CATEGORY],
+    requires: [
+      TOOL_NAMES.SEARCH_USDA_NUTRITION,
+      TOOL_NAMES.SEARCH_GYM_EXERCISES,
+      TOOL_NAMES.RANK_FOODS_BY_CATEGORY,
+    ],
   },
   {
     content: `## Smart Home Tools
@@ -74,7 +88,12 @@ You have access to ALL tools in the system — coding, web, health, finance, sma
     content: `## Task & Memory Tools
 - Use task tools to track multi-step work
 - Use memory tools to persist important information across sessions`,
-    requires: [TOOL_NAMES.CREATE_TASK, TOOL_NAMES.LIST_TASKS, TOOL_NAMES.UPDATE_TASK, TOOL_NAMES.SAVE_MEMORY],
+    requires: [
+      TOOL_NAMES.CREATE_TASK,
+      TOOL_NAMES.LIST_TASKS,
+      TOOL_NAMES.UPDATE_TASK,
+      TOOL_NAMES.SAVE_MEMORY,
+    ],
   },
 ];
 
@@ -82,14 +101,12 @@ export const OmniPersona: Persona = {
   id: AGENT_IDS.OMNI,
   name: "Omni",
   type: "universal",
-  description: "A universal, all-domain AI assistant with access to all tools, capable of coding, research, smart home control, calculations, and creative tasks.",
+  description:
+    "A universal, all-domain AI assistant with access to all tools, capable of coding, research, smart home control, calculations, and creative tasks.",
   project: "prism-chat",
   displayOrder: 1,
   identity: () => {
-    const sections = [
-      OMNI_CORE_IDENTITY,
-      OMNI_RESPONSE_GUIDELINES,
-    ];
+    const sections = [OMNI_CORE_IDENTITY, OMNI_RESPONSE_GUIDELINES];
 
     return sections.join("\n\n");
   },
@@ -115,7 +132,11 @@ Use them proactively:
 - To delete a task that is no longer relevant or was created in error, set its status to "deleted" via update_task
 - Break large tasks into subtasks — use metadata to link related tasks
 - Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`,
-        requires: [TOOL_NAMES.CREATE_TASK, TOOL_NAMES.LIST_TASKS, TOOL_NAMES.UPDATE_TASK],
+        requires: [
+          TOOL_NAMES.CREATE_TASK,
+          TOOL_NAMES.LIST_TASKS,
+          TOOL_NAMES.UPDATE_TASK,
+        ],
       },
       {
         content: `## Proactive Memory

@@ -20,7 +20,9 @@ export class ProviderError extends Error {
     this.originalError = originalError;
     // Structured error type from provider SDKs (e.g. Anthropic's "rate_limit_error")
     this.errorType =
-      (originalError as Record<string, unknown> | null)?.type as string | null ?? null;
+      ((originalError as Record<string, unknown> | null)?.type as
+        | string
+        | null) ?? null;
   }
 
   toJSON() {

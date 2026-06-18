@@ -1,4 +1,7 @@
-import { DEFAULT_USERNAME, DEFAULT_PROJECT } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  DEFAULT_USERNAME,
+  DEFAULT_PROJECT,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import { Request, Response, NextFunction } from "express";
 import { requestContext } from "../utils/RequestContext.ts";
 
@@ -6,7 +9,11 @@ import { requestContext } from "../utils/RequestContext.ts";
  * Express middleware that attaches x-project, x-username, and x-workspace-id
  * headers to the request object for downstream route handlers.
  */
-export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+export function authMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
   // Single source of truth for project resolution.
   // Priority: query param → body → x-project header → DEFAULT_PROJECT
   req.project =
@@ -16,7 +23,10 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
     DEFAULT_PROJECT;
 
   const forwardedFor = req.headers["x-forwarded-for"];
-  const forwardedIp = typeof forwardedFor === "string" ? forwardedFor.split(",")[0]?.trim() : null;
+  const forwardedIp =
+    typeof forwardedFor === "string"
+      ? forwardedFor.split(",")[0]?.trim()
+      : null;
   const rawIp = forwardedIp || req.ip || null;
   // Normalize IPv4-mapped IPv6 addresses (::ffff:127.0.0.1 → 127.0.0.1)
   req.clientIp = rawIp?.replace(/^::ffff:/, "") || rawIp || undefined;

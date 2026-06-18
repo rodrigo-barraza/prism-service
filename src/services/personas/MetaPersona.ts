@@ -63,7 +63,11 @@ const META_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
 - Use create_custom_agent only AFTER presenting the proposed configuration to the user and receiving their approval (or if they've given you a complete spec upfront).
 - Use update_custom_agent to modify an existing custom agent after verifying its current state.
 - NEVER create or update an agent without at least a name and identity — these are required fields.`,
-    requires: [TOOL_NAMES.CREATE_CUSTOM_AGENT, TOOL_NAMES.LIST_CUSTOM_AGENTS, TOOL_NAMES.UPDATE_CUSTOM_AGENT],
+    requires: [
+      TOOL_NAMES.CREATE_CUSTOM_AGENT,
+      TOOL_NAMES.LIST_CUSTOM_AGENTS,
+      TOOL_NAMES.UPDATE_CUSTOM_AGENT,
+    ],
   },
   {
     content: `- Use search_web if you need to look up Lucide icon names, color palette ideas, or domain-specific terminology for writing the identity prompt.`,
@@ -94,7 +98,8 @@ export const MetaPersona: Persona = {
   type: "",
   project: "prism-chat",
   displayOrder: 4,
-  description: "A specialized meta-agent for designing, creating, viewing, listing, and modifying custom AI agent personas.",
+  description:
+    "A specialized meta-agent for designing, creating, viewing, listing, and modifying custom AI agent personas.",
   icon: "Bot",
   color: "#a855f7",
   identity: () => {

@@ -21,9 +21,6 @@ interface SubAgentSummary {
 
 const router = Router();
 
-
-
-
 // ═══════════════════════════════════════════════════════════════
 // Chat-Spawned Sub-Agent Endpoints
 // ═══════════════════════════════════════════════════════════════
@@ -37,7 +34,8 @@ router.get(
   "/sub-agents",
   asyncHandler(async (request: Request, response: Response) => {
     const conversationIdQuery = request.query.conversationId;
-    const conversationIdentifier = typeof conversationIdQuery === "string" ? conversationIdQuery : undefined;
+    const conversationIdentifier =
+      typeof conversationIdQuery === "string" ? conversationIdQuery : undefined;
     const activeSubAgentsList = OrchestratorService.listSubAgents({
       parentConversationId: conversationIdentifier,
     });
@@ -94,7 +92,9 @@ router.post(
   asyncHandler(async (request: Request, response: Response) => {
     const { conversationId } = request.body;
     if (!conversationId) {
-      return response.status(400).json({ error: "'conversationId' is required" });
+      return response
+        .status(400)
+        .json({ error: "'conversationId' is required" });
     }
 
     const result =

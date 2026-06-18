@@ -51,7 +51,6 @@ const ConversationService: ConversationServiceInterface = {
 
     const now = new Date().toISOString();
 
-
     // Build $set fields for metadata
     const setFields: Record<string, unknown> = { updatedAt: now };
     if (traceId) setFields.traceId = traceId;
@@ -100,9 +99,10 @@ const ConversationService: ConversationServiceInterface = {
         workspaceRoot: conversationMeta.workspaceRoot,
       }),
       // Agent identity — stored on agent sessions for per-agent filtering
-      ...(isAgentSession && conversationMeta?.agent && {
-        agent: conversationMeta.agent,
-      }),
+      ...(isAgentSession &&
+        conversationMeta?.agent && {
+          agent: conversationMeta.agent,
+        }),
       createdAt: now,
     };
 
@@ -150,15 +150,21 @@ const ConversationService: ConversationServiceInterface = {
 
     const derived: Record<string, unknown> = {
       modalities: computeModalities(conversation.messages as ChatMessage[]),
-      providers: extractProviders(conversation.messages as ChatMessage[], conversation.settings as ConversationSettings),
+      providers: extractProviders(
+        conversation.messages as ChatMessage[],
+        conversation.settings as ConversationSettings,
+      ),
       totalCost: computeTotalCost(conversation.messages as ChatMessage[]),
       modelNames: Array.from(modelNamesSet),
     };
 
     // Auto-derive a descriptive title from the first user message if the current title is missing or is 'New Conversation'
-    if (!conversation.title || conversation.title === DEFAULT_CONVERSATION_TITLE) {
+    if (
+      !conversation.title ||
+      conversation.title === DEFAULT_CONVERSATION_TITLE
+    ) {
       const firstUserMessage = (conversation.messages as ChatMessage[])?.find(
-        (chatMessage) => chatMessage.role === "user"
+        (chatMessage) => chatMessage.role === "user",
       );
       if (firstUserMessage?.content) {
         const titleSnippet = firstUserMessage.content.slice(0, 100).trim();
@@ -187,7 +193,11 @@ const ConversationService: ConversationServiceInterface = {
     project: string,
     username: string,
     generating: boolean,
-    { collection = DEFAULT_COLLECTION, agent, title }: { collection?: string; agent?: string; title?: string } = {},
+    {
+      collection = DEFAULT_COLLECTION,
+      agent,
+      title,
+    }: { collection?: string; agent?: string; title?: string } = {},
   ): Promise<void> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return;
@@ -234,7 +244,10 @@ const ConversationService: ConversationServiceInterface = {
     if (!db) return null;
 
     // Recursively discover all descendant session IDs (multi-level sub-agents)
-    const allSessionIds = await discoverDescendantSessionIds(db, sessionId, { project, username });
+    const allSessionIds = await discoverDescendantSessionIds(db, sessionId, {
+      project,
+      username,
+    });
 
     const requests = await db
       .collection(COLLECTIONS.REQUESTS)
@@ -312,11 +325,13 @@ const ConversationService: ConversationServiceInterface = {
     ).length;
 
     const createdAt = (requests as Record<string, unknown>[]).reduce(
-      (min: string | null, r) => (!min || (r.timestamp as string) < min ? (r.timestamp as string) : min),
+      (min: string | null, r) =>
+        !min || (r.timestamp as string) < min ? (r.timestamp as string) : min,
       null as string | null,
     );
     const updatedAt = (requests as Record<string, unknown>[]).reduce(
-      (max: string | null, r) => (!max || (r.timestamp as string) > max ? (r.timestamp as string) : max),
+      (max: string | null, r) =>
+        !max || (r.timestamp as string) > max ? (r.timestamp as string) : max,
       null as string | null,
     );
 
@@ -325,7 +340,8 @@ const ConversationService: ConversationServiceInterface = {
       createdAt && updatedAt
         ? Math.max(
             0,
-            (new Date(updatedAt as string).getTime() - new Date(createdAt as string).getTime()) /
+            (new Date(updatedAt as string).getTime() -
+              new Date(createdAt as string).getTime()) /
               1000,
           )
         : 0;

@@ -9,7 +9,10 @@ import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 const router = express.Router();
 
 function resolveInstanceId(req: Request) {
-  const id = (req.query.instance as string) || (req.body as Record<string, unknown>)?.instance || PROVIDERS.OLLAMA;
+  const id =
+    (req.query.instance as string) ||
+    (req.body as Record<string, unknown>)?.instance ||
+    PROVIDERS.OLLAMA;
   if (!isInstance(id as string)) return PROVIDERS.OLLAMA;
   return id as string;
 }
@@ -25,7 +28,9 @@ router.get(
       const instanceId = resolveInstanceId(req);
       const provider = getProvider(instanceId);
       if (!provider.listModels) {
-        throw new Error(`Provider "${instanceId}" does not support listing models`);
+        throw new Error(
+          `Provider "${instanceId}" does not support listing models`,
+        );
       }
       const data = await provider.listModels();
       res.json(data);

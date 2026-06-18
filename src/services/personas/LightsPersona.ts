@@ -89,7 +89,8 @@ export const LightsPersona: Persona = {
   id: AGENT_IDS.LIGHTS,
   name: "Lights",
   type: "home",
-  description: "A smart home lighting expert that controls your physical LIFX smart bulbs, designing scenes based on color theory, mood, and circadian cycles.",
+  description:
+    "A smart home lighting expert that controls your physical LIFX smart bulbs, designing scenes based on color theory, mood, and circadian cycles.",
   project: "prism-chat",
   identity: () => {
     const sections = [
@@ -102,7 +103,8 @@ export const LightsPersona: Persona = {
   },
   guidelines: "",
   interactionRules: "",
-  toolPolicy: (context) => buildToolPolicy(LIGHTS_TOOL_POLICY_SECTIONS, context),
+  toolPolicy: (context) =>
+    buildToolPolicy(LIGHTS_TOOL_POLICY_SECTIONS, context),
   availableTools: LIGHTS_AVAILABLE_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,

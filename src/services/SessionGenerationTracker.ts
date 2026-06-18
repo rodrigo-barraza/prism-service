@@ -79,7 +79,11 @@ interface SessionStats {
 }
 
 interface SessionGenerationTrackerInterface {
-  register(agentSessionId: string, requestId: string, options?: RegisterOptions): void;
+  register(
+    agentSessionId: string,
+    requestId: string,
+    options?: RegisterOptions,
+  ): void;
   update(requestId: string, params?: UpdateParams): void;
   recordChunkTiming(requestId: string, charCount?: number): void;
   complete(requestId: string): void;
@@ -99,7 +103,12 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
   register(
     agentSessionId: string,
     requestId: string,
-    { provider, model, source = "orchestrator", workerId = null }: RegisterOptions = {},
+    {
+      provider,
+      model,
+      source = "orchestrator",
+      workerId = null,
+    }: RegisterOptions = {},
   ) {
     if (!agentSessionId || !requestId) return;
 
@@ -143,7 +152,10 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
    * Update a tracked request with new token data.
    * Called on each chunk/thinking event or on usage completion.
    */
-  update(requestId: string, { outputTokens, inputTokens, ttft }: UpdateParams = {}) {
+  update(
+    requestId: string,
+    { outputTokens, inputTokens, ttft }: UpdateParams = {},
+  ) {
     const entry = activeRequests.get(requestId);
     if (!entry) return;
 
@@ -259,8 +271,10 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
       const totalIn = completedInputTokens;
       const avgTtft =
         ttftSamples.length > 0
-          ? ttftSamples.reduce((ttftSample: number, b: number) => ttftSample + b, 0) /
-            ttftSamples.length
+          ? ttftSamples.reduce(
+              (ttftSample: number, b: number) => ttftSample + b,
+              0,
+            ) / ttftSamples.length
           : null;
       // Use the most recent completed tok/s (last iteration's rate)
       const completedSamples = accumulator?.completedTokPerSecSamples || [];
@@ -331,7 +345,8 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
 
     // Average TTFT across completed + active samples
     const allTtftSum =
-      ttftSamples.reduce((ttftSample: number, b: number) => ttftSample + b, 0) + activeTtftSum;
+      ttftSamples.reduce((ttftSample: number, b: number) => ttftSample + b, 0) +
+      activeTtftSum;
     const allTtftCount = ttftSamples.length + activeTtftCount;
     const avgTtft = allTtftCount > 0 ? allTtftSum / allTtftCount : null;
 

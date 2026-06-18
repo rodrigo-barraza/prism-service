@@ -444,7 +444,10 @@ function getParameterDescriptors(): ParameterDescriptor[] {
 function getAgentDefaults(): Record<string, number | string | boolean> {
   const defaults: Record<string, number | string | boolean> = {};
   for (const descriptor of PARAMETER_DESCRIPTORS) {
-    if (descriptor.agentDefault !== "" && descriptor.agentDefault !== undefined) {
+    if (
+      descriptor.agentDefault !== "" &&
+      descriptor.agentDefault !== undefined
+    ) {
       defaults[descriptor.key] = descriptor.agentDefault;
     }
   }

@@ -125,13 +125,17 @@ const STICKERS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
 ];
 
-const STICKERS_AVAILABLE_TOOLS = [DOMAIN_KEY_TAGS.CREATIVE, DOMAIN_KEY_TAGS.WEB];
+const STICKERS_AVAILABLE_TOOLS = [
+  DOMAIN_KEY_TAGS.CREATIVE,
+  DOMAIN_KEY_TAGS.WEB,
+];
 
 export const StickersPersona: Persona = {
   id: AGENT_IDS.STICKERS,
   name: "Clankerbox",
   type: "",
-  description: "A sassy, swearing sticker vending machine bot that designs and generates custom stickers with GlaDOS and Bender vibes.",
+  description:
+    "A sassy, swearing sticker vending machine bot that designs and generates custom stickers with GlaDOS and Bender vibes.",
   project: "prism-chat",
   avatar: "/clankerbox-agent-avatar.png",
   identity: () => {
@@ -151,7 +155,8 @@ export const StickersPersona: Persona = {
   },
   guidelines: "",
   interactionRules: "",
-  toolPolicy: (context) => buildToolPolicy(STICKERS_TOOL_POLICY_SECTIONS, context),
+  toolPolicy: (context) =>
+    buildToolPolicy(STICKERS_TOOL_POLICY_SECTIONS, context),
   availableTools: STICKERS_AVAILABLE_TOOLS,
   capabilities: "",
   usesDirectoryTree: false,

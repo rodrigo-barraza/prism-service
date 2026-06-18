@@ -15,7 +15,7 @@ export function estimateVRAM(
     flashAttention?: boolean;
     gpuTotalGiB?: number;
     gpuBaselineGiB?: number;
-  } = {}
+  } = {},
 ): Record<string, unknown> | null {
   if (!modelData) return null;
 
@@ -64,7 +64,7 @@ export async function estimateVRAMForModel(
     flashAttention?: boolean;
     gpuTotalGiB?: number;
     gpuBaselineGiB?: number;
-  } = {}
+  } = {},
 ): Promise<Record<string, unknown> | null> {
   const provider = getProvider(instanceId) as GenericProvider | undefined;
   if (!provider?.listModels) return null;
@@ -73,7 +73,9 @@ export async function estimateVRAMForModel(
   const allModels = result?.data || result?.models || [];
   const modelData = allModels.find(
     (modelEntry: Record<string, unknown>) =>
-      modelEntry.id === modelKey || modelEntry.path === modelKey || modelEntry.key === modelKey,
+      modelEntry.id === modelKey ||
+      modelEntry.path === modelKey ||
+      modelEntry.key === modelKey,
   ) as LmStudioRawModel | undefined;
 
   if (!modelData) return null;

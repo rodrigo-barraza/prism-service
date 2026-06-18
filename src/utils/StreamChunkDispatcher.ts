@@ -7,7 +7,10 @@
 
 import FileService from "../services/FileService.ts";
 import logger from "./logger.ts";
-import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { TokenUsage, ToolCallEntry } from "../types/admin.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { FILE_CATEGORIES } from "../constants.ts";
@@ -64,7 +67,10 @@ interface StreamChunk {
   result?: unknown;
   status?: string;
   thoughtSignature?: string;
-  reasoningItem?: { id: string; summary: Array<{ type: string; text: string }> };
+  reasoningItem?: {
+    id: string;
+    summary: Array<{ type: string; text: string }>;
+  };
   message?: string;
   phase?: string;
   progress?: number;
@@ -92,16 +98,18 @@ interface ImageChunkInput {
  * end of a streaming buffer (closing tag hasn't arrived yet).
  */
 export function stripToolCallMarkup(text: string): string {
-  return text
-    // Completed tag pairs
-    .replace(/<\|?tool_call\|?>[\s\S]*?<\/?\|?tool_call\|?>/gi, "")
-    .replace(/<\|?tool_response\|?>[\s\S]*?<\/?\|?tool_response\|?>/gi, "")
-    .replace(/<\|?result\|?>[\s\S]*?<\/?\|?result\|?>/gi, "")
-    .replace(/\[END_TOOL_REQUEST\]/gi, "")
-    // Incomplete tags at end of stream (closing tag hasn't arrived yet)
-    .replace(/<\|?tool_call\|?>[\s\S]*$/gi, "")
-    .replace(/<\|?tool_response\|?>[\s\S]*$/gi, "")
-    .replace(/<\|?result\|?>[\s\S]*$/gi, "");
+  return (
+    text
+      // Completed tag pairs
+      .replace(/<\|?tool_call\|?>[\s\S]*?<\/?\|?tool_call\|?>/gi, "")
+      .replace(/<\|?tool_response\|?>[\s\S]*?<\/?\|?tool_response\|?>/gi, "")
+      .replace(/<\|?result\|?>[\s\S]*?<\/?\|?result\|?>/gi, "")
+      .replace(/\[END_TOOL_REQUEST\]/gi, "")
+      // Incomplete tags at end of stream (closing tag hasn't arrived yet)
+      .replace(/<\|?tool_call\|?>[\s\S]*$/gi, "")
+      .replace(/<\|?tool_response\|?>[\s\S]*$/gi, "")
+      .replace(/<\|?result\|?>[\s\S]*$/gi, "")
+  );
 }
 
 export async function uploadImageChunk(
@@ -122,7 +130,9 @@ export async function uploadImageChunk(
     );
     return ref;
   } catch (error: unknown) {
-    logger.error(`[${logPrefix}] MinIO upload failed: ${getErrorMessage(error)}`);
+    logger.error(
+      `[${logPrefix}] MinIO upload failed: ${getErrorMessage(error)}`,
+    );
     return null;
   }
 }
@@ -198,7 +208,8 @@ export async function dispatchChunk(
       return true;
 
     case "stopReason":
-      state.stopReason = (chunk as unknown as { stopReason?: string }).stopReason || undefined;
+      state.stopReason =
+        (chunk as unknown as { stopReason?: string }).stopReason || undefined;
       return true;
 
     case "thinking":
@@ -254,11 +265,18 @@ export async function dispatchChunk(
       return true;
 
     case "webSearchResult":
-      emit({ type: SERVER_SENT_EVENT_TYPES.WEB_SEARCH_RESULT, results: chunk.results });
+      emit({
+        type: SERVER_SENT_EVENT_TYPES.WEB_SEARCH_RESULT,
+        results: chunk.results,
+      });
       return true;
 
     case "audio":
-      emit({ type: SERVER_SENT_EVENT_TYPES.AUDIO, data: chunk.data, mimeType: chunk.mimeType });
+      emit({
+        type: SERVER_SENT_EVENT_TYPES.AUDIO,
+        data: chunk.data,
+        mimeType: chunk.mimeType,
+      });
       if (chunk.data) state.audioChunks.push(chunk.data);
       if (chunk.mimeType) {
         const rateMatch = chunk.mimeType.match(/rate=(\d+)/);

@@ -22,7 +22,8 @@ const MIME_TO_EXT: Record<string, string> = {
   "video/ogg": "ogg",
   "video/quicktime": "mov",
   "application/pdf": "pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    "docx",
   "application/msword": "doc",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
   "application/vnd.ms-excel": "xls",
@@ -47,7 +48,9 @@ export interface FileServiceInterface {
     project?: string | null,
     username?: string | null,
   ): Promise<{ ref: string; size: number; contentType: string }>;
-  getFile(key: string): Promise<{ stream: Readable; contentType: string } | null>;
+  getFile(
+    key: string,
+  ): Promise<{ stream: Readable; contentType: string } | null>;
   isMinioRef(ref: unknown): ref is string;
   extractKey(ref: string): string;
 }
@@ -115,12 +118,17 @@ const FileService: FileServiceInterface = {
       contentType,
     };
   },
-  async getFile(key: string): Promise<{ stream: Readable; contentType: string } | null> {
+  async getFile(
+    key: string,
+  ): Promise<{ stream: Readable; contentType: string } | null> {
     if (!MinioWrapper.isAvailable()) return null;
 
     // Helper to fetch stat + stream for a given key
     const tryKey = async (k: string) => {
-      const stat = (await MinioWrapper.stat(k)) as MinioStatResult | null | undefined;
+      const stat = (await MinioWrapper.stat(k)) as
+        | MinioStatResult
+        | null
+        | undefined;
       const stream = await MinioWrapper.get(k);
       return {
         stream: stream as Readable,

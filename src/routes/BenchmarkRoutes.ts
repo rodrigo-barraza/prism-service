@@ -107,7 +107,7 @@ registerCleanup(async () => {
   logger.info(
     `[Benchmark] Shutdown: aborting ${activeRuns.size} active run(s)`,
   );
-    for ( const [id, controller] of activeRuns) {
+  for (const [id, controller] of activeRuns) {
     controller.abort();
     activeRuns.delete(id);
   }
@@ -119,14 +119,21 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const benchmarks = await BenchmarkService.list(req.project || null) as BenchmarkDoc[];
+      const benchmarks = (await BenchmarkService.list(
+        req.project || null,
+      )) as BenchmarkDoc[];
 
       // Attach latest run summary + cumulative cost across ALL runs
       const enriched = await Promise.all(
         benchmarks.map(async (b) => {
           const [latestRun, allRuns] = await Promise.all([
-            BenchmarkService.getLatestRun(b.id, req.project || null) as Promise<BenchmarkRunDoc | null>,
-            BenchmarkService.getRuns(b.id, req.project || null) as Promise<BenchmarkRunDoc[]>,
+            BenchmarkService.getLatestRun(
+              b.id,
+              req.project || null,
+            ) as Promise<BenchmarkRunDoc | null>,
+            BenchmarkService.getRuns(b.id, req.project || null) as Promise<
+              BenchmarkRunDoc[]
+            >,
           ]);
           const cumulativeCost = allRuns.reduce(
             (sum, r) => sum + (r.summary?.totalCost || 0),
@@ -164,7 +171,9 @@ router.get(
   "/stats",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const benchmarks = await BenchmarkService.list(req.project || null) as BenchmarkDoc[];
+      const benchmarks = (await BenchmarkService.list(
+        req.project || null,
+      )) as BenchmarkDoc[];
 
       // Phase 1: For each benchmark, find the latest result per model config.
       // getRuns() returns runs sorted by startedAt DESC, so the first
@@ -186,12 +195,15 @@ router.get(
         return `${r.provider}:${r.model}:${thinking}:${tools}:${agent}`;
       };
 
-            for ( const b of benchmarks) {
-        const runs = await BenchmarkService.getRuns(b.id, req.project || null) as BenchmarkRunDoc[];
+      for (const b of benchmarks) {
+        const runs = (await BenchmarkService.getRuns(
+          b.id,
+          req.project || null,
+        )) as BenchmarkRunDoc[];
         const seenForBenchmark = new Set(); // track which model configs we've already recorded as "latest"
 
-                for ( const run of runs) {
-                    for ( const result of (run.models || []) as BenchmarkResult[]) {
+        for (const run of runs) {
+          for (const result of (run.models || []) as BenchmarkResult[]) {
             const modelKey = makeKey(result);
 
             // Accumulate ALL-run cost/latency regardless of dedup
@@ -261,9 +273,12 @@ router.get(
           let passed = 0;
           let failed = 0;
           let errored = 0;
-          const perBenchmark: (PerBenchmarkStat & { latestPassed: boolean; latestErrored: boolean })[] = [];
+          const perBenchmark: (PerBenchmarkStat & {
+            latestPassed: boolean;
+            latestErrored: boolean;
+          })[] = [];
 
-                    for ( const benchmarkResult of benchmarkResults) {
+          for (const benchmarkResult of benchmarkResults) {
             if (benchmarkResult.error) errored++;
             else if (benchmarkResult.passed) passed++;
             else failed++;
@@ -302,7 +317,10 @@ router.get(
             totalLatency: runTotal.totalLatency,
             runCount: runTotal.runCount,
             passRate: total > 0 ? passed / total : 0,
-            avgLatency: runTotal.runCount > 0 ? runTotal.totalLatency / runTotal.runCount : 0,
+            avgLatency:
+              runTotal.runCount > 0
+                ? runTotal.totalLatency / runTotal.runCount
+                : 0,
             benchmarks: perBenchmark,
           };
         },
@@ -310,7 +328,9 @@ router.get(
 
       // Sort by pass rate descending, then by total benchmarks descending
       models.sort(
-        (firstModel, secondModel) => secondModel.passRate - firstModel.passRate || secondModel.total - firstModel.total,
+        (firstModel, secondModel) =>
+          secondModel.passRate - firstModel.passRate ||
+          secondModel.total - firstModel.total,
       );
 
       res.json({
@@ -379,7 +399,10 @@ router.post(
       if (
         benchmarkMode !== "agent" &&
         !expectedValue &&
-        (!assertions || !assertions.some((assertion: TextAssertion) => assertion.expectedValue))
+        (!assertions ||
+          !assertions.some(
+            (assertion: TextAssertion) => assertion.expectedValue,
+          ))
       ) {
         return res.status(400).json({
           error:
@@ -408,8 +431,11 @@ router.post(
 
       // Validate assertions array if provided
       if (assertions && Array.isArray(assertions)) {
-                for ( const assertion of assertions) {
-          if (assertion.matchMode && !validModes.includes(assertion.matchMode)) {
+        for (const assertion of assertions) {
+          if (
+            assertion.matchMode &&
+            !validModes.includes(assertion.matchMode)
+          ) {
             return res.status(400).json({
               error: `Invalid matchMode in assertion. Must be one of: ${validModes.join(", ")}`,
             });
@@ -588,7 +614,9 @@ router.post(
       const { models: modelTargets } = req.body || {};
 
       const run = await BenchmarkService.runBenchmark(
-        benchmark as unknown as Parameters<typeof BenchmarkService.runBenchmark>[0],
+        benchmark as unknown as Parameters<
+          typeof BenchmarkService.runBenchmark
+        >[0],
         modelTargets,
         req.project || null,
         req.username || DEFAULT_USERNAME,
@@ -647,7 +675,10 @@ router.post(
               const { type, _sourceModel, ...rest } = event;
               send(type as string, { ...rest, ...sourceTag });
             } else {
-              send(event.type as string, { content: event.content, ...sourceTag });
+              send(event.type as string, {
+                content: event.content,
+                ...sourceTag,
+              });
             }
           },
         },
@@ -744,7 +775,7 @@ router.get("/:id/follow", (req: Request, res: Response) => {
   );
 
   // Replay completed results
-    for ( const result of state.completedResults) {
+  for (const result of state.completedResults) {
     res.write(
       `data: ${JSON.stringify({ type: "model_complete", ...result })}\n\n`,
     );
@@ -796,7 +827,10 @@ router.get(
         return res.status(404).json({ error: "Benchmark not found" });
       }
 
-      const runs = await BenchmarkService.getRuns(benchmark.id as string, req.project || null);
+      const runs = await BenchmarkService.getRuns(
+        benchmark.id as string,
+        req.project || null,
+      );
       res.json({ runs, count: runs.length });
     } catch (error: unknown) {
       logger.error(`GET /benchmark/:id/runs error: ${getErrorMessage(error)}`);
@@ -819,26 +853,30 @@ router.post(
         return res.status(404).json({ error: "Benchmark not found" });
       }
 
-      const previousRun = await BenchmarkService.getRunById(
+      const previousRun = (await BenchmarkService.getRunById(
         String(req.params.runId),
         req.project || null,
-      ) as BenchmarkRunDoc | null;
+      )) as BenchmarkRunDoc | null;
       if (!previousRun) {
         return res.status(404).json({ error: "Run not found" });
       }
 
       // Re-run with the same model set from the previous run
-      const modelTargets = (previousRun.models || []).map((modelResult: BenchmarkResult) => ({
-        provider: modelResult.provider,
-        model: modelResult.model,
-        display_name: modelResult.label,
-        thinkingEnabled: modelResult.thinkingEnabled,
-        toolsEnabled: modelResult.toolsEnabled,
-        agent: modelResult.agent || undefined,
-      }));
+      const modelTargets = (previousRun.models || []).map(
+        (modelResult: BenchmarkResult) => ({
+          provider: modelResult.provider,
+          model: modelResult.model,
+          display_name: modelResult.label,
+          thinkingEnabled: modelResult.thinkingEnabled,
+          toolsEnabled: modelResult.toolsEnabled,
+          agent: modelResult.agent || undefined,
+        }),
+      );
 
       const run = await BenchmarkService.runBenchmark(
-        benchmark as unknown as Parameters<typeof BenchmarkService.runBenchmark>[0],
+        benchmark as unknown as Parameters<
+          typeof BenchmarkService.runBenchmark
+        >[0],
         modelTargets,
         req.project || null,
         req.username || DEFAULT_USERNAME,

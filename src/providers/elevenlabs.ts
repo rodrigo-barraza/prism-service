@@ -13,7 +13,7 @@ function getApiKey() {
   return ELEVENLABS_API_KEY;
 }
 
-const elevenlabsProvider = ({
+const elevenlabsProvider = {
   name: "elevenlabs",
 
   async generateSpeech(
@@ -36,11 +36,11 @@ const elevenlabsProvider = ({
           body: JSON.stringify({
             text,
             model_id:
-                            options.modelId ||
-                            getDefaultModels(TYPES.TEXT, TYPES.AUDIO).elevenlabs,
+              options.modelId ||
+              getDefaultModels(TYPES.TEXT, TYPES.AUDIO).elevenlabs,
             voice_settings: {
-                            stability: options.stability || 0.5,
-                            similarity_boost: options.similarityBoost || 0.8,
+              stability: options.stability || 0.5,
+              similarity_boost: options.similarityBoost || 0.8,
             },
           }),
         },
@@ -56,7 +56,7 @@ const elevenlabsProvider = ({
       return { stream: response.body, contentType: "audio/mpeg" };
     } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
-            throw new ProviderError("elevenlabs", getErrorMessage(error), 500, error);
+      throw new ProviderError("elevenlabs", getErrorMessage(error), 500, error);
     }
   },
   async *generateSpeechStream(
@@ -67,7 +67,7 @@ const elevenlabsProvider = ({
     logger.provider("ElevenLabs", `generateSpeechStream voiceId=${voiceId}`);
     const apiKey = getApiKey();
     const modelId =
-            options.modelId || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).elevenlabs;
+      options.modelId || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).elevenlabs;
     const websocketUrl = `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input?model_id=${modelId}`;
 
     const websocket = new WebSocket(websocketUrl, {
@@ -85,8 +85,8 @@ const elevenlabsProvider = ({
       JSON.stringify({
         text: " ",
         voice_settings: {
-                    stability: options.stability || 0.5,
-                    similarity_boost: options.similarityBoost || 0.8,
+          stability: options.stability || 0.5,
+          similarity_boost: options.similarityBoost || 0.8,
         },
         xi_api_key: apiKey,
       }),
@@ -101,7 +101,7 @@ const elevenlabsProvider = ({
     websocket.on("message", (data: WebSocket.RawData) => {
       const response = JSON.parse(data.toString());
       messageQueue.push(response);
-            if (resolveMessage) {
+      if (resolveMessage) {
         const resolve = resolveMessage;
         resolveMessage = null;
         resolve();
@@ -110,19 +110,19 @@ const elevenlabsProvider = ({
 
     websocket.on("close", () => {
       ended = true;
-            if (resolveMessage) resolveMessage();
+      if (resolveMessage) resolveMessage();
     });
 
     websocket.on("error", (websocketError: Error) => {
       error = websocketError;
-            if (resolveMessage) resolveMessage();
+      if (resolveMessage) resolveMessage();
     });
 
     // Send text in background
     (async () => {
       try {
         let buffer = "";
-                for await ( const chunk of textStream) {
+        for await (const chunk of textStream) {
           buffer += chunk;
           let match: RegExpMatchArray | null;
           while ((match = buffer.match(/([.!?]+)\s/))) {
@@ -162,17 +162,24 @@ const elevenlabsProvider = ({
       while (true) {
         if (messageQueue.length > 0) {
           const message = messageQueue.shift()!;
-                    if (message.audio) {
-                        yield Buffer.from(message.audio, "base64");
+          if (message.audio) {
+            yield Buffer.from(message.audio, "base64");
           }
-                    if (message.isFinal) {
+          if (message.isFinal) {
             break;
           }
         } else {
           if (error)
-            throw new ProviderError("elevenlabs", getErrorMessage(error), 500, error);
+            throw new ProviderError(
+              "elevenlabs",
+              getErrorMessage(error),
+              500,
+              error,
+            );
           if (ended) break;
-          await new Promise<void>((resolve) => { resolveMessage = resolve; });
+          await new Promise<void>((resolve) => {
+            resolveMessage = resolve;
+          });
         }
       }
     } finally {
@@ -181,6 +188,6 @@ const elevenlabsProvider = ({
       }
     }
   },
-});
+};
 
 export default elevenlabsProvider;

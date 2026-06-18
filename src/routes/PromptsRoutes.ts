@@ -3,7 +3,11 @@ import express, { Request, Response } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import logger from "../utils/logger.ts";
 import { COLLECTIONS } from "../constants.ts";
-import { PostPromptSchema, PatchPromptSchema, GetPromptsQuerySchema } from "../types/index.ts";
+import {
+  PostPromptSchema,
+  PatchPromptSchema,
+  GetPromptsQuerySchema,
+} from "../types/index.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { generateUUID } from "@rodrigo-barraza/utilities-library";
 
@@ -53,7 +57,9 @@ router.get(
 
       res.json({ data: prompts, total, page, limit });
     } catch (error: unknown) {
-      logger.error(`[Prompts][GET] Error listing prompts: ${getErrorMessage(error)}`);
+      logger.error(
+        `[Prompts][GET] Error listing prompts: ${getErrorMessage(error)}`,
+      );
       res.status(500).json({ error: "Failed to list prompts" });
     }
   }),
@@ -78,7 +84,9 @@ router.get(
 
       res.json(prompt);
     } catch (error: unknown) {
-      logger.error(`[Prompts][GET /:id] Error fetching prompt: ${getErrorMessage(error)}`);
+      logger.error(
+        `[Prompts][GET /:id] Error fetching prompt: ${getErrorMessage(error)}`,
+      );
       res.status(500).json({ error: "Failed to fetch prompt" });
     }
   }),
@@ -115,7 +123,9 @@ router.post(
 
       res.status(201).json(promptDocument);
     } catch (error: unknown) {
-      logger.error(`[Prompts][POST] Error creating prompt: ${getErrorMessage(error)}`);
+      logger.error(
+        `[Prompts][POST] Error creating prompt: ${getErrorMessage(error)}`,
+      );
       res.status(500).json({ error: "Failed to create prompt" });
     }
   }),
@@ -137,11 +147,13 @@ router.patch(
       const updates = parseResult.data;
       const database = req.db;
 
-      const result = await database.collection(COLLECTIONS.PROMPTS).findOneAndUpdate(
-        { id, project: req.project, username: req.username },
-        { $set: { ...updates, updatedAt: new Date() } },
-        { returnDocument: "after" },
-      );
+      const result = await database
+        .collection(COLLECTIONS.PROMPTS)
+        .findOneAndUpdate(
+          { id, project: req.project, username: req.username },
+          { $set: { ...updates, updatedAt: new Date() } },
+          { returnDocument: "after" },
+        );
 
       if (!result) {
         return res.status(404).json({ error: "Prompt not found" });
@@ -149,7 +161,9 @@ router.patch(
 
       res.json(result);
     } catch (error: unknown) {
-      logger.error(`[Prompts][PATCH] Error updating prompt ${req.params.id}: ${getErrorMessage(error)}`);
+      logger.error(
+        `[Prompts][PATCH] Error updating prompt ${req.params.id}: ${getErrorMessage(error)}`,
+      );
       res.status(500).json({ error: "Failed to update prompt" });
     }
   }),
@@ -175,7 +189,9 @@ router.delete(
 
       res.json({ success: true });
     } catch (error: unknown) {
-      logger.error(`[Prompts][DELETE] Error deleting prompt ${req.params.id}: ${getErrorMessage(error)}`);
+      logger.error(
+        `[Prompts][DELETE] Error deleting prompt ${req.params.id}: ${getErrorMessage(error)}`,
+      );
       res.status(500).json({ error: "Failed to delete prompt" });
     }
   }),

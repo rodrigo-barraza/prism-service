@@ -8,13 +8,16 @@ import {
 } from "./constants.ts";
 
 /** Check if a lowercased model name matches any pattern in a list. */
-export function matchesAny(nameLower: string, patterns: readonly string[]): boolean {
+export function matchesAny(
+  nameLower: string,
+  patterns: readonly string[],
+): boolean {
   return patterns.some((pattern) => nameLower.includes(pattern));
 }
 
 export function detectCapabilities(
   modelKey: string | null | undefined,
-  providerMeta: { capabilities?: Record<string, unknown> } = {}
+  providerMeta: { capabilities?: Record<string, unknown> } = {},
 ) {
   const nameLower = (modelKey || "").toLowerCase();
   const capabilities = providerMeta.capabilities || {};
@@ -31,8 +34,7 @@ export function detectCapabilities(
 
   // Vision (images)
   const supportsVision =
-    !!capabilities.vision ||
-    matchesAny(nameLower, VISION_PATTERNS);
+    !!capabilities.vision || matchesAny(nameLower, VISION_PATTERNS);
 
   // Video
   const supportsVideo = matchesAny(nameLower, VIDEO_PATTERNS);

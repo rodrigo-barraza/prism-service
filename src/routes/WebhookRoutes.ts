@@ -40,7 +40,8 @@ router.get(
         return false;
       }
       if (filterAgent && event.data.agent !== filterAgent) return false;
-      if (filterProvider && event.data.provider !== filterProvider) return false;
+      if (filterProvider && event.data.provider !== filterProvider)
+        return false;
       if (filterProject && event.data.project !== filterProject) return false;
       return true;
     };
@@ -59,7 +60,9 @@ router.get(
       }
     }
 
-    res.write(`data: ${JSON.stringify({ type: "connected", listenerCount: WebhookEventBus.listenerCount + 1 })}\n\n`);
+    res.write(
+      `data: ${JSON.stringify({ type: "connected", listenerCount: WebhookEventBus.listenerCount + 1 })}\n\n`,
+    );
 
     const onEvent = (event: WebhookEvent) => {
       if (!shouldForward(event)) return;
@@ -97,7 +100,9 @@ router.post(
       const { url, events, filter, enabled } = req.body;
 
       if (!url || typeof url !== "string") {
-        return res.status(400).json({ error: "url is required and must be a string" });
+        return res
+          .status(400)
+          .json({ error: "url is required and must be a string" });
       }
 
       // TODO(security): validate URL against SSRF by restricting to public IPs / known hosts
@@ -109,7 +114,9 @@ router.post(
       }
 
       if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-        return res.status(400).json({ error: "url must use http or https protocol" });
+        return res
+          .status(400)
+          .json({ error: "url must use http or https protocol" });
       }
 
       const subscriptionId = crypto.randomUUID();
@@ -144,7 +151,9 @@ router.post(
         },
       });
     } catch (error: unknown) {
-      logger.error(`POST /webhooks/subscriptions error: ${getErrorMessage(error)}`);
+      logger.error(
+        `POST /webhooks/subscriptions error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),
@@ -166,7 +175,9 @@ router.get(
 
       res.json({ subscriptions });
     } catch (error: unknown) {
-      logger.error(`GET /webhooks/subscriptions error: ${getErrorMessage(error)}`);
+      logger.error(
+        `GET /webhooks/subscriptions error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),
@@ -190,7 +201,9 @@ router.delete(
       logger.info(`Webhook subscription deleted: ${req.params.id}`);
       res.json({ deleted: true });
     } catch (error: unknown) {
-      logger.error(`DELETE /webhooks/subscriptions/:id error: ${getErrorMessage(error)}`);
+      logger.error(
+        `DELETE /webhooks/subscriptions/:id error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),
@@ -205,7 +218,9 @@ router.patch(
     try {
       const { enabled, events, filter, url } = req.body;
 
-      const updateFields: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+      const updateFields: Record<string, unknown> = {
+        updatedAt: new Date().toISOString(),
+      };
       if (enabled !== undefined) updateFields.enabled = enabled;
       if (events !== undefined) updateFields.events = events;
       if (filter !== undefined) updateFields.filter = filter;
@@ -213,7 +228,9 @@ router.patch(
         try {
           const parsedUrl = new URL(url);
           if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-            return res.status(400).json({ error: "url must use http or https protocol" });
+            return res
+              .status(400)
+              .json({ error: "url must use http or https protocol" });
           }
         } catch {
           return res.status(400).json({ error: "url must be a valid URL" });
@@ -235,7 +252,9 @@ router.patch(
 
       res.json({ subscription: result });
     } catch (error: unknown) {
-      logger.error(`PATCH /webhooks/subscriptions/:id error: ${getErrorMessage(error)}`);
+      logger.error(
+        `PATCH /webhooks/subscriptions/:id error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),

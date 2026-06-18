@@ -61,7 +61,9 @@ Wrap your summary in <summary> tags after the analysis.`;
  *
  * Claude Code equivalent: formatCompactSummary() in compact.ts
  */
-export function extractSummaryFromResponse(responseText: string): string | null {
+export function extractSummaryFromResponse(
+  responseText: string,
+): string | null {
   const summaryMatch = responseText.match(/<summary>([\s\S]*?)<\/summary>/i);
   if (summaryMatch?.[1]) {
     return summaryMatch[1].trim();
@@ -70,7 +72,9 @@ export function extractSummaryFromResponse(responseText: string): string | null 
   // Fallback: if no <summary> tags but text exists, use the whole response
   // minus any <analysis> block. This handles models that don't follow the
   // tag format exactly.
-  const withoutAnalysis = responseText.replace(/<analysis>[\s\S]*?<\/analysis>/gi, "").trim();
+  const withoutAnalysis = responseText
+    .replace(/<analysis>[\s\S]*?<\/analysis>/gi, "")
+    .trim();
   if (withoutAnalysis.length > 200) {
     return withoutAnalysis;
   }
@@ -85,9 +89,9 @@ export function extractSummaryFromResponse(responseText: string): string | null 
  *
  * Claude Code equivalent: stripImagesFromMessages() in compact.ts
  */
-export function stripImagesFromMessages<T extends { images?: string[]; [key: string]: unknown }>(
-  messages: T[],
-): T[] {
+export function stripImagesFromMessages<
+  T extends { images?: string[]; [key: string]: unknown },
+>(messages: T[]): T[] {
   return messages.map((message) => {
     if (!message.images?.length) return message;
     return {

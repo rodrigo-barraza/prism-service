@@ -1,5 +1,10 @@
 import logger from "../../utils/logger.ts";
-import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES, TOOL_NAMES, DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+  TOOL_NAMES,
+  DOMAINS,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 // ── Worktree Isolation Tools ────────────────────────────────
 // Allows the agent to self-isolate into a git worktree for
@@ -57,7 +62,10 @@ const enterWorktree = {
   domain: DOMAINS.CORE_WORKSPACE.displayName,
   labels: ["coding", "git"],
 
-  async execute(toolArguments: Record<string, unknown>, context: WorktreeContext) {
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: WorktreeContext,
+  ) {
     const enterArgs = toolArguments as unknown as EnterWorktreeArgs;
 
     const { default: ToolOrchestratorService } =
@@ -92,11 +100,11 @@ const enterWorktree = {
     const branchName = `worktree/${sessionId.slice(0, 8)}-${Date.now().toString(36)}`;
 
     // Create worktree via tools-api
-    const createResult = await ToolOrchestratorService._proxyPost(
+    const createResult = (await ToolOrchestratorService._proxyPost(
       "/agentic/git/worktree/create",
       { path: repoPath, branch: branchName },
       context,
-    ) as WorktreeCreateResult;
+    )) as WorktreeCreateResult;
 
     if (createResult.error) {
       return { error: `Failed to create worktree: ${createResult.error}` };
@@ -163,7 +171,10 @@ const exitWorktree = {
   domain: DOMAINS.CORE_WORKSPACE.displayName,
   labels: ["coding", "git"],
 
-  async execute(toolArguments: Record<string, unknown>, context: WorktreeContext) {
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: WorktreeContext,
+  ) {
     const exitArgs = toolArguments as unknown as ExitWorktreeArgs;
 
     const { default: ToolOrchestratorService } =
@@ -181,21 +192,22 @@ const exitWorktree = {
     let mergeResult: WorktreeMergeResult | null = null;
 
     if (action === "merge") {
-      const diffResult = await ToolOrchestratorService._proxyPost(
+      const diffResult = (await ToolOrchestratorService._proxyPost(
         "/agentic/git/worktree/diff",
         { path: worktreeState.repoPath, branch: worktreeState.branchName },
         context,
-      ) as { error?: string };
+      )) as { error?: string };
 
-      mergeResult = await ToolOrchestratorService._proxyPost(
+      mergeResult = (await ToolOrchestratorService._proxyPost(
         "/agentic/git/worktree/merge",
         {
           path: worktreeState.repoPath,
           branch: worktreeState.branchName,
-          message: commitMessage || `Merge worktree: ${worktreeState.branchName}`,
+          message:
+            commitMessage || `Merge worktree: ${worktreeState.branchName}`,
         },
         context,
-      ) as WorktreeMergeResult;
+      )) as WorktreeMergeResult;
 
       if (mergeResult.error) {
         return {
@@ -209,7 +221,11 @@ const exitWorktree = {
     // Remove the worktree (both merge and discard)
     await ToolOrchestratorService._proxyPost(
       "/agentic/git/worktree/remove",
-      { path: worktreeState.repoPath, worktreePath: worktreeState.worktreePath, deleteBranch: true },
+      {
+        path: worktreeState.repoPath,
+        worktreePath: worktreeState.worktreePath,
+        deleteBranch: true,
+      },
       context,
     );
 

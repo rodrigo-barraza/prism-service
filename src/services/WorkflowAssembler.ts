@@ -38,7 +38,10 @@ function isUtilityStep(step: WorkflowStep): boolean {
  * Build compound port IDs for a conversation input node.
  * Format: "{messageIndex}.{modality}" e.g. "0.text", "1.text", "1.image"
  */
-function buildConversationPorts(messages: WorkflowMessage[], supportedModalities: string[] = ["text"]): string[] {
+function buildConversationPorts(
+  messages: WorkflowMessage[],
+  supportedModalities: string[] = ["text"],
+): string[] {
   const ports: string[] = [];
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
@@ -71,8 +74,10 @@ function resolveModelModalities(step: WorkflowStep): ResolvedModalities {
       modelType:
         configModel.modelType || (isImageGen ? "image" : "conversation"),
       supportsSystemPrompt:
-        (configModel as Record<string, unknown>).supportsSystemPrompt !== undefined
-          ? (configModel as Record<string, unknown>).supportsSystemPrompt as boolean
+        (configModel as Record<string, unknown>).supportsSystemPrompt !==
+        undefined
+          ? ((configModel as Record<string, unknown>)
+              .supportsSystemPrompt as boolean)
           : (configModel.outputTypes?.includes("text") ?? true),
     };
   }
@@ -160,10 +165,16 @@ function assembleGraph(steps: WorkflowStep[]): AssembledGraph {
     const messages: WorkflowMessage[] = [];
     if (step.systemPrompt)
       messages.push({ role: "system", content: step.systemPrompt });
-    const userMessage: WorkflowMessage = { role: "user", content: step.input || "" };
+    const userMessage: WorkflowMessage = {
+      role: "user",
+      content: step.input || "",
+    };
     messages.push(userMessage);
     if (step.output) {
-      const assistantMessage: WorkflowMessage & { images?: string[] } = { role: "assistant", content: step.output };
+      const assistantMessage: WorkflowMessage & { images?: string[] } = {
+        role: "assistant",
+        content: step.output,
+      };
       if (step.outputImageRef) assistantMessage.images = [step.outputImageRef];
       messages.push(assistantMessage);
     }
