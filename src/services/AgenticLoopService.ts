@@ -1,4 +1,4 @@
-import { DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { DEFAULT_TOPOLOGY, DEFAULT_REASONING_STRATEGY } from "@rodrigo-barraza/utilities-library/taxonomy";
 import AgenticToolResolver from "./AgenticToolResolver.ts";
 import AgenticLoopState from "./AgenticLoopState.ts";
 import HarnessRegistry from "./harnesses/HarnessRegistry.ts";
@@ -22,7 +22,8 @@ import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
  *   1. Tool resolution (AgenticToolResolver)
  *   2. State initialization (AgenticLoopState)
  *   3. Harness selection and instantiation (HarnessRegistry)
- *   4. Cleanup (approvals, questions, session tracking)
+ *   4. Reasoning strategy resolution (Chain of Thought / Tree of Thoughts)
+ *   5. Cleanup (approvals, questions, session tracking)
  *
  * Also exposes approval/question resolution APIs used by AgentRoutes.
  */
@@ -73,10 +74,11 @@ export default class AgenticLoopService {
       planModeActive: !!options.planFirst,
     });
 
-    // 3. Select harness (from request option → persisted settings → default)
+    // 3. Select harness, topology, and reasoning strategy
     let harnessId = options.harness;
     let topologyId = options.topology;
-    if (!harnessId || !topologyId || options.enableCriticGate === undefined) {
+    let reasoningStrategy = options.reasoningStrategy;
+    if (!harnessId || !topologyId || !reasoningStrategy || options.enableCriticGate === undefined) {
       try {
         const { default: SettingsService } =
           await import("./SettingsService.js");
@@ -84,6 +86,8 @@ export default class AgenticLoopService {
         if (!harnessId) harnessId = agentSettings?.harness || "standard";
         if (!topologyId)
           topologyId = agentSettings?.topology || DEFAULT_TOPOLOGY;
+        if (!reasoningStrategy)
+          reasoningStrategy = (agentSettings?.reasoningStrategy as string) || DEFAULT_REASONING_STRATEGY;
 
         // CriticGate: auto-enable from settings when a critic model is configured
         // and the request didn't explicitly set enableCriticGate.
@@ -98,13 +102,25 @@ export default class AgenticLoopService {
       } catch {
         if (!harnessId) harnessId = "standard";
         if (!topologyId) topologyId = DEFAULT_TOPOLOGY;
+        if (!reasoningStrategy) reasoningStrategy = DEFAULT_REASONING_STRATEGY;
       }
     }
+
+    // Migration: legacy "tree_of_thought" harness → standard harness + tree_of_thoughts strategy
+    if (harnessId === "tree_of_thought") {
+      harnessId = "standard";
+      reasoningStrategy = "tree_of_thoughts";
+      logger.info(
+        `[AgenticLoop] Migrated legacy harness "tree_of_thought" → harness "standard" + reasoningStrategy "tree_of_thoughts"`,
+      );
+    }
+
     options.harness = harnessId;
     options.topology = topologyId;
+    options.reasoningStrategy = reasoningStrategy;
     const HarnessClass = HarnessRegistry.get(harnessId)!;
     logger.info(
-      `[AgenticLoop] Using harness: "${HarnessClass.id}" (${HarnessClass.label})`,
+      `[AgenticLoop] Using harness: "${HarnessClass.id}" (${HarnessClass.label}), strategy: "${reasoningStrategy}"`,
     );
 
     // 4. Instantiate and run

@@ -132,7 +132,7 @@ export default class BaseAgenticHarness {
    *
    * Returns true if the tool set was mutated.
    */
-  protected checkAndApplyToolSetChanges(
+  checkAndApplyToolSetChanges(
     currentMessages?: ConversationMessage[],
   ): boolean {
     const sessionId = this.context.agentSessionId;
