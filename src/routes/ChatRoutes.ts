@@ -47,7 +47,7 @@ import SessionGenerationTracker from "../services/SessionGenerationTracker.ts";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
 import localModelQueue from "../services/LocalModelQueue.ts";
 import LocalProviderGateway from "../services/local-provider/index.ts";
-import { getInstancesByType } from "../providers/instance-registry.ts";
+import { getInstancesByType, getInstanceType } from "../providers/instance-registry.ts";
 import { resolveModelForInstances } from "../utils/ModelResolution.ts";
 import {
   markGenerating,
@@ -242,8 +242,6 @@ async function prepareGenerationContext(
     agentContext,
     // Multi-workspace: user-selected workspace root path (absolute fs path).
     workspaceRoot,
-    // Device pinning: bypass load balancing and target a specific local instance.
-    device,
     // CriticGate: multi-model review of dangerous tool calls.
     enableCriticGate,
     criticModel,
@@ -372,42 +370,41 @@ async function prepareGenerationContext(
   // multiple instances are registered, verify the model is available on
   // each instance (with quant-level fallback) and pick the least-busy
   // usable instance. Same model resolution logic as OrchestratorService.
+  //
+  // Instance pinning: when the caller sends a specific instance ID
+  // (e.g. "lm-studio-2"), resolve its base type for model resolution
+  // but skip load balancing — the request is pinned to that instance.
   let resolvedModel =
     requestedModel ||
     getDefaultModels(TYPES.TEXT, TYPES.TEXT)[providerName as string];
   if (localModelQueue.isLocal(providerName)) {
-    // ── Device pinning (bypass load balancing) ────────────────
-    // When the caller explicitly requests a specific device instance
-    // (e.g. "lm-studio-server"), skip the least-busy routing entirely
-    // and pin the request to that exact instance. Model resolution still
-    // runs against the targeted device so @quant syntax works.
-    if (device && getProvider(device)) {
-      const pinnedSiblings = getInstancesByType(providerName).filter(
-        (instance) => instance.id === device,
+    const pinnedInstanceType = getInstanceType(providerName);
+    const isInstancePinned = pinnedInstanceType !== null && pinnedInstanceType !== providerName;
+
+    if (isInstancePinned) {
+      // ── Instance pinning (bypass load balancing) ──────────────
+      // The caller sent a specific instance ID (e.g. "lm-studio-2").
+      // Resolve the base type so we can run model resolution against
+      // this single instance, then skip load balancing entirely.
+      const pinnedSiblings = getInstancesByType(pinnedInstanceType).filter(
+        (instance) => instance.id === providerName,
       );
       if (pinnedSiblings.length > 0) {
         const { modelOverrides } = await resolveModelForInstances(
           resolvedModel,
           pinnedSiblings,
         );
-        const override = modelOverrides.get(device);
+        const override = modelOverrides.get(providerName);
         if (override) {
           resolvedModel = override;
         }
         logger.info(
-          `[chat] 📌 Device pinned: ${providerName} → ${device}` +
+          `[chat] 📌 Instance pinned: ${pinnedInstanceType} → ${providerName}` +
             (override ? ` (model="${resolvedModel}")` : ""),
         );
-        providerName = device;
-      } else {
-        logger.warn(
-          `[chat] Requested device "${device}" not found among ${providerName} instances — falling back to load balancing`,
-        );
       }
-    }
-
-    // Only run load balancing when no device was pinned above
-    if (!device || providerName !== device) {
+    } else {
+      // ── Standard load balancing path ──────────────────────────
       let siblings = getInstancesByType(providerName);
       // ── Model resolution (always) ──────────────────────────────
       // Resolve model availability across instances with quant-level
