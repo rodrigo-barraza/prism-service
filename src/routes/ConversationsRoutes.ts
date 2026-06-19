@@ -42,6 +42,7 @@ const CONVERSATION_LIST_PROJECTION: import("mongodb").Document = {
   settings: 1,
   parentAgentSessionId: 1,
   hasSubAgents: 1,
+  subAgents: 1,
 };
 
 interface ConversationDocument {
@@ -280,6 +281,28 @@ router.get(
         enrichConversationsWithSubAgentFlag(agentConversations),
       ]);
 
+      // Derive hasSubAgents from the stored subAgents array (primary source
+      // of truth, written by BaseAgenticHarness.finalize) and strip the
+      // heavy array from the list response. The cross-reference enrichment
+      // above acts as a secondary fallback for sessions that predate the
+      // subAgents array or where finalize didn't run.
+      const deriveAndStripSubAgentsArray = (conversations: Document[]) => {
+        for (const session of conversations) {
+          const record = session as Record<string, unknown>;
+          const storedSubAgents = record.subAgents as unknown[] | undefined;
+          if (
+            storedSubAgents &&
+            Array.isArray(storedSubAgents) &&
+            storedSubAgents.length > 0
+          ) {
+            record.hasSubAgents = true;
+          }
+          delete record.subAgents;
+        }
+      };
+      deriveAndStripSubAgentsArray(modelConversations);
+      deriveAndStripSubAgentsArray(agentConversations);
+
       // Merge and sort in memory by updatedAt descending
       const merged = [
         ...modelConversations.map((conversation) => ({
@@ -392,6 +415,18 @@ router.get(
           AgenticLoopService.getPendingApproval(conversationId);
         const pendingQuestion =
           AgenticLoopService.getPendingQuestion(conversationId);
+
+        // Derive hasSubAgents from the stored subAgents array when the
+        // persisted boolean flag is missing (sessions created before the
+        // flag was introduced or when the OrchestratorService write failed).
+        const agentChatRecord = agentChat as Record<string, unknown>;
+        if (
+          !agentChatRecord.hasSubAgents &&
+          Array.isArray(agentChatRecord.subAgents) &&
+          (agentChatRecord.subAgents as unknown[]).length > 0
+        ) {
+          agentChatRecord.hasSubAgents = true;
+        }
 
         return res.json({
           ...agentChat,
