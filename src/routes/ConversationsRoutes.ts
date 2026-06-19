@@ -222,9 +222,48 @@ router.get(
         }
       };
 
+      // Enrich agent sessions with `hasSubAgents` by cross-referencing
+      // child sessions that point back via `parentAgentSessionId`.
+      // The stored flag may be missing on sessions created before the flag
+      // was introduced or when the write failed silently at spawn time.
+      const enrichAgentSessionsWithSubAgentFlag = async (
+        agentSessions: Document[],
+      ) => {
+        if (agentSessions.length === 0) return;
+        const sessionIds = agentSessions
+          .map((session) => (session as Record<string, unknown>).id as string)
+          .filter(Boolean);
+        if (sessionIds.length === 0) return;
+
+        try {
+          const parentIdsWithChildren = await db
+            .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+            .distinct("parentAgentSessionId", {
+              parentAgentSessionId: { $in: sessionIds },
+              project,
+              username,
+            });
+
+          if (parentIdsWithChildren.length > 0) {
+            const parentIdSet = new Set(parentIdsWithChildren);
+            for (const session of agentSessions) {
+              const sessionRecord = session as Record<string, unknown>;
+              if (parentIdSet.has(sessionRecord.id)) {
+                sessionRecord.hasSubAgents = true;
+              }
+            }
+          }
+        } catch (enrichmentError: unknown) {
+          logger.warn(
+            `Failed to enrich agent sessions with hasSubAgents flag: ${errorMessage(enrichmentError)}`,
+          );
+        }
+      };
+
       await Promise.all([
         queryAndEnrichConversationsWithRequestCosts(modelConversations, false),
         queryAndEnrichConversationsWithRequestCosts(agentConversations, true),
+        enrichAgentSessionsWithSubAgentFlag(agentConversations),
       ]);
 
       // Merge and sort in memory by updatedAt descending
