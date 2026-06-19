@@ -75,10 +75,13 @@ export interface FinalizerPayload {
 
 /**
  * Resolve the MongoDB collection for conversation persistence.
- * Agent projects go to agent_conversations; everything else to model_conversations.
+ * Agent requests always go to agent_conversations; everything else to model_conversations.
  */
-function getCollectionOpts(project: string | null | undefined) {
-  if (AgentPersonaRegistry.isAgentProject(project || "")) {
+function getCollectionOpts(
+  project: string | null | undefined,
+  agent?: string | null,
+) {
+  if (agent || AgentPersonaRegistry.isAgentProject(project || "")) {
     return { collection: COLLECTIONS.AGENT_CONVERSATIONS };
   }
   return undefined;
@@ -473,7 +476,7 @@ export async function finalizeTextGeneration(
       username as string,
       sanitizedMessagesToAppend,
       finalMeta,
-      getCollectionOpts(project),
+      getCollectionOpts(project, agent),
     );
   }
   // ── Emit done event ───────────────────────────────────────────

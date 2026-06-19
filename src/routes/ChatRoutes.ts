@@ -712,7 +712,7 @@ export async function handleAgent(
   // GET /agent-sessions/:id never 404s while the loop is running
   // (e.g. when the user switches away and back during generation).
   markGenerating(conversationId, project, username, true, {
-    ...getCollectionOpts(project),
+    ...getCollectionOpts(project, agent),
     agent: agent ?? undefined,
     title:
       typeof conversationMeta?.title === "string"
@@ -795,7 +795,7 @@ export async function handleAgent(
       project,
       username,
       false,
-      getCollectionOpts(project),
+      getCollectionOpts(project, agent),
     );
     const totalSec = (performance.now() - requestStart) / 1000;
     RequestLogger.logChatGeneration({
