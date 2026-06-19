@@ -11,6 +11,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
 import type { ConversationMessage as HarnessBasePayload } from "../types.ts";
+import type { MessagePayload } from "../../conversation/types.ts";
 
 import { injectSystemPromptContext } from "../../system-prompt/index.ts";
 import {
@@ -19,10 +20,7 @@ import {
 } from "../lifecycle/Finalizer.ts";
 import { PROMPT_DELIMITERS } from "../../../constants.ts";
 
-interface HarnessPayload extends HarnessBasePayload {
-  rawContent?: string;
-  isCompactSummary?: boolean;
-  _alreadyPersisted?: boolean;
+interface HarnessPayload extends HarnessBasePayload, Pick<MessagePayload, "rawContent" | "isCompactSummary" | "_alreadyPersisted"> {
   _isErrorIndicator?: boolean;
 }
 

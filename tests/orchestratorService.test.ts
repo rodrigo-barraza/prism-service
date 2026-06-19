@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "./setup.ts";
 import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
-import { PROVIDERS } from "../src/constants.ts";
+import { COLLECTIONS, PROVIDERS } from "../src/constants.ts";
 
 let mockExistsSyncResult: boolean | undefined = undefined;
 
@@ -382,7 +382,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
       const collectionCalls = getCollectionSpy.mock.calls;
       const agentConversationsCall = collectionCalls.find(
-        (call: unknown[]) => (call[1] as string) === "agent_conversations",
+        (call: unknown[]) => (call[1] as string) === COLLECTIONS.AGENT_CONVERSATIONS,
       );
       expect(agentConversationsCall).toBeDefined();
 

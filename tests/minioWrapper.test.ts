@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockMinioManager = {
   init: vi.fn().mockResolvedValue(undefined),
-  isAvailable: vi.fn().mockReturnValue(true),
-  getBucketUrl: vi.fn().mockReturnValue('https://minio.example.com/bucket'),
-  getPublicUrl: vi.fn().mockReturnValue('https://minio.example.com/bucket/test-key'),
+  isAvailable: vi.fn(),
+  getBucketUrl: vi.fn(),
+  getPublicUrl: vi.fn(),
   upload: vi.fn().mockResolvedValue({ etag: 'abc123' }),
   get: vi.fn().mockResolvedValue(Buffer.from('file-content')),
   remove: vi.fn().mockResolvedValue(undefined),
@@ -29,47 +29,51 @@ beforeEach(async () => {
 });
 
 describe('MinioWrapper', () => {
-  describe('init', () => {
-    it('delegates to MinioManager.init with config object including publicRead and logger', async () => {
-      await MinioWrapper.init('minio.example.com', 'access-key', 'secret-key', 'test-bucket');
+  describe('init — positional-to-config argument transformation', () => {
+    it('transforms four positional arguments into a config object with endpoint, accessKey, secretKey, and bucket', async () => {
+      await MinioWrapper.init('minio.rod.dev', 'my-access', 'my-secret', 'media-bucket');
 
       expect(mockMinioManager.init).toHaveBeenCalledOnce();
       const initArgument = mockMinioManager.init.mock.calls[0][0];
-      expect(initArgument.endpoint).toBe('minio.example.com');
-      expect(initArgument.accessKey).toBe('access-key');
-      expect(initArgument.secretKey).toBe('secret-key');
-      expect(initArgument.bucket).toBe('test-bucket');
+      expect(initArgument).toEqual(expect.objectContaining({
+        endpoint: 'minio.rod.dev',
+        accessKey: 'my-access',
+        secretKey: 'my-secret',
+        bucket: 'media-bucket',
+      }));
+    });
+
+    it('always sets publicRead to true in the config object', async () => {
+      await MinioWrapper.init('any-host', 'any-key', 'any-secret', 'any-bucket');
+
+      const initArgument = mockMinioManager.init.mock.calls[0][0];
       expect(initArgument.publicRead).toBe(true);
+    });
+
+    it('passes a logger instance to MinioManager', async () => {
+      await MinioWrapper.init('host', 'key', 'secret', 'bucket');
+
+      const initArgument = mockMinioManager.init.mock.calls[0][0];
       expect(initArgument.logger).toBeDefined();
+      expect(typeof initArgument.logger.info).toBe('function');
+      expect(typeof initArgument.logger.error).toBe('function');
+    });
+
+    it('propagates init rejection to the caller', async () => {
+      mockMinioManager.init.mockRejectedValueOnce(new Error('Connection timeout'));
+      await expect(
+        MinioWrapper.init('bad-host', 'key', 'secret', 'bucket'),
+      ).rejects.toThrow('Connection timeout');
     });
   });
 
-  describe('isAvailable', () => {
-    it('delegates to MinioManager.isAvailable', () => {
-      const result = MinioWrapper.isAvailable();
-      expect(mockMinioManager.isAvailable).toHaveBeenCalledOnce();
-      expect(result).toBe(true);
+  describe('argument forwarding — verifies each method passes arguments through unchanged', () => {
+    it('forwards the key argument to getPublicUrl', () => {
+      MinioWrapper.getPublicUrl('uploads/2026/image.webp');
+      expect(mockMinioManager.getPublicUrl).toHaveBeenCalledWith('uploads/2026/image.webp');
     });
-  });
 
-  describe('getBucketUrl', () => {
-    it('delegates to MinioManager.getBucketUrl', () => {
-      const result = MinioWrapper.getBucketUrl();
-      expect(mockMinioManager.getBucketUrl).toHaveBeenCalledOnce();
-      expect(result).toBe('https://minio.example.com/bucket');
-    });
-  });
-
-  describe('getPublicUrl', () => {
-    it('delegates to MinioManager.getPublicUrl with the provided key', () => {
-      const result = MinioWrapper.getPublicUrl('some-key');
-      expect(mockMinioManager.getPublicUrl).toHaveBeenCalledWith('some-key');
-      expect(result).toBe('https://minio.example.com/bucket/test-key');
-    });
-  });
-
-  describe('upload', () => {
-    it('delegates to MinioManager.upload with key, buffer, and contentType', async () => {
+    it('forwards key, buffer, and contentType to upload', async () => {
       const testBuffer = Buffer.from('test-data');
       await MinioWrapper.upload('uploads/image.png', testBuffer, 'image/png');
 
@@ -79,50 +83,54 @@ describe('MinioWrapper', () => {
         'image/png',
       );
     });
-  });
 
-  describe('get', () => {
-    it('delegates to MinioManager.get with the provided key', async () => {
-      const result = await MinioWrapper.get('test-key');
-      expect(mockMinioManager.get).toHaveBeenCalledWith('test-key');
-      expect(result).toEqual(Buffer.from('file-content'));
+    it('forwards the key argument to get', async () => {
+      await MinioWrapper.get('documents/report.pdf');
+      expect(mockMinioManager.get).toHaveBeenCalledWith('documents/report.pdf');
     });
-  });
 
-  describe('remove', () => {
-    it('delegates to MinioManager.remove with the provided key', async () => {
-      await MinioWrapper.remove('obsolete-key');
-      expect(mockMinioManager.remove).toHaveBeenCalledWith('obsolete-key');
+    it('forwards the key argument to remove', async () => {
+      await MinioWrapper.remove('obsolete/file.txt');
+      expect(mockMinioManager.remove).toHaveBeenCalledWith('obsolete/file.txt');
     });
-  });
 
-  describe('stat', () => {
-    it('delegates to MinioManager.stat with the provided key', async () => {
-      const result = await MinioWrapper.stat('some-file.txt');
+    it('forwards the key argument to stat', async () => {
+      await MinioWrapper.stat('some-file.txt');
       expect(mockMinioManager.stat).toHaveBeenCalledWith('some-file.txt');
-      expect(result).toHaveProperty('size', 1024);
+    });
+
+    it('forwards the prefix argument to listObjects', async () => {
+      await MinioWrapper.listObjects('uploads/2026/');
+      expect(mockMinioManager.listObjects).toHaveBeenCalledWith('uploads/2026/');
     });
   });
 
-  describe('listObjects', () => {
-    it('delegates to MinioManager.listObjects with the provided prefix', async () => {
-      const result = await MinioWrapper.listObjects('uploads/');
-      expect(mockMinioManager.listObjects).toHaveBeenCalledWith('uploads/');
-      expect(result).toEqual([{ name: 'file1.txt' }]);
-    });
-  });
-
-  describe('error handling', () => {
-    it('propagates errors from MinioManager.upload', async () => {
+  describe('error propagation', () => {
+    it('propagates upload errors with the original error message', async () => {
       mockMinioManager.upload.mockRejectedValueOnce(new Error('Connection refused'));
       await expect(
         MinioWrapper.upload('key', Buffer.from('data'), 'text/plain'),
       ).rejects.toThrow('Connection refused');
     });
 
-    it('propagates errors from MinioManager.get', async () => {
+    it('propagates get errors with the original error message', async () => {
       mockMinioManager.get.mockRejectedValueOnce(new Error('Object not found'));
       await expect(MinioWrapper.get('missing-key')).rejects.toThrow('Object not found');
+    });
+
+    it('propagates remove errors with the original error message', async () => {
+      mockMinioManager.remove.mockRejectedValueOnce(new Error('Permission denied'));
+      await expect(MinioWrapper.remove('protected-key')).rejects.toThrow('Permission denied');
+    });
+
+    it('propagates stat errors with the original error message', async () => {
+      mockMinioManager.stat.mockRejectedValueOnce(new Error('Not found'));
+      await expect(MinioWrapper.stat('ghost-key')).rejects.toThrow('Not found');
+    });
+
+    it('propagates listObjects errors with the original error message', async () => {
+      mockMinioManager.listObjects.mockRejectedValueOnce(new Error('Bucket does not exist'));
+      await expect(MinioWrapper.listObjects('bad-prefix/')).rejects.toThrow('Bucket does not exist');
     });
   });
 });

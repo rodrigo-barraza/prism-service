@@ -56,7 +56,7 @@ describe('normalizers', () => {
       expect(entry.supportsSystemPrompt).toBe(true);
       expect(entry.streaming).toBe(true);
       expect(entry.contextLength).toBe(32768);
-      expect(entry.size).toBeDefined();
+      expect(entry.size).toBe('4.7 GB');
       expect(entry.params).toBe('8B');
       expect(entry.quantization).toBe('Q4_K_M');
       expect(entry.bitsPerWeight).toBe(4.5);
@@ -128,7 +128,7 @@ describe('normalizers', () => {
       expect(entry.modelType).toBe('conversation');
       expect(entry.params).toBe('8B');
       expect(entry.architecture).toBe('qwen3');
-      expect(entry.size).toBeDefined();
+      expect(entry.size).toBe('4.7 GB');
       expect(entry.thinking).toBe(true);
       expect(entry._raw).toBe(raw);
     });
@@ -208,6 +208,15 @@ describe('normalizers', () => {
       const entry = normalizeOpenAICompatModel(raw);
       expect(entry.label).toBe('My Custom Model');
     });
+
+    it('appends parsed quant even when display_name is provided', () => {
+      const raw: OpenAICompatRawModel = {
+        id: 'Qwen/Qwen3-8B-AWQ',
+        display_name: 'Qwen3 8B',
+      };
+      const entry = normalizeOpenAICompatModel(raw);
+      expect(entry.label).toBe('Qwen3 8B (AWQ)');
+    });
   });
 
   describe('normalizeVllmModel', () => {
@@ -251,23 +260,31 @@ describe('normalizers', () => {
       expect(entry.publisher).toBe('Qwen');
       expect(entry.thinking).toBe(true);
     });
+
+    it('does not set _raw because normalizeOpenAICompatModel does not assign it', () => {
+      const raw: OpenAICompatRawModel = {
+        id: 'test-model',
+      };
+      const entry = normalizeVllmModel(raw);
+      expect(entry._raw).toBeUndefined();
+    });
   });
 
   describe('NORMALIZER_BY_TYPE', () => {
     it('maps lm-studio to normalizeLmStudioModel', () => {
-      expect(NORMALIZER_BY_TYPE['lm-studio']).toBeDefined();
+      expect(NORMALIZER_BY_TYPE['lm-studio']).toBe(normalizeLmStudioModel);
     });
 
     it('maps ollama to normalizeOllamaModel', () => {
-      expect(NORMALIZER_BY_TYPE['ollama']).toBeDefined();
+      expect(NORMALIZER_BY_TYPE['ollama']).toBe(normalizeOllamaModel);
     });
 
     it('maps vllm to normalizeVllmModel', () => {
-      expect(NORMALIZER_BY_TYPE['vllm']).toBeDefined();
+      expect(NORMALIZER_BY_TYPE['vllm']).toBe(normalizeVllmModel);
     });
 
     it('maps llama-cpp to normalizeOpenAICompatModel', () => {
-      expect(NORMALIZER_BY_TYPE['llama-cpp']).toBeDefined();
+      expect(NORMALIZER_BY_TYPE['llama-cpp']).toBe(normalizeOpenAICompatModel);
     });
 
     it('has exactly 4 entries', () => {

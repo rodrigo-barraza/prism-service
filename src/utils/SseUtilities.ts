@@ -62,7 +62,7 @@ export function buildJsonResponseFromEvents(
   events: SseEvent[],
   requestBody: ChatRequest,
 ) {
-  const errorEvent = events.find((e: SseEvent) => e.type === "error");
+  const errorEvent = events.find((event: SseEvent) => event.type === "error");
   if (errorEvent) {
     return {
       error: new ProviderError(
@@ -74,51 +74,51 @@ export function buildJsonResponseFromEvents(
   }
 
   const doneEvent =
-    events.find((e: SseEvent) => e.type === "done") || ({} as SseEvent);
+    events.find((event: SseEvent) => event.type === "done") || ({} as SseEvent);
   const text = events
-    .filter((e: SseEvent) => e.type === "chunk")
-    .map((e: SseEvent) => e.content)
+    .filter((event: SseEvent) => event.type === "chunk")
+    .map((event: SseEvent) => event.content)
     .join("");
   const thinking = events
-    .filter((e: SseEvent) => e.type === "thinking")
-    .map((e: SseEvent) => e.content)
+    .filter((event: SseEvent) => event.type === "thinking")
+    .map((event: SseEvent) => event.content)
     .join("");
   const images = events
-    .filter((e: SseEvent) => e.type === "image")
-    .map((e: SseEvent) => ({
-      data: e.data,
-      mimeType: e.mimeType,
-      minioRef: e.minioRef || null,
+    .filter((event: SseEvent) => event.type === "image")
+    .map((event: SseEvent) => ({
+      data: event.data,
+      mimeType: event.mimeType,
+      minioRef: event.minioRef || null,
     }));
 
   const toolCalls = events
     .filter(
-      (e: SseEvent) => e.type === "tool_execution" && e.status === "calling",
+      (event: SseEvent) => event.type === "tool_execution" && event.status === "calling",
     )
-    .map((e: SseEvent) => ({
-      name: e.tool?.name,
-      args: e.tool?.args,
+    .map((event: SseEvent) => ({
+      name: event.tool?.name,
+      args: event.tool?.args,
     }));
 
   const toolResults = events
     .filter(
-      (e: SseEvent) =>
-        e.type === "tool_execution" &&
-        (e.status === "done" || e.status === "error"),
+      (event: SseEvent) =>
+        event.type === "tool_execution" &&
+        (event.status === "done" || event.status === "error"),
     )
-    .map((e: SseEvent) => ({
-      name: e.tool?.name,
-      args: e.tool?.args,
-      result: e.tool?.result,
-      status: e.status,
+    .map((event: SseEvent) => ({
+      name: event.tool?.name,
+      args: event.tool?.args,
+      result: event.tool?.result,
+      status: event.status,
     }));
 
   const audioEvents = events
-    .filter((e: SseEvent) => e.type === "audio")
-    .map((e: SseEvent) => ({
-      data: e.data,
-      mimeType: e.mimeType,
-      minioRef: e.minioRef || null,
+    .filter((event: SseEvent) => event.type === "audio")
+    .map((event: SseEvent) => ({
+      data: event.data,
+      mimeType: event.mimeType,
+      minioRef: event.minioRef || null,
     }));
 
   return {
