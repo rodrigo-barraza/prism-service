@@ -10,6 +10,8 @@ import type {
   ConversationSettings,
   MessagePayload,
   ConversationServiceInterface,
+  TransformedConversation,
+  TransformedSessionStats,
 } from "./types.ts";
 import {
   extractFiles,
@@ -37,7 +39,7 @@ const ConversationService: ConversationServiceInterface = {
     newMessages: Array<ChatMessage | MessagePayload>,
     conversationMeta: ConversationMeta | null = null,
     { collection = DEFAULT_COLLECTION }: { collection?: string } = {},
-  ): Promise<Record<string, unknown>> {
+  ): Promise<TransformedConversation> {
     const traceId = conversationMeta?.traceId || null;
     const dbCollection = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
 
@@ -178,7 +180,7 @@ const ConversationService: ConversationServiceInterface = {
     );
 
     // Return the doc with derived fields merged (avoids a third read)
-    return { ...conversation, ...derived };
+    return { ...conversation, ...derived } as unknown as TransformedConversation;
   },
 
   /**
@@ -234,7 +236,7 @@ const ConversationService: ConversationServiceInterface = {
     sessionId: string,
     project: string,
     username: string,
-  ): Promise<Record<string, unknown> | null> {
+  ): Promise<TransformedSessionStats | null> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return null;
 
@@ -275,9 +277,9 @@ const ConversationService: ConversationServiceInterface = {
     }
 
     // Aggregate
-    const providers = new Set();
-    const models = new Set();
-    const operations = new Set();
+    const providers = new Set<string>();
+    const models = new Set<string>();
+    const operations = new Set<string>();
     let totalCost = 0;
     let totalInputTokens = 0;
     let totalOutputTokens = 0;

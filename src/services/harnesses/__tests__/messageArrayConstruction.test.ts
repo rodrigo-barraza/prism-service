@@ -46,12 +46,12 @@ function computeNewTurnMessages(
   originalMessages: HarnessPayload[],
   currentMessages: HarnessPayload[],
   originalMessageCount: number,
-): any[] {
+): HarnessPayload[] {
   return computeNewTurnMessagesReal(
     originalMessages,
     currentMessages,
     originalMessageCount,
-  );
+  ) as HarnessPayload[];
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -2406,7 +2406,7 @@ describe("Message Array Construction", () => {
         (message) =>
           message.role === "assistant" &&
           message.toolCalls?.some(
-            (toolCall: any) => toolCall.name === "enable_tools",
+            (toolCall) => toolCall.name === "enable_tools",
           ),
       );
       expect(enableToolsCalls).toHaveLength(0);
@@ -2901,7 +2901,7 @@ describe("Message Array Construction", () => {
         (message) =>
           message.role === "assistant" &&
           message.toolCalls?.some(
-            (toolCall: any) => toolCall.name === "run_command",
+            (toolCall) => toolCall.name === "run_command",
           ),
       );
       expect(successfulToolCall).toBeDefined();
