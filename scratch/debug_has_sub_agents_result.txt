@@ -1,0 +1,83 @@
+🔒 Connecting to Synology Vault...
+Connecting to MongoDB: prism...
+[15:17:08] OK    [prism] MongoDB connected: prism
+
+--- Checking counts of parentAgentSessionId ---
+Agent conversations with parentAgentSessionId set: 1105
+Model conversations with parentAgentSessionId set: 195
+Sample agent child conversations: [
+  {
+    id: 'a45c4db9-d6f2-4d67-93f9-430857cd61bc',
+    parentAgentSessionId: 'd865ec08-125c-4619-90a5-268d7f4d1cea',
+    project: 'retina-agent',
+    username: '::ffff:127.0.0.1',
+    title: 'New Conversation'
+  },
+  {
+    id: 'f73b7919-07df-4e78-b588-a638382da219',
+    parentAgentSessionId: 'd865ec08-125c-4619-90a5-268d7f4d1cea',
+    project: 'retina-agent',
+    username: '::ffff:127.0.0.1',
+    title: 'New Conversation'
+  },
+  {
+    id: 'f83fc7dd-1692-4687-9cef-2047810a298b',
+    parentAgentSessionId: 'dbcc793c-ed89-4742-a6f1-2d2ed22a3588',
+    project: 'retina-agent',
+    username: '::ffff:127.0.0.1',
+    title: 'New Conversation'
+  },
+  {
+    id: '07c565c4-9fb3-4721-bea0-1e530bf303ef',
+    parentAgentSessionId: 'dbcc793c-ed89-4742-a6f1-2d2ed22a3588',
+    project: 'retina-agent',
+    username: '::ffff:127.0.0.1',
+    title: 'New Conversation'
+  },
+  {
+    id: '4aba2494-cd5e-4ec3-bd94-538bd82fc351',
+    parentAgentSessionId: '94eacb88-84b6-4faf-96a6-2566dd4f687d',
+    project: 'retina-agent',
+    username: '::ffff:127.0.0.1',
+    title: 'New Conversation'
+  }
+]
+Sample model child conversations: [
+  {
+    id: '18442058-021b-491a-8403-0406d6810d51',
+    parentAgentSessionId: '8dba7e37-2c67-442b-bc69-54baf0d18a21',
+    project: 'retina',
+    username: '::ffff:127.0.0.1',
+    title: 'New Conversation'
+  },
+  {
+    id: 'ce9018f6-18f4-49a7-ae45-1be4e339f2dd',
+    parentAgentSessionId: '672571f8-287f-48f8-82ab-a46b9db6f652',
+    project: 'retina',
+    username: '::ffff:127.0.0.1',
+    title: 'New Conversation'
+  },
+  {
+    id: '70da33c7-1f27-4680-9861-ea9224a372e6',
+    parentAgentSessionId: '672571f8-287f-48f8-82ab-a46b9db6f652',
+    project: 'retina',
+    username: '::ffff:127.0.0.1',
+    title: 'New Conversation'
+  },
+  {
+    id: 'c84a769d-2a20-45f4-8d1e-a9465c784c8d',
+    parentAgentSessionId: 'de1edc1b-3350-4a71-9821-8cb4e10b994b',
+    project: 'retina',
+    username: '::ffff:127.0.0.1',
+    title: 'New Conversation'
+  },
+  {
+    id: 'a8006bb8-2048-494f-ba02-afc6ea54b3fe',
+    parentAgentSessionId: 'f032c50d-1fc6-4327-8476-94f6b451128e',
+    project: 'retina',
+    username: '::ffff:127.0.0.1',
+    title: 'New Conversation'
+  }
+]
+
+Done.
