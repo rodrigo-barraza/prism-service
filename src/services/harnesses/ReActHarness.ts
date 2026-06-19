@@ -1,5 +1,6 @@
 import BaseAgenticHarness from "./BaseAgenticHarness.ts";
 import { runTreeOfThoughts } from "./strategies/TreeOfThoughtsStrategy.ts";
+import { runGraphOfThoughts } from "./strategies/GraphOfThoughtsStrategy.ts";
 import logger from "../../utils/logger.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -123,6 +124,12 @@ export default class ReActHarness extends BaseAgenticHarness {
         `[ReActHarness] Delegating to Tree of Thoughts reasoning strategy`,
       );
       return runTreeOfThoughts(this);
+    }
+    if (resolvedStrategy === REASONING_STRATEGIES.GRAPH_OF_THOUGHTS) {
+      logger.info(
+        `[ReActHarness] Delegating to Graph of Thoughts reasoning strategy`,
+      );
+      return runGraphOfThoughts(this);
     }
 
     const context = this.context;
