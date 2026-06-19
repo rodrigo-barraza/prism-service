@@ -398,10 +398,15 @@ export default class OrchestratorService {
         );
 
         if (parentCollection) {
-          await parentCollection.updateOne(
-            { id: parentAgentSessionId },
+          const hasSubAgentsResult = await parentCollection.updateOne(
+            { id: parentAgentSessionId, project, username },
             { $set: { hasSubAgents: true } },
           );
+          if (hasSubAgentsResult.matchedCount === 0) {
+            logger.warn(
+              `[Orchestrator] hasSubAgents write matched 0 documents for session ${parentAgentSessionId} (project=${project}, username=${username})`,
+            );
+          }
         }
       } catch (databaseError: unknown) {
         logger.warn(
@@ -801,8 +806,12 @@ export default class OrchestratorService {
         );
 
         if (databaseCollection) {
-          await databaseCollection.updateOne(
-            { id: orchestratorContext.conversationId },
+          const topologyResult = await databaseCollection.updateOne(
+            {
+              id: orchestratorContext.conversationId,
+              project: orchestratorContext.project,
+              username: orchestratorContext.username,
+            },
             {
               $set: {
                 "settings.agents.topology": topology,
@@ -810,9 +819,15 @@ export default class OrchestratorService {
               },
             },
           );
-          logger.info(
-            `[Orchestrator] Updated session settings topology to "${topology}" for conversation ${orchestratorContext.conversationId}`,
-          );
+          if (topologyResult.matchedCount === 0) {
+            logger.warn(
+              `[Orchestrator] Topology sync matched 0 documents for conversation ${orchestratorContext.conversationId}`,
+            );
+          } else {
+            logger.info(
+              `[Orchestrator] Updated session settings topology to "${topology}" for conversation ${orchestratorContext.conversationId}`,
+            );
+          }
         }
       } catch (databaseError: unknown) {
         logger.warn(

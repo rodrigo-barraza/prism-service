@@ -571,6 +571,14 @@ router.get(
         .collection(COLLECTIONS.AGENT_CONVERSATIONS)
         .findOne({ id: req.params.id });
       if (conversationDocument) {
+        const agentRecord = conversationDocument as Record<string, unknown>;
+        if (
+          !agentRecord.hasSubAgents &&
+          Array.isArray(agentRecord.subAgents) &&
+          (agentRecord.subAgents as unknown[]).length > 0
+        ) {
+          agentRecord.hasSubAgents = true;
+        }
         return res.json({ ...conversationDocument, type: "agent" });
       }
 
