@@ -58,6 +58,8 @@ import {
   LONG_STRUCTURED_OUTPUT,
   POST_ERROR_HEALTH_CHECK,
   TREE_OF_THOUGHT_BRANCH_PROMPT,
+  GRAPH_OF_THOUGHTS_SYNTHESIS_PROMPT,
+  STRATEGY_COMPARISON_PROMPT,
   SEARCH_FOR_TOOLS,
 } from "./helpers/testPrompts.ts";
 
@@ -2017,6 +2019,52 @@ describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
       }
     }
   }, 600_000);
+
+  it("15.5 — standard harness with graph_of_thoughts reasoningStrategy emits synthesis events", async () => {
+    for (const target of providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1)) {
+      console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [{ role: "user", content: GRAPH_OF_THOUGHTS_SYNTHESIS_PROMPT }],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 2000,
+          autoApprove: true,
+          maxIterations: 3,
+          harness: "standard",
+          reasoningStrategy: "graph_of_thoughts",
+          branchCount: 2,
+        },
+        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+      );
+
+      logResult(`15.5 [${target.providerName}]`, result);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+
+      if (isEmptyResponse(result)) {
+        console.log("  ⚠ Model returned empty — skipping GoT event assertions");
+      } else {
+        // Verify branching_started was emitted
+        const branchingStartedStatuses = result.statuses.filter(
+          (status) => status.message === "branching_started",
+        );
+        expect(branchingStartedStatuses.length).toBeGreaterThanOrEqual(1);
+        expect(branchingStartedStatuses[0].branchCount).toBe(2);
+
+        // Verify synthesis_started was emitted (GoT-specific)
+        const synthesisStatuses = result.statuses.filter(
+          (status) => status.message === "synthesis_started",
+        );
+        expect(synthesisStatuses.length).toBeGreaterThanOrEqual(1);
+      }
+    }
+  }, 600_000);
 });
 
 
@@ -2168,4 +2216,296 @@ describe("Suite 16: System Reminder Lifecycle", () => {
       );
     }
   }, 300_000);
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+// Suite 17: Graph-of-Thoughts Branching & Synthesis Events
+// ═══════════════════════════════════════════════════════════════
+
+describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
+  it("17.1 — GoT strategy emits branching_started and branch_selected with synthesizing flag", async () => {
+    for (const target of providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1)) {
+      console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [{ role: "user", content: GRAPH_OF_THOUGHTS_SYNTHESIS_PROMPT }],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 2000,
+          autoApprove: true,
+          maxIterations: 3,
+          harness: "standard",
+          reasoningStrategy: "graph_of_thoughts",
+          branchCount: 2,
+        },
+        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+      );
+
+      logResult(`17.1 [${target.providerName}]`, result);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+
+      if (isEmptyResponse(result)) {
+        console.log("  ⚠ Model returned empty — skipping GoT event assertions");
+      } else {
+        // Verify branching_started event was emitted with branchCount
+        const branchingStartedStatuses = result.statuses.filter(
+          (status) => status.message === "branching_started",
+        );
+        expect(branchingStartedStatuses.length).toBeGreaterThanOrEqual(1);
+        expect(branchingStartedStatuses[0].branchCount).toBe(2);
+
+        // Verify branch_selected event was emitted with synthesizing=true (GoT differentiator)
+        const branchSelectedStatuses = result.statuses.filter(
+          (status) => status.message === "branch_selected",
+        );
+        expect(branchSelectedStatuses.length).toBeGreaterThanOrEqual(1);
+
+        const selectedEvent = branchSelectedStatuses[0];
+        expect(selectedEvent.synthesizing).toBe(true);
+        expect(selectedEvent.scores).toBeDefined();
+
+        console.log(
+          `  📊 GoT: branching_started=${branchingStartedStatuses.length}, ` +
+            `branch_selected=${branchSelectedStatuses.length}, ` +
+            `synthesizing=${selectedEvent.synthesizing}`,
+        );
+        console.log(
+          `  📊 All scores: ${JSON.stringify(selectedEvent.scores)}`,
+        );
+      }
+    }
+  }, 600_000);
+
+  it("17.2 — GoT emits synthesis_started event after scoring", async () => {
+    for (const target of providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1)) {
+      console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [{ role: "user", content: GRAPH_OF_THOUGHTS_SYNTHESIS_PROMPT }],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 2000,
+          autoApprove: true,
+          maxIterations: 3,
+          harness: "standard",
+          reasoningStrategy: "graph_of_thoughts",
+          branchCount: 3,
+        },
+        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+      );
+
+      logResult(`17.2 [${target.providerName}]`, result);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+
+      if (isEmptyResponse(result)) {
+        console.log("  ⚠ Model returned empty — skipping synthesis event assertions");
+      } else {
+        // Verify synthesis_started event fires (GoT-unique event)
+        const synthesisStatuses = result.statuses.filter(
+          (status) => status.message === "synthesis_started",
+        );
+        expect(synthesisStatuses.length).toBeGreaterThanOrEqual(1);
+
+        const synthesisEvent = synthesisStatuses[0];
+        expect(synthesisEvent.branchCount).toBeGreaterThanOrEqual(2);
+        expect(synthesisEvent.iteration).toBeDefined();
+
+        console.log(
+          `  📊 Synthesis: branchCount=${synthesisEvent.branchCount}, ` +
+            `iteration=${synthesisEvent.iteration}`,
+        );
+      }
+    }
+  }, 600_000);
+
+  it("17.3 — GoT with branchCount=1 skips synthesis (single candidate fast path)", async () => {
+    for (const target of providerTargets.slice(0, 1)) {
+      console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [{ role: "user", content: SIMPLE_ARITHMETIC }],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 200,
+          autoApprove: true,
+          maxIterations: 2,
+          harness: "standard",
+          reasoningStrategy: "graph_of_thoughts",
+          branchCount: 1,
+        },
+        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+      );
+
+      logResult(`17.3 [${target.providerName}]`, result);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+
+      // With branchCount=1 GoT should NOT emit synthesis_started (skips synthesis)
+      const synthesisStatuses = result.statuses.filter(
+        (status) => status.message === "synthesis_started",
+      );
+      expect(synthesisStatuses).toHaveLength(0);
+
+      // branch_selected should still fire with score=10 (single-candidate fast path)
+      const selectedStatuses = result.statuses.filter(
+        (status) => status.message === "branch_selected",
+      );
+      if (selectedStatuses.length > 0) {
+        expect(selectedStatuses[0].score).toBe(10);
+        console.log(`  📊 Single-branch score: ${selectedStatuses[0].score} (expected 10)`);
+      }
+    }
+  }, 300_000);
+
+  it("17.4 — GoT completes with text output for text-only prompts", async () => {
+    for (const target of providerTargets.slice(0, 1)) {
+      console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [{ role: "user", content: STRATEGY_COMPARISON_PROMPT }],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 2000,
+          autoApprove: true,
+          maxIterations: 2,
+          harness: "standard",
+          reasoningStrategy: "graph_of_thoughts",
+          branchCount: 2,
+        },
+        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+      );
+
+      logResult(`17.4 [${target.providerName}]`, result);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+
+      if (!isEmptyResponse(result)) {
+        expect(result.text.length + result.thinking.length).toBeGreaterThan(0);
+        console.log(
+          `  📊 GoT text output: ${result.text.length} chars, ` +
+            `thinking: ${result.thinking.length} chars`,
+        );
+      }
+    }
+  }, 600_000);
+
+  it("17.5 — GoT vs ToT comparison: GoT emits synthesis events that ToT does not", async () => {
+    const toolCallingTargets = providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1);
+
+    if (toolCallingTargets.length === 0) {
+      console.log("  ⏭ Skipping: no tool-calling providers available");
+      return;
+    }
+
+    const target = toolCallingTargets[0];
+    console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+
+    // Run ToT
+    const totResult = await agentStreamWithRetry(
+      {
+        provider: target.providerName,
+        model: target.model,
+        messages: [{ role: "user", content: STRATEGY_COMPARISON_PROMPT }],
+        agent: "OMNI",
+        agentSessionId: crypto.randomUUID(),
+        maxTokens: 2000,
+        autoApprove: true,
+        maxIterations: 2,
+        harness: "standard",
+        reasoningStrategy: "tree_of_thoughts",
+        branchCount: 2,
+      },
+      { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+    );
+
+    // Run GoT
+    const gotResult = await agentStreamWithRetry(
+      {
+        provider: target.providerName,
+        model: target.model,
+        messages: [{ role: "user", content: STRATEGY_COMPARISON_PROMPT }],
+        agent: "OMNI",
+        agentSessionId: crypto.randomUUID(),
+        maxTokens: 2000,
+        autoApprove: true,
+        maxIterations: 2,
+        harness: "standard",
+        reasoningStrategy: "graph_of_thoughts",
+        branchCount: 2,
+      },
+      { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+    );
+
+    logResult(`17.5 ToT [${target.providerName}]`, totResult);
+    logResult(`17.5 GoT [${target.providerName}]`, gotResult);
+
+    // Both should complete
+    expect(totResult.timedOut).toBe(false);
+    expect(totResult.done).toBeTruthy();
+    expect(gotResult.timedOut).toBe(false);
+    expect(gotResult.done).toBeTruthy();
+
+    // Key structural difference: GoT should emit synthesis_started, ToT should NOT
+    if (!isEmptyResponse(totResult) && !isEmptyResponse(gotResult)) {
+      const totSynthesisStatuses = totResult.statuses.filter(
+        (status) => status.message === "synthesis_started",
+      );
+      const gotSynthesisStatuses = gotResult.statuses.filter(
+        (status) => status.message === "synthesis_started",
+      );
+
+      expect(totSynthesisStatuses).toHaveLength(0);
+      expect(gotSynthesisStatuses.length).toBeGreaterThanOrEqual(1);
+
+      // GoT branch_selected should have synthesizing=true, ToT should not
+      const totSelectedStatuses = totResult.statuses.filter(
+        (status) => status.message === "branch_selected",
+      );
+      const gotSelectedStatuses = gotResult.statuses.filter(
+        (status) => status.message === "branch_selected",
+      );
+
+      if (gotSelectedStatuses.length > 0) {
+        expect(gotSelectedStatuses[0].synthesizing).toBe(true);
+      }
+      if (totSelectedStatuses.length > 0) {
+        expect(totSelectedStatuses[0].synthesizing).toBeUndefined();
+      }
+
+      console.log(
+        `  📊 ToT: synthesis_started=${totSynthesisStatuses.length}, ` +
+          `branch_selected=${totSelectedStatuses.length}`,
+      );
+      console.log(
+        `  📊 GoT: synthesis_started=${gotSynthesisStatuses.length}, ` +
+          `branch_selected=${gotSelectedStatuses.length}, ` +
+          `synthesizing=${gotSelectedStatuses[0]?.synthesizing}`,
+      );
+    }
+  }, 900_000);
 });

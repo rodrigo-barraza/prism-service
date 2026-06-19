@@ -1,0 +1,2482 @@
+[
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "19\u201319",
+    "severity": "\ud83d\udd34",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage",
+    "description": "Test declares local `ConversationMessage` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.",
+    "fix": "Import `ChatMessage` from `src/types/ProviderTypes.ts`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "79\u201379",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "138\u2013138",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "163\u2013163",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "230\u2013230",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "260\u2013260",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "313\u2013313",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "359\u2013359",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "369\u2013369",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "427\u2013427",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "585\u2013585",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "646\u2013646",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "693\u2013693",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "724\u2013724",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "798\u2013798",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Project Skills]` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.PROJECT_SKILLS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "799\u2013799",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Agent Memory]` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.AGENT_MEMORY`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "832\u2013832",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "860\u2013860",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "917\u2013917",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `anthropic` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.ANTHROPIC`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "985\u2013985",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `anthropic` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.ANTHROPIC`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1063\u20131063",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1149\u20131149",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `anthropic` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.ANTHROPIC`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1213\u20131213",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1269\u20131269",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1353\u20131353",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `anthropic` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.ANTHROPIC`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1423\u20131423",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `anthropic` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.ANTHROPIC`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1478\u20131478",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1532\u20131532",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1565\u20131565",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1634\u20131634",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1694\u20131694",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1742\u20131742",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `anthropic` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.ANTHROPIC`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1785\u20131785",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `anthropic` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.ANTHROPIC`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1833\u20131833",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1939\u20131939",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1981\u20131981",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "1982\u20131982",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Agent Memory]` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.AGENT_MEMORY`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2039\u20132039",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2097\u20132097",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2111\u20132111",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[System Context]` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SYSTEM_CONTEXT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2112\u20132112",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[System Context - Local Time:` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2120\u20132120",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[System Context]` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SYSTEM_CONTEXT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2151\u20132151",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2179\u20132179",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[System Context]` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SYSTEM_CONTEXT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2194\u20132194",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[System Context]` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SYSTEM_CONTEXT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2300\u20132300",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2408\u20132408",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2483\u20132483",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `anthropic` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.ANTHROPIC`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2573\u20132573",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2660\u20132660",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "2759\u20132759",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "3074\u20133074",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "3235\u20133235",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "3289\u20133289",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "3355\u20133355",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "3429\u20133429",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "3483\u20133483",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "3511\u20133511",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "3603\u20133603",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "line_range": "3634\u20133634",
+    "severity": "\ud83d\udfe1",
+    "source": "src/constants.ts",
+    "exported": "PROMPT_DELIMITERS",
+    "description": "Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.",
+    "fix": "Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/reasoningStrategy.test.ts",
+    "line_range": "96\u201396",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/reasoningStrategy.test.ts",
+    "line_range": "96\u201396",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `tree_of_thought` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.TREE_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/reasoningStrategy.test.ts",
+    "line_range": "96\u201396",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/conversationDerivedUtils.test.ts",
+    "line_range": "38\u201338",
+    "severity": "\ud83d\udd34",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage",
+    "description": "Test declares local `TestMessage` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.",
+    "fix": "Import `ChatMessage` from `src/types/ProviderTypes.ts`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/outputTruncationRecovery.test.ts",
+    "line_range": "291\u2013291",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/outputTruncationRecovery.test.ts",
+    "line_range": "434\u2013434",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/outputTruncationRecovery.test.ts",
+    "line_range": "462\u2013462",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/scheduledTasks-adversarial.test.ts",
+    "line_range": "9\u20139",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/scheduledTasks-adversarial.test.ts",
+    "line_range": "200\u2013200",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/scheduledTasks-adversarial.test.ts",
+    "line_range": "230\u2013230",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/scheduledTasks-adversarial.test.ts",
+    "line_range": "279\u2013279",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/scheduledTasks-adversarial.test.ts",
+    "line_range": "310\u2013310",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/scheduledTasks-adversarial.test.ts",
+    "line_range": "342\u2013342",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/scheduledTasks-adversarial.test.ts",
+    "line_range": "362\u2013362",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/scheduledTasks-adversarial.test.ts",
+    "line_range": "388\u2013388",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/scheduledTasks-adversarial.test.ts",
+    "line_range": "430\u2013430",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopService.test.ts",
+    "line_range": "118\u2013118",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopService.test.ts",
+    "line_range": "122\u2013122",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/client-tool-state-updaters.test.ts",
+    "line_range": "17\u201317",
+    "severity": "\ud83d\udd34",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage",
+    "description": "Test declares local `ToolMessageSlice` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.",
+    "fix": "Import `ChatMessage` from `src/types/ProviderTypes.ts`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/client-tool-state-updaters.test.ts",
+    "line_range": "18\u201318",
+    "severity": "\ud83d\udd34",
+    "source": "src/services/harnesses/types.ts",
+    "exported": "ToolCall / ToolSchema",
+    "description": "Test declares local `ToolExecutionInput` mimicking `ToolCall / ToolSchema` instead of importing it from `src/services/harnesses/types.ts`.",
+    "fix": "Import `ToolCall / ToolSchema` from `src/services/harnesses/types.ts`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/client-tool-state-updaters.test.ts",
+    "line_range": "25\u201325",
+    "severity": "\ud83d\udd34",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage",
+    "description": "Test declares local `DisplayMessage` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.",
+    "fix": "Import `ChatMessage` from `src/types/ProviderTypes.ts`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "29\u201329",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "49\u201349",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "217\u2013217",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "222\u2013222",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "517\u2013517",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "539\u2013539",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "551\u2013551",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "567\u2013567",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "580\u2013580",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "597\u2013597",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "601\u2013601",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "622\u2013622",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "636\u2013636",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "656\u2013656",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/thinkingMode.test.ts",
+    "line_range": "717\u2013717",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/tokenMetricsLive.live.test.ts",
+    "line_range": "492\u2013492",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/tokenCostLive.live.test.ts",
+    "line_range": "651\u2013651",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `lm-studio` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.LM_STUDIO`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/modelCapability.live.test.ts",
+    "line_range": "303\u2013303",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/lmStudioModels.live.test.ts",
+    "line_range": "297\u2013297",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `lm-studio` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.LM_STUDIO`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/lmStudioModels.live.test.ts",
+    "line_range": "362\u2013362",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `lm-studio` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.LM_STUDIO`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/lmStudioModels.live.test.ts",
+    "line_range": "427\u2013427",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `lm-studio` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.LM_STUDIO`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/lmStudioModels.live.test.ts",
+    "line_range": "494\u2013494",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `lm-studio` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.LM_STUDIO`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/lmStudioModels.live.test.ts",
+    "line_range": "559\u2013559",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `lm-studio` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.LM_STUDIO`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "line_range": "1648\u20131648",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "line_range": "1874\u20131874",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "line_range": "1875\u20131875",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `chain_of_thought` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.CHAIN_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "line_range": "1902\u20131902",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "line_range": "1903\u20131903",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "line_range": "1952\u20131952",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "line_range": "1953\u20131953",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `chain_of_thought` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.CHAIN_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "line_range": "1996\u20131996",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "line_range": "1997\u20131997",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/lmStudioProvider.test.ts",
+    "line_range": "53\u201353",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/lmStudioProvider.test.ts",
+    "line_range": "74\u201374",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/harness-stream-processing.test.ts",
+    "line_range": "384\u2013384",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "50\u201350",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "58\u201358",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "67\u201367",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "76\u201376",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "85\u201385",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "105\u2013105",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "115\u2013115",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "125\u2013125",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "135\u2013135",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "150\u2013150",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "162\u2013162",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "175\u2013175",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "207\u2013207",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "218\u2013218",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "228\u2013228",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "241\u2013241",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "251\u2013251",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "407\u2013407",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "408\u2013408",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "414\u2013414",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "420\u2013420",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "423\u2013423",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "424\u2013424",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "433\u2013433",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `tree_of_thought` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.TREE_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "449\u2013449",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `tree_of_thought` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.TREE_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "455\u2013455",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "824\u2013824",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `tree_of_thought` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.TREE_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "825\u2013825",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "826\u2013826",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "830\u2013830",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `tree_of_thought` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.TREE_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "831\u2013831",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `chain_of_thought` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.CHAIN_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "833\u2013833",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `tree_of_thought` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.TREE_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "834\u2013834",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "835\u2013835",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "838\u2013838",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "839\u2013839",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "844\u2013844",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `chain_of_thought` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.CHAIN_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "846\u2013846",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `tree_of_thought` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.TREE_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "847\u2013847",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "848\u2013848",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "851\u2013851",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "852\u2013852",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "856\u2013856",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "857\u2013857",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `chain_of_thought` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.CHAIN_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "859\u2013859",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `tree_of_thought` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.TREE_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "860\u2013860",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "861\u2013861",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "864\u2013864",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "865\u2013865",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "866\u2013866",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `chain_of_thought` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.CHAIN_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "870\u2013870",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "871\u2013871",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `chain_of_thought` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.CHAIN_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "873\u2013873",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `tree_of_thought` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.TREE_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "874\u2013874",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "875\u2013875",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "878\u2013878",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "879\u2013879",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `chain_of_thought` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.CHAIN_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "884\u2013884",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `chain_of_thought` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.CHAIN_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "886\u2013886",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `tree_of_thought` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.TREE_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "887\u2013887",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "888\u2013888",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `tree_of_thoughts` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.TREE_OF_THOUGHTS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "892\u2013892",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "REASONING_STRATEGIES",
+    "description": "Hard-coded reasoning strategy `chain_of_thought` instead of referencing `REASONING_STRATEGIES` constant.",
+    "fix": "Replace with `REASONING_STRATEGIES.CHAIN_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "920\u2013920",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "927\u2013927",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "940\u2013940",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "950\u2013950",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "965\u2013965",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "974\u2013974",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "983\u2013983",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "999\u2013999",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "1014\u20131014",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "1031\u20131031",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "1043\u20131043",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "1055\u20131055",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "line_range": "1344\u20131344",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/finalizer-race-condition.test.ts",
+    "line_range": "19\u201319",
+    "severity": "\ud83d\udd34",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage",
+    "description": "Test declares local `TestMessage` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.",
+    "fix": "Import `ChatMessage` from `src/types/ProviderTypes.ts`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/finalize-message-persistence.test.ts",
+    "line_range": "21\u201321",
+    "severity": "\ud83d\udd34",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage",
+    "description": "Test declares local `TestMessage` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.",
+    "fix": "Import `ChatMessage` from `src/types/ProviderTypes.ts`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/finalize-message-persistence.test.ts",
+    "line_range": "31\u201331",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/finalize-message-persistence.test.ts",
+    "line_range": "32\u201332",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/finalize-message-persistence.test.ts",
+    "line_range": "42\u201342",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/finalize-message-persistence.test.ts",
+    "line_range": "1014\u20131014",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/finalize-message-persistence.test.ts",
+    "line_range": "1189\u20131189",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitStore.test.ts",
+    "line_range": "125\u2013125",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitStore.test.ts",
+    "line_range": "126\u2013126",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitStore.test.ts",
+    "line_range": "127\u2013127",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/somatic/systemPromptAssemblerIntegration.test.ts",
+    "line_range": "55\u201355",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/subAgentResultBuilder.test.ts",
+    "line_range": "52\u201352",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/subAgentResultBuilder.test.ts",
+    "line_range": "53\u201353",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/parameterRegistry.test.ts",
+    "line_range": "57\u201357",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/parameterRegistry.test.ts",
+    "line_range": "66\u201366",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/parameterRegistry.test.ts",
+    "line_range": "95\u201395",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `anthropic` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.ANTHROPIC`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/parameterRegistry.test.ts",
+    "line_range": "121\u2013121",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/parameterRegistry.test.ts",
+    "line_range": "147\u2013147",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/parameterRegistry.test.ts",
+    "line_range": "174\u2013174",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/chatRoute-adversarial.test.ts",
+    "line_range": "51\u201351",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/chatRoute-adversarial.test.ts",
+    "line_range": "65\u201365",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/chatRoute-adversarial.test.ts",
+    "line_range": "79\u201379",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/chatRoute-adversarial.test.ts",
+    "line_range": "87\u201387",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/chatRoute-adversarial.test.ts",
+    "line_range": "118\u2013118",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/chatRoute-adversarial.test.ts",
+    "line_range": "137\u2013137",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/chatRoute-adversarial.test.ts",
+    "line_range": "152\u2013152",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/chatRoute-adversarial.test.ts",
+    "line_range": "177\u2013177",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/config.test.ts",
+    "line_range": "98\u201398",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `openai` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.OPENAI`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/config.test.ts",
+    "line_range": "99\u201399",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `anthropic` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.ANTHROPIC`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/config.test.ts",
+    "line_range": "100\u2013100",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `google` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.GOOGLE`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/config.test.ts",
+    "line_range": "101\u2013101",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `elevenlabs` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.ELEVENLABS`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/config.test.ts",
+    "line_range": "102\u2013102",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "PROVIDERS",
+    "description": "Hard-coded provider string `inworld` instead of referencing `PROVIDERS` constant.",
+    "fix": "Replace with `PROVIDERS.INWORLD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "86\u201386",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "87\u201387",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "89\u201389",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "96\u201396",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "105\u2013105",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "112\u2013112",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "113\u2013113",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "120\u2013120",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "120\u2013120",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `tree_of_thought` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.TREE_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "121\u2013121",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `tree_of_thought` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.TREE_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "123\u2013123",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "128\u2013128",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `tree_of_thought` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.TREE_OF_THOUGHT`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "136\u2013136",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "137\u2013137",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "139\u2013139",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "143\u2013143",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-registry.test.ts",
+    "line_range": "151\u2013151",
+    "severity": "\ud83d\udd35",
+    "source": "src/constants.ts",
+    "exported": "HARNESS_IDS",
+    "description": "Hard-coded harness ID `standard` instead of referencing `HARNESS_IDS` constant.",
+    "fix": "Replace with `HARNESS_IDS.STANDARD`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/functionCallingUtilities.test.ts",
+    "line_range": "19\u201319",
+    "severity": "\ud83d\udd34",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage",
+    "description": "Test declares local `TestMessage` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.",
+    "fix": "Import `ChatMessage` from `src/types/ProviderTypes.ts`"
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/functionCallingUtilities.test.ts",
+    "line_range": "368\u2013368",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/contextWindowManager.test.ts",
+    "line_range": "609\u2013609",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/contextWindowManager.test.ts",
+    "line_range": "623\u2013623",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/contextWindowManager.test.ts",
+    "line_range": "649\u2013649",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/contextWindowManager.test.ts",
+    "line_range": "660\u2013660",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/contextWindowManager.test.ts",
+    "line_range": "673\u2013673",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  },
+  {
+    "category": "Duplicated Types & Interfaces",
+    "file": "tests/contextWindowManager.test.ts",
+    "line_range": "707\u2013707",
+    "severity": "\ud83d\udd35",
+    "source": "src/types/ProviderTypes.ts",
+    "exported": "ChatMessage / MessagePayload",
+    "description": "Inline object literal cast with `as any`/`as unknown` for message array.",
+    "fix": "Type the fixture with `ChatMessage` or `MessagePayload` directly."
+  }
+]
