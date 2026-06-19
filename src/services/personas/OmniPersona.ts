@@ -41,6 +41,7 @@ export const OmniPersona: Persona = {
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy([], context),
   availableTools: ["*"],
+  enabledByDefaultTools: [],
   capabilities: "",
   usesDirectoryTree: true,
   usesCodingGuidelines: true,

@@ -107,6 +107,7 @@ export const OogPersona: Persona = {
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy(OOG_TOOL_POLICY_SECTIONS, context),
   availableTools: ["*"],
+  enabledByDefaultTools: [],
   capabilities: "",
   usesDirectoryTree: true,
   usesCodingGuidelines: true,
