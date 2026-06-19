@@ -85,6 +85,13 @@ export const SPAWN_TWO_WORKERS =
   "2. Worker 2: Run `echo 'hello from worker 2'` using shell\n\n" +
   "Use team_create with 2 members. Each worker should use shell_execute.";
 
+export const FORCED_TOPOLOGY_SPAWN =
+  "You MUST use the team_create tool immediately to create a team called 'topology-test'. " +
+  "Create exactly 2 members:\n" +
+  "1. Member 1: description='echo-alpha', prompt='Run echo alpha-complete using the shell_execute tool, then report done.'\n" +
+  "2. Member 2: description='echo-beta', prompt='Run echo beta-complete using the shell_execute tool, then report done.'\n\n" +
+  "Call team_create NOW with these 2 members. Do not explain or plan — just call the tool.";
+
 // ── Adversarial / Edge Case Prompts ────────────────────────────
 
 export const EMPTY_STRING = "";

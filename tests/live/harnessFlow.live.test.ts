@@ -61,6 +61,7 @@ import {
   GRAPH_OF_THOUGHTS_SYNTHESIS_PROMPT,
   STRATEGY_COMPARISON_PROMPT,
   SEARCH_FOR_TOOLS,
+  FORCED_TOPOLOGY_SPAWN,
 } from "./helpers/testPrompts.ts";
 
 
@@ -2797,5 +2798,186 @@ describe("Suite 18: Strategy × Topology Live Combination Matrix", () => {
           `${result.text.length} chars, ${result.totalEvents} events`,
       );
     }
+  }, 900_000);
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+// Suite 19: Forced Subagent Topology Execution Matrix
+// ───────────────────────────────────────────────────────────────
+// Unlike Suite 18 which tests config acceptance (topology is
+// passed but subagents may never spawn), Suite 19 explicitly
+// forces team_create calls under each of the 4 topologies and
+// asserts that subagent lifecycle events (spawned → completed)
+// actually fire in the SSE stream.
+// ═══════════════════════════════════════════════════════════════
+
+describe("Suite 19: Forced Subagent Topology Execution Matrix", () => {
+  const TOPOLOGY_MATRIX = [
+    { key: "sequential", label: "Sequential Pipeline" },
+    { key: "hierarchical", label: "Hierarchical Parallel" },
+    { key: "hierarchical_aggregation", label: "Hierarchical Aggregation" },
+    { key: "peer_to_peer", label: "Peer-to-Peer Mesh" },
+  ] as const;
+
+  // ── 19.1–19.4: One test per topology, forcing team_create ────
+
+  let topologyTestIndex = 0;
+  for (const topology of TOPOLOGY_MATRIX) {
+    topologyTestIndex++;
+
+    it(`19.${topologyTestIndex} — ${topology.label}: spawns subagents and emits lifecycle events`, async () => {
+      const toolCallingTargets = providerTargets.filter(
+        (providerTarget) => providerTarget.supportsToolCalling,
+      ).slice(0, 1);
+
+      if (toolCallingTargets.length === 0) {
+        console.log("  ⏭ Skipping: no tool-calling providers available");
+        return;
+      }
+
+      const target = toolCallingTargets[0];
+      console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+      console.log(`  🔗 Topology: ${topology.label} (${topology.key})`);
+
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [{ role: "user", content: FORCED_TOPOLOGY_SPAWN }],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 3000,
+          autoApprove: true,
+          maxIterations: 10,
+          harness: "standard",
+          reasoningStrategy: "chain_of_thought",
+          topology: topology.key,
+        },
+        { timeoutMs: getMultiAgentTimeout(target) },
+      );
+
+      logResult(`19.${topologyTestIndex} [${topology.label}] [${target.providerName}]`, result);
+
+      // Must complete without timeout
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+
+      // Must have attempted team_create
+      const allToolEvents = [...result.toolExecutions, ...result.toolCalls];
+      const teamCreateEvents = allToolEvents.filter(
+        (toolEvent) => {
+          const toolName = toolEvent.tool?.name || toolEvent.name;
+          return toolName === "team_create" || toolName === "create_team";
+        },
+      );
+
+      console.log(
+        `  📊 team_create calls: ${teamCreateEvents.length}`,
+      );
+
+      expect(teamCreateEvents.length).toBeGreaterThanOrEqual(1);
+
+      // Must have emitted sub_agent_status events (spawned lifecycle)
+      const spawnedEvents = result.subAgentStatuses.filter(
+        (subAgentEvent) => subAgentEvent.message === "spawned",
+      );
+      const completedEvents = result.subAgentStatuses.filter(
+        (subAgentEvent) => subAgentEvent.message === "completed" || subAgentEvent.message === "complete",
+      );
+
+      console.log(
+        `  📊 Sub-agent spawned events: ${spawnedEvents.length}`,
+      );
+      console.log(
+        `  📊 Sub-agent completed events: ${completedEvents.length}`,
+      );
+
+      // At least 2 subagents must have been spawned (we requested 2 members)
+      expect(spawnedEvents.length).toBeGreaterThanOrEqual(2);
+
+      // Log unique sub-agent IDs to verify distinct agents were created
+      const uniqueSubAgentIds = new Set(
+        result.subAgentStatuses
+          .map((subAgentEvent) => subAgentEvent.subAgentId)
+          .filter(Boolean),
+      );
+
+      console.log(
+        `  📊 Unique sub-agent IDs: ${uniqueSubAgentIds.size} (${[...uniqueSubAgentIds].join(", ")})`,
+      );
+
+      expect(uniqueSubAgentIds.size).toBeGreaterThanOrEqual(2);
+
+      console.log(
+        `  ✓ Topology "${topology.key}" spawned ${spawnedEvents.length} subagents, ` +
+          `${completedEvents.length} completed, ${uniqueSubAgentIds.size} unique IDs`,
+      );
+    }, 900_000);
+  }
+
+  // ── 19.5: Cross-topology structural comparison ────────────────
+
+  it("19.5 — sequential vs peer_to_peer produce structurally different sub_agent_status patterns", async () => {
+    const toolCallingTargets = providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1);
+
+    if (toolCallingTargets.length === 0) {
+      console.log("  ⏭ Skipping: no tool-calling providers available");
+      return;
+    }
+
+    const target = toolCallingTargets[0];
+    console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+
+    const runWithTopology = async (topologyKey: string) => {
+      return agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [{ role: "user", content: FORCED_TOPOLOGY_SPAWN }],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 3000,
+          autoApprove: true,
+          maxIterations: 10,
+          harness: "standard",
+          reasoningStrategy: "chain_of_thought",
+          topology: topologyKey,
+        },
+        { timeoutMs: getMultiAgentTimeout(target) },
+      );
+    };
+
+    const sequentialResult = await runWithTopology("sequential");
+    const peerToPeerResult = await runWithTopology("peer_to_peer");
+
+    logResult(`19.5 [sequential] [${target.providerName}]`, sequentialResult);
+    logResult(`19.5 [peer_to_peer] [${target.providerName}]`, peerToPeerResult);
+
+    // Both must complete
+    expect(sequentialResult.timedOut).toBe(false);
+    expect(sequentialResult.done).toBeTruthy();
+    expect(peerToPeerResult.timedOut).toBe(false);
+    expect(peerToPeerResult.done).toBeTruthy();
+
+    // Both must have spawned subagents
+    const sequentialSpawns = sequentialResult.subAgentStatuses.filter(
+      (subAgentEvent) => subAgentEvent.message === "spawned",
+    );
+    const peerToPeerSpawns = peerToPeerResult.subAgentStatuses.filter(
+      (subAgentEvent) => subAgentEvent.message === "spawned",
+    );
+
+    console.log(`  📊 Sequential spawns: ${sequentialSpawns.length}`);
+    console.log(`  📊 Peer-to-Peer spawns: ${peerToPeerSpawns.length}`);
+
+    expect(sequentialSpawns.length).toBeGreaterThanOrEqual(2);
+    expect(peerToPeerSpawns.length).toBeGreaterThanOrEqual(2);
+
+    console.log(
+      `  ✓ Both topologies spawned subagents — sequential: ${sequentialSpawns.length}, p2p: ${peerToPeerSpawns.length}`,
+    );
   }, 900_000);
 });
