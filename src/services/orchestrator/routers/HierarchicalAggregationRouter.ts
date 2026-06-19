@@ -104,7 +104,8 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
     const assignments: OrchestratorSpawnParams[] = [];
     const orchestratorFallback = await getSubAgentFallback();
 
-    for (const member of members) {
+    for (let memberIndex = 0; memberIndex < members.length; memberIndex++) {
+      const member = members[memberIndex];
       let assignedProvider = providerName;
       let assignedModel = member.model || resolvedModel;
 
@@ -133,6 +134,8 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
         agent: member.agent,
         assignedProvider,
         assignedModel,
+        agentIndex: memberIndex,
+        teamSize: members.length,
         orchestratorContext,
       });
     }

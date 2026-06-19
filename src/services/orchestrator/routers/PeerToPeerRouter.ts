@@ -125,6 +125,8 @@ export class PeerToPeerRouter implements TopologyRouter {
         agent: member.agent,
         assignedProvider,
         assignedModel,
+        agentIndex: memberIndex,
+        teamSize: members.length,
         orchestratorContext,
       };
 

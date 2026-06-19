@@ -163,6 +163,8 @@ export default class OrchestratorService {
     agent: memberAgentName,
     assignedProvider,
     assignedModel,
+    agentIndex,
+    teamSize,
     orchestratorContext,
   }: OrchestratorSpawnParams): Promise<SubAgentResult | { error: string }> {
     const {
@@ -368,6 +370,8 @@ export default class OrchestratorService {
       minContextLength: minContextLength || null,
       parentConversationId,
       enabledTools: subAgentEnabledTools || null,
+      agentIndex,
+      teamSize,
     };
 
     activeSubAgents.set(agentId, subAgentState);
@@ -971,13 +975,27 @@ export default class OrchestratorService {
       ? `- Only modify files within your workspace\n`
       : "";
 
+    const workspaceIntroLine = showWorkspaceConstraint
+      ? `Your workspace is: ${subAgent.worktreePath}\n`
+      : "";
+
+    const activeTopology = orchestratorContext.topology || DEFAULT_TOPOLOGY;
+
+    const agentPositionLine =
+      subAgent.agentIndex != null && subAgent.teamSize != null
+        ? `Agent: ${subAgent.agentIndex + 1} of ${subAgent.teamSize}\n`
+        : "";
+
     const subAgentMessages: ConversationMessage[] = [
       ...(subAgent.messages || []),
       {
         role: "user",
         content:
-          `You are a sub-agent in a multi-agent coding system.\n\n` +
-          `Your workspace is: ${subAgent.worktreePath}\n` +
+          `You are a sub-agent in a multi-agent system.\n` +
+          `Topology: ${activeTopology}\n` +
+          agentPositionLine +
+          `\n` +
+          workspaceIntroLine +
           (subAgent.files?.length
             ? `Focus on files: ${subAgent.files.join(", ")}\n`
             : "") +
