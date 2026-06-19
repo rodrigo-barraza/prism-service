@@ -40,7 +40,6 @@ const ConversationService: ConversationServiceInterface = {
   ): Promise<Record<string, unknown>> {
     const traceId = conversationMeta?.traceId || null;
     const dbCollection = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
-    const isAgentSession = collection === COLLECTIONS.AGENT_CONVERSATIONS;
 
     // Extract files (upload base64 data to MinIO)
     const processedMessages = await extractFiles(
@@ -98,11 +97,9 @@ const ConversationService: ConversationServiceInterface = {
       ...(conversationMeta?.workspaceRoot && {
         workspaceRoot: conversationMeta.workspaceRoot,
       }),
-      // Agent identity — stored on agent sessions for per-agent filtering
-      ...(isAgentSession &&
-        conversationMeta?.agent && {
-          agent: conversationMeta.agent,
-        }),
+      ...(conversationMeta?.agent && {
+        agent: conversationMeta.agent,
+      }),
       createdAt: now,
     };
 
@@ -205,7 +202,6 @@ const ConversationService: ConversationServiceInterface = {
 
     if (generating) {
       // Upsert — create a stub if it doesn't exist yet
-      const isAgentSession = collection === COLLECTIONS.AGENT_CONVERSATIONS;
       await db.collection(collection).updateOne(
         { id: conversationId, project, username },
         {
@@ -218,8 +214,7 @@ const ConversationService: ConversationServiceInterface = {
             modalities: computeModalities([]),
             providers: [],
             totalCost: 0,
-            // Agent identity — stored on agent sessions for per-agent filtering
-            ...(isAgentSession && agent && { agent }),
+            ...(agent && { agent }),
             createdAt: now,
           },
         },
