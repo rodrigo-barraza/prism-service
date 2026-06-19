@@ -19,6 +19,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { HARNESS_IDS, PROVIDERS, REASONING_STRATEGIES } from "../src/constants.ts";
 import { ChatRequestSchema } from "../src/types/schemas.ts";
 import AgenticLoopState from "../src/services/AgenticLoopState.ts";
 import ToolContext from "../src/services/ToolContext.ts";
@@ -47,7 +48,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should reject payload with missing messages field entirely", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
     };
     const result = ChatRequestSchema.safeParse(payload);
     expect(result.success).toBe(false);
@@ -55,7 +56,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should reject payload where messages is not an array", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: "not-an-array",
     };
     const result = ChatRequestSchema.safeParse(payload);
@@ -64,7 +65,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should reject payload where messages is an object instead of array", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: { role: "user", content: "hi" },
     };
     const result = ChatRequestSchema.safeParse(payload);
@@ -73,7 +74,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should reject message with missing role field", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ content: "hi" }],
     };
     const result = ChatRequestSchema.safeParse(payload);
@@ -82,7 +83,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should accept message with empty string content (boundary case)", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "" }],
     };
     const result = ChatRequestSchema.safeParse(payload);
@@ -102,7 +103,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should reject maxTokens as a string that is not a number", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "hi" }],
       maxTokens: "lots",
     };
@@ -112,7 +113,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should reject temperature as a boolean instead of number", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "hi" }],
       temperature: true,
     };
@@ -122,7 +123,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should reject maxIterations as a string instead of number", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "hi" }],
       maxIterations: "infinity",
     };
@@ -132,7 +133,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should accept negative maxIterations (schema does not bound it)", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "hi" }],
       maxIterations: -1,
     };
@@ -147,7 +148,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should reject NaN as maxTokens (Zod z.number rejects non-finite values)", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "hi" }],
       maxTokens: NaN,
     };
@@ -159,7 +160,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should reject Infinity as branchCount (Zod z.number rejects non-finite values)", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "hi" }],
       branchCount: Infinity,
     };
@@ -172,7 +173,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should pass through unknown extra fields due to .passthrough()", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "hi" }],
       __proto__: { polluted: true },
       constructor: { prototype: { polluted: true } },
@@ -204,7 +205,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should reject agentSessionId with path traversal characters", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "hi" }],
       agentSessionId: "../../etc/passwd",
     };
@@ -215,7 +216,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should reject harness name with path traversal characters", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "hi" }],
       harness: "../../../etc/passwd",
     };
@@ -225,7 +226,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should accept harness name with semicolons (no path traversal)", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "hi" }],
       harness: "standard; rm -rf /",
     };
@@ -238,7 +239,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should accept a payload with zero messages (empty array)", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [],
     };
     const result = ChatRequestSchema.safeParse(payload);
@@ -248,7 +249,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
 
   it("should accept deeply nested content arrays without stack overflow", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{
         role: "user",
         content: [
@@ -404,33 +405,33 @@ describe("Flow 3: HarnessRegistry Dispatch", () => {
   it("should return standard harness for unknown harness id (fallback)", () => {
     const harness = HarnessRegistry.get("nonexistent-harness-xyz");
     expect(harness).toBeDefined();
-    // Should fallback to 'standard' (ReActHarness)
-    expect(harness!.id).toBe("standard");
+    // Should fallback to HARNESS_IDS.STANDARD (ReActHarness)
+    expect(harness!.id).toBe(HARNESS_IDS.STANDARD);
   });
 
   it("should return standard harness for empty string id", () => {
     const harness = HarnessRegistry.get("");
     expect(harness).toBeDefined();
-    expect(harness!.id).toBe("standard");
+    expect(harness!.id).toBe(HARNESS_IDS.STANDARD);
   });
 
   it("should return standard harness for id with special characters", () => {
     const harness = HarnessRegistry.get("../../../etc/passwd");
     expect(harness).toBeDefined();
-    expect(harness!.id).toBe("standard");
+    expect(harness!.id).toBe(HARNESS_IDS.STANDARD);
   });
 
-  it("should have 'standard' harness registered", () => {
-    expect(HarnessRegistry.has("standard")).toBe(true);
+  it("should have HARNESS_IDS.STANDARD harness registered", () => {
+    expect(HarnessRegistry.has(HARNESS_IDS.STANDARD)).toBe(true);
   });
 
   it("should have 'vision_language' harness registered (underscore convention)", () => {
     expect(HarnessRegistry.has("vision_language")).toBe(true);
   });
 
-  it("should not have 'tree-of-thought' as a harness (now a strategy)", () => {
-    expect(HarnessRegistry.has("tree-of-thought")).toBe(false);
-    expect(HarnessRegistry.has("tree_of_thought")).toBe(false);
+  it("should not have HARNESS_IDS.TREE_OF_THOUGHT as a harness (now a strategy)", () => {
+    expect(HarnessRegistry.has(HARNESS_IDS.TREE_OF_THOUGHT)).toBe(false);
+    expect(HarnessRegistry.has(HARNESS_IDS.TREE_OF_THOUGHT)).toBe(false);
   });
 
   it("should list all registered harnesses with required metadata", () => {
@@ -446,13 +447,13 @@ describe("Flow 3: HarnessRegistry Dispatch", () => {
   // ── State Machine Violation: Legacy Harness Migration ──────────
 
   it("should confirm legacy tree-of-thought harness is not in the registry (migration handled by AgenticLoopService)", () => {
-    // Legacy "tree_of_thought" and "tree-of-thought" harness IDs are now
+    // Legacy HARNESS_IDS.TREE_OF_THOUGHT and HARNESS_IDS.TREE_OF_THOUGHT harness IDs are now
     // migrated to standard + tree_of_thoughts strategy in AgenticLoopService.
     // HarnessRegistry.get() falls back to standard for any unknown ID,
     // but the intent is that the migration code in AgenticLoopService
     // catches these BEFORE they reach the registry.
-    const harness = HarnessRegistry.get("tree-of-thought");
-    expect(harness!.id).toBe("standard");
+    const harness = HarnessRegistry.get(HARNESS_IDS.TREE_OF_THOUGHT);
+    expect(harness!.id).toBe(HARNESS_IDS.STANDARD);
   });
 });
 
@@ -821,75 +822,75 @@ describe("Flow 6: maxIterations Resolution Logic", () => {
 describe("Flow 7: Legacy Harness Migration Logic", () => {
 
   // Extracted from AgenticLoopService.runAgenticLoop() lines 110-117:
-  // if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
-  //   harnessId = "standard";
-  //   reasoningStrategy = "tree_of_thoughts";
+  // if (harnessId === HARNESS_IDS.TREE_OF_THOUGHT || harnessId === HARNESS_IDS.TREE_OF_THOUGHT) {
+  //   harnessId = HARNESS_IDS.STANDARD;
+  //   reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
   // }
 
   it("should migrate tree_of_thought harness to standard + tree_of_thoughts", () => {
-    let harnessId: string = "tree_of_thought";
-    let reasoningStrategy: string = "chain_of_thought";
+    let harnessId: string = HARNESS_IDS.TREE_OF_THOUGHT;
+    let reasoningStrategy: string = REASONING_STRATEGIES.CHAIN_OF_THOUGHT;
 
-    if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
-      harnessId = "standard";
-      reasoningStrategy = "tree_of_thoughts";
+    if (harnessId === HARNESS_IDS.TREE_OF_THOUGHT || harnessId === HARNESS_IDS.TREE_OF_THOUGHT) {
+      harnessId = HARNESS_IDS.STANDARD;
+      reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
     }
 
-    expect(harnessId).toBe("standard");
-    expect(reasoningStrategy).toBe("tree_of_thoughts");
+    expect(harnessId).toBe(HARNESS_IDS.STANDARD);
+    expect(reasoningStrategy).toBe(REASONING_STRATEGIES.TREE_OF_THOUGHTS);
   });
 
   it("should migrate tree-of-thought (kebab) harness to standard + tree_of_thoughts", () => {
-    let harnessId: string = "tree-of-thought";
-    let reasoningStrategy: string = "chain_of_thought";
+    let harnessId: string = HARNESS_IDS.TREE_OF_THOUGHT;
+    let reasoningStrategy: string = REASONING_STRATEGIES.CHAIN_OF_THOUGHT;
 
-    if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
-      harnessId = "standard";
-      reasoningStrategy = "tree_of_thoughts";
+    if (harnessId === HARNESS_IDS.TREE_OF_THOUGHT || harnessId === HARNESS_IDS.TREE_OF_THOUGHT) {
+      harnessId = HARNESS_IDS.STANDARD;
+      reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
     }
 
-    expect(harnessId).toBe("standard");
-    expect(reasoningStrategy).toBe("tree_of_thoughts");
+    expect(harnessId).toBe(HARNESS_IDS.STANDARD);
+    expect(reasoningStrategy).toBe(REASONING_STRATEGIES.TREE_OF_THOUGHTS);
   });
 
   it("should NOT migrate tree_of_thoughts (plural) — that's a strategy, not a harness", () => {
-    let harnessId: string = "tree_of_thoughts";
-    let reasoningStrategy: string = "chain_of_thought";
+    let harnessId: string = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
+    let reasoningStrategy: string = REASONING_STRATEGIES.CHAIN_OF_THOUGHT;
 
-    if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
-      harnessId = "standard";
-      reasoningStrategy = "tree_of_thoughts";
+    if (harnessId === HARNESS_IDS.TREE_OF_THOUGHT || harnessId === HARNESS_IDS.TREE_OF_THOUGHT) {
+      harnessId = HARNESS_IDS.STANDARD;
+      reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
     }
 
-    // Should remain unchanged — "tree_of_thoughts" (plural) is NOT a legacy harness
-    expect(harnessId).toBe("tree_of_thoughts");
-    expect(reasoningStrategy).toBe("chain_of_thought");
+    // Should remain unchanged — REASONING_STRATEGIES.TREE_OF_THOUGHTS (plural) is NOT a legacy harness
+    expect(harnessId).toBe(REASONING_STRATEGIES.TREE_OF_THOUGHTS);
+    expect(reasoningStrategy).toBe(REASONING_STRATEGIES.CHAIN_OF_THOUGHT);
   });
 
   it("should not migrate standard harness", () => {
-    let harnessId: string = "standard";
-    let reasoningStrategy: string = "chain_of_thought";
+    let harnessId: string = HARNESS_IDS.STANDARD;
+    let reasoningStrategy: string = REASONING_STRATEGIES.CHAIN_OF_THOUGHT;
 
-    if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
-      harnessId = "standard";
-      reasoningStrategy = "tree_of_thoughts";
+    if (harnessId === HARNESS_IDS.TREE_OF_THOUGHT || harnessId === HARNESS_IDS.TREE_OF_THOUGHT) {
+      harnessId = HARNESS_IDS.STANDARD;
+      reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
     }
 
-    expect(harnessId).toBe("standard");
-    expect(reasoningStrategy).toBe("chain_of_thought");
+    expect(harnessId).toBe(HARNESS_IDS.STANDARD);
+    expect(reasoningStrategy).toBe(REASONING_STRATEGIES.CHAIN_OF_THOUGHT);
   });
 
   it("should not migrate vision-language harness", () => {
     let harnessId: string = "vision-language";
-    let reasoningStrategy: string = "chain_of_thought";
+    let reasoningStrategy: string = REASONING_STRATEGIES.CHAIN_OF_THOUGHT;
 
-    if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
-      harnessId = "standard";
-      reasoningStrategy = "tree_of_thoughts";
+    if (harnessId === HARNESS_IDS.TREE_OF_THOUGHT || harnessId === HARNESS_IDS.TREE_OF_THOUGHT) {
+      harnessId = HARNESS_IDS.STANDARD;
+      reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
     }
 
     expect(harnessId).toBe("vision-language");
-    expect(reasoningStrategy).toBe("chain_of_thought");
+    expect(reasoningStrategy).toBe(REASONING_STRATEGIES.CHAIN_OF_THOUGHT);
   });
 });
 
@@ -917,14 +918,14 @@ describe("Flow 8: Schema Edge Cases — Adversarial Payloads", () => {
 
   it("should reject an array as the entire payload", () => {
     const result = ChatRequestSchema.safeParse([
-      { provider: "openai", messages: [] },
+      { provider: PROVIDERS.OPENAI, messages: [] },
     ]);
     expect(result.success).toBe(false);
   });
 
   it("should accept enabledTools as empty array", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "hi" }],
       enabledTools: [],
     };
@@ -937,7 +938,7 @@ describe("Flow 8: Schema Edge Cases — Adversarial Payloads", () => {
 
   it("should reject enabledTools containing non-string elements", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "hi" }],
       enabledTools: [123, null, { name: "tool" }],
     };
@@ -947,7 +948,7 @@ describe("Flow 8: Schema Edge Cases — Adversarial Payloads", () => {
 
   it("should accept message with content as multimodal array", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{
         role: "user",
         content: [
@@ -962,7 +963,7 @@ describe("Flow 8: Schema Edge Cases — Adversarial Payloads", () => {
 
   it("should reject message with content as a number", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: 42 }],
     };
     const result = ChatRequestSchema.safeParse(payload);
@@ -971,7 +972,7 @@ describe("Flow 8: Schema Edge Cases — Adversarial Payloads", () => {
 
   it("should reject message with content as a boolean", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: true }],
     };
     const result = ChatRequestSchema.safeParse(payload);
@@ -980,7 +981,7 @@ describe("Flow 8: Schema Edge Cases — Adversarial Payloads", () => {
 
   it("should accept toolCalls with minimal required fields", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{
         role: "assistant",
         content: "Using tool",
@@ -996,7 +997,7 @@ describe("Flow 8: Schema Edge Cases — Adversarial Payloads", () => {
 
   it("should reject toolCalls missing the name field", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{
         role: "assistant",
         content: "Using tool",
@@ -1011,7 +1012,7 @@ describe("Flow 8: Schema Edge Cases — Adversarial Payloads", () => {
 
   it("should reject toolCalls missing the args field", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{
         role: "assistant",
         content: "Using tool",
@@ -1028,7 +1029,7 @@ describe("Flow 8: Schema Edge Cases — Adversarial Payloads", () => {
 
   it("should accept message content with RTL text and zero-width joiners", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{
         role: "user",
         content: "مرحبا\u200D\u200D\u200D\u200F\u200E\u2066\u2069 ZWJ test",
@@ -1040,7 +1041,7 @@ describe("Flow 8: Schema Edge Cases — Adversarial Payloads", () => {
 
   it("should accept message content with emoji sequences and variation selectors", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{
         role: "user",
         content: "👨‍👩‍👧‍👦 family emoji | 🏳️‍🌈 flag | 👋🏿 skin tone",
@@ -1052,7 +1053,7 @@ describe("Flow 8: Schema Edge Cases — Adversarial Payloads", () => {
 
   it("should accept message content with null byte embedded in string", () => {
     const payload = {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       messages: [{
         role: "user",
         content: "before\0after",
@@ -1341,7 +1342,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
     const context = createMockContext({
       agentSessionId: "test-session-active",
       reminderModel: "gemini-3.5-flash",
-      reminderProvider: "google",
+      reminderProvider: PROVIDERS.GOOGLE,
       extractedBullets,
     });
     const state = createMockState(8);

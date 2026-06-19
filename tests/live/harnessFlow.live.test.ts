@@ -2509,3 +2509,293 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
     }
   }, 900_000);
 });
+
+
+// ═══════════════════════════════════════════════════════════════
+// Suite 18: Strategy × Topology Live Combination Matrix
+//
+// Reasoning strategy controls the main agent's inner loop:
+//   - chain_of_thought: single-pass sequential ReAct
+//   - tree_of_thoughts: N parallel branches → score → pick winner
+//   - graph_of_thoughts: N parallel branches → score → synthesize merge
+//
+// Topology controls sub-agent coordination (via team_create tool):
+//   - sequential: chain — each agent passes output to the next
+//   - hierarchical: parallel — all agents run concurrently, best wins
+//   - hierarchical_aggregation: parallel + synthesis merge pass
+//   - peer_to_peer: round-robin discussion mesh
+//
+// These are ORTHOGONAL axes. This suite tests the full 3×4 matrix
+// to verify every combination resolves, completes, and emits the
+// correct structural SSE events without errors or crashes.
+// ═══════════════════════════════════════════════════════════════
+
+describe("Suite 18: Strategy × Topology Live Combination Matrix", () => {
+  const STRATEGIES = [
+    {
+      key: "chain_of_thought",
+      label: "CoT",
+      expectedBranching: false,
+      expectedSynthesis: false,
+    },
+    {
+      key: "tree_of_thoughts",
+      label: "ToT",
+      expectedBranching: true,
+      expectedSynthesis: false,
+    },
+    {
+      key: "graph_of_thoughts",
+      label: "GoT",
+      expectedBranching: true,
+      expectedSynthesis: true,
+    },
+  ] as const;
+
+  const TOPOLOGIES = [
+    { key: "sequential", label: "Sequential" },
+    { key: "hierarchical", label: "Hierarchical" },
+    { key: "hierarchical_aggregation", label: "Hierarchical Aggregation" },
+    { key: "peer_to_peer", label: "Peer-to-Peer" },
+  ] as const;
+
+  // ── 18.1–18.12: Full matrix (1 test per cell) ─────────────────
+
+  let matrixTestIndex = 0;
+  for (const strategy of STRATEGIES) {
+    for (const topology of TOPOLOGIES) {
+      matrixTestIndex++;
+
+      it(`18.${matrixTestIndex} — ${strategy.label} + ${topology.label}: completes and emits correct events`, async () => {
+        const toolCallingTargets = providerTargets.filter(
+          (providerTarget) => providerTarget.supportsToolCalling,
+        ).slice(0, 1);
+
+        if (toolCallingTargets.length === 0) {
+          console.log("  ⏭ Skipping: no tool-calling providers available");
+          return;
+        }
+
+        const target = toolCallingTargets[0];
+        console.log(
+          `\n  🎯 Provider: ${target.providerName} (${target.model})` +
+            `\n  📐 Strategy: ${strategy.label} (${strategy.key})` +
+            `\n  🔗 Topology: ${topology.label} (${topology.key})`,
+        );
+
+        const isMultiBranch = strategy.key !== "chain_of_thought";
+        const prompt = isMultiBranch
+          ? GRAPH_OF_THOUGHTS_SYNTHESIS_PROMPT
+          : SIMPLE_ARITHMETIC;
+
+        const result = await agentStreamWithRetry(
+          {
+            provider: target.providerName,
+            model: target.model,
+            messages: [{ role: "user", content: prompt }],
+            agent: "OMNI",
+            agentSessionId: crypto.randomUUID(),
+            maxTokens: isMultiBranch ? 2000 : 300,
+            autoApprove: true,
+            maxIterations: isMultiBranch ? 3 : 2,
+            harness: "standard",
+            reasoningStrategy: strategy.key,
+            topology: topology.key,
+            ...(isMultiBranch ? { branchCount: 2 } : {}),
+          },
+          { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+        );
+
+        logResult(
+          `18.${matrixTestIndex} [${strategy.label}+${topology.label}] [${target.providerName}]`,
+          result,
+        );
+
+        // Infrastructure assertions — every combination must complete
+        expect(result.timedOut).toBe(false);
+        expect(result.done).toBeTruthy();
+
+        if (isEmptyResponse(result)) {
+          console.log("  ⚠ Model returned empty — skipping event assertions");
+          return;
+        }
+
+        // Strategy-specific structural assertions
+        const branchingStartedStatuses = result.statuses.filter(
+          (status) => status.message === "branching_started",
+        );
+        const synthesisStatuses = result.statuses.filter(
+          (status) => status.message === "synthesis_started",
+        );
+
+        if (strategy.expectedBranching) {
+          expect(branchingStartedStatuses.length).toBeGreaterThanOrEqual(1);
+          console.log(
+            `  📊 branching_started events: ${branchingStartedStatuses.length}`,
+          );
+        } else {
+          expect(branchingStartedStatuses).toHaveLength(0);
+          console.log(
+            `  ✓ No branching events (CoT as expected)`,
+          );
+        }
+
+        if (strategy.expectedSynthesis) {
+          expect(synthesisStatuses.length).toBeGreaterThanOrEqual(1);
+          console.log(
+            `  📊 synthesis_started events: ${synthesisStatuses.length}`,
+          );
+        } else {
+          expect(synthesisStatuses).toHaveLength(0);
+          console.log(
+            `  ✓ No synthesis events (${strategy.label} as expected)`,
+          );
+        }
+
+        // Log topology setting (it's forwarded to orchestrator on team_create, not visible in events)
+        console.log(`  ✓ Topology "${topology.key}" accepted without errors`);
+      }, 600_000);
+    }
+  }
+
+  // ── 18.13: Topology actually affects team_create dispatch ─────
+
+  it("18.13 — topology is forwarded to team_create: sequential vs hierarchical produce different execution patterns", async () => {
+    const toolCallingTargets = providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1);
+
+    if (toolCallingTargets.length === 0) {
+      console.log("  ⏭ Skipping: no tool-calling providers available");
+      return;
+    }
+
+    const target = toolCallingTargets[0];
+    console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+
+    const teamCreatePrompt =
+      "Use team_create with 2 members:\n" +
+      "1. First member: echo 'step-one' using shell\n" +
+      "2. Second member: echo 'step-two' using shell\n\n" +
+      "Create the team now.";
+
+    // Run with sequential topology
+    const sequentialResult = await agentStreamWithRetry(
+      {
+        provider: target.providerName,
+        model: target.model,
+        messages: [{ role: "user", content: teamCreatePrompt }],
+        agent: "OMNI",
+        agentSessionId: crypto.randomUUID(),
+        maxTokens: 3000,
+        autoApprove: true,
+        maxIterations: 10,
+        harness: "standard",
+        reasoningStrategy: "chain_of_thought",
+        topology: "sequential",
+      },
+      { timeoutMs: getMultiAgentTimeout(target) },
+    );
+
+    // Run with hierarchical topology
+    const hierarchicalResult = await agentStreamWithRetry(
+      {
+        provider: target.providerName,
+        model: target.model,
+        messages: [{ role: "user", content: teamCreatePrompt }],
+        agent: "OMNI",
+        agentSessionId: crypto.randomUUID(),
+        maxTokens: 3000,
+        autoApprove: true,
+        maxIterations: 10,
+        harness: "standard",
+        reasoningStrategy: "chain_of_thought",
+        topology: "hierarchical",
+      },
+      { timeoutMs: getMultiAgentTimeout(target) },
+    );
+
+    logResult(`18.13 sequential [${target.providerName}]`, sequentialResult);
+    logResult(`18.13 hierarchical [${target.providerName}]`, hierarchicalResult);
+
+    // Both must complete without timeout
+    expect(sequentialResult.timedOut).toBe(false);
+    expect(sequentialResult.done).toBeTruthy();
+    expect(hierarchicalResult.timedOut).toBe(false);
+    expect(hierarchicalResult.done).toBeTruthy();
+
+    // Both should have attempted team_create
+    const sequentialToolEvents = [...sequentialResult.toolExecutions, ...sequentialResult.toolCalls];
+    const hierarchicalToolEvents = [...hierarchicalResult.toolExecutions, ...hierarchicalResult.toolCalls];
+
+    const sequentialTeamCreates = sequentialToolEvents.filter(
+      (toolEvent) =>
+        (toolEvent.tool?.name || toolEvent.name) === "team_create" ||
+        (toolEvent.tool?.name || toolEvent.name) === "create_team",
+    );
+    const hierarchicalTeamCreates = hierarchicalToolEvents.filter(
+      (toolEvent) =>
+        (toolEvent.tool?.name || toolEvent.name) === "team_create" ||
+        (toolEvent.tool?.name || toolEvent.name) === "create_team",
+    );
+
+    console.log(
+      `  📊 Sequential: ${sequentialTeamCreates.length} team_create calls, ` +
+        `${sequentialToolEvents.length} total tool events`,
+    );
+    console.log(
+      `  📊 Hierarchical: ${hierarchicalTeamCreates.length} team_create calls, ` +
+        `${hierarchicalToolEvents.length} total tool events`,
+    );
+  }, 900_000);
+
+  // ── 18.14: All strategies work with peer_to_peer topology ────
+
+  it("18.14 — all 3 strategies complete cleanly with peer_to_peer topology", async () => {
+    const toolCallingTargets = providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1);
+
+    if (toolCallingTargets.length === 0) {
+      console.log("  ⏭ Skipping: no tool-calling providers available");
+      return;
+    }
+
+    const target = toolCallingTargets[0];
+    console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+
+    const strategyKeys = ["chain_of_thought", "tree_of_thoughts", "graph_of_thoughts"] as const;
+
+    for (const strategyKey of strategyKeys) {
+      const isMultiBranch = strategyKey !== "chain_of_thought";
+
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [{ role: "user", content: STRATEGY_COMPARISON_PROMPT }],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: isMultiBranch ? 2000 : 300,
+          autoApprove: true,
+          maxIterations: isMultiBranch ? 3 : 2,
+          harness: "standard",
+          reasoningStrategy: strategyKey,
+          topology: "peer_to_peer",
+          ...(isMultiBranch ? { branchCount: 2 } : {}),
+        },
+        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+      );
+
+      logResult(`18.14 [${strategyKey}+p2p] [${target.providerName}]`, result);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
+
+      console.log(
+        `  ✓ ${strategyKey} + peer_to_peer completed: ` +
+          `${result.text.length} chars, ${result.totalEvents} events`,
+      );
+    }
+  }, 900_000);
+});

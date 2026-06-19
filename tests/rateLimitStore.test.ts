@@ -122,9 +122,9 @@ describe('RateLimitStore adversarial', () => {
     // "openai::gpt-5::hack::model" — split("::") would give wrong provider/model
     rateLimitStore.update('openai::gpt-5', 'injected', { rpm: 999 });
     const snapshot = rateLimitStore.getAll();
-    // The key is "openai::gpt-5::injected" — split("::") gives ["openai", "gpt-5", "injected"]
-    // Destructured as [provider, model] → provider="openai", model="gpt-5"
-    // This means the "injected" part is silently dropped and the entry appears under "openai"
+    // The key is "openai::gpt-5::injected" — split("::") gives [PROVIDERS.OPENAI, "gpt-5", "injected"]
+    // Destructured as [provider, model] → provider=PROVIDERS.OPENAI, model="gpt-5"
+    // This means the "injected" part is silently dropped and the entry appears under PROVIDERS.OPENAI
     expect(snapshot).toBeDefined();
   });
 

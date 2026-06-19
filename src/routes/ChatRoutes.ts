@@ -61,6 +61,7 @@ import type {
   EmitFunction,
   ToolSchema,
 } from "../services/harnesses/types.ts";
+import type { ChatMessage } from "../types/ProviderTypes.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { PROVIDERS, FILE_CATEGORIES } from "../constants.ts";
 
@@ -1050,11 +1051,11 @@ async function handleStreamingText(context: GenerationContext) {
   const stream =
     (modelDefinition as Record<string, unknown> | null)?.liveAPI &&
     provider.generateTextStreamLive
-      ? provider.generateTextStreamLive(messages as any, resolvedModel, {
+      ? provider.generateTextStreamLive(messages as ChatMessage[], resolvedModel, {
           ...options,
           signal,
         })
-      : provider.generateTextStream(messages as any, resolvedModel, {
+      : provider.generateTextStream(messages as ChatMessage[], resolvedModel, {
           ...options,
           signal,
         });
@@ -1214,7 +1215,7 @@ async function handleStreamingText(context: GenerationContext) {
     streamState.thinkingSignature = "";
     streamState.toolCalls.length = 0;
     const followUpStream = provider.generateTextStream(
-      updatedMessages as any,
+      updatedMessages as ChatMessage[],
       resolvedModel,
       {
         ...options,
@@ -1354,7 +1355,7 @@ async function handleNonStreamingText(context: GenerationContext) {
   }
   const generationStart = performance.now();
   const genResult = await provider.generateText(
-    messages as any,
+    messages as ChatMessage[],
     resolvedModel,
     options,
   );
@@ -1430,7 +1431,7 @@ async function handleNonStreamingText(context: GenerationContext) {
     thinking: genResult.thinking || "",
     images,
     toolCalls:
-      genResult.toolCalls?.map((toolCall: any) => ({
+      genResult.toolCalls?.map((toolCall) => ({
         id: toolCall.id || null,
         name: toolCall.name,
         args: toolCall.args || {},
@@ -1448,7 +1449,7 @@ async function handleNonStreamingText(context: GenerationContext) {
     timeToGenerationSec: (generationStart - requestStart) / 1000,
     generationSec: (now - generationStart) / 1000,
     totalSec: (now - requestStart) / 1000,
-    rateLimits: (genResult as any).rateLimits || null,
+    rateLimits: genResult.rateLimits || null,
   });
 }
 // ─── SSE streaming or JSON fallback ─────────────────────────

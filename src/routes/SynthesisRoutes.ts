@@ -2,6 +2,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
 import logger from "../utils/logger.ts";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { COLLECTIONS } from "../constants.ts";
 import {
   PostSynthesisBodySchema,
@@ -50,9 +51,7 @@ router.get(
 
       res.json(runs);
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(`Error fetching synthesis runs: ${errorMessage}`);
+      logger.error(`Error fetching synthesis runs: ${errorMessage(error)}`);
       next(error);
     }
   }),
@@ -81,9 +80,7 @@ router.get(
 
       res.json(run);
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(`Error fetching synthesis run: ${errorMessage}`);
+      logger.error(`Error fetching synthesis run: ${errorMessage(error)}`);
       next(error);
     }
   }),
@@ -139,9 +136,7 @@ router.post(
 
       res.json(document);
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(`Error creating synthesis run: ${errorMessage}`);
+      logger.error(`Error creating synthesis run: ${errorMessage(error)}`);
       next(error);
     }
   }),
@@ -191,9 +186,7 @@ router.patch(
 
       res.json(updated);
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(`Error patching synthesis run: ${errorMessage}`);
+      logger.error(`Error patching synthesis run: ${errorMessage(error)}`);
       next(error);
     }
   }),
@@ -222,9 +215,7 @@ router.delete(
 
       res.json({ success: true, id: runId });
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(`Error deleting synthesis run: ${errorMessage}`);
+      logger.error(`Error deleting synthesis run: ${errorMessage(error)}`);
       next(error);
     }
   }),

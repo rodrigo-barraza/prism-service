@@ -4,6 +4,7 @@ import {
   roundMilliseconds,
   errorMessage,
 } from "@rodrigo-barraza/utilities-library";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import express, { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
@@ -118,8 +119,8 @@ export async function handleVoice(
               ? conversationMeta.title
               : undefined,
         },
-      ).catch((error: Error) =>
-        logger.error(`Failed to set isGenerating: ${error.message}`),
+      ).catch((error: unknown) =>
+        logger.error(`Failed to set isGenerating: ${getErrorMessage(error)}`),
       );
     }
     const options = { instructions, model, ...extraOptions };
@@ -132,7 +133,7 @@ export async function handleVoice(
       throw new Error("Speech generation returned no stream");
     }
     const stream = result.stream;
-    if ("pipe" in stream && typeof (stream as any).pipe === "function") {
+    if ("pipe" in stream && typeof (stream as import("stream").Readable).pipe === "function") {
       // Node.js readable stream
       const nodeStream = stream as import("stream").Readable;
       if (audioChunks) {
@@ -225,9 +226,9 @@ export async function handleVoice(
             false,
           ),
         )
-        .catch((error: Error) =>
+        .catch((error: unknown) =>
           logger.error(
-            `Failed to append messages to conversation ${conversationId}: ${error.message}`,
+            `Failed to append messages to conversation ${conversationId}: ${getErrorMessage(error)}`,
           ),
         );
     }
@@ -240,8 +241,8 @@ export async function handleVoice(
         project,
         username,
         false,
-      ).catch((error: Error) =>
-        logger.error(`Failed to clear isGenerating on error: ${error.message}`),
+      ).catch((error: unknown) =>
+        logger.error(`Failed to clear isGenerating on error: ${getErrorMessage(error)}`),
       );
     }
     const totalSec = (performance.now() - requestStart) / 1000;
@@ -394,8 +395,8 @@ router.post(
                 ? conversationMeta.title
                 : undefined,
           },
-        ).catch((error: Error) =>
-          logger.error(`Failed to set isGenerating: ${error.message}`),
+        ).catch((error: unknown) =>
+          logger.error(`Failed to set isGenerating: ${getErrorMessage(error)}`),
         );
       }
       const provider = getProvider(providerName);
@@ -518,9 +519,9 @@ router.post(
               false,
             ),
           )
-          .catch((error: Error) =>
+          .catch((error: unknown) =>
             logger.error(
-              `Failed to append messages to conversation ${conversationId}: ${error.message}`,
+              `Failed to append messages to conversation ${conversationId}: ${getErrorMessage(error)}`,
             ),
           );
       }
@@ -539,9 +540,9 @@ router.post(
           req.project || "any",
           req.username || "any",
           false,
-        ).catch((error: Error) =>
+        ).catch((error: unknown) =>
           logger.error(
-            `Failed to clear isGenerating on error: ${error.message}`,
+            `Failed to clear isGenerating on error: ${getErrorMessage(error)}`,
           ),
         );
       }

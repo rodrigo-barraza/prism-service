@@ -687,7 +687,7 @@ const anthropicProvider = {
         }
         throw new ProviderError(
           "anthropic",
-          error instanceof Error ? error.message : String(error),
+          getErrorMessage(error),
           (error as AnthropicSdkError)?.status || 500,
           error,
         );

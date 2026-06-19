@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 import { createLmStudioProvider } from "../src/providers/lm-studio.ts";
 
 /**
@@ -50,7 +51,7 @@ function createNativeApiModelResponse(
     models: [
       {
         type: "llm",
-        publisher: "google",
+        publisher: PROVIDERS.GOOGLE,
         key: modelKey,
         display_name: "Test Model",
         architecture: "gemma4",
@@ -71,7 +72,7 @@ function createOpenAiCompatModelResponse(modelKey: string = TEST_MODEL) {
       {
         id: modelKey,
         object: "model",
-        owned_by: "google",
+        owned_by: PROVIDERS.GOOGLE,
       },
     ],
     object: "list",

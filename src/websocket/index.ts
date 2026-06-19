@@ -485,9 +485,9 @@ function handleWebsocketLive(
                   username,
                   true,
                   { title: activeConversationTitle },
-                ).catch((error: Error) =>
+                ).catch((error: unknown) =>
                   logger.error(
-                    `[Live API] Failed to set isGenerating: ${error.message}`,
+                    `[Live API] Failed to set isGenerating: ${getErrorMessage(error)}`,
                   ),
                 );
               }
@@ -766,9 +766,9 @@ function handleWebsocketLive(
                     toolCalls: turnToolCalls,
                     outputCharacters: turnText.length,
                     ...(audioRef ? { audioRef } : {}),
-                  }).catch((error: Error) =>
+                  }).catch((error: unknown) =>
                     logger.error(
-                      `[Live API] Failed to log ${eventType} request: ${error.message}`,
+                      `[Live API] Failed to log ${eventType} request: ${getErrorMessage(error)}`,
                     ),
                   );
 
@@ -799,9 +799,9 @@ function handleWebsocketLive(
                       project,
                       username,
                       false,
-                    ).catch((error: Error) =>
+                    ).catch((error: unknown) =>
                       logger.error(
-                        `[Live API] Failed to clear isGenerating on ${eventType}: ${error.message}`,
+                        `[Live API] Failed to clear isGenerating on ${eventType}: ${getErrorMessage(error)}`,
                       ),
                     );
                   }
@@ -851,9 +851,9 @@ function handleWebsocketLive(
                   project,
                   username,
                   false,
-                ).catch((error: Error) =>
+                ).catch((error: unknown) =>
                   logger.error(
-                    `[Live API] Failed to clear isGenerating on close: ${error.message}`,
+                    `[Live API] Failed to clear isGenerating on close: ${getErrorMessage(error)}`,
                   ),
                 );
               }
@@ -961,9 +961,9 @@ function handleWebsocketLive(
         project,
         username,
         false,
-      ).catch((error: Error) =>
+      ).catch((error: unknown) =>
         logger.error(
-          `[Live API] Failed to clear isGenerating on disconnect: ${error.message}`,
+          `[Live API] Failed to clear isGenerating on disconnect: ${getErrorMessage(error)}`,
         ),
       );
     }

@@ -19,19 +19,8 @@ import {
   type SegmentSnapshot,
 } from "../../prism-client/src/utils/toolCallStateUpdaters.ts";
 
-import type { Message, ToolCallEvent } from "../../prism-client/src/types/types.ts";
+import type { Message as DisplayMessage, ToolCallEvent } from "../../prism-client/src/types/types.ts";
 import { prepareDisplayMessages } from "../../prism-client/src/utils/messageHelpers.ts";
-
-type DisplayMessage = Omit<Message, "tool_calls"> & {
-  tool_calls?: Array<{
-    id: string;
-    name?: string;
-    args?: any;
-    result?: any;
-    status?: string;
-    function?: { name?: string; arguments?: string };
-  }>;
-};
 
 // prepareDisplayMessages is now imported directly from prism-client utils
 
@@ -344,7 +333,7 @@ describe("prepareDisplayMessages", () => {
             id: "toolCall-0",
             name: "generate_audio",
             args: {},
-            result: { success: true },
+            result: { success: true } as any,
             status: "done",
           },
         ],

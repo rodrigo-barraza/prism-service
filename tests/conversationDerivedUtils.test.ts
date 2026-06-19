@@ -34,8 +34,7 @@ const {
 } = await import("../src/services/conversation/utils.ts");
 
 // ── Type alias for convenience ────────────────────────────────
-import type { ChatMessage } from "../src/types/admin.ts";
-type TestMessage = ChatMessage;
+import type { ChatMessage as TestMessage } from "../src/types/admin.ts";
 
 // ═══════════════════════════════════════════════════════════════
 describe("computeModalities", () => {

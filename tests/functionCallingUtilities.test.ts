@@ -13,10 +13,8 @@ import {
   expandMessagesForFunctionCall,
   truncateToolResult,
 } from "../src/utils/FunctionCallingUtilities.ts";
-import type { ChatMessage } from "../src/types/admin.ts";
-
 // ── Types ──────────────────────────────────────────────────────
-type TestMessage = ChatMessage;
+import type { ChatMessage as TestMessage } from "../src/types/admin.ts";
 
 // ═══════════════════════════════════════════════════════════════
 describe("truncateToolResult", () => {

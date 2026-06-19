@@ -14,20 +14,21 @@
 import { describe, it, expect } from "vitest";
 import { swapMessageContent, assembleMessagesToAppend as assembleMessagesToAppendReal, sanitizeMessagesForPersistence } from "../src/services/harnesses/lifecycle/Finalizer.ts";
 import { PROMPT_DELIMITERS, PROVIDERS } from "../src/constants.ts";
-import type { MessagePayload } from "../src/services/conversation/types.ts";
+import type { MessagePayload, ToolCallPayload } from "../src/services/conversation/types.ts";
+import type { ConversationMessage as BaseConversationMessage } from "../src/services/harnesses/types.ts";
 
-type TestMessage = MessagePayload & {
-  toolCalls?: any[];
+type TestPayload = BaseConversationMessage & {
+  rawContent?: string;
 };
 
 type FinalizerInput = Parameters<typeof assembleMessagesToAppendReal>[0];
 
 type TestAssemblyInput = Omit<FinalizerInput, "text" | "thinking" | "audioReference" | "overrideMessagesToAppend" | "toolCalls"> & {
-  overrideMessagesToAppend: TestMessage[];
+  overrideMessagesToAppend: TestPayload[];
   finalText: string;
   finalThinking: string;
   audioRef: string | null;
-  toolCalls: any[];
+  toolCalls: ToolCallPayload[];
 };
 
 // ── Simulate the Finalizer's message assembly ───────────────────
@@ -36,15 +37,15 @@ type TestAssemblyInput = Omit<FinalizerInput, "text" | "thinking" | "audioRefere
  * Convenience wrapper around the production assembleMessagesToAppend + sanitize.
  * Maps test-friendly field names to the canonical production parameter names.
  */
-function assembleMessagesToAppend(input: TestAssemblyInput): TestMessage[] {
+function assembleMessagesToAppend(input: TestAssemblyInput): TestPayload[] {
   const messages = assembleMessagesToAppendReal({
     ...input,
     text: input.finalText,
     thinking: input.finalThinking,
     audioReference: input.audioRef,
-  }) as TestMessage[];
+  }) as TestPayload[];
 
-  return sanitizeMessagesForPersistence(messages) as TestMessage[];
+  return sanitizeMessagesForPersistence(messages) as TestPayload[];
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -53,7 +54,7 @@ function assembleMessagesToAppend(input: TestAssemblyInput): TestMessage[] {
 
 describe("Finalizer message assembly", () => {
   it("correctly assembles messages for a generate_audio tool turn", () => {
-    const newTurnMessages: TestMessage[] = [
+    const newTurnMessages: TestPayload[] = [
       { role: "user", content: "make a song about the war" },
       {
         role: "assistant",
@@ -128,8 +129,8 @@ describe("Finalizer message assembly", () => {
       images: [],
       audioRef: null,
       toolCalls: [
-        { id: "toolCall-0", name: "search_web", args: {}, result: { results: [] } },
-        { id: "toolCall-1", name: "generate_audio", args: {}, result: { success: true } },
+        { id: "toolCall-0", name: "search_web", args: {} },
+        { id: "toolCall-1", name: "generate_audio", args: {} },
       ],
       resolvedModel: "claude-haiku-4-5-20251001",
       providerName: PROVIDERS.ANTHROPIC,
@@ -152,7 +153,7 @@ describe("Finalizer message assembly", () => {
       images: [],
       audioRef: null,
       toolCalls: [
-        { id: "toolCall-0", name: "mcp_query", args: {}, result: { rows: [] } },
+        { id: "toolCall-0", name: "mcp_query", args: {} },
       ],
       resolvedModel: "qwen3-8b",
       providerName: PROVIDERS.LM_STUDIO,
@@ -237,7 +238,7 @@ describe("done event → appendAndFinalize race condition", () => {
 
   it("stale DB fetch returns only turn 1 messages", () => {
     // DB state at the time of the first fetch (before appendAndFinalize completes)
-    const staleDatabaseMessages: TestMessage[] = [
+    const staleDatabaseMessages: TestPayload[] = [
       { role: "user", content: "hey whats up" },
       { role: "assistant", content: "Hey Rodrigo!" },
     ];
@@ -251,7 +252,7 @@ describe("done event → appendAndFinalize race condition", () => {
 
   it("after retry, DB should have all messages (if appendAndFinalize succeeded)", () => {
     // DB state after appendAndFinalize completes
-    const completeDatabaseMessages: TestMessage[] = [
+    const completeDatabaseMessages: TestPayload[] = [
       { role: "user", content: "hey whats up" },
       { role: "assistant", content: "Hey Rodrigo!" },
       { role: "user", content: "make a song about the war" },
@@ -592,7 +593,7 @@ describe("done event → appendAndFinalize race condition", () => {
 
 describe("swapMsgContent — system context injection handling", () => {
   it("swaps injected system context to rawContent", () => {
-    const message: TestMessage = {
+    const message: TestPayload = {
       role: "user",
       content:
         `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nYou are helpful.\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nmake a song about the war`,
@@ -607,7 +608,7 @@ describe("swapMsgContent — system context injection handling", () => {
   });
 
   it("swaps Local Time context format", () => {
-    const message: TestMessage = {
+    const message: TestPayload = {
       role: "user",
       content:
         `${PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX} 2026-05-26T20:00:00-07:00]\n\nhey whats up`,
@@ -623,7 +624,7 @@ describe("swapMsgContent — system context injection handling", () => {
     // When rawContent already starts with [System Context], the function
     // early-returns — no swap is performed. This prevents double-swapping
     // on messages that were already processed.
-    const message: TestMessage = {
+    const message: TestPayload = {
       role: "user",
       content: "make a song about the war",
       rawContent:
@@ -638,7 +639,7 @@ describe("swapMsgContent — system context injection handling", () => {
   });
 
   it("no-ops when rawContent already has System Context prefix", () => {
-    const message: TestMessage = {
+    const message: TestPayload = {
       role: "user",
       content: "make a song",
       rawContent: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nAlready swapped`,
@@ -652,7 +653,7 @@ describe("swapMsgContent — system context injection handling", () => {
   });
 
   it("does nothing to assistant messages", () => {
-    const message: TestMessage = {
+    const message: TestPayload = {
       role: "assistant",
       content: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nThis should not be swapped`,
     };
@@ -666,7 +667,7 @@ describe("swapMsgContent — system context injection handling", () => {
   });
 
   it("handles messages without system context prefix", () => {
-    const message: TestMessage = {
+    const message: TestPayload = {
       role: "user",
       content: "simple message",
     };
@@ -695,7 +696,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
     // Finalizer appends: [user1, assistant1]
     // DB after turn 1: [user1, assistant1]
 
-    const databaseAfterTurn1: TestMessage[] = [
+    const databaseAfterTurn1: TestPayload[] = [
       {
         role: "user",
         content: "hey whats up",
@@ -730,7 +731,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
     // Finalizer assembles:
     //   messagesToAppend = [user2, assistant2_tools, assistant_final]
 
-    const turn2NewTurnMessages: TestMessage[] = [
+    const turn2NewTurnMessages: TestPayload[] = [
       {
         role: "user",
         content: "make a song about the war",

@@ -4,7 +4,7 @@ import googleProvider from "../src/providers/google.ts";
 import anthropicProvider from "../src/providers/anthropic.ts";
 import AgenticLoopState from "../src/services/AgenticLoopState.ts";
 import { MODELS } from "../src/config.ts";
-import { PROVIDERS } from "../src/constants.ts";
+import { HARNESS_IDS, PROVIDERS } from "../src/constants.ts";
 import {
   extractThinkTags,
   ThinkTagParser,
@@ -214,12 +214,12 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
 
       const messages = [{ role: "user", content: "hello" }];
       await googleProvider.generateText(messages, MODELS.GEMINI_35_FLASH.name, {
-        serviceTier: "standard",
+        serviceTier: HARNESS_IDS.STANDARD,
       });
 
       expect(mockGenerateContent).toHaveBeenCalledTimes(1);
       const args = mockGenerateContent.mock.calls[0][0] as any;
-      expect(args.config.serviceTier).toBe("standard");
+      expect(args.config.serviceTier).toBe(HARNESS_IDS.STANDARD);
     });
 
     it("configures all standard parameters correctly", async () => {
@@ -594,7 +594,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
         topK: 25,
         maxTokens: 500,
         stopSequences: ["STOP1", "STOP2"],
-        serviceTier: "standard",
+        serviceTier: HARNESS_IDS.STANDARD,
       });
 
       expect(mockMessagesCreate).toHaveBeenCalledTimes(1);

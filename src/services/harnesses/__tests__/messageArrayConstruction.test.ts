@@ -10,13 +10,16 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 
-import type { ConversationMessage as BaseConversationMessage } from "../types.ts";
+import type { ConversationMessage as HarnessBasePayload } from "../types.ts";
 
 import { injectSystemPromptContext } from "../../system-prompt/index.ts";
-import { computeNewTurnMessages as computeNewTurnMessagesReal } from "../lifecycle/Finalizer.ts";
+import {
+  computeNewTurnMessages as computeNewTurnMessagesReal,
+  swapMessageContent,
+} from "../lifecycle/Finalizer.ts";
 import { PROMPT_DELIMITERS } from "../../../constants.ts";
 
-interface ConversationMessage extends BaseConversationMessage {
+interface HarnessPayload extends HarnessBasePayload {
   rawContent?: string;
   isCompactSummary?: boolean;
   _alreadyPersisted?: boolean;
@@ -25,7 +28,7 @@ interface ConversationMessage extends BaseConversationMessage {
 
 // ── Simulate hook injection (delegates to SystemPromptAssembler.injectSystemPromptContext) ──
 function simulateBeforePromptHook(
-  currentMessages: ConversationMessage[],
+  currentMessages: HarnessPayload[],
   options: {
     systemPrompt: string;
     platformContextMessage?: string | null;
@@ -42,8 +45,8 @@ function simulateBeforePromptHook(
 
 // ── Simulate finalize slice logic (delegates to computeNewTurnMessages) ──
 function computeNewTurnMessages(
-  originalMessages: ConversationMessage[],
-  currentMessages: ConversationMessage[],
+  originalMessages: HarnessPayload[],
+  currentMessages: HarnessPayload[],
   originalMessageCount: number,
 ): any[] {
   return computeNewTurnMessagesReal(
@@ -62,8 +65,8 @@ describe("Message Array Construction", () => {
   // Scenario 1: Discord Agent (Lupos) — First Turn
   // ────────────────────────────────────────────────────────────
   describe("Discord Agent (Lupos) — first turn, new conversation", () => {
-    let originalMessages: ConversationMessage[];
-    let currentMessages: ConversationMessage[];
+    let originalMessages: HarnessPayload[];
+    let currentMessages: HarnessPayload[];
     let originalMessageCount: number;
 
     const LUPOS_IDENTITY =
@@ -76,7 +79,7 @@ describe("Message Array Construction", () => {
       "User: rodrigo#1234",
     ].join("\n");
     const SOMATIC_STATE = [
-      "[Somatic State — Lupos]",
+      `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]`,
       "current_emotion: curious",
       "emotional_valence: 0.6",
       "arousal: 0.45",
@@ -184,8 +187,8 @@ describe("Message Array Construction", () => {
   // No somatic state, no platform context
   // ────────────────────────────────────────────────────────────
   describe("General Agent (Omni) — first turn, no platform context", () => {
-    let originalMessages: ConversationMessage[];
-    let currentMessages: ConversationMessage[];
+    let originalMessages: HarnessPayload[];
+    let currentMessages: HarnessPayload[];
     let originalMessageCount: number;
 
     const OMNI_IDENTITY =
@@ -251,13 +254,13 @@ describe("Message Array Construction", () => {
   // already persisted
   // ────────────────────────────────────────────────────────────
   describe("Discord Agent (Lupos) — subsequent turn, history loaded", () => {
-    let originalMessages: ConversationMessage[];
-    let currentMessages: ConversationMessage[];
+    let originalMessages: HarnessPayload[];
+    let currentMessages: HarnessPayload[];
     let originalMessageCount: number;
 
     const LUPOS_IDENTITY = "You are Lupos...";
     const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab";
-    const SOMATIC_STATE = "[Somatic State — Lupos]\ncurrent_emotion: amused";
+    const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: amused`;
 
     beforeEach(() => {
       // History loaded from DB: system + user + assistant + platform + somatic + new user
@@ -356,21 +359,21 @@ describe("Message Array Construction", () => {
     const LUPOS_IDENTITY = "You are Lupos, an artist wolf king...";
     const PLATFORM_CONTEXT =
       "Platform: Discord\nServer: Rod's Lab\nChannel: #general";
-    const SOMATIC_STATE = "[Somatic State — Lupos]\ncurrent_emotion: curious";
+    const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: curious`;
 
     it("should NOT overwrite a mid-conversation somatic system message with the identity prompt", () => {
       // History loaded from DB: the prior turn only persisted
       // somatic + user + assistant (platform context was dropped)
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "hey lupos" },
         { role: "assistant", content: "yo" },
         {
           role: "system",
-          content: "[Somatic State — Lupos]\ncurrent_emotion: bored",
+          content: `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: bored`,
         },
         { role: "user", content: "tell me something" },
       ];
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: LUPOS_IDENTITY,
@@ -405,13 +408,13 @@ describe("Message Array Construction", () => {
 
     it("should persist platform context on subsequent turns when it was missing from history", () => {
       // History without any system messages at all (worst case)
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "hey lupos" },
         { role: "assistant", content: "yo" },
         { role: "user", content: "tell me something" },
       ];
       const originalMessageCount = originalMessages.length; // 3
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: LUPOS_IDENTITY,
@@ -471,12 +474,12 @@ describe("Message Array Construction", () => {
     });
 
     it("should correctly order all messages when history has NO system messages", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "hey" },
         { role: "assistant", content: "sup" },
         { role: "user", content: "draw me a wolf" },
       ];
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: LUPOS_IDENTITY,
@@ -516,13 +519,13 @@ describe("Message Array Construction", () => {
     });
 
     it("should not create duplicate identity prompts when history already has one at index 0", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "system", content: "Old identity" },
         { role: "user", content: "hey" },
         { role: "assistant", content: "sup" },
         { role: "user", content: "new message" },
       ];
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: LUPOS_IDENTITY,
@@ -553,8 +556,8 @@ describe("Message Array Construction", () => {
   // Scenario 4: Already-persisted user message (background timer)
   // ────────────────────────────────────────────────────────────
   describe("Already-persisted user message (scheduled/timer trigger)", () => {
-    let originalMessages: ConversationMessage[];
-    let currentMessages: ConversationMessage[];
+    let originalMessages: HarnessPayload[];
+    let currentMessages: HarnessPayload[];
     let originalMessageCount: number;
 
     beforeEach(() => {
@@ -607,8 +610,8 @@ describe("Message Array Construction", () => {
   // Scenario 5: Multi-iteration tool loop
   // ────────────────────────────────────────────────────────────
   describe("Multi-iteration tool loop (ReAct pattern)", () => {
-    let originalMessages: ConversationMessage[];
-    let currentMessages: ConversationMessage[];
+    let originalMessages: HarnessPayload[];
+    let currentMessages: HarnessPayload[];
     let originalMessageCount: number;
 
     beforeEach(() => {
@@ -670,10 +673,10 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("CONTEXT NOTE filtering", () => {
     it("should filter out [CONTEXT NOTE: messages from persisted output", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "hello" },
       ];
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Omni.",
@@ -714,8 +717,8 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Edge case — empty original messages", () => {
     it("should handle originalMessageCount of 0 with sliceIndex clamped to 0", () => {
-      const originalMessages: ConversationMessage[] = [];
-      const currentMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [];
+      const currentMessages: HarnessPayload[] = [
         { role: "system", content: "System prompt" },
         {
           role: "assistant",
@@ -743,14 +746,14 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Recency-optimal message ordering", () => {
     it("should maintain recency-optimal ordering: identity → history → platform → somatic → user", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "system", content: "Old identity" },
         { role: "system", content: "Old platform context" },
         { role: "user", content: "first message" },
         { role: "assistant", content: "first response" },
         { role: "user", content: "second message" },
       ];
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "Updated Lupos identity",
@@ -785,18 +788,18 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Skills and memories injection", () => {
     it("should inject skills and memories into the last user message content", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "deploy the project" },
       ];
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a coding agent.",
         platformContextMessage: null,
         selfContextMessage: null,
         skillsText:
-          "[Project Skills]\n### deploy.sh\nRun deploy script with --env flag",
-        memoriesText: "[Agent Memory]\nUser prefers blue-green deployments",
+          `${PROMPT_DELIMITERS.PROJECT_SKILLS}\n### deploy.sh\nRun deploy script with --env flag`,
+        memoriesText: `${PROMPT_DELIMITERS.AGENT_MEMORY}\nUser prefers blue-green deployments`,
       });
 
       const userMessage = currentMessages.find(
@@ -818,18 +821,18 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Discord Agent (Lupos) — full round-trip with tool call", () => {
     it("should produce correct final messages array for persistence", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "draw me a wolf, lupos" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Lupos, an artist wolf king...",
         platformContextMessage:
           "Platform: Discord\nServer: Rod's Lab\nChannel: #art",
         selfContextMessage:
-          "[Somatic State — Lupos]\ncurrent_emotion: excited\narousal: 0.8",
+          `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: excited\narousal: 0.8`,
       });
 
       // Iteration 1: assistant calls generate_image tool
@@ -891,14 +894,14 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Extended thinking (Claude-style)", () => {
     it("should preserve thinking field on assistant messages through the pipeline", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         {
           role: "user",
           content: "Explain quantum entanglement in simple terms",
         },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a helpful assistant.",
@@ -939,11 +942,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Native thinking with thinkingSignature", () => {
     it("should preserve thinkingSignature on assistant messages for cache continuity", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "Write a binary search implementation" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a coding agent.",
@@ -1021,11 +1024,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Parallel tool calls (multiple tools in one iteration)", () => {
     it("should persist all parallel tool calls and their results in order", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "Compare weather in Tokyo and Vancouver" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Omni.",
@@ -1093,11 +1096,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Thinking interleaved with tool calls (multi-iteration)", () => {
     it("should preserve thinking on every iteration's assistant message", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "What files are in the project?" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a coding agent.",
@@ -1175,11 +1178,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Image generation output (images array on assistant)", () => {
     it("should preserve images array on assistant messages through persistence", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "draw me a sunset" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Lupos.",
@@ -1231,11 +1234,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Audio generation output", () => {
     it("should preserve audio field on assistant messages through persistence", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "say something menacing" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Lupos.",
@@ -1288,11 +1291,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Validation error recovery loop", () => {
     it("should persist validation error system messages and recovery iterations", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "add a new endpoint to the API" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a coding agent.",
@@ -1379,11 +1382,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Planning injection filtering (Finalizer sanitization)", () => {
     it("should filter out _isPlanningInjection messages from the Finalizer pipeline", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "refactor the auth module" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a coding agent.",
@@ -1451,11 +1454,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Conversation summary compaction filtering (Finalizer sanitization)", () => {
     it("should filter out [Conversation Summary and isCompactSummary messages", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "long conversation starter" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Omni.",
@@ -1510,7 +1513,7 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Multi-turn with prior tool call history", () => {
     it("should correctly handle tool history loaded from the database", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "system", content: "Previous system prompt" },
         { role: "user", content: "what's the weather?" },
         {
@@ -1534,7 +1537,7 @@ describe("Message Array Construction", () => {
         { role: "user", content: "what about Tokyo?" },
       ];
       const originalMessageCount = originalMessages.length; // 5
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Omni.",
@@ -1591,11 +1594,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("OpenAI Responses API metadata (responsesItemId, reasoningItem)", () => {
     it("should preserve responsesItemId and reasoningItem on tool calls", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "search the web for latest Rust news" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Omni.",
@@ -1661,11 +1664,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Tool call duration tracking", () => {
     it("should preserve durationMs on individual tool call results", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "run the test suite" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a coding agent.",
@@ -1716,11 +1719,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Content segments and fragments (display metadata)", () => {
     it("should preserve contentSegments, textFragments, and thinkingFragments on assistant messages", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "explain the code" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a coding agent.",
@@ -1766,11 +1769,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Generation settings preservation", () => {
     it("should preserve generationSettings on assistant messages", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "write a poem" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a creative agent.",
@@ -1814,11 +1817,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Usage and cost tracking", () => {
     it("should preserve usage accumulator and cost on assistant messages", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "hello" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Omni.",
@@ -1867,11 +1870,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Dynamic tool enabling (tool-update system messages)", () => {
     it("should persist tool-update system messages injected by the harness", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "search for trending products" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Omni.",
@@ -1963,14 +1966,14 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Full integration: Lupos multi-iteration with thinking + tools + images", () => {
     it("should produce the complete expected messages array for MongoDB persistence", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         {
           role: "user",
           content: "draw me as a wolf warrior and say something epic",
         },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt:
@@ -1978,8 +1981,8 @@ describe("Message Array Construction", () => {
         platformContextMessage:
           "Platform: Discord\nServer: Rod's Lab\nChannel: #art\nGuild ID: 123456789\nChannel ID: 987654321",
         selfContextMessage:
-          "[Somatic State — Lupos]\ncurrent_emotion: inspired\nemotional_valence: 0.85\narousal: 0.75\ndominance: 0.7",
-        memoriesText: "[Agent Memory]\nrodrigo likes epic fantasy art",
+          `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: inspired\nemotional_valence: 0.85\narousal: 0.75\ndominance: 0.7`,
+        memoriesText: `${PROMPT_DELIMITERS.AGENT_MEMORY}\nrodrigo likes epic fantasy art`,
       });
 
       // Iteration 1: think → generate_image tool call
@@ -2105,38 +2108,13 @@ describe("Message Array Construction", () => {
   // [System Context] version in rawContent
   // ────────────────────────────────────────────────────────────
   describe("rawContent / content swap (Finalizer behavior)", () => {
-    function swapMessageContent(message: ConversationMessage): void {
-      if (message.role === "user" && typeof message.content === "string") {
-        if (
-          message.rawContent?.startsWith("[System Context]") ||
-          message.rawContent?.startsWith("[System Context - Local Time:")
-        ) {
-          return;
-        }
-        if (message.rawContent) {
-          const dirty = message.content;
-          message.content = message.rawContent;
-          message.rawContent = dirty;
-        } else if (message.content.startsWith("[System Context]")) {
-          const dirty = message.content;
-          let clean = message.content;
-          const splitIndex = message.content.indexOf("\n\n[User Message]\n");
-          if (splitIndex !== -1) {
-            clean = message.content.substring(
-              splitIndex + "\n\n[User Message]\n".length,
-            );
-          }
-          message.content = clean;
-          message.rawContent = dirty;
-        }
-      }
-    }
+
 
     it("should swap rawContent and content so DB stores clean user text", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "what time is it?" },
       ];
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Omni.",
@@ -2172,11 +2150,11 @@ describe("Message Array Construction", () => {
     });
 
     it("should no-op on already-swapped messages (rawContent starts with [System Context])", () => {
-      const alreadySwapped: ConversationMessage = {
+      const alreadySwapped: HarnessPayload = {
         role: "user",
         content: "what time is it?",
         rawContent:
-          "[System Context]\n- Local Time: Sunday\n\n[User Message]\nwhat time is it?",
+          `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\n- Local Time: Sunday\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nwhat time is it?`,
       };
 
       const cloned = { ...alreadySwapped };
@@ -2188,10 +2166,10 @@ describe("Message Array Construction", () => {
     });
 
     it("should handle legacy messages without rawContent by parsing [System Context] block", () => {
-      const legacyMessage: ConversationMessage = {
+      const legacyMessage: HarnessPayload = {
         role: "user",
         content:
-          "[System Context]\n- Local Time: Sunday\n\n[User Message]\nlegacy question here",
+          `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\n- Local Time: Sunday\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nlegacy question here`,
       };
 
       swapMessageContent(legacyMessage);
@@ -2208,11 +2186,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Full tool discovery lifecycle (search → nudge → enable → doc addendum → use)", () => {
     it("should persist all injected system messages throughout the discovery chain", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "find me some events happening this weekend" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Omni.",
@@ -2344,11 +2322,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Lower-tier model auto-enable (flash/mini/haiku)", () => {
     it("should inject auto-enabled confirmation instead of enable_tools nudge", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "search for weather tools" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Omni.",
@@ -2444,11 +2422,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Output truncation recovery (auto-continue)", () => {
     it("should persist truncated assistant output and continuation system message", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "write a comprehensive guide to Rust" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a coding agent.",
@@ -2522,11 +2500,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Exhaustion recovery (iteration limit reached)", () => {
     it("should persist exhaustion system message and summary response", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "refactor the entire codebase" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a coding agent.",
@@ -2604,11 +2582,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Codex model continuation prompt (planning → action transition)", () => {
     it("should persist the planning output and continuation system message", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "implement a REST API for user management" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a coding agent.",
@@ -2697,11 +2675,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Plan mode blocked tool calls (system injection)", () => {
     it("should persist the blocked-tools system message and the re-attempt", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "implement a login page" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a coding agent.",
@@ -2793,11 +2771,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Error-as-context message (truncation exhaustion)", () => {
     it("should persist error-as-context assistant message with _isErrorIndicator", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "generate a massive report" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Omni.",
@@ -2870,11 +2848,11 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Provider error as conversation context", () => {
     it("should persist provider error message for next-turn context", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "deploy the application" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are a coding agent.",
@@ -2939,14 +2917,14 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Chained tool discovery (multiple search passes)", () => {
     it("should persist all tool-update messages from separate discovery chains", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         {
           role: "user",
           content: "find weather data and then search for events near me",
         },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Omni.",
@@ -3113,14 +3091,14 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Mixed system messages in a single turn", () => {
     it("should persist validation errors, tool-update nudges, and continuation prompts together", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         {
           role: "user",
           content: "use the search API to find products, then create a report",
         },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Omni.",
@@ -3277,16 +3255,16 @@ describe("Message Array Construction", () => {
   // ────────────────────────────────────────────────────────────
   describe("Discord agent with tool discovery + somatic state", () => {
     it("should order system messages correctly: identity → ... → platform → somatic → tool-updates", () => {
-      const originalMessages: ConversationMessage[] = [
+      const originalMessages: HarnessPayload[] = [
         { role: "user", content: "search for drawing tools" },
       ];
       const originalMessageCount = originalMessages.length;
-      const currentMessages: ConversationMessage[] = [...originalMessages];
+      const currentMessages: HarnessPayload[] = [...originalMessages];
 
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Lupos.",
         platformContextMessage: "Platform: Discord\nServer: Rod's Lab",
-        selfContextMessage: "[Somatic State — Lupos]\ncurrent_emotion: curious",
+        selfContextMessage: `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: curious`,
       });
 
       // search_tools
@@ -3419,14 +3397,14 @@ describe("Message Array Construction", () => {
   // not platform-level. Only platform context should be absent.
   // ────────────────────────────────────────────────────────────
   describe("Prism-Client Lupos — no agentContext, somatic state still injected", () => {
-    let originalMessages: ConversationMessage[];
-    let currentMessages: ConversationMessage[];
+    let originalMessages: HarnessPayload[];
+    let currentMessages: HarnessPayload[];
     let originalMessageCount: number;
 
     const LUPOS_IDENTITY =
       "You are Lupos, an insane recovering-drug-addicted artist wolf king...";
     const SOMATIC_STATE = [
-      "[Somatic State — Lupos]",
+      `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]`,
       "current_emotion: curious",
       "emotional_valence: 0.6",
       "arousal: 0.45",
@@ -3503,12 +3481,12 @@ describe("Message Array Construction", () => {
   // Scenario: _isIdentityPrompt tag is set and enables reliable capture
   // ────────────────────────────────────────────────────────────
   describe("_isIdentityPrompt tag — reliable conversationMeta.systemPrompt capture", () => {
-    let currentMessages: ConversationMessage[];
+    let currentMessages: HarnessPayload[];
 
     const LUPOS_IDENTITY =
       "You are Lupos, an insane recovering-drug-addicted artist wolf king...";
     const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab";
-    const SOMATIC_STATE = "[Somatic State — Lupos]\ncurrent_emotion: amused";
+    const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: amused`;
 
     beforeEach(() => {
       currentMessages = [{ role: "user", content: "hey lupos" }];
@@ -3556,7 +3534,7 @@ describe("Message Array Construction", () => {
     it("should prefer _isIdentityPrompt-tagged message over first system message for conversationMeta capture", () => {
       // Simulate a scenario where a validation error system message gets prepended
       // (this could happen in edge cases with compaction or error injection)
-      const messagesWithErrorFirst: ConversationMessage[] = [
+      const messagesWithErrorFirst: HarnessPayload[] = [
         { role: "system", content: "[VALIDATION ERROR] Some lint error..." },
         { role: "system", content: LUPOS_IDENTITY, _isIdentityPrompt: true },
         { role: "system", content: SOMATIC_STATE },
@@ -3575,7 +3553,7 @@ describe("Message Array Construction", () => {
     });
 
     it("should fall back to first system message when no _isIdentityPrompt tag exists (backward compat)", () => {
-      const legacyMessages: ConversationMessage[] = [
+      const legacyMessages: HarnessPayload[] = [
         { role: "system", content: "Legacy identity prompt without tag" },
         { role: "user", content: "test" },
       ];
@@ -3600,9 +3578,9 @@ describe("Message Array Construction", () => {
       const LUPOS_IDENTITY = "You are Lupos...";
       const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab";
       const SOMATIC_STATE =
-        "[Somatic State — Lupos]\ncurrent_emotion: melancholy";
+        `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: melancholy`;
 
-      const currentMessages: ConversationMessage[] = [
+      const currentMessages: HarnessPayload[] = [
         { role: "user", content: "hey" },
       ];
 
@@ -3631,9 +3609,9 @@ describe("Message Array Construction", () => {
 
     it("should capture identity even when only somatic state + identity exist (prism-client)", () => {
       const LUPOS_IDENTITY = "You are Lupos...";
-      const SOMATIC_STATE = "[Somatic State — Lupos]\ncurrent_emotion: happy";
+      const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: happy`;
 
-      const currentMessages: ConversationMessage[] = [
+      const currentMessages: HarnessPayload[] = [
         { role: "user", content: "how are you?" },
       ];
 

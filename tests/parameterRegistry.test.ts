@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { PROVIDERS } from "../src/constants.ts";
 import request from 'supertest';
 import { app } from './setup.ts';
 import { getParameterDescriptors, getAgentDefaults } from '../src/services/ParameterRegistry.ts';
@@ -54,7 +55,7 @@ describe('Chat Pipeline - Agent defaults resolution', () => {
   it('should apply agent default parameters when not explicitly sent in agent mode', async () => {
     // We mock/spy on the provider.generateText or provider.generateTextStream
     // of openai to see what options it gets called with.
-    // In our supertest setup.ts, the provider is retrieved via `getProvider("openai")`
+    // In our supertest setup.ts, the provider is retrieved via `getProvider(PROVIDERS.OPENAI)`
     // which delegates to MOCK_GENERATE_TEXT/MOCK_GENERATE_TEXT_STREAM.
     const { MOCK_GENERATE_TEXT_STREAM } = await import('./setup.ts');
     MOCK_GENERATE_TEXT_STREAM.mockClear();
@@ -63,7 +64,7 @@ describe('Chat Pipeline - Agent defaults resolution', () => {
       .post('/chat')
       .set('Authorization', 'Bearer test-secret')
       .send({
-        provider: 'openai',
+        provider: PROVIDERS.OPENAI,
         model: 'gpt-5.5',
         agent: 'CODING',
         messages: [{ role: 'user', content: 'hello' }],
@@ -92,7 +93,7 @@ describe('Chat Pipeline - Agent defaults resolution', () => {
       .post('/chat')
       .set('Authorization', 'Bearer test-secret')
       .send({
-        provider: 'anthropic',
+        provider: PROVIDERS.ANTHROPIC,
         model: 'claude-sonnet-4-5-20250929',
         agent: 'CODING',
         messages: [{ role: 'user', content: 'hello' }],
@@ -118,7 +119,7 @@ describe('Chat Pipeline - Agent defaults resolution', () => {
       .post('/chat')
       .set('Authorization', 'Bearer test-secret')
       .send({
-        provider: 'google',
+        provider: PROVIDERS.GOOGLE,
         model: 'gemini-3.5-flash',
         agent: 'CODING',
         messages: [{ role: 'user', content: 'hello' }],
@@ -144,7 +145,7 @@ describe('Chat Pipeline - Agent defaults resolution', () => {
       .post('/chat')
       .set('Authorization', 'Bearer test-secret')
       .send({
-        provider: 'openai',
+        provider: PROVIDERS.OPENAI,
         model: 'gpt-5.5',
         agent: 'CODING',
         temperature: 0.7,
@@ -171,7 +172,7 @@ describe('Chat Pipeline - Agent defaults resolution', () => {
       .post('/chat')
       .set('Authorization', 'Bearer test-secret')
       .send({
-        provider: 'openai',
+        provider: PROVIDERS.OPENAI,
         model: 'gpt-5.5',
         messages: [{ role: 'user', content: 'hello' }],
       })
