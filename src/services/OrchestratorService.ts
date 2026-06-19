@@ -89,8 +89,8 @@ async function getSubAgentFallback(): Promise<{
 /** Active sub-agents spawned via chat tools, keyed by agentId */
 const activeSubAgents = new Map<string, SubAgentState>();
 
-/** Counter for generating sequential agent IDs */
-let agentCounter = 0;
+/** Per-conversation counters for generating sequential agent IDs relative to each session */
+const agentCountersByConversation = new Map<string, number>();
 
 // Register shutdown cleanup — abort all running sub-agents and remove worktrees
 registerCleanup(async () => {
@@ -280,7 +280,10 @@ export default class OrchestratorService {
       }
     }
 
-    const agentId = `agent-${(++agentCounter).toString(36)}-${crypto.randomUUID().slice(0, 4)}`;
+    const conversationCounterKey = parentConversationId || parentAgentSessionId || "global";
+    const currentConversationCount = (agentCountersByConversation.get(conversationCounterKey) || 0) + 1;
+    agentCountersByConversation.set(conversationCounterKey, currentConversationCount);
+    const agentId = `agent-${currentConversationCount.toString(36)}-${crypto.randomUUID().slice(0, 4)}`;
     const branchName = `orchestrator/${agentId}`;
     const workspaceRoot = GitWorktreeHelper.getDefaultWorkspaceRoot(
       orchestratorWorkspaceRoot ?? undefined,
@@ -665,13 +668,20 @@ export default class OrchestratorService {
 
   static cleanupSession(parentAgentSessionId: string): void {
     const keys = [];
+    const conversationIdsToClean = new Set<string>();
     for (const [key, subAgentState] of activeSubAgents.entries()) {
       if (subAgentState.parentAgentSessionId === parentAgentSessionId) {
         keys.push(key);
+        if (subAgentState.parentConversationId) {
+          conversationIdsToClean.add(subAgentState.parentConversationId);
+        }
       }
     }
     for (const key of keys) {
       activeSubAgents.delete(key);
+    }
+    for (const conversationId of conversationIdsToClean) {
+      agentCountersByConversation.delete(conversationId);
     }
     logger.info(
       `[Orchestrator] Cleaned up session ${parentAgentSessionId} from active registry`,
