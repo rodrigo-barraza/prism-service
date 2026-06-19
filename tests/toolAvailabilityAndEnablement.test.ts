@@ -132,9 +132,9 @@ const MOCK_CLIENT_SCHEMAS = [
 ];
 
 const MOCK_ORCHESTRATOR_SCHEMAS = [
-  { name: "create_team", description: "Spawn worker agents", parameters: { type: "object", properties: {} } },
+  { name: "create_team", description: "Spawn sub-agents", parameters: { type: "object", properties: {} } },
   { name: "send_message", description: "Send message to worker", parameters: { type: "object", properties: {} } },
-  { name: "stop_agent", description: "Stop a worker agent", parameters: { type: "object", properties: {} } },
+  { name: "stop_agent", description: "Stop a sub-agent", parameters: { type: "object", properties: {} } },
   { name: "get_task_output", description: "Read output from worker", parameters: { type: "object", properties: {} } },
   { name: "delete_team", description: "Delete a team", parameters: { type: "object", properties: {} } },
 ];

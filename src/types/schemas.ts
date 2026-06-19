@@ -115,6 +115,7 @@ export const ChatRequestSchema = z
     maxSubAgentIterations: z.number().nullable().optional(),
     agentContext: z.unknown().nullable().optional(),
     workspaceRoot: z.string().nullable().optional(),
+    workspaceEnabled: z.boolean().nullable().optional(),
     enableCriticGate: z.boolean().nullable().optional(),
     criticModel: z.string().nullable().optional(),
     reminderModel: z.string().nullable().optional(),

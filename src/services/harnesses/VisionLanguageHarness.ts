@@ -182,6 +182,7 @@ Use these images to observe the environment, notice changes, animations, or user
               (tool: ToolSchema) => tool.name,
             ),
             workspaceRoot: workspaceRoot || undefined,
+            workspaceEnabled: options.workspaceEnabled as boolean | undefined,
           };
           await hooks.run("beforePrompt", hookContext);
 

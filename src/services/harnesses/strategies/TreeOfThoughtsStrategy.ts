@@ -177,6 +177,7 @@ export async function runTreeOfThoughts(
       (tool: ToolSchema) => tool.name,
     ),
     workspaceRoot: workspaceRoot || undefined,
+    workspaceEnabled: options.workspaceEnabled as boolean | undefined,
   };
   await hooks.run("beforePrompt", hookContext);
 
