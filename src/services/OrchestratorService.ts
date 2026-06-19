@@ -376,6 +376,32 @@ export default class OrchestratorService {
       `[Orchestrator] Spawned sub-agent ${agentId}: "${description}" → ${subAgentProvider} (model="${subAgentModel}") in ${worktreePath}${subAgentState.isolated ? " (isolated worktree)" : " (shared workspace)"}`,
     );
 
+    // Mark the parent session as having sub-agents (persistent flag for the UI)
+    if (parentAgentSessionId) {
+      try {
+        const { MONGO_DB_NAME: dbName } = await import("../../config.ts");
+        const { COLLECTIONS: collectionNames } =
+          await import("../constants.ts");
+        const MongoWrapper = (await import("../wrappers/MongoWrapper.ts"))
+          .default;
+        const parentCollection = MongoWrapper.getCollection(
+          dbName,
+          collectionNames.AGENT_CONVERSATIONS,
+        );
+
+        if (parentCollection) {
+          await parentCollection.updateOne(
+            { id: parentAgentSessionId },
+            { $set: { hasSubAgents: true } },
+          );
+        }
+      } catch (databaseError: unknown) {
+        logger.warn(
+          `[Orchestrator] Failed to set hasSubAgents on parent session ${parentAgentSessionId}: ${getErrorMessage(databaseError)}`,
+        );
+      }
+    }
+
     // Emit early so the frontend can show live status immediately
     // (before the blocking loop starts and before a result is available)
     if (orchestratorContext.emit) {

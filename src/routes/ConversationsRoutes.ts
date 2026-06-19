@@ -41,6 +41,7 @@ const CONVERSATION_LIST_PROJECTION: import("mongodb").Document = {
   modelNames: 1,
   settings: 1,
   parentAgentSessionId: 1,
+  hasSubAgents: 1,
 };
 
 interface ConversationDocument {
