@@ -666,7 +666,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
 
   // ── Test 7: Coordinator with 4 workers across 3 turns ────────
   // Exercises the full coordinator pipeline: the model is asked to
-  // spawn 4 parallel worker agents. Subsequent turns verify the
+  // spawn 4 parallel sub-agents. Subsequent turns verify the
   // coordinator doesn't re-enter a processing loop when workers
   // have completed and the session has accumulated tool results.
   it("coordinator spawns workers and completes 3 turns without looping", async () => {

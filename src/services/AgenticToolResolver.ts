@@ -10,6 +10,7 @@ import {
   CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST,
   TOOL_NAMES,
   DEFAULT_TOPOLOGY,
+  DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TYPES } from "../config.ts";
 import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
@@ -40,6 +41,7 @@ interface ResolveOptions {
   disabledTools?: string[];
   webSearch?: boolean;
   isSubAgent?: boolean;
+  workspaceEnabled?: boolean;
   [key: string]: unknown;
 }
 
@@ -286,6 +288,20 @@ export default class AgenticToolResolver {
         );
         logger.info(
           `[AgenticLoop] Applied blockedTools denylist (${disabledSet.size} tools blocked, enabledSet protects ${enabledSet.size})`,
+        );
+      }
+    }
+
+    // ── Workspace domain exclusion ─────────────────────────────────
+    if (options.workspaceEnabled === false) {
+      const workspaceDomainName = DOMAINS.CORE_WORKSPACE.displayName;
+      const previousCount = finalTools.length;
+      finalTools = finalTools.filter(
+        (tool) => (tool as ToolSchema).domain !== workspaceDomainName,
+      );
+      if (finalTools.length < previousCount) {
+        logger.info(
+          `[AgenticToolResolver] Workspace disabled: removed ${previousCount - finalTools.length} workspace-domain tools`,
         );
       }
     }

@@ -55,6 +55,7 @@ export interface AssemblerContext {
   clientIp?: string | null;
   requestId?: string;
   options?: Record<string, unknown>;
+  workspaceEnabled?: boolean;
   _injectedSkills?: string[];
   _currentMessages?: Array<Record<string, unknown>>;
   [key: string]: unknown;

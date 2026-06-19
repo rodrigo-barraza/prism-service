@@ -391,7 +391,7 @@ export function createLmStudioProvider(
   const MCP_SERVER_URL = DEFAULT_MCP_SERVER_URL;
   // ── Per-instance model load mutex (singleflight) ──────────
   // Prevents duplicate model loads when multiple concurrent requests
-  // (e.g. worker agents) hit the same instance before the first load finishes.
+  // (e.g. sub-agents) hit the same instance before the first load finishes.
   // Key: model name → Promise that resolves when the load completes.
 
   const _loadInflight = new Map<string, Promise<void>>();

@@ -242,6 +242,8 @@ async function prepareGenerationContext(
     agentContext,
     // Multi-workspace: user-selected workspace root path (absolute fs path).
     workspaceRoot,
+    // Workspace toggle: when false, workspace tools are excluded from the agent session.
+    workspaceEnabled,
     // CriticGate: multi-model review of dangerous tool calls.
     enableCriticGate,
     criticModel,
@@ -298,6 +300,7 @@ async function prepareGenerationContext(
     ...(agentContext != null && { agentContext }),
     ...(enableCriticGate != null && { enableCriticGate }),
     ...(criticModel != null && { criticModel }),
+    ...(workspaceEnabled != null && { workspaceEnabled }),
     ...(harness != null && { harness }),
     ...(topology != null && { topology }),
     ...(reasoningStrategy != null && { reasoningStrategy }),

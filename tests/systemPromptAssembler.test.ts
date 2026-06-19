@@ -134,7 +134,7 @@ const MOCK_TOOLS_API_SCHEMAS = [
 const COORDINATOR_TOOL_SCHEMAS = [
   {
     name: "create_team",
-    description: "Spawn worker agents",
+    description: "Spawn sub-agents",
     parameters: { type: "object", properties: {} },
     domain: "Core Orchestrator Tools",
     domainKey: "core_orchestrator",
@@ -150,7 +150,7 @@ const COORDINATOR_TOOL_SCHEMAS = [
   },
   {
     name: "stop_agent",
-    description: "Stop a worker agent",
+    description: "Stop a sub-agent",
     parameters: { type: "object", properties: {} },
     domain: "Core Orchestrator Tools",
     domainKey: "core_orchestrator",

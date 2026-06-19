@@ -226,10 +226,10 @@ Complete tool-by-tool mapping between Claude Code (from [razakiau/claude-code `s
 
 | Claude Code Tool | Prism Equivalent | Parity | Notes |
 |---|---|---|---|
-| `AgentTool` | `team_create` (single member) | ✅ Match | Spawn one or more autonomous worker agents with task descriptions and optional file paths. Supports both single-agent and multi-agent (parallel) workflows via a unified `members[]` array |
+| `AgentTool` | `team_create` (single member) | ✅ Match | Spawn one or more autonomous sub-agents with task descriptions and optional file paths. Supports both single-agent and multi-agent (parallel) workflows via a unified `members[]` array |
 | `SendMessageTool` | `send_message` | ✅ Match | Continue a running worker with additional instructions |
 | — | `stop_agent` | ✅ **Extra** | Gracefully stop a running worker — CC lacks an explicit stop tool (workers run to completion) |
-| `TaskOutputTool` | `task_output` | ✅ Match | Read worker agent output. Returns full result if completed, or partial output (last 2000 chars) if still running. Coordinator-only tool |
+| `TaskOutputTool` | `task_output` | ✅ Match | Read sub-agent output. Returns full result if completed, or partial output (last 2000 chars) if still running. Coordinator-only tool |
 | `TeamCreateTool` | `team_create` | ✅ Match | Unified tool — `team_create` handles both individual and team worker spawning via the `members[]` parameter |
 
 **Architectural note:** Our coordinator has a key advantage over CC: **git worktree isolation**. CC runs all workers against the same filesystem, creating potential file conflicts. Our workers each get an isolated git worktree branch, preventing interference. We also distribute workers across multiple local provider instances (least-busy routing), which CC doesn't support.

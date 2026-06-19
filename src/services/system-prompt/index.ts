@@ -381,14 +381,15 @@ export default class SystemPromptAssembler {
     }
 
     // ── 6. Environment ───────────────────────────────────────────
-    sections.push(
-      `## Environment\n` +
-        `- OS: Linux (WSL2)\n` +
-        `- Workspace: ${this.workspaceRoot}`,
-    );
+    const isWorkspaceEnabled = context.workspaceEnabled !== false;
+    const environmentLines = [`- OS: Linux (WSL2)`];
+    if (isWorkspaceEnabled) {
+      environmentLines.push(`- Workspace: ${this.workspaceRoot}`);
+    }
+    sections.push(`## Environment\n` + environmentLines.join(`\n`));
 
     // ── 7. Project Structure (cached) ────────────────────────────
-    if (codingFallback || persona?.usesDirectoryTree) {
+    if (isWorkspaceEnabled && (codingFallback || persona?.usesDirectoryTree)) {
       const dirTree = await this.fetchDirectoryTree();
       if (dirTree) {
         sections.push(`## Project Structure\n` + dirTree);
