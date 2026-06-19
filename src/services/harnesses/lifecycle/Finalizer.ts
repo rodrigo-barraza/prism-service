@@ -521,13 +521,8 @@ export function sanitizeMessagesForPersistence(
   messagesToAppend: MessagePayload[],
 ): MessagePayload[] {
   return messagesToAppend
-    .map((message) => {
-      const cloned = { ...message };
-      swapMessageContent(cloned);
-      delete cloned._isIdentityPrompt;
-      return cloned;
-    })
     .filter((message) => {
+      if (message._isIdentityPrompt === true) return false;
       if (message.role === "user" && typeof message.content === "string") {
         if (message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX))
           return false;
@@ -538,6 +533,12 @@ export function sanitizeMessagesForPersistence(
       if (message._isPlanningInjection === true) return false;
       if (message._alreadyPersisted === true) return false;
       return true;
+    })
+    .map((message) => {
+      const cloned = { ...message };
+      swapMessageContent(cloned);
+      delete cloned._isIdentityPrompt;
+      return cloned;
     });
 }
 
