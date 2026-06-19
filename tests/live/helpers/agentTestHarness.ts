@@ -52,6 +52,16 @@ export interface StatusEvent {
   [key: string]: unknown;
 }
 
+export interface SubAgentStatusEvent {
+  type: string;
+  subAgentId?: string;
+  message?: string;
+  description?: string;
+  error?: string;
+  durationMs?: number;
+  [key: string]: unknown;
+}
+
 export interface ToolCallEvent {
   type: string;
   tool?: { name: string; args: Record<string, unknown>; id: string };
@@ -98,6 +108,7 @@ export interface AgentSSEResult {
   chunks: string[];
   thinkingChunks: string[];
   statuses: StatusEvent[];
+  subAgentStatuses: SubAgentStatusEvent[];
   toolCalls: ToolCallEvent[];
   toolExecutions: ToolCallEvent[];
   usageUpdates: TransformedUsageUpdate[];
@@ -176,6 +187,7 @@ function createEmptyResult(): AgentSSEResult {
     chunks: [],
     thinkingChunks: [],
     statuses: [],
+    subAgentStatuses: [],
     toolCalls: [],
     toolExecutions: [],
     usageUpdates: [],
@@ -314,6 +326,10 @@ export async function consumeAgentSSE(
 
             case "toolCall":
               result.toolCalls.push(event);
+              break;
+
+            case "sub_agent_status":
+              result.subAgentStatuses.push(event as unknown as SubAgentStatusEvent);
               break;
 
             case "usage_update":
@@ -835,6 +851,9 @@ export function logResult(label: string, result: AgentSSEResult): void {
   console.log(`  │ Tool calls:     ${String(toolCallCount).padEnd(40)}│`);
   console.log(`  │ Usage updates:  ${String(result.usageUpdates.length).padEnd(40)}│`);
   console.log(`  │ Errors:         ${String(result.errors.length).padEnd(40)}│`);
+  if (result.subAgentStatuses.length > 0) {
+    console.log(`  │ Sub-agents:     ${String(result.subAgentStatuses.length).padEnd(40)}│`);
+  }
   console.log(`  │ Total events:   ${String(result.totalEvents).padEnd(40)}│`);
 
   // Event type breakdown
