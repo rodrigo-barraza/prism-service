@@ -117,6 +117,7 @@ router.get(
               providers: 1,
               messageCount: { $size: { $ifNull: ["$messages", []] } },
               totalCost: { $ifNull: ["$totalCost", 0] },
+              agent: 1,
             })
             .sort({ [sort as string]: sortDir })
             .limit(skip + limit)
