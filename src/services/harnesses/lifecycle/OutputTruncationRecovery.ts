@@ -23,6 +23,7 @@ import type {
   AgenticContext,
 } from "../types.ts";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
 /** Maximum number of auto-continuation attempts before giving up. */
 export const MAX_OUTPUT_TRUNCATION_RECOVERIES = 3;
@@ -170,7 +171,7 @@ export function buildProviderErrorMessage(
   error: unknown,
   iteration: number,
 ): string {
-  const errorText = error instanceof Error ? error.message : String(error);
+  const errorText = errorMessage(error);
   return (
     `The model provider encountered an error on iteration ${iteration}: ` +
     `\`${errorText}\`. The conversation history up to this point has been ` +

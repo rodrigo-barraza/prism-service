@@ -452,8 +452,7 @@ const MCPClientService = {
       }));
       return { resources, serverName, count: resources.length };
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const extractedErrorMessage = getErrorMessage(error);
       const errorCode =
         error instanceof Error &&
         "code" in error &&
@@ -462,8 +461,8 @@ const MCPClientService = {
           : undefined;
       // Some servers don't implement resources — that's fine
       if (
-        errorMessage.includes("not supported") ||
-        errorMessage.includes("not implemented") ||
+        extractedErrorMessage.includes("not supported") ||
+        extractedErrorMessage.includes("not implemented") ||
         errorCode === -32601
       ) {
         return {
@@ -474,7 +473,7 @@ const MCPClientService = {
         };
       }
       return {
-        error: `Failed to list resources from "${serverName}": ${errorMessage}`,
+        error: `Failed to list resources from "${serverName}": ${extractedErrorMessage}`,
       };
     }
   },

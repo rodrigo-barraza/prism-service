@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import logger from "../utils/logger.ts";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
 export interface WebhookEvent {
   webhookEventId: string;
@@ -34,7 +35,7 @@ const WebhookEventBus = {
         listener(event);
       } catch (error: unknown) {
         logger.error(
-          `WebhookEventBus listener error: ${error instanceof Error ? error.message : String(error)}`,
+          `WebhookEventBus listener error: ${errorMessage(error)}`,
         );
       }
     }
