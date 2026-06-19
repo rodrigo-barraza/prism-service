@@ -306,4 +306,159 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
     getWorkspaceRootsSpy.mockRestore();
   });
+
+  describe("hasSubAgents flag persistence", () => {
+    it("should set hasSubAgents: true on the parent session when a sub-agent is spawned", async () => {
+      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+      const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });
+      const mockCollection = { updateOne: mockUpdateOne };
+
+      const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+        mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
+      );
+
+      await OrchestratorService.spawnFromTool({
+        description: "Sub-agent that triggers hasSubAgents",
+        prompt: "Do work",
+        files: [],
+        orchestratorContext,
+      });
+
+      expect(mockUpdateOne).toHaveBeenCalledWith(
+        { id: orchestratorContext.agentSessionId },
+        { $set: { hasSubAgents: true } },
+      );
+
+      getCollectionSpy.mockRestore();
+    });
+
+    it("should target the correct parent session ID from orchestratorContext.agentSessionId", async () => {
+      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+      const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });
+      const mockCollection = { updateOne: mockUpdateOne };
+
+      const customContext = {
+        ...orchestratorContext,
+        agentSessionId: "custom-parent-session-abc",
+      };
+
+      const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+        mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
+      );
+
+      await OrchestratorService.spawnFromTool({
+        description: "Sub-agent with custom parent",
+        prompt: "Do work",
+        files: [],
+        orchestratorContext: customContext,
+      });
+
+      const hasSubAgentsCall = mockUpdateOne.mock.calls.find(
+        (call: unknown[]) =>
+          (call[0] as Record<string, unknown>).id === "custom-parent-session-abc" &&
+          (call[1] as Record<string, unknown>).$set &&
+          ((call[1] as Record<string, Record<string, unknown>>).$set as Record<string, unknown>).hasSubAgents === true,
+      );
+      expect(hasSubAgentsCall).toBeDefined();
+
+      getCollectionSpy.mockRestore();
+    });
+
+    it("should use the AGENT_CONVERSATIONS collection for the hasSubAgents update", async () => {
+      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+      const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });
+      const mockCollection = { updateOne: mockUpdateOne };
+
+      const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+        mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
+      );
+
+      await OrchestratorService.spawnFromTool({
+        description: "Sub-agent collection check",
+        prompt: "Do work",
+        files: [],
+        orchestratorContext,
+      });
+
+      const collectionCalls = getCollectionSpy.mock.calls;
+      const agentConversationsCall = collectionCalls.find(
+        (call: unknown[]) => (call[1] as string) === "agent_conversations",
+      );
+      expect(agentConversationsCall).toBeDefined();
+
+      getCollectionSpy.mockRestore();
+    });
+
+    it("should not throw when MongoDB is unavailable for hasSubAgents update", async () => {
+      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+
+      const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+        null as unknown as ReturnType<typeof MongoWrapper.getCollection>
+      );
+
+      const result = await OrchestratorService.spawnFromTool({
+        description: "Sub-agent with null collection",
+        prompt: "Do work",
+        files: [],
+        orchestratorContext,
+      });
+
+      expect(result).toBeDefined();
+      expect(result.error).toBeUndefined();
+
+      getCollectionSpy.mockRestore();
+    });
+
+    it("should not throw when the MongoDB updateOne rejects for hasSubAgents", async () => {
+      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+      const mockUpdateOne = vi.fn().mockRejectedValue(new Error("MongoDB connection lost"));
+      const mockCollection = { updateOne: mockUpdateOne };
+
+      const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+        mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
+      );
+
+      const result = await OrchestratorService.spawnFromTool({
+        description: "Sub-agent with failing DB",
+        prompt: "Do work",
+        files: [],
+        orchestratorContext,
+      });
+
+      expect(result).toBeDefined();
+      expect(result.error).toBeUndefined();
+
+      getCollectionSpy.mockRestore();
+    });
+
+    it("should set hasSubAgents on parent session for each sub-agent spawned via createTeam", async () => {
+      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+      const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });
+      const mockCollection = { updateOne: mockUpdateOne };
+
+      const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+        mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
+      );
+
+      const teamArgs = {
+        name: "has_sub_agents_team",
+        members: [
+          { description: "Agent A", prompt: "Do task A" },
+          { description: "Agent B", prompt: "Do task B" },
+        ],
+      };
+
+      await OrchestratorService.createTeam(teamArgs, orchestratorContext);
+
+      const hasSubAgentsCalls = mockUpdateOne.mock.calls.filter(
+        (call: unknown[]) =>
+          (call[0] as Record<string, unknown>).id === orchestratorContext.agentSessionId &&
+          (call[1] as Record<string, unknown>).$set &&
+          ((call[1] as Record<string, Record<string, unknown>>).$set as Record<string, unknown>).hasSubAgents === true,
+      );
+      expect(hasSubAgentsCalls.length).toBeGreaterThanOrEqual(1);
+
+      getCollectionSpy.mockRestore();
+    });
+  });
 });
