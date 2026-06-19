@@ -1,0 +1,269 @@
+=== Finding 1 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Duplicated Types & Interfaces
+Severity: 🔴
+Source: src/types/ProviderTypes.ts
+Exported: ChatMessage
+Description: Test declares local `ConversationMessage` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.
+Fix: Import `ChatMessage` from `src/types/ProviderTypes.ts`
+Line Range: 19–19
+
+=== Finding 2 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`
+Line Range: 79–79
+
+=== Finding 3 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`
+Line Range: 260–260
+
+=== Finding 4 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`
+Line Range: 359–359
+
+=== Finding 5 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`
+Line Range: 369–369
+
+=== Finding 6 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Project Skills]` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.PROJECT_SKILLS`
+Line Range: 798–798
+
+=== Finding 7 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Agent Memory]` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.AGENT_MEMORY`
+Line Range: 799–799
+
+=== Finding 8 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`
+Line Range: 832–832
+
+=== Finding 9 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`
+Line Range: 1981–1981
+
+=== Finding 10 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Agent Memory]` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.AGENT_MEMORY`
+Line Range: 1982–1982
+
+=== Finding 11 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[System Context]` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SYSTEM_CONTEXT`
+Line Range: 2111–2111
+
+=== Finding 12 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[System Context - Local Time:` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX`
+Line Range: 2112–2112
+
+=== Finding 13 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[System Context]` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SYSTEM_CONTEXT`
+Line Range: 2120–2120
+
+=== Finding 14 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[System Context]` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SYSTEM_CONTEXT`
+Line Range: 2179–2179
+
+=== Finding 15 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[System Context]` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SYSTEM_CONTEXT`
+Line Range: 2194–2194
+
+=== Finding 16 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`
+Line Range: 3289–3289
+
+=== Finding 17 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`
+Line Range: 3429–3429
+
+=== Finding 18 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`
+Line Range: 3511–3511
+
+=== Finding 19 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`
+Line Range: 3603–3603
+
+=== Finding 20 ===
+File: src/services/harnesses/__tests__/messageArrayConstruction.test.ts
+Category: Hard-Coded Magic Strings & Values
+Severity: 🟡
+Source: src/constants.ts
+Exported: PROMPT_DELIMITERS
+Description: Hard-coded prompt delimiter `[Somatic State` matches `PROMPT_DELIMITERS` constant.
+Fix: Replace with `PROMPT_DELIMITERS.SOMATIC_STATE`
+Line Range: 3634–3634
+
+=== Finding 21 ===
+File: tests/conversationDerivedUtils.test.ts
+Category: Duplicated Types & Interfaces
+Severity: 🔴
+Source: src/types/ProviderTypes.ts
+Exported: ChatMessage
+Description: Test declares local `TestMessage` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.
+Fix: Import `ChatMessage` from `src/types/ProviderTypes.ts`
+Line Range: 38–38
+
+=== Finding 22 ===
+File: tests/client-tool-state-updaters.test.ts
+Category: Duplicated Types & Interfaces
+Severity: 🔴
+Source: src/types/ProviderTypes.ts
+Exported: ChatMessage
+Description: Test declares local `ToolMessageSlice` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.
+Fix: Import `ChatMessage` from `src/types/ProviderTypes.ts`
+Line Range: 17–17
+
+=== Finding 23 ===
+File: tests/client-tool-state-updaters.test.ts
+Category: Duplicated Types & Interfaces
+Severity: 🔴
+Source: src/services/harnesses/types.ts
+Exported: ToolCall / ToolSchema
+Description: Test declares local `ToolExecutionInput` mimicking `ToolCall / ToolSchema` instead of importing it from `src/services/harnesses/types.ts`.
+Fix: Import `ToolCall / ToolSchema` from `src/services/harnesses/types.ts`
+Line Range: 18–18
+
+=== Finding 24 ===
+File: tests/client-tool-state-updaters.test.ts
+Category: Duplicated Types & Interfaces
+Severity: 🔴
+Source: src/types/ProviderTypes.ts
+Exported: ChatMessage
+Description: Test declares local `DisplayMessage` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.
+Fix: Import `ChatMessage` from `src/types/ProviderTypes.ts`
+Line Range: 25–25
+
+=== Finding 25 ===
+File: tests/finalizer-race-condition.test.ts
+Category: Duplicated Types & Interfaces
+Severity: 🔴
+Source: src/types/ProviderTypes.ts
+Exported: ChatMessage
+Description: Test declares local `TestMessage` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.
+Fix: Import `ChatMessage` from `src/types/ProviderTypes.ts`
+Line Range: 19–19
+
+=== Finding 26 ===
+File: tests/finalize-message-persistence.test.ts
+Category: Duplicated Types & Interfaces
+Severity: 🔴
+Source: src/types/ProviderTypes.ts
+Exported: ChatMessage
+Description: Test declares local `TestMessage` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.
+Fix: Import `ChatMessage` from `src/types/ProviderTypes.ts`
+Line Range: 21–21
+
+=== Finding 27 ===
+File: tests/functionCallingUtilities.test.ts
+Category: Duplicated Types & Interfaces
+Severity: 🔴
+Source: src/types/ProviderTypes.ts
+Exported: ChatMessage
+Description: Test declares local `TestMessage` mimicking `ChatMessage` instead of importing it from `src/types/ProviderTypes.ts`.
+Fix: Import `ChatMessage` from `src/types/ProviderTypes.ts`
+Line Range: 19–19
