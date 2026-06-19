@@ -145,6 +145,15 @@ export const TREE_OF_THOUGHT_BRANCH_PROMPT =
   "Should I use a linked list or an array for a queue implementation? " +
   "Consider different approaches and pick the best one. Explain briefly.";
 
+export const GRAPH_OF_THOUGHTS_SYNTHESIS_PROMPT =
+  "Design a retry mechanism for HTTP requests. Consider exponential backoff, " +
+  "jitter, circuit breaker patterns, and timeout handling. " +
+  "Combine the best aspects of each approach into a single unified design.";
+
+export const STRATEGY_COMPARISON_PROMPT =
+  "What are the trade-offs between using a monolith vs microservices " +
+  "architecture for a new web application? Consider multiple perspectives.";
+
 // ── Dynamic Tool Discovery ─────────────────────────────────────
 
 export const SEARCH_FOR_TOOLS =

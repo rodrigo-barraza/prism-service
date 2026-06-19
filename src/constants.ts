@@ -154,6 +154,7 @@ export const HARNESS_IDS = {
 export const REASONING_STRATEGIES = {
   CHAIN_OF_THOUGHT: "chain_of_thought",
   TREE_OF_THOUGHTS: "tree_of_thoughts",
+  GRAPH_OF_THOUGHTS: "graph_of_thoughts",
 } as const;
 
 // ─── Prompt Construction Delimiters ──────────────────────────
