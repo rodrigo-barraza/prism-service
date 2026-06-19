@@ -190,6 +190,11 @@ export async function handleSseRequest(
 /**
  * Handle a non-streaming JSON request lifecycle.
  * Collects events from the handler and returns a flat JSON response.
+ *
+ * Creates an AbortController tied to the client connection so that
+ * provider-side inference (e.g. vLLM on a Jetson) is cancelled when
+ * the caller disconnects or hits "stop" — preventing orphaned GPU
+ * generations from blocking the LocalModelQueue semaphore.
  */
 export async function handleJsonRequest(
   req: Request,
@@ -199,10 +204,31 @@ export async function handleJsonRequest(
   handler: (
     params: ChatRequest,
     onEvent: (event: SseEvent) => void,
+    context: { signal: AbortSignal },
   ) => Promise<void> = handleConversation,
 ) {
+  const controller = createAbortController();
+  const connectionStartTime = Date.now();
+
+  res.on("close", () => {
+    if (!res.writableFinished) {
+      const durationSeconds = (
+        (Date.now() - connectionStartTime) /
+        1000
+      ).toFixed(1);
+      logger.warn(
+        `[JSON] Client disconnected after ${durationSeconds}s — aborting in-flight generation`,
+      );
+      controller.abort();
+    }
+  });
+
   const events: SseEvent[] = [];
-  await handler(params, (event: SseEvent) => events.push(event));
+  await handler(params, (event: SseEvent) => events.push(event), {
+    signal: controller.signal,
+  });
+
+  if (controller.signal.aborted) return;
 
   const { error, response } = buildJsonResponseFromEvents(events, req.body);
   if (error) return next(error);
