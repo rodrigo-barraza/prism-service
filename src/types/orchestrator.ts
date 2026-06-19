@@ -48,6 +48,8 @@ export interface SubAgentState {
   pendingMessages?: string[];
   enabledTools?: string[] | null;
   reservationReleased?: boolean;
+  agentIndex?: number;
+  teamSize?: number;
 }
 
 export interface WorktreeDiff {
@@ -103,6 +105,8 @@ export interface OrchestratorSpawnParams {
   agent?: string;
   assignedProvider?: string;
   assignedModel?: string;
+  agentIndex?: number;
+  teamSize?: number;
   orchestratorContext: OrchestratorContext;
 }
 
