@@ -1,5 +1,6 @@
 import logger from "../../utils/logger.ts";
 import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
 // ────────────────────────────────────────────────────────────
 // Internal Tool Registry
@@ -111,7 +112,7 @@ try {
   init();
 } catch (error: unknown) {
   logger.error(
-    `[InternalToolRegistry] Init failed: ${error instanceof Error ? error.message : String(error)}`,
+    `[InternalToolRegistry] Init failed: ${errorMessage(error)}`,
   );
 }
 
