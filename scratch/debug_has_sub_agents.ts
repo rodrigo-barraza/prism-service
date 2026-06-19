@@ -30,43 +30,46 @@ if (!db) {
 }
 
 try {
-  console.log("\n--- Checking counts of parentAgentSessionId ---");
-  
-  const agentConversationsCountWithParent = await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).countDocuments({
-    parentAgentSessionId: { $ne: null, $exists: true }
-  });
-  console.log("Agent conversations with parentAgentSessionId set:", agentConversationsCountWithParent);
-  
-  const modelConversationsCountWithParent = await db.collection(COLLECTIONS.MODEL_CONVERSATIONS).countDocuments({
-    parentAgentSessionId: { $ne: null, $exists: true }
-  });
-  console.log("Model conversations with parentAgentSessionId set:", modelConversationsCountWithParent);
-  
-  // Let's print some parent ids and their structures
-  if (agentConversationsCountWithParent > 0) {
-    const sampleAgentChildren = await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).find({
-      parentAgentSessionId: { $ne: null, $exists: true }
-    }).limit(5).toArray();
-    console.log("Sample agent child conversations:", sampleAgentChildren.map(c => ({
-      id: c.id,
-      parentAgentSessionId: c.parentAgentSessionId,
-      project: c.project,
-      username: c.username,
-      title: c.title
-    })));
-  }
+  console.log("\n--- Checking parent session lookup ---");
 
-  if (modelConversationsCountWithParent > 0) {
-    const sampleModelChildren = await db.collection(COLLECTIONS.MODEL_CONVERSATIONS).find({
-      parentAgentSessionId: { $ne: null, $exists: true }
-    }).limit(5).toArray();
-    console.log("Sample model child conversations:", sampleModelChildren.map(c => ({
-      id: c.id,
-      parentAgentSessionId: c.parentAgentSessionId,
-      project: c.project,
-      username: c.username,
-      title: c.title
-    })));
+  const targetParentId = "c49761ba-9a5f-49a8-822b-6b7ecdb86d2a";
+
+  const parentInAgent = await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).findOne({ id: targetParentId });
+  const parentInModel = await db.collection(COLLECTIONS.MODEL_CONVERSATIONS).findOne({ id: targetParentId });
+
+  console.log("Agent collection lookup:", parentInAgent ? JSON.stringify({
+    id: parentInAgent.id,
+    project: parentInAgent.project,
+    username: parentInAgent.username,
+    title: parentInAgent.title
+  }, null, 2) : "Not Found");
+
+  console.log("Model collection lookup:", parentInModel ? JSON.stringify({
+    id: parentInModel.id,
+    project: parentInModel.project,
+    username: parentInModel.username,
+    title: parentInModel.title
+  }, null, 2) : "Not Found");
+
+  // Let's find any parents that have children in the database with project: 'prism-chat' and username: 'anonymous'
+  console.log("\n--- Finding parents that match project='prism-chat' and username='anonymous' ---");
+  const children = await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).find({
+    parentAgentSessionId: { $ne: null },
+    project: "prism-chat",
+    username: "anonymous"
+  }).toArray();
+  console.log(`Found ${children.length} children matching filter.`);
+  const parentIds = Array.from(new Set(children.map(c => c.parentAgentSessionId)));
+  console.log("Parent IDs:", parentIds);
+
+  for (const parentId of parentIds) {
+    const pAgent = await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).findOne({ id: parentId });
+    const pModel = await db.collection(COLLECTIONS.MODEL_CONVERSATIONS).findOne({ id: parentId });
+    if (pAgent || pModel) {
+      console.log(`Parent ID ${parentId}: agent? ${!!pAgent} model? ${!!pModel} project=${pAgent?.project || pModel?.project} username=${pAgent?.username || pModel?.username}`);
+    } else {
+      console.log(`Parent ID ${parentId} DOES NOT EXIST in either collection!`);
+    }
   }
 
 } catch (error: any) {

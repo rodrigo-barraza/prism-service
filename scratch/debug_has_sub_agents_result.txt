@@ -1,83 +1,160 @@
 🔒 Connecting to Synology Vault...
 Connecting to MongoDB: prism...
-[15:17:08] OK    [prism] MongoDB connected: prism
+[15:28:02] OK    [prism] MongoDB connected: prism
 
---- Checking counts of parentAgentSessionId ---
-Agent conversations with parentAgentSessionId set: 1105
-Model conversations with parentAgentSessionId set: 195
-Sample agent child conversations: [
-  {
-    id: 'a45c4db9-d6f2-4d67-93f9-430857cd61bc',
-    parentAgentSessionId: 'd865ec08-125c-4619-90a5-268d7f4d1cea',
-    project: 'retina-agent',
-    username: '::ffff:127.0.0.1',
-    title: 'New Conversation'
-  },
-  {
-    id: 'f73b7919-07df-4e78-b588-a638382da219',
-    parentAgentSessionId: 'd865ec08-125c-4619-90a5-268d7f4d1cea',
-    project: 'retina-agent',
-    username: '::ffff:127.0.0.1',
-    title: 'New Conversation'
-  },
-  {
-    id: 'f83fc7dd-1692-4687-9cef-2047810a298b',
-    parentAgentSessionId: 'dbcc793c-ed89-4742-a6f1-2d2ed22a3588',
-    project: 'retina-agent',
-    username: '::ffff:127.0.0.1',
-    title: 'New Conversation'
-  },
-  {
-    id: '07c565c4-9fb3-4721-bea0-1e530bf303ef',
-    parentAgentSessionId: 'dbcc793c-ed89-4742-a6f1-2d2ed22a3588',
-    project: 'retina-agent',
-    username: '::ffff:127.0.0.1',
-    title: 'New Conversation'
-  },
-  {
-    id: '4aba2494-cd5e-4ec3-bd94-538bd82fc351',
-    parentAgentSessionId: '94eacb88-84b6-4faf-96a6-2566dd4f687d',
-    project: 'retina-agent',
-    username: '::ffff:127.0.0.1',
-    title: 'New Conversation'
-  }
+--- Checking parent session lookup ---
+Agent collection lookup: Not Found
+Model collection lookup: Not Found
+
+--- Finding parents that match project='prism-chat' and username='anonymous' ---
+Found 320 children matching filter.
+Parent IDs: [
+  '60ccac14-814a-4ec0-a349-35784b19c12a',
+  'c49761ba-9a5f-49a8-822b-6b7ecdb86d2a',
+  '1aa73846-6e63-48d5-adf6-9ba1e1ed1727',
+  'ebb9f4bc-7cca-4029-84e2-af689727ead8',
+  'e1c13b44-b7c8-48bd-94e5-959d4e578995',
+  'c83c662a-4180-4c82-bb27-cda6aefd1b66',
+  '030fce90-a799-4292-8042-0985d542da6a',
+  'a2fa48fa-2093-462d-bb27-96511fe6f3f9',
+  '47c94863-e790-41ce-85c7-ddb6af15e077',
+  '6483b40e-20a3-49ef-977f-f8ed9c298837',
+  '44e03187-7cd1-476a-a4c7-7b9e8cf5a32e',
+  'dbbb699a-7513-40ac-8713-4de08d8b0740',
+  '7500ddd5-7c3c-4cfa-a8b0-139f889315e4',
+  '15ad53c3-c1d1-4840-b20f-f1a48bf96844',
+  'a8b4ae72-74b0-4df7-b03d-8ca8d5dba943',
+  'b7bcddcc-4a75-4e5a-8262-3240bceb55d7',
+  '0ebb5b41-ac00-43ef-b844-9ad0f89d5638',
+  'fb778b02-099a-406b-b8c7-03f0cf7a1e77',
+  '895cbf86-eff6-45b7-8199-0da45496b52e',
+  'a32c4e0a-a88b-4fc4-8b52-301483ce7d52',
+  'd89de259-0b4b-404d-8db3-3c5779a4a1b0',
+  '3bfd32e0-a289-4386-81a3-7220190a40b5',
+  'f6c5baa1-7831-4523-abcb-5dd56ee24ac2',
+  'c0a23c5e-29d7-4c7a-acf9-86b09264f0c1',
+  'edd6268c-69fb-4a0a-9c39-5cdc9c65634e',
+  '1bed2c6c-3921-4df4-8b51-87e4fae524ea',
+  '07367dbd-6c35-4831-aed9-e202809cadf0',
+  '877c731a-221a-4dc1-8865-9d519d64079d',
+  '59c5ae8e-00f0-4a34-8ccc-528f4ed19379',
+  'ec9acb62-cefb-489a-896c-62860bbdec28',
+  '9a557441-44a1-463b-93bb-d4ebbf5f6a7b',
+  'da435c51-1409-4430-b491-664a80813ad2',
+  '49c335e1-d774-46a6-9be3-46f36f1329fb',
+  'b2e3aaf7-759b-47d2-bad2-011635de6ea4',
+  '9afba5f4-78f1-4bab-a0d4-661340642ede',
+  '4ab2f1a3-2111-44c7-a01d-70d42215e584',
+  '09268218-7bb3-44b9-9d43-a2b252738e26',
+  '0aa778ee-2d5e-404c-bc80-cdf735251f4e',
+  '885b3381-c48d-49aa-a665-dde4d702a7f6',
+  '84a6e09c-eb46-4912-9518-bfec6224dc0c',
+  'f0b4a281-dfd0-433c-98d5-e870d58f015c',
+  '6e5c7f4a-544a-4287-ab2e-583dd35e9015',
+  '6ae3d29c-0389-4a54-b326-255f27c6a6c0',
+  '43950bdf-03e6-4a86-8baf-28b95e2e0d13',
+  'e059c656-7126-40a8-b8cc-6c7e4b8d4701',
+  '1bad7576-8cf7-4f47-adfb-1e51649be400',
+  '633d4c8c-7427-43c5-bc79-95651db1238d',
+  'd7ea69be-226e-4ec0-b379-04ef1f43d8f9',
+  'c1e5adbb-44fb-42ee-b7ea-05d424ee726c',
+  'eb07dd91-b088-4c35-a5db-d03c2676f8c1',
+  'f01873f8-d85a-481b-8503-24f78a6935f2',
+  'ae02e35e-b7b2-4aab-b357-a490de6f82bd',
+  'b8c25984-2dfc-4bb2-8a27-ab76e9503c9e',
+  'f756b645-4492-4ce3-94bb-25aab2635993',
+  'e70d8149-a752-4b5e-a1d6-83ee927e0638',
+  '1cf889f7-0ab2-4841-b5e2-1dbd69c0364f',
+  '2469dfa5-ca8d-4092-a649-0a24f481ff9c',
+  'fbfbab64-def0-4185-b608-cf1e297fbca5',
+  'de22b100-7f79-472e-9941-3e715684ad53',
+  '7268e51f-3e31-45f1-ab89-df7a8e515e41',
+  'a664423a-06e8-4927-ba8b-5d9ecc0c51d6',
+  'a0e2d0ff-509c-47cb-8cc1-4eaef03fb29e',
+  '2b82e94b-09c2-4466-8fe0-b87508373481',
+  '7d72c052-d886-457a-ba16-dc2a2bc5b39a',
+  '96dd5e9a-457e-4b79-abc2-6766b9c36514',
+  'e8893ac8-8133-484a-b93d-b5002c2550fb',
+  'd152cb01-cb88-4d60-92b0-332d1464801a',
+  'd8bc416d-3c98-4bc8-b19d-e54618266336',
+  '858af73d-5700-40c5-930a-6070af3d2442',
+  'a91a92a9-10a5-4b8a-89cb-f2106d419123',
+  '077ea3ea-a421-4180-be56-74094b8f5ead',
+  'ee9cd1a9-695f-4d30-979f-dc24726962c2',
+  '455190f3-7097-453e-a6b1-83a5d315182c'
 ]
-Sample model child conversations: [
-  {
-    id: '18442058-021b-491a-8403-0406d6810d51',
-    parentAgentSessionId: '8dba7e37-2c67-442b-bc69-54baf0d18a21',
-    project: 'retina',
-    username: '::ffff:127.0.0.1',
-    title: 'New Conversation'
-  },
-  {
-    id: 'ce9018f6-18f4-49a7-ae45-1be4e339f2dd',
-    parentAgentSessionId: '672571f8-287f-48f8-82ab-a46b9db6f652',
-    project: 'retina',
-    username: '::ffff:127.0.0.1',
-    title: 'New Conversation'
-  },
-  {
-    id: '70da33c7-1f27-4680-9861-ea9224a372e6',
-    parentAgentSessionId: '672571f8-287f-48f8-82ab-a46b9db6f652',
-    project: 'retina',
-    username: '::ffff:127.0.0.1',
-    title: 'New Conversation'
-  },
-  {
-    id: 'c84a769d-2a20-45f4-8d1e-a9465c784c8d',
-    parentAgentSessionId: 'de1edc1b-3350-4a71-9821-8cb4e10b994b',
-    project: 'retina',
-    username: '::ffff:127.0.0.1',
-    title: 'New Conversation'
-  },
-  {
-    id: 'a8006bb8-2048-494f-ba02-afc6ea54b3fe',
-    parentAgentSessionId: 'f032c50d-1fc6-4327-8476-94f6b451128e',
-    project: 'retina',
-    username: '::ffff:127.0.0.1',
-    title: 'New Conversation'
-  }
-]
+Parent ID 60ccac14-814a-4ec0-a349-35784b19c12a DOES NOT EXIST in either collection!
+Parent ID c49761ba-9a5f-49a8-822b-6b7ecdb86d2a DOES NOT EXIST in either collection!
+Parent ID 1aa73846-6e63-48d5-adf6-9ba1e1ed1727 DOES NOT EXIST in either collection!
+Parent ID ebb9f4bc-7cca-4029-84e2-af689727ead8 DOES NOT EXIST in either collection!
+Parent ID e1c13b44-b7c8-48bd-94e5-959d4e578995 DOES NOT EXIST in either collection!
+Parent ID c83c662a-4180-4c82-bb27-cda6aefd1b66 DOES NOT EXIST in either collection!
+Parent ID 030fce90-a799-4292-8042-0985d542da6a DOES NOT EXIST in either collection!
+Parent ID a2fa48fa-2093-462d-bb27-96511fe6f3f9 DOES NOT EXIST in either collection!
+Parent ID 47c94863-e790-41ce-85c7-ddb6af15e077 DOES NOT EXIST in either collection!
+Parent ID 6483b40e-20a3-49ef-977f-f8ed9c298837 DOES NOT EXIST in either collection!
+Parent ID 44e03187-7cd1-476a-a4c7-7b9e8cf5a32e DOES NOT EXIST in either collection!
+Parent ID dbbb699a-7513-40ac-8713-4de08d8b0740 DOES NOT EXIST in either collection!
+Parent ID 7500ddd5-7c3c-4cfa-a8b0-139f889315e4 DOES NOT EXIST in either collection!
+Parent ID 15ad53c3-c1d1-4840-b20f-f1a48bf96844 DOES NOT EXIST in either collection!
+Parent ID a8b4ae72-74b0-4df7-b03d-8ca8d5dba943 DOES NOT EXIST in either collection!
+Parent ID b7bcddcc-4a75-4e5a-8262-3240bceb55d7 DOES NOT EXIST in either collection!
+Parent ID 0ebb5b41-ac00-43ef-b844-9ad0f89d5638 DOES NOT EXIST in either collection!
+Parent ID fb778b02-099a-406b-b8c7-03f0cf7a1e77 DOES NOT EXIST in either collection!
+Parent ID 895cbf86-eff6-45b7-8199-0da45496b52e DOES NOT EXIST in either collection!
+Parent ID a32c4e0a-a88b-4fc4-8b52-301483ce7d52 DOES NOT EXIST in either collection!
+Parent ID d89de259-0b4b-404d-8db3-3c5779a4a1b0 DOES NOT EXIST in either collection!
+Parent ID 3bfd32e0-a289-4386-81a3-7220190a40b5 DOES NOT EXIST in either collection!
+Parent ID f6c5baa1-7831-4523-abcb-5dd56ee24ac2 DOES NOT EXIST in either collection!
+Parent ID c0a23c5e-29d7-4c7a-acf9-86b09264f0c1 DOES NOT EXIST in either collection!
+Parent ID edd6268c-69fb-4a0a-9c39-5cdc9c65634e DOES NOT EXIST in either collection!
+Parent ID 1bed2c6c-3921-4df4-8b51-87e4fae524ea DOES NOT EXIST in either collection!
+Parent ID 07367dbd-6c35-4831-aed9-e202809cadf0 DOES NOT EXIST in either collection!
+Parent ID 877c731a-221a-4dc1-8865-9d519d64079d DOES NOT EXIST in either collection!
+Parent ID 59c5ae8e-00f0-4a34-8ccc-528f4ed19379 DOES NOT EXIST in either collection!
+Parent ID ec9acb62-cefb-489a-896c-62860bbdec28 DOES NOT EXIST in either collection!
+Parent ID 9a557441-44a1-463b-93bb-d4ebbf5f6a7b DOES NOT EXIST in either collection!
+Parent ID da435c51-1409-4430-b491-664a80813ad2 DOES NOT EXIST in either collection!
+Parent ID 49c335e1-d774-46a6-9be3-46f36f1329fb DOES NOT EXIST in either collection!
+Parent ID b2e3aaf7-759b-47d2-bad2-011635de6ea4 DOES NOT EXIST in either collection!
+Parent ID 9afba5f4-78f1-4bab-a0d4-661340642ede DOES NOT EXIST in either collection!
+Parent ID 4ab2f1a3-2111-44c7-a01d-70d42215e584 DOES NOT EXIST in either collection!
+Parent ID 09268218-7bb3-44b9-9d43-a2b252738e26 DOES NOT EXIST in either collection!
+Parent ID 0aa778ee-2d5e-404c-bc80-cdf735251f4e DOES NOT EXIST in either collection!
+Parent ID 885b3381-c48d-49aa-a665-dde4d702a7f6 DOES NOT EXIST in either collection!
+Parent ID 84a6e09c-eb46-4912-9518-bfec6224dc0c DOES NOT EXIST in either collection!
+Parent ID f0b4a281-dfd0-433c-98d5-e870d58f015c DOES NOT EXIST in either collection!
+Parent ID 6e5c7f4a-544a-4287-ab2e-583dd35e9015 DOES NOT EXIST in either collection!
+Parent ID 6ae3d29c-0389-4a54-b326-255f27c6a6c0 DOES NOT EXIST in either collection!
+Parent ID 43950bdf-03e6-4a86-8baf-28b95e2e0d13 DOES NOT EXIST in either collection!
+Parent ID e059c656-7126-40a8-b8cc-6c7e4b8d4701 DOES NOT EXIST in either collection!
+Parent ID 1bad7576-8cf7-4f47-adfb-1e51649be400 DOES NOT EXIST in either collection!
+Parent ID 633d4c8c-7427-43c5-bc79-95651db1238d DOES NOT EXIST in either collection!
+Parent ID d7ea69be-226e-4ec0-b379-04ef1f43d8f9 DOES NOT EXIST in either collection!
+Parent ID c1e5adbb-44fb-42ee-b7ea-05d424ee726c DOES NOT EXIST in either collection!
+Parent ID eb07dd91-b088-4c35-a5db-d03c2676f8c1 DOES NOT EXIST in either collection!
+Parent ID f01873f8-d85a-481b-8503-24f78a6935f2 DOES NOT EXIST in either collection!
+Parent ID ae02e35e-b7b2-4aab-b357-a490de6f82bd DOES NOT EXIST in either collection!
+Parent ID b8c25984-2dfc-4bb2-8a27-ab76e9503c9e: agent? true model? false project=prism-chat username=anonymous
+Parent ID f756b645-4492-4ce3-94bb-25aab2635993: agent? true model? false project=prism-chat username=anonymous
+Parent ID e70d8149-a752-4b5e-a1d6-83ee927e0638: agent? true model? false project=prism-chat username=anonymous
+Parent ID 1cf889f7-0ab2-4841-b5e2-1dbd69c0364f: agent? true model? false project=prism-chat username=anonymous
+Parent ID 2469dfa5-ca8d-4092-a649-0a24f481ff9c: agent? true model? false project=prism-chat username=anonymous
+Parent ID fbfbab64-def0-4185-b608-cf1e297fbca5: agent? true model? false project=prism-chat username=anonymous
+Parent ID de22b100-7f79-472e-9941-3e715684ad53: agent? true model? false project=prism-chat username=anonymous
+Parent ID 7268e51f-3e31-45f1-ab89-df7a8e515e41: agent? true model? false project=prism-chat username=anonymous
+Parent ID a664423a-06e8-4927-ba8b-5d9ecc0c51d6: agent? true model? false project=prism-chat username=anonymous
+Parent ID a0e2d0ff-509c-47cb-8cc1-4eaef03fb29e: agent? true model? false project=prism-chat username=anonymous
+Parent ID 2b82e94b-09c2-4466-8fe0-b87508373481: agent? true model? false project=prism-chat username=anonymous
+Parent ID 7d72c052-d886-457a-ba16-dc2a2bc5b39a: agent? true model? false project=prism-chat username=anonymous
+Parent ID 96dd5e9a-457e-4b79-abc2-6766b9c36514: agent? true model? false project=prism-chat username=anonymous
+Parent ID e8893ac8-8133-484a-b93d-b5002c2550fb: agent? true model? false project=prism-chat username=anonymous
+Parent ID d152cb01-cb88-4d60-92b0-332d1464801a: agent? true model? false project=prism-chat username=anonymous
+Parent ID d8bc416d-3c98-4bc8-b19d-e54618266336: agent? true model? false project=prism-chat username=anonymous
+Parent ID 858af73d-5700-40c5-930a-6070af3d2442: agent? true model? false project=prism-chat username=anonymous
+Parent ID a91a92a9-10a5-4b8a-89cb-f2106d419123: agent? true model? false project=prism-chat username=anonymous
+Parent ID 077ea3ea-a421-4180-be56-74094b8f5ead: agent? true model? false project=prism-chat username=anonymous
+Parent ID ee9cd1a9-695f-4d30-979f-dc24726962c2: agent? true model? false project=prism-chat username=anonymous
+Parent ID 455190f3-7097-453e-a6b1-83a5d315182c: agent? true model? false project=prism-chat username=anonymous
 
 Done.
