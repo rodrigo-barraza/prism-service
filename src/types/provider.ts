@@ -153,9 +153,11 @@ export interface GenerateTextResult {
     name: string;
     args: Record<string, unknown>;
     thoughtSignature?: string;
+    durationMs?: number;
   }>;
   images?: Array<{ data: string; mimeType: string }>;
   safetyBlock?: boolean;
+  rateLimits?: Record<string, unknown> | null;
 }
 
 export interface GenerateImageResult {

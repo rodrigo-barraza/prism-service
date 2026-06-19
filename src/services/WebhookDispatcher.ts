@@ -5,6 +5,7 @@ import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
 
 interface WebhookSubscription {
@@ -81,7 +82,7 @@ async function dispatchToSubscription(
       );
     } catch (error: unknown) {
       logger.warn(
-        `Webhook dispatch to ${subscription.url} failed (attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS}): ${error instanceof Error ? error.message : String(error)}`,
+        `Webhook dispatch to ${subscription.url} failed (attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS}): ${errorMessage(error)}`,
       );
     } finally {
       if (timeoutHandle) {
@@ -111,7 +112,7 @@ async function refreshSubscriptions() {
       .toArray()) as unknown as WebhookSubscription[];
   } catch (error: unknown) {
     logger.error(
-      `Failed to refresh webhook subscriptions: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to refresh webhook subscriptions: ${errorMessage(error)}`,
     );
   }
 }
@@ -123,7 +124,7 @@ function handleEvent(event: WebhookEvent) {
 
     dispatchToSubscription(subscription, event).catch((error: unknown) => {
       logger.error(
-        `Unhandled error dispatching webhook: ${error instanceof Error ? error.message : String(error)}`,
+        `Unhandled error dispatching webhook: ${errorMessage(error)}`,
       );
     });
   }

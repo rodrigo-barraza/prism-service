@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { PROVIDERS } from "../src/constants.ts";
 import express, { Request, Response, NextFunction } from 'express';
 import supertest from 'supertest';
 
@@ -6,7 +7,7 @@ import supertest from 'supertest';
 
 const mockModelDefinition = {
   name: 'test-model',
-  provider: 'google',
+  provider: PROVIDERS.GOOGLE,
   contextLength: 128_000,
 };
 
@@ -197,7 +198,7 @@ describe('Scheduled Tasks Flow Adversarial Tests', () => {
           name: 'Massive Load Test',
           prompt: hugePrompt,
           agent: 'OMNI',
-          provider: 'google',
+          provider: PROVIDERS.GOOGLE,
           model: 'gemini-3.5-flash',
           scheduleType: 'cron',
           cronExpression: '0 * * * *',
@@ -227,7 +228,7 @@ describe('Scheduled Tasks Flow Adversarial Tests', () => {
         name: 'Unicode Task 💖 \0 \u0000 RTL 🕋',
         prompt: 'Clean the system \0 now',
         agent: 'OMNI',
-        provider: 'google',
+        provider: PROVIDERS.GOOGLE,
         model: 'gemini-3.5-flash',
         scheduleType: 'once',
         scheduleTime: '12:00',
@@ -276,7 +277,7 @@ describe('Scheduled Tasks Flow Adversarial Tests', () => {
         name: 'Valid Task',
         prompt: 'Check CPU',
         agent: 'OMNI',
-        provider: 'google',
+        provider: PROVIDERS.GOOGLE,
         model: 'gemini-3.5-flash',
         scheduleType: 'hourly',
         enabled: true,
@@ -307,7 +308,7 @@ describe('Scheduled Tasks Flow Adversarial Tests', () => {
         name: 'Race Task',
         prompt: 'Execute job',
         agent: 'OMNI',
-        provider: 'google',
+        provider: PROVIDERS.GOOGLE,
         model: 'gemini-3.5-flash',
         scheduleType: 'cron',
         cronExpression: '* * * * *', // every minute
@@ -339,7 +340,7 @@ describe('Scheduled Tasks Flow Adversarial Tests', () => {
         name: 'Disabled Task',
         prompt: 'Should not run',
         agent: 'OMNI',
-        provider: 'google',
+        provider: PROVIDERS.GOOGLE,
         model: 'gemini-3.5-flash',
         scheduleType: 'cron',
         cronExpression: '* * * * *',
@@ -359,7 +360,7 @@ describe('Scheduled Tasks Flow Adversarial Tests', () => {
         name: 'Secret Task Unregistered',
         prompt: 'Top secret execution',
         agent: 'OMNI',
-        provider: 'google',
+        provider: PROVIDERS.GOOGLE,
         model: 'gemini-3.5-flash',
         scheduleType: 'hourly',
         enabled: true,
@@ -385,7 +386,7 @@ describe('Scheduled Tasks Flow Adversarial Tests', () => {
         name: 'Secret Task Registered',
         prompt: 'Top secret execution',
         agent: 'OMNI',
-        provider: 'google',
+        provider: PROVIDERS.GOOGLE,
         model: 'gemini-3.5-flash',
         scheduleType: 'hourly',
         enabled: true,
@@ -427,7 +428,7 @@ describe('Scheduled Tasks Flow Adversarial Tests', () => {
         name: 'Error Prone Task',
         prompt: 'Will fail soon',
         agent: 'OMNI',
-        provider: 'google',
+        provider: PROVIDERS.GOOGLE,
         model: 'gemini-3.5-flash',
         scheduleType: 'hourly',
         enabled: true,

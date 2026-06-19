@@ -1,4 +1,5 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import express, { Request, Response, NextFunction } from "express";
 import { ObjectId, type Document } from "mongodb";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
@@ -215,7 +216,7 @@ router.get(
           );
         } catch (costError: unknown) {
           logger.warn(
-            `Failed to enrich ${isAgentType ? "agent session" : "conversation"} costs: ${costError instanceof Error ? costError.message : String(costError)}`,
+            `Failed to enrich ${isAgentType ? "agent session" : "conversation"} costs: ${errorMessage(costError)}`,
           );
         }
       };
@@ -250,9 +251,7 @@ router.get(
 
       res.json({ items, nextCursor, hasMore });
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(`Error fetching unified conversations: ${errorMessage}`);
+      logger.error(`Error fetching unified conversations: ${errorMessage(error)}`);
       next(error);
     }
   }),
@@ -355,9 +354,7 @@ router.get(
 
       res.status(404).json({ error: "Conversation not found" });
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(`Error fetching specific conversation: ${errorMessage}`);
+      logger.error(`Error fetching specific conversation: ${errorMessage(error)}`);
       next(error);
     }
   }),
@@ -382,9 +379,7 @@ router.get(
 
       res.json(workflows);
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(`Error fetching conversation workflows: ${errorMessage}`);
+      logger.error(`Error fetching conversation workflows: ${errorMessage(error)}`);
       next(error);
     }
   }),
@@ -438,9 +433,7 @@ router.post(
 
       res.json({ ...conversation, type: isAgent ? "agent" : "direct" });
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(`Error appending messages to conversation: ${errorMessage}`);
+      logger.error(`Error appending messages to conversation: ${errorMessage(error)}`);
       next(error);
     }
   }),
@@ -504,9 +497,7 @@ router.patch(
 
       res.status(404).json({ error: "Conversation not found" });
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(`Error patching conversation: ${errorMessage}`);
+      logger.error(`Error patching conversation: ${errorMessage(error)}`);
       next(error);
     }
   }),
@@ -545,9 +536,7 @@ router.delete(
 
       res.status(404).json({ error: "Conversation not found" });
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(`Error deleting conversation: ${errorMessage}`);
+      logger.error(`Error deleting conversation: ${errorMessage(error)}`);
       next(error);
     }
   }),

@@ -322,13 +322,6 @@ export async function runGraphOfThoughts(
       //  (GoT differentiator — aggregation instead of pick-winner)
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      emit({
-        type: SERVER_SENT_EVENT_TYPES.STATUS,
-        message: STATUS_MESSAGES.SYNTHESIS_STARTED,
-        branchCount: scoredBranches.length,
-        iteration: state.iterations,
-      });
-
       const synthesizedPass = await synthesizeBranches(
         harness,
         scoredBranches,
@@ -780,7 +773,7 @@ async function synthesizeBranches(
 
   emit({
     type: SERVER_SENT_EVENT_TYPES.STATUS,
-    message: "synthesis_started",
+    message: STATUS_MESSAGES.SYNTHESIS_STARTED,
     branchCount: scoredBranches.length,
     iteration: state.iterations,
   });

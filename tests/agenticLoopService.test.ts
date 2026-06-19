@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import AgenticLoopService from "../src/services/AgenticLoopService.ts";
 import ContextWindowManager from "../src/utils/ContextWindowManager.ts";
 import SettingsService from "../src/services/SettingsService.ts";
-import { PROVIDERS } from "../src/constants.ts";
+import { HARNESS_IDS, PROVIDERS } from "../src/constants.ts";
 import { TYPES } from "../src/config.ts";
 
 vi.mock("../src/utils/logger.ts", () => ({
@@ -110,19 +110,22 @@ vi.mock("../src/services/system-prompt/index.ts", () => ({
   },
 }));
 
-vi.mock("../src/services/SettingsService.ts", () => ({
-  default: {
-    getCached: vi.fn(),
-    get: vi.fn().mockResolvedValue({
-      agents: {
-        harness: "standard",
-      } as Partial<Required<ReturnType<typeof import("../src/services/SettingsService.ts").default.getCached>>["agents"]>,
-    } as any),
-    getSection: vi.fn().mockResolvedValue({
-      harness: "standard",
-    } as Partial<Required<ReturnType<typeof import("../src/services/SettingsService.ts").default.getCached>>["agents"]>),
-  },
-}));
+vi.mock("../src/services/SettingsService.ts", async () => {
+  const { HARNESS_IDS } = await import("../src/constants.ts");
+  return {
+    default: {
+      getCached: vi.fn(),
+      get: vi.fn().mockResolvedValue({
+        agents: {
+          harness: HARNESS_IDS.STANDARD,
+        },
+      }),
+      getSection: vi.fn().mockResolvedValue({
+        harness: HARNESS_IDS.STANDARD,
+      }),
+    },
+  };
+});
 
 vi.mock("../src/routes/ChatRoutes.ts", () => ({
   finalizeTextGeneration: vi.fn().mockResolvedValue(undefined),

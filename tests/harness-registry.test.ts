@@ -6,7 +6,7 @@
  * unknown harness IDs with graceful fallback.
  */
 import { describe, it, expect, vi } from "vitest";
-import { PROVIDERS } from "../src/constants.ts";
+import { HARNESS_IDS, PROVIDERS } from "../src/constants.ts";
 
 // ── Mock heavy dependencies that ReActHarness transitively imports ──
 vi.mock("../src/utils/logger.ts", () => ({
@@ -46,19 +46,22 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../src/services/SettingsService.ts", () => ({
-  default: {
-    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
-    get: vi.fn().mockResolvedValue({}),
-    getSection: vi.fn().mockResolvedValue({}),
-    getMemoryModelConfig: vi.fn().mockResolvedValue({
-      provider: PROVIDERS.GOOGLE,
-      model: "gemini-embedding-2-preview",
-    }),
-    invalidateCache: vi.fn(),
-    getDefaults: vi.fn(),
-  },
-}));
+vi.mock("../src/services/SettingsService.ts", async () => {
+  const { PROVIDERS } = await import("../src/constants.ts");
+  return {
+    default: {
+      getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
+      get: vi.fn().mockResolvedValue({}),
+      getSection: vi.fn().mockResolvedValue({}),
+      getMemoryModelConfig: vi.fn().mockResolvedValue({
+        provider: PROVIDERS.GOOGLE,
+        model: "gemini-embedding-2-preview",
+      }),
+      invalidateCache: vi.fn(),
+      getDefaults: vi.fn(),
+    },
+  };
+});
 
 vi.mock("../src/services/ConversationService.ts", () => ({
   default: {
@@ -83,17 +86,17 @@ const HarnessRegistry = (
 
 // ═══════════════════════════════════════════════════════════════
 describe("HarnessRegistry", () => {
-  it("should resolve the ReAct harness by the 'standard' id", () => {
-    const HarnessClass = HarnessRegistry.get("standard");
+  it("should resolve the ReAct harness by the HARNESS_IDS.STANDARD id", () => {
+    const HarnessClass = HarnessRegistry.get(HARNESS_IDS.STANDARD);
     expect(HarnessClass).toBeDefined();
-    expect(HarnessClass!.id).toBe("standard");
+    expect(HarnessClass!.id).toBe(HARNESS_IDS.STANDARD);
     expect(HarnessClass!.label).toBe("ReAct Loop");
   });
 
   it("should fall back to the ReAct harness for unknown ids", () => {
     const HarnessClass = HarnessRegistry.get("nonexistent-harness-id");
     expect(HarnessClass).toBeDefined();
-    expect(HarnessClass!.id).toBe("standard");
+    expect(HarnessClass!.id).toBe(HARNESS_IDS.STANDARD);
   });
 
   it("should list all registered harnesses", () => {
@@ -102,30 +105,30 @@ describe("HarnessRegistry", () => {
     expect(harnessList.length).toBeGreaterThanOrEqual(1);
 
     const reactHarnessEntry = harnessList.find(
-      (entry: any) => entry.id === "standard",
+      (entry: any) => entry.id === HARNESS_IDS.STANDARD,
     );
     expect(reactHarnessEntry).toBeDefined();
     expect(reactHarnessEntry!.label).toBe("ReAct Loop");
     expect(reactHarnessEntry!.description).toContain("Reason→Act→Observe");
   });
 
-  it("should report 'standard' as a registered harness id", () => {
-    expect(HarnessRegistry.has("standard")).toBe(true);
+  it("should report HARNESS_IDS.STANDARD as a registered harness id", () => {
+    expect(HarnessRegistry.has(HARNESS_IDS.STANDARD)).toBe(true);
   });
 
   it("should report unknown ids as not registered", () => {
     expect(HarnessRegistry.has("nonexistent")).toBe(false);
   });
 
-  it("should fall back to 'standard' when requesting the legacy 'tree_of_thought' harness id", () => {
-    const harnessClass = HarnessRegistry.get("tree_of_thought");
+  it("should fall back to HARNESS_IDS.STANDARD when requesting the legacy HARNESS_IDS.TREE_OF_THOUGHT harness id", () => {
+    const harnessClass = HarnessRegistry.get(HARNESS_IDS.TREE_OF_THOUGHT);
     expect(harnessClass).toBeDefined();
-    expect(harnessClass!.id).toBe("standard");
+    expect(harnessClass!.id).toBe(HARNESS_IDS.STANDARD);
   });
 
   it("should not include tree_of_thought inside the list of available harnesses", () => {
     const harnessList = HarnessRegistry.list();
-    const treeOfThoughtHarnessEntry = harnessList.find((entry) => entry.id === "tree_of_thought");
+    const treeOfThoughtHarnessEntry = harnessList.find((entry) => entry.id === HARNESS_IDS.TREE_OF_THOUGHT);
     expect(treeOfThoughtHarnessEntry).toBeUndefined();
   });
 });
@@ -133,14 +136,14 @@ describe("HarnessRegistry", () => {
 // ═══════════════════════════════════════════════════════════════
 describe("ReActHarness — static metadata", () => {
   it("should have the correct static id for backward compatibility", () => {
-    const HarnessClass = HarnessRegistry.get("standard");
-    // The static id MUST remain 'standard' for backward compatibility
+    const HarnessClass = HarnessRegistry.get(HARNESS_IDS.STANDARD);
+    // The static id MUST remain HARNESS_IDS.STANDARD for backward compatibility
     // with existing agent sessions in MongoDB
-    expect(HarnessClass!.id).toBe("standard");
+    expect(HarnessClass!.id).toBe(HARNESS_IDS.STANDARD);
   });
 
   it("should extend BaseAgenticHarness", () => {
-    const HarnessClass = HarnessRegistry.get("standard");
+    const HarnessClass = HarnessRegistry.get(HARNESS_IDS.STANDARD);
     // Verify it's a class (constructor function)
     expect(typeof HarnessClass).toBe("function");
     expect(HarnessClass!.prototype).toBeDefined();
@@ -148,7 +151,7 @@ describe("ReActHarness — static metadata", () => {
   });
 
   it("should have a descriptive label and description", () => {
-    const HarnessClass = HarnessRegistry.get("standard");
+    const HarnessClass = HarnessRegistry.get(HARNESS_IDS.STANDARD);
     expect(HarnessClass!.label).not.toBe("Standard");
     expect(HarnessClass!.label).toBe("ReAct Loop");
     expect(HarnessClass!.description).toContain("approval gating");

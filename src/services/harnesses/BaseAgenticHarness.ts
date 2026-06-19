@@ -865,9 +865,9 @@ export default class BaseAgenticHarness {
       toolCalls: pass.pendingToolCalls as ToolCallPayload[],
       outputCharacters: pass.outputCharacters,
       agenticIteration: state.iterations,
-    }).catch((error: Error) =>
+    }).catch((error: unknown) =>
       logger.error(
-        `[AgenticLoopService] Failed to log intermediate request: ${error.message}`,
+        `[AgenticLoopService] Failed to log intermediate request: ${errorMessage(error)}`,
       ),
     );
   }
@@ -1027,9 +1027,9 @@ export default class BaseAgenticHarness {
         messages: currentMessages,
         sessionOutcome: state.sessionOutcome,
       })
-      .catch((error: Error) =>
+      .catch((error: unknown) =>
         logger.error(
-          `[AgenticLoopService] afterResponse hooks failed: ${error.message}`,
+          `[AgenticLoopService] afterResponse hooks failed: ${errorMessage(error)}`,
         ),
       );
 

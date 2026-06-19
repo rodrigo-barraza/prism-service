@@ -5,6 +5,7 @@ import {
 
 const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import express, { Request, Response } from "express";
 import {
   PROVIDERS,
@@ -548,9 +549,7 @@ router.post(
       const count = await ToolOrchestratorService.refreshSchemas();
       res.json({ ok: true, count });
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: errorMessage(error) });
     }
   }),
 );

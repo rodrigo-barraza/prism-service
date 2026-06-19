@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { PROVIDERS } from "../src/constants.ts";
 import supertest from 'supertest';
 import { app } from './setup.ts';
 
@@ -48,7 +49,7 @@ describe('Chat Route adversarial — HTTP trust boundary', () => {
       .set('x-project', 'test')
       .set('x-username', 'adversarial')
       .send({
-        provider: 'openai',
+        provider: PROVIDERS.OPENAI,
         messages: 'not an array',
       });
     expect(response.status).toBe(200);
@@ -62,7 +63,7 @@ describe('Chat Route adversarial — HTTP trust boundary', () => {
       .set('x-project', 'test')
       .set('x-username', 'adversarial')
       .send({
-        provider: 'openai',
+        provider: PROVIDERS.OPENAI,
         messages: [],
       });
     expect(response.status).toBe(200);
@@ -76,7 +77,7 @@ describe('Chat Route adversarial — HTTP trust boundary', () => {
       .set('x-project', 'test')
       .set('x-username', 'adversarial')
       .send({
-        provider: 'openai',
+        provider: PROVIDERS.OPENAI,
         messages: [{ role: 'user', content: 'hello\0world\0' }],
       });
     expect(response.status).toBe(200);
@@ -115,7 +116,7 @@ describe('Chat Route adversarial — HTTP trust boundary', () => {
       .set('x-project', 'test')
       .set('x-username', 'adversarial')
       .send({
-        provider: 'openai',
+        provider: PROVIDERS.OPENAI,
         messages: [
           {
             role: 'user',
@@ -134,7 +135,7 @@ describe('Chat Route adversarial — HTTP trust boundary', () => {
       .set('x-project', 'test')
       .set('x-username', 'adversarial')
       .send({
-        provider: 'openai',
+        provider: PROVIDERS.OPENAI,
         messages: [{ role: 'user', content: 'test' }],
         maxTokens: -1,
         temperature: NaN,
@@ -149,7 +150,7 @@ describe('Chat Route adversarial — HTTP trust boundary', () => {
       .set('x-project', 'test')
       .set('x-username', 'adversarial')
       .send({
-        provider: 'openai',
+        provider: PROVIDERS.OPENAI,
         messages: [{ role: 'user', content: 'hi' }],
         maxTokens: Number.MAX_SAFE_INTEGER,
       });
@@ -174,7 +175,7 @@ describe('Chat Route adversarial — HTTP trust boundary', () => {
       .set('x-project', 'test')
       .set('x-username', 'adversarial')
       .send({
-        provider: 'openai',
+        provider: PROVIDERS.OPENAI,
         messages: [{ role: 'user', content: 'hi' }],
         unknownField: 'should be ignored',
         anotherCustomField: { nested: true },

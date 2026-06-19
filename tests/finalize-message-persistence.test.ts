@@ -12,13 +12,9 @@
 
 import { describe, it, expect } from "vitest";
 import { PROMPT_DELIMITERS } from "../src/constants.ts";
-import type { ChatMessage } from "../src/types/admin.ts";
+import type { ConversationMessage as TestMessage } from "../src/services/harnesses/types.ts";
 import { computeNewTurnMessages, sanitizeMessagesForPersistence } from "../src/services/harnesses/lifecycle/Finalizer.ts";
-
 import type { MessagePayload } from "../src/services/conversation/types.ts";
-
-// ── Types mirroring the harness ConversationMessage shape ────────
-type TestMessage = ChatMessage;
 
 /**
  * Delegates to the production newTurnMessages slice logic from

@@ -1,4 +1,5 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import express, { Request, Response, NextFunction } from "express";
 import { ObjectId } from "mongodb";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
@@ -251,13 +252,12 @@ router.post(
       });
     } catch (error: unknown) {
       const serverId = req.params.id as string;
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(`MCP connect failed for ${serverId}: ${errorMessage}`);
-      logger.error(`MCP connection failed: ${errorMessage}`);
+      const errorText = errorMessage(error);
+      logger.error(`MCP connect failed for ${serverId}: ${errorText}`);
+      logger.error(`MCP connection failed: ${errorText}`);
       res
         .status(502)
-        .json({ error: `MCP server connection failed: ${errorMessage}` });
+        .json({ error: `MCP server connection failed: ${errorText}` });
     }
   }),
 );

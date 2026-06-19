@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
+import { PROVIDERS } from "../src/constants.ts";
 import request from 'supertest';
 import { app } from './setup.ts';
 import ToolOrchestratorService from '../src/services/ToolOrchestratorService.ts';
@@ -95,10 +96,10 @@ describe('GET /config', () => {
       .expect(200);
 
     const list = res.body.providerList;
-    expect(list).toContain('openai');
-    expect(list).toContain('anthropic');
-    expect(list).toContain('google');
-    expect(list).toContain('elevenlabs');
+    expect(list).toContain(PROVIDERS.OPENAI);
+    expect(list).toContain(PROVIDERS.ANTHROPIC);
+    expect(list).toContain(PROVIDERS.GOOGLE);
+    expect(list).toContain(PROVIDERS.ELEVENLABS);
     expect(list).toContain('inworld');
   });
 });
