@@ -70,6 +70,15 @@ const { buildJsonResponseFromEvents } = await import(
 );
 
 import type { SseEvent } from "../src/types/SseTypes.ts";
+import type { ChatRequest } from "../src/types/schemas.ts";
+
+function callBuildJsonResponse(events: SseEvent[], requestBody: Partial<ChatRequest>) {
+  return buildJsonResponseFromEvents(events, {
+    provider: PROVIDERS.OPENAI,
+    messages: [],
+    ...requestBody,
+  } as ChatRequest);
+}
 
 // ── Types ──────────────────────────────────────────────────────
 type TestEvent = SseEvent;
@@ -89,10 +98,10 @@ describe("buildJsonResponseFromEvents", () => {
       },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.OPENAI,
       model: "gpt-5.5",
-    } as any);
+    });
 
     expect(result.error).toBeUndefined();
     expect(result.response!.text).toBe("Hello world!");
@@ -107,9 +116,9 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "done", provider: PROVIDERS.GOOGLE, model: "gemini-3.5-flash" },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.GOOGLE,
-    } as any);
+    });
 
     expect(result.response!.text).toBeNull();
   });
@@ -122,9 +131,9 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "done", provider: PROVIDERS.ANTHROPIC, model: "claude-opus-4" },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.ANTHROPIC,
-    } as any);
+    });
 
     expect(result.response!.thinking).toBe("Let me reason...");
     expect(result.response!.text).toBe("Answer here");
@@ -136,9 +145,9 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "done", provider: PROVIDERS.GOOGLE },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.GOOGLE,
-    } as any);
+    });
 
     expect(result.response!.thinking).toBeNull();
   });
@@ -154,9 +163,9 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "done", provider: PROVIDERS.OPENAI },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.OPENAI,
-    } as any);
+    });
 
     expect(result.response!.images).toHaveLength(1);
     expect(result.response!.images![0]).toEqual({
@@ -172,9 +181,9 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "done", provider: PROVIDERS.GOOGLE },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.GOOGLE,
-    } as any);
+    });
 
     expect(result.response!.images).toBeUndefined();
   });
@@ -194,9 +203,9 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "done", provider: PROVIDERS.GOOGLE },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.GOOGLE,
-    } as any);
+    });
 
     // Only "calling" status should be included
     expect(result.response!.toolCalls).toHaveLength(1);
@@ -209,9 +218,9 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "error", message: "Rate limit exceeded" },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.OPENAI,
-    } as any);
+    });
 
     expect(result.error).toBeDefined();
     expect(result.error!.message).toBe("Rate limit exceeded");
@@ -220,9 +229,9 @@ describe("buildJsonResponseFromEvents", () => {
   it("should use 'Unknown error' when error event has no message", () => {
     const events: TestEvent[] = [{ type: "error" }];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.OPENAI,
-    } as any);
+    });
 
     expect(result.error).toBeDefined();
     expect(result.error!.message).toBe("Unknown error");
@@ -234,10 +243,10 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "done" },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.ANTHROPIC,
       model: "claude-4-sonnet",
-    } as any);
+    });
 
     expect(result.response!.provider).toBe(PROVIDERS.ANTHROPIC);
     expect(result.response!.model).toBe("claude-4-sonnet");
@@ -248,9 +257,9 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "done", provider: PROVIDERS.GOOGLE, traceId: "trace-abc-123" },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.GOOGLE,
-    } as any);
+    });
 
     expect(result.response!.traceId).toBe("trace-abc-123");
   });
@@ -260,9 +269,9 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "done", provider: PROVIDERS.GOOGLE },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.GOOGLE,
-    } as any);
+    });
 
     expect(result.response).not.toHaveProperty("traceId");
   });
@@ -276,9 +285,9 @@ describe("buildJsonResponseFromEvents", () => {
       },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.GOOGLE,
-    } as any);
+    });
 
     expect(result.response!.conversationId).toBe("conv-xyz");
   });
@@ -288,9 +297,9 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "done", provider: "local", estimatedCost: 0 },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: "local",
-    } as any);
+    });
 
     expect(result.response!.estimatedCost).toBe(0);
   });
@@ -300,9 +309,9 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "done", provider: "local" },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: "local",
-    } as any);
+    });
 
     expect(result.response!.estimatedCost).toBeNull();
   });
@@ -335,9 +344,9 @@ describe("buildJsonResponseFromEvents", () => {
       { type: "done", provider: PROVIDERS.GOOGLE },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.GOOGLE,
-    } as any);
+    });
 
     expect(result.response!.toolResults).toHaveLength(2);
     expect(result.response!.toolResults![0]).toEqual({
@@ -369,9 +378,9 @@ describe("buildJsonResponseFromEvents", () => {
       },
     ];
 
-    const result = buildJsonResponseFromEvents(events as any, {
+    const result = callBuildJsonResponse(events, {
       provider: PROVIDERS.GOOGLE,
-    } as any);
+    });
 
     expect(result.response!.audio).toHaveLength(1);
     expect(result.response!.audio![0]).toEqual({

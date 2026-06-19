@@ -73,11 +73,15 @@ async function getSubAgentFallback(): Promise<{
   model: string;
 } | null> {
   try {
-    const agents = await SettingsService.getSection("agents");
-    if (agents?.subAgentProvider && agents?.subAgentModel) {
+    const agentSettings = await SettingsService.getSection("agents");
+    if (
+      agentSettings &&
+      typeof agentSettings.subAgentProvider === "string" &&
+      typeof agentSettings.subAgentModel === "string"
+    ) {
       return {
-        provider: agents.subAgentProvider as string,
-        model: agents.subAgentModel as string,
+        provider: agentSettings.subAgentProvider,
+        model: agentSettings.subAgentModel,
       };
     }
     return null;
@@ -110,15 +114,15 @@ registerCleanup(async () => {
 
   // Clean up worktrees in parallel
   const cleanups = running
-    .filter((item) => item.isolated && item.worktreePath)
-    .map((item) =>
-      GitWorktreeHelper.removeWorktree(item.repositoryPath, item.worktreePath!)
+    .filter((subAgent) => subAgent.isolated && subAgent.worktreePath)
+    .map((subAgent) =>
+      GitWorktreeHelper.removeWorktree(subAgent.repositoryPath, subAgent.worktreePath!)
         .then(() => {
-          item.worktreePath = null;
+          subAgent.worktreePath = null;
         })
         .catch((error: unknown) =>
           logger.warn(
-            `[Orchestrator] Shutdown worktree cleanup failed for ${item.agentId}: ${getErrorMessage(error)}`,
+            `[Orchestrator] Shutdown worktree cleanup failed for ${subAgent.agentId}: ${getErrorMessage(error)}`,
           ),
         ),
     );
@@ -210,36 +214,36 @@ export default class OrchestratorService {
     const isLocal = localModelQueue.isLocal(providerName);
     let subAgentModel =
       assignedModel || (isLocal ? resolvedModel : model || resolvedModel);
-    const preAssigned = !!assignedProvider;
+    const isPreAssigned = !!assignedProvider;
 
-    if (preAssigned) {
+    if (isPreAssigned) {
       logger.info(
         `[Orchestrator] spawnFromTool: pre-assigned to ${subAgentProvider} — model "${subAgentModel}" (skipping instance selection)`,
       );
     }
-    if (!preAssigned && localModelQueue.isLocal(providerName)) {
+    if (!isPreAssigned && localModelQueue.isLocal(providerName)) {
       const providerType = getInstanceType(providerName) || providerName;
-      let siblings = getInstancesByType(providerType);
+      let siblingInstances = getInstancesByType(providerType);
 
       // ── Model availability filter ─────────────────────────────
       // Shared logic with /chat route: verify model availability per
       // instance with quant-level fallback for heterogeneous GPU setups.
       let instanceModelOverrides = new Map();
 
-      if (siblings.length > 1) {
+      if (siblingInstances.length > 1) {
         const { usable, modelOverrides } = await resolveModelForInstances(
           subAgentModel,
-          siblings,
+          siblingInstances,
         );
         instanceModelOverrides = modelOverrides;
 
         if (usable.length > 0) {
-          siblings = usable;
+          siblingInstances = usable;
         } else {
           logger.warn(
             `[Orchestrator] Model "${subAgentModel}" not available on any ${getInstanceType(providerName) || providerName} instance`,
           );
-          siblings = [];
+          siblingInstances = [];
         }
       }
 
@@ -251,19 +255,19 @@ export default class OrchestratorService {
       //
       // instanceReservations prevents race conditions when multiple team_create
       // calls fire concurrently — the counter is incremented synchronously.
-      const assigned = InstanceLoadBalancer.selectAndReserveInstance(
-        siblings,
+      const assignedInstance = InstanceLoadBalancer.selectAndReserveInstance(
+        siblingInstances,
         providerName,
         instanceModelOverrides,
         subAgentModel,
         activeSubAgents,
       );
 
-      if (assigned) {
-        subAgentProvider = assigned.provider;
-        subAgentModel = assigned.model;
+      if (assignedInstance) {
+        subAgentProvider = assignedInstance.provider;
+        subAgentModel = assignedInstance.model;
         logger.info(
-          `[Orchestrator] Assigned sub-agent to ${assigned.provider} (${assigned.slotsAvailable} slots free, ${siblings.length} instance${siblings.length > 1 ? "s" : ""} pooled) — model "${assigned.model}"`,
+          `[Orchestrator] Assigned sub-agent to ${assignedInstance.provider} (${assignedInstance.slotsAvailable} slots free, ${siblingInstances.length} instance${siblingInstances.length > 1 ? "s" : ""} pooled) — model "${assignedInstance.model}"`,
         );
       } else {
         // Resolve the user-configured (or hardcoded) sub-agent fallback
@@ -383,13 +387,13 @@ export default class OrchestratorService {
     // Mark the parent session as having sub-agents (persistent flag for the UI)
     if (parentAgentSessionId) {
       try {
-        const { MONGO_DB_NAME: dbName } = await import("../../config.ts");
+        const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
         const { COLLECTIONS: collectionNames } =
           await import("../constants.ts");
         const MongoWrapper = (await import("../wrappers/MongoWrapper.ts"))
           .default;
         const parentCollection = MongoWrapper.getCollection(
-          dbName,
+          databaseName,
           collectionNames.AGENT_CONVERSATIONS,
         );
 
@@ -719,7 +723,7 @@ export default class OrchestratorService {
   }
 
   static async createTeam(
-    args: { name: string; members: TeamMember[]; topology?: string },
+    teamCreationArguments: { name: string; members: TeamMember[]; topology?: string },
     orchestratorContext: OrchestratorContext,
   ): Promise<(SubAgentResult | { error: string })[]> {
     // Warm up/preload AgenticLoopService to avoid ESM concurrent dynamic import race conditions in Vitest
@@ -727,7 +731,7 @@ export default class OrchestratorService {
 
     const settings = await SettingsService.getSection("agents");
     const topology =
-      args.topology ||
+      teamCreationArguments.topology ||
       orchestratorContext.topology ||
       settings?.topology ||
       DEFAULT_TOPOLOGY;
@@ -745,7 +749,7 @@ export default class OrchestratorService {
       return [{ error: errorMessage }];
     }
 
-    if (!args || !args.members || !Array.isArray(args.members)) {
+    if (!teamCreationArguments || !teamCreationArguments.members || !Array.isArray(teamCreationArguments.members)) {
       const errorMessage =
         "Invalid or missing 'members' array in createTeam arguments.";
       logger.error(`[Orchestrator] createTeam: ${errorMessage}`);
@@ -753,13 +757,13 @@ export default class OrchestratorService {
     }
 
     logger.info(
-      `[Orchestrator] createTeam: routing via active topology "${topology}" for ${args.members.length} member(s)...`,
+      `[Orchestrator] createTeam: routing via active topology "${topology}" for ${teamCreationArguments.members.length} member(s)...`,
     );
 
     // Validate member prompts before routing — undefined/empty prompts cause
     // runaway loops where sub-agents report "no task" without converging.
     // Return an actionable error so the orchestrator LLM can retry with proper prompts.
-    const membersWithMissingPrompts = args.members
+    const membersWithMissingPrompts = teamCreationArguments.members
       .map((member, memberIndex) => ({ member, memberIndex }))
       .filter(
         ({ member }) =>
@@ -781,18 +785,18 @@ export default class OrchestratorService {
     // Sync the active topology to the session settings in MongoDB so the UI badge and state match execution
     if (orchestratorContext.conversationId) {
       try {
-        const { MONGO_DB_NAME: dbName } = await import("../../config.ts");
+        const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
         const { COLLECTIONS: collectionNames } =
           await import("../constants.ts");
         const MongoWrapper = (await import("../wrappers/MongoWrapper.ts"))
           .default;
-        const dbCollection = MongoWrapper.getCollection(
-          dbName,
+        const databaseCollection = MongoWrapper.getCollection(
+          databaseName,
           collectionNames.AGENT_CONVERSATIONS,
         );
 
-        if (dbCollection) {
-          await dbCollection.updateOne(
+        if (databaseCollection) {
+          await databaseCollection.updateOne(
             { id: orchestratorContext.conversationId },
             {
               $set: {
@@ -832,19 +836,21 @@ export default class OrchestratorService {
     }
 
     const spawnResults = await router.execute(
-      args.name,
-      args.members,
+      teamCreationArguments.name,
+      teamCreationArguments.members,
       orchestratorContext,
       (assignment: OrchestratorSpawnParams) =>
         OrchestratorService.spawnFromTool(assignment),
     );
 
+    const agentIds = spawnResults
+      .map((result: SubAgentResult | { error: string }) =>
+        "agent_id" in result ? result.agent_id : undefined,
+      )
+      .filter((agentId): agentId is string => typeof agentId === "string");
+
     const teamEntry = {
-      agentIds: spawnResults
-        .map((result: SubAgentResult | { error: string }) =>
-          "agent_id" in result ? result.agent_id : undefined,
-        )
-        .filter(Boolean) as string[],
+      agentIds,
       createdAt: Date.now(),
     };
 
@@ -970,12 +976,12 @@ export default class OrchestratorService {
       });
     }
 
-    const showWorkspaceConstraint = hasWorkspaceSetup && isWorkspaceAvailable;
-    const workspaceConstraintInstruction = showWorkspaceConstraint
+    const shouldShowWorkspaceConstraint = hasWorkspaceSetup && isWorkspaceAvailable;
+    const workspaceConstraintInstruction = shouldShowWorkspaceConstraint
       ? `- Only modify files within your workspace\n`
       : "";
 
-    const workspaceIntroLine = showWorkspaceConstraint
+    const workspaceIntroLine = shouldShowWorkspaceConstraint
       ? `Your workspace is: ${subAgent.worktreePath}\n`
       : "";
 
@@ -1048,7 +1054,7 @@ export default class OrchestratorService {
       throw new Error(`Provider not found: ${subAgent.providerName}`);
     }
     const { getModelByName } = await import("../config.js");
-    const subAgentModelDef = getModelByName(subAgent.resolvedModel);
+    const subAgentModelDefinition = getModelByName(subAgent.resolvedModel);
 
     let loopResult: { messages?: ConversationMessage[] } | undefined;
     try {
@@ -1056,7 +1062,7 @@ export default class OrchestratorService {
         provider: subAgentProviderInstance as LLMProvider,
         providerName: subAgent.providerName,
         resolvedModel: subAgent.resolvedModel,
-        modelDefinition: subAgentModelDef,
+        modelDefinition: subAgentModelDefinition,
         messages: subAgentMessages,
         options: {
           autoApprove: true,
@@ -1132,7 +1138,22 @@ export default class OrchestratorService {
           subAgent.repositoryPath,
           subAgent.branchName,
         );
-        subAgent.diff = diffResult.error ? null : (diffResult as WorktreeDiff);
+        if (
+          !("error" in diffResult) &&
+          typeof diffResult.hasChanges === "boolean" &&
+          typeof diffResult.additions === "number" &&
+          typeof diffResult.deletions === "number" &&
+          Array.isArray(diffResult.files)
+        ) {
+          subAgent.diff = {
+            hasChanges: diffResult.hasChanges,
+            additions: diffResult.additions,
+            deletions: diffResult.deletions,
+            files: diffResult.files,
+          };
+        } else {
+          subAgent.diff = null;
+        }
       } else {
         subAgent.diff = null;
       }

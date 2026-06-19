@@ -17,9 +17,7 @@ import { PROMPT_DELIMITERS, PROVIDERS } from "../src/constants.ts";
 import type { MessagePayload, ToolCallPayload } from "../src/services/conversation/types.ts";
 import type { ConversationMessage as BaseConversationMessage } from "../src/services/harnesses/types.ts";
 
-type TestPayload = BaseConversationMessage & {
-  rawContent?: string;
-};
+type TestPayload = BaseConversationMessage & Pick<MessagePayload, "rawContent">;
 
 type FinalizerInput = Parameters<typeof assembleMessagesToAppendReal>[0];
 

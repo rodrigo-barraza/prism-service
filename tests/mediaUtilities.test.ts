@@ -57,6 +57,14 @@ describe('getDataUrlMimeType', () => {
   it('returns null for an empty string', () => {
     expect(getDataUrlMimeType('')).toBeNull();
   });
+
+  it('returns null for a data URL without base64 encoding marker', () => {
+    expect(getDataUrlMimeType('data:text/plain,hello%20world')).toBeNull();
+  });
+
+  it('returns null for data URLs with extra parameters between mime and base64 (regex limitation)', () => {
+    expect(getDataUrlMimeType('data:text/html;charset=utf-8;base64,PGh0bWw+')).toBeNull();
+  });
 });
 
 describe('getUrlType', () => {
@@ -127,5 +135,25 @@ describe('inferMimeFromUrl', () => {
 
   it('returns "any" for completely invalid URLs', () => {
     expect(inferMimeFromUrl('not-a-url')).toBe('any');
+  });
+
+  it('returns "any" for audio extensions (not handled by the source)', () => {
+    expect(inferMimeFromUrl('https://example.com/track.mp3')).toBe('any');
+    expect(inferMimeFromUrl('https://example.com/sound.wav')).toBe('any');
+    expect(inferMimeFromUrl('https://example.com/audio.ogg')).toBe('any');
+  });
+
+  it('returns "any" for video extensions (not handled by the source)', () => {
+    expect(inferMimeFromUrl('https://example.com/clip.mp4')).toBe('any');
+    expect(inferMimeFromUrl('https://example.com/video.webm')).toBe('any');
+  });
+
+  it('correctly identifies extensions on URLs with query strings', () => {
+    expect(inferMimeFromUrl('https://cdn.example.com/photo.png?v=2&token=abc')).toBe('image');
+    expect(inferMimeFromUrl('https://cdn.example.com/doc.pdf?download=true')).toBe('pdf');
+  });
+
+  it('correctly identifies extensions on URLs with hash fragments', () => {
+    expect(inferMimeFromUrl('https://example.com/readme.md#section-1')).toBe('text');
   });
 });

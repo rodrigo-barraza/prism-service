@@ -40,6 +40,14 @@ describe('nameParsers', () => {
       expect(formatParams(123456)).toBe('123456');
     });
 
+    it('rounds fractional millions to nearest integer via toFixed(0)', () => {
+      expect(formatParams(1_500_000)).toBe('2M');
+    });
+
+    it('formats negative values as raw numbers (no special handling)', () => {
+      expect(formatParams(-500)).toBe('-500');
+    });
+
     it('handles exact 1B boundary', () => {
       expect(formatParams(1_000_000_000)).toBe('1B');
     });
@@ -89,6 +97,18 @@ describe('nameParsers', () => {
     it('parses 0.5b correctly', () => {
       expect(parseParamsFromName('phi-0.5b')).toBe('0.5B');
     });
+
+    it('returns null when param count is at the start of the string (no separator prefix)', () => {
+      expect(parseParamsFromName('8b-model')).toBeNull();
+    });
+
+    it('returns the first match when multiple param patterns exist', () => {
+      expect(parseParamsFromName('model-8b-4b')).toBe('8B');
+    });
+
+    it('returns null for param-like strings missing the B suffix', () => {
+      expect(parseParamsFromName('model-8m-large')).toBeNull();
+    });
   });
 
   describe('parseQuantFromName', () => {
@@ -132,7 +152,7 @@ describe('nameParsers', () => {
       expect(parseQuantFromName('model@q4_k_s')).toBe('Q4_K_S');
     });
 
-    it('parses q8_0 quantization (no k suffix)', () => {
+    it('does not parse q8_0 because regex requires the _k segment', () => {
       expect(parseQuantFromName('model@q8_0')).toBeNull();
     });
 
@@ -173,6 +193,10 @@ describe('nameParsers', () => {
 
     it('returns empty string for leading slash', () => {
       expect(parsePublisherFromName('/model-name')).toBe('');
+    });
+
+    it('returns only the first segment for deeply nested paths', () => {
+      expect(parsePublisherFromName('org/sub-org/model-name')).toBe('org');
     });
   });
 });

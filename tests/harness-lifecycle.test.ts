@@ -43,6 +43,8 @@ vi.mock("../src/services/SessionGenerationTracker.ts", () => ({
   default: {
     complete: vi.fn(),
     register: vi.fn(),
+    update: vi.fn(),
+    recordChunkTiming: vi.fn(),
   },
 }));
 
@@ -627,6 +629,27 @@ import type {
 } from "../src/services/harnesses/types.ts";
 
 import { validateAfterToolExecution } from "../src/services/harnesses/lifecycle/ValidationInterceptor.ts";
+
+function createMockAgenticContext(overrides?: Partial<AgenticContext>): AgenticContext {
+  return {
+    project: "test-project",
+    username: "test-user",
+    agentSessionId: "session-123",
+    conversationId: "conv-123",
+    traceId: "trace-123",
+    providerName: "test-provider",
+    resolvedModel: "test-model",
+    workspaceRoot: "/home/rodrigo/development",
+    emit: vi.fn(),
+    requestId: "req-123",
+    options: {},
+    messages: [],
+    provider: {
+      generateTextStream: vi.fn(),
+    },
+    ...overrides,
+  } as AgenticContext;
+}
 import CriticGate from "../src/services/harnesses/lifecycle/CriticGate.ts";
 
 import AgenticLoopState from "../src/services/AgenticLoopState.ts";
@@ -639,18 +662,7 @@ describe("ToolExecutor", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockContext = {
-      project: "test-project",
-      username: "test-user",
-      agentSessionId: "session-123",
-      conversationId: "conv-123",
-      traceId: "trace-123",
-      providerName: "test-provider",
-      resolvedModel: "test-model",
-      workspaceRoot: "/home/rodrigo/development",
-      emit: vi.fn(),
-      requestId: "req-123",
-    } as unknown as AgenticContext;
+    mockContext = createMockAgenticContext();
     mockTools = {
       customToolMap: new Map(),
       finalTools: [{ name: "read_file" } as ToolSchema],
@@ -757,18 +769,7 @@ describe("ValidationInterceptor", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockContext = {
-      project: "test-project",
-      username: "test-user",
-      agentSessionId: "session-123",
-      workspaceRoot: "/home/rodrigo/development",
-      provider: {} as any,
-      providerName: "test-provider",
-      resolvedModel: "test-model",
-      messages: [],
-      emit: vi.fn(),
-      options: {},
-    } as unknown as AgenticContext;
+    mockContext = createMockAgenticContext({ provider: {} as any });
     mockState = {} as any;
   });
 
@@ -895,18 +896,7 @@ describe("CriticGate", () => {
     mockProvider = {
       generateTextStream: vi.fn(),
     };
-    mockContext = {
-      project: "test-project",
-      username: "test-user",
-      agentSessionId: "session-123",
-      workspaceRoot: "/home/rodrigo/development",
-      provider: mockProvider,
-      providerName: "test-provider",
-      resolvedModel: "test-model",
-      messages: [],
-      emit: vi.fn(),
-      options: {},
-    } as unknown as AgenticContext;
+    mockContext = createMockAgenticContext({ provider: mockProvider });
   });
 
   it("should auto-approve any tool calls that are not in the DANGER tier and fallback to context.resolvedModel if criticModel is unconfigured", async () => {

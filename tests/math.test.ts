@@ -78,7 +78,7 @@ describe('math', () => {
       expect(result).toBe(50.0);
     });
 
-    it('uses sec normally when it is exactly 0.001', () => {
+    it('returns null when sec is exactly 0.001 because computed rate exceeds MAX cap', () => {
       const result = calculateTokensPerSec(100, 0.001);
       expect(result).toBeNull();
     });
@@ -101,6 +101,28 @@ describe('math', () => {
         providerReported: 42.789,
       });
       expect(result).toBe(42.8);
+    });
+
+    it('returns null for negative sec (falls through to fallback, which is also missing)', () => {
+      expect(calculateTokensPerSec(100, -5)).toBeNull();
+    });
+
+    it('uses fallbackSec when sec is negative', () => {
+      const result = calculateTokensPerSec(100, -5, { fallbackSec: 2 });
+      expect(result).toBe(50.0);
+    });
+
+    it('returns null for NaN tokens', () => {
+      expect(calculateTokensPerSec(NaN, 5)).toBeNull();
+    });
+
+    it('returns null for NaN sec with no fallback', () => {
+      expect(calculateTokensPerSec(100, NaN)).toBeNull();
+    });
+
+    it('uses fallbackSec when sec is NaN', () => {
+      const result = calculateTokensPerSec(100, NaN, { fallbackSec: 4 });
+      expect(result).toBe(25.0);
     });
   });
 });

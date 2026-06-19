@@ -132,11 +132,31 @@ const MOCK_CLIENT_SCHEMAS = [
 ];
 
 const MOCK_ORCHESTRATOR_SCHEMAS = [
-  { name: "create_team", description: "Spawn sub-agents", parameters: { type: "object", properties: {} } },
-  { name: "send_message", description: "Send message to worker", parameters: { type: "object", properties: {} } },
-  { name: "stop_agent", description: "Stop a sub-agent", parameters: { type: "object", properties: {} } },
-  { name: "get_task_output", description: "Read output from worker", parameters: { type: "object", properties: {} } },
-  { name: "delete_team", description: "Delete a team", parameters: { type: "object", properties: {} } },
+  {
+    name: "create_team",
+    description: "Spawn one or more sub-agents, each in an isolated git worktree. Sub-agents inherit the currently enabled tools and can dynamically enable more via enable_tools. Returns results from all members when execution completes.",
+    parameters: { type: "object", properties: {} }
+  },
+  {
+    name: "send_message",
+    description: "Send a follow-up message to a running or completed sub-agent. Use to continue work, provide corrections, or give new instructions.",
+    parameters: { type: "object", properties: {} }
+  },
+  {
+    name: "stop_agent",
+    description: "Stop a running sub-agent. The sub-agent's worktree is cleaned up.",
+    parameters: { type: "object", properties: {} }
+  },
+  {
+    name: "get_task_output",
+    description: "Read the output from a previously spawned sub-agent by its agent ID. Use this to check on a sub-agent's result after it has completed, or to read partial output from a still-running sub-agent. Returns the sub-agent's final text, tool usage stats, diff summary, and status.",
+    parameters: { type: "object", properties: {} }
+  },
+  {
+    name: "delete_team",
+    description: "Stop and remove all sub-agents in a named team. Cleans up worktrees for all members.",
+    parameters: { type: "object", properties: {} }
+  },
 ];
 
 const MOCK_MCP_SCHEMAS = [

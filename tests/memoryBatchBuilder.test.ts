@@ -60,14 +60,21 @@ describe('BatchBuilder', () => {
       expect(batches[0].stale).toHaveLength(0);
     });
 
-    it('splits clusters across batches when exceeding BATCH_MAX_CLUSTERS', () => {
+    it('splits 7 clusters into exactly 2 batches (5 + 2) respecting BATCH_MAX_CLUSTERS', () => {
       const clusters = Array.from({ length: 7 }, (_, index) => [
         createMemory(`cluster${index}-a`),
         createMemory(`cluster${index}-b`),
       ]);
       const batches = buildBatches(clusters, []);
-      expect(batches.length).toBeGreaterThanOrEqual(2);
-      expect(batches[0].clusters.length).toBeLessThanOrEqual(BATCH_MAX_CLUSTERS);
+      expect(batches).toHaveLength(2);
+      expect(batches[0].clusters).toHaveLength(BATCH_MAX_CLUSTERS);
+      expect(batches[1].clusters).toHaveLength(2);
+
+      const totalClusters = batches.reduce(
+        (sum, batch) => sum + batch.clusters.length,
+        0,
+      );
+      expect(totalClusters).toBe(7);
     });
 
     it('attaches stale memories to cluster batches', () => {
@@ -100,18 +107,24 @@ describe('BatchBuilder', () => {
       expect(batches[0].stale).toHaveLength(1);
     });
 
-    it('handles large number of stale memories split into batches', () => {
+    it('splits 25 stale memories into exactly 3 batches (10 + 10 + 5) respecting BATCH_MAX_STALE', () => {
       const staleMemories = Array.from({ length: 25 }, (_, index) =>
         createMemory(`stale-${index}`),
       );
       const batches = buildBatches([], staleMemories);
-      expect(batches.length).toBeGreaterThanOrEqual(2);
-      for (const batch of batches) {
-        expect(batch.stale.length).toBeLessThanOrEqual(BATCH_MAX_STALE);
-      }
+      expect(batches).toHaveLength(3);
+      expect(batches[0].stale).toHaveLength(BATCH_MAX_STALE);
+      expect(batches[1].stale).toHaveLength(BATCH_MAX_STALE);
+      expect(batches[2].stale).toHaveLength(5);
+
+      const totalStale = batches.reduce(
+        (sum, batch) => sum + batch.stale.length,
+        0,
+      );
+      expect(totalStale).toBe(25);
     });
 
-    it('respects token budget overflow by creating new batches', () => {
+    it('isolates a token-budget-exceeding cluster into its own batch', () => {
       const longContent = 'x'.repeat(50000);
       const clusters = [
         [
@@ -121,12 +134,76 @@ describe('BatchBuilder', () => {
         [createMemory('small-1'), createMemory('small-2')],
       ];
       const batches = buildBatches(clusters, []);
-      expect(batches.length).toBeGreaterThanOrEqual(1);
+      expect(batches).toHaveLength(2);
+      expect(batches[0].clusters).toHaveLength(1);
+      expect(batches[1].clusters).toHaveLength(1);
+
       const totalClusters = batches.reduce(
         (sum, batch) => sum + batch.clusters.length,
         0,
       );
       expect(totalClusters).toBe(2);
+    });
+
+    it('places a single oversized cluster alone in its first batch (bypasses budget guard)', () => {
+      const hugeContent = 'y'.repeat(100000);
+      const clusters = [
+        [createMemory('huge-1', { content: hugeContent })],
+      ];
+      const batches = buildBatches(clusters, []);
+      expect(batches).toHaveLength(1);
+      expect(batches[0].clusters).toHaveLength(1);
+    });
+
+    it('overflows stale memories into separate batches when clusters consume the token budget', () => {
+      const mediumContent = 'z'.repeat(40000);
+      const clusters = [
+        [createMemory('big-cluster', { content: mediumContent })],
+      ];
+      const staleMemories = Array.from({ length: 5 }, (_, index) =>
+        createMemory(`stale-${index}`),
+      );
+      const batches = buildBatches(clusters, staleMemories);
+
+      const totalClusters = batches.reduce(
+        (sum, batch) => sum + batch.clusters.length,
+        0,
+      );
+      const totalStale = batches.reduce(
+        (sum, batch) => sum + batch.stale.length,
+        0,
+      );
+      expect(totalClusters).toBe(1);
+      expect(totalStale).toBe(5);
+    });
+
+    it('returns empty array when both inputs are empty arrays (not just falsy)', () => {
+      const batches = buildBatches([], []);
+      expect(batches).toStrictEqual([]);
+      expect(Array.isArray(batches)).toBe(true);
+    });
+
+    it('preserves all memories across batches without loss or duplication', () => {
+      const clusters = Array.from({ length: 12 }, (_, index) => [
+        createMemory(`cluster-${index}-only`),
+      ]);
+      const staleMemories = Array.from({ length: 15 }, (_, index) =>
+        createMemory(`stale-${index}`),
+      );
+
+      const batches = buildBatches(clusters, staleMemories);
+
+      const allClusterMemoryIds = batches.flatMap((batch) =>
+        batch.clusters.flatMap((cluster) => cluster.map((memory) => memory.id)),
+      );
+      const allStaleMemoryIds = batches.flatMap((batch) =>
+        batch.stale.map((memory) => memory.id),
+      );
+
+      expect(new Set(allClusterMemoryIds).size).toBe(12);
+      expect(new Set(allStaleMemoryIds).size).toBe(15);
+      expect(allClusterMemoryIds).toHaveLength(12);
+      expect(allStaleMemoryIds).toHaveLength(15);
     });
   });
 });

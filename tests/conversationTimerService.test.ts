@@ -96,7 +96,6 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
         insertOne: vi.fn().mockResolvedValue({ insertedId: "test" }),
       }),
     }),
-    getCollection: vi.fn(),
   },
 }));
 

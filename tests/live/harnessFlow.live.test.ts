@@ -21,6 +21,7 @@
  * ════════════════════════════════════════════════════════════════
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { REASONING_STRATEGIES } from "../../src/constants.ts";
 import {
   discoverProviders,
   agentStream,
@@ -1875,7 +1876,7 @@ describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
           maxTokens: 200,
           autoApprove: true,
           harness: "standard",
-          reasoningStrategy: "chain_of_thought",
+          reasoningStrategy: REASONING_STRATEGIES.CHAIN_OF_THOUGHT,
         },
         { timeoutMs: getTimeout(target) },
       );
@@ -1903,7 +1904,7 @@ describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
           autoApprove: true,
           maxIterations: 3,
           harness: "standard",
-          reasoningStrategy: "tree_of_thoughts",
+          reasoningStrategy: REASONING_STRATEGIES.TREE_OF_THOUGHTS,
           branchCount: 2,
         },
         { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
@@ -1953,7 +1954,7 @@ describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
           autoApprove: true,
           maxIterations: 10,
           harness: "standard",
-          reasoningStrategy: "chain_of_thought",
+          reasoningStrategy: REASONING_STRATEGIES.CHAIN_OF_THOUGHT,
           topology: "sequential",
         },
         { timeoutMs: getMultiAgentTimeout(target) },
@@ -1997,7 +1998,7 @@ describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
           autoApprove: true,
           maxIterations: 10,
           harness: "standard",
-          reasoningStrategy: "tree_of_thoughts",
+          reasoningStrategy: REASONING_STRATEGIES.TREE_OF_THOUGHTS,
           topology: "sequential",
           branchCount: 2,
         },
@@ -2037,7 +2038,7 @@ describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
           autoApprove: true,
           maxIterations: 3,
           harness: "standard",
-          reasoningStrategy: "graph_of_thoughts",
+          reasoningStrategy: REASONING_STRATEGIES.GRAPH_OF_THOUGHTS,
           branchCount: 2,
         },
         { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
@@ -2242,7 +2243,7 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
           autoApprove: true,
           maxIterations: 3,
           harness: "standard",
-          reasoningStrategy: "graph_of_thoughts",
+          reasoningStrategy: REASONING_STRATEGIES.GRAPH_OF_THOUGHTS,
           branchCount: 2,
         },
         { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
@@ -2302,7 +2303,7 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
           autoApprove: true,
           maxIterations: 3,
           harness: "standard",
-          reasoningStrategy: "graph_of_thoughts",
+          reasoningStrategy: REASONING_STRATEGIES.GRAPH_OF_THOUGHTS,
           branchCount: 3,
         },
         { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
@@ -2349,7 +2350,7 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
           autoApprove: true,
           maxIterations: 2,
           harness: "standard",
-          reasoningStrategy: "graph_of_thoughts",
+          reasoningStrategy: REASONING_STRATEGIES.GRAPH_OF_THOUGHTS,
           branchCount: 1,
         },
         { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
@@ -2392,7 +2393,7 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
           autoApprove: true,
           maxIterations: 2,
           harness: "standard",
-          reasoningStrategy: "graph_of_thoughts",
+          reasoningStrategy: REASONING_STRATEGIES.GRAPH_OF_THOUGHTS,
           branchCount: 2,
         },
         { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
@@ -2438,7 +2439,7 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
         autoApprove: true,
         maxIterations: 2,
         harness: "standard",
-        reasoningStrategy: "tree_of_thoughts",
+        reasoningStrategy: REASONING_STRATEGIES.TREE_OF_THOUGHTS,
         branchCount: 2,
       },
       { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
@@ -2456,7 +2457,7 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
         autoApprove: true,
         maxIterations: 2,
         harness: "standard",
-        reasoningStrategy: "graph_of_thoughts",
+        reasoningStrategy: REASONING_STRATEGIES.GRAPH_OF_THOUGHTS,
         branchCount: 2,
       },
       { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
@@ -2534,19 +2535,19 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
 describe("Suite 18: Strategy × Topology Live Combination Matrix", () => {
   const STRATEGIES = [
     {
-      key: "chain_of_thought",
+      key: REASONING_STRATEGIES.CHAIN_OF_THOUGHT,
       label: "CoT",
       expectedBranching: false,
       expectedSynthesis: false,
     },
     {
-      key: "tree_of_thoughts",
+      key: REASONING_STRATEGIES.TREE_OF_THOUGHTS,
       label: "ToT",
       expectedBranching: true,
       expectedSynthesis: false,
     },
     {
-      key: "graph_of_thoughts",
+      key: REASONING_STRATEGIES.GRAPH_OF_THOUGHTS,
       label: "GoT",
       expectedBranching: true,
       expectedSynthesis: true,
@@ -2584,7 +2585,7 @@ describe("Suite 18: Strategy × Topology Live Combination Matrix", () => {
             `\n  🔗 Topology: ${topology.label} (${topology.key})`,
         );
 
-        const isMultiBranch = strategy.key !== "chain_of_thought";
+        const isMultiBranch = strategy.key !== REASONING_STRATEGIES.CHAIN_OF_THOUGHT;
         const prompt = isMultiBranch
           ? GRAPH_OF_THOUGHTS_SYNTHESIS_PROMPT
           : SIMPLE_ARITHMETIC;
@@ -2700,7 +2701,7 @@ describe("Suite 18: Strategy × Topology Live Combination Matrix", () => {
           autoApprove: true,
           maxIterations: 10,
           harness: "standard",
-          reasoningStrategy: "chain_of_thought",
+          reasoningStrategy: REASONING_STRATEGIES.CHAIN_OF_THOUGHT,
           topology,
         },
         { timeoutMs: getMultiAgentTimeout(target) },
@@ -2751,10 +2752,10 @@ describe("Suite 18: Strategy × Topology Live Combination Matrix", () => {
     const target = toolCallingTargets[0];
     console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
 
-    const strategyKeys = ["chain_of_thought", "tree_of_thoughts", "graph_of_thoughts"] as const;
+    const strategyKeys = [REASONING_STRATEGIES.CHAIN_OF_THOUGHT, REASONING_STRATEGIES.TREE_OF_THOUGHTS, REASONING_STRATEGIES.GRAPH_OF_THOUGHTS] as const;
 
     for (const strategyKey of strategyKeys) {
-      const isMultiBranch = strategyKey !== "chain_of_thought";
+      const isMultiBranch = strategyKey !== REASONING_STRATEGIES.CHAIN_OF_THOUGHT;
 
       const result = await agentStreamWithRetry(
         {
@@ -2837,7 +2838,7 @@ describe("Suite 19: Forced Subagent Topology Execution Matrix", () => {
           autoApprove: true,
           maxIterations: 10,
           harness: "standard",
-          reasoningStrategy: "chain_of_thought",
+          reasoningStrategy: REASONING_STRATEGIES.CHAIN_OF_THOUGHT,
           topology: topology.key,
         },
         { timeoutMs: getMultiAgentTimeout(target) },
@@ -2929,7 +2930,7 @@ describe("Suite 19: Forced Subagent Topology Execution Matrix", () => {
           autoApprove: true,
           maxIterations: 10,
           harness: "standard",
-          reasoningStrategy: "chain_of_thought",
+          reasoningStrategy: REASONING_STRATEGIES.CHAIN_OF_THOUGHT,
           topology: topologyKey,
         },
         { timeoutMs: getMultiAgentTimeout(target) },
@@ -3008,7 +3009,7 @@ describe("Suite 19: Forced Subagent Topology Execution Matrix", () => {
         autoApprove: true,
         maxIterations: 10,
         harness: "standard",
-        reasoningStrategy: "tree_of_thoughts",
+        reasoningStrategy: REASONING_STRATEGIES.TREE_OF_THOUGHTS,
         topology: "hierarchical",
         branchCount: 2,
       },
@@ -3056,7 +3057,7 @@ describe("Suite 19: Forced Subagent Topology Execution Matrix", () => {
         autoApprove: true,
         maxIterations: 10,
         harness: "standard",
-        reasoningStrategy: "graph_of_thoughts",
+        reasoningStrategy: REASONING_STRATEGIES.GRAPH_OF_THOUGHTS,
         topology: "peer_to_peer",
         branchCount: 2,
       },
