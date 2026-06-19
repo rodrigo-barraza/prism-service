@@ -242,6 +242,8 @@ async function prepareGenerationContext(
     agentContext,
     // Multi-workspace: user-selected workspace root path (absolute fs path).
     workspaceRoot,
+    // Device pinning: bypass load balancing and target a specific local instance.
+    device,
     // CriticGate: multi-model review of dangerous tool calls.
     enableCriticGate,
     criticModel,
@@ -374,56 +376,89 @@ async function prepareGenerationContext(
     requestedModel ||
     getDefaultModels(TYPES.TEXT, TYPES.TEXT)[providerName as string];
   if (localModelQueue.isLocal(providerName)) {
-    let siblings = getInstancesByType(providerName);
-    // ── Model resolution (always) ──────────────────────────────
-    // Resolve model availability across instances with quant-level
-    // fallback. Also handles @quant syntax (e.g. "qwen3-32b@q4_k_m")
-    // by mapping it to the actual LM Studio model key.
-    const { usable, modelOverrides } = await resolveModelForInstances(
-      resolvedModel,
-      siblings,
-    );
-    if (usable.length > 0) {
-      siblings = usable;
-      // For single instance, apply model override directly
-      if (siblings.length === 1) {
-        const override = modelOverrides.get(siblings[0].id);
+    // ── Device pinning (bypass load balancing) ────────────────
+    // When the caller explicitly requests a specific device instance
+    // (e.g. "lm-studio-server"), skip the least-busy routing entirely
+    // and pin the request to that exact instance. Model resolution still
+    // runs against the targeted device so @quant syntax works.
+    if (device && getProvider(device)) {
+      const pinnedSiblings = getInstancesByType(providerName).filter(
+        (instance) => instance.id === device,
+      );
+      if (pinnedSiblings.length > 0) {
+        const { modelOverrides } = await resolveModelForInstances(
+          resolvedModel,
+          pinnedSiblings,
+        );
+        const override = modelOverrides.get(device);
         if (override) {
           resolvedModel = override;
-          logger.info(
-            `[chat] Model resolved: "${requestedModel}" → "${resolvedModel}" (single instance)`,
-          );
-        }
-      }
-    } else {
-      logger.warn(
-        `[chat] Model "${resolvedModel}" not available on any ${providerName} instance — falling back to first`,
-      );
-    }
-    // ── Multi-instance load balancing ──────────────────────────
-    if (siblings.length > 1) {
-      // Least-busy: pick the instance with the most available slots
-      let bestId = providerName;
-      let bestAvailable = -Infinity;
-      for (const inst of siblings) {
-        const queueState = localModelQueue._getQueue(inst.id);
-        const available = inst.concurrency - queueState.activeCount;
-        if (available > bestAvailable) {
-          bestAvailable = available;
-          bestId = inst.id;
-        }
-      }
-      if (bestId !== providerName) {
-        // Apply model override if this instance uses a different quant
-        const modelOverride = modelOverrides.get(bestId);
-        if (modelOverride) {
-          resolvedModel = modelOverride;
         }
         logger.info(
-          `[chat] ⚖️ Load balance: ${providerName} → ${bestId} ` +
-            `(model="${resolvedModel}", ${siblings.map((sibling) => `${sibling.id}:${sibling.concurrency - localModelQueue._getQueue(sibling.id).activeCount}free`).join(", ")})`,
+          `[chat] 📌 Device pinned: ${providerName} → ${device}` +
+            (override ? ` (model="${resolvedModel}")` : ""),
         );
-        providerName = bestId;
+        providerName = device;
+      } else {
+        logger.warn(
+          `[chat] Requested device "${device}" not found among ${providerName} instances — falling back to load balancing`,
+        );
+      }
+    }
+
+    // Only run load balancing when no device was pinned above
+    if (!device || providerName !== device) {
+      let siblings = getInstancesByType(providerName);
+      // ── Model resolution (always) ──────────────────────────────
+      // Resolve model availability across instances with quant-level
+      // fallback. Also handles @quant syntax (e.g. "qwen3-32b@q4_k_m")
+      // by mapping it to the actual LM Studio model key.
+      const { usable, modelOverrides } = await resolveModelForInstances(
+        resolvedModel,
+        siblings,
+      );
+      if (usable.length > 0) {
+        siblings = usable;
+        // For single instance, apply model override directly
+        if (siblings.length === 1) {
+          const override = modelOverrides.get(siblings[0].id);
+          if (override) {
+            resolvedModel = override;
+            logger.info(
+              `[chat] Model resolved: "${requestedModel}" → "${resolvedModel}" (single instance)`,
+            );
+          }
+        }
+      } else {
+        logger.warn(
+          `[chat] Model "${resolvedModel}" not available on any ${providerName} instance — falling back to first`,
+        );
+      }
+      // ── Multi-instance load balancing ──────────────────────────
+      if (siblings.length > 1) {
+        // Least-busy: pick the instance with the most available slots
+        let bestId = providerName;
+        let bestAvailable = -Infinity;
+        for (const inst of siblings) {
+          const queueState = localModelQueue._getQueue(inst.id);
+          const available = inst.concurrency - queueState.activeCount;
+          if (available > bestAvailable) {
+            bestAvailable = available;
+            bestId = inst.id;
+          }
+        }
+        if (bestId !== providerName) {
+          // Apply model override if this instance uses a different quant
+          const modelOverride = modelOverrides.get(bestId);
+          if (modelOverride) {
+            resolvedModel = modelOverride;
+          }
+          logger.info(
+            `[chat] ⚖️ Load balance: ${providerName} → ${bestId} ` +
+              `(model="${resolvedModel}", ${siblings.map((sibling) => `${sibling.id}:${sibling.concurrency - localModelQueue._getQueue(sibling.id).activeCount}free`).join(", ")})`,
+          );
+          providerName = bestId;
+        }
       }
     }
   }
