@@ -236,7 +236,11 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
     expect(results).toHaveLength(2);
     expect(mockUpdateOne).toHaveBeenCalledWith(
-      { id: "conv-id-789" },
+      {
+        id: "conv-id-789",
+        project: orchestratorContext.project,
+        username: orchestratorContext.username,
+      },
       expect.objectContaining({
         $set: expect.objectContaining({
           "settings.agents.topology": "peer_to_peer",
@@ -325,7 +329,11 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       });
 
       expect(mockUpdateOne).toHaveBeenCalledWith(
-        { id: orchestratorContext.agentSessionId },
+        {
+          id: orchestratorContext.agentSessionId,
+          project: orchestratorContext.project,
+          username: orchestratorContext.username,
+        },
         { $set: { hasSubAgents: true } },
       );
 
