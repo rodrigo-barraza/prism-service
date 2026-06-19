@@ -749,6 +749,11 @@ export default class OrchestratorService {
       return [{ error: errorMessage }];
     }
 
+    // Propagate the resolved topology back to the context so _runSubAgentLoop
+    // (and all downstream consumers) build the sub-agent system prompt with the
+    // correct topology — not the stale session-level default.
+    orchestratorContext.topology = topology;
+
     if (!teamCreationArguments || !teamCreationArguments.members || !Array.isArray(teamCreationArguments.members)) {
       const errorMessage =
         "Invalid or missing 'members' array in createTeam arguments.";
