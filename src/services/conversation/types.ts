@@ -61,6 +61,51 @@ export interface MessagePayload {
   [key: string]: unknown;
 }
 
+export interface TransformedConversation {
+  id: string;
+  project: string;
+  username: string;
+  title: string;
+  messages: ChatMessage[];
+  systemPrompt: string;
+  settings: ConversationSettings;
+  modalities: Record<string, boolean>;
+  providers: string[];
+  totalCost: number;
+  modelNames: string[];
+  isGenerating: boolean;
+  synthetic?: boolean;
+  traceId?: string | null;
+  parentAgentSessionId?: string | null;
+  workspaceRoot?: string | null;
+  agent?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  [key: string]: unknown; // Allow extra MongoDB properties dynamically
+}
+
+export interface TransformedSessionStats {
+  agentSessionId: string;
+  requestCount: number;
+  subAgentRequestCount: number;
+  totalCost: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  totalCacheReadInputTokens: number;
+  totalCacheCreationInputTokens: number;
+  totalReasoningOutputTokens: number;
+  providers: string[];
+  models: string[];
+  operations: string[];
+  modalities: Record<string, boolean>;
+  toolCounts: Record<string, number>;
+  requestErrorCount: number;
+  totalElapsedTime: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 export interface ConversationServiceInterface {
   appendMessages(
     conversationId: string,
@@ -69,7 +114,7 @@ export interface ConversationServiceInterface {
     newMessages: Array<ChatMessage | MessagePayload>,
     conversationMeta?: ConversationMeta | null,
     options?: { collection?: string },
-  ): Promise<Record<string, unknown>>;
+  ): Promise<TransformedConversation>;
   setGenerating(
     conversationId: string,
     project: string,
@@ -81,5 +126,5 @@ export interface ConversationServiceInterface {
     sessionId: string,
     project: string,
     username: string,
-  ): Promise<Record<string, unknown> | null>;
+  ): Promise<TransformedSessionStats | null>;
 }
