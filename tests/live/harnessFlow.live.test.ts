@@ -2661,7 +2661,7 @@ describe("Suite 18: Strategy × Topology Live Combination Matrix", () => {
 
   // ── 18.13: Topology actually affects team_create dispatch ─────
 
-  it("18.13 — topology is forwarded to team_create: sequential vs hierarchical produce different execution patterns", async () => {
+  it("18.13 — topology is forwarded to team_create: all 4 topologies execute subagents successfully", async () => {
     const toolCallingTargets = providerTargets.filter(
       (providerTarget) => providerTarget.supportsToolCalling,
     ).slice(0, 1);
@@ -2680,75 +2680,61 @@ describe("Suite 18: Strategy × Topology Live Combination Matrix", () => {
       "2. Second member: echo 'step-two' using shell\n\n" +
       "Create the team now.";
 
-    // Run with sequential topology
-    const sequentialResult = await agentStreamWithRetry(
-      {
-        provider: target.providerName,
-        model: target.model,
-        messages: [{ role: "user", content: teamCreatePrompt }],
-        agent: "OMNI",
-        agentSessionId: crypto.randomUUID(),
-        maxTokens: 3000,
-        autoApprove: true,
-        maxIterations: 10,
-        harness: "standard",
-        reasoningStrategy: "chain_of_thought",
-        topology: "sequential",
-      },
-      { timeoutMs: getMultiAgentTimeout(target) },
-    );
+    const topologies = [
+      "sequential",
+      "hierarchical",
+      "hierarchical_aggregation",
+      "peer_to_peer",
+    ] as const;
 
-    // Run with hierarchical topology
-    const hierarchicalResult = await agentStreamWithRetry(
-      {
-        provider: target.providerName,
-        model: target.model,
-        messages: [{ role: "user", content: teamCreatePrompt }],
-        agent: "OMNI",
-        agentSessionId: crypto.randomUUID(),
-        maxTokens: 3000,
-        autoApprove: true,
-        maxIterations: 10,
-        harness: "standard",
-        reasoningStrategy: "chain_of_thought",
-        topology: "hierarchical",
-      },
-      { timeoutMs: getMultiAgentTimeout(target) },
-    );
+    for (const topology of topologies) {
+      console.log(`\n  🚀 Running team_create with topology: ${topology}`);
+      const result = await agentStreamWithRetry(
+        {
+          provider: target.providerName,
+          model: target.model,
+          messages: [{ role: "user", content: teamCreatePrompt }],
+          agent: "OMNI",
+          agentSessionId: crypto.randomUUID(),
+          maxTokens: 3000,
+          autoApprove: true,
+          maxIterations: 10,
+          harness: "standard",
+          reasoningStrategy: "chain_of_thought",
+          topology,
+        },
+        { timeoutMs: getMultiAgentTimeout(target) },
+      );
 
-    logResult(`18.13 sequential [${target.providerName}]`, sequentialResult);
-    logResult(`18.13 hierarchical [${target.providerName}]`, hierarchicalResult);
+      logResult(`18.13 [${topology}] [${target.providerName}]`, result);
 
-    // Both must complete without timeout
-    expect(sequentialResult.timedOut).toBe(false);
-    expect(sequentialResult.done).toBeTruthy();
-    expect(hierarchicalResult.timedOut).toBe(false);
-    expect(hierarchicalResult.done).toBeTruthy();
+      expect(result.timedOut).toBe(false);
+      expect(result.done).toBeTruthy();
 
-    // Both should have attempted team_create
-    const sequentialToolEvents = [...sequentialResult.toolExecutions, ...sequentialResult.toolCalls];
-    const hierarchicalToolEvents = [...hierarchicalResult.toolExecutions, ...hierarchicalResult.toolCalls];
+      const toolEvents = [...result.toolExecutions, ...result.toolCalls];
+      const teamCreates = toolEvents.filter(
+        (toolEvent) =>
+          (toolEvent.tool?.name || toolEvent.name) === "team_create" ||
+          (toolEvent.tool?.name || toolEvent.name) === "create_team",
+      );
 
-    const sequentialTeamCreates = sequentialToolEvents.filter(
-      (toolEvent) =>
-        (toolEvent.tool?.name || toolEvent.name) === "team_create" ||
-        (toolEvent.tool?.name || toolEvent.name) === "create_team",
-    );
-    const hierarchicalTeamCreates = hierarchicalToolEvents.filter(
-      (toolEvent) =>
-        (toolEvent.tool?.name || toolEvent.name) === "team_create" ||
-        (toolEvent.tool?.name || toolEvent.name) === "create_team",
-    );
+      const spawnEvents = result.subAgentStatuses.filter(
+        (statusEvent) => statusEvent.message === "spawned",
+      );
 
-    console.log(
-      `  📊 Sequential: ${sequentialTeamCreates.length} team_create calls, ` +
-        `${sequentialToolEvents.length} total tool events`,
-    );
-    console.log(
-      `  📊 Hierarchical: ${hierarchicalTeamCreates.length} team_create calls, ` +
-        `${hierarchicalToolEvents.length} total tool events`,
-    );
-  }, 900_000);
+      console.log(
+        `  📊 [${topology}] Team Creates: ${teamCreates.length}, ` +
+          `Sub-agents Spawned: ${spawnEvents.length}, ` +
+          `Total SSE Events: ${result.totalEvents}`,
+      );
+
+      // Verify that team_create was actually called
+      expect(teamCreates.length).toBeGreaterThanOrEqual(1);
+
+      // Verify that sub-agents were actually spawned and executed
+      expect(spawnEvents.length).toBeGreaterThanOrEqual(1);
+    }
+  }, 1200_000);
 
   // ── 18.14: All strategies work with peer_to_peer topology ────
 
@@ -2995,4 +2981,100 @@ describe("Suite 19: Forced Subagent Topology Execution Matrix", () => {
       `  ✓ Both topologies spawned subagents — sequential: ${sequentialSpawns.length}, p2p: ${peerToPeerSpawns.length}`,
     );
   }, 900_000);
+
+  // ── 19.6: ToT Strategy + Hierarchical Topology Spawning ──────
+
+  it("19.6 — ToT strategy + Hierarchical topology: spawns subagents inside parallel reasoning branches", async () => {
+    const toolCallingTargets = providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1);
+
+    if (toolCallingTargets.length === 0) {
+      console.log("  ⏭ Skipping: no tool-calling providers available");
+      return;
+    }
+
+    const target = toolCallingTargets[0];
+    console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+
+    const result = await agentStreamWithRetry(
+      {
+        provider: target.providerName,
+        model: target.model,
+        messages: [{ role: "user", content: FORCED_TOPOLOGY_SPAWN }],
+        agent: "OMNI",
+        agentSessionId: crypto.randomUUID(),
+        maxTokens: 4000,
+        autoApprove: true,
+        maxIterations: 10,
+        harness: "standard",
+        reasoningStrategy: "tree_of_thoughts",
+        topology: "hierarchical",
+        branchCount: 2,
+      },
+      { timeoutMs: getMultiAgentTimeout(target) * 2 },
+    );
+
+    logResult(`19.6 [ToT+Hierarchical] [${target.providerName}]`, result);
+
+    expect(result.timedOut).toBe(false);
+    expect(result.done).toBeTruthy();
+
+    const spawnEvents = result.subAgentStatuses.filter(
+      (subAgentEvent) => subAgentEvent.message === "spawned",
+    );
+
+    console.log(`  📊 ToT+Hierarchical subagent spawns: ${spawnEvents.length}`);
+
+    // Verify subagents were actually spawned
+    expect(spawnEvents.length).toBeGreaterThanOrEqual(1);
+  }, 1200_000);
+
+  // ── 19.7: GoT Strategy + Peer-to-Peer Topology Spawning ──────
+
+  it("19.7 — GoT strategy + Peer-to-Peer topology: spawns subagents inside graph reasoning branches", async () => {
+    const toolCallingTargets = providerTargets.filter(
+      (providerTarget) => providerTarget.supportsToolCalling,
+    ).slice(0, 1);
+
+    if (toolCallingTargets.length === 0) {
+      console.log("  ⏭ Skipping: no tool-calling providers available");
+      return;
+    }
+
+    const target = toolCallingTargets[0];
+    console.log(`\n  🎯 Provider: ${target.providerName} (${target.model})`);
+
+    const result = await agentStreamWithRetry(
+      {
+        provider: target.providerName,
+        model: target.model,
+        messages: [{ role: "user", content: FORCED_TOPOLOGY_SPAWN }],
+        agent: "OMNI",
+        agentSessionId: crypto.randomUUID(),
+        maxTokens: 4000,
+        autoApprove: true,
+        maxIterations: 10,
+        harness: "standard",
+        reasoningStrategy: "graph_of_thoughts",
+        topology: "peer_to_peer",
+        branchCount: 2,
+      },
+      { timeoutMs: getMultiAgentTimeout(target) * 2 },
+    );
+
+    logResult(`19.7 [GoT+P2P] [${target.providerName}]`, result);
+
+    expect(result.timedOut).toBe(false);
+    expect(result.done).toBeTruthy();
+
+    const spawnEvents = result.subAgentStatuses.filter(
+      (subAgentEvent) => subAgentEvent.message === "spawned",
+    );
+
+    console.log(`  📊 GoT+P2P subagent spawns: ${spawnEvents.length}`);
+
+    // Verify subagents were actually spawned
+    expect(spawnEvents.length).toBeGreaterThanOrEqual(1);
+  }, 1200_000);
 });
