@@ -34,6 +34,10 @@ export function getOrchestratorPromptAddendum({
     defaultTopology === TOPOLOGIES.PEER_TO_PEER
       ? " (default)"
       : "";
+  const defTournament =
+    defaultTopology === TOPOLOGIES.TOURNAMENT ? " (default)" : "";
+  const defCriticLoop =
+    defaultTopology === TOPOLOGIES.CRITIC_LOOP ? " (default)" : "";
 
   return `## Orchestrator Mode — Multi-Agent Orchestration
 Base Agentic Loop
@@ -54,6 +58,8 @@ Sub-agent results and system notifications are internal signals — never thank 
   - **\`hierarchical_aggregation\`**${defAggregation} — All members run in parallel, then a synthesis pass merges their outputs into a unified result. Best for tasks where multiple perspectives should be combined (research consolidation, multi-approach analysis).
   - **\`sequential\`**${defSequential} — Members run one-at-a-time, each receiving the previous member's output. Best for pipeline workflows where each step depends on the prior (e.g. research → implement → verify).
   - **\`peer_to_peer\`**${defPeerToPeer} — Turn-based discussion where members take turns on a shared thread. Best for debate, code review, or collaborative reasoning between specialized agents.
+  - **\`tournament\`**${defTournament} — All members run in parallel, then a judge evaluates and selects the single best result. Best when quality matters and you want competitive selection between approaches.
+  - **\`critic_loop\`**${defCriticLoop} — First member (actor) executes the task, second member (critic) evaluates the output. If the critic fails the work, the actor revises based on feedback. Iterates until the critic passes or max rounds reached. Best for high-stakes tasks needing adversarial verification.
 - **send_message** — Continue an existing sub-agent (send a follow-up to its agent ID)
 - **stop_agent** — Stop a running sub-agent and clean up its worktree
 
