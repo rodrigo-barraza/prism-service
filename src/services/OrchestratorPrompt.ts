@@ -31,7 +31,7 @@ export function getOrchestratorPromptAddendum({
   const defSequential =
     defaultTopology === TOPOLOGIES.SEQUENTIAL ? " (default)" : "";
   const defPeerToPeer =
-    defaultTopology === TOPOLOGIES.PEER_TO_PEER || defaultTopology === "p2p"
+    defaultTopology === TOPOLOGIES.PEER_TO_PEER
       ? " (default)"
       : "";
 

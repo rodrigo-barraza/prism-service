@@ -6,16 +6,29 @@ import type {
 } from "../../../types/orchestrator.ts";
 import type { TopologyRouter } from "../TopologyRouter.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
-import { InstanceLoadBalancer } from "../InstanceLoadBalancer.ts";
-import { resolveModelForInstances } from "../../../utils/ModelResolution.ts";
 import {
-  getInstancesByType,
-  getInstanceType,
-} from "../../../providers/instance-registry.ts";
-import localModelQueue from "../../LocalModelQueue.ts";
+  resolveSiblingInstances,
+  selectInstanceForMember,
+} from "../InstanceResolver.ts";
 import logger from "../../../utils/logger.ts";
-import { getSubAgentFallback } from "../SubAgentFallback.ts";
 import { GitWorktreeHelper } from "../GitWorktreeHelper.ts";
+
+const MINIMUM_SUBSTANTIVE_RESPONSE_LENGTH = 80;
+
+/**
+ * Detect stall responses using structural signals rather than brittle
+ * keyword matching. A response is considered a stall when it is very
+ * short AND the agent performed no tool work — indicating it had
+ * nothing actionable to do.
+ */
+function isStallResponse(
+  responseText: string,
+  spawnResult: SubAgentResult,
+): boolean {
+  const isShortResponse = responseText.trim().length < MINIMUM_SUBSTANTIVE_RESPONSE_LENGTH;
+  const hasNoToolUsage = spawnResult.toolUses === 0;
+  return isShortResponse && hasNoToolUsage;
+}
 
 export class PeerToPeerRouter implements TopologyRouter {
   async execute(
@@ -30,27 +43,6 @@ export class PeerToPeerRouter implements TopologyRouter {
     logger.info(
       `[PeerToPeerRouter] Starting Peer-to-Peer mesh execution of ${members.length} member(s)...`,
     );
-
-    // Validate member prompts upfront — undefined/empty prompts cause
-    // runaway loops where every agent reports "no task" without signaling [DONE]
-    const invalidMembers = members.filter(
-      (member) =>
-        !member.prompt ||
-        typeof member.prompt !== "string" ||
-        member.prompt.trim().length === 0,
-    );
-    if (invalidMembers.length > 0) {
-      const invalidNames = invalidMembers.map(
-        (member) => member.agent || member.description || "(unnamed)",
-      );
-      const errorMessage = `${invalidMembers.length} member(s) have missing or empty prompts: [${invalidNames.join(", ")}]. Every peer-to-peer member requires a non-empty 'prompt' field.`;
-      logger.error(`[PeerToPeerRouter] ${errorMessage}`);
-      return [{ error: errorMessage }];
-    }
-
-    const isLocal = localModelQueue.isLocal(providerName);
-    const providerType = getInstanceType(providerName) || providerName;
-    const orchestratorFallback = await getSubAgentFallback();
 
     const results: (SubAgentResult | { error: string })[] = [];
     const sharedDiscussion: string[] = [];
@@ -72,44 +64,16 @@ export class PeerToPeerRouter implements TopologyRouter {
         `[PeerToPeerRouter] Turn ${turnIndex + 1}/${maxTurnsCount}: Active Speaker is "${speakerName}" (${member.description})`,
       );
 
-      // 1. Resolve instance
-      let siblings = getInstancesByType(providerType);
-      let instanceModelOverrides = new Map<string, string>();
-      let assignedProvider = providerName;
-      let assignedModel = member.model || resolvedModel;
-
-      if (isLocal && siblings.length > 1) {
-        const { usable, modelOverrides } = await resolveModelForInstances(
-          assignedModel,
-          siblings,
-        );
-        instanceModelOverrides = modelOverrides;
-        if (usable.length > 0) {
-          siblings = usable;
-        } else {
-          logger.warn(
-            `[PeerToPeerRouter] Model "${assignedModel}" not available on any ${providerType} instance`,
-          );
-          siblings = [];
-        }
-      }
-
-      if (isLocal && siblings.length > 0) {
-        const assigned = InstanceLoadBalancer.selectAndReserveInstance(
-          siblings,
-          providerName,
-          instanceModelOverrides,
-          assignedModel,
-          new Map(),
-        );
-        if (assigned) {
-          assignedProvider = assigned.provider;
-          assignedModel = assigned.model;
-        } else if (orchestratorFallback) {
-          assignedProvider = orchestratorFallback.provider;
-          assignedModel = orchestratorFallback.model;
-        }
-      }
+      // 1. Re-resolve instances per turn (availability changes between turns)
+      const resolvedSiblings = await resolveSiblingInstances(
+        { providerName, resolvedModel },
+        "PeerToPeerRouter",
+      );
+      const { assignedProvider, assignedModel } = selectInstanceForMember(
+        member,
+        resolvedSiblings,
+        { providerName, resolvedModel },
+      );
 
       // 2. Compile shared conversation thread history
       const promptHistory =
@@ -200,19 +164,9 @@ export class PeerToPeerRouter implements TopologyRouter {
         break;
       }
 
-      // 7. Stall detection — if consecutive agents produce boilerplate "no task" responses,
-      // break the loop early to prevent runaway cycles of empty reports
-      const normalizedResponse = responseText.toLowerCase();
-      const isStallResponse =
-        normalizedResponse.includes("no actionable task") ||
-        normalizedResponse.includes("standing by") ||
-        normalizedResponse.includes("no specific work") ||
-        normalizedResponse.includes("task assigned: `undefined`") ||
-        normalizedResponse.includes("task assigned:**  `undefined`") ||
-        (normalizedResponse.includes("undefined") &&
-          normalizedResponse.includes("no pending"));
-
-      if (isStallResponse) {
+      // 7. Stall detection — short response with no tool usage indicates the agent
+      // had nothing actionable. Consecutive stalls abort the mesh to prevent runaway loops.
+      if (isStallResponse(responseText, spawnResult)) {
         consecutiveStallCount++;
         logger.warn(
           `[PeerToPeerRouter] Stall detected from "${speakerName}" (${consecutiveStallCount}/${maximumConsecutiveStalls} consecutive stalls)`,

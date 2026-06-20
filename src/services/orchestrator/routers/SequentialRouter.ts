@@ -6,15 +6,11 @@ import type {
 } from "../../../types/orchestrator.ts";
 import type { TopologyRouter } from "../TopologyRouter.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
-import { InstanceLoadBalancer } from "../InstanceLoadBalancer.ts";
-import { resolveModelForInstances } from "../../../utils/ModelResolution.ts";
 import {
-  getInstancesByType,
-  getInstanceType,
-} from "../../../providers/instance-registry.ts";
-import localModelQueue from "../../LocalModelQueue.ts";
+  resolveSiblingInstances,
+  selectInstanceForMember,
+} from "../InstanceResolver.ts";
 import logger from "../../../utils/logger.ts";
-import { getSubAgentFallback } from "../SubAgentFallback.ts";
 import { GitWorktreeHelper } from "../GitWorktreeHelper.ts";
 
 export class SequentialRouter implements TopologyRouter {
@@ -31,10 +27,6 @@ export class SequentialRouter implements TopologyRouter {
       `[SequentialRouter] Starting sequential team execution of ${members.length} member(s)...`,
     );
 
-    const isLocal = localModelQueue.isLocal(providerName);
-    const providerType = getInstanceType(providerName) || providerName;
-    const orchestratorFallback = await getSubAgentFallback();
-
     const results: (SubAgentResult | { error: string })[] = [];
     let accumulatedContext = "";
 
@@ -44,44 +36,17 @@ export class SequentialRouter implements TopologyRouter {
         `[SequentialRouter] Running step ${index + 1}/${members.length}: ${member.description}`,
       );
 
-      // 1. Resolve instance for this step
-      let siblings = getInstancesByType(providerType);
-      let instanceModelOverrides = new Map<string, string>();
-      let assignedProvider = providerName;
-      let assignedModel = member.model || resolvedModel;
+      // 1. Re-resolve instances per step (availability changes between sequential steps)
+      const resolvedSiblings = await resolveSiblingInstances(
+        { providerName, resolvedModel },
+        "SequentialRouter",
+      );
+      const { assignedProvider, assignedModel } = selectInstanceForMember(
+        member,
+        resolvedSiblings,
+        { providerName, resolvedModel },
+      );
 
-      if (isLocal && siblings.length > 1) {
-        const { usable, modelOverrides } = await resolveModelForInstances(
-          assignedModel,
-          siblings,
-        );
-        instanceModelOverrides = modelOverrides;
-        if (usable.length > 0) {
-          siblings = usable;
-        } else {
-          logger.warn(
-            `[SequentialRouter] Model "${assignedModel}" not available on any ${providerType} instance`,
-          );
-          siblings = [];
-        }
-      }
-
-      if (isLocal && siblings.length > 0) {
-        const assigned = InstanceLoadBalancer.selectAndReserveInstance(
-          siblings,
-          providerName,
-          instanceModelOverrides,
-          assignedModel,
-          new Map(),
-        );
-        if (assigned) {
-          assignedProvider = assigned.provider;
-          assignedModel = assigned.model;
-        } else if (orchestratorFallback) {
-          assignedProvider = orchestratorFallback.provider;
-          assignedModel = orchestratorFallback.model;
-        }
-      }
 
       // 2. Prepare step prompt by prepending accumulated context from all prior steps
       const basePrompt = member.prompt;

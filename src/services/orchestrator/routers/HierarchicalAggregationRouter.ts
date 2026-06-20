@@ -5,16 +5,12 @@ import type {
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
 import type { TopologyRouter } from "../TopologyRouter.ts";
-import { InstanceLoadBalancer } from "../InstanceLoadBalancer.ts";
-import { resolveModelForInstances } from "../../../utils/ModelResolution.ts";
 import {
-  getInstancesByType,
-  getInstanceType,
-} from "../../../providers/instance-registry.ts";
+  resolveSiblingInstances,
+  selectInstanceForMember,
+} from "../InstanceResolver.ts";
 import { getProvider } from "../../../providers/index.ts";
-import localModelQueue from "../../LocalModelQueue.ts";
 import logger from "../../../utils/logger.ts";
-import { getSubAgentFallback } from "../SubAgentFallback.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 
 const MAXIMUM_SYNTHESIS_CHARACTERS = 120_000;
@@ -80,51 +76,20 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
 
     // ── Phase 1: Parallel execution (identical to HierarchicalRouter) ────
 
-    const isLocal = localModelQueue.isLocal(providerName);
-    const providerType = getInstanceType(providerName) || providerName;
-    let siblings = getInstancesByType(providerType);
-    let instanceModelOverrides = new Map<string, string>();
-
-    if (isLocal && siblings.length > 1) {
-      const { usable, modelOverrides } = await resolveModelForInstances(
-        resolvedModel,
-        siblings,
-      );
-      instanceModelOverrides = modelOverrides;
-      if (usable.length > 0) {
-        siblings = usable;
-      } else {
-        logger.warn(
-          `[HierarchicalAggregationRouter] Model "${resolvedModel}" not available on any ${providerType} instance`,
-        );
-        siblings = [];
-      }
-    }
+    const resolvedSiblings = await resolveSiblingInstances(
+      { providerName, resolvedModel },
+      "HierarchicalAggregationRouter",
+    );
 
     const assignments: OrchestratorSpawnParams[] = [];
-    const orchestratorFallback = await getSubAgentFallback();
 
     for (let memberIndex = 0; memberIndex < members.length; memberIndex++) {
       const member = members[memberIndex];
-      let assignedProvider = providerName;
-      let assignedModel = member.model || resolvedModel;
-
-      if (isLocal && siblings.length > 0) {
-        const assigned = InstanceLoadBalancer.selectAndReserveInstance(
-          siblings,
-          providerName,
-          instanceModelOverrides,
-          assignedModel,
-          new Map(),
-        );
-        if (assigned) {
-          assignedProvider = assigned.provider;
-          assignedModel = assigned.model;
-        } else if (orchestratorFallback) {
-          assignedProvider = orchestratorFallback.provider;
-          assignedModel = orchestratorFallback.model;
-        }
-      }
+      const { assignedProvider, assignedModel } = selectInstanceForMember(
+        member,
+        resolvedSiblings,
+        { providerName, resolvedModel },
+      );
 
       assignments.push({
         description: member.description,
@@ -144,6 +109,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
       spawnSubAgent(assignment),
     );
     const memberResults = await Promise.all(spawnPromises);
+
 
     // ── Phase 2: Synthesis pass (GoT aggregation) ────────────────────
 
