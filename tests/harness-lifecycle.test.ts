@@ -20,7 +20,7 @@ import { executeToolBatch, executeToolSingle } from "../src/services/harnesses/l
 import { createStandardHooks } from "../src/services/harnesses/lifecycle/HookInitializer.ts";
 
 import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
-import SessionGenerationTracker from "../src/services/SessionGenerationTracker.ts";
+import ConversationGenerationTracker from "../src/services/ConversationGenerationTracker.ts";
 import BaseAgenticHarness from "../src/services/harnesses/BaseAgenticHarness.ts";
 import AgentHooks from "../src/services/AgentHooks.ts";
 import AutoApprovalEngine from "../src/services/AutoApprovalEngine.ts";
@@ -39,7 +39,7 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
   },
 }));
 
-vi.mock("../src/services/SessionGenerationTracker.ts", () => ({
+vi.mock("../src/services/ConversationGenerationTracker.ts", () => ({
   default: {
     complete: vi.fn(),
     register: vi.fn(),
@@ -584,7 +584,7 @@ describe("ExhaustionRecovery", () => {
     expect(currentMessages[0].content).toContain("maximum number of tool-call iterations");
     expect(mockHarness.consumeStream).toHaveBeenCalled();
     expect(mockHarness.emitGenerationProgress).toHaveBeenCalled();
-    expect(SessionGenerationTracker.complete).toHaveBeenCalledWith("req-123-exhaustion");
+    expect(ConversationGenerationTracker.complete).toHaveBeenCalledWith("req-123-exhaustion");
   });
 
   it("should call generateTextStreamLive when liveAPI is true", async () => {

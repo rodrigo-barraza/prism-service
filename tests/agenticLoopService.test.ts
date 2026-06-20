@@ -83,7 +83,7 @@ vi.mock("../src/utils/ContextWindowManager.ts", () => ({
   },
 }));
 
-vi.mock("../src/services/SessionGenerationTracker.ts", () => ({
+vi.mock("../src/services/ConversationGenerationTracker.ts", () => ({
   default: {
     register: vi.fn(),
     update: vi.fn(),
@@ -398,10 +398,10 @@ describe("AgenticLoopService", () => {
     await AgenticLoopService.runAgenticLoop(mockContext);
 
     // Should register generation against the parent/coordinator session
-    const SessionGenerationTracker = (await import("../src/services/SessionGenerationTracker.ts")).default;
+    const ConversationGenerationTracker = (await import("../src/services/ConversationGenerationTracker.ts")).default;
     
     // Verify register was called with the parent session ID and source: sub-agent
-    expect(SessionGenerationTracker.register).toHaveBeenCalledWith(
+    expect(ConversationGenerationTracker.register).toHaveBeenCalledWith(
       "coordinator-123", 
       expect.any(String), 
       expect.objectContaining({
@@ -411,7 +411,7 @@ describe("AgenticLoopService", () => {
     );
 
     // Verify cleanup WAS called for workers to prevent memory leaks
-    expect(SessionGenerationTracker.cleanup).toHaveBeenCalledWith("worker-456");
+    expect(ConversationGenerationTracker.cleanup).toHaveBeenCalledWith("worker-456");
   });
 
   it("should resolve disabledTools mode correctly", async () => {
