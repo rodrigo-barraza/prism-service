@@ -728,6 +728,10 @@ export default class OrchestratorService {
     );
   }
 
+  static cleanupSession(parentAgentConversationId: string): void {
+    return this.cleanupConversation(parentAgentConversationId);
+  }
+
   static async createTeam(
     teamCreationArguments: { name: string; members: TeamMember[]; topology?: string },
     orchestratorContext: OrchestratorContext,

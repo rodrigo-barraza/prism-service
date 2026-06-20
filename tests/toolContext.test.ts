@@ -162,7 +162,7 @@ describe("ToolContext — cleanup", () => {
     ToolContext.set(SESSION, "data", "value");
     ToolContext.cleanup(SESSION);
 
-    expect(mockDeleteOne).toHaveBeenCalledWith({ sessionId: SESSION });
+    expect(mockDeleteOne).toHaveBeenCalledWith({ conversationId: SESSION });
   });
 
   it("cleanup() decrements activeSessionCount", () => {
@@ -195,8 +195,8 @@ describe("ToolContext — MongoDB write-through", () => {
     });
 
     const call = mockUpdateOne.mock.calls[0];
-    expect(call[0]).toEqual({ sessionId: SESSION });
-    expect(call[1].$set.sessionId).toBe(SESSION);
+    expect(call[0]).toEqual({ conversationId: SESSION });
+    expect(call[1].$set.conversationId).toBe(SESSION);
     expect(call[1].$set.state).toEqual({ key: "value" });
     expect(call[2]).toEqual({ upsert: true });
   });
@@ -232,7 +232,7 @@ describe("ToolContext — ensureLoaded (MongoDB read-through)", () => {
 
   it("ensureLoaded() restores state from MongoDB", async () => {
     mockFindOne.mockResolvedValueOnce({
-      sessionId: SESSION,
+      conversationId: SESSION,
       state: { cursor: 5, page: "results" },
     });
 
@@ -244,7 +244,7 @@ describe("ToolContext — ensureLoaded (MongoDB read-through)", () => {
 
   it("ensureLoaded() is idempotent (only loads once)", async () => {
     mockFindOne.mockResolvedValueOnce({
-      sessionId: SESSION,
+      conversationId: SESSION,
       state: { key: "first" },
     });
 
@@ -259,7 +259,7 @@ describe("ToolContext — ensureLoaded (MongoDB read-through)", () => {
     ToolContext.set(SESSION, "winner", "memory");
 
     mockFindOne.mockResolvedValueOnce({
-      sessionId: SESSION,
+      conversationId: SESSION,
       state: { winner: "mongo", newKey: "from-mongo" },
     });
 

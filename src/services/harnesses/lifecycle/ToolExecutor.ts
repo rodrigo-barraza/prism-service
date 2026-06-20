@@ -31,6 +31,7 @@ export async function executeToolBatch(
     project,
     username,
     agent,
+    agentConversationId,
     agentSessionId,
     conversationId,
     traceId,
@@ -39,6 +40,8 @@ export async function executeToolBatch(
     workspaceRoot,
     emit,
   } = context;
+
+  const resolvedAgentConversationId = agentConversationId || (agentSessionId as string) || "";
 
   const results = await Promise.all(
     toolCalls.map(async (toolCall) => {
@@ -68,11 +71,12 @@ export async function executeToolBatch(
             username,
             agent,
             requestId: context.requestId,
-            agentSessionId,
+            agentConversationId: resolvedAgentConversationId,
+            agentSessionId: resolvedAgentConversationId,
             conversationId,
             iteration: state.iterations,
             workspaceRoot,
-            _toolState: ToolContext.getStore(agentSessionId),
+            _toolState: ToolContext.getStore(resolvedAgentConversationId),
           },
         );
         const durationMs = Date.now() - startTime;
@@ -90,7 +94,8 @@ export async function executeToolBatch(
           username,
           agent: agent || null,
           traceId: traceId || null,
-          agentSessionId,
+          agentConversationId: resolvedAgentConversationId,
+          agentSessionId: resolvedAgentConversationId,
           conversationId,
           clientIp: context.clientIp || null,
           requestId: context.requestId,
@@ -101,7 +106,7 @@ export async function executeToolBatch(
           _maxSubAgentIterations: context.options?.maxSubAgentIterations,
           _minContextLength: context.options?.minContextLength,
           workspaceRoot,
-          _toolState: ToolContext.getStore(agentSessionId),
+          _toolState: ToolContext.getStore(resolvedAgentConversationId),
           enabledTools: tools.finalTools.map((toolSchema) => toolSchema.name),
           _topology:
             typeof context.options?.topology === "string"

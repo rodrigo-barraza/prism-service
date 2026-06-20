@@ -277,7 +277,7 @@ describe("Flow 2: AgenticLoopState Invariants", () => {
     expect(state.streamedToolCalls).toEqual([]);
     expect(state.displaySegments).toEqual([]);
     expect(state.planModeActive).toBe(false);
-    expect(state.sessionOutcome).toBe("completed");
+    expect(state.conversationOutcome).toBe("completed");
   });
 
   it("should preserve planModeActive when explicitly set in constructor", () => {

@@ -98,6 +98,14 @@ vi.mock("../src/services/ConversationGenerationTracker.ts", () => ({
       tokPerSec: 20,
       avgTtft: 0.5,
     }),
+    getConversationStats: vi.fn().mockReturnValue({
+      activeRequests: 0,
+      totalOutputTokens: 10,
+      totalInputTokens: 5,
+      totalTokens: 15,
+      tokPerSec: 20,
+      avgTtft: 0.5,
+    }),
   },
 }));
 

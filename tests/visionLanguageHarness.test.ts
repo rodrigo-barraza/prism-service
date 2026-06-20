@@ -52,6 +52,14 @@ vi.mock("../src/services/ConversationGenerationTracker.ts", () => ({
     recordChunkTiming: vi.fn(),
     complete: vi.fn(),
     cleanup: vi.fn(),
+    getConversationStats: vi.fn().mockReturnValue({
+      activeRequests: 0,
+      totalOutputTokens: 10,
+      totalInputTokens: 5,
+      totalTokens: 15,
+      tokPerSec: 20,
+      avgTtft: 0.5,
+    }),
     getSessionStats: vi.fn().mockReturnValue({
       activeRequests: 0,
       totalOutputTokens: 10,
