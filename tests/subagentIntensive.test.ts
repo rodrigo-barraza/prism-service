@@ -129,14 +129,38 @@ describe("Sub-Agent Intensive Integration Tests", () => {
   // ── 1. Parallelism & Concurrency ────────────────────────────
   describe("Parallelism & Concurrency Limits", () => {
     it("should execute multiple team members in parallel and collect all results", async () => {
-      let activeLoops = 0;
-      let peakConcurrency = 0;
+      let activeLoopCount = 0;
+      let peakConcurrencyCount = 0;
+      const concurrencyBarrierPromises: { resolve: () => void; reject: (error: Error) => void }[] = [];
 
       mockRunAgenticLoop.mockImplementation(async () => {
-        activeLoops++;
-        peakConcurrency = Math.max(peakConcurrency, activeLoops);
-        await new Promise((resolve) => setTimeout(resolve, 40));
-        activeLoops--;
+        activeLoopCount++;
+        peakConcurrencyCount = Math.max(peakConcurrencyCount, activeLoopCount);
+
+        if (activeLoopCount === 3) {
+          for (const promiseRegistration of concurrencyBarrierPromises) {
+            promiseRegistration.resolve();
+          }
+        } else {
+          await new Promise<void>((resolveFunction, rejectFunction) => {
+            const barrierTimeoutId = setTimeout(() => {
+              rejectFunction(new Error("Barrier timeout: concurrent execution did not reach 3 agents."));
+            }, 2000);
+
+            concurrencyBarrierPromises.push({
+              resolve: () => {
+                clearTimeout(barrierTimeoutId);
+                resolveFunction();
+              },
+              reject: (error) => {
+                clearTimeout(barrierTimeoutId);
+                rejectFunction(error);
+              },
+            });
+          });
+        }
+
+        activeLoopCount--;
         return {
           messages: [{ role: "assistant", content: "Parallel output" }],
         };
@@ -155,11 +179,11 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
 
       expect(results).toHaveLength(3);
-      expect(peakConcurrency).toBe(3); // Assert all 3 executed at the same time
+      expect(peakConcurrencyCount).toBe(3); // Assert all 3 executed at the same time
       expect(mockRunAgenticLoop).toHaveBeenCalledTimes(3);
 
-      for (const res of results) {
-        expect("status" in res && res.status).toBe("completed");
+      for (const result of results) {
+        expect("status" in result && result.status).toBe("completed");
       }
     });
   });
