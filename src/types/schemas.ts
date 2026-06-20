@@ -66,7 +66,6 @@ export const ChatRequestSchema = z
     messages: z.array(ChatMessageSchema),
     conversationId: z.string().nullable().optional(),
     agentConversationId: sanitizedString().nullable().optional(),
-    agentSessionId: sanitizedString().nullable().optional(),
     conversationMeta: z.record(z.string(), z.unknown()).nullable().optional(),
     traceId: z.string().nullable().optional(),
     project: z.string().default("any"),

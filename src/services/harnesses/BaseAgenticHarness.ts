@@ -97,9 +97,7 @@ export default class BaseAgenticHarness {
     this.state = state;
     this.tools = tools;
     this.trackerSessionId = (context.parentAgentConversationId ||
-      context.parentAgentSessionId ||
       context.agentConversationId ||
-      context.agentSessionId ||
       "") as string;
   }
 
@@ -447,12 +445,10 @@ export default class BaseAgenticHarness {
       providerName,
       resolvedModel,
       parentAgentConversationId,
-      parentAgentSessionId,
       agentConversationId,
-      agentSessionId,
     } = this.context;
-    const resolvedParent = parentAgentConversationId || parentAgentSessionId;
-    const resolvedAgent = agentConversationId || agentSessionId;
+    const resolvedParent = parentAgentConversationId;
+    const resolvedAgent = agentConversationId;
     ConversationGenerationTracker.register(this.trackerSessionId, passRequestId, {
       provider: providerName,
       model: resolvedModel,
@@ -625,7 +621,7 @@ export default class BaseAgenticHarness {
             toolArgs: streamChunk.args || {},
             agent: this.context.agent || null,
             conversationId: this.context.conversationId || null,
-            agentSessionId: this.context.agentSessionId || null,
+            agentConversationId: this.context.agentConversationId || null,
             project: this.context.project,
             username: this.context.username,
             provider: this.context.providerName,
@@ -658,7 +654,7 @@ export default class BaseAgenticHarness {
             status: streamChunk.status,
             agent: this.context.agent || null,
             conversationId: this.context.conversationId || null,
-            agentSessionId: this.context.agentSessionId || null,
+            agentConversationId: this.context.agentConversationId || null,
             project: this.context.project,
             username: this.context.username,
             provider: this.context.providerName,
@@ -715,7 +711,7 @@ export default class BaseAgenticHarness {
         toolArgs: streamChunk.args || {},
         agent: this.context.agent || null,
         conversationId: this.context.conversationId || null,
-        agentSessionId: this.context.agentSessionId || null,
+        agentConversationId: this.context.agentConversationId || null,
         project: this.context.project,
         username: this.context.username,
         provider: this.context.providerName,

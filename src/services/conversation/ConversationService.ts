@@ -72,9 +72,6 @@ const ConversationService: ConversationServiceInterface = {
       if (conversationMeta.parentAgentConversationId) {
         setFields.parentAgentConversationId = conversationMeta.parentAgentConversationId;
         setFields.parentAgentSessionId = conversationMeta.parentAgentConversationId;
-      } else if (conversationMeta.parentAgentSessionId) {
-        setFields.parentAgentConversationId = conversationMeta.parentAgentSessionId;
-        setFields.parentAgentSessionId = conversationMeta.parentAgentSessionId;
       }
       if (conversationMeta.parentConversationId) {
         setFields.parentConversationId = conversationMeta.parentConversationId;
@@ -87,7 +84,7 @@ const ConversationService: ConversationServiceInterface = {
     // Build $setOnInsert for auto-creation of new conversations
     const metaSettings = conversationMeta?.settings || {};
     const metaSysPrompt = conversationMeta?.systemPrompt || "";
-    const parentId = conversationMeta?.parentAgentConversationId || conversationMeta?.parentAgentSessionId || null;
+    const parentId = conversationMeta?.parentAgentConversationId || null;
     const parentConversationId = conversationMeta?.parentConversationId || null;
 
     const setOnInsertBase: Record<string, unknown> = {
@@ -360,7 +357,6 @@ const ConversationService: ConversationServiceInterface = {
 
     return {
       agentConversationId: conversationId,
-      agentSessionId: conversationId,
       requestCount: requests.length,
       subAgentRequestCount,
       totalCost,
@@ -380,14 +376,6 @@ const ConversationService: ConversationServiceInterface = {
       createdAt,
       updatedAt,
     };
-  },
-
-  async getSessionStats(
-    sessionId: string,
-    project: string,
-    username: string,
-  ): Promise<TransformedConversationStats | null> {
-    return this.getConversationStats(sessionId, project, username);
   },
 };
 

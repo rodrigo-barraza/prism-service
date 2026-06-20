@@ -51,7 +51,7 @@ export interface AssemblerContext {
   resolvedToolNames?: string[];
   agentContext?: AgentContext;
   traceId?: string | null;
-  agentSessionId?: string | null;
+  agentConversationId?: string | null;
   clientIp?: string | null;
   requestId?: string;
   options?: Record<string, unknown>;
@@ -63,7 +63,7 @@ export interface AssemblerContext {
 
 export interface MemoryFetchOptions {
   traceId?: string | null;
-  agentSessionId?: string | null;
+  agentConversationId?: string | null;
   endpoint?: string;
   _username?: string;
   guildId?: string;
@@ -72,7 +72,7 @@ export interface MemoryFetchOptions {
 
 export interface SkillFetchOptions {
   traceId?: string | null;
-  agentSessionId?: string | null;
+  agentConversationId?: string | null;
   endpoint?: string;
   agent?: string | null;
 }

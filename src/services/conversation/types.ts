@@ -6,7 +6,6 @@ export interface ConversationMeta {
   settings?: ConversationSettings;
   traceId?: string | null;
   parentAgentConversationId?: string | null;
-  parentAgentSessionId?: string | null;
   parentConversationId?: string | null;
   workspaceRoot?: string | null;
   synthetic?: boolean;
@@ -79,7 +78,6 @@ export interface TransformedConversation {
   synthetic?: boolean;
   traceId?: string | null;
   parentAgentConversationId?: string | null;
-  parentAgentSessionId?: string | null;
   parentConversationId?: string | null;
   workspaceRoot?: string | null;
   agent?: string | null;
@@ -90,7 +88,6 @@ export interface TransformedConversation {
 
 export interface TransformedConversationStats {
   agentConversationId: string;
-  agentSessionId?: string;
   requestCount: number;
   subAgentRequestCount: number;
   totalCost: number;
@@ -129,11 +126,6 @@ export interface ConversationServiceInterface {
   ): Promise<void>;
   getConversationStats(
     conversationId: string,
-    project: string,
-    username: string,
-  ): Promise<TransformedConversationStats | null>;
-  getSessionStats(
-    sessionId: string,
     project: string,
     username: string,
   ): Promise<TransformedConversationStats | null>;

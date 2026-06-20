@@ -75,7 +75,7 @@ interface WorkflowDocument {
 
 /**
  * GET /conversations
- * List both direct conversations and agent sessions, merged and sorted by updatedAt.
+ * List both direct conversations and agent conversations, merged and sorted by updatedAt.
  */
 router.get(
   "/",
@@ -157,7 +157,7 @@ router.get(
       ) => {
         if (conversations.length === 0) return;
         const conversationIds = conversations
-          .map((session) => (session as Record<string, unknown>).id as string)
+          .map((conversation) => (conversation as Record<string, unknown>).id as string)
           .filter(Boolean);
         if (conversationIds.length === 0) return;
 
@@ -219,7 +219,7 @@ router.get(
           );
         } catch (costError: unknown) {
           logger.warn(
-            `Failed to enrich ${isAgentType ? "agent session" : "conversation"} costs: ${errorMessage(costError)}`,
+            `Failed to enrich ${isAgentType ? "agent conversation" : "conversation"} costs: ${errorMessage(costError)}`,
           );
         }
       };
@@ -288,11 +288,11 @@ router.get(
       // Derive hasSubAgents from the stored subAgents array (primary source
       // of truth, written by BaseAgenticHarness.finalize) and strip the
       // heavy array from the list response. The cross-reference enrichment
-      // above acts as a secondary fallback for sessions that predate the
+      // above acts as a secondary fallback for conversations that predate the
       // subAgents array or where finalize didn't run.
       const deriveAndStripSubAgentsArray = (conversations: Document[]) => {
-        for (const session of conversations) {
-          const record = session as Record<string, unknown>;
+        for (const conversation of conversations) {
+          const record = conversation as Record<string, unknown>;
           const storedSubAgents = record.subAgents as unknown[] | undefined;
           if (
             storedSubAgents &&
@@ -313,8 +313,8 @@ router.get(
           ...conversation,
           type: "direct" as const,
         })),
-        ...agentConversations.map((session) => ({
-          ...session,
+        ...agentConversations.map((conversation) => ({
+          ...conversation,
           type: "agent" as const,
         })),
       ] as (Document & { type: string })[];
@@ -340,7 +340,7 @@ router.get(
 
 /**
  * GET /conversations/:id
- * Get a specific conversation or agent session.
+ * Get a specific conversation or agent conversation.
  */
 router.get(
   "/:id",
@@ -404,13 +404,13 @@ router.get(
         });
       }
 
-      // Check agent sessions next
+      // Check agent conversations next
       const agentChat = await db
         .collection(COLLECTIONS.AGENT_CONVERSATIONS)
         .findOne({ id: conversationId, project, username });
 
       if (agentChat) {
-        const stats = await ConversationService.getSessionStats(
+        const stats = await ConversationService.getConversationStats(
           conversationId,
           project,
           username,
@@ -421,7 +421,7 @@ router.get(
           AgenticLoopService.getPendingQuestion(conversationId);
 
         // Derive hasSubAgents from the stored subAgents array when the
-        // persisted boolean flag is missing (sessions created before the
+        // persisted boolean flag is missing (conversations created before the
         // flag was introduced or when the OrchestratorService write failed).
         const agentChatRecord = agentChat as Record<string, unknown>;
         if (
@@ -480,7 +480,7 @@ router.get(
 
 /**
  * POST /conversations/:id/messages
- * Append messages to an existing conversation or agent session.
+ * Append messages to an existing conversation or agent conversation.
  */
 router.post(
   "/:id/messages",
@@ -534,7 +534,7 @@ router.post(
 
 /**
  * PATCH /conversations/:id
- * Update specific fields of a conversation or agent session.
+ * Update specific fields of a conversation or agent conversation.
  */
 router.patch(
   "/:id",
@@ -571,7 +571,7 @@ router.patch(
         return res.json({ ...conversation, type: "direct" });
       }
 
-      // Try updating agent sessions next
+      // Try updating agent conversations next
       result = await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).updateOne(
         { id: conversationId, project, username },
         {
@@ -582,10 +582,10 @@ router.patch(
       );
 
       if (result.matchedCount > 0) {
-        const session = await db
+        const agentConversation = await db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .findOne({ id: conversationId, project, username });
-        return res.json({ ...session, type: "agent" });
+        return res.json({ ...agentConversation, type: "agent" });
       }
 
       res.status(404).json({ error: "Conversation not found" });
@@ -598,7 +598,7 @@ router.patch(
 
 /**
  * DELETE /conversations/:id
- * Delete a specific conversation or agent session.
+ * Delete a specific conversation or agent conversation.
  */
 router.delete(
   "/:id",
@@ -618,7 +618,7 @@ router.delete(
         return res.json({ success: true, id: conversationId, type: "direct" });
       }
 
-      // Try deleting from agent sessions next
+      // Try deleting from agent conversations next
       result = await db
         .collection(COLLECTIONS.AGENT_CONVERSATIONS)
         .deleteOne({ id: conversationId, project, username });

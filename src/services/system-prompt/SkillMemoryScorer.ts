@@ -22,7 +22,7 @@ export class SkillMemoryScorer {
     queryText: string,
     {
       traceId,
-      agentSessionId,
+      agentConversationId,
       endpoint,
       _username,
       guildId,
@@ -36,7 +36,7 @@ export class SkillMemoryScorer {
         queryText,
         limit: 10,
         traceId: traceId || undefined,
-        agentSessionId: agentSessionId || undefined,
+        agentSessionId: agentConversationId || undefined,
         endpoint: endpoint || "/agent",
         username: _username || undefined,
         guildId: guildId || undefined,
@@ -61,7 +61,7 @@ export class SkillMemoryScorer {
     project: string | null,
     username: string,
     queryText: string,
-    { traceId, agentSessionId, endpoint, agent }: SkillFetchOptions = {},
+    { traceId, agentConversationId, endpoint, agent }: SkillFetchOptions = {},
   ): Promise<ScoredSkill[]> {
     try {
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
@@ -99,7 +99,7 @@ export class SkillMemoryScorer {
           project,
           endpoint: endpoint || "/agent",
           traceId: traceId || null,
-          agentSessionId: agentSessionId || null,
+          agentConversationId: agentConversationId || null,
           agent: agent || null,
         });
       } catch (error: unknown) {

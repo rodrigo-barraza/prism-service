@@ -197,9 +197,7 @@ export interface LogChatGenerationParams {
   conversationId?: string | null;
   traceId?: string | null;
   agentConversationId?: string | null;
-  agentSessionId?: string | null;
   parentAgentConversationId?: string | null;
-  parentAgentSessionId?: string | null;
   success?: boolean;
   errorMessage?: string | null;
   usage?: TokenUsage | null;

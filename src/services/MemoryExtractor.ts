@@ -126,7 +126,6 @@ interface MemoryExtractionContext {
   messages: ConversationMessage[];
   traceId?: string | null;
   agentConversationId?: string | null;
-  agentSessionId?: string | null;
   conversationId?: string | null;
   endpoint?: string | null;
   agent?: string | null;
@@ -167,7 +166,6 @@ export default class MemoryExtractor {
     messages,
     traceId,
     agentConversationId,
-    agentSessionId,
     conversationId,
     endpoint,
     agent,
@@ -286,8 +284,7 @@ export default class MemoryExtractor {
           provider: extractionProvider,
           model: extractionModel,
           traceId: traceId || null,
-          agentConversationId: agentConversationId || agentSessionId || null,
-          agentSessionId: agentConversationId || agentSessionId || null,
+          agentConversationId: agentConversationId || null,
           aiMessages: aiMessages as MessagePayload[],
           resultText: result?.text || "",
           usage: realUsage,
@@ -301,9 +298,9 @@ export default class MemoryExtractor {
         });
 
         // Emit incremental usage so the UI token badge updates in real-time
-        // instead of jumping when fetchSessionStats runs 2-8s later.
-        // Include estimatedCost so the session cost badge is accurate
-        // before the backend aggregation (fetchSessionStats) completes.
+        // instead of jumping when fetchConversationStats runs 2-8s later.
+        // Include estimatedCost so the conversation cost badge is accurate
+        // before the backend aggregation (fetchConversationStats) completes.
         if (emit && success) {
           try {
             const extractPricing = getPricing(TYPES.TEXT, TYPES.TEXT)[
@@ -394,8 +391,7 @@ export default class MemoryExtractor {
             content: memoryObject.content,
             conversationId: conversationId || undefined,
             traceId: traceId || undefined,
-            agentConversationId: agentConversationId || agentSessionId || undefined,
-            agentSessionId: agentConversationId || agentSessionId || undefined,
+            agentConversationId: agentConversationId || undefined,
             endpoint: endpoint || "/agent",
           });
 
@@ -481,7 +477,6 @@ export default class MemoryExtractor {
         messages: messages || context.messages,
         traceId: context.traceId,
         agentConversationId: context.agentConversationId,
-        agentSessionId: context.agentConversationId,
         conversationId: context.conversationId as string | null,
         endpoint:
           ((context as Record<string, unknown>).endpoint as string | null) ||
@@ -507,7 +502,7 @@ export default class MemoryExtractor {
                 )
             : undefined;
 
-          // Check if consolidation should run (tracks session count)
+          // Check if consolidation should run (tracks conversation count)
           MemoryConsolidationService.checkAndRun({
             project: context.project,
             username: context.username,
@@ -519,7 +514,6 @@ export default class MemoryExtractor {
             agent: context.agent || null,
             traceId: context.traceId || null,
             agentConversationId: context.agentConversationId || null,
-            agentSessionId: context.agentConversationId || null,
           });
         })
         .catch((error: unknown) =>
