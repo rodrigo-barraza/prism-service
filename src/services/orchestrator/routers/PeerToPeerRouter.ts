@@ -44,6 +44,16 @@ export class PeerToPeerRouter implements TopologyRouter {
       `[PeerToPeerRouter] Starting Peer-to-Peer mesh execution of ${members.length} member(s)...`,
     );
 
+    const invalidMembersCount = members.filter(
+      (member) => !member.prompt || member.prompt.trim() === "",
+    ).length;
+
+    if (invalidMembersCount > 0) {
+      const errorMessage = `${invalidMembersCount} member(s) have missing or empty prompts. Cannot execute Peer-to-Peer mesh topology.`;
+      logger.error(`[PeerToPeerRouter] ${errorMessage}`);
+      return [{ error: errorMessage }];
+    }
+
     const results: (SubAgentResult | { error: string })[] = [];
     const sharedDiscussion: string[] = [];
     let consecutiveStallCount = 0;
