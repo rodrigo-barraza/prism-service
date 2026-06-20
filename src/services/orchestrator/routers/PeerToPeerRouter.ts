@@ -89,7 +89,10 @@ export class PeerToPeerRouter implements TopologyRouter {
     for (let turnIndex = 0; turnIndex < maxTurnsCount; turnIndex++) {
       const memberIndex = turnIndex % members.length;
       const member = members[memberIndex];
-      const speakerName = member.agent || `agent-${memberIndex + 1}`;
+      let speakerName = member.agent || `agent-${memberIndex + 1}`;
+      if (/^agent-\d+$/i.test(speakerName)) {
+        speakerName = `agent-${memberIndex + 1}`;
+      }
       const isFirstTurnForMember = !agentIdsByMemberIndex.has(memberIndex);
 
       logger.info(
