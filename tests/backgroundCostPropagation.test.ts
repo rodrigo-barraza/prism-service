@@ -41,7 +41,7 @@ const MOCK_EMBEDDING_PRICING = {
 const configMock = {
   MONGO_DB_NAME: "prism-test",
   TYPES,
-  getPricing: (_inputType, outputType) => {
+  getPricing: (_inputType: any, outputType: any) => {
     if (outputType === "embedding") return MOCK_EMBEDDING_PRICING;
     return MOCK_TEXT_PRICING;
   },
@@ -160,8 +160,8 @@ describe("Background Cost Propagation", () => {
       { role: "user", content: "The login endpoint is returning 500 errors." },
     ];
     it("should emit estimatedCost in memory:extract usage_update", async () => {
-      const emittedEvents = [];
-      const emit = (event) => emittedEvents.push(event);
+      const emittedEvents: any[] = [];
+      const emit = (event: any) => emittedEvents.push(event);
 
       // Override generateText to return something parseable
       mockGenerateText.mockResolvedValueOnce({
@@ -199,12 +199,12 @@ describe("Background Cost Propagation", () => {
         { inputTokens: extractEvent.usage.inputTokens, outputTokens: extractEvent.usage.outputTokens },
         MOCK_TEXT_PRICING["test-extract-model"],
       );
-      expect(extractEvent.usage.estimatedCost).toBeCloseTo(expectedCost, 8);
+      expect(extractEvent.usage.estimatedCost).toBeCloseTo(expectedCost as number, 8);
     });
 
     it("should emit estimatedCost in embed:memory usage_update", async () => {
-      const emittedEvents = [];
-      const emit = (event) => emittedEvents.push(event);
+      const emittedEvents: any[] = [];
+      const emit = (event: any) => emittedEvents.push(event);
 
       mockGenerateText.mockResolvedValueOnce({
         text: JSON.stringify([
@@ -239,8 +239,8 @@ describe("Background Cost Propagation", () => {
     });
 
     it("should not emit usage_update when extraction yields no memories", async () => {
-      const emittedEvents = [];
-      const emit = (event) => emittedEvents.push(event);
+      const emittedEvents: any[] = [];
+      const emit = (event: any) => emittedEvents.push(event);
 
       mockGenerateText.mockResolvedValueOnce({
         text: "[]",
@@ -272,8 +272,8 @@ describe("Background Cost Propagation", () => {
     });
 
     it("should skip extraction when save_memory was used (mutual exclusion)", async () => {
-      const emittedEvents = [];
-      const emit = (event) => emittedEvents.push(event);
+      const emittedEvents: any[] = [];
+      const emit = (event: any) => emittedEvents.push(event);
 
       const result = await MemoryExtractor.extractAndStore({
         project: "test-project",
@@ -282,7 +282,7 @@ describe("Background Cost Propagation", () => {
         agentConversationId: "session-1",
         endpoint: "/agent",
         agent: "CODING",
-        toolCalls: [{ name: "save_memory", args: {} }],
+        toolCalls: [{ id: "call-1", name: "save_memory", args: {} }],
         emit,
       });
 
@@ -291,12 +291,12 @@ describe("Background Cost Propagation", () => {
     });
 
     it("should handle null estimatedCost gracefully when model pricing is unavailable", async () => {
-      const emittedEvents = [];
-      const emit = (event) => emittedEvents.push(event);
+      const emittedEvents: any[] = [];
+      const emit = (event: any) => emittedEvents.push(event);
 
       // Override settings to return a model not in our pricing table
       const SettingsService = (await import("../src/services/SettingsService.ts")).default;
-      SettingsService.getSection.mockResolvedValueOnce({
+      (SettingsService.getSection as any).mockResolvedValueOnce({
         extractionProvider: "test-provider",
         extractionModel: "unknown-model-not-in-pricing",
         embeddingModel: "unknown-embed-model",
@@ -334,7 +334,7 @@ describe("Background Cost Propagation", () => {
      * Simulates the client-side accumulation logic from AgentComponent.js.
      * This is the exact pattern used in the onUsageUpdate handler.
      */
-    function accumulateBackgroundUsage(existing, usageEvent) {
+    function accumulateBackgroundUsage(existing: any, usageEvent: any) {
       const bg = existing || { inputTokens: 0, outputTokens: 0, cost: 0 };
       return {
         inputTokens: bg.inputTokens + (usageEvent.inputTokens || 0),
@@ -426,7 +426,7 @@ describe("Background Cost Propagation", () => {
     });
 
     it("should handle null bgUsage gracefully (no background ops happened)", () => {
-      const bgUsage = null;
+      const bgUsage = null as any;
 
       const backendTotalCost = 0.005000;
       const result = (backendTotalCost || 0) + (bgUsage?.cost || 0);

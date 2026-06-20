@@ -509,9 +509,13 @@ describe('FunctionCallingUtilities adversarial', () => {
       expect(expanded[5].role).toBe("tool");
       expect(expanded[5].name).toBe("generate_audio");
 
-      const lastUserIndex = expanded.findLastIndex(
-        (message) => message.role === "user",
-      );
+      let lastUserIndex = -1;
+      for (let i = expanded.length - 1; i >= 0; i--) {
+        if (expanded[i].role === "user") {
+          lastUserIndex = i;
+          break;
+        }
+      }
       expect(lastUserIndex).toBe(3);
 
       const toolIndex = expanded.findIndex(

@@ -36,7 +36,7 @@ function createMockCollection() {
   return {
     _docs: docs,
 
-    async updateOne(filter, update, options = {}) {
+    async updateOne(filter: any, update: any, options: any = {}) {
       const $set = update.$set || {};
       const $setOnInsert = update.$setOnInsert || {};
       const $push = update.$push || {};
@@ -74,10 +74,11 @@ function createMockCollection() {
       // Apply $push
       for (const [field, value] of Object.entries($push)) {
         if (!doc[field]) doc[field] = [];
-        if (value.$each) {
-          doc[field].push(...value.$each);
+        const val = value as any;
+        if (val.$each) {
+          doc[field].push(...val.$each);
         } else {
-          doc[field].push(value);
+          doc[field].push(val);
         }
       }
 
@@ -88,14 +89,14 @@ function createMockCollection() {
       };
     },
 
-    async findOne(filter) {
+    async findOne(filter: any) {
       const key = JSON.stringify(filter);
       return docs.get(key) || null;
     },
   };
 }
 
-let mockCollection;
+let mockCollection: any;
 
 // MongoWrapper mock — supports both getCollection() and getDb().collection()
 vi.mock("../src/wrappers/MongoWrapper.ts", () => {
@@ -166,8 +167,8 @@ async function createStub(id = BASE_ARGS.conversationId) {
 describe("ConversationService.appendMessages", () => {
   beforeEach(() => {
     mockCollection = createMockCollection();
-    MongoWrapper.getCollection.mockReturnValue(mockCollection);
-    MongoWrapper.getDb.mockReturnValue({
+    (MongoWrapper.getCollection as any).mockReturnValue(mockCollection);
+    (MongoWrapper.getDb as any).mockReturnValue({
       collection: () => mockCollection,
     });
   });
@@ -409,12 +410,12 @@ describe("ConversationService.appendMessages", () => {
   // layer must never mutate timer state — this aligns with Antigravity's
   // architecture where auto-cancel lives in the messaging dispatch layer.
   describe("timer isolation from message persistence", () => {
-    let mockTimersCollection;
+    let mockTimersCollection: any;
 
     beforeEach(() => {
       mockTimersCollection = createMockCollection();
-      MongoWrapper.getDb.mockReturnValue({
-        collection: (name) => {
+      (MongoWrapper.getDb as any).mockReturnValue({
+        collection: (name: any) => {
           if (name === COLLECTIONS.CONVERSATION_TIMERS) {
             return mockTimersCollection;
           }
@@ -423,7 +424,7 @@ describe("ConversationService.appendMessages", () => {
       });
     });
 
-    async function createActiveTimer(sessionId) {
+    async function createActiveTimer(sessionId: any) {
       const filter = {
         conversationId: sessionId,
         project: "coding",
@@ -527,7 +528,7 @@ describe("ConversationService.appendMessages", () => {
 describe("ConversationService.setGenerating", () => {
   beforeEach(() => {
     mockCollection = createMockCollection();
-    MongoWrapper.getDb.mockReturnValue({
+    (MongoWrapper.getDb as any).mockReturnValue({
       collection: () => mockCollection,
     });
   });

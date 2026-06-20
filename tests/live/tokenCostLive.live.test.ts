@@ -288,7 +288,7 @@ const SAMPLE_TOOLS = [
 
 // ── Helpers ──────────────────────────────────────────────────
 
-async function chat(payload) {
+async function chat(payload: any): Promise<any> {
   const res = await fetch(`${PRISM_SERVICE_URL}/chat?stream=false`, {
     method: "POST",
     headers: {
@@ -302,10 +302,10 @@ async function chat(payload) {
     const body = await res.text();
     throw new Error(`Prism returned ${res.status}: ${body}`);
   }
-  return res.json();
+  return (await res.json()) as any;
 }
 
-async function isProviderAvailable(provider, model) {
+async function isProviderAvailable(provider: any, model: any): Promise<boolean> {
   try {
     const res = await chat({
       provider,
@@ -319,11 +319,11 @@ async function isProviderAvailable(provider, model) {
   }
 }
 
-async function isLmStudioAvailable() {
+async function isLmStudioAvailable(): Promise<string | null> {
   try {
     const res = await fetch("http://localhost:1234/v1/models");
     if (!res.ok) return null;
-    const data = await res.json();
+    const data = (await res.json()) as any;
     return data.data?.[0]?.id || null;
   } catch {
     return null;
@@ -332,8 +332,8 @@ async function isLmStudioAvailable() {
 
 // ── Provider availability checks ────────────────────────────
 
-const availability = {};
-let lmStudioModel = null;
+const availability: Record<string, boolean> = {};
+let lmStudioModel: string | null = null;
 
 beforeAll(async () => {
   // Check Prism is running
@@ -395,7 +395,7 @@ describe("Live — OpenAI gpt-5-nano", () => {
 
     // Verify cost matches our calculator
     const pricing = TEXT_PRICING[MODEL];
-    const expectedCost = calculateTextCost(res.usage, pricing);
+    const expectedCost = calculateTextCost(res.usage, pricing)!;
     expect(res.estimatedCost).toBeCloseTo(expectedCost, 8);
 
     // Sanity: a one-word prompt should be < 100 input tokens
@@ -424,7 +424,7 @@ describe("Live — OpenAI gpt-5-nano", () => {
 
     // Verify cost calculation
     const pricing = TEXT_PRICING[MODEL];
-    const expectedCost = calculateTextCost(res.usage, pricing);
+    const expectedCost = calculateTextCost(res.usage, pricing)!;
     expect(res.estimatedCost).toBeCloseTo(expectedCost, 8);
   });
 
@@ -478,7 +478,7 @@ describe("Live — Anthropic haiku-4.5", () => {
     expect(res.estimatedCost).toBeGreaterThan(0);
 
     const pricing = TEXT_PRICING[MODEL];
-    const expectedCost = calculateTextCost(res.usage, pricing);
+    const expectedCost = calculateTextCost(res.usage, pricing)!;
     expect(res.estimatedCost).toBeCloseTo(expectedCost, 8);
 
     expect(res.usage.inputTokens).toBeLessThan(100);
@@ -511,7 +511,7 @@ describe("Live — Anthropic haiku-4.5", () => {
 
     // Cost should account for all tiers
     const pricing = TEXT_PRICING[MODEL];
-    const expectedCost = calculateTextCost(res.usage, pricing);
+    const expectedCost = calculateTextCost(res.usage, pricing)!;
     expect(res.estimatedCost).toBeCloseTo(expectedCost, 8);
   });
 
@@ -565,7 +565,7 @@ describe("Live — Google gemini-3-flash", () => {
     expect(res.estimatedCost).toBeGreaterThan(0);
 
     const pricing = TEXT_PRICING[MODEL];
-    const expectedCost = calculateTextCost(res.usage, pricing);
+    const expectedCost = calculateTextCost(res.usage, pricing)!;
     expect(res.estimatedCost).toBeCloseTo(expectedCost, 8);
 
     expect(res.usage.inputTokens).toBeLessThan(100);
@@ -593,7 +593,7 @@ describe("Live — Google gemini-3-flash", () => {
 
     const pricing = TEXT_PRICING[MODEL];
     const expectedCost = calculateTextCost(res.usage, pricing);
-    expect(res.estimatedCost).toBeCloseTo(expectedCost, 8);
+    expect(res.estimatedCost).toBeCloseTo(expectedCost!, 8);
   });
 
   it("FC request costs more than non-FC due to tool definitions", async () => {
@@ -648,7 +648,7 @@ describe("Live — LM Studio (local)", () => {
     if (!lmStudioModel) return;
 
     const res = await chat({
-      provider: "lm-studio",
+      provider: PROVIDERS.LM_STUDIO,
       model: lmStudioModel,
       messages: [{ role: "user", content: SIMPLE_PROMPT }],
       tools: SAMPLE_TOOLS,
@@ -697,7 +697,7 @@ describe("Live — Cross-provider consistency", () => {
 
       // Verify cost matches our calculator for every provider
       const pricing = TEXT_PRICING[model];
-      const expectedCost = calculateTextCost(res.usage, pricing);
+      const expectedCost = calculateTextCost(res.usage, pricing)!;
       expect(res.estimatedCost).toBeCloseTo(expectedCost, 8);
 
       // Response shape is consistent

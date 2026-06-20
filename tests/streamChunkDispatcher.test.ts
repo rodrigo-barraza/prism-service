@@ -8,7 +8,7 @@
  * dispatchChunk is the single source of truth for mapping provider stream
  * chunks to SSE events. Bugs here break the entire streaming pipeline.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../src/services/FileService.ts", () => ({
   default: {

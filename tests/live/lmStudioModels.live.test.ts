@@ -16,6 +16,7 @@
  * ═══════════════════════════════════════════════════════════
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { PROVIDERS } from "../../src/constants.ts";
 
 const PRISM_SERVICE_URL = "http://localhost:7777";
 const LM_STUDIO_URL = "http://localhost:1234";
@@ -134,7 +135,7 @@ async function chat(payload: any) {
     },
     body: JSON.stringify(payload),
   });
-  const body = await res.json();
+  const body = (await res.json()) as any;
   if (!res.ok || body.error) {
     throw new Error(body.message || `HTTP ${res.status}`);
   }
@@ -158,7 +159,7 @@ async function _unloadAllModels() {
   try {
     const res = await fetch(`${LM_STUDIO_URL}/api/v1/models`);
     if (!res.ok) return;
-    const data = await res.json();
+    const data = (await res.json()) as any;
     const models = data.models || data.data || [];
     for (const m of models) {
       for (const inst of m.loaded_instances || []) {
@@ -174,11 +175,11 @@ async function _unloadAllModels() {
   }
 }
 
-async function getAvailableModels() {
+async function getAvailableModels(): Promise<string[]> {
   const res = await fetch(`${LM_STUDIO_URL}/v1/models`);
   if (!res.ok) throw new Error("LM Studio not responding");
-  const data = await res.json() as any;
-  return (data.data || []).map((m: any) => m.id);
+  const data = (await res.json()) as any;
+  return (data.data || []).map((m: any) => m.id as string);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -226,7 +227,7 @@ beforeAll(async () => {
   const allModels = await getAvailableModels();
   modelsToTest = allModels.filter(shouldTestModel);
 
-  const skipped = allModels.filter((m) => !shouldTestModel(m));
+  const skipped = allModels.filter((m: string) => !shouldTestModel(m));
   const params = (id: string) => {
     const p = extractParamCount(id);
     return p ? `${p}B` : "?B";
@@ -294,7 +295,7 @@ describe("LM Studio — Model Compatibility", () => {
       try {
         // Load the model via Prism (auto-load handles load/unload)
         const res = await chat({
-          provider: "lm-studio",
+          provider: PROVIDERS.LM_STUDIO,
           model,
           messages: [{ role: "user", content: "What is 2 + 2? Answer briefly." }],
           maxTokens: 50,
@@ -359,7 +360,7 @@ describe("LM Studio — Model Compatibility", () => {
 
       try {
         const res = await chat({
-          provider: "lm-studio",
+          provider: PROVIDERS.LM_STUDIO,
           model,
           messages: [
             {
@@ -424,7 +425,7 @@ describe("LM Studio — Model Compatibility", () => {
 
       try {
         const res = await chat({
-          provider: "lm-studio",
+          provider: PROVIDERS.LM_STUDIO,
           model,
           messages: [
             {
@@ -491,7 +492,7 @@ describe("LM Studio — Model Compatibility", () => {
 
       try {
         const res = await chat({
-          provider: "lm-studio",
+          provider: PROVIDERS.LM_STUDIO,
           model,
           messages: [
             { role: "user", content: "My name is TestBot." },
@@ -556,7 +557,7 @@ describe("LM Studio — Model Compatibility", () => {
 
       try {
         const res = await chat({
-          provider: "lm-studio",
+          provider: PROVIDERS.LM_STUDIO,
           model,
           messages: [
             {

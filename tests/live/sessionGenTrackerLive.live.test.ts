@@ -44,21 +44,21 @@ const SSE_IDLE_TIMEOUT_MS = 60_000;
 async function findTargetModel() {
   const res = await fetch(`${LM_STUDIO_URL}/api/v1/models`);
   if (!res.ok) throw new Error("LM Studio not responding");
-  const data = await res.json();
+  const data = (await res.json()) as any;
   const models = data.models || data.data || [];
 
   for (const pattern of TARGET_MODEL_PATTERNS) {
-    const match = models.find((m) => pattern.test(m.key || m.id));
+    const match = models.find((m: any) => pattern.test(m.key || m.id));
     if (match) return match.key || match.id;
   }
 
   // Fallback: any loaded conversational model
   const loaded = models.find(
-    (m) => m.loaded_instances?.length > 0 && m.type !== TYPES.EMBEDDING,
+    (m: any) => m.loaded_instances?.length > 0 && m.type !== TYPES.EMBEDDING,
   );
   if (loaded) return loaded.key || loaded.id;
 
-  const first = models.find((m) => m.type !== TYPES.EMBEDDING);
+  const first = models.find((m: any) => m.type !== TYPES.EMBEDDING);
   return first ? first.key || first.id : null;
 }
 
@@ -67,12 +67,12 @@ async function findTargetModel() {
  * Extended to capture generation_progress and worker_status events
  * for tok/s validation.
  */
-async function consumeAgentSSE(response, { timeoutMs = AGENT_TIMEOUT_MS, controller } = {}) {
-  const reader = response.body.getReader();
+async function consumeAgentSSE(response: any, { timeoutMs = AGENT_TIMEOUT_MS, controller }: any = {}) {
+  const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
-  const result = {
+  const result: any = {
     events: [],
     chunks: [],
     thinkingChunks: [],
@@ -121,7 +121,7 @@ async function consumeAgentSSE(response, { timeoutMs = AGENT_TIMEOUT_MS, control
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
-      buffer = lines.pop();
+      buffer = lines.pop() || "";
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -202,7 +202,7 @@ async function consumeAgentSSE(response, { timeoutMs = AGENT_TIMEOUT_MS, control
 
       if (result.done) break;
     }
-  } catch (error) {
+  } catch (error: any) {
     if (error.name === "AbortError") {
       result.aborted = true;
     } else {
@@ -220,7 +220,7 @@ async function consumeAgentSSE(response, { timeoutMs = AGENT_TIMEOUT_MS, control
 /**
  * Stream an agent request and return structured SSE results.
  */
-async function agentStream(payload, { timeoutMs = AGENT_TIMEOUT_MS } = {}) {
+async function agentStream(payload: any, { timeoutMs = AGENT_TIMEOUT_MS }: any = {}) {
   const controller = new AbortController();
   const response = await fetch(`${PRISM_SERVICE_URL}/agent`, {
     method: "POST",
@@ -244,12 +244,12 @@ async function agentStream(payload, { timeoutMs = AGENT_TIMEOUT_MS } = {}) {
 /**
  * Log tok/s test results with comprehensive telemetry.
  */
-function logTokPerSecResult(label, result) {
+function logTokPerSecResult(label: any, result: any) {
   const dur = (result.durationMs / 1000).toFixed(1);
   const progEvents = result.generationProgressEvents;
   const lastProg = progEvents[progEvents.length - 1];
   const peakTokPerSec = progEvents.reduce(
-    (max, e) => (e.tokPerSec != null && e.tokPerSec > max ? e.tokPerSec : max), 0,
+    (max: any, e: any) => (e.tokPerSec != null && e.tokPerSec > max ? e.tokPerSec : max), 0,
   );
   const subAgentIds = Object.keys(result.subAgentGenerationProgress);
 
@@ -278,7 +278,7 @@ function logTokPerSecResult(label, result) {
   for (const subAgentId of subAgentIds) {
     const progressList = result.subAgentGenerationProgress[subAgentId];
     const peakRate = progressList.reduce(
-      (max, e) => (e.tokPerSec != null && e.tokPerSec > max ? e.tokPerSec : max), 0,
+      (max: any, e: any) => (e.tokPerSec != null && e.tokPerSec > max ? e.tokPerSec : max), 0,
     );
     const lastEvent = progressList[progressList.length - 1];
     console.log(`  │ Sub-agent ${subAgentId.slice(0, 10).padEnd(10)}: ${progressList.length} events, peak=${peakRate > 0 ? peakRate.toFixed(1) : "N/A"} tok/s, last=${lastEvent?.tokPerSec?.toFixed(1) ?? "N/A"} tok/s│`);
@@ -291,7 +291,7 @@ function logTokPerSecResult(label, result) {
 // Test Suite
 // ═══════════════════════════════════════════════════════════
 
-let targetModel = null;
+let targetModel: any = null;
 
 beforeAll(async () => {
   try {
@@ -347,7 +347,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
 
     // At least one event must have a non-null, positive tok/s
     const withTokPerSec = result.generationProgressEvents.filter(
-      (e) => e.tokPerSec != null && e.tokPerSec > 0,
+      (e: any) => e.tokPerSec != null && e.tokPerSec > 0,
     );
     expect(withTokPerSec.length).toBeGreaterThan(0);
 
@@ -365,8 +365,8 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
     // Sanity: tok/s should be reasonable (0.1 – 500 tok/s for local models)
     const peakTokPerSec = Math.max(
       ...result.generationProgressEvents
-        .filter((e) => e.tokPerSec != null)
-        .map((e) => e.tokPerSec),
+        .filter((e: any) => e.tokPerSec != null)
+        .map((e: any) => e.tokPerSec),
     );
     expect(peakTokPerSec).toBeGreaterThan(0);
     expect(peakTokPerSec).toBeLessThan(500);
@@ -404,7 +404,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
     // If tool calls were made, there should be multiple iterations
     // and generation_progress from each iteration's LLM call
     const iterationEvents = result.statuses.filter(
-      (s) => s.message === "iteration_progress",
+      (s: any) => s.message === "iteration_progress",
     );
     if (iterationEvents.length > 1) {
       // Multiple iterations → should have progress from each
@@ -466,7 +466,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
 
     // At least some events should have valid tok/s
     const validProgress = result.generationProgressEvents.filter(
-      (e) => e.tokPerSec != null && e.tokPerSec > 0,
+      (e: any) => e.tokPerSec != null && e.tokPerSec > 0,
     );
     expect(validProgress.length).toBeGreaterThan(0);
 
@@ -479,14 +479,14 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
     // On a single LM Studio instance with sequential workers,
     // activeRequests will be 1 at any given time.
     const maxActiveReqs = Math.max(
-      ...result.generationProgressEvents.map((e) => e.activeRequests || 0),
+      ...result.generationProgressEvents.map((e: any) => e.activeRequests || 0),
     );
     console.log(`     Peak activeRequests: ${maxActiveReqs}`);
 
     // ── Per-subagent tok/s (MessageList toolCallItem) ──────────
     // Check if workers were actually spawned
     const teamCreateCalls = result.toolCalls.filter(
-      (t) => t.tool?.name === "team_create" || t.name === "team_create",
+      (t: any) => t.tool?.name === "team_create" || t.name === "team_create",
     );
     const subAgentIds = Object.keys(result.subAgentGenerationProgress);
 
@@ -503,7 +503,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
 
         // At least one event should have tok/s
         const wWithTokPerSec = progressList.filter(
-          (e) => e.tokPerSec != null && e.tokPerSec > 0,
+          (e: any) => e.tokPerSec != null && e.tokPerSec > 0,
         );
 
         console.log(`     Sub-agent ${subAgentId.slice(0, 12)}: ${progressList.length} progress events, ${wWithTokPerSec.length} with tok/s`);
@@ -527,7 +527,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
       // Model didn't spawn workers — this is possible if LM Studio
       // doesn't support function calling for this model. Log but don't fail.
       console.log(`\n  ⚠ Model did not spawn workers — coordinator-only tok/s verified`);
-      console.log(`    Tool calls: ${result.toolCalls.map((t) => t.tool?.name || t.name).join(", ") || "none"}`);
+      console.log(`    Tool calls: ${result.toolCalls.map((t: any) => t.tool?.name || t.name).join(", ") || "none"}`);
     }
   }, 600_000); // 10 min total
 
@@ -640,7 +640,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
 
     // Cross-validate with the generation_started event TTFT
     const genStartedEvents = result.statuses.filter(
-      (s) => s.message === "generation_started" && s.timeToFirstToken != null,
+      (s: any) => s.message === "generation_started" && s.timeToFirstToken != null,
     );
     if (genStartedEvents.length > 0) {
       const serverTtft = genStartedEvents[0].timeToFirstToken;

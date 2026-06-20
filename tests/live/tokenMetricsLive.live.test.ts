@@ -56,18 +56,22 @@ const LM_STUDIO_PATTERNS = [
 
 
  */
-async function streamAndCollect(provider, model, prompt, {
+/**
+ * Stream an /agent or /chat request and collect all token-relevant
+ * SSE events into a structured result object.
+ */
+async function streamAndCollect(provider: any, model: any, prompt: any, {
   maxTokens = 500,
   timeout = 120_000,
   agent = "CODING",
   autoApprove = true,
   maxIterations = 25,
   enabledTools,
-} = {}) {
+}: any = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
 
-  const body = {
+  const body: any = {
     provider,
     model,
     messages: [{ role: "user", content: prompt }],
@@ -95,11 +99,11 @@ async function streamAndCollect(provider, model, prompt, {
     throw new Error(`/agent returned ${res.status}: ${await res.text()}`);
   }
 
-  const reader = res.body.getReader();
+  const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
-  const result = {
+  const result: any = {
     progressEvents: [],
     usageUpdates: [],
     doneUsage: null,
@@ -197,7 +201,7 @@ async function streamAndCollect(provider, model, prompt, {
 // ═══════════════════════════════════════════════════════════════
 
 /** Check that token fields are monotonically non-decreasing. */
-function checkMonotonicity(events) {
+function checkMonotonicity(events: any) {
   let prevOut = 0, prevIn = 0, prevTotal = 0;
   const violations = [];
   for (let i = 0; i < events.length; i++) {
@@ -213,7 +217,7 @@ function checkMonotonicity(events) {
 }
 
 /** Print a formatted results table. */
-function printTable(label, result) {
+function printTable(label: any, result: any) {
   const events = result.progressEvents;
   if (!events.length) {
     console.log(`\n  ⚠ ${label}: no generation_progress events received`);
@@ -231,7 +235,7 @@ function printTable(label, result) {
   console.log(`  │ Progress out:     ${String(last.outputTokens).padStart(6)}   Provider out: ${String(providerOut).padStart(6)}      │`);
   console.log(`  │ Progress in:      ${String(last.inputTokens).padStart(6)}   Provider in:  ${String(providerIn).padStart(6)}      │`);
   console.log(`  │ Progress total:   ${String(last.totalTokens).padStart(6)}                             │`);
-  console.log(`  │ Peak tok/s:       ${String(Math.max(...events.filter(e => e.tokPerSec != null).map(e => e.tokPerSec), 0).toFixed(1)).padStart(6)}                             │`);
+  console.log(`  │ Peak tok/s:       ${String(Math.max(...events.filter((e: any) => e.tokPerSec != null).map((e: any) => e.tokPerSec), 0).toFixed(1)).padStart(6)}                             │`);
   console.log(`  │ Duration:         ${(result.durationMs / 1000).toFixed(1).padStart(5)}s                             │`);
   if (providerOut > 0) {
     const ratio = last.outputTokens / providerOut;
@@ -244,27 +248,27 @@ function printTable(label, result) {
 // Discovery
 // ═══════════════════════════════════════════════════════════════
 
-let lmStudioModel = null;
+let lmStudioModel: any = null;
 let lmStudioAvailable = false;
 let _prismAvailable = false;
 /** Tracks which online providers have valid API keys. */
-const onlineAvailable = { openai: false, anthropic: false, google: false };
+const onlineAvailable: any = { openai: false, anthropic: false, google: false };
 
 async function findLmStudioModel() {
   try {
     const res = await fetch(`${LM_STUDIO_URL}/api/v1/models`);
     if (!res.ok) return null;
-    const data = await res.json();
+    const data = (await res.json()) as any;
     const models = data.models || data.data || [];
     for (const pattern of LM_STUDIO_PATTERNS) {
-      const match = models.find((m) => pattern.test(m.key || m.id));
+      const match = models.find((m: any) => pattern.test(m.key || m.id));
       if (match) return match.key || match.id;
     }
     const loaded = models.find(
-      (m) => m.loaded_instances?.length > 0 && m.type !== TYPES.EMBEDDING,
+      (m: any) => m.loaded_instances?.length > 0 && m.type !== TYPES.EMBEDDING,
     );
     if (loaded) return loaded.key || loaded.id;
-    const first = models.find((m) => m.type !== TYPES.EMBEDDING);
+    const first = models.find((m: any) => m.type !== TYPES.EMBEDDING);
     return first ? first.key || first.id : null;
   } catch {
     return null;
@@ -279,12 +283,12 @@ async function probeOnlineProviders() {
   try {
     const res = await fetch(`${PRISM_SERVICE_URL}/config`);
     if (!res.ok) return;
-    const cfg = await res.json();
+    const cfg = (await res.json()) as any;
     const textModels = cfg?.textToText?.models || {};
     for (const provider of Object.keys(ONLINE_MODELS)) {
       const providerModels = textModels[provider] || [];
-      const target = ONLINE_MODELS[provider].model;
-      if (providerModels.some((m) => m.name === target)) {
+      const target = ONLINE_MODELS[provider as keyof typeof ONLINE_MODELS].model;
+      if (providerModels.some((m: any) => m.name === target)) {
         onlineAvailable[provider] = true;
       }
     }
@@ -340,12 +344,12 @@ describe("LM Studio — Token Metrics", () => {
 
     expect(result.progressEvents.length).toBeGreaterThan(0);
     const withTokPerSec = result.progressEvents.filter(
-      (e) => e.tokPerSec != null && e.tokPerSec > 0,
+      (e: any) => e.tokPerSec != null && e.tokPerSec > 0,
     );
     expect(withTokPerSec.length).toBeGreaterThan(0);
 
     // Sane range: 0.1–500 tok/s for local models
-    const peak = Math.max(...withTokPerSec.map((e) => e.tokPerSec));
+    const peak = Math.max(...withTokPerSec.map((e: any) => e.tokPerSec));
     expect(peak).toBeGreaterThan(0);
     expect(peak).toBeLessThan(500);
   }, 90_000);
@@ -437,7 +441,7 @@ describe("LM Studio — Token Metrics", () => {
     // Should have progress events even during tool-call generation
     expect(result.progressEvents.length).toBeGreaterThan(0);
     const withTokPerSec = result.progressEvents.filter(
-      (e) => e.tokPerSec != null && e.tokPerSec > 0,
+      (e: any) => e.tokPerSec != null && e.tokPerSec > 0,
     );
     expect(withTokPerSec.length).toBeGreaterThan(0);
 
@@ -533,7 +537,7 @@ describe.each([
 
     // ─── 4. Tok/s reporting ───────────────────────────────────
     const withTokPerSec = result.progressEvents.filter(
-      (e) => e.tokPerSec != null && e.tokPerSec > 0,
+      (eventItem: any) => eventItem.tokPerSec != null && eventItem.tokPerSec > 0,
     );
 
     if (withTokPerSec.length === 0) {
@@ -541,7 +545,7 @@ describe.each([
       console.log(`  ⚠ No live tok/s events — model may batch SSE output`);
       expect(last.outputTokens).toBeGreaterThan(0);
     } else {
-      const peak = Math.max(...withTokPerSec.map((e) => e.tokPerSec));
+      const peak = Math.max(...withTokPerSec.map((eventItem: any) => eventItem.tokPerSec));
       expect(peak).toBeGreaterThan(0);
       expect(peak).toBeLessThan(2000);
       console.log(`  ✅ Tok/s: peak=${peak.toFixed(1)} across ${withTokPerSec.length} events`);
@@ -563,7 +567,7 @@ describe.each([
     // ─── 7. TTFT tracking ─────────────────────────────────────
     // avgTtft should be present in at least one progress event
     const withTtft = result.progressEvents.filter(
-      (e) => e.avgTtft != null && e.avgTtft > 0,
+      (eventItem: any) => eventItem.avgTtft != null && eventItem.avgTtft > 0,
     );
     if (withTtft.length > 0) {
       const ttft = withTtft[0].avgTtft;
@@ -620,7 +624,7 @@ describe.each([
 
     // ─── create_team detection ────────────────────────────────
     const teamCreateCalls = result.toolCalls.filter(
-      (t) => (t.tool?.name || t.name) === "create_team",
+      (t: any) => (t.tool?.name || t.name) === "create_team",
     );
     console.log(`     team_create calls: ${teamCreateCalls.length}`);
 
@@ -640,10 +644,10 @@ describe.each([
 
         // Per-subagent tok/s
         const wWithTokPerSec = progressList.filter(
-          (e) => e.tokPerSec != null && e.tokPerSec > 0,
+          (e: any) => e.tokPerSec != null && e.tokPerSec > 0,
         );
         const peakTokPerSec = wWithTokPerSec.length > 0
-          ? Math.max(...wWithTokPerSec.map((e) => e.tokPerSec))
+          ? Math.max(...wWithTokPerSec.map((e: any) => e.tokPerSec))
           : 0;
 
         console.log(
@@ -682,11 +686,11 @@ describe.each([
     // not the average. When multiple workers are active, the
     // aggregate should exceed any single worker's peak.
     const coordWithTokPerSec = result.progressEvents.filter(
-      (e) => e.tokPerSec != null && e.tokPerSec > 0,
+      (e: any) => e.tokPerSec != null && e.tokPerSec > 0,
     );
     if (coordWithTokPerSec.length > 0) {
       const coordPeakTokPerSec = Math.max(
-        ...coordWithTokPerSec.map((e) => e.tokPerSec),
+        ...coordWithTokPerSec.map((e: any) => e.tokPerSec),
       );
       console.log(`     Coordinator peak tok/s: ${coordPeakTokPerSec.toFixed(1)}`);
       expect(coordPeakTokPerSec).toBeGreaterThan(0);
@@ -697,7 +701,7 @@ describe.each([
         // Coordinator outputTokens should be >= sum of worker outputTokens
         // (it also includes orchestrator's own tokens)
         const workerTotalOut = result.subAgentCompleteEvents.reduce(
-          (sum, wc) => sum + (wc.usage?.outputTokens || 0), 0,
+          (sum: any, wc: any) => sum + (wc.usage?.outputTokens || 0), 0,
         );
         console.log(`     Coordinator total out: ${last.outputTokens}, Sub-agent sum: ${workerTotalOut}`);
         expect(last.outputTokens).toBeGreaterThanOrEqual(workerTotalOut);

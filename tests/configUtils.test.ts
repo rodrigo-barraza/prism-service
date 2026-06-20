@@ -31,7 +31,7 @@ describe("Config route — pattern constant detection", () => {
     expect(textToText).toHaveProperty("defaults");
 
     // At least one provider should have models
-    const allModels = Object.values(textToText.models).flat();
+    const allModels = Object.values(textToText.models).flat() as any[];
     expect(allModels.length).toBeGreaterThan(0);
 
     // Every model should have required fields
@@ -46,7 +46,7 @@ describe("Config route — pattern constant detection", () => {
   it("thinking-capable models have thinking: true and Thinking in tools", async () => {
     const res = await request(app).get("/config").expect(200);
 
-    const allModels = Object.values(res.body.textToText.models).flat();
+    const allModels = Object.values(res.body.textToText.models).flat() as any[];
     const thinkingModels = allModels.filter((m) => m.thinking === true);
 
     // We should have at least some thinking models (o1, o3, deepseek, qwen3, etc.)
@@ -63,7 +63,7 @@ describe("Config route — pattern constant detection", () => {
   it("thinking-capable models expose thinkingLevels array containing low and high", async () => {
     const res = await request(app).get("/config").expect(200);
 
-    const allModels = Object.values(res.body.textToText.models).flat();
+    const allModels = Object.values(res.body.textToText.models).flat() as any[];
     const thinkingModels = allModels.filter(
       (m: any) => m.thinking === true && m.modelType === "conversation"
     );
@@ -82,7 +82,7 @@ describe("Config route — pattern constant detection", () => {
   it("models with Tool Calling have it in their tools array", async () => {
     const res = await request(app).get("/config").expect(200);
 
-    const allModels = Object.values(res.body.textToText.models).flat();
+    const allModels = Object.values(res.body.textToText.models).flat() as any[];
     const fcModels = allModels.filter(
       (m) => m.tools && m.tools.includes("Tool Calling"),
     );
@@ -100,7 +100,7 @@ describe("Config route — pattern constant detection", () => {
   it("vision-capable models have image in inputTypes", async () => {
     const res = await request(app).get("/config").expect(200);
 
-    const allModels = Object.values(res.body.textToText.models).flat();
+    const allModels = Object.values(res.body.textToText.models).flat() as any[];
     const visionModels = allModels.filter(
       (m) => m.vision === true || m.inputTypes?.includes("image"),
     );
@@ -123,7 +123,7 @@ describe("Pattern matching behavior (via model catalog)", () => {
   it("qwen3 models are detected as thinking-capable", async () => {
     const res = await request(app).get("/config").expect(200);
 
-    const allModels = Object.values(res.body.textToText.models).flat();
+    const allModels = Object.values(res.body.textToText.models).flat() as any[];
     const qwen3 = allModels.filter((m) =>
       m.name.toLowerCase().includes("qwen3"),
     );
@@ -137,7 +137,7 @@ describe("Pattern matching behavior (via model catalog)", () => {
   it("deepseek-r1 models are detected as thinking-capable", async () => {
     const res = await request(app).get("/config").expect(200);
 
-    const allModels = Object.values(res.body.textToText.models).flat();
+    const allModels = Object.values(res.body.textToText.models).flat() as any[];
     const dsr1 = allModels.filter((m) =>
       m.name.toLowerCase().includes("deepseek-r1"),
     );
@@ -160,7 +160,7 @@ describe("Dynamic model merging (via /config endpoint)", () => {
     for (const [_provider, models] of Object.entries(
       res.body.textToText.models,
     )) {
-      const names = models.map((m) => m.name);
+      const names = (models as any[]).map((m: any) => m.name);
       const uniqueNames = new Set(names);
       expect(uniqueNames.size).toBe(
         names.length,
@@ -171,7 +171,7 @@ describe("Dynamic model merging (via /config endpoint)", () => {
   it("all model entries have required pricing structure", async () => {
     const res = await request(app).get("/config").expect(200);
 
-    const allModels = Object.values(res.body.textToText.models).flat();
+    const allModels = Object.values(res.body.textToText.models).flat() as any[];
     for (const model of allModels) {
       // Every model must have pricing (even if zero for local models)
       expect(model).toHaveProperty("pricing");
@@ -191,7 +191,7 @@ describe("formatBytes (via model size fields)", () => {
   it("model size strings are well-formed when present", async () => {
     const res = await request(app).get("/config").expect(200);
 
-    const allModels = Object.values(res.body.textToText.models).flat();
+    const allModels = Object.values(res.body.textToText.models).flat() as any[];
     const withSize = allModels.filter((m) => m.size);
 
     for (const model of withSize) {
@@ -209,7 +209,7 @@ describe("Arena score enrichment", () => {
   it("some models have arena scores attached", async () => {
     const res = await request(app).get("/config").expect(200);
 
-    const allModels = Object.values(res.body.textToText.models).flat();
+    const allModels = Object.values(res.body.textToText.models).flat() as any[];
     const withArena = allModels.filter(
       (m) => m.arena && Object.keys(m.arena).length > 0,
     );
@@ -221,7 +221,7 @@ describe("Arena score enrichment", () => {
   it("arena scores are numeric values", async () => {
     const res = await request(app).get("/config").expect(200);
 
-    const allModels = Object.values(res.body.textToText.models).flat();
+    const allModels = Object.values(res.body.textToText.models).flat() as any[];
     const withArena = allModels.filter((m) => m.arena);
 
     for (const model of withArena) {
@@ -261,7 +261,7 @@ describe("LM Studio config integration", () => {
 
     // Since LM Studio is not available in test, test vllm/ollama if present
     // or just verify the structure expectation
-    const allModels = Object.values(res.body.textToText.models).flat();
+    const allModels = Object.values(res.body.textToText.models).flat() as any[];
     const freeModels = allModels.filter(
       (m) =>
         m.pricing.inputPerMillion === 0 && m.pricing.outputPerMillion === 0,

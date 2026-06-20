@@ -293,14 +293,14 @@ const SAMPLE_TOOLS = [
 ];
 
 // ── Helper: compute expected cost from config pricing ────────
-function expectedCost(model, usage) {
+function expectedCost(model: string, usage: any): number {
   const pricing = TEXT_PRICING[model];
   expect(pricing).toBeDefined();
-  return calculateTextCost(usage, pricing);
+  return calculateTextCost(usage, pricing)!;
 }
 
 // ── Helper: send chat request (non-streaming) ────────────────
-function sendChat(payload) {
+function sendChat(payload: any) {
   return request(app)
     .post("/chat?stream=false")
     .send(payload);
