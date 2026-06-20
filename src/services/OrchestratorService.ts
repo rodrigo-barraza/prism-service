@@ -757,9 +757,11 @@ export default class OrchestratorService {
       TOPOLOGIES.PEER_TO_PEER,
       TOPOLOGIES.TOURNAMENT,
       TOPOLOGIES.CRITIC_LOOP,
+      TOPOLOGIES.DIVIDE_AND_CONQUER,
+      TOPOLOGIES.MCTS,
     ];
     if (!validTopologies.includes(topology)) {
-      const errorMessage = `Invalid topology: "${topology}". Available topologies are: hierarchical, hierarchical_aggregation, sequential, peer_to_peer, tournament, critic_loop.`;
+      const errorMessage = `Invalid topology: "${topology}". Available topologies are: hierarchical, hierarchical_aggregation, sequential, peer_to_peer, tournament, critic_loop, divide_and_conquer, mcts.`;
       logger.error(`[Orchestrator] createTeam: ${errorMessage}`);
       return [{ error: errorMessage }];
     }
@@ -867,6 +869,14 @@ export default class OrchestratorService {
       const { CriticLoopRouter } =
         await import("./orchestrator/routers/CriticLoopRouter.ts");
       router = new CriticLoopRouter();
+    } else if (topology === TOPOLOGIES.DIVIDE_AND_CONQUER) {
+      const { DivideAndConquerRouter } =
+        await import("./orchestrator/routers/DivideAndConquerRouter.ts");
+      router = new DivideAndConquerRouter();
+    } else if (topology === TOPOLOGIES.MCTS) {
+      const { MCTSRouter } =
+        await import("./orchestrator/routers/MCTSRouter.ts");
+      router = new MCTSRouter();
     } else {
       const { HierarchicalRouter } =
         await import("./orchestrator/routers/HierarchicalRouter.ts");
@@ -1141,6 +1151,14 @@ export default class OrchestratorService {
       [TOPOLOGIES.CRITIC_LOOP]: {
         name: "Critic Loop (Actor-Critic)",
         description: "Actor produces output, critic evaluates and provides pass/fail feedback. If failed, actor revises. Iterates until critic approves or max rounds reached.",
+      },
+      [TOPOLOGIES.DIVIDE_AND_CONQUER]: {
+        name: "Divide & Conquer (ToT)",
+        description: "A planner decomposes the task into independent subtasks, each dispatched to a sub-agent in parallel, then synthesized into a unified result.",
+      },
+      [TOPOLOGIES.MCTS]: {
+        name: "MCTS-Guided Search (LATS)",
+        description: "Monte Carlo Tree Search — expands N branches in parallel, evaluates and scores each, selects the best, and refines iteratively until complete.",
       },
     };
 

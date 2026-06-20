@@ -38,6 +38,10 @@ export function getOrchestratorPromptAddendum({
     defaultTopology === TOPOLOGIES.TOURNAMENT ? " (default)" : "";
   const defCriticLoop =
     defaultTopology === TOPOLOGIES.CRITIC_LOOP ? " (default)" : "";
+  const defDivideAndConquer =
+    defaultTopology === TOPOLOGIES.DIVIDE_AND_CONQUER ? " (default)" : "";
+  const defMcts =
+    defaultTopology === TOPOLOGIES.MCTS ? " (default)" : "";
 
   return `## Orchestrator Mode — Multi-Agent Orchestration
 Base Agentic Loop
@@ -60,6 +64,8 @@ Sub-agent results and system notifications are internal signals — never thank 
   - **\`peer_to_peer\`**${defPeerToPeer} — Turn-based discussion where members take turns on a shared thread. Best for debate, code review, or collaborative reasoning between specialized agents.
   - **\`tournament\`**${defTournament} — All members run in parallel, then a judge evaluates and selects the single best result. Best when quality matters and you want competitive selection between approaches.
   - **\`critic_loop\`**${defCriticLoop} — First member (actor) executes the task, second member (critic) evaluates the output. If the critic fails the work, the actor revises based on feedback. Iterates until the critic passes or max rounds reached. Best for high-stakes tasks needing adversarial verification.
+  - **\`divide_and_conquer\`**${defDivideAndConquer} — A planner decomposes the task into independent subtasks, each dispatched to a sub-agent in parallel, then synthesized. Best for large, complex tasks that can be broken into orthogonal work streams.
+  - **\`mcts\`**${defMcts} — Monte Carlo Tree Search. Expands N branches in parallel, evaluates and scores each, selects the best, and refines iteratively. Best for tasks where quality ceiling matters and compute budget is available.
 - **send_message** — Continue an existing sub-agent (send a follow-up to its agent ID)
 - **stop_agent** — Stop a running sub-agent and clean up its worktree
 
