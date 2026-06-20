@@ -194,7 +194,6 @@ async function processBatch(
     endpoint,
     traceId,
     agentConversationId,
-    agentSessionId,
     broadcast,
     systemPrompt = CONSOLIDATION_PROMPT,
     inputBuilder,
@@ -262,8 +261,7 @@ async function processBatch(
     provider: consolidationProvider,
     model: consolidationModel,
     traceId: traceId || null,
-    agentConversationId: agentConversationId || agentSessionId || null,
-    agentSessionId: agentConversationId || agentSessionId || null,
+    agentConversationId: agentConversationId || null,
     aiMessages: aiMessages as MessagePayload[],
     resultText: result?.text || "",
     usage: realUsage,
@@ -345,7 +343,6 @@ const MemoryConsolidationService = {
     endpoint,
     traceId,
     agentConversationId,
-    agentSessionId,
     guildId,
   }: ConsolidateOptions) {
     const startTime = performance.now();
@@ -498,7 +495,6 @@ const MemoryConsolidationService = {
           endpoint,
           traceId,
           agentConversationId,
-          agentSessionId,
           broadcast,
           systemPrompt: CONVERSATIONAL_CONSOLIDATION_PROMPT,
           inputBuilder: buildConversationalBatchInput,
@@ -562,7 +558,6 @@ const MemoryConsolidationService = {
           endpoint,
           traceId,
           agentConversationId,
-          agentSessionId,
           broadcast,
         });
         allActions.push(...batchActions);
@@ -648,7 +643,6 @@ const MemoryConsolidationService = {
     agent,
     traceId,
     agentConversationId,
-    agentSessionId,
   }: CheckAndRunOptions) {
     try {
       await incrementRunCount(project || "global");
@@ -662,12 +656,11 @@ const MemoryConsolidationService = {
           agent: agent || AGENT_IDS.CODING,
           project,
           username,
-          trigger: "session_threshold",
+          trigger: "conversation_threshold",
           broadcast,
           endpoint: endpoint || "/agent",
           traceId: traceId || null,
           agentConversationId: agentConversationId || null,
-          agentSessionId: agentSessionId || null,
         }).catch((error: unknown) =>
           logger.error(
             `[MemoryConsolidation] Background consolidation failed: ${getErrorMessage(error)}`,

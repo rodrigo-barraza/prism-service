@@ -188,7 +188,7 @@ export default class SystemPromptAssembler {
           latestUserMessage.content,
           {
             traceId: context.traceId,
-            agentSessionId: context.agentSessionId,
+            agentSessionId: context.agentConversationId,
             endpoint: context.agentContext?.endpoint || "/agent",
             project: context.project,
             username: context.username,
@@ -408,7 +408,7 @@ export default class SystemPromptAssembler {
       queryText,
       {
         traceId: context.traceId,
-        agentSessionId: context.agentSessionId,
+        agentConversationId: context.agentConversationId,
         endpoint: "/agent",
         agent: agentId,
       },
@@ -424,7 +424,7 @@ export default class SystemPromptAssembler {
         `${PROMPT_DELIMITERS.PROJECT_SKILLS}\n` + skillBlocks.join("\n\n");
     }
 
-    // ── 9. Session Memory (embedding search) ────────────────────
+    // ── 9. Conversation Memory (embedding search) ────────────────────
     const memoryQuery = queryText || context.project || "";
     let memoriesText = "";
 
@@ -439,7 +439,7 @@ export default class SystemPromptAssembler {
         memoryQuery,
         {
           traceId: context.traceId,
-          agentSessionId: context.agentSessionId,
+          agentConversationId: context.agentConversationId,
           endpoint: "/agent",
           _username: context.username,
           guildId: memoryGuildId,
@@ -451,7 +451,7 @@ export default class SystemPromptAssembler {
       }
     }
 
-    // ── 10. Workflow Memory (cross-session procedural learning) ──
+    // ── 10. Workflow Memory (cross-conversation procedural learning) ──
     let workflowsText = "";
     if (memoryQuery && !isDirectMode) {
       try {
@@ -461,7 +461,7 @@ export default class SystemPromptAssembler {
           memoryQuery,
           {
             traceId: context.traceId,
-            agentSessionId: context.agentSessionId,
+            agentConversationId: context.agentConversationId,
             endpoint: "/agent",
             username: context.username,
           },

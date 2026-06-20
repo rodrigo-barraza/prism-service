@@ -193,7 +193,6 @@ async function prepareGenerationContext(
     messages,
     conversationId: incomingConversationId,
     agentConversationId: incomingAgentConversationId,
-    agentSessionId: incomingAgentSessionId,
     conversationMeta: incomingConversationMeta,
     traceId: incomingTraceId,
     project,
@@ -499,9 +498,8 @@ async function prepareGenerationContext(
     userMessage,
     // Identity
     incomingConversationId,
-    incomingAgentSessionId: incomingAgentConversationId || incomingAgentSessionId || null,
-    agentConversationId: incomingAgentConversationId || incomingAgentSessionId || null,
-    agentSessionId: incomingAgentConversationId || incomingAgentSessionId || null,
+    incomingAgentConversationId: incomingAgentConversationId || null,
+    agentConversationId: incomingAgentConversationId || null,
     incomingConversationMeta,
     incomingTraceId,
     skipConversation,
@@ -583,7 +581,7 @@ export async function handleConversation(
   const fullContext = {
     ...context,
     conversationId: conversationId || null,
-    agentSessionId: null as string | null,
+    agentConversationId: null as string | null,
     conversationMeta,
     traceId,
   };
@@ -700,10 +698,10 @@ export async function handleConversation(
     });
   }
 }
-// ─── Agent session path (agentSessionId, no conversationId) ─
+// ─── Agent conversation path (agentConversationId, no conversationId) ─
 /**
  * Handle an agent request: always dispatches to AgenticLoopService.
- * Persistence uses agentSessionId (not conversationId).
+ * Persistence uses agentConversationId (not conversationId).
  *
  * Used exclusively by the /agent route.
  */
@@ -730,7 +728,6 @@ export async function handleAgent(
     options,
     incomingConversationId,
     agentConversationId,
-    agentSessionId,
     incomingConversationMeta,
     incomingTraceId,
     project,
@@ -741,8 +738,8 @@ export async function handleAgent(
     requestId,
     localRelease,
   } = context;
-  // ── Agent session identity ─────────────────────────────────
-  const resolvedAgentConversationId = agentConversationId || agentSessionId || crypto.randomUUID();
+  // ── Agent conversation identity ─────────────────────────────────
+  const resolvedAgentConversationId = agentConversationId || crypto.randomUUID();
   const conversationId = incomingConversationId || crypto.randomUUID();
   const traceId = incomingTraceId || null;
   const conversationMeta = incomingConversationMeta || null;
@@ -793,7 +790,6 @@ export async function handleAgent(
         originalMessages: context.originalMessages as ConversationMessage[],
         options,
         agentConversationId: resolvedAgentConversationId,
-        agentSessionId: resolvedAgentConversationId,
         conversationId,
         userMessage: context.userMessage as ConversationMessage | null,
         conversationMeta,
@@ -850,7 +846,6 @@ export async function handleAgent(
       provider: providerName,
       model: resolvedModel || requestedModel || "any",
       agentConversationId: resolvedAgentConversationId,
-      agentSessionId: resolvedAgentConversationId,
       conversationId: conversationId || null,
       traceId: traceId || null,
       success: false,
@@ -1058,7 +1053,7 @@ type GenerationContext = Awaited<
   conversationId: string | null;
   conversationMeta?: Record<string, unknown> | null;
   traceId?: string | null;
-  agentSessionId: string | null;
+  agentConversationId: string | null;
 };
 
 async function handleStreamingText(context: GenerationContext) {
@@ -1382,13 +1377,13 @@ async function handleNonStreamingText(context: GenerationContext) {
         : undefined,
   });
   // Track this sub-request in ConversationGenerationTracker if it belongs
-  // to an active agent session (e.g., tools-api calling /chat?stream=false
+  // to an active agent conversation (e.g., tools-api calling /chat?stream=false
   // for generate_image prompt-softening or describe_image).
-  const subRequestId = context.agentSessionId
+  const subRequestId = context.agentConversationId
     ? `sub-${context.requestId || crypto.randomUUID()}`
     : null;
-  if (subRequestId && context.agentSessionId) {
-    ConversationGenerationTracker.register(context.agentSessionId, subRequestId, {
+  if (subRequestId && context.agentConversationId) {
+    ConversationGenerationTracker.register(context.agentConversationId, subRequestId, {
       provider: context.providerName,
       model: resolvedModel,
       source: "tool-sub-request",
@@ -1402,7 +1397,7 @@ async function handleNonStreamingText(context: GenerationContext) {
   );
   const now = performance.now();
   // Complete sub-request tracking with actual token data
-  if (subRequestId && context.agentSessionId) {
+  if (subRequestId && context.agentConversationId) {
     const outTokens = genResult.usage?.outputTokens || 0;
     if (outTokens > 0) {
       ConversationGenerationTracker.update(subRequestId, {

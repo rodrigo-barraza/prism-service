@@ -38,9 +38,7 @@ export interface FinalizerContext {
   options: LlmOptions;
   conversationId: string | null;
   agentConversationId?: string | null;
-  agentSessionId?: string | null;
   parentAgentConversationId?: string | null;
-  parentAgentSessionId?: string | null;
   parentConversationId?: string | null;
   userMessage?: MessagePayload | null;
   conversationMeta?: Record<string, unknown> | null;
@@ -186,9 +184,7 @@ export async function finalizeTextGeneration(
     options,
     conversationId,
     agentConversationId,
-    agentSessionId,
     parentAgentConversationId,
-    parentAgentSessionId,
     parentConversationId,
     userMessage,
     conversationMeta,
@@ -344,10 +340,10 @@ export async function finalizeTextGeneration(
       provider: providerName,
       model: resolvedModel,
       conversationId,
-      agentConversationId: agentConversationId || agentSessionId,
-      agentSessionId: agentConversationId || agentSessionId,
-      parentAgentConversationId: parentAgentConversationId || parentAgentSessionId,
-      parentAgentSessionId: parentAgentConversationId || parentAgentSessionId,
+      agentConversationId: agentConversationId || null,
+      agentSessionId: agentConversationId || null,
+      parentAgentConversationId: parentAgentConversationId || null,
+      parentAgentSessionId: parentAgentConversationId || null,
       traceId: traceId || null,
       success: true,
       usage: usage || undefined,
@@ -457,10 +453,9 @@ export async function finalizeTextGeneration(
       settings: mergedSettings,
     };
 
-    const effectiveParentAgentConversationId = parentAgentConversationId || parentAgentSessionId;
-    if (effectiveParentAgentConversationId) {
-      finalMeta.parentAgentConversationId = effectiveParentAgentConversationId;
-      finalMeta.parentAgentSessionId = effectiveParentAgentConversationId;
+    if (parentAgentConversationId) {
+      finalMeta.parentAgentConversationId = parentAgentConversationId;
+      finalMeta.parentAgentSessionId = parentAgentConversationId;
       finalMeta.isSubAgent = true;
     }
     if (parentConversationId) {
