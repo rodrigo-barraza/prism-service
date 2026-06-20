@@ -567,6 +567,7 @@ describe("ExhaustionRecovery", () => {
       createPassState: vi.fn().mockReturnValue({}),
       consumeStream: vi.fn().mockResolvedValue(undefined),
       emitGenerationProgress: vi.fn(),
+      logIteration: vi.fn(),
     };
     const mockState: any = {};
     const currentMessages: any[] = [];
@@ -608,6 +609,7 @@ describe("ExhaustionRecovery", () => {
       createPassState: vi.fn().mockReturnValue({}),
       consumeStream: vi.fn().mockResolvedValue(undefined),
       emitGenerationProgress: vi.fn(),
+      logIteration: vi.fn(),
     };
     const mockState: any = {};
     const currentMessages: any[] = [];
