@@ -440,6 +440,7 @@ describe('resolveLockedOffToolNames', () => {
 // ═══════════════════════════════════════════════════════════════
 
 import { BENCHMARK_PRESETS, type BenchmarkPreset } from '../src/data/benchmarkPresets.ts';
+import { MATCH_MODES } from '../src/types/benchmark.ts';
 
 describe('BENCHMARK_PRESETS', () => {
   it('should export a non-empty array of presets', () => {
@@ -472,7 +473,7 @@ describe('BENCHMARK_PRESETS', () => {
   });
 
   it('should have valid matchMode values in assertions', () => {
-    const validMatchModes = ['contains', 'exact', 'regex', 'startsWith', 'endsWith'];
+    const validMatchModes = Object.values(MATCH_MODES);
 
     for (const preset of BENCHMARK_PRESETS) {
       for (const assertion of preset.assertions) {
