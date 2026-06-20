@@ -56,7 +56,7 @@ export interface MemoryStoreParams {
   metadata?: Record<string, unknown>;
   conversationId?: string | null;
   traceId?: string | null;
-  agentSessionId?: string | null;
+  agentConversationId?: string | null;
   endpoint?: string | null;
 }
 
@@ -68,7 +68,7 @@ export interface MemorySearchParams {
   queryText: string;
   limit?: number;
   traceId?: string | null;
-  agentSessionId?: string | null;
+  agentConversationId?: string | null;
   endpoint?: string | null;
 }
 
@@ -108,7 +108,7 @@ export interface ConsolidationParams {
   broadcast?: (event: Record<string, unknown>) => void;
   endpoint?: string | null;
   traceId?: string | null;
-  agentSessionId?: string | null;
+  agentConversationId?: string | null;
   guildId?: string;
 }
 
@@ -152,7 +152,7 @@ export interface ExtractionMeta {
   project?: string | null;
   username?: string;
   traceId?: string | null;
-  agentSessionId?: string | null;
+  agentConversationId?: string | null;
   endpoint?: string | null;
   agent?: string | null;
 }

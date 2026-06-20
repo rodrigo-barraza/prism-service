@@ -1,0 +1,51 @@
+
+> prism-service@1.0.0 typecheck
+> tsc --noEmit
+
+src/routes/ChatRoutes.ts(782,47): error TS2345: Argument of type '{ provider: import("../services/harnesses/types.ts").LLMProvider; providerName: string; resolvedModel: string; modelDefinition: ModelDefinition | null; messages: ConversationMessage[]; ... 15 more ...; signal: AbortSignal | undefined; }' is not assignable to parameter of type 'AgenticContext'.
+  Property 'agentConversationId' is missing in type '{ provider: import("../services/harnesses/types.ts").LLMProvider; providerName: string; resolvedModel: string; modelDefinition: ModelDefinition | null; messages: ConversationMessage[]; ... 15 more ...; signal: AbortSignal | undefined; }' but required in type 'AgenticContext'.
+src/routes/ChatRoutes.ts(847,7): error TS2322: Type '{}' is not assignable to type 'string'.
+src/routes/admin/AdminAgentConversationRoutes.ts(11,10): error TS2724: '"../../utils/ConversationDiscovery.ts"' has no exported member named 'discoverDescendantSessionIds'. Did you mean 'discoverDescendantConversationIds'?
+src/services/AgenticLoopService.ts(48,36): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+src/services/AgenticLoopService.ts(57,7): error TS2322: Type 'unknown' is not assignable to type 'string | undefined'.
+src/services/AgenticLoopService.ts(63,51): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+src/services/AgenticLoopService.ts(68,23): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+src/services/AgenticLoopService.ts(141,35): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+src/services/AgenticLoopService.ts(149,45): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+src/services/AgenticLoopService.ts(157,31): error TS2339: Property 'cleanupSession' does not exist on type 'typeof OrchestratorService'.
+src/services/ConversationEmbeddingService.ts(47,9): error TS2322: Type 'unknown' is not assignable to type 'string'.
+src/services/ConversationTimerService.ts(463,47): error TS2345: Argument of type '{ provider: import("./harnesses/types.ts").LLMProvider; providerName: string; resolvedModel: string; modelDefinition: ModelDefinition | null; messages: ConversationMessage[]; ... 14 more ...; emit: (event: SseEvent) => void; }' is not assignable to parameter of type 'AgenticContext'.
+  Property 'agentConversationId' is missing in type '{ provider: import("./harnesses/types.ts").LLMProvider; providerName: string; resolvedModel: string; modelDefinition: ModelDefinition | null; messages: ConversationMessage[]; ... 14 more ...; emit: (event: SseEvent) => void; }' but required in type 'AgenticContext'.
+src/services/MemoryExtractor.ts(479,9): error TS2322: Type 'unknown' is not assignable to type 'string | null | undefined'.
+src/services/MemoryExtractor.ts(516,13): error TS2322: Type '{} | null' is not assignable to type 'string | null | undefined'.
+  Type '{}' is not assignable to type 'string'.
+src/services/ScheduledTaskService.ts(360,47): error TS2345: Argument of type '{ provider: import("./harnesses/types.ts").LLMProvider; providerName: string; resolvedModel: string; modelDefinition: ModelDefinition | null; messages: ConversationMessage[]; ... 14 more ...; emit: (event: SseEvent) => void; }' is not assignable to parameter of type 'AgenticContext'.
+  Property 'agentConversationId' is missing in type '{ provider: import("./harnesses/types.ts").LLMProvider; providerName: string; resolvedModel: string; modelDefinition: ModelDefinition | null; messages: ConversationMessage[]; ... 14 more ...; emit: (event: SseEvent) => void; }' but required in type 'AgenticContext'.
+src/services/ToolOrchestratorService.ts(1348,11): error TS2352: Conversion of type '{ project: string | null | undefined; username: string | null | undefined; agent: string | null | undefined; providerName: string | undefined; resolvedModel: string | undefined; ... 7 more ...; topology: string | null; }' to type 'OrchestratorContext' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'agentConversationId' is missing in type '{ project: string | null | undefined; username: string | null | undefined; agent: string | null | undefined; providerName: string | undefined; resolvedModel: string | undefined; ... 7 more ...; topology: string | null; }' but required in type 'OrchestratorContext'.
+src/services/ToolOrchestratorService.ts(1355,11): error TS2352: Conversion of type '{ project: string | null | undefined; username: string | null | undefined; agent: string | null | undefined; providerName: string | undefined; resolvedModel: string | undefined; ... 7 more ...; topology: string | null; }' to type 'OrchestratorContext' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'agentConversationId' is missing in type '{ project: string | null | undefined; username: string | null | undefined; agent: string | null | undefined; providerName: string | undefined; resolvedModel: string | undefined; ... 7 more ...; topology: string | null; }' but required in type 'OrchestratorContext'.
+src/services/ToolOrchestratorService.ts(1367,11): error TS2352: Conversion of type '{ project: string | null | undefined; username: string | null | undefined; agent: string | null | undefined; providerName: string | undefined; resolvedModel: string | undefined; ... 7 more ...; topology: string | null; }' to type 'OrchestratorContext' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'agentConversationId' is missing in type '{ project: string | null | undefined; username: string | null | undefined; agent: string | null | undefined; providerName: string | undefined; resolvedModel: string | undefined; ... 7 more ...; topology: string | null; }' but required in type 'OrchestratorContext'.
+src/services/WorkflowMemoryService.ts(222,7): error TS2322: Type '{}' is not assignable to type 'string'.
+src/services/WorkflowMemoryService.ts(228,7): error TS2322: Type '{}' is not assignable to type 'string'.
+src/services/harnesses/VisionLanguageHarness.ts(178,13): error TS2322: Type 'unknown' is not assignable to type 'string'.
+src/services/harnesses/VisionLanguageHarness.ts(603,15): error TS2339: Property 'sessionOutcome' does not exist on type 'AgenticLoopState'.
+src/services/harnesses/VisionLanguageHarness.ts(621,13): error TS2339: Property 'sessionOutcome' does not exist on type 'AgenticLoopState'.
+src/services/harnesses/lifecycle/ContextPressureManager.ts(112,9): error TS2322: Type 'unknown' is not assignable to type 'string'.
+src/services/harnesses/lifecycle/SystemReminderInjector.ts(63,51): error TS2345: Argument of type '{}' is not assignable to parameter of type 'string'.
+src/services/harnesses/lifecycle/SystemReminderInjector.ts(84,31): error TS2345: Argument of type '{}' is not assignable to parameter of type 'string'.
+src/services/harnesses/lifecycle/ToolDiscoveryNudge.ts(71,53): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+src/services/harnesses/lifecycle/ToolExecutor.ts(71,13): error TS2322: Type 'unknown' is not assignable to type 'string | null | undefined'.
+src/services/harnesses/lifecycle/ToolExecutor.ts(75,46): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+src/services/harnesses/lifecycle/ToolExecutor.ts(93,11): error TS2322: Type 'unknown' is not assignable to type 'string | null | undefined'.
+src/services/harnesses/lifecycle/ToolExecutor.ts(104,44): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+src/services/harnesses/lifecycle/ValidationInterceptor.ts(140,9): error TS2322: Type 'unknown' is not assignable to type 'string | null | undefined'.
+src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts(167,5): error TS2322: Type 'unknown' is not assignable to type 'string'.
+src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts(598,13): error TS2339: Property 'sessionOutcome' does not exist on type 'AgenticLoopState'.
+src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts(609,26): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts(623,11): error TS2339: Property 'sessionOutcome' does not exist on type 'AgenticLoopState'.
+src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts(173,5): error TS2322: Type 'unknown' is not assignable to type 'string'.
+src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts(687,13): error TS2339: Property 'sessionOutcome' does not exist on type 'AgenticLoopState'.
+src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts(699,26): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts(713,11): error TS2339: Property 'sessionOutcome' does not exist on type 'AgenticLoopState'.

@@ -39,33 +39,39 @@ export default class AgenticLoopService {
       username,
       modelDefinition,
       messages,
+      agentConversationId,
       agentSessionId,
       conversationId,
+      parentAgentConversationId,
       parentAgentSessionId,
     } = context;
 
-    // Load any persisted tool state from MongoDB (e.g. after server restart or previous turn)
-    await ToolContext.ensureLoaded(agentSessionId);
+    const resolvedAgentConversationId = agentConversationId || (agentSessionId as string) || "";
+    const resolvedParentAgentConversationId = parentAgentConversationId || (parentAgentSessionId as string) || null;
 
-    // 1. Resolve tools (passing agentSessionId so dynamicEnabledTools is merged)
+    // Load any persisted tool state from MongoDB (e.g. after server restart or previous turn)
+    await ToolContext.ensureLoaded(resolvedAgentConversationId);
+
+    // 1. Resolve tools (passing agentConversationId so dynamicEnabledTools is merged)
     const resolvedTools = await AgenticToolResolver.resolve({
       options,
       agent: agent || undefined,
       project,
       username,
       modelDefinition: modelDefinition || undefined,
-      agentSessionId,
+      agentConversationId: resolvedAgentConversationId,
+      agentSessionId: resolvedAgentConversationId,
       providerName: context.providerName,
       resolvedModel: context.resolvedModel,
     });
 
     // If dynamicEnabledTools is not in ToolContext, populate it with the resolved tools
-    const toolContextStore = ToolContext.getStore(agentSessionId);
+    const toolContextStore = ToolContext.getStore(resolvedAgentConversationId);
     if (!toolContextStore.has("dynamicEnabledTools")) {
       const initialNames =
         resolvedTools.resolvedEnabledTools ||
         resolvedTools.finalTools.map((tool) => tool.name);
-      ToolContext.set(agentSessionId, "dynamicEnabledTools", initialNames);
+      ToolContext.set(resolvedAgentConversationId, "dynamicEnabledTools", initialNames);
     }
 
     // 2. Initialize shared state
@@ -137,24 +143,24 @@ export default class AgenticLoopService {
     try {
       return await harness.run();
     } finally {
-      // Clean up in-memory cache keyed by agentSessionId (keeps MongoDB state for next turn)
-      ToolContext.cleanupInMemory(agentSessionId);
+      // Clean up in-memory cache keyed by agentConversationId (keeps MongoDB state for next turn)
+      ToolContext.cleanupInMemory(resolvedAgentConversationId);
 
       // Clean up in-memory state keyed by conversationId (client-facing)
       pendingApprovals.delete(conversationId);
       pendingQuestions.delete(conversationId);
 
       // Always clean up per-session tracker entries to prevent memory leaks —
-      // sub-agent sessions have their own agentSessionId that must be released.
-      ConversationGenerationTracker.cleanup(agentSessionId);
+      // sub-agent sessions have their own agentConversationId that must be released.
+      ConversationGenerationTracker.cleanup(resolvedAgentConversationId);
 
       // Only clean up orchestrator state for root sessions — sub-agents are
-      // cleaned by the parent session's OrchestratorService.cleanupSession().
-      if (!parentAgentSessionId) {
+      // cleaned by the parent session's OrchestratorService.cleanupConversation().
+      if (!resolvedParentAgentConversationId) {
         try {
           const { default: OrchestratorService } =
             await import("./OrchestratorService.js");
-          OrchestratorService.cleanupSession(agentSessionId);
+          OrchestratorService.cleanupConversation(resolvedAgentConversationId);
         } catch {
           /* OrchestratorService may not be used */
         }

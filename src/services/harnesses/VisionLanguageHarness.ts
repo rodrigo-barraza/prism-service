@@ -54,6 +54,7 @@ interface BeforePromptHookContext {
   username: string;
   agent?: string | null;
   traceId?: string | null;
+  agentConversationId: string;
   agentSessionId: string;
   agentContext?: unknown;
   enabledTools: string[] | null;
@@ -93,6 +94,7 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
     const state = this.state;
     const {
       options,
+      agentConversationId,
       agentSessionId,
       traceId,
       project,
@@ -102,6 +104,8 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
       emit,
       signal,
     } = context;
+
+    const resolvedAgentConversationId = agentConversationId || (agentSessionId as string) || "";
 
     // ── Resolve max iterations ────────────────────────────────
     const clientMaxIterations = options.maxIterations;
@@ -175,7 +179,8 @@ Use these images to observe the environment, notice changes, animations, or user
             username,
             agent,
             traceId,
-            agentSessionId,
+            agentConversationId: resolvedAgentConversationId,
+            agentSessionId: resolvedAgentConversationId,
             agentContext: options.agentContext,
             enabledTools: this.tools.resolvedEnabledTools,
             resolvedToolNames: this.tools.finalTools.map(
@@ -261,7 +266,7 @@ Use these images to observe the environment, notice changes, animations, or user
             }
             lastUserMessage.images = [...liveFrames];
             logger.info(
-              `[VisionLanguageHarness] Injected ${liveFrames.length} live frames into last user message for session ${agentSessionId}`,
+              `[VisionLanguageHarness] Injected ${liveFrames.length} live frames into last user message for session ${resolvedAgentConversationId}`,
             );
           }
         }
@@ -275,7 +280,7 @@ Use these images to observe the environment, notice changes, animations, or user
         // ── Create per-iteration pass state ────────────────────
         const pass = this.createPassState(passOptions);
         const requestIdBase =
-          context.requestId || agentSessionId || crypto.randomUUID();
+          context.requestId || resolvedAgentConversationId || crypto.randomUUID();
         const passRequestId = `${requestIdBase}-iter-${state.iterations}`;
         pass.requestId = passRequestId;
 
@@ -600,7 +605,7 @@ Use these images to observe the environment, notice changes, animations, or user
         state.streamedToolCalls.length > 0 &&
         !signal?.aborted
       ) {
-        state.sessionOutcome = "exhausted";
+        state.conversationOutcome = "exhausted";
         await runExhaustionRecoveryPass(this, context, state, currentMessages);
       }
 
@@ -618,7 +623,7 @@ Use these images to observe the environment, notice changes, animations, or user
         context,
       );
 
-      state.sessionOutcome = "error";
+      state.conversationOutcome = "error";
 
       try {
         await this.finalize(currentMessages, hooks);

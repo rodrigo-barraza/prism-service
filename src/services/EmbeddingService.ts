@@ -40,6 +40,7 @@ interface EmbeddingOptions {
   endpoint?: string | null;
   agent?: string | null;
   traceId?: string | null;
+  agentConversationId?: string | null;
   agentSessionId?: string | null;
 }
 
@@ -124,7 +125,8 @@ const EmbeddingService = {
         provider: providerName,
         model: resolvedModel,
         traceId: options.traceId || null,
-        agentSessionId: options.agentSessionId || null,
+        agentConversationId: options.agentConversationId || options.agentSessionId || null,
+        agentSessionId: options.agentConversationId || options.agentSessionId || null,
         success,
         errorMessage,
         estimatedCost,

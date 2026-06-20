@@ -46,7 +46,9 @@ export interface LogParams {
   model?: string | null;
   conversationId?: string | null;
   traceId?: string | null;
+  agentConversationId?: string | null;
   agentSessionId?: string | null;
+  parentAgentConversationId?: string | null;
   parentAgentSessionId?: string | null;
   toolsUsed?: boolean;
   toolDisplayNames?: string[];
@@ -173,7 +175,9 @@ const RequestLogger = {
     model,
     conversationId = null,
     traceId = null,
+    agentConversationId = null,
     agentSessionId = null,
+    parentAgentConversationId = null,
     parentAgentSessionId = null,
     toolsUsed = false,
     toolDisplayNames = [],
@@ -211,6 +215,8 @@ const RequestLogger = {
         logger.error("RequestLogger: MongoDB client not available");
         return;
       }
+      const effectiveAgentConversationId = agentConversationId || agentSessionId || null;
+      const effectiveParentAgentConversationId = parentAgentConversationId || parentAgentSessionId || null;
       const document = {
         requestId,
         timestamp: new Date().toISOString(),
@@ -225,8 +231,10 @@ const RequestLogger = {
         model,
         conversationId,
         traceId,
-        agentSessionId,
-        ...(parentAgentSessionId && { parentAgentSessionId }),
+        ...(effectiveAgentConversationId && { agentConversationId: effectiveAgentConversationId }),
+        ...(effectiveAgentConversationId && { agentSessionId: effectiveAgentConversationId }),
+        ...(effectiveParentAgentConversationId && { parentAgentConversationId: effectiveParentAgentConversationId }),
+        ...(effectiveParentAgentConversationId && { parentAgentSessionId: effectiveParentAgentConversationId }),
         toolsUsed,
         toolDisplayNames,
         toolApiNames,
@@ -284,7 +292,9 @@ const RequestLogger = {
     model,
     conversationId = null,
     traceId = null,
+    agentConversationId = null,
     agentSessionId = null,
+    parentAgentConversationId = null,
     parentAgentSessionId = null,
     success = true,
     errorMessage = null,
@@ -344,7 +354,9 @@ const RequestLogger = {
       model,
       conversationId,
       traceId,
+      agentConversationId,
       agentSessionId,
+      parentAgentConversationId,
       parentAgentSessionId,
       toolsUsed: toolCalls && toolCalls.length > 0,
       toolDisplayNames:
@@ -466,7 +478,7 @@ const RequestLogger = {
     provider: providerName,
     model,
     traceId,
-    agentSessionId,
+    agentConversationId,
     aiMessages,
     resultText,
     usage: apiUsage = null,
@@ -519,7 +531,7 @@ const RequestLogger = {
       clientIp: null,
       agent: agent || null,
       traceId: traceId || null,
-      agentSessionId: agentSessionId || null,
+      agentConversationId: agentConversationId || null,
       provider: providerName,
       model,
       success,

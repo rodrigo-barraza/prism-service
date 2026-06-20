@@ -267,9 +267,10 @@ const ScheduledTaskService = {
     payload?: Record<string, unknown>,
     {
       username = "system",
+      agentConversationId,
       agentSessionId,
-    }: { username?: string; agentSessionId?: string } = {},
-  ): Promise<{ agentSessionId: string }> {
+    }: { username?: string; agentConversationId?: string; agentSessionId?: string } = {},
+  ): Promise<{ agentConversationId: string; agentSessionId: string }> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
@@ -377,6 +378,7 @@ const ScheduledTaskService = {
             disabledTools: task.toolConfig.disabledTools,
           }),
         },
+        agentConversationId: resolvedSessionId,
         agentSessionId: resolvedSessionId,
         conversationId: resolvedSessionId,
         userMessage: userTriggerMessage as ConversationMessage,
@@ -423,7 +425,7 @@ const ScheduledTaskService = {
       throw error;
     }
 
-    return { agentSessionId: resolvedSessionId };
+    return { agentConversationId: resolvedSessionId, agentSessionId: resolvedSessionId };
   },
 
   /**
@@ -591,7 +593,7 @@ const ScheduledTaskService = {
     project: string,
     username: string,
     payload?: Record<string, unknown>,
-  ): Promise<{ success: boolean; agentSessionId: string }> {
+  ): Promise<{ success: boolean; agentConversationId: string; agentSessionId: string }> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
@@ -617,6 +619,7 @@ const ScheduledTaskService = {
     // Fire-and-forget background execution with the pre-generated session ID
     this.executeTask({ ...task, id: task.id }, payload, {
       username,
+      agentConversationId: agentSessionId,
       agentSessionId,
     }).catch((error: unknown) => {
       logger.error(
@@ -624,7 +627,7 @@ const ScheduledTaskService = {
       );
     });
 
-    return { success: true, agentSessionId };
+    return { success: true, agentConversationId: agentSessionId, agentSessionId };
   },
 };
 

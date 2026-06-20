@@ -192,6 +192,7 @@ async function prepareGenerationContext(
     model: requestedModel,
     messages,
     conversationId: incomingConversationId,
+    agentConversationId: incomingAgentConversationId,
     agentSessionId: incomingAgentSessionId,
     conversationMeta: incomingConversationMeta,
     traceId: incomingTraceId,
@@ -498,7 +499,9 @@ async function prepareGenerationContext(
     userMessage,
     // Identity
     incomingConversationId,
-    incomingAgentSessionId,
+    incomingAgentSessionId: incomingAgentConversationId || incomingAgentSessionId || null,
+    agentConversationId: incomingAgentConversationId || incomingAgentSessionId || null,
+    agentSessionId: incomingAgentConversationId || incomingAgentSessionId || null,
     incomingConversationMeta,
     incomingTraceId,
     skipConversation,
@@ -726,7 +729,8 @@ export async function handleAgent(
     requestedModel,
     options,
     incomingConversationId,
-    incomingAgentSessionId,
+    agentConversationId,
+    agentSessionId,
     incomingConversationMeta,
     incomingTraceId,
     project,
@@ -738,7 +742,7 @@ export async function handleAgent(
     localRelease,
   } = context;
   // ── Agent session identity ─────────────────────────────────
-  const agentSessionId = incomingAgentSessionId || crypto.randomUUID();
+  const resolvedAgentConversationId = agentConversationId || agentSessionId || crypto.randomUUID();
   const conversationId = incomingConversationId || crypto.randomUUID();
   const traceId = incomingTraceId || null;
   const conversationMeta = incomingConversationMeta || null;
@@ -788,7 +792,8 @@ export async function handleAgent(
         messages: context.messages,
         originalMessages: context.originalMessages as ConversationMessage[],
         options,
-        agentSessionId,
+        agentConversationId: resolvedAgentConversationId,
+        agentSessionId: resolvedAgentConversationId,
         conversationId,
         userMessage: context.userMessage as ConversationMessage | null,
         conversationMeta,
@@ -844,7 +849,8 @@ export async function handleAgent(
       harness: (options.harness as string) || null,
       provider: providerName,
       model: resolvedModel || requestedModel || "any",
-      agentSessionId: agentSessionId,
+      agentConversationId: resolvedAgentConversationId,
+      agentSessionId: resolvedAgentConversationId,
       conversationId: conversationId || null,
       traceId: traceId || null,
       success: false,

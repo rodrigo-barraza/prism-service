@@ -39,7 +39,7 @@ export default class AgenticLoopState {
   // ── Display segment tracking ────────────────────────────
   // Mirrors the client-side contentSegments system so the
   // interleaving order (thinking ↔ tools ↔ text) survives DB
-  // round-trips for proper rendering on session restore.
+  // round-trips for proper rendering on conversation restore.
   displaySegments: DisplaySegment[];
   displayTextFragments: string[];
   displayThinkingFragments: string[];
@@ -64,11 +64,11 @@ export default class AgenticLoopState {
   // ── Error budget tracking ───────────────────────────────
   toolErrorCounts: Map<string, number>;
 
-  // ── Session outcome ───────────────────────────────
+  // ── Conversation outcome ───────────────────────────
   // Set by harnesses before finalization to indicate how the
-  // session ended. Used by afterResponse hooks (e.g. AWM) to
+  // conversation ended. Used by afterResponse hooks (e.g. AWM) to
   // gate actions that should only run on successful completions.
-  sessionOutcome: "completed" | "exhausted" | "error" | "aborted";
+  conversationOutcome: "completed" | "exhausted" | "error" | "aborted";
 
   // ── Branch tracking (TreeOfThought) ─────────────────────
   branchesExplored: number;
@@ -123,7 +123,7 @@ export default class AgenticLoopState {
     this.postCompactTokenCount = null;
 
     this.toolErrorCounts = new Map();
-    this.sessionOutcome = "completed";
+    this.conversationOutcome = "completed";
 
     this.branchesExplored = 0;
     this.branchesBacktracked = 0;

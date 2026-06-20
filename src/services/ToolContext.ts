@@ -5,38 +5,38 @@ import { COLLECTIONS } from "../constants.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 /**
- * ToolContext — per-session key-value state store for stateful tool chains.
+ * ToolContext — per-conversation key-value state store for stateful tool chains.
  *
  * Inspired by the Antigravity SDK's `ToolContext` pattern. Tools can persist
- * state across multiple invocations within the same agent session without
+ * state across multiple invocations within the same agent conversation without
  * consuming LLM context window tokens.
  *
  * Architecture:
- *   - In-memory Map for fast synchronous reads during the session
+ *   - In-memory Map for fast synchronous reads during the conversation
  *   - MongoDB persistence for durability across server restarts
  *   - Write-through: every set() writes to both memory and MongoDB
  *   - Read-through: getStore() loads from MongoDB on first access
  *
  * Use cases:
  *   - Pagination cursors (search_web, list_directory)
- *   - Browser tab/session state (control_browser)
+ *   - Browser tab/conversation state (control_browser)
  *   - Cumulative diff tracking (replace_in_file rollback)
  *   - MCP connection state across invocations
  *
  * Lifecycle:
- *   - Created lazily on first `get`/`set` for a session
- *   - Cleaned up when the session ends (AgenticLoopService.finally)
+ *   - Created lazily on first `get`/`set` for a conversation
+ *   - Cleaned up when the conversation ends (AgenticLoopService.finally)
  *   - Persisted to MongoDB `tool_context` collection
  *
  * MongoDB Document Shape:
- *   { sessionId: string, state: Record<string, unknown>, updatedAt: string }
+ *   { conversationId: string, state: Record<string, unknown>, updatedAt: string }
  */
 
-/** In-memory session state cache */
-const sessions = new Map<string, Map<string, unknown>>();
+/** In-memory conversation state cache */
+const conversations = new Map<string, Map<string, unknown>>();
 
-/** Tracks which sessions have been loaded from MongoDB */
-const loadedSessions = new Set<string>();
+/** Tracks which conversations have been loaded from MongoDB */
+const loadedConversations = new Set<string>();
 
 function getCollection() {
   return MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTIONS.TOOL_CONTEXT);
@@ -44,7 +44,7 @@ function getCollection() {
 
 /** Persist the full state map to MongoDB (write-through). */
 async function persistToMongo(
-  sessionId: string,
+  conversationId: string,
   store: Map<string, unknown>,
 ): Promise<void> {
   try {
@@ -53,10 +53,10 @@ async function persistToMongo(
 
     const state = Object.fromEntries(store);
     await collection.updateOne(
-      { sessionId },
+      { conversationId },
       {
         $set: {
-          sessionId,
+          conversationId,
           state,
           updatedAt: new Date().toISOString(),
         },
@@ -65,18 +65,18 @@ async function persistToMongo(
     );
   } catch (error) {
     logger.warn(
-      `[ToolContext] MongoDB persist failed for session ${sessionId}: ${getErrorMessage(error)}`,
+      `[ToolContext] MongoDB persist failed for conversation ${conversationId}: ${getErrorMessage(error)}`,
     );
   }
 }
 
 /** Load state from MongoDB into memory (read-through, first access only). */
-async function loadFromMongo(sessionId: string): Promise<Map<string, unknown>> {
+async function loadFromMongo(conversationId: string): Promise<Map<string, unknown>> {
   try {
     const collection = getCollection();
     if (!collection) return new Map();
 
-    const doc = (await collection.findOne({ sessionId })) as {
+    const doc = (await collection.findOne({ conversationId })) as {
       state?: Record<string, unknown>;
     } | null;
     if (doc?.state && typeof doc.state === "object") {
@@ -84,7 +84,7 @@ async function loadFromMongo(sessionId: string): Promise<Map<string, unknown>> {
     }
   } catch (error) {
     logger.warn(
-      `[ToolContext] MongoDB load failed for session ${sessionId}: ${getErrorMessage(error)}`,
+      `[ToolContext] MongoDB load failed for conversation ${conversationId}: ${getErrorMessage(error)}`,
     );
   }
   return new Map();
@@ -92,32 +92,32 @@ async function loadFromMongo(sessionId: string): Promise<Map<string, unknown>> {
 
 export default class ToolContext {
   /**
-   * Get the full state store for a session.
+   * Get the full state store for a conversation.
    * Creates the store lazily if it doesn't exist in memory.
    * Note: This returns the in-memory store synchronously.
    * For first access after a restart, call `ensureLoaded()` first.
    */
-  static getStore(sessionId: string): Map<string, unknown> {
-    let store = sessions.get(sessionId);
+  static getStore(conversationId: string): Map<string, unknown> {
+    let store = conversations.get(conversationId);
     if (!store) {
       store = new Map();
-      sessions.set(sessionId, store);
+      conversations.set(conversationId, store);
     }
     return store;
   }
 
   /**
-   * Ensure the session's state is loaded from MongoDB.
-   * Called once at the start of a session to restore state
+   * Ensure the conversation's state is loaded from MongoDB.
+   * Called once at the start of a conversation to restore state
    * from a previous server lifecycle.
    */
-  static async ensureLoaded(sessionId: string): Promise<void> {
-    if (loadedSessions.has(sessionId)) return;
-    loadedSessions.add(sessionId);
+  static async ensureLoaded(conversationId: string): Promise<void> {
+    if (loadedConversations.has(conversationId)) return;
+    loadedConversations.add(conversationId);
 
-    const mongoState = await loadFromMongo(sessionId);
+    const mongoState = await loadFromMongo(conversationId);
     if (mongoState.size > 0) {
-      const store = ToolContext.getStore(sessionId);
+      const store = ToolContext.getStore(conversationId);
       // Merge MongoDB state with any in-memory state (memory wins on conflict)
       for (const [key, value] of mongoState) {
         if (!store.has(key)) {
@@ -125,98 +125,98 @@ export default class ToolContext {
         }
       }
       logger.info(
-        `[ToolContext] Restored ${mongoState.size} state entries from MongoDB for session ${sessionId}`,
+        `[ToolContext] Restored ${mongoState.size} state entries from MongoDB for conversation ${conversationId}`,
       );
     }
   }
 
-  /** Get a single value from a session's state. */
-  static get<T = unknown>(sessionId: string, key: string): T | undefined {
-    return sessions.get(sessionId)?.get(key) as T | undefined;
+  /** Get a single value from a conversation's state. */
+  static get<T = unknown>(conversationId: string, key: string): T | undefined {
+    return conversations.get(conversationId)?.get(key) as T | undefined;
   }
 
-  /** Set a single value in a session's state (write-through to MongoDB). */
-  static set(sessionId: string, key: string, value: unknown): void {
-    const store = ToolContext.getStore(sessionId);
+  /** Set a single value in a conversation's state (write-through to MongoDB). */
+  static set(conversationId: string, key: string, value: unknown): void {
+    const store = ToolContext.getStore(conversationId);
     store.set(key, value);
     // Async write-through — don't await to keep tool execution fast
-    persistToMongo(sessionId, store).catch(() => {});
+    persistToMongo(conversationId, store).catch(() => {});
   }
 
-  /** Delete a single key from a session's state. */
-  static delete(sessionId: string, key: string): boolean {
-    const store = sessions.get(sessionId);
+  /** Delete a single key from a conversation's state. */
+  static delete(conversationId: string, key: string): boolean {
+    const store = conversations.get(conversationId);
     if (!store) return false;
     const result = store.delete(key);
     if (result) {
-      persistToMongo(sessionId, store).catch(() => {});
+      persistToMongo(conversationId, store).catch(() => {});
     }
     return result;
   }
 
-  /** Check if a session has a specific key. */
-  static has(sessionId: string, key: string): boolean {
-    return sessions.get(sessionId)?.has(key) ?? false;
+  /** Check if a conversation has a specific key. */
+  static has(conversationId: string, key: string): boolean {
+    return conversations.get(conversationId)?.has(key) ?? false;
   }
 
   /**
-   * Clean up only the in-memory cache for a session.
+   * Clean up only the in-memory cache for a conversation.
    * Keeps MongoDB state intact so it can be restored on the next turn.
    */
-  static cleanupInMemory(sessionId: string): void {
-    const store = sessions.get(sessionId);
+  static cleanupInMemory(conversationId: string): void {
+    const store = conversations.get(conversationId);
     if (store) {
       const keyCount = store.size;
-      sessions.delete(sessionId);
-      loadedSessions.delete(sessionId);
+      conversations.delete(conversationId);
+      loadedConversations.delete(conversationId);
       if (keyCount > 0) {
         logger.info(
-          `[ToolContext] Cleaned up in-memory cache of ${keyCount} state entries for session ${sessionId}`,
+          `[ToolContext] Cleaned up in-memory cache of ${keyCount} state entries for conversation ${conversationId}`,
         );
       }
     }
   }
 
   /**
-   * Clean up all state for a session.
+   * Clean up all state for a conversation.
    * Removes from both memory and MongoDB.
-   * Called when the session explicitly ends or is deleted.
+   * Called when the conversation explicitly ends or is deleted.
    */
-  static cleanup(sessionId: string): void {
-    const store = sessions.get(sessionId);
+  static cleanup(conversationId: string): void {
+    const store = conversations.get(conversationId);
     if (store) {
       const keyCount = store.size;
-      sessions.delete(sessionId);
-      loadedSessions.delete(sessionId);
+      conversations.delete(conversationId);
+      loadedConversations.delete(conversationId);
 
       // Async cleanup from MongoDB
       const collection = getCollection();
       if (collection) {
-        collection.deleteOne({ sessionId }).catch((error: unknown) => {
+        collection.deleteOne({ conversationId }).catch((error: unknown) => {
           logger.warn(
-            `[ToolContext] MongoDB cleanup failed for session ${sessionId}: ${getErrorMessage(error)}`,
+            `[ToolContext] MongoDB cleanup failed for conversation ${conversationId}: ${getErrorMessage(error)}`,
           );
         });
       }
 
       if (keyCount > 0) {
         logger.info(
-          `[ToolContext] Cleaned up ${keyCount} state entries and deleted MongoDB document for session ${sessionId}`,
+          `[ToolContext] Cleaned up ${keyCount} state entries and deleted MongoDB document for conversation ${conversationId}`,
         );
       }
     }
   }
 
-  /** Get the number of active sessions with state (for diagnostics). */
-  static get activeSessionCount(): number {
-    return sessions.size;
+  /** Get the number of active conversations with state (for diagnostics). */
+  static get activeConversationCount(): number {
+    return conversations.size;
   }
 
   /**
-   * Get a snapshot of all state keys for a session (for diagnostics).
+   * Get a snapshot of all state keys for a conversation (for diagnostics).
    * Returns an empty array if no state exists.
    */
-  static keys(sessionId: string): string[] {
-    return Array.from(sessions.get(sessionId)?.keys() ?? []);
+  static keys(conversationId: string): string[] {
+    return Array.from(conversations.get(conversationId)?.keys() ?? []);
   }
 }

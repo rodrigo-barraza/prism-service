@@ -165,16 +165,18 @@ export function normalizeVllmModel(raw: OpenAICompatRawModel): ModelEntry {
   return entry;
 }
 
+import { PROVIDERS } from "../../constants.ts";
+
 export type NormalizerFunction = (
   raw: LmStudioRawModel & OllamaRawModel & OpenAICompatRawModel,
 ) => ModelEntry;
 
 export const NORMALIZER_BY_TYPE: Record<string, NormalizerFunction> = {
-  "lm-studio": normalizeLmStudioModel as NormalizerFunction,
-  ollama: normalizeOllamaModel as NormalizerFunction,
-  vllm: normalizeVllmModel as NormalizerFunction,
-  "llama-cpp": normalizeOpenAICompatModel as NormalizerFunction,
+  [PROVIDERS.LM_STUDIO]: normalizeLmStudioModel as NormalizerFunction,
+  [PROVIDERS.OLLAMA]: normalizeOllamaModel as NormalizerFunction,
+  [PROVIDERS.VLLM]: normalizeVllmModel as NormalizerFunction,
+  [PROVIDERS.LLAMA_CPP]: normalizeOpenAICompatModel as NormalizerFunction,
 };
 
 /** Provider types that should get HuggingFace metadata enrichment. */
-export const HF_ENRICHED_TYPES = new Set(["vllm", "llama-cpp"]);
+export const HF_ENRICHED_TYPES = new Set([PROVIDERS.VLLM, PROVIDERS.LLAMA_CPP]);

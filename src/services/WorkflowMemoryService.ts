@@ -50,6 +50,7 @@ interface WorkflowStep {
 
 interface WorkflowDocument {
   conversationId: string;
+  agentConversationId: string;
   agentSessionId: string;
   project: string;
   username: string;
@@ -164,10 +165,12 @@ const WorkflowMemoryService = {
     context: AgenticContext,
     output: { messages?: ConversationMessage[]; sessionOutcome?: string },
   ): Promise<void> {
-    const { conversationId, agentSessionId, project, username, agent } =
+    const { conversationId, agentConversationId, agentSessionId, project, username, agent } =
       context;
 
-    if (!conversationId || !agentSessionId) return;
+    const resolvedAgentConversationId = agentConversationId || (agentSessionId as string) || "";
+
+    if (!conversationId || !resolvedAgentConversationId) return;
     if (!AgentPersonaRegistry.isAgentProject(project)) return;
 
     // Only persist workflows from sessions that completed successfully.
@@ -201,7 +204,7 @@ const WorkflowMemoryService = {
 
     const existingWorkflow = await workflowCollection.findOne({
       conversationId,
-      agentSessionId,
+      agentConversationId: resolvedAgentConversationId,
     });
     if (existingWorkflow) {
       const existingCreatedAt = existingWorkflow.createdAt as
@@ -219,13 +222,15 @@ const WorkflowMemoryService = {
       project,
       endpoint: "/agent",
       traceId: context.traceId,
-      agentSessionId,
+      agentConversationId: resolvedAgentConversationId,
+      agentSessionId: resolvedAgentConversationId,
       agent,
     });
 
     const workflowDocument: WorkflowDocument = {
       conversationId,
-      agentSessionId,
+      agentConversationId: resolvedAgentConversationId,
+      agentSessionId: resolvedAgentConversationId,
       project,
       username,
       agent: agent || "CODING",
@@ -238,7 +243,7 @@ const WorkflowMemoryService = {
     };
 
     await workflowCollection.updateOne(
-      { conversationId, agentSessionId },
+      { conversationId, agentConversationId: resolvedAgentConversationId },
       { $set: workflowDocument },
       { upsert: true },
     );
@@ -264,6 +269,7 @@ const WorkflowMemoryService = {
     queryText: string,
     options: {
       traceId?: string | null;
+      agentConversationId?: string | null;
       agentSessionId?: string | null;
       endpoint?: string | null;
       username?: string;
@@ -291,7 +297,8 @@ const WorkflowMemoryService = {
       project,
       endpoint: options.endpoint || "/agent",
       traceId: options.traceId,
-      agentSessionId: options.agentSessionId,
+      agentConversationId: options.agentConversationId || options.agentSessionId,
+      agentSessionId: options.agentConversationId || options.agentSessionId,
       agent,
     });
 

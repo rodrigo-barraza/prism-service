@@ -51,6 +51,7 @@ interface ResolveParams {
   project?: string;
   username?: string;
   modelDefinition?: ModelDefinition;
+  agentConversationId?: string;
   agentSessionId?: string;
   providerName?: string;
   resolvedModel?: string;
@@ -83,6 +84,7 @@ export default class AgenticToolResolver {
     project: _project,
     username: _username,
     modelDefinition,
+    agentConversationId,
     agentSessionId,
     providerName,
     resolvedModel,
@@ -113,9 +115,10 @@ export default class AgenticToolResolver {
     // ── Tool filtering ────────────────────────────────────────────
     let resolvedEnabledTools: string[] | null = options.enabledTools || null;
     let shouldApplyDisabledFilter = false;
-    if (agentSessionId) {
+    const effectiveAgentConversationId = agentConversationId || agentSessionId;
+    if (effectiveAgentConversationId) {
       const dynamicTools = ToolContext.get<string[]>(
-        agentSessionId,
+        effectiveAgentConversationId,
         "dynamicEnabledTools",
       );
       if (Array.isArray(dynamicTools) && dynamicTools.length > 0) {

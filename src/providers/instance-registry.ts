@@ -7,6 +7,7 @@ import {
   PROVIDER_OLLAMA,
   PROVIDER_LLAMA_CPP,
 } from "../../config.ts";
+import { PROVIDERS } from "../constants.ts";
 
 // Import factories
 import { createLmStudioProvider } from "./lm-studio.ts";
@@ -20,18 +21,18 @@ import {
 
 // ── Factory map ─────────────────────────────────────────────
 const FACTORIES = {
-  "lm-studio": createLmStudioProvider,
-  ollama: createOllamaProvider,
-  vllm: createVllmProvider,
-  "llama-cpp": createLlamaCppProvider,
+  [PROVIDERS.LM_STUDIO]: createLmStudioProvider,
+  [PROVIDERS.OLLAMA]: createOllamaProvider,
+  [PROVIDERS.VLLM]: createVllmProvider,
+  [PROVIDERS.LLAMA_CPP]: createLlamaCppProvider,
 };
 
 // ── Provider arrays from secrets ────────────────────────────
 const PROVIDER_ARRAYS = {
-  "lm-studio": PROVIDER_LM_STUDIO || [],
-  vllm: PROVIDER_VLLM || [],
-  ollama: PROVIDER_OLLAMA || [],
-  "llama-cpp": PROVIDER_LLAMA_CPP || [],
+  [PROVIDERS.LM_STUDIO]: PROVIDER_LM_STUDIO || [],
+  [PROVIDERS.VLLM]: PROVIDER_VLLM || [],
+  [PROVIDERS.OLLAMA]: PROVIDER_OLLAMA || [],
+  [PROVIDERS.LLAMA_CPP]: PROVIDER_LLAMA_CPP || [],
 };
 
 // ── Registry ────────────────────────────────────────────────

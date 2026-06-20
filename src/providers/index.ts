@@ -6,14 +6,15 @@ import inworldProvider from "./inworld.ts";
 import ActiveGenerationTracker from "../services/ActiveGenerationTracker.ts";
 import { getInstanceProvider, isInstance } from "./instance-registry.ts";
 import type { Provider } from "../types/provider.ts";
+import { PROVIDERS } from "../constants.ts";
 
 // Static cloud providers — local providers are resolved via instance registry
 const providers: Record<string, Provider> = {
-  openai: openaiProvider as unknown as Provider,
-  anthropic: anthropicProvider as Provider,
-  google: googleProvider as Provider,
-  elevenlabs: elevenlabsProvider as unknown as Provider,
-  inworld: inworldProvider as unknown as Provider,
+  [PROVIDERS.OPENAI]: openaiProvider as unknown as Provider,
+  [PROVIDERS.ANTHROPIC]: anthropicProvider as Provider,
+  [PROVIDERS.GOOGLE]: googleProvider as Provider,
+  [PROVIDERS.ELEVENLABS]: elevenlabsProvider as unknown as Provider,
+  [PROVIDERS.INWORLD]: inworldProvider as unknown as Provider,
 };
 
 /**

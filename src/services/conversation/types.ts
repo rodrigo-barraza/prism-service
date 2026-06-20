@@ -5,6 +5,7 @@ export interface ConversationMeta {
   systemPrompt?: string;
   settings?: ConversationSettings;
   traceId?: string | null;
+  parentAgentConversationId?: string | null;
   parentAgentSessionId?: string | null;
   parentConversationId?: string | null;
   workspaceRoot?: string | null;
@@ -77,6 +78,7 @@ export interface TransformedConversation {
   isGenerating: boolean;
   synthetic?: boolean;
   traceId?: string | null;
+  parentAgentConversationId?: string | null;
   parentAgentSessionId?: string | null;
   parentConversationId?: string | null;
   workspaceRoot?: string | null;
@@ -86,8 +88,9 @@ export interface TransformedConversation {
   [key: string]: unknown; // Allow extra MongoDB properties dynamically
 }
 
-export interface TransformedSessionStats {
-  agentSessionId: string;
+export interface TransformedConversationStats {
+  agentConversationId: string;
+  agentSessionId?: string;
   requestCount: number;
   subAgentRequestCount: number;
   totalCost: number;
@@ -124,9 +127,14 @@ export interface ConversationServiceInterface {
     generating: boolean,
     options?: { collection?: string; agent?: string; title?: string },
   ): Promise<void>;
+  getConversationStats(
+    conversationId: string,
+    project: string,
+    username: string,
+  ): Promise<TransformedConversationStats | null>;
   getSessionStats(
     sessionId: string,
     project: string,
     username: string,
-  ): Promise<TransformedSessionStats | null>;
+  ): Promise<TransformedConversationStats | null>;
 }

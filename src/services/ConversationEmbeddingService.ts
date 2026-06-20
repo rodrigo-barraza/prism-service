@@ -44,7 +44,8 @@ const ConversationEmbeddingService = {
     ) => {
       ConversationEmbeddingService.generateAndPersist({
         conversationId: context.conversationId as string | null,
-        agentSessionId: context.agentSessionId,
+        agentConversationId: context.agentConversationId,
+        agentSessionId: context.agentConversationId,
         project: context.project,
         username: context.username,
         agent: context.agent || null,
@@ -67,6 +68,7 @@ const ConversationEmbeddingService = {
    */
   async generateAndPersist({
     conversationId,
+    agentConversationId,
     agentSessionId,
     project,
     username,
@@ -76,7 +78,8 @@ const ConversationEmbeddingService = {
     endpoint,
   }: {
     conversationId: string | null;
-    agentSessionId: string;
+    agentConversationId: string;
+    agentSessionId?: string;
     project: string;
     username: string;
     agent: string | null;
@@ -187,7 +190,8 @@ const ConversationEmbeddingService = {
       project,
       endpoint: endpoint || "/agent",
       traceId,
-      agentSessionId,
+      agentConversationId: agentConversationId || agentSessionId || "",
+      agentSessionId: agentConversationId || agentSessionId || "",
       agent,
     });
 

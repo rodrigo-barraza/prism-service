@@ -97,7 +97,7 @@ export default class BaseAgenticHarness {
     this.state = state;
     this.tools = tools;
     this.trackerSessionId =
-      context.parentAgentSessionId || context.agentSessionId;
+      context.parentAgentConversationId || context.agentConversationId;
   }
 
   /** Execute the agentic loop. Subclasses MUST override. */
@@ -135,8 +135,8 @@ export default class BaseAgenticHarness {
   checkAndApplyToolSetChanges(
     currentMessages?: ConversationMessage[],
   ): boolean {
-    const sessionId = this.context.agentSessionId;
-    const toolContextStore = ToolContext.getStore(sessionId);
+    const conversationId = this.context.agentConversationId;
+    const toolContextStore = ToolContext.getStore(conversationId);
     if (!toolContextStore.get("toolSetDirty")) return false;
 
     toolContextStore.delete("toolSetDirty");
@@ -163,7 +163,7 @@ export default class BaseAgenticHarness {
       }),
     ] as Array<{ name: string; [key: string]: unknown }>;
 
-    const isSubAgent = !!this.context.parentAgentSessionId;
+    const isSubAgent = !!this.context.parentAgentConversationId;
 
     // When the model has native thinking, the think tool is redundant —
     // re-apply the same exclusion that AgenticToolResolver.resolve() does
@@ -273,7 +273,7 @@ export default class BaseAgenticHarness {
   emitGenerationProgress(): void {
     const { emit } = this.context;
     const state = this.state;
-    const stats = ConversationGenerationTracker.getSessionStats(
+    const stats = ConversationGenerationTracker.getConversationStats(
       this.trackerSessionId,
     );
     if (stats.activeRequests > 0 || stats.totalOutputTokens > 0) {
@@ -443,14 +443,14 @@ export default class BaseAgenticHarness {
     const {
       providerName,
       resolvedModel,
-      parentAgentSessionId,
-      agentSessionId,
+      parentAgentConversationId,
+      agentConversationId,
     } = this.context;
     ConversationGenerationTracker.register(this.trackerSessionId, passRequestId, {
       provider: providerName,
       model: resolvedModel,
-      source: parentAgentSessionId ? "sub-agent" : "orchestrator",
-      subAgentId: parentAgentSessionId ? agentSessionId : null,
+      source: parentAgentConversationId ? "sub-agent" : "orchestrator",
+      subAgentId: parentAgentConversationId ? agentConversationId : null,
     });
   }
 
@@ -816,8 +816,8 @@ export default class BaseAgenticHarness {
       username,
       agent,
       conversationId,
-      agentSessionId,
-      parentAgentSessionId,
+      agentConversationId,
+      parentAgentConversationId,
       traceId,
     } = this.context;
     const state = this.state;
@@ -845,8 +845,8 @@ export default class BaseAgenticHarness {
       provider: providerName,
       model: resolvedModel,
       conversationId,
-      agentSessionId,
-      parentAgentSessionId: parentAgentSessionId || null,
+      agentConversationId,
+      parentAgentConversationId: parentAgentConversationId || null,
       traceId: traceId || null,
       success: true,
       usage: pass.usage,
@@ -910,10 +910,10 @@ export default class BaseAgenticHarness {
     const state = this.state;
 
     if (context.signal?.aborted) {
-      state.sessionOutcome = "aborted";
+      state.conversationOutcome = "aborted";
     }
 
-    const { agentSessionId, conversationId, project, username } = context;
+    const { agentConversationId, conversationId, project, username } = context;
     const requestStart = context.requestStart ?? performance.now();
 
     const now = performance.now();
@@ -932,7 +932,7 @@ export default class BaseAgenticHarness {
     );
 
     logger.info(
-      `[AgenticLoop] finalize: session=${agentSessionId} conversation=${conversationId} project=${project} ` +
+      `[AgenticLoop] finalize: conversation=${agentConversationId} conversationId=${conversationId} project=${project} ` +
         `originalMsgCount=${state.originalMessageCount} currentMsgs=${currentMessages.length} ` +
         `newTurnMsgs=${newTurnMessages.length} ` +
         `roles=[${newTurnMessages.map((conversationMessage) => conversationMessage.role).join(",")}] ` +
@@ -967,7 +967,7 @@ export default class BaseAgenticHarness {
       newTurnMessages as MessagePayload[],
     );
 
-    // Persist sub-agent snapshots for orchestrator sessions
+    // Persist sub-agent snapshots for orchestrator conversations
     if (
       state.streamedToolCalls.some(
         (toolCall) => toolCall.name === TOOL_NAMES.CREATE_TEAM,
@@ -1025,7 +1025,7 @@ export default class BaseAgenticHarness {
         thinking: state.streamedThinking,
         toolCalls: state.streamedToolCalls,
         messages: currentMessages,
-        sessionOutcome: state.sessionOutcome,
+        conversationOutcome: state.conversationOutcome,
       })
       .catch((error: unknown) =>
         logger.error(

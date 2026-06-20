@@ -15,8 +15,8 @@ import type {
 
 export interface SubAgentState {
   agentId: string;
-  subAgentSessionId: string;
-  parentAgentSessionId: string;
+  subAgentConversationId: string;
+  parentAgentConversationId: string;
   description: string;
   branchName: string | null;
   worktreePath: string | null;
@@ -117,7 +117,7 @@ export interface OrchestratorContext {
   providerName: string;
   resolvedModel: string;
   traceId: string | null;
-  agentSessionId: string;
+  agentConversationId: string;
   conversationId: string;
   maxSubAgentIterations?: number;
   minContextLength?: number;

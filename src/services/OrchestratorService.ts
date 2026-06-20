@@ -93,7 +93,7 @@ async function getSubAgentFallback(): Promise<{
 /** Active sub-agents spawned via chat tools, keyed by agentId */
 const activeSubAgents = new Map<string, SubAgentState>();
 
-/** Per-conversation counters for generating sequential agent IDs relative to each session */
+/** Per-conversation counters for generating sequential agent IDs relative to each conversation */
 const agentCountersByConversation = new Map<string, number>();
 
 // Register shutdown cleanup — abort all running sub-agents and remove worktrees
@@ -178,7 +178,7 @@ export default class OrchestratorService {
       providerName,
       resolvedModel,
       traceId,
-      agentSessionId: parentAgentSessionId,
+      agentConversationId: parentAgentConversationId,
       conversationId: parentConversationId,
       maxSubAgentIterations: clientMaxSubAgentIterations,
       minContextLength,
@@ -286,7 +286,7 @@ export default class OrchestratorService {
       }
     }
 
-    const conversationCounterKey = parentConversationId || parentAgentSessionId || "global";
+    const conversationCounterKey = parentConversationId || parentAgentConversationId || "global";
     const currentConversationCount = (agentCountersByConversation.get(conversationCounterKey) || 0) + 1;
     agentCountersByConversation.set(conversationCounterKey, currentConversationCount);
     const agentId = `agent-${currentConversationCount.toString(36)}-${crypto.randomUUID().slice(0, 4)}`;
@@ -319,7 +319,7 @@ export default class OrchestratorService {
       worktreePath = worktreeResult.worktreePath || workspaceRoot;
     }
 
-    const subAgentSessionId = crypto.randomUUID();
+    const subAgentConversationId = crypto.randomUUID();
 
     // Resolve sub-agent type and its tools
     let subAgentAgentType = agent;
@@ -344,8 +344,8 @@ export default class OrchestratorService {
 
     const subAgentState: SubAgentState = {
       agentId,
-      subAgentSessionId,
-      parentAgentSessionId,
+      subAgentConversationId,
+      parentAgentConversationId,
       description,
       branchName: worktreeResult.error ? null : branchName,
       worktreePath,
@@ -706,11 +706,11 @@ export default class OrchestratorService {
     }));
   }
 
-  static cleanupSession(parentAgentSessionId: string): void {
+  static cleanupConversation(parentAgentConversationId: string): void {
     const keys = [];
     const conversationIdsToClean = new Set<string>();
     for (const [key, subAgentState] of activeSubAgents.entries()) {
-      if (subAgentState.parentAgentSessionId === parentAgentSessionId) {
+      if (subAgentState.parentAgentConversationId === parentAgentConversationId) {
         keys.push(key);
         if (subAgentState.parentConversationId) {
           conversationIdsToClean.add(subAgentState.parentConversationId);
@@ -724,7 +724,7 @@ export default class OrchestratorService {
       agentCountersByConversation.delete(conversationId);
     }
     logger.info(
-      `[Orchestrator] Cleaned up session ${parentAgentSessionId} from active registry`,
+      `[Orchestrator] Cleaned up conversation ${parentAgentConversationId} from active registry`,
     );
   }
 
@@ -757,7 +757,7 @@ export default class OrchestratorService {
 
     // Propagate the resolved topology back to the context so _runSubAgentLoop
     // (and all downstream consumers) build the sub-agent system prompt with the
-    // correct topology — not the stale session-level default.
+    // correct topology — not the stale conversation-level default.
     orchestratorContext.topology = topology;
 
     if (!teamCreationArguments || !teamCreationArguments.members || !Array.isArray(teamCreationArguments.members)) {
@@ -793,7 +793,7 @@ export default class OrchestratorService {
       return [{ error: errorMessage }];
     }
 
-    // Sync the active topology to the session settings in MongoDB so the UI badge and state match execution
+    // Sync the active topology to the conversation settings in MongoDB so the UI badge and state match execution
     if (orchestratorContext.conversationId) {
       try {
         const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
@@ -826,13 +826,13 @@ export default class OrchestratorService {
             );
           } else {
             logger.info(
-              `[Orchestrator] Updated session settings topology to "${topology}" for conversation ${orchestratorContext.conversationId}`,
+              `[Orchestrator] Updated conversation settings topology to "${topology}" for conversation ${orchestratorContext.conversationId}`,
             );
           }
         }
       } catch (databaseError: unknown) {
         logger.warn(
-          `[Orchestrator] Failed to update session settings topology in MongoDB: ${getErrorMessage(databaseError)}`,
+          `[Orchestrator] Failed to update conversation settings topology in MongoDB: ${getErrorMessage(databaseError)}`,
         );
       }
     }
@@ -888,7 +888,7 @@ export default class OrchestratorService {
   ) {
     const parentConversationId = orchestratorContext?.conversationId;
 
-    // Find all sub-agents belonging to this orchestrator session
+    // Find all sub-agents belonging to this orchestrator conversation
     const teamSubAgents = [...activeSubAgents.entries()].filter(
       ([, subAgent]) => {
         if (parentConversationId) {
@@ -1044,7 +1044,7 @@ export default class OrchestratorService {
       subAgentId: subAgent.agentId,
       subAgentDescription: subAgent.description,
       parentEmit,
-      parentSessionId: orchestratorContext.agentSessionId,
+      parentConversationId: orchestratorContext.agentConversationId,
     });
     const subAgentEmit = telemetry.createEmitFunction();
 
@@ -1096,9 +1096,9 @@ export default class OrchestratorService {
             minContextLength: subAgent.minContextLength,
           }),
         },
-        agentSessionId: subAgent.subAgentSessionId,
-        parentAgentSessionId: subAgent.parentAgentSessionId,
-        conversationId: subAgent.subAgentSessionId,
+        agentConversationId: subAgent.subAgentConversationId,
+        parentAgentConversationId: subAgent.parentAgentConversationId,
+        conversationId: subAgent.subAgentConversationId,
         parentConversationId: subAgent.parentConversationId,
         traceId: subAgent.traceId,
         project: subAgent.project,
@@ -1188,7 +1188,7 @@ export default class OrchestratorService {
     // the result payload.
     subAgent.abortController = null;
     // Remove worktree now that the diff has been collected — prevents orphaned
-    // worktrees from accumulating on disk across sessions.
+    // worktrees from accumulating on disk across conversations.
     if (
       subAgent.status !== "stopped" &&
       subAgent.isolated &&
