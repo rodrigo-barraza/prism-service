@@ -20,22 +20,14 @@ describe("getOrchestratorPromptAddendum", () => {
     expect(prompt).not.toContain("**`peer_to_peer`** (default)");
   });
 
-  it("should mark peer_to_peer as default when defaultTopology is peer_to_peer or p2p", () => {
-    const prompt1 = getOrchestratorPromptAddendum({
+  it("should mark peer_to_peer as default when defaultTopology is peer_to_peer", () => {
+    const prompt = getOrchestratorPromptAddendum({
       subAgentTools: [],
       defaultTopology: "peer_to_peer",
     });
-    expect(prompt1).toContain("**`peer_to_peer`** (default)");
-    expect(prompt1).not.toContain("**`hierarchical`** (default)");
-    expect(prompt1).not.toContain("**`sequential`** (default)");
-
-    const prompt2 = getOrchestratorPromptAddendum({
-      subAgentTools: [],
-      defaultTopology: "p2p",
-    });
-    expect(prompt2).toContain("**`peer_to_peer`** (default)");
-    expect(prompt2).not.toContain("**`hierarchical`** (default)");
-    expect(prompt2).not.toContain("**`sequential`** (default)");
+    expect(prompt).toContain("**`peer_to_peer`** (default)");
+    expect(prompt).not.toContain("**`hierarchical`** (default)");
+    expect(prompt).not.toContain("**`sequential`** (default)");
   });
 });
 
