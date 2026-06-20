@@ -225,26 +225,21 @@ router.get(
       };
 
       // Enrich conversations with `hasSubAgents` by cross-referencing
-      // child sessions that point back via `parentAgentSessionId`.
-      // The stored flag may be missing on sessions created before the flag
+      // child conversations that point back via `parentConversationId`.
+      // The stored flag may be missing on conversations created before the flag
       // was introduced or when the write failed silently at spawn time.
       const enrichConversationsWithSubAgentFlag = async (
         conversations: Document[],
       ) => {
         if (conversations.length === 0) return;
-        const sessionIds = conversations
-          .map((session) => (session as Record<string, unknown>).id as string)
+        const conversationIds = conversations
+          .map((conversation) => (conversation as Record<string, unknown>).id as string)
           .filter(Boolean);
-        if (sessionIds.length === 0) return;
+        if (conversationIds.length === 0) return;
 
         try {
-          // Query both parentConversationId (correct document linkage) and
-          // parentAgentSessionId (legacy, backward compat for old data).
           const parentFieldQuery = {
-            $or: [
-              { parentConversationId: { $in: sessionIds } },
-              { parentAgentSessionId: { $in: sessionIds } },
-            ],
+            parentConversationId: { $in: conversationIds },
             project,
             username,
           };
@@ -252,27 +247,27 @@ router.get(
             db
               .collection(COLLECTIONS.AGENT_CONVERSATIONS)
               .find(parentFieldQuery)
-              .project({ parentConversationId: 1, parentAgentSessionId: 1 })
+              .project({ parentConversationId: 1 })
               .toArray(),
             db
               .collection(COLLECTIONS.MODEL_CONVERSATIONS)
               .find(parentFieldQuery)
-              .project({ parentConversationId: 1, parentAgentSessionId: 1 })
+              .project({ parentConversationId: 1 })
               .toArray(),
           ]);
 
           const parentIdSet = new Set<string>();
           for (const childDocument of [...agentParents, ...modelParents]) {
             const documentRecord = childDocument as Record<string, unknown>;
-            const linkId = (documentRecord.parentConversationId || documentRecord.parentAgentSessionId) as string | null;
+            const linkId = documentRecord.parentConversationId as string | null;
             if (linkId) parentIdSet.add(linkId);
           }
 
           if (parentIdSet.size > 0) {
-            for (const session of conversations) {
-              const sessionRecord = session as Record<string, unknown>;
-              if (parentIdSet.has(sessionRecord.id as string)) {
-                sessionRecord.hasSubAgents = true;
+            for (const conversation of conversations) {
+              const conversationRecord = conversation as Record<string, unknown>;
+              if (parentIdSet.has(conversationRecord.id as string)) {
+                conversationRecord.hasSubAgents = true;
               }
             }
           }
