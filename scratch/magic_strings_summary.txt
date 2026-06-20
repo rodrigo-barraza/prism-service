@@ -1,0 +1,63 @@
+Found 77 magic strings:
+
+File: tests/chatRoute-adversarial.test.ts (1 findings)
+  * Line 88: Literal string `"openai"` duplicates the production constant `PROVIDERS.OPENAI`.
+
+File: tests/config.test.ts (1 findings)
+  * Line 103: Literal string `"inworld"` duplicates the production constant `PROVIDERS.INWORLD`.
+
+File: tests/conversationListCostEnrichment.test.ts (1 findings)
+  * Line 5: Literal string `"requests"` duplicates the production constant `COLLECTIONS.REQUESTS`.
+
+File: tests/live/lmStudioModels.live.test.ts (5 findings)
+  * Line 297: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+  * Line 362: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+  * Line 427: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+  * Line 494: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+  * Line 559: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+
+File: tests/live/tokenCostLive.live.test.ts (1 findings)
+  * Line 651: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+
+File: tests/live/tokenMetricsLive.live.test.ts (1 findings)
+  * Line 492: Literal string `"openai"` duplicates the production constant `PROVIDERS.OPENAI`.
+
+File: tests/localProviderNormalizers.test.ts (8 findings)
+  * Line 275: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+  * Line 279: Literal string `"ollama"` duplicates the production constant `PROVIDERS.OLLAMA`.
+  * Line 283: Literal string `"vllm"` duplicates the production constant `PROVIDERS.VLLM`.
+  * Line 287: Literal string `"llama-cpp"` duplicates the production constant `PROVIDERS.LLAMA_CPP`.
+  * Line 297: Literal string `"vllm"` duplicates the production constant `PROVIDERS.VLLM`.
+  * ... and 3 more
+
+File: tests/loggerContextTags.test.ts (7 findings)
+  * Line 35: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+  * Line 48: Literal string `"openai"` duplicates the production constant `PROVIDERS.OPENAI`.
+  * Line 59: Literal string `"openai"` duplicates the production constant `PROVIDERS.OPENAI`.
+  * Line 71: Literal string `"anthropic"` duplicates the production constant `PROVIDERS.ANTHROPIC`.
+  * Line 83: Literal string `"google"` duplicates the production constant `PROVIDERS.GOOGLE`.
+  * ... and 2 more
+
+File: tests/providerInstanceRegistry.test.ts (23 findings)
+  * Line 57: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+  * Line 59: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+  * Line 60: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+  * Line 74: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+  * Line 84: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+  * ... and 18 more
+
+File: tests/rateLimitExtraction.test.ts (11 findings)
+  * Line 13: Literal string `"openai"` duplicates the production constant `PROVIDERS.OPENAI`.
+  * Line 14: Literal string `"anthropic"` duplicates the production constant `PROVIDERS.ANTHROPIC`.
+  * Line 15: Literal string `"google"` duplicates the production constant `PROVIDERS.GOOGLE`.
+  * Line 16: Literal string `"elevenlabs"` duplicates the production constant `PROVIDERS.ELEVENLABS`.
+  * Line 17: Literal string `"inworld"` duplicates the production constant `PROVIDERS.INWORLD`.
+  * ... and 6 more
+
+File: tests/voiceCatalog.test.ts (18 findings)
+  * Line 22: Literal string `"openai"` duplicates the production constant `PROVIDERS.OPENAI`.
+  * Line 23: Literal string `"anthropic"` duplicates the production constant `PROVIDERS.ANTHROPIC`.
+  * Line 24: Literal string `"google"` duplicates the production constant `PROVIDERS.GOOGLE`.
+  * Line 25: Literal string `"elevenlabs"` duplicates the production constant `PROVIDERS.ELEVENLABS`.
+  * Line 26: Literal string `"inworld"` duplicates the production constant `PROVIDERS.INWORLD`.
+  * ... and 13 more

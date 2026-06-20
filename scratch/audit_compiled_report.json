@@ -1,0 +1,1073 @@
+[
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/adminStats.test.ts",
+    "lineStart": 42,
+    "lineEnd": 42,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const sizeExpr = (expression as any).$size;`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/adminStats.test.ts",
+    "lineStart": 53,
+    "lineEnd": 53,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const fieldName = (expression as any).replace(\"$\", \"\");`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/autoApprovalEngine.test.ts",
+    "lineStart": 387,
+    "lineEnd": 387,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = await hook({ name: \"read_file\", args: {}, id: \"tc1\" }, {} as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/autoApprovalEngine.test.ts",
+    "lineStart": 397,
+    "lineEnd": 397,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = await hook({ name: \"execute_shell\", args: {}, id: \"tc2\" }, {} as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/autoApprovalEngine.test.ts",
+    "lineStart": 407,
+    "lineEnd": 407,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = await hook({ name: \"execute_shell\", args: {}, id: \"tc3\" }, {} as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/chatRoute-adversarial.test.ts",
+    "lineStart": 88,
+    "lineEnd": 88,
+    "severity": "🟡",
+    "description": "Literal string `\"openai\"` duplicates the production constant `PROVIDERS.OPENAI`.",
+    "fix": "Import and use `PROVIDERS.OPENAI` from `src/constants.ts`."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/client-tool-state-updaters.test.ts",
+    "lineStart": 336,
+    "lineEnd": 336,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `result: { success: true } as any,`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/config.test.ts",
+    "lineStart": 103,
+    "lineEnd": 103,
+    "severity": "🟡",
+    "description": "Literal string `\"inworld\"` duplicates the production constant `PROVIDERS.INWORLD`.",
+    "fix": "Import and use `PROVIDERS.INWORLD` from `src/constants.ts`."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/contextWindowManager.test.ts",
+    "lineStart": 609,
+    "lineEnd": 609,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = ContextWindowManager.enforce([giantSystemMessage] as any, {`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/contextWindowManager.test.ts",
+    "lineStart": 623,
+    "lineEnd": 623,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = ContextWindowManager.enforce(messagesWithUndefined as any, {`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/contextWindowManager.test.ts",
+    "lineStart": 649,
+    "lineEnd": 649,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = ContextWindowManager.enforce(messagesWithDeepToolResults as any, {`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/contextWindowManager.test.ts",
+    "lineStart": 660,
+    "lineEnd": 660,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = ContextWindowManager.enforce(messages as any, {`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/contextWindowManager.test.ts",
+    "lineStart": 673,
+    "lineEnd": 673,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = ContextWindowManager.enforce(messages as any, {`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/conversationListCostEnrichment.test.ts",
+    "lineStart": 5,
+    "lineEnd": 5,
+    "severity": "🟡",
+    "description": "Literal string `\"requests\"` duplicates the production constant `COLLECTIONS.REQUESTS`.",
+    "fix": "Import and use `COLLECTIONS.REQUESTS` from `src/constants.ts`."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/finalize-message-persistence.test.ts",
+    "lineStart": 27,
+    "lineEnd": 27,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const messagesAsPayload = currentMessages as unknown as MessagePayload[];`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/finalize-message-persistence.test.ts",
+    "lineStart": 28,
+    "lineEnd": 28,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `return computeNewTurnMessages(messagesAsPayload, messagesAsPayload, originalMessageCount) as unknown as TestMessage[];`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/finalize-message-persistence.test.ts",
+    "lineStart": 38,
+    "lineEnd": 38,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `return sanitizeMessagesForPersistence(messagesToAppend as any) as unknown as TestMessage[];`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/finalize-message-persistence.test.ts",
+    "lineStart": 1010,
+    "lineEnd": 1010,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `(message) => (message as any)._alreadyPersisted,`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/finalize-message-persistence.test.ts",
+    "lineStart": 1185,
+    "lineEnd": 1185,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `(message) => (message as any)._alreadyPersisted,`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/functionCallingUtilities.test.ts",
+    "lineStart": 33,
+    "lineEnd": 33,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = truncateToolResult(largeArray) as unknown[];`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/functionCallingUtilities.test.ts",
+    "lineStart": 58,
+    "lineEnd": 58,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `expect((result.events as unknown[]).length).toBe(10);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/functionCallingUtilities.test.ts",
+    "lineStart": 328,
+    "lineEnd": 328,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `expect((result.events as unknown[]).length).toBe(10);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/functionCallingUtilities.test.ts",
+    "lineStart": 330,
+    "lineEnd": 330,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `expect((result.products as unknown[]).length).toBe(10);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/functionCallingUtilities.test.ts",
+    "lineStart": 366,
+    "lineEnd": 366,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const messages = [{ role: 'user', content: null }] as any;`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/harness-lifecycle.test.ts",
+    "lineStart": 248,
+    "lineEnd": 248,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const updatedResult = results[0].result as any;`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/harness-stream-processing.test.ts",
+    "lineStart": 385,
+    "lineEnd": 385,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const assistantContent = messages[0].content as any[];`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/live/lmStudioModels.live.test.ts",
+    "lineStart": 180,
+    "lineEnd": 180,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const data = await res.json() as any;`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/lmStudioModels.live.test.ts",
+    "lineStart": 297,
+    "lineEnd": 297,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/lmStudioModels.live.test.ts",
+    "lineStart": 362,
+    "lineEnd": 362,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/lmStudioModels.live.test.ts",
+    "lineStart": 427,
+    "lineEnd": 427,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/lmStudioModels.live.test.ts",
+    "lineStart": 494,
+    "lineEnd": 494,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/lmStudioModels.live.test.ts",
+    "lineStart": 559,
+    "lineEnd": 559,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/tokenCostLive.live.test.ts",
+    "lineStart": 651,
+    "lineEnd": 651,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/tokenMetricsLive.live.test.ts",
+    "lineStart": 492,
+    "lineEnd": 492,
+    "severity": "🟡",
+    "description": "Literal string `\"openai\"` duplicates the production constant `PROVIDERS.OPENAI`.",
+    "fix": "Import and use `PROVIDERS.OPENAI` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineStart": 275,
+    "lineEnd": 275,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineStart": 279,
+    "lineEnd": 279,
+    "severity": "🟡",
+    "description": "Literal string `\"ollama\"` duplicates the production constant `PROVIDERS.OLLAMA`.",
+    "fix": "Import and use `PROVIDERS.OLLAMA` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineStart": 283,
+    "lineEnd": 283,
+    "severity": "🟡",
+    "description": "Literal string `\"vllm\"` duplicates the production constant `PROVIDERS.VLLM`.",
+    "fix": "Import and use `PROVIDERS.VLLM` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineStart": 287,
+    "lineEnd": 287,
+    "severity": "🟡",
+    "description": "Literal string `\"llama-cpp\"` duplicates the production constant `PROVIDERS.LLAMA_CPP`.",
+    "fix": "Import and use `PROVIDERS.LLAMA_CPP` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineStart": 297,
+    "lineEnd": 297,
+    "severity": "🟡",
+    "description": "Literal string `\"vllm\"` duplicates the production constant `PROVIDERS.VLLM`.",
+    "fix": "Import and use `PROVIDERS.VLLM` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineStart": 301,
+    "lineEnd": 301,
+    "severity": "🟡",
+    "description": "Literal string `\"llama-cpp\"` duplicates the production constant `PROVIDERS.LLAMA_CPP`.",
+    "fix": "Import and use `PROVIDERS.LLAMA_CPP` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineStart": 305,
+    "lineEnd": 305,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineStart": 309,
+    "lineEnd": 309,
+    "severity": "🟡",
+    "description": "Literal string `\"ollama\"` duplicates the production constant `PROVIDERS.OLLAMA`.",
+    "fix": "Import and use `PROVIDERS.OLLAMA` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineStart": 35,
+    "lineEnd": 35,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineStart": 48,
+    "lineEnd": 48,
+    "severity": "🟡",
+    "description": "Literal string `\"openai\"` duplicates the production constant `PROVIDERS.OPENAI`.",
+    "fix": "Import and use `PROVIDERS.OPENAI` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineStart": 59,
+    "lineEnd": 59,
+    "severity": "🟡",
+    "description": "Literal string `\"openai\"` duplicates the production constant `PROVIDERS.OPENAI`.",
+    "fix": "Import and use `PROVIDERS.OPENAI` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineStart": 71,
+    "lineEnd": 71,
+    "severity": "🟡",
+    "description": "Literal string `\"anthropic\"` duplicates the production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Import and use `PROVIDERS.ANTHROPIC` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineStart": 83,
+    "lineEnd": 83,
+    "severity": "🟡",
+    "description": "Literal string `\"google\"` duplicates the production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineStart": 95,
+    "lineEnd": 95,
+    "severity": "🟡",
+    "description": "Literal string `\"vllm\"` duplicates the production constant `PROVIDERS.VLLM`.",
+    "fix": "Import and use `PROVIDERS.VLLM` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineStart": 106,
+    "lineEnd": 106,
+    "severity": "🟡",
+    "description": "Literal string `\"vllm\"` duplicates the production constant `PROVIDERS.VLLM`.",
+    "fix": "Import and use `PROVIDERS.VLLM` from `src/constants.ts`."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/mcpSearchMerge.test.ts",
+    "lineStart": 320,
+    "lineEnd": 320,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const matches = result.matches as unknown[];`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/policyEngine.test.ts",
+    "lineStart": 373,
+    "lineEnd": 373,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = PolicyEngine.evaluate(null as any, 'any_tool', {});`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 57,
+    "lineEnd": 57,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 59,
+    "lineEnd": 59,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 60,
+    "lineEnd": 60,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 74,
+    "lineEnd": 74,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 84,
+    "lineEnd": 84,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 91,
+    "lineEnd": 91,
+    "severity": "🟡",
+    "description": "Literal string `\"vllm\"` duplicates the production constant `PROVIDERS.VLLM`.",
+    "fix": "Import and use `PROVIDERS.VLLM` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 97,
+    "lineEnd": 97,
+    "severity": "🟡",
+    "description": "Literal string `\"ollama\"` duplicates the production constant `PROVIDERS.OLLAMA`.",
+    "fix": "Import and use `PROVIDERS.OLLAMA` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 99,
+    "lineEnd": 99,
+    "severity": "🟡",
+    "description": "Literal string `\"llama-cpp\"` duplicates the production constant `PROVIDERS.LLAMA_CPP`.",
+    "fix": "Import and use `PROVIDERS.LLAMA_CPP` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 106,
+    "lineEnd": 106,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 108,
+    "lineEnd": 108,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 119,
+    "lineEnd": 119,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 131,
+    "lineEnd": 131,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 133,
+    "lineEnd": 133,
+    "severity": "🟡",
+    "description": "Literal string `\"vllm\"` duplicates the production constant `PROVIDERS.VLLM`.",
+    "fix": "Import and use `PROVIDERS.VLLM` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 137,
+    "lineEnd": 137,
+    "severity": "🟡",
+    "description": "Literal string `\"ollama\"` duplicates the production constant `PROVIDERS.OLLAMA`.",
+    "fix": "Import and use `PROVIDERS.OLLAMA` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 162,
+    "lineEnd": 162,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 163,
+    "lineEnd": 163,
+    "severity": "🟡",
+    "description": "Literal string `\"vllm\"` duplicates the production constant `PROVIDERS.VLLM`.",
+    "fix": "Import and use `PROVIDERS.VLLM` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 169,
+    "lineEnd": 169,
+    "severity": "🟡",
+    "description": "Literal string `\"ollama\"` duplicates the production constant `PROVIDERS.OLLAMA`.",
+    "fix": "Import and use `PROVIDERS.OLLAMA` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 170,
+    "lineEnd": 170,
+    "severity": "🟡",
+    "description": "Literal string `\"llama-cpp\"` duplicates the production constant `PROVIDERS.LLAMA_CPP`.",
+    "fix": "Import and use `PROVIDERS.LLAMA_CPP` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 176,
+    "lineEnd": 176,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 178,
+    "lineEnd": 178,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 183,
+    "lineEnd": 183,
+    "severity": "🟡",
+    "description": "Literal string `\"ollama\"` duplicates the production constant `PROVIDERS.OLLAMA`.",
+    "fix": "Import and use `PROVIDERS.OLLAMA` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 193,
+    "lineEnd": 193,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineStart": 197,
+    "lineEnd": 197,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 13,
+    "lineEnd": 13,
+    "severity": "🟡",
+    "description": "Literal string `\"openai\"` duplicates the production constant `PROVIDERS.OPENAI`.",
+    "fix": "Import and use `PROVIDERS.OPENAI` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 14,
+    "lineEnd": 14,
+    "severity": "🟡",
+    "description": "Literal string `\"anthropic\"` duplicates the production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Import and use `PROVIDERS.ANTHROPIC` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 15,
+    "lineEnd": 15,
+    "severity": "🟡",
+    "description": "Literal string `\"google\"` duplicates the production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 16,
+    "lineEnd": 16,
+    "severity": "🟡",
+    "description": "Literal string `\"elevenlabs\"` duplicates the production constant `PROVIDERS.ELEVENLABS`.",
+    "fix": "Import and use `PROVIDERS.ELEVENLABS` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 17,
+    "lineEnd": 17,
+    "severity": "🟡",
+    "description": "Literal string `\"inworld\"` duplicates the production constant `PROVIDERS.INWORLD`.",
+    "fix": "Import and use `PROVIDERS.INWORLD` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 54,
+    "lineEnd": 54,
+    "severity": "🟡",
+    "description": "Literal string `\"openai\"` duplicates the production constant `PROVIDERS.OPENAI`.",
+    "fix": "Import and use `PROVIDERS.OPENAI` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 71,
+    "lineEnd": 71,
+    "severity": "🟡",
+    "description": "Literal string `\"openai\"` duplicates the production constant `PROVIDERS.OPENAI`.",
+    "fix": "Import and use `PROVIDERS.OPENAI` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 73,
+    "lineEnd": 73,
+    "severity": "🟡",
+    "description": "Literal string `\"openai\"` duplicates the production constant `PROVIDERS.OPENAI`.",
+    "fix": "Import and use `PROVIDERS.OPENAI` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 129,
+    "lineEnd": 129,
+    "severity": "🟡",
+    "description": "Literal string `\"anthropic\"` duplicates the production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Import and use `PROVIDERS.ANTHROPIC` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 146,
+    "lineEnd": 146,
+    "severity": "🟡",
+    "description": "Literal string `\"anthropic\"` duplicates the production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Import and use `PROVIDERS.ANTHROPIC` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 148,
+    "lineEnd": 148,
+    "severity": "🟡",
+    "description": "Literal string `\"anthropic\"` duplicates the production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Import and use `PROVIDERS.ANTHROPIC` from `src/constants.ts`."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/recurrenceMatcher.test.ts",
+    "lineStart": 233,
+    "lineEnd": 233,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const rule = { frequency: 'hourly' as any, interval: 1 };`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/thinkingMode.test.ts",
+    "lineStart": 29,
+    "lineEnd": 29,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const res = (mockMessagesCreate as any)(...args);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/thinkingMode.test.ts",
+    "lineStart": 49,
+    "lineEnd": 49,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `stream: (...args: Parameters<InstanceType<typeof import(\"@anthropic-ai/sdk\").default>[\"messages\"][\"stream\"]>) => (mockMessagesStream as any)(...args),`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 22,
+    "lineEnd": 22,
+    "severity": "🟡",
+    "description": "Literal string `\"openai\"` duplicates the production constant `PROVIDERS.OPENAI`.",
+    "fix": "Import and use `PROVIDERS.OPENAI` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 23,
+    "lineEnd": 23,
+    "severity": "🟡",
+    "description": "Literal string `\"anthropic\"` duplicates the production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Import and use `PROVIDERS.ANTHROPIC` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 24,
+    "lineEnd": 24,
+    "severity": "🟡",
+    "description": "Literal string `\"google\"` duplicates the production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 25,
+    "lineEnd": 25,
+    "severity": "🟡",
+    "description": "Literal string `\"elevenlabs\"` duplicates the production constant `PROVIDERS.ELEVENLABS`.",
+    "fix": "Import and use `PROVIDERS.ELEVENLABS` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 26,
+    "lineEnd": 26,
+    "severity": "🟡",
+    "description": "Literal string `\"inworld\"` duplicates the production constant `PROVIDERS.INWORLD`.",
+    "fix": "Import and use `PROVIDERS.INWORLD` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 27,
+    "lineEnd": 27,
+    "severity": "🟡",
+    "description": "Literal string `\"lm-studio\"` duplicates the production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 28,
+    "lineEnd": 28,
+    "severity": "🟡",
+    "description": "Literal string `\"vllm\"` duplicates the production constant `PROVIDERS.VLLM`.",
+    "fix": "Import and use `PROVIDERS.VLLM` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 29,
+    "lineEnd": 29,
+    "severity": "🟡",
+    "description": "Literal string `\"ollama\"` duplicates the production constant `PROVIDERS.OLLAMA`.",
+    "fix": "Import and use `PROVIDERS.OLLAMA` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 30,
+    "lineEnd": 30,
+    "severity": "🟡",
+    "description": "Literal string `\"llama-cpp\"` duplicates the production constant `PROVIDERS.LLAMA_CPP`.",
+    "fix": "Import and use `PROVIDERS.LLAMA_CPP` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 43,
+    "lineEnd": 43,
+    "severity": "🟡",
+    "description": "Literal string `\"openai\"` duplicates the production constant `PROVIDERS.OPENAI`.",
+    "fix": "Import and use `PROVIDERS.OPENAI` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 50,
+    "lineEnd": 50,
+    "severity": "🟡",
+    "description": "Literal string `\"google\"` duplicates the production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 57,
+    "lineEnd": 57,
+    "severity": "🟡",
+    "description": "Literal string `\"elevenlabs\"` duplicates the production constant `PROVIDERS.ELEVENLABS`.",
+    "fix": "Import and use `PROVIDERS.ELEVENLABS` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 63,
+    "lineEnd": 63,
+    "severity": "🟡",
+    "description": "Literal string `\"inworld\"` duplicates the production constant `PROVIDERS.INWORLD`.",
+    "fix": "Import and use `PROVIDERS.INWORLD` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 74,
+    "lineEnd": 74,
+    "severity": "🟡",
+    "description": "Literal string `\"inworld\"` duplicates the production constant `PROVIDERS.INWORLD`.",
+    "fix": "Import and use `PROVIDERS.INWORLD` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 79,
+    "lineEnd": 79,
+    "severity": "🟡",
+    "description": "Literal string `\"inworld\"` duplicates the production constant `PROVIDERS.INWORLD`.",
+    "fix": "Import and use `PROVIDERS.INWORLD` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 87,
+    "lineEnd": 87,
+    "severity": "🟡",
+    "description": "Literal string `\"openai\"` duplicates the production constant `PROVIDERS.OPENAI`.",
+    "fix": "Import and use `PROVIDERS.OPENAI` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 95,
+    "lineEnd": 95,
+    "severity": "🟡",
+    "description": "Literal string `\"openai\"` duplicates the production constant `PROVIDERS.OPENAI`.",
+    "fix": "Import and use `PROVIDERS.OPENAI` from `src/constants.ts`."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 102,
+    "lineEnd": 102,
+    "severity": "🟡",
+    "description": "Literal string `\"inworld\"` duplicates the production constant `PROVIDERS.INWORLD`.",
+    "fix": "Import and use `PROVIDERS.INWORLD` from `src/constants.ts`."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/webhookEventBus.test.ts",
+    "lineStart": 1068,
+    "lineEnd": 1068,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const address = server.address() as any;`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/workflowAssembler.test.ts",
+    "lineStart": 31,
+    "lineEnd": 31,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = assembleGraph(null as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/workflowAssembler.test.ts",
+    "lineStart": 51,
+    "lineEnd": 51,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = assembleGraph(steps as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/workflowAssembler.test.ts",
+    "lineStart": 69,
+    "lineEnd": 69,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = assembleGraph(steps as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/workflowAssembler.test.ts",
+    "lineStart": 86,
+    "lineEnd": 86,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = assembleGraph(steps as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/workflowAssembler.test.ts",
+    "lineStart": 97,
+    "lineEnd": 97,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = assembleGraph(steps as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/workflowAssembler.test.ts",
+    "lineStart": 113,
+    "lineEnd": 113,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = assembleGraph(steps as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/workflowAssembler.test.ts",
+    "lineStart": 130,
+    "lineEnd": 130,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = assembleGraph(steps as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/workflowAssembler.test.ts",
+    "lineStart": 150,
+    "lineEnd": 150,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = assembleGraph(steps as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/workflowAssembler.test.ts",
+    "lineStart": 166,
+    "lineEnd": 166,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = assembleGraph(steps as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/workflowAssembler.test.ts",
+    "lineStart": 184,
+    "lineEnd": 184,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = assembleGraph(steps as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/workflowAssembler.test.ts",
+    "lineStart": 195,
+    "lineEnd": 195,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = assembleGraph(steps as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/workflowAssembler.test.ts",
+    "lineStart": 212,
+    "lineEnd": 212,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = assembleGraph(steps as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  }
+]
