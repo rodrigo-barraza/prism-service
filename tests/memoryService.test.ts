@@ -4,30 +4,31 @@ import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
 import EmbeddingService from "../src/services/EmbeddingService.ts";
 import SettingsService from "../src/services/SettingsService.ts";
 
-const mockCollection = {
-  find: vi.fn().mockReturnThis(),
-  project: vi.fn().mockReturnThis(),
-  sort: vi.fn().mockReturnThis(),
-  limit: vi.fn().mockReturnThis(),
-  skip: vi.fn().mockReturnThis(),
-  toArray: vi.fn().mockResolvedValue([]),
-  insertOne: vi.fn().mockResolvedValue(undefined),
-  deleteOne: vi.fn().mockResolvedValue({ deletedCount: 1 }),
-  updateOne: vi.fn().mockResolvedValue({ modifiedCount: 1 }),
-  findOne: vi.fn().mockResolvedValue(null),
-  countDocuments: vi.fn().mockResolvedValue(0),
-  aggregate: vi.fn().mockReturnThis(),
-  createIndex: vi.fn().mockResolvedValue(undefined),
-};
-
-vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
-  default: {
-    getCollection: vi.fn().mockReturnValue(mockCollection),
-    getDb: vi.fn().mockReturnValue({
-      collection: vi.fn().mockReturnValue(mockCollection),
-    }),
-  },
-}));
+vi.mock("../src/wrappers/MongoWrapper.ts", () => {
+  const collection = {
+    find: vi.fn().mockReturnThis(),
+    project: vi.fn().mockReturnThis(),
+    sort: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    skip: vi.fn().mockReturnThis(),
+    toArray: vi.fn().mockResolvedValue([]),
+    insertOne: vi.fn().mockResolvedValue(undefined),
+    deleteOne: vi.fn().mockResolvedValue({ deletedCount: 1 }),
+    updateOne: vi.fn().mockResolvedValue({ modifiedCount: 1 }),
+    findOne: vi.fn().mockResolvedValue(null),
+    countDocuments: vi.fn().mockResolvedValue(0),
+    aggregate: vi.fn().mockReturnThis(),
+    createIndex: vi.fn().mockResolvedValue(undefined),
+  };
+  return {
+    default: {
+      getCollection: vi.fn().mockReturnValue(collection),
+      getDb: vi.fn().mockReturnValue({
+        collection: vi.fn().mockReturnValue(collection),
+      }),
+    },
+  };
+});
 
 vi.mock("../src/services/EmbeddingService.ts", () => ({
   default: {
@@ -44,6 +45,14 @@ vi.mock("../src/services/SettingsService.ts", () => ({
   },
 }));
 
+vi.mock("../src/services/RequestLogger.ts", () => ({
+  default: {
+    log: vi.fn(),
+    logChatGeneration: vi.fn(),
+    logBackgroundLlmCall: vi.fn(),
+  },
+}));
+
 const mockGenerateText = vi.fn();
 vi.mock("../src/providers/index.ts", () => ({
   getProvider: vi.fn().mockImplementation(() => ({
@@ -53,8 +62,11 @@ vi.mock("../src/providers/index.ts", () => ({
 }));
 
 describe("MemoryService", () => {
+  let mockCollection: any;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCollection = MongoWrapper.getCollection("", "");
     mockCollection.toArray.mockResolvedValue([]);
     mockCollection.findOne.mockResolvedValue(null);
   });
@@ -90,7 +102,6 @@ describe("MemoryService", () => {
     });
 
     it("should skip storing when a duplicate memory is detected", async () => {
-      // Return a document with matching embedding
       mockCollection.toArray.mockResolvedValue([
         { embedding: [0.1, 0.2, 0.3] }
       ]);
@@ -106,7 +117,6 @@ describe("MemoryService", () => {
     });
 
     it("should store memory if cosine similarity is below duplicate threshold", async () => {
-      // Return a document with completely different embedding (opposite direction)
       mockCollection.toArray.mockResolvedValue([
         { embedding: [-0.1, -0.2, -0.3] }
       ]);
@@ -192,7 +202,8 @@ describe("MemoryService", () => {
 
       expect(updated).toBe(true);
       expect(EmbeddingService.embed).toHaveBeenCalledWith("Old Title: New updated content", {
-        project: "test-project"
+        project: "test-project",
+        source: "memory"
       });
       expect(mockCollection.updateOne).toHaveBeenCalledTimes(1);
     });

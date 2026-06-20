@@ -120,10 +120,10 @@ describe("BackgroundHousekeepingService", () => {
       // Mock MinIO Wrapper
       vi.spyOn(MinioWrapper, "isAvailable").mockReturnValue(true);
       const listObjectsMock = vi.spyOn(MinioWrapper, "listObjects").mockResolvedValue([
-        "conv-active/file1.png",
-        "conv-orphaned/file2.png",
-        "projects/proj-1/file3.png" // Should be skipped (structural prefix)
-      ]);
+        { name: "conv-active/file1.png" },
+        { name: "conv-orphaned/file2.png" },
+        { name: "projects/proj-1/file3.png" } // Should be skipped (structural prefix)
+      ] as any);
       const minioRemoveMock = vi.spyOn(MinioWrapper, "remove").mockResolvedValue(undefined as any);
 
       const result = await BackgroundHousekeepingService.run({ trigger: "test" });
