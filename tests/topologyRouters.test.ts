@@ -726,4 +726,323 @@ describe("Topology Routers Test Suite", () => {
       expect(promptArg).toContain("Agent completed 3 iterations using write_file (5×) but did not produce a final summary.");
     });
   });
+
+  describe("1-Based Agent Indexing", () => {
+    it("HierarchicalRouter should pass 1-based agentIndex to all members", async () => {
+      const router = new HierarchicalRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+        { description: "Task C", prompt: "Prompt C" },
+      ];
+
+      await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(3);
+      expect(spawnSubAgentMock.mock.calls[0][0].agentIndex).toBe(1);
+      expect(spawnSubAgentMock.mock.calls[1][0].agentIndex).toBe(2);
+      expect(spawnSubAgentMock.mock.calls[2][0].agentIndex).toBe(3);
+
+      for (const call of spawnSubAgentMock.mock.calls) {
+        expect(call[0].teamSize).toBe(3);
+      }
+    });
+
+    it("SequentialRouter should pass 1-based agentIndex to all steps", async () => {
+      const router = new SequentialRouter();
+      const members = [
+        { description: "Step A", prompt: "Do A" },
+        { description: "Step B", prompt: "Do B" },
+      ];
+
+      await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
+      expect(spawnSubAgentMock.mock.calls[0][0].agentIndex).toBe(1);
+      expect(spawnSubAgentMock.mock.calls[1][0].agentIndex).toBe(2);
+
+      for (const call of spawnSubAgentMock.mock.calls) {
+        expect(call[0].teamSize).toBe(2);
+      }
+    });
+
+    it("HierarchicalAggregationRouter should pass 1-based agentIndex to all members", async () => {
+      const router = new HierarchicalAggregationRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+      ];
+
+      await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(spawnSubAgentMock.mock.calls[0][0].agentIndex).toBe(1);
+      expect(spawnSubAgentMock.mock.calls[1][0].agentIndex).toBe(2);
+
+      for (const call of spawnSubAgentMock.mock.calls) {
+        expect(call[0].teamSize).toBe(2);
+      }
+    });
+
+    it("PeerToPeerRouter should pass 1-based agentIndex on initial spawn", async () => {
+      const router = new PeerToPeerRouter();
+      const members = [
+        { agent: "Dev", description: "Write Code", prompt: "Code prompt" },
+        { agent: "QA", description: "Verify Code", prompt: "QA prompt" },
+        { agent: "PM", description: "Review", prompt: "Review prompt" },
+      ];
+
+      spawnSubAgentMock
+        .mockResolvedValueOnce({
+          agent_id: "agent-dev", description: "Write Code", status: "completed",
+          result: "Dev output", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        })
+        .mockResolvedValueOnce({
+          agent_id: "agent-qa", description: "Verify Code", status: "completed",
+          result: "QA output", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        })
+        .mockResolvedValueOnce({
+          agent_id: "agent-pm", description: "Review", status: "completed",
+          result: "PM output [DONE]", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        });
+
+      await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(spawnSubAgentMock.mock.calls[0][0].agentIndex).toBe(1);
+      expect(spawnSubAgentMock.mock.calls[1][0].agentIndex).toBe(2);
+      expect(spawnSubAgentMock.mock.calls[2][0].agentIndex).toBe(3);
+
+      for (const call of spawnSubAgentMock.mock.calls) {
+        expect(call[0].teamSize).toBe(3);
+      }
+    });
+
+    it("should never pass agentIndex 0 from any router", async () => {
+      const allRouters = [
+        { router: new HierarchicalRouter(), name: "Hierarchical" },
+        { router: new SequentialRouter(), name: "Sequential" },
+        { router: new HierarchicalAggregationRouter(), name: "HierarchicalAggregation" },
+      ];
+
+      for (const { router, name } of allRouters) {
+        spawnSubAgentMock.mockClear();
+        const members = [{ description: `${name} Task`, prompt: `${name} prompt` }];
+
+        await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+        const passedIndex = spawnSubAgentMock.mock.calls[0][0].agentIndex;
+        expect(passedIndex).toBeGreaterThanOrEqual(1);
+        expect(passedIndex).not.toBe(0);
+      }
+    });
+  });
+
+  describe("PeerToPeerRouter Round Tracking", () => {
+    let continueSubAgentMock: Mock;
+
+    beforeEach(() => {
+      continueSubAgentMock = vi.fn().mockImplementation(async (_agentId: string, _prompt: string) => ({
+        agent_id: _agentId,
+        status: "completed",
+        result: `Continued agent ${_agentId} with updated context`,
+        summary: "Continued",
+        toolUses: 1,
+        durationMs: 80,
+        iterations: 1,
+        messages: [],
+      }));
+    });
+
+    it("should pass round 1 on initial spawn for all members", async () => {
+      const router = new PeerToPeerRouter();
+      const members = [
+        { agent: "Dev", description: "Write Code", prompt: "Code prompt" },
+        { agent: "QA", description: "Verify Code", prompt: "QA prompt" },
+      ];
+
+      spawnSubAgentMock
+        .mockResolvedValueOnce({
+          agent_id: "agent-dev", description: "Write Code", status: "completed",
+          result: "Dev output", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        })
+        .mockResolvedValueOnce({
+          agent_id: "agent-qa", description: "Verify Code", status: "completed",
+          result: "QA output [DONE]", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        });
+
+      await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock);
+
+      expect(spawnSubAgentMock.mock.calls[0][0].round).toBe(1);
+      expect(spawnSubAgentMock.mock.calls[1][0].round).toBe(1);
+    });
+
+    it("should pass round 2 on continuation turns for all members", async () => {
+      const router = new PeerToPeerRouter();
+      const members = [
+        { agent: "Dev", description: "Write Code", prompt: "Code prompt" },
+        { agent: "QA", description: "Verify Code", prompt: "QA prompt" },
+      ];
+
+      spawnSubAgentMock
+        .mockResolvedValueOnce({
+          agent_id: "agent-dev", description: "Write Code", status: "completed",
+          result: "Dev round 1", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        })
+        .mockResolvedValueOnce({
+          agent_id: "agent-qa", description: "Verify Code", status: "completed",
+          result: "QA round 1", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        });
+
+      await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock);
+
+      // Round 2: continueSubAgent should be called with round=2 (4th argument)
+      expect(continueSubAgentMock).toHaveBeenCalledTimes(2);
+      expect(continueSubAgentMock.mock.calls[0][3]).toBe(2);
+      expect(continueSubAgentMock.mock.calls[1][3]).toBe(2);
+    });
+
+    it("should correctly compute round for larger teams across multiple turns", async () => {
+      const router = new PeerToPeerRouter();
+      const members = [
+        { agent: "Agent-A", description: "Task A", prompt: "Prompt A" },
+        { agent: "Agent-B", description: "Task B", prompt: "Prompt B" },
+        { agent: "Agent-C", description: "Task C", prompt: "Prompt C" },
+      ];
+
+      spawnSubAgentMock
+        .mockResolvedValueOnce({
+          agent_id: "agent-a", description: "Task A", status: "completed",
+          result: "A round 1", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        })
+        .mockResolvedValueOnce({
+          agent_id: "agent-b", description: "Task B", status: "completed",
+          result: "B round 1", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        })
+        .mockResolvedValueOnce({
+          agent_id: "agent-c", description: "Task C", status: "completed",
+          result: "C round 1", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        });
+
+      // continueSubAgent will be called for round 2 (turns 4, 5, 6)
+      continueSubAgentMock.mockImplementation(async (agentId: string) => ({
+        agent_id: agentId,
+        status: "completed",
+        result: `${agentId} round 2 complete`,
+        summary: "Continued",
+        toolUses: 1,
+        durationMs: 80,
+        iterations: 1,
+        messages: [],
+      }));
+
+      await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock);
+
+      // 3 members × 2 rounds = 6 turns. maxTurns = Math.max(3, Math.min(10, 6)) = 6
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(3);
+      expect(continueSubAgentMock).toHaveBeenCalledTimes(3);
+
+      // All initial spawns should have round=1
+      for (const call of spawnSubAgentMock.mock.calls) {
+        expect(call[0].round).toBe(1);
+      }
+
+      // All continuations should have round=2
+      for (const call of continueSubAgentMock.mock.calls) {
+        expect(call[3]).toBe(2);
+      }
+    });
+
+    it("should inject speaker identity line into prompt for first turn", async () => {
+      const router = new PeerToPeerRouter();
+      const members = [
+        { agent: "Dev", description: "Write Code", prompt: "Build the app" },
+        { agent: "QA", description: "Verify Code", prompt: "Test the app" },
+      ];
+
+      spawnSubAgentMock
+        .mockResolvedValueOnce({
+          agent_id: "agent-dev", description: "Write Code", status: "completed",
+          result: "Dev output", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        })
+        .mockResolvedValueOnce({
+          agent_id: "agent-qa", description: "Verify Code", status: "completed",
+          result: "QA output [DONE]", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        });
+
+      await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock);
+
+      // Agent-1 (Dev) should see its identity in the prompt
+      const devPrompt = spawnSubAgentMock.mock.calls[0][0].prompt;
+      expect(devPrompt).toContain("Your speaker identity in this discussion is Dev");
+      expect(devPrompt).toContain("Tag all your contributions with [Dev]");
+      expect(devPrompt).toContain("Build the app");
+
+      // Agent-2 (QA) should see its identity and the shared discussion board
+      const qaPrompt = spawnSubAgentMock.mock.calls[1][0].prompt;
+      expect(qaPrompt).toContain("Your speaker identity in this discussion is QA");
+      expect(qaPrompt).toContain("Tag all your contributions with [QA]");
+      expect(qaPrompt).toContain("Test the app");
+      expect(qaPrompt).toContain("SHARED DISCUSSION BOARD");
+    });
+
+    it("should use 1-based fallback speaker names when agent names match agent-N pattern", async () => {
+      const router = new PeerToPeerRouter();
+      const members = [
+        { agent: "agent-0", description: "First", prompt: "First prompt" },
+        { agent: "agent-5", description: "Second", prompt: "Second prompt" },
+      ];
+
+      spawnSubAgentMock
+        .mockResolvedValueOnce({
+          agent_id: "agent-first", description: "First", status: "completed",
+          result: "First output", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        })
+        .mockResolvedValueOnce({
+          agent_id: "agent-second", description: "Second", status: "completed",
+          result: "Second output [DONE]", summary: "Done", toolUses: 1, durationMs: 50, iterations: 1, messages: [],
+        });
+
+      await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock);
+
+      // agent-0 should be normalized to agent-1 (1-based)
+      const firstPrompt = spawnSubAgentMock.mock.calls[0][0].prompt;
+      expect(firstPrompt).toContain("Your speaker identity in this discussion is agent-1");
+      expect(firstPrompt).not.toContain("agent-0");
+
+      // agent-5 should be normalized to agent-2 (1-based by member position)
+      const secondPrompt = spawnSubAgentMock.mock.calls[1][0].prompt;
+      expect(secondPrompt).toContain("Your speaker identity in this discussion is agent-2");
+    });
+
+    it("should inject speaker identity into continuation prompts with shared discussion", async () => {
+      const router = new PeerToPeerRouter();
+      const members = [
+        { agent: "Dev", description: "Write Code", prompt: "Build feature X" },
+        { agent: "QA", description: "Verify Code", prompt: "Test feature X" },
+      ];
+
+      spawnSubAgentMock
+        .mockResolvedValueOnce({
+          agent_id: "agent-dev", description: "Write Code", status: "completed",
+          result: "Dev built feature X", summary: "Done", toolUses: 2, durationMs: 100, iterations: 1, messages: [],
+        })
+        .mockResolvedValueOnce({
+          agent_id: "agent-qa", description: "Verify Code", status: "completed",
+          result: "QA found 2 issues", summary: "Done", toolUses: 1, durationMs: 80, iterations: 1, messages: [],
+        });
+
+      await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock);
+
+      // Dev's round 2 continuation prompt should have:
+      // 1. Shared discussion board with both agents' outputs
+      // 2. Speaker identity for Dev
+      // 3. The original task prompt
+      const devContinuePrompt = continueSubAgentMock.mock.calls[0][1];
+      expect(devContinuePrompt).toContain("SHARED DISCUSSION BOARD");
+      expect(devContinuePrompt).toContain("[Dev]: Dev built feature X");
+      expect(devContinuePrompt).toContain("[QA]: QA found 2 issues");
+      expect(devContinuePrompt).toContain("YOUR TASK (Dev)");
+      expect(devContinuePrompt).toContain("Your speaker identity in this discussion is Dev");
+      expect(devContinuePrompt).toContain("Build feature X");
+    });
+  });
 });
