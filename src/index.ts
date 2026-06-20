@@ -290,6 +290,10 @@ setupWebSocket(wss);
         db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .createIndex({ isGenerating: 1, updatedAt: -1 }),
+        // agent_sessions — sub-agent parent linkage (tree grouping in UI)
+        db
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+          .createIndex({ parentConversationId: 1 }),
 
         // workflows — used by conversationIds lookup
         db

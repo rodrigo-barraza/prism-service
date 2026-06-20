@@ -41,6 +41,7 @@ const CONVERSATION_LIST_PROJECTION: import("mongodb").Document = {
   modelNames: 1,
   settings: 1,
   parentAgentSessionId: 1,
+  parentConversationId: 1,
   hasSubAgents: 1,
   subAgents: 1,
 };
@@ -237,32 +238,40 @@ router.get(
         if (sessionIds.length === 0) return;
 
         try {
+          // Query both parentConversationId (correct document linkage) and
+          // parentAgentSessionId (legacy, backward compat for old data).
+          const parentFieldQuery = {
+            $or: [
+              { parentConversationId: { $in: sessionIds } },
+              { parentAgentSessionId: { $in: sessionIds } },
+            ],
+            project,
+            username,
+          };
           const [agentParents, modelParents] = await Promise.all([
             db
               .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-              .distinct("parentAgentSessionId", {
-                parentAgentSessionId: { $in: sessionIds },
-                project,
-                username,
-              }),
+              .find(parentFieldQuery)
+              .project({ parentConversationId: 1, parentAgentSessionId: 1 })
+              .toArray(),
             db
               .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-              .distinct("parentAgentSessionId", {
-                parentAgentSessionId: { $in: sessionIds },
-                project,
-                username,
-              }),
+              .find(parentFieldQuery)
+              .project({ parentConversationId: 1, parentAgentSessionId: 1 })
+              .toArray(),
           ]);
 
-          const parentIdSet = new Set([
-            ...agentParents.filter(Boolean),
-            ...modelParents.filter(Boolean),
-          ]);
+          const parentIdSet = new Set<string>();
+          for (const childDocument of [...agentParents, ...modelParents]) {
+            const documentRecord = childDocument as Record<string, unknown>;
+            const linkId = (documentRecord.parentConversationId || documentRecord.parentAgentSessionId) as string | null;
+            if (linkId) parentIdSet.add(linkId);
+          }
 
           if (parentIdSet.size > 0) {
             for (const session of conversations) {
               const sessionRecord = session as Record<string, unknown>;
-              if (parentIdSet.has(sessionRecord.id)) {
+              if (parentIdSet.has(sessionRecord.id as string)) {
                 sessionRecord.hasSubAgents = true;
               }
             }
