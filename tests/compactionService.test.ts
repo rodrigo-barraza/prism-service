@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 import CompactionService from "../src/services/compact/CompactionService.ts";
 import AutoCompactionTrigger from "../src/services/compact/AutoCompactionTrigger.ts";
 import MicroCompactionService from "../src/services/compact/MicroCompactionService.ts";
@@ -18,7 +19,7 @@ vi.mock("../src/providers/index.ts", () => ({
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
     getSection: vi.fn().mockResolvedValue({
-      extractionProvider: "google",
+      extractionProvider: PROVIDERS.GOOGLE,
       extractionModel: "gemini-3-flash-preview",
     }),
   },
@@ -270,7 +271,7 @@ describe("CompactionService", () => {
     expect(RequestLogger.logBackgroundLlmCall).toHaveBeenCalledTimes(1);
     expect(RequestLogger.logBackgroundLlmCall).toHaveBeenCalledWith(expect.objectContaining({
       success: true,
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
       model: "gemini-3-flash-preview",
     }));
 

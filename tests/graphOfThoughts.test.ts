@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 import { runGraphOfThoughts } from "../src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts";
 import { APPROVAL_TIERS } from "../src/services/AutoApprovalEngine.ts";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
@@ -41,7 +42,7 @@ describe("GraphOfThoughtsStrategy", () => {
       project: "test-project",
       username: "test-user",
       agent: "CODING",
-      providerName: "google",
+      providerName: PROVIDERS.GOOGLE,
       resolvedModel: "gemini-3.5-flash",
       traceId: "trace-id-123",
       agentConversationId: "session-id-456",

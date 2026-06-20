@@ -640,7 +640,7 @@ describe("ConversationService.getConversationStats", () => {
               cacheReadInputTokens: 0,
               cacheCreationInputTokens: 0,
               reasoningOutputTokens: 0,
-              provider: "openai",
+              provider: PROVIDERS.OPENAI,
               model: "gpt-4",
               operation: "chat",
               timestamp: "2026-06-20T10:00:00.000Z",
@@ -656,7 +656,7 @@ describe("ConversationService.getConversationStats", () => {
               cacheReadInputTokens: 10,
               cacheCreationInputTokens: 20,
               reasoningOutputTokens: 5,
-              provider: "google",
+              provider: PROVIDERS.GOOGLE,
               model: "gemini",
               operation: "chat",
               timestamp: "2026-06-20T10:05:00.000Z",
@@ -698,8 +698,8 @@ describe("ConversationService.getConversationStats", () => {
       expect(statsResult.totalCacheReadInputTokens).toBe(10);
       expect(statsResult.totalCacheCreationInputTokens).toBe(20);
       expect(statsResult.totalReasoningOutputTokens).toBe(5);
-      expect(statsResult.providers).toContain("openai");
-      expect(statsResult.providers).toContain("google");
+      expect(statsResult.providers).toContain(PROVIDERS.OPENAI);
+      expect(statsResult.providers).toContain(PROVIDERS.GOOGLE);
       expect(statsResult.models).toContain("gpt-4");
       expect(statsResult.models).toContain("gemini");
       expect(statsResult.operations).toContain("chat");
@@ -857,11 +857,11 @@ describe("Conversation Utilities (utils.ts)", () => {
         { role: "assistant", content: "msg1", provider: "OpenAI" },
         { role: "assistant", content: "msg2", provider: "Google" }
       ];
-      const settings = { provider: "anthropic" };
+      const settings = { provider: PROVIDERS.ANTHROPIC };
       const providers = extractProviders(messages as any, settings as any);
-      expect(providers).toContain("openai");
-      expect(providers).toContain("google");
-      expect(providers).toContain("anthropic");
+      expect(providers).toContain(PROVIDERS.OPENAI);
+      expect(providers).toContain(PROVIDERS.GOOGLE);
+      expect(providers).toContain(PROVIDERS.ANTHROPIC);
       expect(providers).toHaveLength(3);
     });
 
@@ -882,7 +882,7 @@ describe("Conversation Utilities (utils.ts)", () => {
         { role: "user", content: "Hi" },
         { role: "assistant", content: "Hello", model: "gpt-4" }
       ];
-      const settings = { model: "gpt-4", provider: "openai" };
+      const settings = { model: "gpt-4", provider: PROVIDERS.OPENAI };
 
       const patchFields = buildConversationPatchFields({
         title: "Updated Title",
@@ -895,12 +895,12 @@ describe("Conversation Utilities (utils.ts)", () => {
       expect(patchFields.systemPrompt).toBe("You are a compiler");
       expect(patchFields.settings).toEqual({
         model: "gpt-4",
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         systemPrompt: "You are a compiler"
       });
       expect(patchFields.messages).toEqual(messages);
       expect(patchFields.modalities?.textIn).toBe(true);
-      expect(patchFields.providers).toContain("openai");
+      expect(patchFields.providers).toContain(PROVIDERS.OPENAI);
       expect(patchFields.totalCost).toBe(0);
       expect(patchFields.modelNames).toContain("gpt-4");
     });

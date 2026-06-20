@@ -28,6 +28,7 @@ import {
   pendingQuestions,
 } from "../src/services/ApprovalRegistry.ts";
 import HarnessRegistry from "../src/services/harnesses/HarnessRegistry.ts";
+import VisionLanguageHarness from "../src/services/harnesses/VisionLanguageHarness.ts";
 
 
 // ═══════════════════════════════════════════════════════════════════
@@ -426,7 +427,7 @@ describe("Flow 3: HarnessRegistry Dispatch", () => {
   });
 
   it("should have 'vision_language' harness registered (underscore convention)", () => {
-    expect(HarnessRegistry.has("vision_language")).toBe(true);
+    expect(HarnessRegistry.has(VisionLanguageHarness.id)).toBe(true);
   });
 
   it("should not have HARNESS_IDS.TREE_OF_THOUGHT as a harness (now a strategy)", () => {

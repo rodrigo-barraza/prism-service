@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 
 // Unmock RequestLogger so we test the actual implementation
 vi.unmock("../src/services/RequestLogger.ts");
@@ -38,7 +39,7 @@ describe("RequestLogger Unit Tests Suite", () => {
       await RequestLogger.log({
         requestId: "request-123",
         endpoint: "chat",
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         model: "gemini-3.5-flash",
         success: true,
         inputTokens: 100,
@@ -48,7 +49,7 @@ describe("RequestLogger Unit Tests Suite", () => {
       expect(mockInsertOne).toHaveBeenCalledTimes(1);
       const insertedDocument = mockInsertOne.mock.calls[0][0];
       expect(insertedDocument.requestId).toBe("request-123");
-      expect(insertedDocument.provider).toBe("google");
+      expect(insertedDocument.provider).toBe(PROVIDERS.GOOGLE);
       expect(insertedDocument.model).toBe("gemini-3.5-flash");
       expect(insertedDocument.success).toBe(true);
       expect(insertedDocument.inputTokens).toBe(100);
@@ -71,7 +72,7 @@ describe("RequestLogger Unit Tests Suite", () => {
         RequestLogger.log({
           requestId: "request-456",
           endpoint: "chat",
-          provider: "openai",
+          provider: PROVIDERS.OPENAI,
           model: "gpt-4o",
           success: true,
         })
@@ -85,7 +86,7 @@ describe("RequestLogger Unit Tests Suite", () => {
     it("should correctly compile and log chat generation metadata and payloads", async () => {
       await RequestLogger.logChatGeneration({
         requestId: "chat-request-123",
-        provider: "anthropic",
+        provider: PROVIDERS.ANTHROPIC,
         model: "claude-3-opus",
         success: true,
         usage: {
@@ -126,7 +127,7 @@ describe("RequestLogger Unit Tests Suite", () => {
         requestId: "bg-request-123",
         endpoint: "background",
         operation: "extraction",
-        provider: "google",
+        provider: PROVIDERS.GOOGLE,
         model: "gemini-3.5-flash",
         aiMessages: [
           { role: "user", content: "Extract info" },

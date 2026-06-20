@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 import { APPROVAL_TIERS } from "../src/services/AutoApprovalEngine.ts";
 import CriticGate from "../src/services/harnesses/lifecycle/CriticGate.ts";
 import { checkAndWaitForApproval } from "../src/services/harnesses/lifecycle/ApprovalGate.ts";
@@ -147,7 +148,7 @@ describe("Harness Lifecycle Modules", () => {
       project: "test-project",
       username: "test-user",
       agent: "CODING",
-      providerName: "google",
+      providerName: PROVIDERS.GOOGLE,
       resolvedModel: "gemini-3.5-flash",
       traceId: "trace-id-123",
       agentConversationId: "session-id-456",
@@ -524,7 +525,7 @@ describe("Harness Lifecycle Modules", () => {
         project: "test-project",
         username: "test-user",
         agent: "CODING",
-        providerName: "google",
+        providerName: PROVIDERS.GOOGLE,
         traceId: "trace-id-123",
         agentConversationId: "session-id-456",
         conversationId: "conv-id-789",

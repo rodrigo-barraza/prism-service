@@ -109,7 +109,7 @@ describe('GET /config', () => {
     expect(list).toContain(PROVIDERS.ANTHROPIC);
     expect(list).toContain(PROVIDERS.GOOGLE);
     expect(list).toContain(PROVIDERS.ELEVENLABS);
-    expect(list).toContain('inworld');
+    expect(list).toContain(PROVIDERS.INWORLD);
   });
 });
 
@@ -192,21 +192,21 @@ describe("Config Utility Functions", () => {
   describe("getModelOptions", () => {
     it("should return grouped options by provider", () => {
       const options = getModelOptions(TYPES.TEXT, TYPES.TEXT);
-      expect(options).toHaveProperty("openai");
-      expect(options).toHaveProperty("google");
-      expect(options).toHaveProperty("anthropic");
-      expect(Array.isArray(options.openai)).toBe(true);
-      expect(options.openai[0]).toHaveProperty("name");
+      expect(options).toHaveProperty(PROVIDERS.OPENAI);
+      expect(options).toHaveProperty(PROVIDERS.GOOGLE);
+      expect(options).toHaveProperty(PROVIDERS.ANTHROPIC);
+      expect(Array.isArray(options[PROVIDERS.OPENAI])).toBe(true);
+      expect(options[PROVIDERS.OPENAI][0]).toHaveProperty("name");
     });
   });
 
   describe("getDefaultModels", () => {
     it("should return default model names for each provider", () => {
       const defaults = getDefaultModels(TYPES.TEXT, TYPES.TEXT);
-      expect(defaults).toHaveProperty("google");
-      expect(defaults).toHaveProperty("anthropic");
-      expect(defaults).toHaveProperty("openai");
-      expect(typeof defaults.openai).toBe("string");
+      expect(defaults).toHaveProperty(PROVIDERS.GOOGLE);
+      expect(defaults).toHaveProperty(PROVIDERS.ANTHROPIC);
+      expect(defaults).toHaveProperty(PROVIDERS.OPENAI);
+      expect(typeof defaults[PROVIDERS.OPENAI]).toBe("string");
     });
   });
 
@@ -224,7 +224,7 @@ describe("Config Utility Functions", () => {
       const model = getModelByName("gpt-5.5");
       expect(model).not.toBeNull();
       expect(model!.name).toBe("gpt-5.5");
-      expect(model!.provider).toBe("openai");
+      expect(model!.provider).toBe(PROVIDERS.OPENAI);
     });
 
     it("should return null for unknown model names", () => {
@@ -238,10 +238,10 @@ describe("Config Utility Functions", () => {
       const recommendation = resolveRecommendedDefault(
         TYPES.TEXT,
         TYPES.TEXT,
-        new Set(["google", "openai", "anthropic"])
+        new Set([PROVIDERS.GOOGLE, PROVIDERS.OPENAI, PROVIDERS.ANTHROPIC])
       );
       expect(recommendation).not.toBeNull();
-      expect(recommendation!.provider).toBe("google");
+      expect(recommendation!.provider).toBe(PROVIDERS.GOOGLE);
       expect(recommendation!.model).toBe("gemini-3.5-flash");
     });
 
@@ -249,10 +249,10 @@ describe("Config Utility Functions", () => {
       const recommendation = resolveRecommendedDefault(
         TYPES.TEXT,
         TYPES.TEXT,
-        new Set(["anthropic", "openai"])
+        new Set([PROVIDERS.ANTHROPIC, PROVIDERS.OPENAI])
       );
       expect(recommendation).not.toBeNull();
-      expect(recommendation!.provider).toBe("anthropic");
+      expect(recommendation!.provider).toBe(PROVIDERS.ANTHROPIC);
       expect(recommendation!.model).toContain("haiku");
     });
 
@@ -260,10 +260,10 @@ describe("Config Utility Functions", () => {
       const recommendation = resolveRecommendedDefault(
         TYPES.TEXT,
         TYPES.TEXT,
-        new Set(["openai"])
+        new Set([PROVIDERS.OPENAI])
       );
       expect(recommendation).not.toBeNull();
-      expect(recommendation!.provider).toBe("openai");
+      expect(recommendation!.provider).toBe(PROVIDERS.OPENAI);
       expect(recommendation!.model).toBe("gpt-5.4-mini");
     });
 
@@ -271,7 +271,7 @@ describe("Config Utility Functions", () => {
       const recommendation = resolveRecommendedDefault(
         TYPES.TEXT,
         TYPES.TEXT,
-        new Set(["google"]),
+        new Set([PROVIDERS.GOOGLE]),
         true
       );
       expect(recommendation).not.toBeNull();
