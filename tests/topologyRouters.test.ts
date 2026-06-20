@@ -125,9 +125,9 @@ describe("Topology Routers Test Suite", () => {
       // First call prompt should be the base prompt
       expect(spawnSubAgentMock.mock.calls[0][0].prompt).toBe("Do A");
 
-      // Second call prompt should contain context from first call
+      // Second call prompt should contain accumulated context from prior steps
       const secondPrompt = spawnSubAgentMock.mock.calls[1][0].prompt;
-      expect(secondPrompt).toContain("PREVIOUS STEP RESULT");
+      expect(secondPrompt).toContain("PREVIOUS STEPS RESULTS");
       expect(secondPrompt).toContain("Completed task: Step A");
       expect(secondPrompt).toContain("Do B");
 
