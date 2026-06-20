@@ -1011,6 +1011,30 @@ export default class OrchestratorService {
 
     const activeTopology = orchestratorContext.topology || DEFAULT_TOPOLOGY;
 
+    const topologyMetadata: Record<string, { name: string; description: string }> = {
+      [TOPOLOGIES.HIERARCHICAL]: {
+        name: "Hierarchical (Parallel)",
+        description: "All sub-agents run in parallel, each independently working on their own task. No shared state between agents.",
+      },
+      [TOPOLOGIES.HIERARCHICAL_AGGREGATION]: {
+        name: "Hierarchical Aggregation (Parallel + Synthesis)",
+        description: "All sub-agents run in parallel, then a final synthesis pass merges their outputs into a unified result.",
+      },
+      [TOPOLOGIES.SEQUENTIAL]: {
+        name: "Sequential (Pipeline)",
+        description: "Sub-agents run one at a time in order, each receiving the previous agent's output as context before starting.",
+      },
+      [TOPOLOGIES.PEER_TO_PEER]: {
+        name: "Peer-to-Peer (Mesh / GoT DAG)",
+        description: "Turn-based discussion where agents take turns on a shared thread. Each agent reads all prior contributions before responding.",
+      },
+    };
+
+    const resolvedTopologyMetadata = topologyMetadata[activeTopology] ?? {
+      name: activeTopology,
+      description: "Custom or unknown topology.",
+    };
+
     const agentPositionLine =
       subAgent.agentIndex != null && subAgent.teamSize != null
         ? `Agent: ${subAgent.agentIndex + 1} of ${subAgent.teamSize}\n`
@@ -1022,7 +1046,9 @@ export default class OrchestratorService {
         role: "user",
         content:
           `You are a sub-agent in a multi-agent system.\n` +
-          `Topology: ${activeTopology}\n` +
+          `Sub-agent topology type: ${activeTopology}\n` +
+          `Sub-agent topology name: ${resolvedTopologyMetadata.name}\n` +
+          `Sub-agent topology description: ${resolvedTopologyMetadata.description}\n` +
           agentPositionLine +
           `\n` +
           workspaceIntroLine +
