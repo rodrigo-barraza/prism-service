@@ -12,6 +12,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { COLLECTIONS, PROVIDERS } from "../src/constants.ts";
+import { TOOL_NAMES } from "../src/services/ToolTaxonomyConstants.ts";
+import {
+  extractFiles,
+  computeModalities,
+  extractProviders,
+  computeTotalCost,
+  buildConversationPatchFields,
+  enrichConversationsWithRequestCosts,
+  enrichSingleConversationCost,
+} from "../src/services/conversation/utils.ts";
 
 
 // ── Mock config ────────────────────────────────────────────────
@@ -22,10 +32,22 @@ vi.mock("../config.ts", () => ({
 // ── Mock FileService (no MinIO in tests) ───────────────────────
 vi.mock("../src/services/FileService.ts", () => ({
   default: {
-    isExternalStorage: () => false,
+    isExternalStorage: () => (globalThis as any).isExternalStorageMockValue ?? false,
     isMinioRef: () => false,
-    uploadFile: vi.fn().mockResolvedValue({ ref: "minio://test/ref" }),
+    uploadFile: vi.fn().mockImplementation(async () => {
+      if ((globalThis as any).uploadFileShouldThrow) {
+        throw new Error("Upload failed");
+      }
+      return { ref: "minio://test/ref" };
+    }),
   },
+}));
+
+// ── Mock ConversationDiscovery ────────────────────────────────
+vi.mock("../src/utils/ConversationDiscovery.ts", () => ({
+  discoverDescendantConversationIds: vi.fn().mockImplementation(async (db, id) => {
+    return new Set([id]);
+  }),
 }));
 
 // ── In-memory collection mock ──────────────────────────────────
@@ -600,5 +622,318 @@ describe("ConversationService.setGenerating", () => {
     });
 
     expect(doc.isGenerating).toBe(false);
+  });
+});
+
+describe("ConversationService.getConversationStats", () => {
+  let mockRequestsCollection: any;
+
+  beforeEach(() => {
+    mockRequestsCollection = {
+      find: vi.fn().mockReturnValue({
+        project: vi.fn().mockReturnValue({
+          toArray: vi.fn().mockResolvedValue([
+            {
+              estimatedCost: 0.0015,
+              inputTokens: 100,
+              outputTokens: 50,
+              cacheReadInputTokens: 0,
+              cacheCreationInputTokens: 0,
+              reasoningOutputTokens: 0,
+              provider: "openai",
+              model: "gpt-4",
+              operation: "chat",
+              timestamp: "2026-06-20T10:00:00.000Z",
+              modalities: { textIn: true, textOut: true },
+              toolApiNames: ["read_file"],
+              success: true,
+              agentConversationId: "test-session-123",
+            },
+            {
+              estimatedCost: 0.002,
+              inputTokens: 120,
+              outputTokens: 80,
+              cacheReadInputTokens: 10,
+              cacheCreationInputTokens: 20,
+              reasoningOutputTokens: 5,
+              provider: "google",
+              model: "gemini",
+              operation: "chat",
+              timestamp: "2026-06-20T10:05:00.000Z",
+              modalities: { textIn: true, textOut: true, imageIn: true },
+              toolApiNames: [],
+              success: false,
+              agentConversationId: "sub-agent-conversation",
+            }
+          ])
+        })
+      })
+    };
+
+    (MongoWrapper.getDb as any).mockReturnValue({
+      collection: (collectionName: string) => {
+        if (collectionName === COLLECTIONS.REQUESTS) {
+          return mockRequestsCollection;
+        }
+        return mockCollection;
+      }
+    });
+  });
+
+  it("should return aggregated stats correctly for main and sub-agents", async () => {
+    const statsResult = await ConversationService.getConversationStats(
+      "test-session-123",
+      "coding",
+      "testuser"
+    );
+
+    expect(statsResult).not.toBeNull();
+    if (statsResult) {
+      expect(statsResult.requestCount).toBe(2);
+      expect(statsResult.subAgentRequestCount).toBe(1);
+      expect(statsResult.totalCost).toBeCloseTo(0.0035);
+      expect(statsResult.totalInputTokens).toBe(220);
+      expect(statsResult.totalOutputTokens).toBe(130);
+      expect(statsResult.totalTokens).toBe(350);
+      expect(statsResult.totalCacheReadInputTokens).toBe(10);
+      expect(statsResult.totalCacheCreationInputTokens).toBe(20);
+      expect(statsResult.totalReasoningOutputTokens).toBe(5);
+      expect(statsResult.providers).toContain("openai");
+      expect(statsResult.providers).toContain("google");
+      expect(statsResult.models).toContain("gpt-4");
+      expect(statsResult.models).toContain("gemini");
+      expect(statsResult.operations).toContain("chat");
+      expect(statsResult.modalities.textIn).toBe(true);
+      expect(statsResult.modalities.imageIn).toBe(true);
+      expect(statsResult.toolCounts.read_file).toBe(1);
+      expect(statsResult.requestErrorCount).toBe(1);
+      expect(statsResult.totalElapsedTime).toBe(300);
+      expect(statsResult.createdAt).toBe("2026-06-20T10:00:00.000Z");
+      expect(statsResult.updatedAt).toBe("2026-06-20T10:05:00.000Z");
+    }
+  });
+
+  it("should return null if no request log records exist", async () => {
+    mockRequestsCollection.find().project().toArray.mockResolvedValueOnce([]);
+    const statsResult = await ConversationService.getConversationStats(
+      "test-session-123",
+      "coding",
+      "testuser"
+    );
+    expect(statsResult).toBeNull();
+  });
+});
+
+describe("Conversation Utilities (utils.ts)", () => {
+  describe("extractFiles", () => {
+    beforeEach(() => {
+      (globalThis as any).isExternalStorageMockValue = false;
+      (globalThis as any).uploadFileShouldThrow = false;
+    });
+
+    it("should return original messages if external storage is disabled", async () => {
+      const messagesInput = [
+        { role: "user", content: "hello", images: ["data:image/jpeg;base64,abc"] }
+      ];
+      const processedMessages = await extractFiles(messagesInput, "coding", "testuser");
+      expect(processedMessages).toEqual(messagesInput);
+    });
+
+    it("should upload data URLs to external storage and replace them when enabled", async () => {
+      (globalThis as any).isExternalStorageMockValue = true;
+      const messagesInput = [
+        {
+          role: "user",
+          content: "hello",
+          images: [
+            "data:image/jpeg;base64,abc",
+            "minio://existing/image.jpg",
+            "http://example.com/external.png"
+          ]
+        },
+        {
+          role: "assistant",
+          content: "response",
+          audio: "data:audio/mp3;base64,def"
+        }
+      ];
+
+      const processedMessages = await extractFiles(messagesInput, "coding", "testuser");
+      expect(processedMessages[0].images).toEqual([
+        "minio://test/ref",
+        "minio://existing/image.jpg",
+        "http://example.com/external.png"
+      ]);
+      expect(processedMessages[1].audio).toBe("minio://test/ref");
+    });
+
+    it("should fallback to original data URL if upload throws", async () => {
+      (globalThis as any).isExternalStorageMockValue = true;
+      (globalThis as any).uploadFileShouldThrow = true;
+
+      const messagesInput = [
+        { role: "user", content: "hello", images: ["data:image/jpeg;base64,abc"] }
+      ];
+
+      const processedMessages = await extractFiles(messagesInput, "coding", "testuser");
+      expect(processedMessages[0].images).toEqual(["data:image/jpeg;base64,abc"]);
+    });
+  });
+
+  describe("computeModalities", () => {
+    it("should compute base text modalities correctly", () => {
+      const messages = [
+        { role: "user", content: "hey" },
+        { role: "assistant", content: "hello" }
+      ];
+      const modalities = computeModalities(messages);
+      expect(modalities.textIn).toBe(true);
+      expect(modalities.textOut).toBe(true);
+      expect(modalities.imageIn).toBe(false);
+    });
+
+    it("should compute image, video and document modalities correctly", () => {
+      const messages = [
+        {
+          role: "user",
+          content: "look",
+          images: [
+            "data:image/png;base64,abc",
+            "data:application/pdf;base64,def",
+            "test-video.mp4"
+          ]
+        },
+        {
+          role: "assistant",
+          content: "here",
+          images: [
+            "data:image/png;base64,ghi"
+          ]
+        }
+      ];
+      const modalities = computeModalities(messages);
+      expect(modalities.imageIn).toBe(true);
+      expect(modalities.imageOut).toBe(true);
+      expect(modalities.docIn).toBe(true);
+      expect(modalities.videoIn).toBe(true);
+    });
+
+    it("should compute audio modalities correctly", () => {
+      const messages = [
+        { role: "user", content: "audio content", audio: "minio://audio-in" },
+        { role: "assistant", content: "vocal reply", audio: "minio://audio-out" }
+      ];
+      const modalities = computeModalities(messages);
+      expect(modalities.audioIn).toBe(true);
+      expect(modalities.audioOut).toBe(true);
+    });
+
+    it("should compute tools and streaming sources correctly", () => {
+      const messages = [
+        {
+          role: "assistant",
+          content: "running code",
+          toolCalls: [
+            { id: "call-1", name: TOOL_NAMES.CODE_EXECUTION, args: {}, result: "done" },
+            { id: "call-2", name: TOOL_NAMES.SEARCH_WEB, args: {}, result: "results" },
+            { id: "call-3", name: "custom_function", args: {}, result: "output" }
+          ]
+        },
+        {
+          role: "assistant",
+          content: "> **Sources:** google.com\n```exec-shell\npython\n```"
+        }
+      ];
+      const modalities = computeModalities(messages as any);
+      expect(modalities.codeExecution).toBe(true);
+      expect(modalities.webSearch).toBe(true);
+      expect(modalities.functionCalling).toBe(true);
+    });
+  });
+
+  describe("extractProviders & computeTotalCost", () => {
+    it("should extract unique lowercased providers correctly", () => {
+      const messages = [
+        { role: "assistant", content: "msg1", provider: "OpenAI" },
+        { role: "assistant", content: "msg2", provider: "Google" }
+      ];
+      const settings = { provider: "anthropic" };
+      const providers = extractProviders(messages as any, settings as any);
+      expect(providers).toContain("openai");
+      expect(providers).toContain("google");
+      expect(providers).toContain("anthropic");
+      expect(providers).toHaveLength(3);
+    });
+
+    it("should compute total cost summing up message estimatedCost values", () => {
+      const messages = [
+        { role: "user", content: "no cost" },
+        { role: "assistant", content: "costly", estimatedCost: 0.001 },
+        { role: "assistant", content: "more costly", estimatedCost: 0.004 }
+      ];
+      const cost = computeTotalCost(messages as any);
+      expect(cost).toBeCloseTo(0.005);
+    });
+  });
+
+  describe("buildConversationPatchFields", () => {
+    it("should build correct fields dictionary for updates", () => {
+      const messages = [
+        { role: "user", content: "Hi" },
+        { role: "assistant", content: "Hello", model: "gpt-4" }
+      ];
+      const settings = { model: "gpt-4", provider: "openai" };
+
+      const patchFields = buildConversationPatchFields({
+        title: "Updated Title",
+        messages: messages as any,
+        systemPrompt: "You are a compiler",
+        settings: settings as any
+      });
+
+      expect(patchFields.title).toBe("Updated Title");
+      expect(patchFields.systemPrompt).toBe("You are a compiler");
+      expect(patchFields.settings).toEqual({
+        model: "gpt-4",
+        provider: "openai",
+        systemPrompt: "You are a compiler"
+      });
+      expect(patchFields.messages).toEqual(messages);
+      expect(patchFields.modalities?.textIn).toBe(true);
+      expect(patchFields.providers).toContain("openai");
+      expect(patchFields.totalCost).toBe(0);
+      expect(patchFields.modelNames).toContain("gpt-4");
+    });
+  });
+
+  describe("enrichConversationsWithRequestCosts & enrichSingleConversationCost", () => {
+    it("should enrich list of conversations with request costs map", () => {
+      const conversations = [
+        { id: "conv-1", totalCost: 0.001 },
+        { id: "conv-2" }
+      ];
+      const requestLogCosts = [
+        { _id: "conv-1", totalCost: 0.005, requestErrorCount: 2 },
+        { _id: "conv-2", totalCost: 0.003 }
+      ];
+
+      enrichConversationsWithRequestCosts(conversations as any, requestLogCosts);
+
+      expect(conversations[0].totalCost).toBe(0.005);
+      expect((conversations[0] as any).requestErrorCount).toBe(2);
+      expect(conversations[1].totalCost).toBe(0.003);
+    });
+
+    it("should enrich single conversation correctly", () => {
+      const conversation = { id: "conv-1", totalCost: 0.001 };
+      const requestLogAggregation = [
+        { _id: "conv-1", totalCost: 0.008, requestErrorCount: 5 }
+      ];
+
+      enrichSingleConversationCost(conversation as any, requestLogAggregation);
+
+      expect(conversation.totalCost).toBe(0.008);
+      expect((conversation as any).requestErrorCount).toBe(5);
+    });
   });
 });

@@ -3,6 +3,15 @@ import { PROVIDERS } from "../src/constants.ts";
 import request from 'supertest';
 import { app } from './setup.ts';
 import ToolOrchestratorService from '../src/services/ToolOrchestratorService.ts';
+import {
+  getPricing,
+  getDefaultModels,
+  getModelByName,
+  resolveRecommendedDefault,
+  getModels,
+  getModelOptions,
+  TYPES,
+} from "../src/config.ts";
 
 beforeAll(() => {
   vi.spyOn(ToolOrchestratorService, 'getClientToolSchemas').mockReturnValue([
@@ -168,5 +177,114 @@ describe('GET /config/tools', () => {
     expect(saveMemory).toBeDefined();
     // System flag should be preserved as true
     expect(saveMemory.system).toBe(true);
+  });
+});
+
+describe("Config Utility Functions", () => {
+  describe("getModels", () => {
+    it("should return models that support the input and output type combination", () => {
+      const models = getModels(TYPES.TEXT, TYPES.TEXT);
+      expect(models.length).toBeGreaterThan(0);
+      expect(models.every(model => model.inputTypes.includes(TYPES.TEXT) && model.outputTypes.includes(TYPES.TEXT))).toBe(true);
+    });
+  });
+
+  describe("getModelOptions", () => {
+    it("should return grouped options by provider", () => {
+      const options = getModelOptions(TYPES.TEXT, TYPES.TEXT);
+      expect(options).toHaveProperty("openai");
+      expect(options).toHaveProperty("google");
+      expect(options).toHaveProperty("anthropic");
+      expect(Array.isArray(options.openai)).toBe(true);
+      expect(options.openai[0]).toHaveProperty("name");
+    });
+  });
+
+  describe("getDefaultModels", () => {
+    it("should return default model names for each provider", () => {
+      const defaults = getDefaultModels(TYPES.TEXT, TYPES.TEXT);
+      expect(defaults).toHaveProperty("google");
+      expect(defaults).toHaveProperty("anthropic");
+      expect(defaults).toHaveProperty("openai");
+      expect(typeof defaults.openai).toBe("string");
+    });
+  });
+
+  describe("getPricing", () => {
+    it("should return pricing objects map for models", () => {
+      const pricing = getPricing(TYPES.TEXT, TYPES.TEXT);
+      const modelNames = Object.keys(pricing);
+      expect(modelNames.length).toBeGreaterThan(0);
+      expect(pricing[modelNames[0]]).toHaveProperty("inputPerMillion");
+    });
+  });
+
+  describe("getModelByName", () => {
+    it("should find model by exact API name", () => {
+      const model = getModelByName("gpt-5.5");
+      expect(model).not.toBeNull();
+      expect(model!.name).toBe("gpt-5.5");
+      expect(model!.provider).toBe("openai");
+    });
+
+    it("should return null for unknown model names", () => {
+      const model = getModelByName("non-existent-model");
+      expect(model).toBeNull();
+    });
+  });
+
+  describe("resolveRecommendedDefault", () => {
+    it("should resolve Gemini 3.5 Flash first if google is available", () => {
+      const recommendation = resolveRecommendedDefault(
+        TYPES.TEXT,
+        TYPES.TEXT,
+        new Set(["google", "openai", "anthropic"])
+      );
+      expect(recommendation).not.toBeNull();
+      expect(recommendation!.provider).toBe("google");
+      expect(recommendation!.model).toBe("gemini-3.5-flash");
+    });
+
+    it("should fallback to Anthropic Haiku if google is not available", () => {
+      const recommendation = resolveRecommendedDefault(
+        TYPES.TEXT,
+        TYPES.TEXT,
+        new Set(["anthropic", "openai"])
+      );
+      expect(recommendation).not.toBeNull();
+      expect(recommendation!.provider).toBe("anthropic");
+      expect(recommendation!.model).toContain("haiku");
+    });
+
+    it("should fallback to OpenAI if google and anthropic are not available", () => {
+      const recommendation = resolveRecommendedDefault(
+        TYPES.TEXT,
+        TYPES.TEXT,
+        new Set(["openai"])
+      );
+      expect(recommendation).not.toBeNull();
+      expect(recommendation!.provider).toBe("openai");
+      expect(recommendation!.model).toBe("gpt-5.4-mini");
+    });
+
+    it("should respect fcOnly filter and only return models supporting Tool Calling", () => {
+      const recommendation = resolveRecommendedDefault(
+        TYPES.TEXT,
+        TYPES.TEXT,
+        new Set(["google"]),
+        true
+      );
+      expect(recommendation).not.toBeNull();
+      expect(recommendation!.model).toBe("gemini-3.5-flash");
+    });
+
+    it("should return null if no providers are available", () => {
+      const recommendation = resolveRecommendedDefault(
+        TYPES.TEXT,
+        TYPES.TEXT,
+        new Set()
+      );
+      expect(recommendation).toBeNull();
+    });
   });
 });
