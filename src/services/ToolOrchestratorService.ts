@@ -583,7 +583,7 @@ function getOrchestratorToolSchemas(
                 prompt: {
                   type: "string",
                   description:
-                    "Self-contained task prompt. Include file paths, line numbers, and exact instructions. Sub-agents cannot see the orchestrator's conversation.",
+                    "Self-contained task prompt. Include file paths, line numbers, and exact instructions. Sub-agents cannot see the orchestrator's conversation. IMPORTANT: When referencing agents by number, use 1-based indexing (agent-1, agent-2, etc.). Never use agent-0.",
                 },
                 files: {
                   type: "array",
