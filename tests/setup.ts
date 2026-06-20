@@ -7,7 +7,6 @@ import { vi } from 'vitest';
 // ── Mock secrets before anything imports them ──────────────────────────
 vi.mock('../config.ts', () => ({
     PRISM_SERVICE_PORT: 0,
-    GATEWAY_SECRET: 'test-secret',
     OPENAI_API_KEY: 'fake',
     ANTHROPIC_API_KEY: 'fake',
     GOOGLE_API_KEY: 'fake',
@@ -17,12 +16,12 @@ vi.mock('../config.ts', () => ({
     PROVIDER_VLLM: [],
     PROVIDER_OLLAMA: [],
     PROVIDER_LLAMA_CPP: [],
-    OPENAI_COMPATIBLE_BASE_URL: 'http://localhost:9999',
     TOOLS_SERVICE_URL: 'http://localhost:5590',
     MONGO_URI: 'mongodb://test:test@localhost:27017/?directConnection=true&replicaSet=rs0&authSource=admin',
     MONGO_DB_NAME: 'prism-test',
     LIVE_AUDIO_MODEL: 'gemini-2.0-flash-live-001',
 }));
+
 
 // ── Mock global fetch for tools-api ───────────────────────────────────
 const originalFetch = global.fetch;
@@ -98,75 +97,63 @@ vi.mock('../src/wrappers/MongoWrapper.ts', () => ({
 }));
 
 // ── Mock SettingsService to avoid DB dependency in EmbeddingService ────
-vi.mock('../src/services/SettingsService.ts', () => ({
-    default: {
-        getCached: vi.fn().mockReturnValue({
-            memory: {
-                extractionProvider: 'google',
-                extractionModel: 'gemini-3-flash-preview',
-                consolidationProvider: 'google',
-                consolidationModel: 'gemini-3-flash-preview',
-                embeddingProvider: 'google',
-                embeddingModel: 'gemini-embedding-2-preview',
-            },
-            agents: {
-                subAgentProvider: 'google',
-                subAgentModel: 'gemini-3-flash-preview',
-                criticProvider: 'google',
-                criticModel: 'gemini-3-flash-preview',
-                harness: 'standard',
-                topology: 'default',
-                dynamicToolActivation: true,
-            },
-            security: {
-                allowEnvFiles: false,
-            },
-            creative: {
-                imageProvider: 'google',
-                imageModel: 'gemini-3-pro-image-preview',
-                visionProvider: 'google',
-                visionModel: 'gemini-3.5-flash',
-                textToSpeechProvider: 'elevenlabs',
-                textToSpeechModel: '',
-                speechToTextProvider: 'openai',
-                speechToTextModel: '',
-            },
-            somatic: {
-                emotionProvider: 'google',
-                emotionModel: 'gemini-3.5-flash',
-            }
-        }),
-        get: vi.fn().mockResolvedValue({
-            memory: {
-                extractionProvider: 'google',
-                extractionModel: 'gemini-3-flash-preview',
-                consolidationProvider: 'google',
-                consolidationModel: 'gemini-3-flash-preview',
-                embeddingProvider: 'google',
-                embeddingModel: 'gemini-embedding-2-preview',
-            },
-            agents: { subAgentProvider: 'google', subAgentModel: 'gemini-3-flash-preview' },
-        }),
-        getSection: vi.fn().mockResolvedValue({
+vi.mock('../src/services/SettingsService.ts', () => {
+    const mockSettings = {
+        memory: {
             extractionProvider: 'google',
             extractionModel: 'gemini-3-flash-preview',
             consolidationProvider: 'google',
             consolidationModel: 'gemini-3-flash-preview',
             embeddingProvider: 'google',
             embeddingModel: 'gemini-embedding-2-preview',
-        }),
-        getMemoryModelConfig: vi.fn().mockResolvedValue({
-            provider: 'google',
-            model: 'gemini-embedding-2-preview',
-        }),
-        getSomaticModelConfig: vi.fn().mockResolvedValue({
-            provider: 'google',
-            model: 'gemini-3.5-flash',
-        }),
-        invalidateCache: vi.fn(),
-        getDefaults: vi.fn(),
-    },
-}));
+        },
+        agents: {
+            subAgentProvider: 'google',
+            subAgentModel: 'gemini-3-flash-preview',
+            criticProvider: 'google',
+            criticModel: 'gemini-3-flash-preview',
+            reminderProvider: 'google',
+            reminderModel: 'gemini-3-flash-preview',
+            harness: 'standard',
+            topology: 'default',
+            dynamicToolActivation: true,
+        },
+        security: {
+            allowEnvFiles: false,
+        },
+        creative: {
+            imageProvider: 'google',
+            imageModel: 'gemini-3-pro-image-preview',
+            visionProvider: 'google',
+            visionModel: 'gemini-3.5-flash',
+            textToSpeechProvider: 'elevenlabs',
+            textToSpeechModel: '',
+            speechToTextProvider: 'openai',
+            speechToTextModel: '',
+        },
+        somatic: {
+            emotionProvider: 'google',
+            emotionModel: 'gemini-3.5-flash',
+        }
+    };
+    return {
+        default: {
+            getCached: vi.fn().mockReturnValue(mockSettings),
+            get: vi.fn().mockResolvedValue(mockSettings),
+            getSection: vi.fn().mockImplementation(async (section: string) => (mockSettings as any)[section]),
+            getMemoryModelConfig: vi.fn().mockResolvedValue({
+                provider: 'google',
+                model: 'gemini-embedding-2-preview',
+            }),
+            getSomaticModelConfig: vi.fn().mockResolvedValue({
+                provider: 'google',
+                model: 'gemini-3.5-flash',
+            }),
+            invalidateCache: vi.fn(),
+            getDefaults: vi.fn().mockReturnValue(mockSettings),
+        },
+    };
+});
 
 // ── Mock ConversationService to avoid DB writes ───────────────────────
 vi.mock('../src/services/ConversationService.ts', () => ({
@@ -232,23 +219,23 @@ export const MOCK_GENERATE_EMBEDDING = vi.fn().mockResolvedValue({
 vi.mock('../src/providers/index.ts', () => {
     // Re-import at the top of the factory is not allowed, so we inline
     const mockProviderFull = {
-        generateText: (...args) => MOCK_GENERATE_TEXT(...args),
-        generateTextStream: (...args) => MOCK_GENERATE_TEXT_STREAM(...args),
-        generateSpeech: (...args) => MOCK_GENERATE_SPEECH(...args),
-        generateSpeechStream: (...args) => MOCK_GENERATE_SPEECH_STREAM(...args),
-        generateImage: (...args) => MOCK_GENERATE_IMAGE(...args),
-        captionImage: (...args) => MOCK_CAPTION_IMAGE(...args),
-        generateEmbedding: (...args) => MOCK_GENERATE_EMBEDDING(...args),
+        generateText: (...args: any[]) => MOCK_GENERATE_TEXT(...args),
+        generateTextStream: (...args: any[]) => MOCK_GENERATE_TEXT_STREAM(...args),
+        generateSpeech: (...args: any[]) => MOCK_GENERATE_SPEECH(...args),
+        generateSpeechStream: (...args: any[]) => MOCK_GENERATE_SPEECH_STREAM(...args),
+        generateImage: (...args: any[]) => MOCK_GENERATE_IMAGE(...args),
+        captionImage: (...args: any[]) => MOCK_CAPTION_IMAGE(...args),
+        generateEmbedding: (...args: any[]) => MOCK_GENERATE_EMBEDDING(...args),
     };
 
     const mockProviderTextOnly = {
-        generateText: (...args) => MOCK_GENERATE_TEXT(...args),
-        generateTextStream: (...args) => MOCK_GENERATE_TEXT_STREAM(...args),
+        generateText: (...args: any[]) => MOCK_GENERATE_TEXT(...args),
+        generateTextStream: (...args: any[]) => MOCK_GENERATE_TEXT_STREAM(...args),
     };
 
     const mockProviderTtsOnly = {
-        generateSpeech: (...args) => MOCK_GENERATE_SPEECH(...args),
-        generateSpeechStream: (...args) => MOCK_GENERATE_SPEECH_STREAM(...args),
+        generateSpeech: (...args: any[]) => MOCK_GENERATE_SPEECH(...args),
+        generateSpeechStream: (...args: any[]) => MOCK_GENERATE_SPEECH_STREAM(...args),
     };
 
     const providers = {
@@ -265,8 +252,8 @@ vi.mock('../src/providers/index.ts', () => {
     };
 
     return {
-        getProvider: (name) => {
-            const p = providers[name];
+        getProvider: (name: string) => {
+            const p = providers[name as keyof typeof providers];
             if (!p) {
                 throw new Error(
                     `Unknown provider "${name}". Available: ${Object.keys(providers).join(', ')}`,

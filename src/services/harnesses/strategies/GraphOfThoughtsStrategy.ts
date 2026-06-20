@@ -15,6 +15,7 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import logger from "../../../utils/logger.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
+import RequestLogger from "../../RequestLogger.ts";
 import { createStandardHooks } from "../lifecycle/HookInitializer.ts";
 import { executeToolBatch } from "../lifecycle/ToolExecutor.ts";
 import { checkAndWaitForApproval } from "../lifecycle/ApprovalGate.ts";
@@ -343,6 +344,7 @@ export async function runGraphOfThoughts(
       for (const branch of scoredBranches) {
         if (branch.pass.requestId) {
           finalizePassTracker(branch.pass, branch.pass.requestId);
+          harness.logIteration(branch.pass, currentMessages);
         }
       }
 
@@ -1046,6 +1048,7 @@ async function scoreBranchesMultiCriteria(
     };
 
     let scoreResponseText = "";
+    const scoringRequestStartMs = performance.now();
     const scoringStream = context.provider.generateTextStream(
       scoringMessages,
       context.resolvedModel,
@@ -1057,6 +1060,28 @@ async function scoreBranchesMultiCriteria(
         scoreResponseText += chunk;
       }
     }
+
+    RequestLogger.logBackgroundLlmCall({
+      requestId: `${context.requestId || context.agentConversationId || "unknown"}-scoring-iter-${harness["state"].iterations}`,
+      endpoint: "/agent",
+      operation: "agent:scoring",
+      project: context.project,
+      username: context.username,
+      agent: context.agent || null,
+      provider: context.providerName,
+      model: context.resolvedModel,
+      traceId: context.traceId || null,
+      agentConversationId: context.agentConversationId || null,
+      aiMessages: scoringMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
+      resultText: scoreResponseText,
+      success: true,
+      errorMessage: null,
+      requestStartMs: scoringRequestStartMs,
+    }).catch((scoringLogError: unknown) =>
+      logger.error(
+        `[GraphOfThoughts] Failed to log scoring request: ${getErrorMessage(scoringLogError)}`,
+      ),
+    );
 
     const linePattern =
       /(\d+)\s*:\s*correctness\s*=\s*(\d+(?:\.\d+)?)\s*,\s*risk\s*=\s*(\d+(?:\.\d+)?)\s*,\s*efficiency\s*=\s*(\d+(?:\.\d+)?)\s*,\s*completeness\s*=\s*(\d+(?:\.\d+)?)/gi;

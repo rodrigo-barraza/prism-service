@@ -120,7 +120,6 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       resolvedModel: "gemini-3-flash-preview",
       traceId: "trace-id-abc",
       agentConversationId: "session-id-def",
-      agentConversationId: "session-id-def",
       conversationId: "conv-id-ghi",
       emit: vi.fn(),
     };
@@ -789,24 +788,59 @@ describe("Sub-Agent Intensive Integration Tests", () => {
 
   // ── 11. Instance Load Balancer ───────────────────────────────────
   describe("Instance Load Balancer Constraints", () => {
+    function createMockSubAgentState(overrides: Partial<SubAgentState>): SubAgentState {
+      return {
+        agentId: "mock-agent",
+        subAgentConversationId: "mock-convo",
+        parentAgentConversationId: "mock-parent-convo",
+        description: "Mock sub-agent",
+        branchName: null,
+        worktreePath: null,
+        repositoryPath: "/home/rodrigo/development",
+        isolated: false,
+        status: "idle",
+        output: "",
+        toolCalls: [],
+        diff: null,
+        error: null,
+        startedAt: Date.now(),
+        durationMs: 0,
+        totalCost: null,
+        usage: null,
+        abortController: null,
+        messages: null,
+        files: [],
+        project: "test-project",
+        username: "test-user",
+        agent: null,
+        providerName: "google",
+        resolvedModel: "gemini-3-flash-preview",
+        traceId: null,
+        maxIterations: 25,
+        minContextLength: null,
+        parentConversationId: "mock-parent-convo",
+        ...overrides,
+      };
+    }
+
     beforeEach(() => {
       InstanceLoadBalancer.getReservations().clear();
     });
 
     it("should calculate correct active count combining reservations and active sub-agents", () => {
       const activeSubAgentsMap = new Map() as Map<string, SubAgentState>;
-      activeSubAgentsMap.set("agent-one", {
+      activeSubAgentsMap.set("agent-one", createMockSubAgentState({
         providerName: "local-gpu-1",
         status: "running",
-      } as unknown as SubAgentState);
-      activeSubAgentsMap.set("agent-two", {
+      }));
+      activeSubAgentsMap.set("agent-two", createMockSubAgentState({
         providerName: "local-gpu-1",
         status: "complete",
-      } as unknown as SubAgentState);
-      activeSubAgentsMap.set("agent-three", {
+      }));
+      activeSubAgentsMap.set("agent-three", createMockSubAgentState({
         providerName: "local-gpu-2",
         status: "running",
-      } as unknown as SubAgentState);
+      }));
 
       expect(InstanceLoadBalancer.getActiveOn("local-gpu-1", activeSubAgentsMap)).toBe(1);
       expect(InstanceLoadBalancer.getActiveOn("local-gpu-2", activeSubAgentsMap)).toBe(1);
@@ -870,10 +904,10 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       const modelOverrides = new Map<string, string>();
 
       InstanceLoadBalancer.getReservations().set("local-gpu-1", 1);
-      activeSubAgentsMap.set("agent-one", {
+      activeSubAgentsMap.set("agent-one", createMockSubAgentState({
         providerName: "local-gpu-2",
         status: "running",
-      } as unknown as SubAgentState);
+      }));
 
       InstanceLoadBalancer.getReservations().set("local-gpu-1", 2);
 

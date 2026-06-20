@@ -32,7 +32,6 @@ vi.mock("../src/utils/logger.ts", () => ({
 
 vi.mock("../config.ts", () => ({
   PRISM_SERVICE_PORT: 0,
-  GATEWAY_SECRET: "test-secret",
   OPENAI_API_KEY: "fake",
   ANTHROPIC_API_KEY: "fake",
   GOOGLE_API_KEY: "fake",
@@ -42,7 +41,6 @@ vi.mock("../config.ts", () => ({
   PROVIDER_VLLM: [],
   PROVIDER_OLLAMA: [],
   PROVIDER_LLAMA_CPP: [],
-  OPENAI_COMPATIBLE_BASE_URL: "http://localhost:9999",
   TOOLS_SERVICE_URL: "http://localhost:5590",
   MONGO_URI: "mongodb://test:test@localhost:27017",
   MONGO_DB_NAME: "prism-test",
@@ -56,19 +54,24 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../src/services/SettingsService.ts", () => ({
-  default: {
-    getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
-    get: vi.fn().mockResolvedValue({}),
-    getSection: vi.fn().mockResolvedValue({}),
-    getMemoryModelConfig: vi.fn().mockResolvedValue({
-      provider: PROVIDERS.GOOGLE,
-      model: "gemini-embedding-2-preview",
-    }),
-    invalidateCache: vi.fn(),
-    getDefaults: vi.fn(),
-  },
-}));
+vi.mock("../src/services/SettingsService.ts", () => {
+  const mockSettings = {
+    creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS }
+  } as unknown as import("../src/services/SettingsService.ts").SettingsData;
+  return {
+    default: {
+      getCached: vi.fn().mockReturnValue(mockSettings),
+      get: vi.fn().mockResolvedValue(mockSettings),
+      getSection: vi.fn().mockResolvedValue({}),
+      getMemoryModelConfig: vi.fn().mockResolvedValue({
+        provider: PROVIDERS.GOOGLE,
+        model: "gemini-embedding-2-preview",
+      }),
+      invalidateCache: vi.fn(),
+      getDefaults: vi.fn(),
+    },
+  };
+});
 
 vi.mock("../src/services/ConversationService.ts", () => ({
   default: {
@@ -113,6 +116,7 @@ describe("Validation Flow Ordering", () => {
       project: "test-project",
       username: "test-user",
       agentConversationId: "session-flow-test",
+      conversationId: "session-flow-test",
       workspaceRoot: "/home/rodrigo/development",
       provider: {} as any,
       providerName: "test-provider",
@@ -166,7 +170,7 @@ describe("Validation Flow Ordering", () => {
       checkForPlanModeEntry(
         [{ id: "call-2", name: "enter_plan_mode", args: {} }],
         [],
-        planModeState,
+        planModeState as any,
         emitSpy,
       );
 
@@ -216,7 +220,7 @@ describe("Validation Flow Ordering", () => {
       checkForPlanModeEntry(
         [{ id: "call-2", name: "enter_plan_mode", args: {} }],
         [],
-        planModeState,
+        planModeState as any,
         emitSpy,
       );
 
@@ -817,7 +821,7 @@ describe("Validation Flow Ordering", () => {
       // Step 2: Plan mode toggling can proceed (since validation passed)
       const planModeState = { planModeActive: false, planModeText: "" };
       const emitSpy = vi.fn();
-      checkForPlanModeEntry(toolCalls, currentMessages, planModeState, emitSpy);
+      checkForPlanModeEntry(toolCalls, currentMessages, planModeState as any, emitSpy);
       // write_file doesn't trigger plan mode, so it stays false
       expect(planModeState.planModeActive).toBe(false);
 

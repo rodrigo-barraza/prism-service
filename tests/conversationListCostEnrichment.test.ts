@@ -2,7 +2,7 @@
  * Conversation List Cost Enrichment — regression tests.
  *
  * Root cause: Background operations (memory extraction, embedding,
- * consolidation) log their costs to the `requests` collection but never
+ * consolidation) log their costs to the COLLECTIONS.REQUESTS collection but never
  * update the conversation document's `totalCost`. Previously, only
  * agent sessions were enriched with request-log costs in the list
  * endpoint; model (direct) conversations showed stale document-level
@@ -250,7 +250,7 @@ describe("Conversation List Cost Enrichment", () => {
 describe("Single Conversation Cost Enrichment (GET /:id)", () => {
 
   it("should enrich totalCost when request-log is higher", () => {
-    const conversation = { totalCost: 0.001 };
+    const conversation = { id: "conv-1", totalCost: 0.001 };
     const aggregation = [{ _id: "conv-1", totalCost: 0.0035 }];
 
     enrichSingleConversationCost(conversation, aggregation);
@@ -258,7 +258,7 @@ describe("Single Conversation Cost Enrichment (GET /:id)", () => {
   });
 
   it("should preserve document cost when request-log is lower", () => {
-    const conversation = { totalCost: 0.005 };
+    const conversation = { id: "conv-1", totalCost: 0.005 };
     const aggregation = [{ _id: "conv-1", totalCost: 0.003 }];
 
     enrichSingleConversationCost(conversation, aggregation);
@@ -266,13 +266,13 @@ describe("Single Conversation Cost Enrichment (GET /:id)", () => {
   });
 
   it("should no-op when aggregation returns empty array", () => {
-    const conversation = { totalCost: 0.001 };
+    const conversation = { id: "conv-1", totalCost: 0.001 };
     enrichSingleConversationCost(conversation, []);
     expect(conversation.totalCost).toBeCloseTo(0.001, 6);
   });
 
   it("should no-op when aggregation totalCost is zero", () => {
-    const conversation = { totalCost: 0.001 };
+    const conversation = { id: "conv-1", totalCost: 0.001 };
     const aggregation = [{ _id: "conv-1", totalCost: 0 }];
 
     enrichSingleConversationCost(conversation, aggregation);
@@ -280,7 +280,7 @@ describe("Single Conversation Cost Enrichment (GET /:id)", () => {
   });
 
   it("should handle conversation with zero document cost", () => {
-    const conversation = { totalCost: 0 };
+    const conversation = { id: "conv-1", totalCost: 0 };
     const aggregation = [{ _id: "conv-1", totalCost: 0.0005 }];
 
     enrichSingleConversationCost(conversation, aggregation);
@@ -288,7 +288,7 @@ describe("Single Conversation Cost Enrichment (GET /:id)", () => {
   });
 
   it("should handle NaN document cost gracefully", () => {
-    const conversation = { totalCost: NaN };
+    const conversation = { id: "conv-1", totalCost: NaN };
     const aggregation = [{ _id: "conv-1", totalCost: 0.002 }];
 
     enrichSingleConversationCost(conversation, aggregation);

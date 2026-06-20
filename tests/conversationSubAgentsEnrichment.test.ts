@@ -13,7 +13,6 @@ vi.mock("../src/utils/logger.ts", () => ({
 
 vi.mock("../config.ts", () => ({
   MONGO_DB_NAME: "prism-test",
-  GATEWAY_SECRET: "test-secret",
 }));
 
 describe("Conversation Sub-agents Enrichment Integration Tests", () => {
