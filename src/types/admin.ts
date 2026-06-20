@@ -72,8 +72,8 @@ export interface RequestLogEntry {
   model: string;
   conversationId: string | null;
   traceId: string | null;
-  agentSessionId: string | null;
-  parentAgentSessionId?: string;
+  agentConversationId: string | null;
+  parentAgentConversationId?: string;
   toolsUsed: boolean;
   toolDisplayNames: string[];
   toolApiNames: string[];
@@ -196,7 +196,9 @@ export interface LogChatGenerationParams {
   model: string;
   conversationId?: string | null;
   traceId?: string | null;
+  agentConversationId?: string | null;
   agentSessionId?: string | null;
+  parentAgentConversationId?: string | null;
   parentAgentSessionId?: string | null;
   success?: boolean;
   errorMessage?: string | null;
@@ -229,7 +231,7 @@ export interface LogBackgroundLlmCallParams {
   provider: string;
   model: string;
   traceId?: string | null;
-  agentSessionId?: string | null;
+  agentConversationId?: string | null;
   aiMessages: ChatMessage[];
   resultText: string;
   usage?: TokenUsage | null;

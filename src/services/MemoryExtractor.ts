@@ -125,6 +125,7 @@ interface MemoryExtractionContext {
   username: string;
   messages: ConversationMessage[];
   traceId?: string | null;
+  agentConversationId?: string | null;
   agentSessionId?: string | null;
   conversationId?: string | null;
   endpoint?: string | null;
@@ -165,6 +166,7 @@ export default class MemoryExtractor {
     username,
     messages,
     traceId,
+    agentConversationId,
     agentSessionId,
     conversationId,
     endpoint,
@@ -284,7 +286,8 @@ export default class MemoryExtractor {
           provider: extractionProvider,
           model: extractionModel,
           traceId: traceId || null,
-          agentSessionId: agentSessionId || null,
+          agentConversationId: agentConversationId || agentSessionId || null,
+          agentSessionId: agentConversationId || agentSessionId || null,
           aiMessages: aiMessages as MessagePayload[],
           resultText: result?.text || "",
           usage: realUsage,
@@ -391,7 +394,8 @@ export default class MemoryExtractor {
             content: memoryObject.content,
             conversationId: conversationId || undefined,
             traceId: traceId || undefined,
-            agentSessionId: agentSessionId || undefined,
+            agentConversationId: agentConversationId || agentSessionId || undefined,
+            agentSessionId: agentConversationId || agentSessionId || undefined,
             endpoint: endpoint || "/agent",
           });
 
@@ -476,7 +480,8 @@ export default class MemoryExtractor {
         username: context.username,
         messages: messages || context.messages,
         traceId: context.traceId,
-        agentSessionId: context.agentSessionId,
+        agentConversationId: context.agentConversationId,
+        agentSessionId: context.agentConversationId,
         conversationId: context.conversationId as string | null,
         endpoint:
           ((context as Record<string, unknown>).endpoint as string | null) ||
@@ -513,7 +518,8 @@ export default class MemoryExtractor {
                 | null) || "/agent",
             agent: context.agent || null,
             traceId: context.traceId || null,
-            agentSessionId: context.agentSessionId || null,
+            agentConversationId: context.agentConversationId || null,
+            agentSessionId: context.agentConversationId || null,
           });
         })
         .catch((error: unknown) =>

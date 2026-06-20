@@ -481,6 +481,7 @@ const ConversationTimerService = {
             disabledTools: settings.toolConfig.disabledTools,
           }),
         },
+        agentConversationId: crypto.randomUUID(),
         agentSessionId: crypto.randomUUID(),
         conversationId: timer.conversationId,
         userMessage: reminderMessage,

@@ -66,6 +66,7 @@ interface ToolExecutionContext {
   agent?: string | null;
   requestId?: string;
   traceId?: string | null;
+  agentConversationId?: string | null;
   agentSessionId?: string | null;
   conversationId?: string | null;
   iteration?: number;
@@ -1321,7 +1322,8 @@ export default class ToolOrchestratorService {
       agent: context.agent,
       providerName: context._providerName,
       resolvedModel: context._resolvedModel,
-      agentSessionId: context.agentSessionId,
+      agentConversationId: context.agentConversationId || context.agentSessionId,
+      agentSessionId: context.agentConversationId || context.agentSessionId,
       conversationId: context.conversationId,
       traceId: context.traceId,
 

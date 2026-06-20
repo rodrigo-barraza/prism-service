@@ -193,6 +193,7 @@ async function processBatch(
     trigger,
     endpoint,
     traceId,
+    agentConversationId,
     agentSessionId,
     broadcast,
     systemPrompt = CONSOLIDATION_PROMPT,
@@ -261,7 +262,8 @@ async function processBatch(
     provider: consolidationProvider,
     model: consolidationModel,
     traceId: traceId || null,
-    agentSessionId: agentSessionId || null,
+    agentConversationId: agentConversationId || agentSessionId || null,
+    agentSessionId: agentConversationId || agentSessionId || null,
     aiMessages: aiMessages as MessagePayload[],
     resultText: result?.text || "",
     usage: realUsage,
@@ -342,6 +344,7 @@ const MemoryConsolidationService = {
     broadcast,
     endpoint,
     traceId,
+    agentConversationId,
     agentSessionId,
     guildId,
   }: ConsolidateOptions) {
@@ -494,6 +497,7 @@ const MemoryConsolidationService = {
           trigger: trigger || "manual",
           endpoint,
           traceId,
+          agentConversationId,
           agentSessionId,
           broadcast,
           systemPrompt: CONVERSATIONAL_CONSOLIDATION_PROMPT,
@@ -557,6 +561,7 @@ const MemoryConsolidationService = {
           trigger: trigger || "manual",
           endpoint,
           traceId,
+          agentConversationId,
           agentSessionId,
           broadcast,
         });
@@ -642,6 +647,7 @@ const MemoryConsolidationService = {
     endpoint,
     agent,
     traceId,
+    agentConversationId,
     agentSessionId,
   }: CheckAndRunOptions) {
     try {
@@ -660,6 +666,7 @@ const MemoryConsolidationService = {
           broadcast,
           endpoint: endpoint || "/agent",
           traceId: traceId || null,
+          agentConversationId: agentConversationId || null,
           agentSessionId: agentSessionId || null,
         }).catch((error: unknown) =>
           logger.error(

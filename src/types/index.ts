@@ -50,7 +50,7 @@ export {
   PutSkillSchema,
   PostRuleSchema,
   PutRuleSchema,
-  GetAgentSessionsQuerySchema,
+  GetAgentConversationsQuerySchema,
   GetVramBenchmarksQuerySchema,
   PostPromptSchema,
   PatchPromptSchema,

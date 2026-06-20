@@ -1,13 +1,13 @@
 // ─────────────────────────────────────────────────────────────
 // ConversationGenerationTracker
 // ─────────────────────────────────────────────────────────────
-// Per-session in-memory tracker for active LLM requests.
+// Per-conversation in-memory tracker for active LLM requests.
 // Tracks token throughput at the source (backend provider level)
 // so the frontend receives authoritative tok/s data instead of
 // computing rates from SSE chunk inter-arrival times.
 //
 // Each active LLM request registers itself here with timing and
-// token data. The aggregate session tok/s is computed on demand
+// token data. The aggregate conversation tok/s is computed on demand
 // from all active requests — covering the orchestrator, sub-agents,
 // and tool sub-requests (e.g. generate_image → Prism /chat).
 //
@@ -16,7 +16,7 @@
 //   - inputTokens   (set once, from provider usage report)
 //   - ttft          (time to first token, seconds)
 //
-// Session-level accumulators persist across request completions
+// Conversation-level accumulators persist across request completions
 // so cumulative counts never decrease.
 // ─────────────────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ const MIN_TOKENS_FOR_RATE = 10; // minimum tokens before reporting rate
 
 interface ActiveRequest {
   requestId: string;
-  agentSessionId: string;
+  agentConversationId: string;
   startTime: number;
   firstTokenTime: number | null;
   lastTokenTime: number | null;
@@ -80,16 +80,17 @@ interface ConversationGenerationStats {
 
 interface ConversationGenerationTrackerInterface {
   register(
-    agentSessionId: string,
+    agentConversationId: string,
     requestId: string,
     options?: RegisterOptions,
   ): void;
   update(requestId: string, params?: UpdateParams): void;
   recordChunkTiming(requestId: string, charCount?: number): void;
   complete(requestId: string): void;
-  getSessionStats(agentSessionId: string): ConversationGenerationStats;
-  cleanup(agentSessionId: string): void;
-  hasActiveRequests(agentSessionId: string): boolean;
+  getConversationStats(agentConversationId: string): ConversationGenerationStats;
+  getSessionStats(agentConversationId: string): ConversationGenerationStats;
+  cleanup(agentConversationId: string): void;
+  hasActiveRequests(agentConversationId: string): boolean;
   readonly totalActiveRequests: number;
 }
 
@@ -101,7 +102,7 @@ const conversationAccumulators = new Map<string, ConversationAccumulator>();
 
 const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
   register(
-    agentSessionId: string,
+    agentConversationId: string,
     requestId: string,
     {
       provider,
@@ -110,11 +111,11 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
       subAgentId = null,
     }: RegisterOptions = {},
   ) {
-    if (!agentSessionId || !requestId) return;
+    if (!agentConversationId || !requestId) return;
 
     const entry: ActiveRequest = {
       requestId,
-      agentSessionId,
+      agentConversationId,
       startTime: performance.now(),
       firstTokenTime: null,
       lastTokenTime: null,
@@ -131,15 +132,15 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
 
     activeRequests.set(requestId, entry);
 
-    // Maintain session → requests index
-    if (!conversationIndex.has(agentSessionId)) {
-      conversationIndex.set(agentSessionId, new Set());
+    // Maintain conversation → requests index
+    if (!conversationIndex.has(agentConversationId)) {
+      conversationIndex.set(agentConversationId, new Set());
     }
-    conversationIndex.get(agentSessionId)!.add(requestId);
+    conversationIndex.get(agentConversationId)!.add(requestId);
 
-    // Initialize session accumulator (idempotent — preserves across iterations)
-    if (!conversationAccumulators.has(agentSessionId)) {
-      conversationAccumulators.set(agentSessionId, {
+    // Initialize conversation accumulator (idempotent — preserves across iterations)
+    if (!conversationAccumulators.has(agentConversationId)) {
+      conversationAccumulators.set(agentConversationId, {
         completedOutputTokens: 0,
         completedInputTokens: 0,
         ttftSamples: [],
@@ -197,7 +198,7 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
   /**
    * Mark a request as complete and remove it from active tracking.
    * Rolls the request's final token counts and computed tok/s into
-   * the session accumulator so cumulative totals remain monotonically
+   * the conversation accumulator so cumulative totals remain monotonically
    * non-decreasing.
    */
   complete(requestId: string) {
@@ -228,8 +229,8 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
       }
     }
 
-    // Roll completed metrics into the session accumulator
-    const accumulator = conversationAccumulators.get(entry.agentSessionId);
+    // Roll completed metrics into the conversation accumulator
+    const accumulator = conversationAccumulators.get(entry.agentConversationId);
     if (accumulator) {
       accumulator.completedOutputTokens += effectiveOutputTokens;
       accumulator.completedInputTokens += entry.inputTokens;
@@ -244,24 +245,24 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
 
     activeRequests.delete(requestId);
 
-    const conversationSet = conversationIndex.get(entry.agentSessionId);
+    const conversationSet = conversationIndex.get(entry.agentConversationId);
     if (conversationSet) {
       conversationSet.delete(requestId);
-      if (conversationSet.size === 0) conversationIndex.delete(entry.agentSessionId);
+      if (conversationSet.size === 0) conversationIndex.delete(entry.agentConversationId);
     }
   },
 
   /**
-   * Compute aggregate stats for all active requests in a session.
+   * Compute aggregate stats for all active requests in a conversation.
    *
    * Rate computation uses a warm-up guard: tok/s is only reported once
    * a request has accumulated at least MIN_TOKENS_FOR_RATE tokens over
    * at least MIN_ELAPSED_SEC seconds. This prevents anomalous spikes
    * from single large chunks arriving in near-zero elapsed time.
    */
-  getSessionStats(agentSessionId: string): ConversationGenerationStats {
-    const requestIds = conversationIndex.get(agentSessionId);
-    const accumulator = conversationAccumulators.get(agentSessionId);
+  getConversationStats(agentConversationId: string): ConversationGenerationStats {
+    const requestIds = conversationIndex.get(agentConversationId);
+    const accumulator = conversationAccumulators.get(agentConversationId);
     const completedOutputTokens = accumulator?.completedOutputTokens || 0;
     const completedInputTokens = accumulator?.completedInputTokens || 0;
     const ttftSamples = accumulator?.ttftSamples || [];
@@ -351,8 +352,8 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
     const avgTtft = allTtftCount > 0 ? allTtftSum / allTtftCount : null;
 
     // Tok/s: aggregate throughput across all active requests (sum, not average).
-    // When multiple sub-agents generate in parallel, the session-level rate
-    // reflects total tokens/sec being produced across the entire session.
+    // When multiple sub-agents generate in parallel, the conversation-level rate
+    // reflects total tokens/sec being produced across the entire conversation.
     let tokPerSec: number | null = null;
     if (generatingCount > 0) {
       tokPerSec = parseFloat(totalTokPerSec.toFixed(1));
@@ -375,22 +376,25 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
       avgTtft: avgTtft != null ? parseFloat(avgTtft.toFixed(3)) : null,
     };
   },
-  cleanup(agentSessionId: string) {
-    const requestIds = conversationIndex.get(agentSessionId);
+  getSessionStats(agentConversationId: string): ConversationGenerationStats {
+    return this.getConversationStats(agentConversationId);
+  },
+  cleanup(agentConversationId: string) {
+    const requestIds = conversationIndex.get(agentConversationId);
     if (requestIds) {
       for (const rid of requestIds) {
         activeRequests.delete(rid);
       }
-      conversationIndex.delete(agentSessionId);
+      conversationIndex.delete(agentConversationId);
     }
-    conversationAccumulators.delete(agentSessionId);
+    conversationAccumulators.delete(agentConversationId);
   },
-  hasActiveRequests(agentSessionId: string) {
-    const requestIds = conversationIndex.get(agentSessionId);
+  hasActiveRequests(agentConversationId: string) {
+    const requestIds = conversationIndex.get(agentConversationId);
     return !!(requestIds && requestIds.size > 0);
   },
 
-  /** Total active requests across all sessions (for diagnostics). */
+  /** Total active requests across all conversations (for diagnostics). */
   get totalActiveRequests() {
     return activeRequests.size;
   },

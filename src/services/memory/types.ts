@@ -52,6 +52,7 @@ export interface ProcessBatchOptions {
   trigger: string;
   endpoint?: string | null;
   traceId?: string | null;
+  agentConversationId?: string | null;
   agentSessionId?: string | null;
   broadcast?: ((event: Record<string, unknown>) => void) | null;
   systemPrompt?: string;
@@ -78,6 +79,7 @@ export interface ConsolidateOptions {
   broadcast?: ((event: Record<string, unknown>) => void) | null;
   endpoint?: string | null;
   traceId?: string | null;
+  agentConversationId?: string | null;
   agentSessionId?: string | null;
   guildId?: string | null;
 }
@@ -90,5 +92,7 @@ export interface CheckAndRunOptions {
   endpoint?: string | null;
   agent?: string | null;
   traceId?: string | null;
+  agentConversationId?: string | null;
   agentSessionId?: string | null;
 }
+

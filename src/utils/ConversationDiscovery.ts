@@ -1,53 +1,53 @@
 import type { Db } from "mongodb";
 import { COLLECTIONS } from "../constants.ts";
 
-const MAX_SESSION_DEPTH = 10;
+const MAX_CONVERSATION_DEPTH = 10;
 
 /**
- * Recursively discover all descendant session IDs by walking the
- * `parentAgentSessionId` chain in the requests collection.
+ * Recursively discover all descendant conversation IDs by walking the
+ * `parentAgentConversationId` chain in the requests collection.
  *
- * Returns a Set containing the root session ID plus all descendants.
- * Used by admin session stats, session requests, and ConversationService.
+ * Returns a Set containing the root conversation ID plus all descendants.
+ * Used by admin conversation stats and ConversationService.
  */
-export async function discoverDescendantSessionIds(
+export async function discoverDescendantConversationIds(
   database: Db,
-  rootSessionId: string,
+  rootConversationId: string,
   additionalFilter: Record<string, unknown> = {},
 ): Promise<Set<string>> {
-  // Find all active agentSessionIds that are directly tagged with this conversationId
-  const conversationSessionIds = await database
+  // Find all active agentConversationIds that are directly tagged with this conversationId
+  const conversationConversationIds = await database
     .collection(COLLECTIONS.REQUESTS)
-    .distinct("agentSessionId", {
-      conversationId: rootSessionId,
+    .distinct("agentConversationId", {
+      conversationId: rootConversationId,
       ...additionalFilter,
     });
 
-  const allSessionIds = new Set([
-    rootSessionId,
-    ...conversationSessionIds.filter(Boolean),
+  const allConversationIds = new Set([
+    rootConversationId,
+    ...conversationConversationIds.filter(Boolean),
   ]);
-  let frontier = [...allSessionIds];
+  let frontier = [...allConversationIds];
 
   for (
     let depth = 0;
-    depth < MAX_SESSION_DEPTH && frontier.length > 0;
+    depth < MAX_CONVERSATION_DEPTH && frontier.length > 0;
     depth++
   ) {
     const childIds = await database
       .collection(COLLECTIONS.REQUESTS)
-      .distinct("agentSessionId", {
-        parentAgentSessionId: { $in: frontier },
-        agentSessionId: { $nin: [...allSessionIds] },
+      .distinct("agentConversationId", {
+        parentAgentConversationId: { $in: frontier },
+        agentConversationId: { $nin: [...allConversationIds] },
         ...additionalFilter,
       });
 
     if (childIds.length === 0) break;
 
     const newIds = childIds.filter(Boolean);
-    for (const id of newIds) allSessionIds.add(id);
+    for (const id of newIds) allConversationIds.add(id);
     frontier = newIds;
   }
 
-  return allSessionIds;
+  return allConversationIds;
 }

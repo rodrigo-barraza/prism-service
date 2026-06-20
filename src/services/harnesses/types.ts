@@ -201,8 +201,8 @@ export interface AgenticContext {
   username: string;
   modelDefinition?: ModelDefinition | null;
   messages: ConversationMessage[];
-  agentSessionId: string;
-  parentAgentSessionId?: string | null;
+  agentConversationId: string;
+  parentAgentConversationId?: string | null;
   parentConversationId?: string | null;
   traceId?: string | null;
   provider: LLMProvider;

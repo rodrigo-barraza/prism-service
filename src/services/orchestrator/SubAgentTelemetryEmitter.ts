@@ -15,7 +15,7 @@ interface SubAgentTelemetryConfig {
   subAgentId: string;
   subAgentDescription: string;
   parentEmit: EmitFunction | null | undefined;
-  parentSessionId: string | null | undefined;
+  parentConversationId: string | null | undefined;
 }
 
 function isToolCall(value: unknown): value is ToolCall {
@@ -45,7 +45,7 @@ export class SubAgentTelemetryEmitter {
   private subAgentId: string;
   private subAgentDescription: string;
   private parentEmit: EmitFunction | null | undefined;
-  private parentSessionId: string | null | undefined;
+  private parentConversationId: string | null | undefined;
 
   // Timing
   private firstChunkTime: number | null = null;
@@ -81,7 +81,7 @@ export class SubAgentTelemetryEmitter {
     this.subAgentId = config.subAgentId;
     this.subAgentDescription = config.subAgentDescription;
     this.parentEmit = config.parentEmit;
-    this.parentSessionId = config.parentSessionId;
+    this.parentConversationId = config.parentConversationId;
   }
 
   /** Build the generation_progress payload for the frontend. */
@@ -108,9 +108,9 @@ export class SubAgentTelemetryEmitter {
 
   /** Emit aggregate session-level generation_progress from the tracker. */
   private emitAggregateProgress() {
-    if (!this.parentEmit || !this.parentSessionId) return;
-    const stats = ConversationGenerationTracker.getSessionStats(
-      this.parentSessionId,
+    if (!this.parentEmit || !this.parentConversationId) return;
+    const stats = ConversationGenerationTracker.getConversationStats(
+      this.parentConversationId,
     );
     if (stats.totalOutputTokens > 0 || stats.activeRequests > 0) {
       this.highWaterMarkOutputTokens = Math.max(

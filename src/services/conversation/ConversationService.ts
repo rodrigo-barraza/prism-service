@@ -4,14 +4,14 @@ import { MONGO_DB_NAME } from "../../../config.ts";
 
 import { COLLECTIONS } from "../../constants.ts";
 import type { ChatMessage } from "../../types/admin.ts";
-import { discoverDescendantSessionIds } from "../../utils/ConversationDiscovery.ts";
+import { discoverDescendantConversationIds } from "../../utils/ConversationDiscovery.ts";
 import type {
   ConversationMeta,
   ConversationSettings,
   MessagePayload,
   ConversationServiceInterface,
   TransformedConversation,
-  TransformedSessionStats,
+  TransformedConversationStats,
 } from "./types.ts";
 import {
   extractFiles,
@@ -69,7 +69,11 @@ const ConversationService: ConversationServiceInterface = {
           systemPrompt: conversationMeta.systemPrompt || "",
         };
       }
-      if (conversationMeta.parentAgentSessionId) {
+      if (conversationMeta.parentAgentConversationId) {
+        setFields.parentAgentConversationId = conversationMeta.parentAgentConversationId;
+        setFields.parentAgentSessionId = conversationMeta.parentAgentConversationId;
+      } else if (conversationMeta.parentAgentSessionId) {
+        setFields.parentAgentConversationId = conversationMeta.parentAgentSessionId;
         setFields.parentAgentSessionId = conversationMeta.parentAgentSessionId;
       }
       if (conversationMeta.parentConversationId) {
@@ -83,7 +87,7 @@ const ConversationService: ConversationServiceInterface = {
     // Build $setOnInsert for auto-creation of new conversations
     const metaSettings = conversationMeta?.settings || {};
     const metaSysPrompt = conversationMeta?.systemPrompt || "";
-    const parentId = conversationMeta?.parentAgentSessionId || null;
+    const parentId = conversationMeta?.parentAgentConversationId || conversationMeta?.parentAgentSessionId || null;
     const parentConversationId = conversationMeta?.parentConversationId || null;
 
     const setOnInsertBase: Record<string, unknown> = {
@@ -99,7 +103,7 @@ const ConversationService: ConversationServiceInterface = {
       isGenerating: true,
       ...(conversationMeta?.synthetic && { synthetic: true }),
       ...(traceId && { traceId }),
-      ...(parentId && { parentAgentSessionId: parentId }),
+      ...(parentId && { parentAgentConversationId: parentId, parentAgentSessionId: parentId }),
       ...(parentConversationId && { parentConversationId }),
       ...(conversationMeta?.workspaceRoot && {
         workspaceRoot: conversationMeta.workspaceRoot,
@@ -237,16 +241,16 @@ const ConversationService: ConversationServiceInterface = {
     }
   },
 
-  async getSessionStats(
-    sessionId: string,
+  async getConversationStats(
+    conversationId: string,
     project: string,
     username: string,
-  ): Promise<TransformedSessionStats | null> {
+  ): Promise<TransformedConversationStats | null> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return null;
 
-    // Recursively discover all descendant session IDs (multi-level sub-agents)
-    const allSessionIds = await discoverDescendantSessionIds(db, sessionId, {
+    // Recursively discover all descendant conversation IDs (multi-level sub-agents)
+    const allConversationIds = await discoverDescendantConversationIds(db, conversationId, {
       project,
       username,
     });
@@ -254,7 +258,10 @@ const ConversationService: ConversationServiceInterface = {
     const requests = await db
       .collection(COLLECTIONS.REQUESTS)
       .find({
-        agentSessionId: { $in: [...allSessionIds] },
+        $or: [
+          { agentConversationId: { $in: [...allConversationIds] } },
+          { agentSessionId: { $in: [...allConversationIds] } }
+        ],
         project,
         username,
       })
@@ -272,7 +279,9 @@ const ConversationService: ConversationServiceInterface = {
         modalities: 1,
         toolApiNames: 1,
         success: 1,
+        agentConversationId: 1,
         agentSessionId: 1,
+        parentAgentConversationId: 1,
         parentAgentSessionId: 1,
       })
       .toArray();
@@ -323,7 +332,8 @@ const ConversationService: ConversationServiceInterface = {
     }
 
     const subAgentRequestCount = requests.filter(
-      (reservation) => reservation.agentSessionId !== sessionId,
+      (reservation) => 
+        (reservation.agentConversationId || reservation.agentSessionId) !== conversationId,
     ).length;
 
     const createdAt = (requests as Record<string, unknown>[]).reduce(
@@ -349,7 +359,8 @@ const ConversationService: ConversationServiceInterface = {
         : 0;
 
     return {
-      agentSessionId: sessionId,
+      agentConversationId: conversationId,
+      agentSessionId: conversationId,
       requestCount: requests.length,
       subAgentRequestCount,
       totalCost,
@@ -369,6 +380,14 @@ const ConversationService: ConversationServiceInterface = {
       createdAt,
       updatedAt,
     };
+  },
+
+  async getSessionStats(
+    sessionId: string,
+    project: string,
+    username: string,
+  ): Promise<TransformedConversationStats | null> {
+    return this.getConversationStats(sessionId, project, username);
   },
 };
 

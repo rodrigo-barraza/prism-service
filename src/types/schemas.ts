@@ -65,6 +65,7 @@ export const ChatRequestSchema = z
     model: z.string().nullable().optional(),
     messages: z.array(ChatMessageSchema),
     conversationId: z.string().nullable().optional(),
+    agentConversationId: sanitizedString().nullable().optional(),
     agentSessionId: sanitizedString().nullable().optional(),
     conversationMeta: z.record(z.string(), z.unknown()).nullable().optional(),
     traceId: z.string().nullable().optional(),
@@ -325,7 +326,7 @@ export const PutRuleSchema = z.object({
   enabled: z.boolean().optional(),
 });
 
-export const GetAgentSessionsQuerySchema = z.object({
+export const GetAgentConversationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   cursor: z.string().nullable().optional(),
   agent: z.string().nullable().optional(),

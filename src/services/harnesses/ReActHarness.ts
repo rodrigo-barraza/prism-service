@@ -63,7 +63,7 @@ interface BeforePromptHookContext {
   username: string;
   agent?: string | null;
   traceId?: string | null;
-  agentSessionId: string;
+  agentConversationId: string;
   agentContext?: unknown;
   enabledTools: string[] | null;
   resolvedToolNames: string[];
@@ -136,7 +136,7 @@ export default class ReActHarness extends BaseAgenticHarness {
     const state = this.state;
     const {
       options,
-      agentSessionId,
+      agentConversationId,
       traceId,
       project,
       username,
@@ -177,7 +177,7 @@ export default class ReActHarness extends BaseAgenticHarness {
 
     // ── Main loop ────────────────────────────────────────────
     // Wrapped in try/catch to persist accumulated messages on error.
-    // Without this, a provider timeout mid-loop leaves the session
+    // Without this, a provider timeout mid-loop leaves the conversation
     // document as an empty stub (messages: []) in MongoDB — the
     // "disappearing messages" bug.
     try {
@@ -206,7 +206,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             username,
             agent,
             traceId,
-            agentSessionId,
+            agentConversationId,
             agentContext: options.agentContext,
             enabledTools: this.tools.resolvedEnabledTools,
             resolvedToolNames: this.tools.finalTools.map(
@@ -289,7 +289,7 @@ export default class ReActHarness extends BaseAgenticHarness {
         // ── Create per-iteration pass state ────────────────────
         const pass = this.createPassState(passOptions);
         const requestIdBase =
-          context.requestId || agentSessionId || crypto.randomUUID();
+          context.requestId || agentConversationId || crypto.randomUUID();
         const passRequestId = `${requestIdBase}-iter-${state.iterations}`;
         pass.requestId = passRequestId;
 
@@ -642,18 +642,18 @@ export default class ReActHarness extends BaseAgenticHarness {
         state.streamedToolCalls.length > 0 &&
         !signal?.aborted
       ) {
-        state.sessionOutcome = "exhausted";
+        state.conversationOutcome = "exhausted";
         await runExhaustionRecoveryPass(this, context, state, currentMessages);
       }
 
       // ── Finalization (happy path) ──────────────────────────────
-      cleanupReminderCache(agentSessionId);
+      cleanupReminderCache(agentConversationId);
       await this.finalize(currentMessages, hooks);
       return { messages: currentMessages };
     } catch (loopError: unknown) {
       // ── Error-path persistence ─────────────────────────────
       // Persist whatever messages accumulated before the error so
-      // the session isn't left as an empty stub in MongoDB.
+      // the conversation isn't left as an empty stub in MongoDB.
       // Also inject the error as a conversation message so the LLM
       // has context about the failure on the next turn.
       logger.error(
@@ -666,7 +666,7 @@ export default class ReActHarness extends BaseAgenticHarness {
         context,
       );
 
-      state.sessionOutcome = "error";
+      state.conversationOutcome = "error";
 
       try {
         await this.finalize(currentMessages, hooks);

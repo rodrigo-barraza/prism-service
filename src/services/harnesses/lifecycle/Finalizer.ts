@@ -37,7 +37,9 @@ export interface FinalizerContext {
   originalMessages?: MessagePayload[];
   options: LlmOptions;
   conversationId: string | null;
-  agentSessionId: string | null;
+  agentConversationId?: string | null;
+  agentSessionId?: string | null;
+  parentAgentConversationId?: string | null;
   parentAgentSessionId?: string | null;
   parentConversationId?: string | null;
   userMessage?: MessagePayload | null;
@@ -183,7 +185,9 @@ export async function finalizeTextGeneration(
     originalMessages,
     options,
     conversationId,
+    agentConversationId,
     agentSessionId,
+    parentAgentConversationId,
     parentAgentSessionId,
     parentConversationId,
     userMessage,
@@ -340,8 +344,10 @@ export async function finalizeTextGeneration(
       provider: providerName,
       model: resolvedModel,
       conversationId,
-      agentSessionId,
-      parentAgentSessionId,
+      agentConversationId: agentConversationId || agentSessionId,
+      agentSessionId: agentConversationId || agentSessionId,
+      parentAgentConversationId: parentAgentConversationId || parentAgentSessionId,
+      parentAgentSessionId: parentAgentConversationId || parentAgentSessionId,
       traceId: traceId || null,
       success: true,
       usage: usage || undefined,
@@ -451,8 +457,10 @@ export async function finalizeTextGeneration(
       settings: mergedSettings,
     };
 
-    if (parentAgentSessionId) {
-      finalMeta.parentAgentSessionId = parentAgentSessionId;
+    const effectiveParentAgentConversationId = parentAgentConversationId || parentAgentSessionId;
+    if (effectiveParentAgentConversationId) {
+      finalMeta.parentAgentConversationId = effectiveParentAgentConversationId;
+      finalMeta.parentAgentSessionId = effectiveParentAgentConversationId;
       finalMeta.isSubAgent = true;
     }
     if (parentConversationId) {

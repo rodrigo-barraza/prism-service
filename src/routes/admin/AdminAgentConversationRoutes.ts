@@ -8,7 +8,7 @@ import {
   applyDateRangeFilter,
   parsePaginationParams,
 } from "../../utils/QueryBuilders.ts";
-import { discoverDescendantSessionIds } from "../../utils/ConversationDiscovery.ts";
+import { discoverDescendantConversationIds } from "../../utils/ConversationDiscovery.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
 
 const conversationStatsRouter = express.Router();
@@ -24,14 +24,19 @@ conversationStatsRouter.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const conversationId = req.params.id as string;
-      const allConversationIds = await discoverDescendantSessionIds(
+      const allConversationIds = await discoverDescendantConversationIds(
         req.db,
         conversationId,
       );
 
       const requests = await req.db
         .collection(REQUESTS_COLLECTION)
-        .find({ agentSessionId: { $in: [...allConversationIds] } })
+        .find({
+          $or: [
+            { agentConversationId: { $in: [...allConversationIds] } },
+            { agentSessionId: { $in: [...allConversationIds] } }
+          ]
+        })
         .project({
           estimatedCost: 1,
           inputTokens: 1,
@@ -46,7 +51,9 @@ conversationStatsRouter.get(
           modalities: 1,
           toolApiNames: 1,
           success: 1,
+          agentConversationId: 1,
           agentSessionId: 1,
+          parentAgentConversationId: 1,
           parentAgentSessionId: 1,
         })
         .toArray();
@@ -93,7 +100,7 @@ conversationStatsRouter.get(
       }
 
       const subAgentRequestCount = requests.filter(
-        (requestItem) => requestItem.agentSessionId !== conversationId,
+        (requestItem) => (requestItem.agentConversationId || requestItem.agentSessionId) !== conversationId,
       ).length;
 
       const createdAt = (requests as Record<string, unknown>[]).reduce(
@@ -122,6 +129,7 @@ conversationStatsRouter.get(
           : 0;
 
       res.json({
+        agentConversationId: conversationId,
         agentSessionId: conversationId,
         requestCount: requests.length,
         subAgentRequestCount,
@@ -156,14 +164,19 @@ conversationStatsRouter.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rootConversationId = req.params.id as string;
-      const allConversationIds = await discoverDescendantSessionIds(
+      const allConversationIds = await discoverDescendantConversationIds(
         req.db,
         rootConversationId,
       );
 
       const requests = await req.db
         .collection(REQUESTS_COLLECTION)
-        .find({ agentSessionId: { $in: [...allConversationIds] } })
+        .find({
+          $or: [
+            { agentConversationId: { $in: [...allConversationIds] } },
+            { agentSessionId: { $in: [...allConversationIds] } }
+          ]
+        })
         .project({
           requestId: 1,
           timestamp: 1,
@@ -185,7 +198,9 @@ conversationStatsRouter.get(
           toolDisplayNames: 1,
           toolApiNames: 1,
           modalities: 1,
+          agentConversationId: 1,
           agentSessionId: 1,
+          parentAgentConversationId: 1,
           parentAgentSessionId: 1,
           traceId: 1,
           agent: 1,
@@ -272,8 +287,10 @@ agentConversationRouter.get(
                 {
                   $match: {
                     $or: [
+                      { agentConversationId: { $in: conversationIds } },
                       { agentSessionId: { $in: conversationIds } },
                       { conversationId: { $in: conversationIds } },
+                      { parentAgentConversationId: { $in: conversationIds } },
                       { parentAgentSessionId: { $in: conversationIds } },
                     ],
                   },
@@ -284,12 +301,12 @@ agentConversationRouter.get(
                       $cond: [
                         {
                           $and: [
-                            { $ne: ["$parentAgentSessionId", null] },
-                            { $in: ["$parentAgentSessionId", conversationIds] },
+                            { $ne: [{ $ifNull: ["$parentAgentConversationId", "$parentAgentSessionId"] }, null] },
+                            { $in: [{ $ifNull: ["$parentAgentConversationId", "$parentAgentSessionId"] }, conversationIds] },
                           ],
                         },
-                        "$parentAgentSessionId",
-                        { $ifNull: ["$conversationId", "$agentSessionId"] },
+                        { $ifNull: ["$parentAgentConversationId", "$parentAgentSessionId"] },
+                        { $ifNull: ["$conversationId", { $ifNull: ["$agentConversationId", "$agentSessionId"] }] },
                       ],
                     },
                     totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },
