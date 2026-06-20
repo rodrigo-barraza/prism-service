@@ -83,10 +83,10 @@ export class SequentialRouter implements TopologyRouter {
         }
       }
 
-      // 2. Prepare step prompt by prepending accumulated context
+      // 2. Prepare step prompt by prepending accumulated context from all prior steps
       const basePrompt = member.prompt;
       const stepPrompt = accumulatedContext
-        ? `--- PREVIOUS STEP RESULT ---\n${accumulatedContext}\n\n--- YOUR TASK ---\n${basePrompt}`
+        ? `--- PREVIOUS STEPS RESULTS ---\n${accumulatedContext}\n\n--- YOUR TASK ---\n${basePrompt}`
         : basePrompt;
 
       const assignment: OrchestratorSpawnParams = {
@@ -157,8 +157,12 @@ export class SequentialRouter implements TopologyRouter {
         );
       }
 
-      // 5. Accumulate text result for the next agent
-      accumulatedContext = `Step ${index + 1} (${member.description}):\n${spawnResult.result || buildToolCallFallbackSummary(spawnResult) || spawnResult.summary}`;
+      // 5. Accumulate text result for subsequent agents (append, not overwrite)
+      const stepOutput = spawnResult.result || buildToolCallFallbackSummary(spawnResult) || spawnResult.summary;
+      const stepSummaryBlock = `Step ${index + 1} (${member.description}):\n${stepOutput}`;
+      accumulatedContext = accumulatedContext
+        ? `${accumulatedContext}\n\n---\n\n${stepSummaryBlock}`
+        : stepSummaryBlock;
     }
 
     return results;
