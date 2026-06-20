@@ -115,8 +115,8 @@ router.post(
       return res.status(400).json({ error: "Missing 'model' in request body" });
     }
     // Set up SSE — use setHeader pattern (not writeHead) to match /chat endpoint
-    initSseResponse(res);
     res.setHeader("X-Accel-Buffering", "no");
+    initSseResponse(res);
     const send = (data: Record<string, unknown>) => {
       if (!res.writableEnded) {
         res.write(`data: ${JSON.stringify(data)}\n\n`);
