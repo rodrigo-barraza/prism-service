@@ -470,33 +470,29 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     });
   });
 
-  describe("Peer-to-Peer Router Index Normalization", () => {
-    it("should normalize 0-indexed or mismatched agent names (like agent-0) to 1-based speaker names matching member index", async () => {
-      // Clear mock calls
+  describe("Peer-to-Peer Router 0-Based Agent Naming", () => {
+    it("should use 0-based speaker names and correctly tag shared discussion entries", async () => {
       mockRunAgenticLoop.mockClear();
 
-      // Mock runAgenticLoop to return mock output for both turns
       mockRunAgenticLoop
         .mockResolvedValueOnce({
-          messages: [{ role: "assistant", content: "Agent 1 output" }],
+          messages: [{ role: "assistant", content: "Agent 0 output" }],
         })
         .mockResolvedValueOnce({
-          messages: [{ role: "assistant", content: "Agent 2 output [DONE]" }],
+          messages: [{ role: "assistant", content: "Agent 1 output [DONE]" }],
         });
 
       const teamArgs = {
-        name: "peer_to_peer_normalization_team",
+        name: "peer_to_peer_0based_team",
         topology: "peer_to_peer",
         members: [
           {
             description: "First Sub-agent",
             prompt: "Research Pac-Man gameplay mechanics",
-            agent: "agent-0", // Mismatched 0-indexed name
           },
           {
             description: "Second Sub-agent",
             prompt: "Research Pac-Man historical feats",
-            agent: "agent-1", // Mismatched 0-indexed name
           },
         ],
       };
@@ -504,25 +500,23 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
       expect(results).toHaveLength(2);
 
-      // Verify first agent was run and context is correct
       expect(mockRunAgenticLoop).toHaveBeenCalledTimes(2);
 
       const firstAgentCallArgs = mockRunAgenticLoop.mock.calls[0][0];
       const secondAgentCallArgs = mockRunAgenticLoop.mock.calls[1][0];
 
-      // Retrieve prompts passed to sub-agents
-      const firstAgentUserMsg = firstAgentCallArgs.messages[0].content;
-      const secondAgentUserMsg = secondAgentCallArgs.messages[0].content;
+      const firstAgentUserMessage = firstAgentCallArgs.messages[0].content;
+      const secondAgentUserMessage = secondAgentCallArgs.messages[0].content;
 
-      // The first agent should see its task
-      expect(firstAgentUserMsg).toContain("Research Pac-Man gameplay mechanics");
+      // The first agent (agent-0) should see its task and identity
+      expect(firstAgentUserMessage).toContain("Research Pac-Man gameplay mechanics");
+      expect(firstAgentUserMessage).toContain("agent-0");
 
-      // The second agent should see the shared discussion history containing [agent-1] (not [agent-0])
-      // and address the second agent as agent-2 in the task section
-      expect(secondAgentUserMsg).toContain("--- SHARED DISCUSSION BOARD ---");
-      expect(secondAgentUserMsg).toContain("[agent-1]: Agent 1 output");
-      expect(secondAgentUserMsg).toContain("--- YOUR TASK (agent-2) ---");
-      expect(secondAgentUserMsg).toContain("Research Pac-Man historical feats");
+      // The second agent (agent-1) should see shared discussion with [agent-0] tag
+      expect(secondAgentUserMessage).toContain("--- SHARED DISCUSSION BOARD ---");
+      expect(secondAgentUserMessage).toContain("[agent-0]: Agent 0 output");
+      expect(secondAgentUserMessage).toContain("--- YOUR TASK (agent-1) ---");
+      expect(secondAgentUserMessage).toContain("Research Pac-Man historical feats");
     });
   });
 });

@@ -16,42 +16,6 @@ import { GitWorktreeHelper } from "../GitWorktreeHelper.ts";
 const MINIMUM_SUBSTANTIVE_RESPONSE_LENGTH = 80;
 
 /**
- * Replace 0-based agent references (e.g. "agent-0", "Agent-0", "[agent-0]")
- * in a prompt with the correct 1-based speaker names.
- *
- * Uses a two-phase placeholder approach to avoid index collisions when
- * shifting (e.g. "agent-1" as 0-based index 1 must not collide with
- * "agent-1" as the 1-based name of member 0).
- */
-function sanitizeZeroBasedAgentReferences(
-  prompt: string,
-  speakerNamesByMemberIndex: string[],
-): string {
-  if (speakerNamesByMemberIndex.length === 0) return prompt;
-
-  let sanitizedPrompt = prompt;
-
-  // Phase 1: Replace all 0-based agent-N references with unique placeholders
-  for (let index = 0; index < speakerNamesByMemberIndex.length; index++) {
-    const zeroBasedPattern = new RegExp(`\\bagent-${index}\\b`, "gi");
-    sanitizedPrompt = sanitizedPrompt.replace(
-      zeroBasedPattern,
-      `\u0000SPEAKER_${index}\u0000`,
-    );
-  }
-
-  // Phase 2: Replace placeholders with correct 1-based speaker names
-  for (let index = 0; index < speakerNamesByMemberIndex.length; index++) {
-    sanitizedPrompt = sanitizedPrompt.replaceAll(
-      `\u0000SPEAKER_${index}\u0000`,
-      speakerNamesByMemberIndex[index],
-    );
-  }
-
-  return sanitizedPrompt;
-}
-
-/**
  * Strip echoed shared discussion board markers from a sub-agent's response
  * before appending it to the shared thread. Sub-agents often echo the
  * `--- SHARED DISCUSSION BOARD ---` prompt structure in their output,
@@ -74,7 +38,7 @@ function stripEchoedDiscussionMarkers(responseText: string): string {
     // Look for the agent's own content boundary: either a "---" separator
     // followed by a speaker tag, or a standalone markdown header
     const ownContentMatch = afterLastMarker.match(
-      /\n---\s*\n+\s*(?:\[[\w-]+\]:|\#{1,4}\s)/,
+      /\n---\s*\n+\s*(?:\[[\w-]+\]:\s|\#{1,4}\s)/,
     );
 
     if (ownContentMatch && ownContentMatch.index != null) {
@@ -131,8 +95,9 @@ function isStallResponse(
  * 3. Preserves agent state: conversation history, worktree edits, CLI state
  * 4. Merges worktree changes between turns so agents see each other's file edits
  *
- * This aligns with the AutoGen GroupChat persistent-agent model and eliminates
- * the overhead of creating/destroying Git worktrees on every turn.
+ * Agent identifiers use 0-based indexing (agent-0, agent-1, ...) to align
+ * with LLM-natural naming conventions — LLMs default to 0-based from their
+ * code-heavy training data, eliminating identity conflicts.
  */
 export class PeerToPeerRouter implements TopologyRouter {
   async execute(
@@ -159,23 +124,13 @@ export class PeerToPeerRouter implements TopologyRouter {
       return [{ error: errorMessage }];
     }
 
-    // Pre-compute 1-based speaker names for all members.
-    // Any agent name matching the generic "agent-N" pattern gets
-    // normalized to 1-based indexing (e.g. "agent-0" → "agent-1").
+    // Pre-compute 0-based speaker names for all members.
+    // Custom agent names (e.g. "Dev", "QA") are used as-is.
+    // Generic "agent-N" names or missing names default to agent-{memberIndex}.
     const speakerNamesByMemberIndex = members.map((member, index) => {
-      const rawName = member.agent || `agent-${index + 1}`;
-      return /^agent-\d+$/i.test(rawName) ? `agent-${index + 1}` : rawName;
+      const rawName = member.agent || `agent-${index}`;
+      return /^agent-\d+$/i.test(rawName) ? `agent-${index}` : rawName;
     });
-
-    // Pre-sanitize each member's prompt: replace 0-based agent references
-    // from the orchestrator LLM (e.g. "You are Agent-0", "[agent-0]") with
-    // the correct 1-based speaker names.
-    const sanitizedMemberPrompts = members.map((member) =>
-      sanitizeZeroBasedAgentReferences(
-        member.prompt,
-        speakerNamesByMemberIndex,
-      ),
-    );
 
     // Map of memberIndex → agentId for stateful session reuse.
     // Populated on each agent's first turn, then reused for subsequent turns.
@@ -201,7 +156,6 @@ export class PeerToPeerRouter implements TopologyRouter {
       const memberIndex = turnIndex % members.length;
       const member = members[memberIndex];
       const speakerName = speakerNamesByMemberIndex[memberIndex];
-      const sanitizedPrompt = sanitizedMemberPrompts[memberIndex];
       const isFirstTurnForMember = !agentIdsByMemberIndex.has(memberIndex);
 
       const currentRound = Math.floor(turnIndex / members.length) + 1;
@@ -214,8 +168,8 @@ export class PeerToPeerRouter implements TopologyRouter {
       const speakerIdentityLine = `Your speaker identity in this discussion is ${speakerName}. Tag all your contributions with [${speakerName}].`;
       const promptHistory =
         sharedDiscussion.length > 0
-          ? `--- SHARED DISCUSSION BOARD ---\n${sharedDiscussion.join("\n\n")}\n\n--- YOUR TASK (${speakerName}) ---\n${speakerIdentityLine}\n\n${sanitizedPrompt}`
-          : `${speakerIdentityLine}\n\n${sanitizedPrompt}`;
+          ? `--- SHARED DISCUSSION BOARD ---\n${sharedDiscussion.join("\n\n")}\n\n--- YOUR TASK (${speakerName}) ---\n${speakerIdentityLine}\n\n${member.prompt}`
+          : `${speakerIdentityLine}\n\n${member.prompt}`;
 
       let spawnResult: SubAgentResult | { error: string };
 
@@ -240,7 +194,7 @@ export class PeerToPeerRouter implements TopologyRouter {
           agent: member.agent,
           assignedProvider,
           assignedModel,
-          agentIndex: memberIndex + 1,
+          agentIndex: memberIndex,
           teamSize: members.length,
           round: currentRound,
           orchestratorContext,

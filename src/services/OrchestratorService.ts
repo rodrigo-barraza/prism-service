@@ -1133,7 +1133,7 @@ export default class OrchestratorService {
 
     const agentPositionLine =
       subAgent.agentIndex != null && subAgent.teamSize != null
-        ? `Agent: ${subAgent.agentIndex} of ${subAgent.teamSize}\n`
+        ? `Agent: ${subAgent.agentIndex + 1} of ${subAgent.teamSize}\n`
         : "";
 
     const roundLine =
