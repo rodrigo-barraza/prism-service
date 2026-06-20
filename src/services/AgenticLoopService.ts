@@ -9,7 +9,7 @@ import {
   type QuestionDefinition,
   type QuestionAnswer,
 } from "./ApprovalRegistry.ts";
-import SessionGenerationTracker from "./SessionGenerationTracker.ts";
+import ConversationGenerationTracker from "./ConversationGenerationTracker.ts";
 import ToolContext from "./ToolContext.ts";
 import logger from "../utils/logger.ts";
 
@@ -146,7 +146,7 @@ export default class AgenticLoopService {
 
       // Always clean up per-session tracker entries to prevent memory leaks —
       // sub-agent sessions have their own agentSessionId that must be released.
-      SessionGenerationTracker.cleanup(agentSessionId);
+      ConversationGenerationTracker.cleanup(agentSessionId);
 
       // Only clean up orchestrator state for root sessions — sub-agents are
       // cleaned by the parent session's OrchestratorService.cleanupSession().

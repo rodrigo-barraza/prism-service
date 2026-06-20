@@ -1,5 +1,5 @@
 import { expandMessagesForFunctionCall } from "../../../utils/FunctionCallingUtilities.ts";
-import SessionGenerationTracker from "../../SessionGenerationTracker.ts";
+import ConversationGenerationTracker from "../../ConversationGenerationTracker.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -88,5 +88,5 @@ export async function runExhaustionRecoveryPass(
   await harness.consumeStream(exhaustionStream, exhaustionPass, emptyToolNames);
 
   harness.emitGenerationProgress();
-  SessionGenerationTracker.complete(exhaustionRequestId);
+  ConversationGenerationTracker.complete(exhaustionRequestId);
 }

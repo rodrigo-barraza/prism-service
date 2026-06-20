@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// SessionGenerationTracker
+// ConversationGenerationTracker
 // ─────────────────────────────────────────────────────────────
 // Per-session in-memory tracker for active LLM requests.
 // Tracks token throughput at the source (backend provider level)
@@ -49,7 +49,7 @@ interface ActiveRequest {
   subAgentId: string | null;
 }
 
-interface SessionAccumulator {
+interface ConversationAccumulator {
   completedOutputTokens: number;
   completedInputTokens: number;
   ttftSamples: number[];
@@ -69,7 +69,7 @@ interface UpdateParams {
   ttft?: number;
 }
 
-interface SessionStats {
+interface ConversationGenerationStats {
   tokPerSec: number | null;
   activeRequests: number;
   totalOutputTokens: number;
@@ -78,7 +78,7 @@ interface SessionStats {
   avgTtft: number | null;
 }
 
-interface SessionGenerationTrackerInterface {
+interface ConversationGenerationTrackerInterface {
   register(
     agentSessionId: string,
     requestId: string,
@@ -87,7 +87,7 @@ interface SessionGenerationTrackerInterface {
   update(requestId: string, params?: UpdateParams): void;
   recordChunkTiming(requestId: string, charCount?: number): void;
   complete(requestId: string): void;
-  getSessionStats(agentSessionId: string): SessionStats;
+  getSessionStats(agentSessionId: string): ConversationGenerationStats;
   cleanup(agentSessionId: string): void;
   hasActiveRequests(agentSessionId: string): boolean;
   readonly totalActiveRequests: number;
@@ -96,10 +96,10 @@ interface SessionGenerationTrackerInterface {
 // ── State ───────────────────────────────────────────────────
 
 const activeRequests = new Map<string, ActiveRequest>();
-const sessionIndex = new Map<string, Set<string>>();
-const sessionAccumulators = new Map<string, SessionAccumulator>();
+const conversationIndex = new Map<string, Set<string>>();
+const conversationAccumulators = new Map<string, ConversationAccumulator>();
 
-const SessionGenerationTracker: SessionGenerationTrackerInterface = {
+const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
   register(
     agentSessionId: string,
     requestId: string,
@@ -132,14 +132,14 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
     activeRequests.set(requestId, entry);
 
     // Maintain session → requests index
-    if (!sessionIndex.has(agentSessionId)) {
-      sessionIndex.set(agentSessionId, new Set());
+    if (!conversationIndex.has(agentSessionId)) {
+      conversationIndex.set(agentSessionId, new Set());
     }
-    sessionIndex.get(agentSessionId)!.add(requestId);
+    conversationIndex.get(agentSessionId)!.add(requestId);
 
     // Initialize session accumulator (idempotent — preserves across iterations)
-    if (!sessionAccumulators.has(agentSessionId)) {
-      sessionAccumulators.set(agentSessionId, {
+    if (!conversationAccumulators.has(agentSessionId)) {
+      conversationAccumulators.set(agentSessionId, {
         completedOutputTokens: 0,
         completedInputTokens: 0,
         ttftSamples: [],
@@ -229,7 +229,7 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
     }
 
     // Roll completed metrics into the session accumulator
-    const accumulator = sessionAccumulators.get(entry.agentSessionId);
+    const accumulator = conversationAccumulators.get(entry.agentSessionId);
     if (accumulator) {
       accumulator.completedOutputTokens += effectiveOutputTokens;
       accumulator.completedInputTokens += entry.inputTokens;
@@ -244,10 +244,10 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
 
     activeRequests.delete(requestId);
 
-    const sessionSet = sessionIndex.get(entry.agentSessionId);
-    if (sessionSet) {
-      sessionSet.delete(requestId);
-      if (sessionSet.size === 0) sessionIndex.delete(entry.agentSessionId);
+    const conversationSet = conversationIndex.get(entry.agentSessionId);
+    if (conversationSet) {
+      conversationSet.delete(requestId);
+      if (conversationSet.size === 0) conversationIndex.delete(entry.agentSessionId);
     }
   },
 
@@ -259,9 +259,9 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
    * at least MIN_ELAPSED_SEC seconds. This prevents anomalous spikes
    * from single large chunks arriving in near-zero elapsed time.
    */
-  getSessionStats(agentSessionId: string): SessionStats {
-    const requestIds = sessionIndex.get(agentSessionId);
-    const accumulator = sessionAccumulators.get(agentSessionId);
+  getSessionStats(agentSessionId: string): ConversationGenerationStats {
+    const requestIds = conversationIndex.get(agentSessionId);
+    const accumulator = conversationAccumulators.get(agentSessionId);
     const completedOutputTokens = accumulator?.completedOutputTokens || 0;
     const completedInputTokens = accumulator?.completedInputTokens || 0;
     const ttftSamples = accumulator?.ttftSamples || [];
@@ -376,17 +376,17 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
     };
   },
   cleanup(agentSessionId: string) {
-    const requestIds = sessionIndex.get(agentSessionId);
+    const requestIds = conversationIndex.get(agentSessionId);
     if (requestIds) {
       for (const rid of requestIds) {
         activeRequests.delete(rid);
       }
-      sessionIndex.delete(agentSessionId);
+      conversationIndex.delete(agentSessionId);
     }
-    sessionAccumulators.delete(agentSessionId);
+    conversationAccumulators.delete(agentSessionId);
   },
   hasActiveRequests(agentSessionId: string) {
-    const requestIds = sessionIndex.get(agentSessionId);
+    const requestIds = conversationIndex.get(agentSessionId);
     return !!(requestIds && requestIds.size > 0);
   },
 
@@ -396,4 +396,4 @@ const SessionGenerationTracker: SessionGenerationTrackerInterface = {
   },
 };
 
-export default SessionGenerationTracker;
+export default ConversationGenerationTracker;
