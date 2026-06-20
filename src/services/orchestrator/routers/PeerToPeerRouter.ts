@@ -16,6 +16,95 @@ import { GitWorktreeHelper } from "../GitWorktreeHelper.ts";
 const MINIMUM_SUBSTANTIVE_RESPONSE_LENGTH = 80;
 
 /**
+ * Replace 0-based agent references (e.g. "agent-0", "Agent-0", "[agent-0]")
+ * in a prompt with the correct 1-based speaker names.
+ *
+ * Uses a two-phase placeholder approach to avoid index collisions when
+ * shifting (e.g. "agent-1" as 0-based index 1 must not collide with
+ * "agent-1" as the 1-based name of member 0).
+ */
+function sanitizeZeroBasedAgentReferences(
+  prompt: string,
+  speakerNamesByMemberIndex: string[],
+): string {
+  if (speakerNamesByMemberIndex.length === 0) return prompt;
+
+  let sanitizedPrompt = prompt;
+
+  // Phase 1: Replace all 0-based agent-N references with unique placeholders
+  for (let index = 0; index < speakerNamesByMemberIndex.length; index++) {
+    const zeroBasedPattern = new RegExp(`\\bagent-${index}\\b`, "gi");
+    sanitizedPrompt = sanitizedPrompt.replace(
+      zeroBasedPattern,
+      `\u0000SPEAKER_${index}\u0000`,
+    );
+  }
+
+  // Phase 2: Replace placeholders with correct 1-based speaker names
+  for (let index = 0; index < speakerNamesByMemberIndex.length; index++) {
+    sanitizedPrompt = sanitizedPrompt.replaceAll(
+      `\u0000SPEAKER_${index}\u0000`,
+      speakerNamesByMemberIndex[index],
+    );
+  }
+
+  return sanitizedPrompt;
+}
+
+/**
+ * Strip echoed shared discussion board markers from a sub-agent's response
+ * before appending it to the shared thread. Sub-agents often echo the
+ * `--- SHARED DISCUSSION BOARD ---` prompt structure in their output,
+ * which creates nested/duplicated boards on subsequent turns.
+ */
+function stripEchoedDiscussionMarkers(responseText: string): string {
+  let cleanedText = responseText.trim();
+
+  // Remove leading "--- SHARED DISCUSSION BOARD ---" and everything
+  // up to the agent's actual new contribution. Look for the pattern
+  // where the agent echoes the board then starts their own section.
+  if (cleanedText.startsWith("--- SHARED DISCUSSION BOARD ---")) {
+    // Find the last board marker — the agent may have echoed
+    // the entire accumulated thread which itself contains markers
+    const lastMarkerIndex = cleanedText.lastIndexOf(
+      "--- SHARED DISCUSSION BOARD ---",
+    );
+    const afterLastMarker = cleanedText.slice(lastMarkerIndex);
+
+    // Look for the agent's own content boundary: either a "---" separator
+    // followed by a speaker tag, or a standalone markdown header
+    const ownContentMatch = afterLastMarker.match(
+      /\n---\s*\n+\s*(?:\[[\w-]+\]:|\#{1,4}\s)/,
+    );
+
+    if (ownContentMatch && ownContentMatch.index != null) {
+      const bracketIndex = afterLastMarker.indexOf(
+        "[",
+        ownContentMatch.index,
+      );
+      const headerIndex = afterLastMarker.indexOf(
+        "#",
+        ownContentMatch.index,
+      );
+      const contentStart =
+        bracketIndex >= 0 && (headerIndex < 0 || bracketIndex < headerIndex)
+          ? bracketIndex
+          : headerIndex;
+
+      if (contentStart >= 0) {
+        cleanedText = afterLastMarker.slice(contentStart).trim();
+      }
+    }
+  }
+
+  // Strip leading speaker self-tag if it matches the pattern [speaker-name]:
+  // since we prepend our own "[speakerName]: " when appending to the thread
+  cleanedText = cleanedText.replace(/^\[[\w-]+\]:\s*/, "").trim();
+
+  return cleanedText;
+}
+
+/**
  * Detect stall responses using structural signals rather than brittle
  * keyword matching. A response is considered a stall when it is very
  * short AND the agent performed no tool work — indicating it had
@@ -25,7 +114,8 @@ function isStallResponse(
   responseText: string,
   spawnResult: SubAgentResult,
 ): boolean {
-  const isShortResponse = responseText.trim().length < MINIMUM_SUBSTANTIVE_RESPONSE_LENGTH;
+  const isShortResponse =
+    responseText.trim().length < MINIMUM_SUBSTANTIVE_RESPONSE_LENGTH;
   const hasNoToolUsage = spawnResult.toolUses === 0;
   return isShortResponse && hasNoToolUsage;
 }
@@ -69,12 +159,33 @@ export class PeerToPeerRouter implements TopologyRouter {
       return [{ error: errorMessage }];
     }
 
+    // Pre-compute 1-based speaker names for all members.
+    // Any agent name matching the generic "agent-N" pattern gets
+    // normalized to 1-based indexing (e.g. "agent-0" → "agent-1").
+    const speakerNamesByMemberIndex = members.map((member, index) => {
+      const rawName = member.agent || `agent-${index + 1}`;
+      return /^agent-\d+$/i.test(rawName) ? `agent-${index + 1}` : rawName;
+    });
+
+    // Pre-sanitize each member's prompt: replace 0-based agent references
+    // from the orchestrator LLM (e.g. "You are Agent-0", "[agent-0]") with
+    // the correct 1-based speaker names.
+    const sanitizedMemberPrompts = members.map((member) =>
+      sanitizeZeroBasedAgentReferences(
+        member.prompt,
+        speakerNamesByMemberIndex,
+      ),
+    );
+
     // Map of memberIndex → agentId for stateful session reuse.
     // Populated on each agent's first turn, then reused for subsequent turns.
     const agentIdsByMemberIndex = new Map<number, string>();
 
     // The most recent result per member slot — returned to the orchestrator
-    const latestResultByMemberIndex = new Map<number, SubAgentResult | { error: string }>();
+    const latestResultByMemberIndex = new Map<
+      number,
+      SubAgentResult | { error: string }
+    >();
 
     const sharedDiscussion: string[] = [];
     let consecutiveStallCount = 0;
@@ -89,10 +200,8 @@ export class PeerToPeerRouter implements TopologyRouter {
     for (let turnIndex = 0; turnIndex < maxTurnsCount; turnIndex++) {
       const memberIndex = turnIndex % members.length;
       const member = members[memberIndex];
-      let speakerName = member.agent || `agent-${memberIndex + 1}`;
-      if (/^agent-\d+$/i.test(speakerName)) {
-        speakerName = `agent-${memberIndex + 1}`;
-      }
+      const speakerName = speakerNamesByMemberIndex[memberIndex];
+      const sanitizedPrompt = sanitizedMemberPrompts[memberIndex];
       const isFirstTurnForMember = !agentIdsByMemberIndex.has(memberIndex);
 
       const currentRound = Math.floor(turnIndex / members.length) + 1;
@@ -105,8 +214,8 @@ export class PeerToPeerRouter implements TopologyRouter {
       const speakerIdentityLine = `Your speaker identity in this discussion is ${speakerName}. Tag all your contributions with [${speakerName}].`;
       const promptHistory =
         sharedDiscussion.length > 0
-          ? `--- SHARED DISCUSSION BOARD ---\n${sharedDiscussion.join("\n\n")}\n\n--- YOUR TASK (${speakerName}) ---\n${speakerIdentityLine}\n\n${member.prompt}`
-          : `${speakerIdentityLine}\n\n${member.prompt}`;
+          ? `--- SHARED DISCUSSION BOARD ---\n${sharedDiscussion.join("\n\n")}\n\n--- YOUR TASK (${speakerName}) ---\n${speakerIdentityLine}\n\n${sanitizedPrompt}`
+          : `${speakerIdentityLine}\n\n${sanitizedPrompt}`;
 
       let spawnResult: SubAgentResult | { error: string };
 
@@ -153,7 +262,10 @@ export class PeerToPeerRouter implements TopologyRouter {
           logger.error(
             `[PeerToPeerRouter] continueSubAgent callback not provided — cannot reuse session for "${speakerName}"`,
           );
-          spawnResult = { error: "continueSubAgent callback not available for session reuse" };
+          spawnResult = {
+            error:
+              "continueSubAgent callback not available for session reuse",
+          };
         } else {
           spawnResult = await continueSubAgent(
             existingAgentId,
@@ -209,7 +321,10 @@ export class PeerToPeerRouter implements TopologyRouter {
         if (mergeResult.error) {
           const errorMessage = `Failed to merge branch for ${subAgentId}: ${mergeResult.error}`;
           logger.error(`[PeerToPeerRouter] ${errorMessage}`);
-          return [...latestResultByMemberIndex.values(), { error: errorMessage }];
+          return [
+            ...latestResultByMemberIndex.values(),
+            { error: errorMessage },
+          ];
         }
       } else if (spawnResult.status === "completed") {
         logger.info(
@@ -217,15 +332,19 @@ export class PeerToPeerRouter implements TopologyRouter {
         );
       }
 
-      // Append speaker output to shared thread
-      const responseText =
+      // Append speaker output to shared thread — strip any echoed discussion
+      // board markers the sub-agent may have included in its response to keep
+      // the shared thread flat and avoid nested board duplication.
+      const rawResponseText =
         spawnResult.result ||
         buildToolCallFallbackSummary(spawnResult) ||
         spawnResult.summary;
-      sharedDiscussion.push(`[${speakerName}]: ${responseText}`);
+      const cleanedResponseText =
+        stripEchoedDiscussionMarkers(rawResponseText);
+      sharedDiscussion.push(`[${speakerName}]: ${cleanedResponseText}`);
 
       // Early exit check: if an agent signs off with [DONE] or all tasks are finished
-      if (responseText.toUpperCase().includes("[DONE]")) {
+      if (rawResponseText.toUpperCase().includes("[DONE]")) {
         logger.info(
           `[PeerToPeerRouter] Speaker "${speakerName}" signaled termination ([DONE]). Stopping.`,
         );
@@ -234,7 +353,7 @@ export class PeerToPeerRouter implements TopologyRouter {
 
       // Stall detection — short response with no tool usage indicates the agent
       // had nothing actionable. Consecutive stalls abort the mesh to prevent runaway loops.
-      if (isStallResponse(responseText, spawnResult)) {
+      if (isStallResponse(rawResponseText, spawnResult)) {
         consecutiveStallCount++;
         logger.warn(
           `[PeerToPeerRouter] Stall detected from "${speakerName}" (${consecutiveStallCount}/${maximumConsecutiveStalls} consecutive stalls)`,
