@@ -45,12 +45,20 @@ describe("hasSubAgents Derivation — Defense-in-Depth Tests", () => {
     const mockDatabase = {
       collection: (collectionName: string) => {
         return {
-          find: () => {
+          find: (queryFilter: any) => {
             let documents: Record<string, unknown>[] = [];
-            if (collectionName === COLLECTIONS.AGENT_CONVERSATIONS) {
-              documents = mockAgentConversations;
-            } else if (collectionName === COLLECTIONS.MODEL_CONVERSATIONS) {
-              documents = mockModelConversations;
+            if (queryFilter && queryFilter.parentConversationId) {
+              if (collectionName === COLLECTIONS.AGENT_CONVERSATIONS) {
+                documents = mockAgentDistinctParents.map((parentId) => ({ parentConversationId: parentId }));
+              } else if (collectionName === COLLECTIONS.MODEL_CONVERSATIONS) {
+                documents = mockModelDistinctParents.map((parentId) => ({ parentConversationId: parentId }));
+              }
+            } else {
+              if (collectionName === COLLECTIONS.AGENT_CONVERSATIONS) {
+                documents = mockAgentConversations;
+              } else if (collectionName === COLLECTIONS.MODEL_CONVERSATIONS) {
+                documents = mockModelConversations;
+              }
             }
 
             const queryChain = {
@@ -58,7 +66,12 @@ describe("hasSubAgents Derivation — Defense-in-Depth Tests", () => {
               sort: () => queryChain,
               skip: () => queryChain,
               limit: () => queryChain,
-              toArray: async () => documents,
+              toArray: async () => {
+                if (shouldDistinctFail && queryFilter && queryFilter.parentConversationId) {
+                  throw new Error("Simulated database failure for child lookup query");
+                }
+                return documents;
+              },
             };
             return queryChain;
           },

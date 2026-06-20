@@ -312,7 +312,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
   });
 
   describe("hasSubAgents flag persistence", () => {
-    it("should set hasSubAgents: true on the parent session when a sub-agent is spawned", async () => {
+    it("should set hasSubAgents: true on the parent conversation when a sub-agent is spawned", async () => {
       const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
       const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });
       const mockCollection = { updateOne: mockUpdateOne };
@@ -330,7 +330,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
       expect(mockUpdateOne).toHaveBeenCalledWith(
         {
-          id: orchestratorContext.agentSessionId,
+          id: orchestratorContext.conversationId,
           project: orchestratorContext.project,
           username: orchestratorContext.username,
         },
@@ -340,14 +340,14 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       getCollectionSpy.mockRestore();
     });
 
-    it("should target the correct parent session ID from orchestratorContext.agentSessionId", async () => {
+    it("should target the correct parent conversation ID from orchestratorContext.conversationId", async () => {
       const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
       const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });
       const mockCollection = { updateOne: mockUpdateOne };
 
       const customContext = {
         ...orchestratorContext,
-        agentSessionId: "custom-parent-session-abc",
+        conversationId: "custom-parent-conv-abc",
       };
 
       const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
@@ -363,7 +363,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
       const hasSubAgentsCall = mockUpdateOne.mock.calls.find(
         (call: unknown[]) =>
-          (call[0] as Record<string, unknown>).id === "custom-parent-session-abc" &&
+          (call[0] as Record<string, unknown>).id === "custom-parent-conv-abc" &&
           (call[1] as Record<string, unknown>).$set &&
           ((call[1] as Record<string, Record<string, unknown>>).$set as Record<string, unknown>).hasSubAgents === true,
       );
@@ -439,7 +439,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       getCollectionSpy.mockRestore();
     });
 
-    it("should set hasSubAgents on parent session for each sub-agent spawned via createTeam", async () => {
+    it("should set hasSubAgents on parent conversation for each sub-agent spawned via createTeam", async () => {
       const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
       const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });
       const mockCollection = { updateOne: mockUpdateOne };
@@ -460,7 +460,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
       const hasSubAgentsCalls = mockUpdateOne.mock.calls.filter(
         (call: unknown[]) =>
-          (call[0] as Record<string, unknown>).id === orchestratorContext.agentSessionId &&
+          (call[0] as Record<string, unknown>).id === orchestratorContext.conversationId &&
           (call[1] as Record<string, unknown>).$set &&
           ((call[1] as Record<string, Record<string, unknown>>).$set as Record<string, unknown>).hasSubAgents === true,
       );

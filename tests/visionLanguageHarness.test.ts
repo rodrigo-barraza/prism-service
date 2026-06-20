@@ -45,7 +45,7 @@ vi.mock("../src/utils/ContextWindowManager.ts", () => ({
   },
 }));
 
-vi.mock("../src/services/SessionGenerationTracker.ts", () => ({
+vi.mock("../src/services/ConversationGenerationTracker.ts", () => ({
   default: {
     register: vi.fn(),
     update: vi.fn(),

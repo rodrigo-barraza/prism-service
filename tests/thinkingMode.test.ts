@@ -395,12 +395,12 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
         finalTools: [],
       };
 
-      // Import BaseAgenticHarness and SessionGenerationTracker
+      // Import BaseAgenticHarness and ConversationGenerationTracker
       const { default: BaseAgenticHarness } = await import(
         "../src/services/harnesses/BaseAgenticHarness.ts"
       );
-      const { default: SessionGenerationTracker } = await import(
-        "../src/services/SessionGenerationTracker.ts"
+      const { default: ConversationGenerationTracker } = await import(
+        "../src/services/ConversationGenerationTracker.ts"
       );
 
       class DummyHarness extends BaseAgenticHarness {
@@ -413,7 +413,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
         }
       }
 
-      SessionGenerationTracker.register(
+      ConversationGenerationTracker.register(
         mockContext.agentSessionId,
         mockContext.requestId,
         {
@@ -484,7 +484,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       });
 
       // Cleanup
-      SessionGenerationTracker.cleanup(mockContext.agentSessionId);
+      ConversationGenerationTracker.cleanup(mockContext.agentSessionId);
     });
   });
 });
@@ -772,8 +772,8 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       const { default: BaseAgenticHarness } = await import(
         "../src/services/harnesses/BaseAgenticHarness.ts"
       );
-      const { default: SessionGenerationTracker } = await import(
-        "../src/services/SessionGenerationTracker.ts"
+      const { default: ConversationGenerationTracker } = await import(
+        "../src/services/ConversationGenerationTracker.ts"
       );
 
       class DummyHarness extends BaseAgenticHarness {
@@ -786,7 +786,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
         }
       }
 
-      SessionGenerationTracker.register(
+      ConversationGenerationTracker.register(
         mockContext.agentSessionId,
         mockContext.requestId,
         {
@@ -845,7 +845,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       );
 
       // Cleanup
-      SessionGenerationTracker.cleanup(mockContext.agentSessionId);
+      ConversationGenerationTracker.cleanup(mockContext.agentSessionId);
     });
   });
 });
