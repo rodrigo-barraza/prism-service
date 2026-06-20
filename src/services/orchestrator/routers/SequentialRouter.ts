@@ -62,7 +62,7 @@ export class SequentialRouter implements TopologyRouter {
         agent: member.agent,
         assignedProvider,
         assignedModel,
-        agentIndex: index,
+        agentIndex: index + 1,
         teamSize: members.length,
         orchestratorContext,
       };
