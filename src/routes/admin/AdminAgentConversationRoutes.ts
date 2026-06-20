@@ -8,30 +8,30 @@ import {
   applyDateRangeFilter,
   parsePaginationParams,
 } from "../../utils/QueryBuilders.ts";
-import { discoverDescendantSessionIds } from "../../utils/SessionDiscovery.ts";
+import { discoverDescendantSessionIds } from "../../utils/ConversationDiscovery.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
 
-const sessionRouter = express.Router();
-const agentSessionRouter = express.Router();
+const conversationStatsRouter = express.Router();
+const agentConversationRouter = express.Router();
 const { REQUESTS: REQUESTS_COLLECTION } = COLLECTIONS;
 
-sessionRouter.use(requireDb);
-agentSessionRouter.use(requireDb);
+conversationStatsRouter.use(requireDb);
+agentConversationRouter.use(requireDb);
 
-// ─── GET /sessions/:id/stats — aggregate stats for an agent session ─
-sessionRouter.get(
+// ─── GET /sessions/:id/stats — aggregate stats for an agent conversation ─
+conversationStatsRouter.get(
   "/:id/stats",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const sessionId = req.params.id as string;
-      const allSessionIds = await discoverDescendantSessionIds(
+      const conversationId = req.params.id as string;
+      const allConversationIds = await discoverDescendantSessionIds(
         req.db,
-        sessionId,
+        conversationId,
       );
 
       const requests = await req.db
         .collection(REQUESTS_COLLECTION)
-        .find({ agentSessionId: { $in: [...allSessionIds] } })
+        .find({ agentSessionId: { $in: [...allConversationIds] } })
         .project({
           estimatedCost: 1,
           inputTokens: 1,
@@ -54,7 +54,7 @@ sessionRouter.get(
       if (requests.length === 0) {
         return res
           .status(404)
-          .json({ error: "No requests found for this session" });
+          .json({ error: "No requests found for this conversation" });
       }
 
       const providers = new Set();
@@ -93,7 +93,7 @@ sessionRouter.get(
       }
 
       const subAgentRequestCount = requests.filter(
-        (requestItem) => requestItem.agentSessionId !== sessionId,
+        (requestItem) => requestItem.agentSessionId !== conversationId,
       ).length;
 
       const createdAt = (requests as Record<string, unknown>[]).reduce(
@@ -122,7 +122,7 @@ sessionRouter.get(
           : 0;
 
       res.json({
-        agentSessionId: sessionId,
+        agentSessionId: conversationId,
         requestCount: requests.length,
         subAgentRequestCount,
         totalCost,
@@ -150,20 +150,20 @@ sessionRouter.get(
   }),
 );
 
-// ─── GET /sessions/:id/requests — all requests for a session (recursive) ─
-sessionRouter.get(
+// ─── GET /sessions/:id/requests — all requests for a conversation (recursive) ─
+conversationStatsRouter.get(
   "/:id/requests",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const rootSessionId = req.params.id as string;
-      const allSessionIds = await discoverDescendantSessionIds(
+      const rootConversationId = req.params.id as string;
+      const allConversationIds = await discoverDescendantSessionIds(
         req.db,
-        rootSessionId,
+        rootConversationId,
       );
 
       const requests = await req.db
         .collection(REQUESTS_COLLECTION)
-        .find({ agentSessionId: { $in: [...allSessionIds] } })
+        .find({ agentSessionId: { $in: [...allConversationIds] } })
         .project({
           requestId: 1,
           timestamp: 1,
@@ -194,8 +194,8 @@ sessionRouter.get(
         .toArray();
 
       res.json({
-        rootSessionId,
-        sessionIds: [...allSessionIds],
+        rootConversationId,
+        conversationIds: [...allConversationIds],
         total: requests.length,
         requests,
       });
@@ -208,8 +208,8 @@ sessionRouter.get(
   }),
 );
 
-// ─── GET /agent-sessions — list all agent sessions (cross-user) ─
-agentSessionRouter.get(
+// ─── GET /agent-conversations — list all agent conversations (cross-user) ─
+agentConversationRouter.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -260,11 +260,11 @@ agentSessionRouter.get(
       ]);
 
       if (sessionDocuments.length > 0) {
-        const sessionIds = sessionDocuments
-          .map((session) => (session as Record<string, unknown>).id as string)
+        const conversationIds = sessionDocuments
+          .map((conversation) => (conversation as Record<string, unknown>).id as string)
           .filter(Boolean);
 
-        if (sessionIds.length > 0) {
+        if (conversationIds.length > 0) {
           try {
             const costAggregation = await req.db
               .collection(COLLECTIONS.REQUESTS)
@@ -272,9 +272,9 @@ agentSessionRouter.get(
                 {
                   $match: {
                     $or: [
-                      { agentSessionId: { $in: sessionIds } },
-                      { conversationId: { $in: sessionIds } },
-                      { parentAgentSessionId: { $in: sessionIds } },
+                      { agentSessionId: { $in: conversationIds } },
+                      { conversationId: { $in: conversationIds } },
+                      { parentAgentSessionId: { $in: conversationIds } },
                     ],
                   },
                 },
@@ -285,7 +285,7 @@ agentSessionRouter.get(
                         {
                           $and: [
                             { $ne: ["$parentAgentSessionId", null] },
-                            { $in: ["$parentAgentSessionId", sessionIds] },
+                            { $in: ["$parentAgentSessionId", conversationIds] },
                           ],
                         },
                         "$parentAgentSessionId",
@@ -305,13 +305,13 @@ agentSessionRouter.get(
                   costEntry.totalCost,
                 ]),
               );
-              for (const session of sessionDocuments) {
-                const sessionId = (session as Record<string, unknown>)
+              for (const conversation of sessionDocuments) {
+                const conversationId = (conversation as Record<string, unknown>)
                   .id as string;
-                const requestLogCost = costMap.get(sessionId);
+                const requestLogCost = costMap.get(conversationId);
                 if (requestLogCost !== undefined && requestLogCost > 0) {
-                  (session as Record<string, unknown>).totalCost = Math.max(
-                    (session.totalCost as number) || 0,
+                  (conversation as Record<string, unknown>).totalCost = Math.max(
+                    (conversation.totalCost as number) || 0,
                     requestLogCost,
                   );
                 }
@@ -319,7 +319,7 @@ agentSessionRouter.get(
             }
           } catch (costError: unknown) {
             logger.warn(
-              `Failed to enrich admin agent session costs: ${
+              `Failed to enrich admin agent conversation costs: ${
                 costError instanceof Error
                   ? costError.message
                   : String(costError)
@@ -336,14 +336,14 @@ agentSessionRouter.get(
         limit,
       });
     } catch (error: unknown) {
-      logger.error(`Admin /agent-sessions error: ${getErrorMessage(error)}`);
+      logger.error(`Admin /agent-conversations error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
 );
 
-// ─── GET /agent-sessions/:id — single agent session (with messages) ─
-agentSessionRouter.get(
+// ─── GET /agent-conversations/:id — single agent conversation (with messages) ─
+agentConversationRouter.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -352,16 +352,16 @@ agentSessionRouter.get(
         .findOne({ id: req.params.id });
 
       if (!document)
-        return res.status(404).json({ error: "Agent session not found" });
+        return res.status(404).json({ error: "Agent conversation not found" });
 
       res.json(document);
     } catch (error: unknown) {
       logger.error(
-        `Admin /agent-sessions/:id error: ${getErrorMessage(error)}`,
+        `Admin /agent-conversations/:id error: ${getErrorMessage(error)}`,
       );
       next(error);
     }
   }),
 );
 
-export { sessionRouter, agentSessionRouter };
+export { conversationStatsRouter, agentConversationRouter };

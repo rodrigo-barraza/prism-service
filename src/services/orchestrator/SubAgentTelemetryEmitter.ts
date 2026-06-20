@@ -3,7 +3,7 @@
 // phase transitions, HWM aggregate progress, and event routing.
 // Extracted from OrchestratorService._runSubAgentLoop()
 
-import SessionGenerationTracker from "../SessionGenerationTracker.ts";
+import ConversationGenerationTracker from "../ConversationGenerationTracker.ts";
 import { estimateTokens } from "./SubAgentResultBuilder.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -109,7 +109,7 @@ export class SubAgentTelemetryEmitter {
   /** Emit aggregate session-level generation_progress from the tracker. */
   private emitAggregateProgress() {
     if (!this.parentEmit || !this.parentSessionId) return;
-    const stats = SessionGenerationTracker.getSessionStats(
+    const stats = ConversationGenerationTracker.getSessionStats(
       this.parentSessionId,
     );
     if (stats.totalOutputTokens > 0 || stats.activeRequests > 0) {

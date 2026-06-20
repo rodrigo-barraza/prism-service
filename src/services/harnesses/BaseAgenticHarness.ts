@@ -8,7 +8,7 @@ import { calculateTokensPerSec } from "../../utils/math.ts";
 import { getPricing, TYPES } from "../../config.ts";
 import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.ts";
 import ContextWindowManager from "../../utils/ContextWindowManager.ts";
-import SessionGenerationTracker from "../SessionGenerationTracker.ts";
+import ConversationGenerationTracker from "../ConversationGenerationTracker.ts";
 import RequestLogger from "../RequestLogger.ts";
 import FileService from "../FileService.ts";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
@@ -273,7 +273,7 @@ export default class BaseAgenticHarness {
   emitGenerationProgress(): void {
     const { emit } = this.context;
     const state = this.state;
-    const stats = SessionGenerationTracker.getSessionStats(
+    const stats = ConversationGenerationTracker.getSessionStats(
       this.trackerSessionId,
     );
     if (stats.activeRequests > 0 || stats.totalOutputTokens > 0) {
@@ -438,7 +438,7 @@ export default class BaseAgenticHarness {
 
   // ── Session tracking helpers ──────────────────────────────
 
-  /** Register a request with SessionGenerationTracker. */
+  /** Register a request with ConversationGenerationTracker. */
   registerTrackerRequest(passRequestId: string): void {
     const {
       providerName,
@@ -446,7 +446,7 @@ export default class BaseAgenticHarness {
       parentAgentSessionId,
       agentSessionId,
     } = this.context;
-    SessionGenerationTracker.register(this.trackerSessionId, passRequestId, {
+    ConversationGenerationTracker.register(this.trackerSessionId, passRequestId, {
       provider: providerName,
       model: resolvedModel,
       source: parentAgentSessionId ? "sub-agent" : "orchestrator",
@@ -486,7 +486,7 @@ export default class BaseAgenticHarness {
       const reportedInput =
         usageChunk?.inputTokens || rawUsage?.promptTokens || 0;
       if (reportedInput > 0 && pass.requestId) {
-        SessionGenerationTracker.update(pass.requestId, {
+        ConversationGenerationTracker.update(pass.requestId, {
           inputTokens: reportedInput,
         });
       }
@@ -532,7 +532,7 @@ export default class BaseAgenticHarness {
       ] += streamChunk.content || "";
       state.overallOutputCharacters += (streamChunk.content || "").length;
       if (pass.requestId) {
-        SessionGenerationTracker.recordChunkTiming(
+        ConversationGenerationTracker.recordChunkTiming(
           pass.requestId,
           (streamChunk.content || "").length,
         );
@@ -575,7 +575,7 @@ export default class BaseAgenticHarness {
       this._recordTiming(pass);
       state.overallOutputCharacters += streamChunk.characters as number;
       if (pass.requestId) {
-        SessionGenerationTracker.recordChunkTiming(
+        ConversationGenerationTracker.recordChunkTiming(
           pass.requestId,
           streamChunk.characters as number,
         );
@@ -589,7 +589,7 @@ export default class BaseAgenticHarness {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
       if (pass.requestId) {
-        SessionGenerationTracker.recordChunkTiming(
+        ConversationGenerationTracker.recordChunkTiming(
           pass.requestId,
           JSON.stringify(streamChunk.args || {}).length,
         );
@@ -790,7 +790,7 @@ export default class BaseAgenticHarness {
     state.displayTextFragments[state.displayTextFragments.length - 1] +=
       chunkString;
     if (pass.requestId) {
-      SessionGenerationTracker.recordChunkTiming(
+      ConversationGenerationTracker.recordChunkTiming(
         pass.requestId,
         rawChunkString.length,
       );
@@ -1066,7 +1066,7 @@ export default class BaseAgenticHarness {
       pass.firstTokenTime = performance.now();
       const ttftSec = (pass.firstTokenTime - pass.start) / 1000;
       if (pass.requestId)
-        SessionGenerationTracker.update(pass.requestId, { ttft: ttftSec });
+        ConversationGenerationTracker.update(pass.requestId, { ttft: ttftSec });
       this.context.emit({
         type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.GENERATION_STARTED,

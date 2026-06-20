@@ -4,7 +4,7 @@ import { MONGO_DB_NAME } from "../../../config.ts";
 
 import { COLLECTIONS } from "../../constants.ts";
 import type { ChatMessage } from "../../types/admin.ts";
-import { discoverDescendantSessionIds } from "../../utils/SessionDiscovery.ts";
+import { discoverDescendantSessionIds } from "../../utils/ConversationDiscovery.ts";
 import type {
   ConversationMeta,
   ConversationSettings,

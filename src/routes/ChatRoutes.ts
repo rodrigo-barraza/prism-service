@@ -43,7 +43,7 @@ import {
 } from "../utils/StreamChunkDispatcher.ts";
 import { resolveMessageMediaReferences } from "../services/MediaResolutionService.ts";
 
-import SessionGenerationTracker from "../services/SessionGenerationTracker.ts";
+import ConversationGenerationTracker from "../services/ConversationGenerationTracker.ts";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
 import localModelQueue from "../services/LocalModelQueue.ts";
 import LocalProviderGateway from "../services/local-provider/index.ts";
@@ -742,9 +742,9 @@ export async function handleAgent(
   const conversationId = incomingConversationId || crypto.randomUUID();
   const traceId = incomingTraceId || null;
   const conversationMeta = incomingConversationMeta || null;
-  // ── Eager session stub ───────────────────────────────────────
-  // Create the session document immediately via upsert so that
-  // GET /agent-sessions/:id never 404s while the loop is running
+  // ── Eager conversation stub ───────────────────────────────────────
+  // Create the conversation document immediately via upsert so that
+  // GET /agent-conversations/:id never 404s while the loop is running
   // (e.g. when the user switches away and back during generation).
   markGenerating(conversationId, project, username, true, {
     ...getCollectionOpts(project, agent),
@@ -1375,14 +1375,14 @@ async function handleNonStreamingText(context: GenerationContext) {
         ? conversationMeta.title
         : undefined,
   });
-  // Track this sub-request in SessionGenerationTracker if it belongs
+  // Track this sub-request in ConversationGenerationTracker if it belongs
   // to an active agent session (e.g., tools-api calling /chat?stream=false
   // for generate_image prompt-softening or describe_image).
   const subRequestId = context.agentSessionId
     ? `sub-${context.requestId || crypto.randomUUID()}`
     : null;
   if (subRequestId && context.agentSessionId) {
-    SessionGenerationTracker.register(context.agentSessionId, subRequestId, {
+    ConversationGenerationTracker.register(context.agentSessionId, subRequestId, {
       provider: context.providerName,
       model: resolvedModel,
       source: "tool-sub-request",
@@ -1399,11 +1399,11 @@ async function handleNonStreamingText(context: GenerationContext) {
   if (subRequestId && context.agentSessionId) {
     const outTokens = genResult.usage?.outputTokens || 0;
     if (outTokens > 0) {
-      SessionGenerationTracker.update(subRequestId, {
+      ConversationGenerationTracker.update(subRequestId, {
         outputTokens: outTokens,
       });
     }
-    SessionGenerationTracker.complete(subRequestId);
+    ConversationGenerationTracker.complete(subRequestId);
   }
   // Emit chunk/thinking/toolCall events before finalization
   if (genResult.text) {

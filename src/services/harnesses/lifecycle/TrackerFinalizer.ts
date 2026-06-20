@@ -1,8 +1,8 @@
-import SessionGenerationTracker from "../../SessionGenerationTracker.ts";
+import ConversationGenerationTracker from "../../ConversationGenerationTracker.ts";
 import type { PassState } from "../types.ts";
 
 /**
- * TrackerFinalizer — per-pass SessionGenerationTracker finalization.
+ * TrackerFinalizer — per-pass ConversationGenerationTracker finalization.
  *
  * After each LLM stream completes, the harness must:
  *   1. Report output token count to the tracker
@@ -16,7 +16,7 @@ import type { PassState } from "../types.ts";
  */
 
 /**
- * Finalize the SessionGenerationTracker for a completed pass.
+ * Finalize the ConversationGenerationTracker for a completed pass.
  *
  * Updates token counts and marks the request as complete.
  * Returns the resolved input token count for downstream diagnostics.
@@ -26,7 +26,7 @@ export function finalizePassTracker(
   passRequestId: string,
 ): { finalInputTokens: number } {
   if (pass.usage.outputTokens > 0) {
-    SessionGenerationTracker.update(passRequestId, {
+    ConversationGenerationTracker.update(passRequestId, {
       outputTokens: pass.usage.outputTokens,
     });
   }
@@ -34,12 +34,12 @@ export function finalizePassTracker(
   const finalInputTokens =
     pass.usage.inputTokens || pass.usage.promptTokens || 0;
   if (finalInputTokens > 0) {
-    SessionGenerationTracker.update(passRequestId, {
+    ConversationGenerationTracker.update(passRequestId, {
       inputTokens: finalInputTokens,
     });
   }
 
-  SessionGenerationTracker.complete(passRequestId);
+  ConversationGenerationTracker.complete(passRequestId);
 
   return { finalInputTokens };
 }
