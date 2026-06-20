@@ -72,7 +72,10 @@ vi.mock('../src/services/AgenticLoopService.ts', () => ({
   default: {
     resolveApproval: vi.fn().mockReturnValue(true),
     resolveUserQuestion: vi.fn().mockReturnValue(true),
-    listHarnesses: vi.fn().mockReturnValue(['react', 'standard'])
+    listHarnesses: vi.fn().mockReturnValue([
+      { id: 'standard', label: 'Standard', description: 'ReAct harness' },
+      { id: 'vision_language', label: 'Vision Language', description: 'Vision harness' },
+    ])
   }
 }));
 
