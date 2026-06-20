@@ -2,6 +2,10 @@ import { describe, it, expect } from "vitest";
 import { prepareResponsesInput, OpenAIMessage } from "../src/providers/openai.ts";
 
 describe("OpenAI Responses API input preparation", () => {
+  const prepareInput = (messages: OpenAIMessage[]): any[] => {
+    return prepareResponsesInput(messages) as any[];
+  };
+
   it("converts function call IDs to begin with 'fc' if they start with 'call_'", () => {
     const messages: OpenAIMessage[] = [
       {
@@ -17,7 +21,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
 
     // Should generate two input items: the assistant message item, and the function call item
     expect(inputItems).toHaveLength(2);
@@ -53,7 +57,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
     expect(inputItems).toHaveLength(1);
 
     const functionCallItem = inputItems[0];
@@ -78,7 +82,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
     expect(inputItems).toHaveLength(1);
 
     const functionCallItem = inputItems[0];
@@ -104,7 +108,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
     expect(inputItems).toHaveLength(1);
 
     const functionCallItem = inputItems[0];
@@ -131,7 +135,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
     expect(inputItems).toHaveLength(1);
 
     const functionCallItem = inputItems[0];
@@ -169,7 +173,7 @@ describe("OpenAI Responses API input preparation", () => {
       { role: "user", content: "Make it more upbeat" },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
 
     // Find the function_call and function_call_output items
     const functionCallItem = inputItems.find((item) => item.type === "function_call");
@@ -208,7 +212,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
 
     // Should be: assistant text + function_call_1 + function_call_2
     expect(inputItems).toHaveLength(3);
@@ -252,7 +256,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
 
     // Should be: reasoning_item + function_call
     expect(inputItems).toHaveLength(2);
@@ -281,7 +285,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
 
     // Should NOT include an assistant text item since content is empty
     expect(inputItems).toHaveLength(1);
@@ -307,7 +311,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
 
     const functionCallItem = inputItems.find((item) => item.type === "function_call");
     const functionCallOutputItem = inputItems.find((item) => item.type === "function_call_output");
@@ -329,7 +333,7 @@ describe("OpenAI Responses API input preparation", () => {
       { role: "user", content: "Hello" },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
     expect(inputItems[0].role).toBe("developer");
     expect(inputItems[1].role).toBe("user");
   });
@@ -349,7 +353,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
     expect(inputItems).toHaveLength(1);
 
     const functionCallItem = inputItems[0];
@@ -371,7 +375,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
     const functionCallItem = inputItems[0] as unknown as { arguments: string };
     expect(functionCallItem.arguments).toBe(JSON.stringify({ prompt: "test", volume: 0.5 }));
   });
@@ -395,7 +399,7 @@ describe("OpenAI Responses API input preparation", () => {
       { role: "user", content: "Thanks, now make it louder." },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
 
     // Expected order: assistant text, function_call, function_call_output, user
     const functionCallItem = inputItems.find((item) => item.type === "function_call");
@@ -433,7 +437,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
 
     const functionCallItems = inputItems.filter((item) => item.type === "function_call");
     const functionCallOutputItems = inputItems.filter((item) => item.type === "function_call_output");
@@ -462,7 +466,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
 
     const functionCallOutputItems = inputItems.filter((item) => item.type === "function_call_output");
     expect(functionCallOutputItems).toHaveLength(0);
@@ -487,7 +491,7 @@ describe("OpenAI Responses API input preparation", () => {
       },
     ];
 
-    const inputItems = prepareResponsesInput(messages);
+    const inputItems = prepareInput(messages);
 
     // Should be exactly 1 function_call_output (from the tool message), not 2
     const functionCallOutputItems = inputItems.filter((item) => item.type === "function_call_output");

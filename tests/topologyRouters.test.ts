@@ -511,6 +511,7 @@ describe("Topology Routers Test Suite", () => {
       spawnSubAgentMock
         .mockResolvedValueOnce({
           agent_id: "agent-a",
+          description: "Task A",
           status: "completed",
           result: "Task A finished",
           summary: "Done A",
@@ -556,6 +557,7 @@ describe("Topology Routers Test Suite", () => {
       spawnSubAgentMock
         .mockResolvedValueOnce({
           agent_id: "agent-a",
+          description: "Task A",
           status: "completed",
           result: null,
           summary: "Done A",
@@ -567,6 +569,7 @@ describe("Topology Routers Test Suite", () => {
         })
         .mockResolvedValueOnce({
           agent_id: "agent-b",
+          description: "Task B",
           status: "completed",
           result: "Task B finished",
           summary: "Done B",

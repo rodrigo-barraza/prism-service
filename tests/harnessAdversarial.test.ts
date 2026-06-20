@@ -733,7 +733,7 @@ describe("Flow 6: maxIterations Resolution Logic", () => {
   });
 
   it("should clamp maxIterations=-1 to 1 (minimum)", () => {
-    const clientMaxIterations = -1;
+    const clientMaxIterations: any = -1;
     const resolved = clientMaxIterations === 0
       ? Infinity
       : clientMaxIterations
@@ -743,7 +743,7 @@ describe("Flow 6: maxIterations Resolution Logic", () => {
   });
 
   it("should clamp maxIterations=500 to 100 (maximum)", () => {
-    const clientMaxIterations = 500;
+    const clientMaxIterations: any = 500;
     const resolved = clientMaxIterations === 0
       ? Infinity
       : clientMaxIterations
@@ -804,7 +804,7 @@ describe("Flow 6: maxIterations Resolution Logic", () => {
   });
 
   it("should handle maxIterations=1 — valid minimum", () => {
-    const clientMaxIterations = 1;
+    const clientMaxIterations: any = 1;
     const resolved = clientMaxIterations === 0
       ? Infinity
       : clientMaxIterations

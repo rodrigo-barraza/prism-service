@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { PROVIDERS } from '../src/constants.ts';
 
 const mockRateLimitStoreUpdate = vi.fn();
 
@@ -51,7 +52,7 @@ describe('rateLimits', () => {
       const result = extractOpenAIRateLimits(response, 'gpt-4o');
 
       expect(result).not.toBeNull();
-      expect(result!.provider).toBe('openai');
+      expect(result!.provider).toBe(PROVIDERS.OPENAI);
       expect(result!.requests.limit).toBe(500);
       expect(result!.requests.remaining).toBe(499);
       expect(result!.requests.reset).toBe('100ms');
@@ -68,9 +69,9 @@ describe('rateLimits', () => {
       extractOpenAIRateLimits(response, 'gpt-4o');
 
       expect(mockRateLimitStoreUpdate).toHaveBeenCalledWith(
-        'openai',
+        PROVIDERS.OPENAI,
         'gpt-4o',
-        expect.objectContaining({ provider: 'openai' }),
+        expect.objectContaining({ provider: PROVIDERS.OPENAI }),
       );
     });
 
@@ -126,7 +127,7 @@ describe('rateLimits', () => {
       const result = extractAnthropicRateLimits(response, 'claude-opus-4');
 
       expect(result).not.toBeNull();
-      expect(result!.provider).toBe('anthropic');
+      expect(result!.provider).toBe(PROVIDERS.ANTHROPIC);
       expect(result!.requests.limit).toBe(1000);
       expect(result!.tokens.limit).toBe(400000);
       expect(result!.inputTokens.limit).toBe(200000);
@@ -143,9 +144,9 @@ describe('rateLimits', () => {
       extractAnthropicRateLimits(response, 'claude-opus-4');
 
       expect(mockRateLimitStoreUpdate).toHaveBeenCalledWith(
-        'anthropic',
+        PROVIDERS.ANTHROPIC,
         'claude-opus-4',
-        expect.objectContaining({ provider: 'anthropic' }),
+        expect.objectContaining({ provider: PROVIDERS.ANTHROPIC }),
       );
     });
 

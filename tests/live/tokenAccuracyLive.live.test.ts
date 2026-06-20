@@ -27,22 +27,22 @@ const TARGET_MODEL_PATTERNS = [
   /qwen.*3.*30b.*a3b/i,
 ];
 
-let targetModel = null;
+let targetModel: any = null;
 
 async function findTargetModel() {
   const res = await fetch(`${LM_STUDIO_URL}/api/v1/models`);
   if (!res.ok) throw new Error("LM Studio not responding");
-  const data = await res.json();
+  const data = (await res.json()) as any;
   const models = data.models || data.data || [];
   for (const pattern of TARGET_MODEL_PATTERNS) {
-    const match = models.find((m) => pattern.test(m.key || m.id));
+    const match = models.find((m: any) => pattern.test(m.key || m.id));
     if (match) return match.key || match.id;
   }
   const loaded = models.find(
-    (m) => m.loaded_instances?.length > 0 && m.type !== TYPES.EMBEDDING,
+    (m: any) => m.loaded_instances?.length > 0 && m.type !== TYPES.EMBEDDING,
   );
   if (loaded) return loaded.key || loaded.id;
-  const first = models.find((m) => m.type !== TYPES.EMBEDDING);
+  const first = models.find((m: any) => m.type !== TYPES.EMBEDDING);
   return first ? first.key || first.id : null;
 }
 
@@ -54,7 +54,7 @@ async function findTargetModel() {
  * Stream an /agent request and collect all relevant SSE events.
  * Returns structured results for assertions.
  */
-async function streamAndCollect(prompt, { maxTokens = 500, timeout = 120000, canSpawnWorkers = false } = {}) {
+async function streamAndCollect(prompt: any, { maxTokens = 500, timeout = 120000, canSpawnWorkers = false }: any = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
 
@@ -83,11 +83,11 @@ async function streamAndCollect(prompt, { maxTokens = 500, timeout = 120000, can
     throw new Error(`/agent returned ${res.status}: ${await res.text()}`);
   }
 
-  const reader = res.body.getReader();
+  const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
-  const result = {
+  const result: any = {
     // All generation_progress events (main-level)
     progressEvents: [],
     // 1-second interval samples
@@ -217,7 +217,7 @@ async function streamAndCollect(prompt, { maxTokens = 500, timeout = 120000, can
 // ═══════════════════════════════════════════════════════════════
 
 /** Check that token fields are monotonically non-decreasing. */
-function checkMonotonicity(events) {
+function checkMonotonicity(events: any) {
   let prevOut = 0, prevIn = 0, prevTotal = 0;
   const violations = [];
   for (let i = 0; i < events.length; i++) {
@@ -233,7 +233,7 @@ function checkMonotonicity(events) {
 }
 
 /** Print a formatted results table. */
-function printSampleTable(label, result) {
+function printSampleTable(label: any, result: any) {
   const events = result.progressEvents;
   const first = events[0];
   const last = events[events.length - 1];
@@ -404,7 +404,7 @@ describe("LM Studio — Token Accuracy (Real Data Only)", () => {
       for (const subAgentId of subAgentIds) {
         expect(result.subAgentProgressEvents[subAgentId].length).toBeGreaterThan(0);
       }
-      const totalWorkerTokens = subAgentIds.reduce((sum, subAgentId) => {
+      const totalWorkerTokens = subAgentIds.reduce((sum: any, subAgentId: any) => {
         const progressList = result.subAgentProgressEvents[subAgentId];
         const lastProgress = progressList[progressList.length - 1];
         return sum + (lastProgress?.totalOutputTokens || 0);

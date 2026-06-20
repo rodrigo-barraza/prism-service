@@ -32,7 +32,7 @@ describe("Token estimation", () => {
   it("estimates zero tokens for null content", () => {
     const tokens = ContextWindowManager.estimateMessageTokens({
       role: "user",
-      content: null,
+      content: null as any,
     });
     expect(tokens).toBe(4); // Only overhead
   });
@@ -177,7 +177,7 @@ describe("ContextWindowManager.enforce — tool result truncation", () => {
     expect(result.truncated).toBe(true);
     if (result.strategy === "tool_truncation") {
       // The old tool result should be capped at 3000 chars
-      const truncatedTc = result.messages[2].toolCalls[0];
+      const truncatedTc = result.messages[2].toolCalls![0] as any;
       expect(truncatedTc.result.length).toBeLessThanOrEqual(3100); // 3000 + truncation notice
       expect(truncatedTc.result).toContain("truncated");
     }
@@ -208,7 +208,7 @@ describe("ContextWindowManager.enforce — tool result truncation", () => {
     // But with 20k context the whole thing might fit without truncation
     if (!result.truncated) {
       // It fit without truncation — expected for this message count + 20k window
-      const toolCall = result.messages[2].toolCalls[0];
+      const toolCall = result.messages[2].toolCalls![0] as any;
       expect(toolCall.result).toBe(bigResult);
     }
   });
@@ -248,7 +248,7 @@ describe("ContextWindowManager.enforce — assistant compression", () => {
     // The most recent assistant message should be preserved
     const lastAssistant = result.messages.filter(m => m.role === "assistant").pop();
     if (result.strategy !== "sliding_window") {
-      expect(lastAssistant.content).toContain("Short recent answer");
+      expect(lastAssistant?.content).toContain("Short recent answer");
     }
   });
 
@@ -350,7 +350,7 @@ describe("ContextWindowManager.enforce — sliding window", () => {
     expect(result.truncated).toBe(true);
     // The final answer should be in the result
     const lastAssistant = result.messages.filter(m => m.role === "assistant").pop();
-    expect(lastAssistant.content).toContain("FINAL_ANSWER_MARKER");
+    expect(lastAssistant?.content).toContain("FINAL_ANSWER_MARKER");
   });
 
   it("never drops recent user messages even under severe budget pressure", () => {
@@ -481,7 +481,7 @@ describe("Strategy escalation", () => {
     // don't suffice because user messages contain most of the bulk.
     // Budget at 16k: floor((16000 - 8192 - 2000) * 0.80) ≈ 4646 tokens
     // User messages aren't compressed, so 40 × ("Question ".repeat(500)) ≈ 40 × 1000 tokens = 40k → way over
-    const messages = [
+    const messages: any[] = [
       { role: "system", content: "System" },
     ];
 
@@ -569,7 +569,7 @@ describe("Edge cases", () => {
   });
 
   it("handles non-string content (objects)", () => {
-    const messages = [
+    const messages: any[] = [
       { role: "user", content: { text: "Hello", metadata: { foo: "bar" } } },
     ];
     // Should not throw

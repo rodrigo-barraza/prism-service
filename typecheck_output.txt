@@ -1,51 +1,1227 @@
-
-> prism-service@1.0.0 typecheck
-> tsc --noEmit
-
-src/routes/ChatRoutes.ts(782,47): error TS2345: Argument of type '{ provider: import("../services/harnesses/types.ts").LLMProvider; providerName: string; resolvedModel: string; modelDefinition: ModelDefinition | null; messages: ConversationMessage[]; ... 15 more ...; signal: AbortSignal | undefined; }' is not assignable to parameter of type 'AgenticContext'.
-  Property 'agentConversationId' is missing in type '{ provider: import("../services/harnesses/types.ts").LLMProvider; providerName: string; resolvedModel: string; modelDefinition: ModelDefinition | null; messages: ConversationMessage[]; ... 15 more ...; signal: AbortSignal | undefined; }' but required in type 'AgenticContext'.
-src/routes/ChatRoutes.ts(847,7): error TS2322: Type '{}' is not assignable to type 'string'.
-src/routes/admin/AdminAgentConversationRoutes.ts(11,10): error TS2724: '"../../utils/ConversationDiscovery.ts"' has no exported member named 'discoverDescendantSessionIds'. Did you mean 'discoverDescendantConversationIds'?
-src/services/AgenticLoopService.ts(48,36): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
-src/services/AgenticLoopService.ts(57,7): error TS2322: Type 'unknown' is not assignable to type 'string | undefined'.
-src/services/AgenticLoopService.ts(63,51): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
-src/services/AgenticLoopService.ts(68,23): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
-src/services/AgenticLoopService.ts(141,35): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
-src/services/AgenticLoopService.ts(149,45): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
-src/services/AgenticLoopService.ts(157,31): error TS2339: Property 'cleanupSession' does not exist on type 'typeof OrchestratorService'.
-src/services/ConversationEmbeddingService.ts(47,9): error TS2322: Type 'unknown' is not assignable to type 'string'.
-src/services/ConversationTimerService.ts(463,47): error TS2345: Argument of type '{ provider: import("./harnesses/types.ts").LLMProvider; providerName: string; resolvedModel: string; modelDefinition: ModelDefinition | null; messages: ConversationMessage[]; ... 14 more ...; emit: (event: SseEvent) => void; }' is not assignable to parameter of type 'AgenticContext'.
-  Property 'agentConversationId' is missing in type '{ provider: import("./harnesses/types.ts").LLMProvider; providerName: string; resolvedModel: string; modelDefinition: ModelDefinition | null; messages: ConversationMessage[]; ... 14 more ...; emit: (event: SseEvent) => void; }' but required in type 'AgenticContext'.
-src/services/MemoryExtractor.ts(479,9): error TS2322: Type 'unknown' is not assignable to type 'string | null | undefined'.
-src/services/MemoryExtractor.ts(516,13): error TS2322: Type '{} | null' is not assignable to type 'string | null | undefined'.
-  Type '{}' is not assignable to type 'string'.
-src/services/ScheduledTaskService.ts(360,47): error TS2345: Argument of type '{ provider: import("./harnesses/types.ts").LLMProvider; providerName: string; resolvedModel: string; modelDefinition: ModelDefinition | null; messages: ConversationMessage[]; ... 14 more ...; emit: (event: SseEvent) => void; }' is not assignable to parameter of type 'AgenticContext'.
-  Property 'agentConversationId' is missing in type '{ provider: import("./harnesses/types.ts").LLMProvider; providerName: string; resolvedModel: string; modelDefinition: ModelDefinition | null; messages: ConversationMessage[]; ... 14 more ...; emit: (event: SseEvent) => void; }' but required in type 'AgenticContext'.
-src/services/ToolOrchestratorService.ts(1348,11): error TS2352: Conversion of type '{ project: string | null | undefined; username: string | null | undefined; agent: string | null | undefined; providerName: string | undefined; resolvedModel: string | undefined; ... 7 more ...; topology: string | null; }' to type 'OrchestratorContext' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
-  Property 'agentConversationId' is missing in type '{ project: string | null | undefined; username: string | null | undefined; agent: string | null | undefined; providerName: string | undefined; resolvedModel: string | undefined; ... 7 more ...; topology: string | null; }' but required in type 'OrchestratorContext'.
-src/services/ToolOrchestratorService.ts(1355,11): error TS2352: Conversion of type '{ project: string | null | undefined; username: string | null | undefined; agent: string | null | undefined; providerName: string | undefined; resolvedModel: string | undefined; ... 7 more ...; topology: string | null; }' to type 'OrchestratorContext' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
-  Property 'agentConversationId' is missing in type '{ project: string | null | undefined; username: string | null | undefined; agent: string | null | undefined; providerName: string | undefined; resolvedModel: string | undefined; ... 7 more ...; topology: string | null; }' but required in type 'OrchestratorContext'.
-src/services/ToolOrchestratorService.ts(1367,11): error TS2352: Conversion of type '{ project: string | null | undefined; username: string | null | undefined; agent: string | null | undefined; providerName: string | undefined; resolvedModel: string | undefined; ... 7 more ...; topology: string | null; }' to type 'OrchestratorContext' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
-  Property 'agentConversationId' is missing in type '{ project: string | null | undefined; username: string | null | undefined; agent: string | null | undefined; providerName: string | undefined; resolvedModel: string | undefined; ... 7 more ...; topology: string | null; }' but required in type 'OrchestratorContext'.
-src/services/WorkflowMemoryService.ts(222,7): error TS2322: Type '{}' is not assignable to type 'string'.
-src/services/WorkflowMemoryService.ts(228,7): error TS2322: Type '{}' is not assignable to type 'string'.
-src/services/harnesses/VisionLanguageHarness.ts(178,13): error TS2322: Type 'unknown' is not assignable to type 'string'.
-src/services/harnesses/VisionLanguageHarness.ts(603,15): error TS2339: Property 'sessionOutcome' does not exist on type 'AgenticLoopState'.
-src/services/harnesses/VisionLanguageHarness.ts(621,13): error TS2339: Property 'sessionOutcome' does not exist on type 'AgenticLoopState'.
-src/services/harnesses/lifecycle/ContextPressureManager.ts(112,9): error TS2322: Type 'unknown' is not assignable to type 'string'.
-src/services/harnesses/lifecycle/SystemReminderInjector.ts(63,51): error TS2345: Argument of type '{}' is not assignable to parameter of type 'string'.
-src/services/harnesses/lifecycle/SystemReminderInjector.ts(84,31): error TS2345: Argument of type '{}' is not assignable to parameter of type 'string'.
-src/services/harnesses/lifecycle/ToolDiscoveryNudge.ts(71,53): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
-src/services/harnesses/lifecycle/ToolExecutor.ts(71,13): error TS2322: Type 'unknown' is not assignable to type 'string | null | undefined'.
-src/services/harnesses/lifecycle/ToolExecutor.ts(75,46): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
-src/services/harnesses/lifecycle/ToolExecutor.ts(93,11): error TS2322: Type 'unknown' is not assignable to type 'string | null | undefined'.
-src/services/harnesses/lifecycle/ToolExecutor.ts(104,44): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
-src/services/harnesses/lifecycle/ValidationInterceptor.ts(140,9): error TS2322: Type 'unknown' is not assignable to type 'string | null | undefined'.
-src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts(167,5): error TS2322: Type 'unknown' is not assignable to type 'string'.
-src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts(598,13): error TS2339: Property 'sessionOutcome' does not exist on type 'AgenticLoopState'.
-src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts(609,26): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
-src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts(623,11): error TS2339: Property 'sessionOutcome' does not exist on type 'AgenticLoopState'.
-src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts(173,5): error TS2322: Type 'unknown' is not assignable to type 'string'.
-src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts(687,13): error TS2339: Property 'sessionOutcome' does not exist on type 'AgenticLoopState'.
-src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts(699,26): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
-src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts(713,11): error TS2339: Property 'sessionOutcome' does not exist on type 'AgenticLoopState'.
+../prism-client/src/utils/messageHelpers.ts(1,45): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean '../types/types.js'?
+../prism-client/src/utils/messageHelpers.ts(19,10): error TS7006: Parameter 'toolCall' implicitly has an 'any' type.
+../prism-client/src/utils/toolCallStateUpdaters.ts(9,52): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean '../types/types.js'?
+tests/backgroundCostPropagation.test.ts(44,16): error TS7006: Parameter '_inputType' implicitly has an 'any' type.
+tests/backgroundCostPropagation.test.ts(44,28): error TS7006: Parameter 'outputType' implicitly has an 'any' type.
+tests/backgroundCostPropagation.test.ts(163,13): error TS7034: Variable 'emittedEvents' implicitly has type 'any[]' in some locations where its type cannot be determined.
+tests/backgroundCostPropagation.test.ts(164,21): error TS7006: Parameter 'event' implicitly has an 'any' type.
+tests/backgroundCostPropagation.test.ts(186,28): error TS7005: Variable 'emittedEvents' implicitly has an 'any[]' type.
+tests/backgroundCostPropagation.test.ts(202,60): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/backgroundCostPropagation.test.ts(206,13): error TS7034: Variable 'emittedEvents' implicitly has type 'any[]' in some locations where its type cannot be determined.
+tests/backgroundCostPropagation.test.ts(207,21): error TS7006: Parameter 'event' implicitly has an 'any' type.
+tests/backgroundCostPropagation.test.ts(228,26): error TS7005: Variable 'emittedEvents' implicitly has an 'any[]' type.
+tests/backgroundCostPropagation.test.ts(242,13): error TS7034: Variable 'emittedEvents' implicitly has type 'any[]' in some locations where its type cannot be determined.
+tests/backgroundCostPropagation.test.ts(243,21): error TS7006: Parameter 'event' implicitly has an 'any' type.
+tests/backgroundCostPropagation.test.ts(261,28): error TS7005: Variable 'emittedEvents' implicitly has an 'any[]' type.
+tests/backgroundCostPropagation.test.ts(268,26): error TS7005: Variable 'emittedEvents' implicitly has an 'any[]' type.
+tests/backgroundCostPropagation.test.ts(275,13): error TS7034: Variable 'emittedEvents' implicitly has type 'any[]' in some locations where its type cannot be determined.
+tests/backgroundCostPropagation.test.ts(276,21): error TS7006: Parameter 'event' implicitly has an 'any' type.
+tests/backgroundCostPropagation.test.ts(285,21): error TS2741: Property 'id' is missing in type '{ name: string; args: {}; }' but required in type 'ToolCall'.
+tests/backgroundCostPropagation.test.ts(290,14): error TS7005: Variable 'emittedEvents' implicitly has an 'any[]' type.
+tests/backgroundCostPropagation.test.ts(294,13): error TS7034: Variable 'emittedEvents' implicitly has type 'any[]' in some locations where its type cannot be determined.
+tests/backgroundCostPropagation.test.ts(295,21): error TS7006: Parameter 'event' implicitly has an 'any' type.
+tests/backgroundCostPropagation.test.ts(299,34): error TS2339: Property 'mockResolvedValueOnce' does not exist on type '<K extends keyof SettingsData>(section: K) => Promise<SettingsData[K]>'.
+tests/backgroundCostPropagation.test.ts(322,28): error TS7005: Variable 'emittedEvents' implicitly has an 'any[]' type.
+tests/backgroundCostPropagation.test.ts(337,40): error TS7006: Parameter 'existing' implicitly has an 'any' type.
+tests/backgroundCostPropagation.test.ts(337,50): error TS7006: Parameter 'usageEvent' implicitly has an 'any' type.
+tests/backgroundCostPropagation.test.ts(432,58): error TS2339: Property 'cost' does not exist on type 'never'.
+tests/backgroundTokenAccuracy.test.ts(212,15): error TS2339: Property 'usage' does not exist on type '{ requestId: string; endpoint: string; operation: string; project: string; username: string; agent: null; provider: string; model: string; traceId: null; agentConversationId: string; aiMessages: { ...; }[]; ... 4 more ...; extraRequestPayload: {}; }'.
+tests/backgroundTokenAccuracy.test.ts(330,15): error TS18047: 'cost' is possibly 'null'.
+tests/backgroundTokenAccuracy.test.ts(365,15): error TS18047: 'cost' is possibly 'null'.
+tests/client-tool-state-updaters.test.ts(20,8): error TS6059: File '/home/rodrigo/development/prism-client/src/utils/toolCallStateUpdaters.ts' is not under 'rootDir' '/home/rodrigo/development/prism-service'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/home/rodrigo/development/prism-client/package.json' has field "type" with value "module"
+tests/client-tool-state-updaters.test.ts(22,63): error TS6059: File '/home/rodrigo/development/prism-client/src/types/types.ts' is not under 'rootDir' '/home/rodrigo/development/prism-service'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/home/rodrigo/development/prism-client/package.json' has field "type" with value "module"
+tests/client-tool-state-updaters.test.ts(23,40): error TS6059: File '/home/rodrigo/development/prism-client/src/utils/messageHelpers.ts' is not under 'rootDir' '/home/rodrigo/development/prism-service'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/home/rodrigo/development/prism-client/package.json' has field "type" with value "module"
+tests/configUtils.test.ts(50,52): error TS18046: 'm' is of type 'unknown'.
+tests/configUtils.test.ts(57,11): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(58,16): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(75,28): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(76,14): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(77,14): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(78,14): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(87,14): error TS18046: 'm' is of type 'unknown'.
+tests/configUtils.test.ts(87,25): error TS18046: 'm' is of type 'unknown'.
+tests/configUtils.test.ts(95,28): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(96,14): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(105,14): error TS18046: 'm' is of type 'unknown'.
+tests/configUtils.test.ts(105,35): error TS18046: 'm' is of type 'unknown'.
+tests/configUtils.test.ts(113,14): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(128,7): error TS18046: 'm' is of type 'unknown'.
+tests/configUtils.test.ts(133,14): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(142,7): error TS18046: 'm' is of type 'unknown'.
+tests/configUtils.test.ts(146,14): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(163,21): error TS18046: 'models' is of type 'unknown'.
+tests/configUtils.test.ts(163,33): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/configUtils.test.ts(178,14): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(179,14): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(180,21): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(181,21): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(195,46): error TS18046: 'm' is of type 'unknown'.
+tests/configUtils.test.ts(199,14): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(214,14): error TS18046: 'm' is of type 'unknown'.
+tests/configUtils.test.ts(214,37): error TS18046: 'm' is of type 'unknown'.
+tests/configUtils.test.ts(225,47): error TS18046: 'm' is of type 'unknown'.
+tests/configUtils.test.ts(228,55): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(267,9): error TS18046: 'm' is of type 'unknown'.
+tests/configUtils.test.ts(267,44): error TS18046: 'm' is of type 'unknown'.
+tests/configUtils.test.ts(272,14): error TS18046: 'model' is of type 'unknown'.
+tests/configUtils.test.ts(273,14): error TS18046: 'model' is of type 'unknown'.
+tests/contextWindowManager.test.ts(35,7): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+tests/contextWindowManager.test.ts(180,27): error TS2532: Object is possibly 'undefined'.
+tests/contextWindowManager.test.ts(181,14): error TS18046: 'truncatedTc.result' is of type 'unknown'.
+tests/contextWindowManager.test.ts(211,24): error TS2532: Object is possibly 'undefined'.
+tests/contextWindowManager.test.ts(251,14): error TS18048: 'lastAssistant' is possibly 'undefined'.
+tests/contextWindowManager.test.ts(353,12): error TS18048: 'lastAssistant' is possibly 'undefined'.
+tests/contextWindowManager.test.ts(493,9): error TS2353: Object literal may only specify known properties, and 'toolCalls' does not exist in type '{ role: string; content: string; }'.
+tests/contextWindowManager.test.ts(576,49): error TS2345: Argument of type '{ role: string; content: { text: string; metadata: { foo: string; }; }; }[]' is not assignable to parameter of type 'ChatMessage[]'.
+  Type '{ role: string; content: { text: string; metadata: { foo: string; }; }; }' is not assignable to type 'ChatMessage'.
+    Types of property 'content' are incompatible.
+      Type '{ text: string; metadata: { foo: string; }; }' is not assignable to type 'string'.
+tests/conversationService.test.ts(39,21): error TS7006: Parameter 'filter' implicitly has an 'any' type.
+tests/conversationService.test.ts(39,29): error TS7006: Parameter 'update' implicitly has an 'any' type.
+tests/conversationService.test.ts(64,31): error TS2339: Property 'upsert' does not exist on type '{}'.
+tests/conversationService.test.ts(67,39): error TS2339: Property 'upsert' does not exist on type '{}'.
+tests/conversationService.test.ts(77,13): error TS18046: 'value' is of type 'unknown'.
+tests/conversationService.test.ts(78,30): error TS18046: 'value' is of type 'unknown'.
+tests/conversationService.test.ts(91,19): error TS7006: Parameter 'filter' implicitly has an 'any' type.
+tests/conversationService.test.ts(98,5): error TS7034: Variable 'mockCollection' implicitly has type 'any' in some locations where its type cannot be determined.
+tests/conversationService.test.ts(147,9): error TS7005: Variable 'mockCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(169,32): error TS2339: Property 'mockReturnValue' does not exist on type '(dbName: string, collectionName: string) => Collection<Document>'.
+tests/conversationService.test.ts(170,24): error TS2339: Property 'mockReturnValue' does not exist on type '(name: string) => Db'.
+tests/conversationService.test.ts(171,25): error TS7005: Variable 'mockCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(197,13): error TS7005: Variable 'mockCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(412,9): error TS7034: Variable 'mockTimersCollection' implicitly has type 'any' in some locations where its type cannot be determined.
+tests/conversationService.test.ts(416,26): error TS2339: Property 'mockReturnValue' does not exist on type '(name: string) => Db'.
+tests/conversationService.test.ts(417,22): error TS7006: Parameter 'name' implicitly has an 'any' type.
+tests/conversationService.test.ts(419,20): error TS7005: Variable 'mockTimersCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(421,18): error TS7005: Variable 'mockCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(426,38): error TS7006: Parameter 'sessionId' implicitly has an 'any' type.
+tests/conversationService.test.ts(435,13): error TS7005: Variable 'mockTimersCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(461,27): error TS7005: Variable 'mockTimersCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(479,27): error TS7005: Variable 'mockTimersCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(497,27): error TS7005: Variable 'mockTimersCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(520,27): error TS7005: Variable 'mockTimersCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(530,24): error TS2339: Property 'mockReturnValue' does not exist on type '(name: string) => Db'.
+tests/conversationService.test.ts(531,25): error TS7005: Variable 'mockCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(544,23): error TS7005: Variable 'mockCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(565,23): error TS7005: Variable 'mockCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(578,11): error TS7005: Variable 'mockCollection' implicitly has an 'any' type.
+tests/conversationService.test.ts(595,23): error TS7005: Variable 'mockCollection' implicitly has an 'any' type.
+tests/costCalculation.test.ts(21,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(22,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(24,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(27,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(29,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(32,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(34,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(37,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(40,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(45,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(51,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(54,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(60,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(63,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(69,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(72,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(78,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(81,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(87,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(90,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(95,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(98,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(101,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(104,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(109,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(117,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(118,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(120,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(123,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(125,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(128,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(130,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(133,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(137,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(142,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(148,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(151,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(161,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(164,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(169,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(174,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(180,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(183,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(189,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(192,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(197,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(200,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(205,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(210,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(219,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(222,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(232,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(240,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(244,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(248,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(251,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(254,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(257,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(260,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(263,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(267,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(270,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(273,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(276,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(281,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(284,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(287,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(295,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(296,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(297,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(300,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(302,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(305,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(307,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(312,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(321,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(324,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(331,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(334,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(341,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(346,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(354,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(359,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(366,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(374,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(377,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(383,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(384,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(387,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(392,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(393,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(396,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(401,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(402,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(410,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(411,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(412,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(415,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(417,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(420,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(427,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(430,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(435,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(446,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(450,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(452,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(452,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(452,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(453,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(453,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(453,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(454,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(454,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(454,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(457,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(459,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(459,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(459,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(460,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(460,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(460,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(461,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(461,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(461,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(464,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(466,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(466,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(466,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(467,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(467,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(467,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(468,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(468,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(468,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(471,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(473,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(473,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(473,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(474,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(474,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(474,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(475,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(475,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(475,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(478,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(480,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(480,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(480,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(481,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(481,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(481,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(482,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(482,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(482,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(483,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(483,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(483,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(488,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(490,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(490,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(490,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(491,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(491,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(491,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(492,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(492,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(492,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(493,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(493,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(493,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(496,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(498,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(498,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(498,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(499,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(499,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(499,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(500,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(500,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(500,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(501,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(501,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(501,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(504,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(507,51): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(507,53): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(508,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(511,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(514,51): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(514,53): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(515,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(520,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(522,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(522,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(522,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(523,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(523,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(523,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(526,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(528,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(528,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(528,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(529,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(529,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(529,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(534,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(536,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(536,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(536,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(541,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(544,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(545,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(548,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(553,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(554,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(559,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(561,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(561,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(561,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(562,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(562,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(562,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(565,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(567,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(567,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(567,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(568,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(568,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(568,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(571,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(573,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(573,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(573,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(574,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(574,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(574,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(577,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(579,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(579,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(579,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(580,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(580,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(580,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(583,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(585,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(585,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(585,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(586,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(586,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(586,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(591,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(593,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(593,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(593,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(594,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(594,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(594,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(595,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(595,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(595,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(596,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(596,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(596,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(597,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(597,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(597,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(598,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(598,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(598,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(603,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(605,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(605,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(605,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(606,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(606,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(606,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(609,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(611,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(611,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(611,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(614,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(616,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(616,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(616,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(617,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(617,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(617,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(618,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(618,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(618,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(623,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(625,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(625,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(625,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(626,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(626,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(626,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(629,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(631,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(631,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(631,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(632,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(632,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(632,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(635,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(637,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(637,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(637,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(638,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(638,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(638,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(641,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(643,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(643,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(643,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(644,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(644,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(644,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(647,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(649,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(649,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(649,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(650,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(650,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(650,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(653,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(655,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(655,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(655,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(656,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(656,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(656,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(659,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(661,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(661,16): error TS18047: 'model' is possibly 'null'.
+tests/costCalculation.test.ts(661,22): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(662,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(662,16): error TS18047: 'model' is possibly 'null'.
+tests/costCalculation.test.ts(662,22): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(665,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(667,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(667,16): error TS18047: 'model' is possibly 'null'.
+tests/costCalculation.test.ts(667,22): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(668,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(668,16): error TS18047: 'model' is possibly 'null'.
+tests/costCalculation.test.ts(668,22): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(673,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(675,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(675,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(675,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(678,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(680,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(680,16): error TS18047: 'm' is possibly 'null'.
+tests/costCalculation.test.ts(680,18): error TS2339: Property 'pricing' does not exist on type 'ModelDefinition'.
+  Property 'pricing' does not exist on type '{ description: string; name: string; label: string; provider: string; year: number; modelType: string; listed: boolean; inputTypes: string[]; outputTypes: string[]; streaming: boolean; }'.
+tests/costCalculation.test.ts(690,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(691,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(693,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(694,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(697,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(699,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(700,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(703,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(705,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(706,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(711,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(717,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(719,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(720,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(723,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(729,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(730,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(733,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(738,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(739,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(742,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(748,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(749,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(754,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(760,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(761,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(764,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(770,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(775,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(782,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(783,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(784,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(785,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(790,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(798,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(801,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(806,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(811,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(828,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(832,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(833,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(835,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(836,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(839,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(841,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(842,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(845,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(847,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(848,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(851,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(857,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(858,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(859,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(862,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(868,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(869,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(872,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(878,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(879,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(882,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(888,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(889,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(892,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(898,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(901,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(908,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(909,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(910,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(911,9): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(918,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(919,3): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(920,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(921,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(924,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(925,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(928,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(929,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(932,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(935,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(938,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(941,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(944,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(949,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(950,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(954,3): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(955,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(959,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(962,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(966,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(969,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(976,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(979,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(983,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(988,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(992,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(995,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1001,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1005,3): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1006,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1007,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1010,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1011,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1014,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1015,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1018,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1021,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1024,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1034,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1035,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1039,3): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1040,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1044,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1047,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1056,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1059,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1062,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1066,3): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1067,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1068,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1071,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1072,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1075,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1077,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1081,3): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1082,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1083,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1086,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1087,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1090,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1097,7): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1104,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1105,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1115,5): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1116,5): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1119,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/costCalculation.test.ts(1145,5): error TS2304: Cannot find name 'expect'.
+tests/costCalculation.test.ts(1147,5): error TS2304: Cannot find name 'expect'.
+tests/functionCallingUtilities.test.ts(512,38): error TS2550: Property 'findLastIndex' does not exist on type 'ExpandedMessage[]'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2023' or later.
+tests/functionCallingUtilities.test.ts(513,10): error TS7006: Parameter 'message' implicitly has an 'any' type.
+tests/harness-stream-processing.test.ts(76,7): error TS1117: An object literal cannot have multiple properties with the same name.
+tests/harness-stream-processing.test.ts(439,7): error TS1117: An object literal cannot have multiple properties with the same name.
+tests/harness-stream-processing.test.ts(637,7): error TS1117: An object literal cannot have multiple properties with the same name.
+tests/harnessAdversarial.test.ts(737,22): error TS2367: This comparison appears to be unintentional because the types '-1' and '0' have no overlap.
+tests/harnessAdversarial.test.ts(747,22): error TS2367: This comparison appears to be unintentional because the types '500' and '0' have no overlap.
+tests/harnessAdversarial.test.ts(808,22): error TS2367: This comparison appears to be unintentional because the types '1' and '0' have no overlap.
+tests/live/agentLoopLive.live.test.ts(50,18): error TS18046: 'data' is of type 'unknown'.
+tests/live/agentLoopLive.live.test.ts(50,33): error TS18046: 'data' is of type 'unknown'.
+tests/live/agentLoopLive.live.test.ts(54,32): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(60,6): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(65,30): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(77,32): error TS7006: Parameter 'response' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(77,74): error TS2339: Property 'controller' does not exist on type '{ timeoutMs?: number | undefined; }'.
+tests/live/agentLoopLive.live.test.ts(133,7): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+tests/live/agentLoopLive.live.test.ts(141,30): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/agentLoopLive.live.test.ts(147,34): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/agentLoopLive.live.test.ts(151,42): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/agentLoopLive.live.test.ts(155,36): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/agentLoopLive.live.test.ts(172,28): error TS2339: Property '_inLoadPhase' does not exist on type '{ events: never[]; chunks: never[]; thinkingChunks: never[]; statuses: never[]; toolCalls: never[]; errors: never[]; done: null; text: string; thinking: string; phases: Set<unknown>; promptProcessingStarts: number; ... 6 more ...; durationMs: number; }'.
+tests/live/agentLoopLive.live.test.ts(173,26): error TS2339: Property '_inLoadPhase' does not exist on type '{ events: never[]; chunks: never[]; thinkingChunks: never[]; statuses: never[]; toolCalls: never[]; errors: never[]; done: null; text: string; thinking: string; phases: Set<unknown>; promptProcessingStarts: number; ... 6 more ...; durationMs: number; }'.
+tests/live/agentLoopLive.live.test.ts(176,33): error TS2339: Property '_inLoadPhase' does not exist on type '{ events: never[]; chunks: never[]; thinkingChunks: never[]; statuses: never[]; toolCalls: never[]; errors: never[]; done: null; text: string; thinking: string; phases: Set<unknown>; promptProcessingStarts: number; ... 6 more ...; durationMs: number; }'.
+tests/live/agentLoopLive.live.test.ts(178,24): error TS2339: Property '_inLoadPhase' does not exist on type '{ events: never[]; chunks: never[]; thinkingChunks: never[]; statuses: never[]; toolCalls: never[]; errors: never[]; done: null; text: string; thinking: string; phases: Set<unknown>; promptProcessingStarts: number; ... 6 more ...; durationMs: number; }'.
+tests/live/agentLoopLive.live.test.ts(182,37): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/agentLoopLive.live.test.ts(185,37): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/agentLoopLive.live.test.ts(188,34): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/agentLoopLive.live.test.ts(203,9): error TS18046: 'error' is of type 'unknown'.
+tests/live/agentLoopLive.live.test.ts(206,26): error TS2345: Argument of type '{ type: string; message: any; }' is not assignable to parameter of type 'never'.
+tests/live/agentLoopLive.live.test.ts(206,52): error TS18046: 'error' is of type 'unknown'.
+tests/live/agentLoopLive.live.test.ts(224,28): error TS7006: Parameter 'payload' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(242,49): error TS2353: Object literal may only specify known properties, and 'controller' does not exist in type '{ timeoutMs?: number | undefined; }'.
+tests/live/agentLoopLive.live.test.ts(249,26): error TS7006: Parameter 'payload' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(261,23): error TS18046: 'body' is of type 'unknown'.
+tests/live/agentLoopLive.live.test.ts(262,21): error TS18046: 'body' is of type 'unknown'.
+tests/live/agentLoopLive.live.test.ts(262,37): error TS18046: 'body' is of type 'unknown'.
+tests/live/agentLoopLive.live.test.ts(270,20): error TS7006: Parameter 'label' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(270,27): error TS7006: Parameter 'result' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(287,69): error TS7006: Parameter 's' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(293,34): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+tests/live/agentLoopLive.live.test.ts(293,56): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+tests/live/agentLoopLive.live.test.ts(297,39): error TS7006: Parameter 'e' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(315,5): error TS7034: Variable 'targetModel' implicitly has type 'any' in some locations where its type cannot be determined.
+tests/live/agentLoopLive.live.test.ts(349,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(388,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(408,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(436,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(466,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(509,16): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(522,20): error TS18047: 'response.body' is possibly 'null'.
+tests/live/agentLoopLive.live.test.ts(551,18): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(563,43): error TS2339: Property 'message' does not exist on type 'never'.
+tests/live/agentLoopLive.live.test.ts(571,28): error TS18046: 'error' is of type 'unknown'.
+tests/live/agentLoopLive.live.test.ts(575,17): error TS2304: Cannot find name 'err'.
+tests/live/agentLoopLive.live.test.ts(583,12): error TS18047: 'followUp' is possibly 'null'.
+tests/live/agentLoopLive.live.test.ts(585,12): error TS18047: 'followUp' is possibly 'null'.
+tests/live/agentLoopLive.live.test.ts(585,29): error TS18047: 'followUp' is possibly 'null'.
+tests/live/agentLoopLive.live.test.ts(586,12): error TS18047: 'followUp' is possibly 'null'.
+tests/live/agentLoopLive.live.test.ts(588,12): error TS18047: 'followUp' is possibly 'null'.
+tests/live/agentLoopLive.live.test.ts(603,16): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(647,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(658,67): error TS18046: 'result' is of type 'unknown'.
+tests/live/agentLoopLive.live.test.ts(661,12): error TS18046: 'result' is of type 'unknown'.
+tests/live/agentLoopLive.live.test.ts(663,19): error TS18046: 'result' is of type 'unknown'.
+tests/live/agentLoopLive.live.test.ts(664,19): error TS18046: 'result' is of type 'unknown'.
+tests/live/agentLoopLive.live.test.ts(680,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(710,16): error TS2339: Property 'message' does not exist on type 'never'.
+tests/live/agentLoopLive.live.test.ts(713,16): error TS2339: Property 'tool' does not exist on type 'never'.
+tests/live/agentLoopLive.live.test.ts(713,50): error TS2339: Property 'name' does not exist on type 'never'.
+tests/live/agentLoopLive.live.test.ts(742,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/agentLoopLive.live.test.ts(775,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/functionCallingLive.live.test.ts(36,12): error TS18046: 'data' is of type 'unknown'.
+tests/live/functionCallingLive.live.test.ts(38,12): error TS18046: 'data' is of type 'unknown'.
+tests/live/functionCallingLive.live.test.ts(39,26): error TS18046: 'data' is of type 'unknown'.
+tests/live/functionCallingLive.live.test.ts(40,12): error TS18046: 'data' is of type 'unknown'.
+tests/live/functionCallingLive.live.test.ts(42,25): error TS18046: 'data' is of type 'unknown'.
+tests/live/functionCallingLive.live.test.ts(45,12): error TS18046: 'data' is of type 'unknown'.
+tests/live/functionCallingLive.live.test.ts(46,12): error TS18046: 'data' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(138,18): error TS18046: 'body' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(139,21): error TS18046: 'body' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(162,20): error TS18046: 'data' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(162,35): error TS18046: 'data' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(229,37): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/lmStudioModels.live.test.ts(304,16): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(305,16): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(306,16): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(309,27): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(309,39): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(314,11): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(314,41): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(376,13): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(377,28): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(378,18): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(382,16): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(382,28): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(443,16): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(444,16): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(449,27): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(449,39): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(450,29): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(510,16): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(511,16): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(512,16): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(515,25): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(518,16): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(518,28): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(572,16): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(573,16): error TS18046: 'res' is of type 'unknown'.
+tests/live/lmStudioModels.live.test.ts(573,28): error TS18046: 'res' is of type 'unknown'.
+tests/live/sessionGenTrackerLive.live.test.ts(48,18): error TS18046: 'data' is of type 'unknown'.
+tests/live/sessionGenTrackerLive.live.test.ts(48,33): error TS18046: 'data' is of type 'unknown'.
+tests/live/sessionGenTrackerLive.live.test.ts(51,32): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(57,6): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(61,30): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(70,32): error TS7006: Parameter 'response' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(70,74): error TS2339: Property 'controller' does not exist on type '{ timeoutMs?: number | undefined; }'.
+tests/live/sessionGenTrackerLive.live.test.ts(124,7): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+tests/live/sessionGenTrackerLive.live.test.ts(132,30): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(138,34): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(142,42): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(146,36): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(150,54): error TS2345: Argument of type '{ tokPerSec: any; activeRequests: any; outputTokens: any; inputTokens: any; totalTokens: any; avgTtft: any; timestamp: number; }' is not assignable to parameter of type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(162,45): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(165,37): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(168,37): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(171,48): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(174,22): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+tests/live/sessionGenTrackerLive.live.test.ts(175,19): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+tests/live/sessionGenTrackerLive.live.test.ts(177,17): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+tests/live/sessionGenTrackerLive.live.test.ts(188,52): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(192,34): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(206,9): error TS18046: 'error' is of type 'unknown'.
+tests/live/sessionGenTrackerLive.live.test.ts(209,26): error TS2345: Argument of type '{ type: string; message: any; }' is not assignable to parameter of type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(209,52): error TS18046: 'error' is of type 'unknown'.
+tests/live/sessionGenTrackerLive.live.test.ts(223,28): error TS7006: Parameter 'payload' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(241,49): error TS2353: Object literal may only specify known properties, and 'controller' does not exist in type '{ timeoutMs?: number | undefined; }'.
+tests/live/sessionGenTrackerLive.live.test.ts(247,29): error TS7006: Parameter 'label' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(247,36): error TS7006: Parameter 'result' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(252,6): error TS7006: Parameter 'max' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(252,11): error TS7006: Parameter 'e' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(281,8): error TS7006: Parameter 'max' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(281,13): error TS7006: Parameter 'e' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(294,5): error TS7034: Variable 'targetModel' implicitly has type 'any' in some locations where its type cannot be determined.
+tests/live/sessionGenTrackerLive.live.test.ts(328,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(350,16): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(350,39): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(368,26): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(369,23): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(385,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(407,16): error TS2339: Property 'message' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(418,27): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(418,59): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(419,27): error TS2339: Property 'activeRequests' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(420,27): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(436,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(469,16): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(469,39): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(482,55): error TS2339: Property 'activeRequests' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(489,16): error TS2339: Property 'tool' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(489,50): error TS2339: Property 'name' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(501,30): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+tests/live/sessionGenTrackerLive.live.test.ts(506,12): error TS7006: Parameter 'e' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(520,33): error TS2339: Property 'subAgentId' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(522,30): error TS2339: Property 'usage' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(523,42): error TS2339: Property 'usage' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(530,68): error TS2339: Property 'tool' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(530,84): error TS2339: Property 'name' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(541,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(560,17): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(561,22): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(562,28): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(568,22): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(572,22): error TS2339: Property 'usage' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(573,31): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(573,58): error TS2339: Property 'usage' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(574,60): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(574,101): error TS2339: Property 'usage' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(590,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/sessionGenTrackerLive.live.test.ts(611,22): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(612,29): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(613,22): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(614,48): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(617,42): error TS2339: Property 'usage' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(618,23): error TS2339: Property 'usage' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(622,24): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(627,22): error TS2339: Property 'totalTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(628,22): error TS2339: Property 'totalTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(628,50): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(628,74): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(629,48): error TS2339: Property 'totalTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(629,74): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(629,104): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(634,22): error TS2339: Property 'avgTtft' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(635,29): error TS2339: Property 'avgTtft' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(636,22): error TS2339: Property 'avgTtft' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(638,22): error TS2339: Property 'avgTtft' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(639,44): error TS2339: Property 'avgTtft' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(643,16): error TS2339: Property 'message' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(643,54): error TS2339: Property 'timeToFirstToken' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(646,46): error TS2339: Property 'timeToFirstToken' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(649,33): error TS2339: Property 'avgTtft' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(661,17): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(661,46): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(662,22): error TS2339: Property 'totalTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(662,46): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/sessionGenTrackerLive.live.test.ts(662,66): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(30,5): error TS7034: Variable 'targetModel' implicitly has type 'any' in some locations where its type cannot be determined.
+tests/live/tokenAccuracyLive.live.test.ts(36,18): error TS18046: 'data' is of type 'unknown'.
+tests/live/tokenAccuracyLive.live.test.ts(36,33): error TS18046: 'data' is of type 'unknown'.
+tests/live/tokenAccuracyLive.live.test.ts(38,32): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/tokenAccuracyLive.live.test.ts(42,6): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/tokenAccuracyLive.live.test.ts(45,30): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/tokenAccuracyLive.live.test.ts(57,33): error TS7006: Parameter 'prompt' implicitly has an 'any' type.
+tests/live/tokenAccuracyLive.live.test.ts(70,14): error TS7005: Variable 'targetModel' implicitly has an 'any' type.
+tests/live/tokenAccuracyLive.live.test.ts(86,18): error TS18047: 'res.body' is possibly 'null'.
+tests/live/tokenAccuracyLive.live.test.ts(144,38): error TS2345: Argument of type '{ timestamp: number; outputTokens: any; inputTokens: any; totalTokens: any; outputCharacters: any; tokPerSec: any; activeRequests: any; avgTtft: any; }' is not assignable to parameter of type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(146,33): error TS2345: Argument of type '{ timestamp: number; outputTokens: any; inputTokens: any; totalTokens: any; outputCharacters: any; tokPerSec: any; activeRequests: any; avgTtft: any; }' is not assignable to parameter of type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(153,16): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+tests/live/tokenAccuracyLive.live.test.ts(154,13): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+tests/live/tokenAccuracyLive.live.test.ts(156,11): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+tests/live/tokenAccuracyLive.live.test.ts(165,43): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(170,36): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(220,28): error TS7006: Parameter 'events' implicitly has an 'any' type.
+tests/live/tokenAccuracyLive.live.test.ts(236,27): error TS7006: Parameter 'label' implicitly has an 'any' type.
+tests/live/tokenAccuracyLive.live.test.ts(236,34): error TS7006: Parameter 'result' implicitly has an 'any' type.
+tests/live/tokenAccuracyLive.live.test.ts(329,43): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(338,17): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(356,17): error TS2339: Property 'outputCharacters' does not exist on type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(358,19): error TS2339: Property 'outputCharacters' does not exist on type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(358,59): error TS2339: Property 'outputCharacters' does not exist on type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(377,17): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(378,17): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(379,17): error TS2339: Property 'totalTokens' does not exist on type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(401,17): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(405,16): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+tests/live/tokenAccuracyLive.live.test.ts(408,30): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+tests/live/tokenAccuracyLive.live.test.ts(413,43): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenAccuracyLive.live.test.ts(414,19): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenCostLive.live.test.ts(291,21): error TS7006: Parameter 'payload' implicitly has an 'any' type.
+tests/live/tokenCostLive.live.test.ts(308,36): error TS7006: Parameter 'provider' implicitly has an 'any' type.
+tests/live/tokenCostLive.live.test.ts(308,46): error TS7006: Parameter 'model' implicitly has an 'any' type.
+tests/live/tokenCostLive.live.test.ts(316,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(316,32): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(327,12): error TS18046: 'data' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(336,5): error TS7034: Variable 'lmStudioModel' implicitly has type 'any' in some locations where its type cannot be determined.
+tests/live/tokenCostLive.live.test.ts(350,16): error TS2339: Property 'openai' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(351,16): error TS2339: Property 'anthropic' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(355,16): error TS2339: Property 'google' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(362,16): error TS2339: Property 'lmStudio' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(365,47): error TS2339: Property 'openai' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(366,47): error TS2339: Property 'anthropic' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(367,47): error TS2339: Property 'google' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(382,23): error TS2339: Property 'openai' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(391,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(392,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(393,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(394,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(398,44): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(399,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(399,43): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/live/tokenCostLive.live.test.ts(402,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(406,23): error TS2339: Property 'openai' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(416,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(417,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(418,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(419,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(423,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(427,44): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(428,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(428,43): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/live/tokenCostLive.live.test.ts(432,23): error TS2339: Property 'openai' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(450,12): error TS18046: 'withTools' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(451,7): error TS18046: 'noTools' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(453,12): error TS18046: 'withTools' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(453,53): error TS18046: 'noTools' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(466,23): error TS2339: Property 'anthropic' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(475,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(476,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(477,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(478,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(481,44): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(482,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(482,43): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/live/tokenCostLive.live.test.ts(484,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(488,23): error TS2339: Property 'anthropic' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(507,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(509,19): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(510,19): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(514,44): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(515,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(515,43): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/live/tokenCostLive.live.test.ts(519,23): error TS2339: Property 'anthropic' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(529,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(530,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(531,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(532,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(536,8): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(537,8): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(538,8): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(552,23): error TS2339: Property 'google' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(561,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(562,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(563,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(564,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(565,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(568,44): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(569,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(569,43): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/live/tokenCostLive.live.test.ts(571,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(575,23): error TS2339: Property 'google' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(585,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(586,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(588,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(589,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(592,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(595,44): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(596,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(596,43): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/live/tokenCostLive.live.test.ts(600,23): error TS2339: Property 'google' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(618,12): error TS18046: 'withTools' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(619,7): error TS18046: 'noTools' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(630,10): error TS7005: Variable 'lmStudioModel' implicitly has an 'any' type.
+tests/live/tokenCostLive.live.test.ts(639,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(640,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(641,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(644,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(644,42): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(648,10): error TS7005: Variable 'lmStudioModel' implicitly has an 'any' type.
+tests/live/tokenCostLive.live.test.ts(658,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(659,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(660,12): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(674,33): error TS2339: Property 'openai' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(679,33): error TS2339: Property 'anthropic' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(684,33): error TS2339: Property 'google' does not exist on type '{}'.
+tests/live/tokenCostLive.live.test.ts(700,46): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(701,14): error TS18046: 'res' is of type 'unknown'.
+tests/live/tokenCostLive.live.test.ts(701,45): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/live/tokenMetricsLive.live.test.ts(59,33): error TS7006: Parameter 'provider' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(59,43): error TS7006: Parameter 'model' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(59,50): error TS7006: Parameter 'prompt' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(65,3): error TS2339: Property 'enabledTools' does not exist on type '{ maxTokens?: number | undefined; timeout?: number | undefined; agent?: string | undefined; autoApprove?: boolean | undefined; maxIterations?: number | undefined; }'.
+tests/live/tokenMetricsLive.live.test.ts(80,40): error TS2339: Property 'enabledTools' does not exist on type '{ provider: any; model: any; messages: { role: string; content: any; }[]; agent: string; agentConversationId: `${string}-${string}-${string}-${string}-${string}`; maxTokens: number; autoApprove: boolean; maxIterations: number; }'.
+tests/live/tokenMetricsLive.live.test.ts(98,18): error TS18047: 'res.body' is possibly 'null'.
+tests/live/tokenMetricsLive.live.test.ts(138,38): error TS2345: Argument of type '{ timestamp: number; outputTokens: any; inputTokens: any; totalTokens: any; outputCharacters: any; tokPerSec: any; activeRequests: any; avgTtft: any; }' is not assignable to parameter of type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(150,36): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(166,33): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(170,16): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+tests/live/tokenMetricsLive.live.test.ts(171,13): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+tests/live/tokenMetricsLive.live.test.ts(173,11): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+tests/live/tokenMetricsLive.live.test.ts(182,46): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(200,28): error TS7006: Parameter 'events' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(216,21): error TS7006: Parameter 'label' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(216,28): error TS7006: Parameter 'result' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(234,73): error TS7006: Parameter 'e' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(234,103): error TS7006: Parameter 'e' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(247,5): error TS7034: Variable 'lmStudioModel' implicitly has type 'any' in some locations where its type cannot be determined.
+tests/live/tokenMetricsLive.live.test.ts(258,20): error TS18046: 'data' is of type 'unknown'.
+tests/live/tokenMetricsLive.live.test.ts(258,35): error TS18046: 'data' is of type 'unknown'.
+tests/live/tokenMetricsLive.live.test.ts(260,34): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(264,8): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(267,32): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(283,29): error TS2339: Property 'textToText' does not exist on type '{}'.
+tests/live/tokenMetricsLive.live.test.ts(286,22): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ openai: { model: string; label: string; }; anthropic: { model: string; label: string; }; google: { model: string; label: string; }; }'.
+  No index signature with a parameter of type 'string' was found on type '{ openai: { model: string; label: string; }; anthropic: { model: string; label: string; }; google: { model: string; label: string; }; }'.
+tests/live/tokenMetricsLive.live.test.ts(287,32): error TS7006: Parameter 'm' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(288,9): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ openai: boolean; anthropic: boolean; google: boolean; }'.
+  No index signature with a parameter of type 'string' was found on type '{ openai: boolean; anthropic: boolean; google: boolean; }'.
+tests/live/tokenMetricsLive.live.test.ts(334,28): error TS7005: Variable 'lmStudioModel' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(343,16): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(343,39): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(348,57): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(358,28): error TS7005: Variable 'lmStudioModel' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(369,17): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(370,17): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(371,17): error TS2339: Property 'totalTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(374,17): error TS2339: Property 'totalTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(374,40): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(374,59): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(377,27): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(378,19): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(378,55): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(380,27): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(380,60): error TS2339: Property 'promptTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(381,43): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(381,75): error TS2339: Property 'promptTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(382,19): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(391,28): error TS7005: Variable 'lmStudioModel' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(408,28): error TS7005: Variable 'lmStudioModel' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(416,17): error TS2339: Property 'avgTtft' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(417,24): error TS2339: Property 'avgTtft' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(418,17): error TS2339: Property 'avgTtft' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(420,17): error TS2339: Property 'avgTtft' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(430,28): error TS7005: Variable 'lmStudioModel' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(440,16): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(440,39): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(446,17): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(479,10): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ openai: boolean; anthropic: boolean; google: boolean; }'.
+  No index signature with a parameter of type 'string' was found on type '{ openai: boolean; anthropic: boolean; google: boolean; }'.
+tests/live/tokenMetricsLive.live.test.ts(503,17): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(504,17): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(505,17): error TS2339: Property 'totalTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(508,17): error TS2339: Property 'totalTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(508,40): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(508,59): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(509,45): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(509,67): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(509,90): error TS2339: Property 'totalTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(513,25): error TS18047: 'result.doneUsage' is possibly 'null'.
+tests/live/tokenMetricsLive.live.test.ts(514,24): error TS18047: 'result.doneUsage' is possibly 'null'.
+tests/live/tokenMetricsLive.live.test.ts(514,56): error TS18047: 'result.doneUsage' is possibly 'null'.
+tests/live/tokenMetricsLive.live.test.ts(520,17): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(524,29): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(527,50): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(527,89): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(536,16): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(536,39): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(542,19): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(544,59): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(554,22): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(555,22): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(555,47): error TS2339: Property 'promptTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(556,97): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(566,16): error TS2339: Property 'avgTtft' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(566,37): error TS2339: Property 'avgTtft' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(569,32): error TS2339: Property 'avgTtft' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(593,10): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ openai: boolean; anthropic: boolean; google: boolean; }'.
+  No index signature with a parameter of type 'string' was found on type '{ openai: boolean; anthropic: boolean; google: boolean; }'.
+tests/live/tokenMetricsLive.live.test.ts(615,17): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(618,50): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(619,50): error TS2339: Property 'inputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(623,17): error TS2339: Property 'tool' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(623,33): error TS2339: Property 'name' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(634,30): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+tests/live/tokenMetricsLive.live.test.ts(643,12): error TS7006: Parameter 'e' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(646,45): error TS7006: Parameter 'e' implicitly has an 'any' type.
+tests/live/tokenMetricsLive.live.test.ts(659,33): error TS2339: Property 'subAgentId' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(661,46): error TS2339: Property 'subAgentId' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(662,29): error TS2339: Property 'usage' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(662,65): error TS2339: Property 'usage' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(668,19): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(673,44): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(675,60): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(685,16): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(685,39): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(689,44): error TS2339: Property 'tokPerSec' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(700,34): error TS2339: Property 'usage' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(702,57): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(703,21): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/live/tokenMetricsLive.live.test.ts(704,61): error TS2339: Property 'outputTokens' does not exist on type 'never'.
+tests/lmStudioProvider.test.ts(233,8): error TS2352: Conversion of type 'LmStudioLoadedInstance' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'LmStudioLoadedInstance'.
+tests/lmStudioProvider.test.ts(277,22): error TS2352: Conversion of type 'LmStudioLoadedInstance' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'LmStudioLoadedInstance'.
+tests/openai-responses-id.test.ts(26,26): error TS2339: Property 'role' does not exist on type 'ResponseInputItem'.
+  Property 'role' does not exist on type 'ResponseFileSearchToolCall'.
+tests/openai-responses-id.test.ts(27,26): error TS2339: Property 'content' does not exist on type 'ResponseInputItem'.
+  Property 'content' does not exist on type 'ResponseFileSearchToolCall'.
+tests/openai-responses-id.test.ts(33,29): error TS2339: Property 'id' does not exist on type 'ResponseInputItem'.
+  Property 'id' does not exist on type 'EasyInputMessage'.
+tests/openai-responses-id.test.ts(60,29): error TS2339: Property 'id' does not exist on type 'ResponseInputItem'.
+  Property 'id' does not exist on type 'EasyInputMessage'.
+tests/openai-responses-id.test.ts(85,29): error TS2339: Property 'id' does not exist on type 'ResponseInputItem'.
+  Property 'id' does not exist on type 'EasyInputMessage'.
+tests/openai-responses-id.test.ts(111,29): error TS2339: Property 'id' does not exist on type 'ResponseInputItem'.
+  Property 'id' does not exist on type 'EasyInputMessage'.
+tests/openai-responses-id.test.ts(138,29): error TS2339: Property 'id' does not exist on type 'ResponseInputItem'.
+  Property 'id' does not exist on type 'EasyInputMessage'.
+tests/openai-responses-id.test.ts(262,31): error TS2339: Property 'id' does not exist on type 'ResponseInputItem'.
+  Property 'id' does not exist on type 'EasyInputMessage'.
+tests/openai-responses-id.test.ts(266,29): error TS2339: Property 'id' does not exist on type 'ResponseInputItem'.
+  Property 'id' does not exist on type 'EasyInputMessage'.
+tests/openai-responses-id.test.ts(333,26): error TS2339: Property 'role' does not exist on type 'ResponseInputItem'.
+  Property 'role' does not exist on type 'ResponseFileSearchToolCall'.
+tests/openai-responses-id.test.ts(334,26): error TS2339: Property 'role' does not exist on type 'ResponseInputItem'.
+  Property 'role' does not exist on type 'ResponseFileSearchToolCall'.
+tests/openai-responses-id.test.ts(357,29): error TS2339: Property 'id' does not exist on type 'ResponseInputItem'.
+  Property 'id' does not exist on type 'EasyInputMessage'.
+tests/streamChunkDispatcher.test.ts(459,3): error TS2593: Cannot find name 'beforeEach'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+tests/streamingToolPersistence.test.ts(64,28): error TS7006: Parameter 'events' implicitly has an 'any' type.
+tests/streamingToolPersistence.test.ts(66,29): error TS7006: Parameter 'e' implicitly has an 'any' type.
+tests/streamingToolPersistence.test.ts(88,7): error TS7034: Variable 'originalFetch' implicitly has type 'any' in some locations where its type cannot be determined.
+tests/streamingToolPersistence.test.ts(95,24): error TS7005: Variable 'originalFetch' implicitly has an 'any' type.
+tests/streamingToolPersistence.test.ts(158,11): error TS7034: Variable 'chunks' implicitly has type 'any[]' in some locations where its type cannot be determined.
+tests/streamingToolPersistence.test.ts(166,12): error TS7005: Variable 'chunks' implicitly has an 'any[]' type.
+tests/textToSpeech.test.ts(12,16): error TS7006: Parameter 'res' implicitly has an 'any' type.
+tests/textToSpeech.test.ts(198,16): error TS7006: Parameter 'res' implicitly has an 'any' type.
+tests/tokenCostAccuracy.test.ts(296,23): error TS7006: Parameter 'model' implicitly has an 'any' type.
+tests/tokenCostAccuracy.test.ts(296,30): error TS7006: Parameter 'usage' implicitly has an 'any' type.
+tests/tokenCostAccuracy.test.ts(303,19): error TS7006: Parameter 'payload' implicitly has an 'any' type.
+tests/tokenCostAccuracy.test.ts(338,48): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/tokenCostAccuracy.test.ts(363,48): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/tokenCostAccuracy.test.ts(384,48): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/tokenCostAccuracy.test.ts(420,48): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/tokenCostAccuracy.test.ts(445,48): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/tokenCostAccuracy.test.ts(471,48): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/tokenCostAccuracy.test.ts(503,48): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/tokenCostAccuracy.test.ts(535,48): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/tokenCostAccuracy.test.ts(575,48): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/tokenCostAccuracy.test.ts(598,48): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/tokenCostAccuracy.test.ts(618,48): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/tokenCostAccuracy.test.ts(794,48): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+tests/toolCountSync.test.ts(338,50): error TS2345: Argument of type '(tool: Record<string, unknown>) => unknown' is not assignable to parameter of type '(value: ToolSchema, index: number, array: ToolSchema[]) => unknown'.
+  Types of parameters 'tool' and 'value' are incompatible.
+    Type 'ToolSchema' is not assignable to type 'Record<string, unknown>'.
+      Index signature for type 'string' is missing in type 'ToolSchema'.
+tests/toolCountSync.test.ts(375,50): error TS2345: Argument of type '(tool: Record<string, unknown>) => unknown' is not assignable to parameter of type '(value: ToolSchema, index: number, array: ToolSchema[]) => unknown'.
+  Types of parameters 'tool' and 'value' are incompatible.
+    Type 'ToolSchema' is not assignable to type 'Record<string, unknown>'.
+      Index signature for type 'string' is missing in type 'ToolSchema'.
+tests/toolCountSync.test.ts(411,50): error TS2345: Argument of type '(tool: Record<string, unknown>) => string' is not assignable to parameter of type '(value: ToolSchema, index: number, array: ToolSchema[]) => string'.
+  Types of parameters 'tool' and 'value' are incompatible.
+    Type 'ToolSchema' is not assignable to type 'Record<string, unknown>'.
+      Index signature for type 'string' is missing in type 'ToolSchema'.
+tests/toolCountSync.test.ts(454,50): error TS2345: Argument of type '(tool: Record<string, unknown>) => unknown' is not assignable to parameter of type '(value: ToolSchema, index: number, array: ToolSchema[]) => unknown'.
+  Types of parameters 'tool' and 'value' are incompatible.
+    Type 'ToolSchema' is not assignable to type 'Record<string, unknown>'.
+      Index signature for type 'string' is missing in type 'ToolSchema'.
+tests/toolCountSync.test.ts(503,43): error TS2345: Argument of type '(tool: Record<string, unknown>) => unknown' is not assignable to parameter of type '(value: ToolSchemaFull | InternalToolSchema | { name: "create_team"; emoji: string[]; description: string; parameters: { type: string; properties: { name: { ...; }; ... 5 more ...; teamName?: undefined; }; required: string[]; }; } | { ...; } | { ...; } | { ...; } | { ...; }, index: number, array: (ToolSchemaFull | ....'.
+  Types of parameters 'tool' and 'value' are incompatible.
+    Type 'ToolSchemaFull | InternalToolSchema | { name: "create_team"; emoji: string[]; description: string; parameters: { type: string; properties: { name: { type: string; description: string; }; ... 5 more ...; teamName?: undefined; }; required: string[]; }; } | { ...; } | { ...; } | { ...; } | { ...; }' is not assignable to type 'Record<string, unknown>'.
+      Type 'InternalToolSchema' is not assignable to type 'Record<string, unknown>'.
+        Index signature for type 'string' is missing in type 'InternalToolSchema'.
+tests/topologyRouters.test.ts(512,32): error TS2345: Argument of type '{ agent_id: string; status: string; result: string; summary: string; toolUses: number; durationMs: number; iterations: number; messages: never[]; }' is not assignable to parameter of type 'SubAgentResult | { error: string; }'.
+  Property 'description' is missing in type '{ agent_id: string; status: string; result: string; summary: string; toolUses: number; durationMs: number; iterations: number; messages: never[]; }' but required in type 'SubAgentResult'.
+tests/topologyRouters.test.ts(557,32): error TS2345: Argument of type '{ agent_id: string; status: string; result: null; summary: string; toolUses: number; toolNames: { write_file: number; }; iterations: number; durationMs: number; messages: never[]; }' is not assignable to parameter of type 'SubAgentResult | { error: string; }'.
+  Property 'description' is missing in type '{ agent_id: string; status: string; result: null; summary: string; toolUses: number; toolNames: { write_file: number; }; iterations: number; durationMs: number; messages: never[]; }' but required in type 'SubAgentResult'.
+tests/topologyRouters.test.ts(568,32): error TS2345: Argument of type '{ agent_id: string; status: string; result: string; summary: string; toolUses: number; durationMs: number; iterations: number; messages: never[]; }' is not assignable to parameter of type 'SubAgentResult | { error: string; }'.
+  Property 'description' is missing in type '{ agent_id: string; status: string; result: string; summary: string; toolUses: number; durationMs: number; iterations: number; messages: never[]; }' but required in type 'SubAgentResult'.

@@ -813,7 +813,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
         project: "test-project",
         username: "test-user",
         agent: null,
-        providerName: "google",
+        providerName: PROVIDERS.GOOGLE,
         resolvedModel: "gemini-3-flash-preview",
         traceId: null,
         maxIterations: 25,

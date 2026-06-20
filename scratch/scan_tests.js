@@ -1,108 +1,174 @@
 import fs from 'fs';
 import path from 'path';
 
-const TESTS_DIR = '/home/rodrigo/development/prism-service/tests';
+const testsDir = '/home/rodrigo/development/prism-service/tests';
 
-function walkDir(dir, fileList = []) {
-  const files = fs.readdirSync(dir);
-  for (const file of files) {
+function walkDir(dir) {
+  let results = [];
+  const list = fs.readdirSync(dir);
+  list.forEach(file => {
     const filePath = path.join(dir, file);
     const stat = fs.statSync(filePath);
-    if (stat.isDirectory()) {
-      if (file !== 'node_modules' && file !== 'scratch') {
-        walkDir(filePath, fileList);
-      }
+    if (stat && stat.isDirectory()) {
+      results = results.concat(walkDir(filePath));
     } else if (file.endsWith('.test.ts') || file.endsWith('.spec.ts')) {
-      fileList.push(filePath);
+      results.push(filePath);
     }
-  }
-  return fileList;
+  });
+  return results;
 }
 
-const testFiles = walkDir(TESTS_DIR);
-console.log(`Found ${testFiles.length} test files to scan.`);
+const testFiles = walkDir(testsDir);
 
-const results = [];
+const findings = [];
+
+// Load constants to check
+const promptDelimiters = {
+  SYSTEM_CONTEXT: "[System Context]",
+  SYSTEM_CONTEXT_LOCAL_TIME_PREFIX: "[System Context - Local Time:",
+  CONTEXT_NOTE_PREFIX: "[CONTEXT NOTE:",
+  USER_MESSAGE: "[User Message]",
+  PROJECT_SKILLS: "[Project Skills]",
+  AGENT_MEMORY: "[Agent Memory]",
+  SOMATIC_STATE: "[Somatic State",
+  CONVERSATION_SUMMARY: "[Conversation Summary",
+};
+
+const providers = {
+  OPENAI: "openai",
+  ANTHROPIC: "anthropic",
+  GOOGLE: "google",
+  ELEVENLABS: "elevenlabs",
+  INWORLD: "inworld",
+  LM_STUDIO: "lm-studio",
+  VLLM: "vllm",
+  OLLAMA: "ollama",
+  LLAMA_CPP: "llama-cpp",
+};
+
+const collections = {
+  REQUESTS: "requests",
+  MODEL_CONVERSATIONS: "model_conversations",
+  AGENT_CONVERSATIONS: "agent_conversations",
+  WORKFLOWS: "workflows",
+  BENCHMARKS: "benchmarks",
+  BENCHMARK_RUNS: "benchmark_runs",
+  SYNTHESIS: "synthesis",
+  FAVORITES: "favorites",
+  AGENT_SKILLS: "agent_skills",
+  AGENT_RULES: "agent_rules",
+  MCP_SERVERS: "mcp_servers",
+  MEMORIES: "memories",
+  MEMORY_CONSOLIDATION_RUNS: "memory_consolidation_runs",
+  MEMORY_CONSOLIDATION_HISTORY: "memory_consolidation_history",
+  VRAM_BENCHMARKS: "vram_benchmarks",
+  SETTINGS: "settings",
+  CUSTOM_AGENTS: "custom_agents",
+  WORKSPACES: "workspaces",
+  TOOL_CONTEXT: "tool_context",
+  SCHEDULED_TASKS: "scheduled_tasks",
+  CONVERSATION_TIMERS: "conversation_timers",
+  PROMPTS: "prompts",
+  WEBHOOK_SUBSCRIPTIONS: "webhook_subscriptions",
+  SOMATIC_STATE: "somatic_state",
+  WORKFLOW_MEMORIES: "workflow_memories",
+};
+
+const harnessIds = {
+  STANDARD: "standard",
+  TREE_OF_THOUGHT: "tree_of_thought",
+};
+
+const reasoningStrategies = {
+  CHAIN_OF_THOUGHT: "chain_of_thought",
+  TREE_OF_THOUGHTS: "tree_of_thoughts",
+  GRAPH_OF_THOUGHTS: "graph_of_thoughts",
+};
 
 for (const file of testFiles) {
-  const content = fs.readFileSync(file, 'utf8');
+  const content = fs.readFileSync(file, 'utf-8');
   const lines = content.split('\n');
-  const relativePath = path.relative('/home/rodrigo/development/prism-service', file);
 
-  const interfaces = [];
-  const types = [];
-  const anyAssertions = [];
-  const mocks = [];
-  const hardcodedStrings = [];
+  lines.forEach((line, index) => {
+    const lineNum = index + 1;
 
-  // Simple scan
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const lineNumber = i + 1;
-
-    // Detect interfaces
-    const interfaceMatch = line.match(/^\s*interface\s+(\w+)/);
-    if (interfaceMatch) {
-      interfaces.push({ name: interfaceMatch[1], line: lineNumber, content: line.trim() });
-    }
-
-    // Detect types
-    const typeMatch = line.match(/^\s*type\s+(\w+)\s*=/);
-    if (typeMatch && !typeMatch[1].includes('Test') && !typeMatch[1].includes('Mock')) {
-      types.push({ name: typeMatch[1], line: lineNumber, content: line.trim() });
-    }
-
-    // Detect 'as any' / 'as unknown'
-    if (line.includes('as any') || line.includes('as unknown')) {
-      anyAssertions.push({ line: lineNumber, content: line.trim() });
-    }
-
-    // Detect vi.mock
-    if (line.includes('vi.mock(')) {
-      mocks.push({ line: lineNumber, content: line.trim() });
-    }
-
-    // Detect prompt delimiters or specific magic strings
-    const magicStrings = [
-      '\\[System Context\\]',
-      '\\[CONTEXT NOTE:',
-      '\\[User Message\\]',
-      '\\[Project Skills\\]',
-      '\\[Agent Memory\\]',
-      '\\[Somatic State',
-      '\\[Conversation Summary',
-      'chain_of_thought',
-      'tree_of_thoughts',
-      'graph_of_thoughts',
-      'tree_of_thought',
-      'estimation',
-      'vram_benchmarks',
-      'somatic_state',
-      'requests',
-      'model_conversations',
-      'agent_conversations',
-      'workflows'
-    ];
-
-    for (const pattern of magicStrings) {
-      const regex = new RegExp(`['"]${pattern}['"]|['"]${pattern}`);
-      if (regex.test(line)) {
-        hardcodedStrings.push({ pattern, line: lineNumber, content: line.trim() });
+    // Category 1: Interfaces / Types defined in tests
+    // Check if the line defines an interface or type that mirrors production types
+    // (Filtering out obvious test-only things like TestContext, MockConfig, etc.)
+    if ((line.trim().startsWith('interface ') || line.trim().startsWith('type ')) && 
+        !line.includes('import ') && !line.includes('export ')) {
+      // Find what type it is
+      const match = line.match(/(?:interface|type)\s+([a-zA-Z0-9_]+)/);
+      if (match) {
+        const typeName = match[1];
+        if (!['TestContext', 'MockConfig', 'TestEvent', 'TestPayload', 'FinalizerInput', 'TestAssemblyInput', 'TimelineEvent', 'ConsumeOptions', 'AgentStreamPayload', 'TransformedLmStudioModel', 'TransformedOllamaModelsResponse'].includes(typeName)) {
+          findings.push({
+            file,
+            lineNum,
+            category: 'Duplicated Types & Interfaces',
+            severity: '🔴',
+            detail: `Found local type declaration: "${typeName}" in ${path.basename(file)}`,
+            lineContent: line.trim()
+          });
+        }
       }
     }
-  }
 
-  if (interfaces.length > 0 || types.length > 0 || anyAssertions.length > 0 || mocks.length > 0 || hardcodedStrings.length > 0) {
-    results.push({
-      file: relativePath,
-      interfaces,
-      types,
-      anyAssertions,
-      mocks,
-      hardcodedStrings
-    });
-  }
+    // Category 2: Hard-Coded Magic Strings & Values
+    // Check for delimiter markers
+    for (const [key, val] of Object.entries(promptDelimiters)) {
+      if (line.includes(`"${val}"`) || line.includes(`'${val}'`) || line.includes(`\`${val}`)) {
+        // If not already imported/using PROMPT_DELIMITERS
+        if (!line.includes(`PROMPT_DELIMITERS.`)) {
+          findings.push({
+            file,
+            lineNum,
+            category: 'Hard-Coded Magic Strings & Values',
+            severity: '🟡',
+            detail: `Hard-coded prompt delimiter: "${val}" (should use PROMPT_DELIMITERS.${key})`,
+            lineContent: line.trim()
+          });
+        }
+      }
+    }
+
+    // Check for collections
+    for (const [key, val] of Object.entries(collections)) {
+      // Look for collection names passed as literals, e.g. "requests" or 'requests'
+      const searchRegex = new RegExp(`['"\`]${val}['"\`]`);
+      if (searchRegex.test(line)) {
+        if (!line.includes(`COLLECTIONS.`) && !line.includes('import') && !line.includes('export')) {
+          findings.push({
+            file,
+            lineNum,
+            category: 'Hard-Coded Magic Strings & Values',
+            severity: '🟡',
+            detail: `Hard-coded collection name: "${val}" (should use COLLECTIONS.${key})`,
+            lineContent: line.trim()
+          });
+        }
+      }
+    }
+
+    // Check for providers
+    for (const [key, val] of Object.entries(providers)) {
+      // Regex search for provider name literals, only matching when it's a specific configuration property
+      // like `provider: "openai"` or `providerName: 'openai'` or expect().toBe("openai")
+      const searchRegex = new RegExp(`(?:provider|providerName|providerName:|provider:)\\s*[:=]?\\s*['"\`]${val}['"\`]`);
+      if (searchRegex.test(line)) {
+        if (!line.includes(`PROVIDERS.`) && !line.includes('import') && !line.includes('export')) {
+          findings.push({
+            file,
+            lineNum,
+            category: 'Hard-Coded Magic Strings & Values',
+            severity: '🟡',
+            detail: `Hard-coded provider name: "${val}" (should use PROVIDERS.${key})`,
+            lineContent: line.trim()
+          });
+        }
+      }
+    }
+  });
 }
 
-fs.writeFileSync('/home/rodrigo/development/prism-service/scratch/audit_raw_results.json', JSON.stringify(results, null, 2));
-console.log('Scan completed. Raw audit results written to scratch/audit_raw_results.json.');
+console.log(JSON.stringify(findings, null, 2));

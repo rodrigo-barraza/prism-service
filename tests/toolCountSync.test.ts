@@ -249,7 +249,7 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
   it("every tool in CORE_ORCHESTRATOR_TOOLS is system:true in getClientToolSchemas()", () => {
     const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
     const systemToolNames = new Set(
-      clientSchemas.filter((tool: Record<string, unknown>) => tool.system === true).map((tool: Record<string, unknown>) => tool.name),
+      clientSchemas.filter((tool: any) => tool.system === true).map((tool: any) => tool.name),
     );
 
     for (const toolName of CORE_ORCHESTRATOR_TOOLS) {
@@ -260,7 +260,7 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
   it("every tool in InternalToolRegistry is system:true in getClientToolSchemas()", () => {
     const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
     const systemToolNames = new Set(
-      clientSchemas.filter((tool: Record<string, unknown>) => tool.system === true).map((tool: Record<string, unknown>) => tool.name),
+      clientSchemas.filter((tool: any) => tool.system === true).map((tool: any) => tool.name),
     );
 
     for (const toolName of MOCK_INTERNAL_NAMES) {
@@ -283,22 +283,22 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
     // Simulate sidebar filter (actual ConfigRoutes logic)
     const sidebarBypassNames = new Set(
       clientSchemas
-        .filter((tool: Record<string, unknown>) =>
+        .filter((tool: any) =>
           tool.system === true || CORE_AGENTIC_SET.has(tool.name as string),
         )
-        .map((tool: Record<string, unknown>) => tool.name as string),
+        .map((tool: any) => tool.name as string),
     );
 
     // Simulate resolver bypass (AgenticToolResolver logic)
     const ORCHESTRATOR_SET = new Set<string>(CORE_ORCHESTRATOR_TOOLS);
     const resolverBypassNames = new Set(
       clientSchemas
-        .filter((tool: Record<string, unknown>) =>
+        .filter((tool: any) =>
           CORE_AGENTIC_SET.has(tool.name as string) ||
           ORCHESTRATOR_SET.has(tool.name as string) ||
           MOCK_INTERNAL_NAMES.has(tool.name as string),
         )
-        .map((tool: Record<string, unknown>) => tool.name as string),
+        .map((tool: any) => tool.name as string),
     );
 
     // Resolver bypass should be a subset of sidebar bypass
@@ -314,7 +314,7 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
       (name) => !resolverBypassNames.has(name),
     );
     for (const toolName of inSidebarNotResolver) {
-      const tool = clientSchemas.find((tool: Record<string, unknown>) => tool.name === toolName);
+      const tool = clientSchemas.find((tool: any) => tool.name === toolName);
       expect(tool?.system).toBe(true);
       expect(tool?.domain).toBe(DOMAINS.CORE_WORKSPACE.displayName);
     }
@@ -335,8 +335,8 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
     const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
 
     // Both should return ALL tools (no filtering for wildcard)
-    const resolverNames = new Set(finalTools.map((tool: Record<string, unknown>) => tool.name));
-    const clientNames = new Set(clientSchemas.map((tool: Record<string, unknown>) => tool.name));
+    const resolverNames = new Set(finalTools.map((tool: any) => tool.name));
+    const clientNames = new Set(clientSchemas.map((tool: any) => tool.name));
 
     const inResolverNotClient = [...resolverNames].filter((name) => !clientNames.has(name));
     const inClientNotResolver = [...clientNames].filter((name) => !resolverNames.has(name));
@@ -372,8 +372,8 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
         CORE_AGENTIC_SET.has(tool.name as string),
     );
 
-    const resolverNames = new Set(finalTools.map((tool: Record<string, unknown>) => tool.name));
-    const sidebarNames = new Set(sidebarTools.map((tool: Record<string, unknown>) => tool.name));
+    const resolverNames = new Set(finalTools.map((tool: any) => tool.name));
+    const sidebarNames = new Set(sidebarTools.map((tool: any) => tool.name));
 
     // Resolver should be a subset of sidebar (sidebar has extra workspace tools)
     const inResolverNotSidebar = [...resolverNames].filter((name) => !sidebarNames.has(name));
@@ -408,8 +408,8 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
       (tool: Record<string, unknown>) => enabledSet.has(tool.name as string),
     );
 
-    const resolverNames = new Set(finalTools.map((tool: Record<string, unknown>) => tool.name as string));
-    const sidebarNames = new Set(sidebarTools.map((tool: Record<string, unknown>) => tool.name as string));
+    const resolverNames = new Set(finalTools.map((tool: any) => tool.name as string));
+    const sidebarNames = new Set(sidebarTools.map((tool: any) => tool.name as string));
 
     // Resolver still injects prism-local + orchestrator tools even for unlocked personas.
     // The sidebar does NOT. This is an expected divergence when coreToolsLocked is false
@@ -451,7 +451,7 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
       modelDefinition: undefined,
     });
 
-    const resolverNames = new Set(finalTools.map((tool: Record<string, unknown>) => tool.name));
+    const resolverNames = new Set(finalTools.map((tool: any) => tool.name));
 
     for (const toolName of CORE_ORCHESTRATOR_TOOLS) {
       expect(resolverNames.has(toolName)).toBe(false);
@@ -465,7 +465,7 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
     // If a tool is system:true but NOT in any bypass set, it would show in the
     // sidebar but NOT in the system prompt → count mismatch (sidebar > prompt).
     const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
-    const systemTools = clientSchemas.filter((tool: Record<string, unknown>) => tool.system === true);
+    const systemTools = clientSchemas.filter((tool: any) => tool.system === true);
 
     const allBypassTools = new Set<string>([
       ...CORE_AGENTIC_TOOLS,
@@ -474,7 +474,7 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
     ]);
 
     const unaccountedSystemTools = systemTools.filter(
-      (tool: Record<string, unknown>) => !allBypassTools.has(tool.name as string),
+      (tool: any) => !allBypassTools.has(tool.name as string),
     );
 
     // Core workspace tools from tools-api (like read_file, write_file) are system:true
@@ -500,8 +500,8 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
     const aiSchemas = ToolOrchestratorService.getToolSchemas();
     const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
 
-    const aiNames = new Set(aiSchemas.map((tool: Record<string, unknown>) => tool.name));
-    const clientNames = new Set(clientSchemas.map((tool: Record<string, unknown>) => tool.name));
+    const aiNames = new Set(aiSchemas.map((tool: any) => tool.name));
+    const clientNames = new Set(clientSchemas.map((tool: any) => tool.name));
 
     const inAiNotClient = [...aiNames].filter((name) => !clientNames.has(name));
     const inClientNotAi = [...clientNames].filter((name) => !aiNames.has(name));

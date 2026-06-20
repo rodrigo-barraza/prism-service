@@ -230,7 +230,7 @@ describe("LM Studio listModels response parsing", () => {
     expect(result.models[0].loaded_instances).toBeDefined();
     expect(result.models[0].loaded_instances!.length).toBe(1);
     expect(
-      (result.models[0].loaded_instances![0] as Record<string, unknown>).id,
+      (result.models[0].loaded_instances![0] as any).id,
     ).toBe(TEST_MODEL);
   });
 
@@ -274,7 +274,7 @@ describe("LM Studio listModels response parsing", () => {
 
     expect(result.models[0].loaded_instances!.length).toBe(3);
     const instanceIds = result.models[0].loaded_instances!.map(
-      (instance) => (instance as Record<string, unknown>).id,
+      (instance) => (instance as any).id,
     );
     expect(instanceIds).toContain(TEST_MODEL);
     expect(instanceIds).toContain(`${TEST_MODEL}:2`);

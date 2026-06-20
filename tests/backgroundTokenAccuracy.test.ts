@@ -209,7 +209,7 @@ describe("Background Token Accuracy", () => {
 
     it("falls back to heuristic when usage is not provided at all", async () => {
       // Simulates a legacy caller that doesn't pass usage
-      const { usage: _unused, ...parametersWithoutUsage } = baseArgs;
+      const { usage: _unused, ...parametersWithoutUsage } = baseArgs as any;
       await RequestLogger.logBackgroundLlmCall(parametersWithoutUsage);
 
       expect(mockInsertOne).toHaveBeenCalledTimes(1);
@@ -318,7 +318,7 @@ describe("Background Token Accuracy", () => {
         outputTokens: 108,
       };
 
-      const cost = calculateTextCost(heuristicUsage, haikuPricing);
+      const cost = calculateTextCost(heuristicUsage, haikuPricing)!;
       // (1001 / 1M) * 1.0 + (108 / 1M) * 5.0
       // = 0.001001 + 0.00054
       // = 0.001541
@@ -353,7 +353,7 @@ describe("Background Token Accuracy", () => {
         outputTokens: 2751,
       };
 
-      const cost = calculateTextCost(heuristicUsage, haikuPricing);
+      const cost = calculateTextCost(heuristicUsage, haikuPricing)!;
       // (3259 / 1M) * 1.0 + (2751 / 1M) * 5.0
       // = 0.003259 + 0.013755
       // = 0.017014

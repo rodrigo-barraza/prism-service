@@ -61,9 +61,9 @@ vi.mock("../src/utils/AbortController.ts", () => ({
  * @param {Array<object>} events — SSE event objects to emit
 
  */
-function createSSEResponse(events) {
+function createSSEResponse(events: any[]) {
   const encoder = new TextEncoder();
-  const lines = events.map((e) => `data: ${JSON.stringify(e)}`).join("\n") + "\n";
+  const lines = events.map((e: any) => `data: ${JSON.stringify(e)}`).join("\n") + "\n";
 
   const stream = new ReadableStream({
     start(controller) {
@@ -85,7 +85,7 @@ const { default: ToolOrchestratorService } = await import(
 
 // ═══════════════════════════════════════════════════════════════
 describe("ToolOrchestratorService.executeToolStreaming", () => {
-  let originalFetch;
+  let originalFetch: any;
 
   beforeEach(() => {
     originalFetch = globalThis.fetch;
@@ -107,11 +107,11 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
       ]),
     );
 
-    const chunks = [];
+    const chunks: any[] = [];
     const result = await ToolOrchestratorService.executeToolStreaming(
       "execute_command",
       { command: "echo hello" },
-      (event, data) => chunks.push({ event, data }),
+      (event: any, data: any) => chunks.push({ event, data }),
     );
 
     // The result must contain the full stdout
@@ -155,11 +155,11 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
       ]),
     );
 
-    const chunks = [];
+    const chunks: any[] = [];
     await ToolOrchestratorService.executeToolStreaming(
       "execute_command",
       { command: "test" },
-      (event, data, meta) => chunks.push({ event, data, meta }),
+      (event: any, data: any, meta: any) => chunks.push({ event, data, meta }),
     );
 
     // Verify onChunk was called for each SSE event

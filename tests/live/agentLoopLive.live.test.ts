@@ -46,23 +46,23 @@ const SSE_IDLE_TIMEOUT_MS = 60_000;     // No SSE event for 60s = hung
 async function findTargetModel() {
   const res = await fetch(`${LM_STUDIO_URL}/api/v1/models`);
   if (!res.ok) throw new Error("LM Studio not responding");
-  const data = await res.json();
+  const data = (await res.json()) as any;
   const models = data.models || data.data || [];
 
   // Try each pattern in priority order
   for (const pattern of TARGET_MODEL_PATTERNS) {
-    const match = models.find((m) => pattern.test(m.key || m.id));
+    const match = models.find((m: any) => pattern.test(m.key || m.id));
     if (match) return match.key || match.id;
   }
 
   // Fallback: return any loaded conversational model
   const loaded = models.find(
-    (m) => m.loaded_instances?.length > 0 && m.type !== TYPES.EMBEDDING,
+    (m: any) => m.loaded_instances?.length > 0 && m.type !== TYPES.EMBEDDING,
   );
   if (loaded) return loaded.key || loaded.id;
 
   // Last resort: return first conversational model
-  const first = models.find((m) => m.type !== TYPES.EMBEDDING);
+  const first = models.find((m: any) => m.type !== TYPES.EMBEDDING);
   return first ? first.key || first.id : null;
 }
 
@@ -70,16 +70,14 @@ async function findTargetModel() {
  * Parse SSE events from a streaming response.
  * Returns a structured result with all events categorized.
  *
-
-
- * @returns {Promise<object>} Parsed result
+ * @returns {Promise<any>} Parsed result
  */
-async function consumeAgentSSE(response, { timeoutMs = AGENT_TIMEOUT_MS, controller } = {}) {
-  const reader = response.body.getReader();
+async function consumeAgentSSE(response: any, { timeoutMs = AGENT_TIMEOUT_MS, controller }: any = {}) {
+  const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
-  const result = {
+  const result: any = {
     events: [],
     chunks: [],          // text chunks
     thinkingChunks: [],  // thinking/reasoning chunks
@@ -130,7 +128,7 @@ async function consumeAgentSSE(response, { timeoutMs = AGENT_TIMEOUT_MS, control
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
-      buffer = lines.pop();
+      buffer = lines.pop() || "";
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -199,7 +197,7 @@ async function consumeAgentSSE(response, { timeoutMs = AGENT_TIMEOUT_MS, control
       // If we see done, stop reading
       if (result.done) break;
     }
-  } catch (error) {
+  } catch (error: any) {
     if (error.name === "AbortError") {
       result.aborted = true;
     } else {
@@ -217,11 +215,9 @@ async function consumeAgentSSE(response, { timeoutMs = AGENT_TIMEOUT_MS, control
 /**
  * Send an agentic request via SSE streaming.
  *
-
-
- * @returns {Promise<object>} Parsed SSE result
+ * @returns {Promise<any>} Parsed SSE result
  */
-async function agentStream(payload, { timeoutMs = AGENT_TIMEOUT_MS } = {}) {
+async function agentStream(payload: any, { timeoutMs = AGENT_TIMEOUT_MS }: any = {}) {
   const controller = new AbortController();
   const response = await fetch(`${PRISM_SERVICE_URL}/agent`, {
     method: "POST",
@@ -246,7 +242,7 @@ async function agentStream(payload, { timeoutMs = AGENT_TIMEOUT_MS } = {}) {
  * Send a non-streaming agentic request (?stream=false).
  * Simpler for basic tests — returns JSON directly.
  */
-async function agentJSON(payload) {
+async function agentJSON(payload: any) {
   const response = await fetch(`${PRISM_SERVICE_URL}/agent?stream=false`, {
     method: "POST",
     headers: {
@@ -257,7 +253,7 @@ async function agentJSON(payload) {
     body: JSON.stringify(payload),
   });
 
-  const body = await response.json();
+  const body = (await response.json()) as any;
   if (!response.ok || body.error) {
     throw new Error(body.message || body.error || `HTTP ${response.status}`);
   }
@@ -267,7 +263,7 @@ async function agentJSON(payload) {
 /**
  * Helper to log a test result with timing and phase info.
  */
-function logResult(label, result) {
+function logResult(label: any, result: any) {
   const dur = (result.durationMs / 1000).toFixed(1);
   const phases = [...result.phases].join(" → ");
   const textLen = result.text.length;
@@ -284,17 +280,17 @@ function logResult(label, result) {
   console.log(`  │ Thinking:       ${String(thinkLen).padEnd(40)}│`);
   console.log(`  │ PP starts:      ${`${ppStarts} (${ppProgress} ticks)`.padEnd(40)}│`);
   console.log(`  │ Model loads:    ${`${loadStarts} (${loadProgress} ticks)`.padEnd(40)}│`);
-  console.log(`  │ Iterations:     ${String(result.statuses.filter((s) => s.message === "iteration_progress").length).padEnd(40)}│`);
+  console.log(`  │ Iterations:     ${String(result.statuses.filter((s: any) => s.message === "iteration_progress").length).padEnd(40)}│`);
   console.log(`  │ Tool calls:     ${String(result.toolCalls.length).padEnd(40)}│`);
   console.log(`  │ Errors:         ${String(result.errors.length).padEnd(40)}│`);
   console.log(`  │ Total events:   ${String(result.totalEvents).padEnd(40)}│`);
   // Event type breakdown
-  const typeCounts = {};
+  const typeCounts: any = {};
   for (const e of result.events) typeCounts[e.type] = (typeCounts[e.type] || 0) + 1;
   const typeStr = Object.entries(typeCounts).map(([k, v]) => `${k}:${v}`).join(" ");
   console.log(`  │ Types:          ${typeStr.padEnd(40).slice(0, 40)}│`);
   // Dump usage event
-  const usageEv = result.events.find((e) => e.type === "usage_update" || e.type === "done");
+  const usageEv = result.events.find((e: any) => e.type === "usage_update" || e.type === "done");
   if (usageEv?.usage) {
     const u = usageEv.usage;
     console.log(`  │ Usage:          in=${u.inputTokens || 0} out=${u.outputTokens || 0} reason=${u.reasoningOutputTokens || 0}`.padEnd(60).slice(0, 60) + "│");
@@ -312,7 +308,7 @@ function logResult(label, result) {
 // Test Suite
 // ═══════════════════════════════════════════════════════════════
 
-let targetModel = null;
+let targetModel: any = null;
 const agentConversationId = crypto.randomUUID();
 
 beforeAll(async () => {
@@ -519,7 +515,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     });
 
     // Read a few events then abort
-    const reader = response.body.getReader();
+    const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let eventCount = 0;
 
@@ -560,19 +556,19 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
         // If we got a done event or meaningful output, we're good
         if (followUp.done || followUp.text.length > 0) break;
         // If we got a "terminated" error, the model is still recovering
-        if (followUp.errors.some((e) => e.message?.includes("terminated"))) {
+        if (followUp.errors.some((e: any) => e.message?.includes("terminated"))) {
           console.log(`  ⚠ Attempt ${attempt}: model still recovering, retrying…`);
           await new Promise((r) => setTimeout(r, 3000));
           followUp = null;
           continue;
         }
         break;
-      } catch (error) {
+      } catch (error: any) {
         if (attempt < 3 && error.message?.includes("ECONNREFUSED")) {
           console.log(`  ⚠ Attempt ${attempt}: server not ready, retrying in 3s…`);
           await new Promise((r) => setTimeout(r, 3000));
         } else {
-          throw err;
+          throw error;
         }
       }
     }
@@ -707,10 +703,10 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
 
     // Check if the model actually spawned workers
     const workerEvents = turn1.statuses.filter(
-      (s) => s.message === "workers_updated",
+      (s: any) => s.message === "workers_updated",
     );
     const teamCreateCalls = turn1.toolCalls.filter(
-      (t) => t.tool?.name === "team_create" || t.name === "team_create",
+      (t: any) => t.tool?.name === "team_create" || t.name === "team_create",
     );
     console.log(
       `  📊 Workers spawned: ${workerEvents.length > 0 ? "yes" : "no"} | ` +

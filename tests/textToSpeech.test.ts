@@ -9,7 +9,7 @@ describe("POST /text-to-audio", () => {
     MOCK_GENERATE_SPEECH.mockResolvedValue({
       contentType: "audio/mpeg",
       stream: {
-        pipe: (res) => {
+        pipe: (res: any) => {
           res.write(Buffer.from("fake-audio-data"));
           res.end();
         },
@@ -195,7 +195,7 @@ describe("POST /text-to-audio", () => {
     MOCK_GENERATE_SPEECH.mockResolvedValueOnce({
       contentType: "audio/wav",
       stream: {
-        pipe: (res) => {
+        pipe: (res: any) => {
           res.write(Buffer.from("wav-data"));
           res.end();
         },
