@@ -82,7 +82,6 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
       const username = req.username || "any";
       const { db } = req;
 
@@ -91,7 +90,8 @@ router.get(
         return res.status(400).json({ error: parsed.error.format() });
       }
 
-      const { limit, cursor, agent, type = "all", taskId } = parsed.data;
+      const { limit, cursor, agent, type = "all", taskId, project: queryProject } = parsed.data;
+      const project = queryProject || req.project || "any";
 
       // Include conversations created under DEFAULT_USERNAME ("anonymous")
       // as a fallback — handles the migration scenario where conversations
@@ -355,7 +355,8 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
+      const queryProject = req.query.project as string | undefined;
+      const project = queryProject || req.project || "any";
       const username = req.username || "any";
       const { db } = req;
       const conversationId = req.params.id as string;
@@ -500,7 +501,8 @@ router.post(
   "/:id/messages",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
+      const queryProject = req.query.project as string | undefined;
+      const project = queryProject || req.project || "any";
       const username = req.username || "any";
       const { db } = req;
       const conversationId = req.params.id as string;
@@ -558,7 +560,8 @@ router.patch(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
+      const queryProject = req.query.project as string | undefined;
+      const project = queryProject || req.project || "any";
       const username = req.username || "any";
       const { db } = req;
       const conversationId = req.params.id as string;
@@ -626,7 +629,8 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
+      const queryProject = req.query.project as string | undefined;
+      const project = queryProject || req.project || "any";
       const username = req.username || "any";
       const { db } = req;
       const conversationId = req.params.id as string;
