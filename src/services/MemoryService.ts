@@ -49,7 +49,6 @@ export interface MemoryStoreParams {
   conversationId?: string | null;
   traceId?: string;
   agentConversationId?: string;
-  agentSessionId?: string;
   endpoint?: string;
 }
 
@@ -72,7 +71,6 @@ export interface MemorySearchParams {
   limit?: number;
   traceId?: string;
   agentConversationId?: string;
-  agentSessionId?: string;
   endpoint?: string;
   username?: string;
 }
@@ -98,7 +96,6 @@ export interface EmbedOptions {
   project?: string | null;
   traceId?: string;
   agentConversationId?: string;
-  agentSessionId?: string;
   endpoint?: string;
   agent?: string;
   username?: string;
@@ -223,8 +220,7 @@ ${participantList}`;
       provider: extractionProvider,
       model: extractionModel,
       traceId: (meta.traceId as string) || null,
-      agentConversationId: (meta.agentConversationId as string) || (meta.agentSessionId as string) || null,
-      agentSessionId: (meta.agentConversationId as string) || (meta.agentSessionId as string) || null,
+      agentConversationId: (meta.agentConversationId as string) || null,
       aiMessages,
       resultText: result?.text || "",
       usage: result?.usage || null,
@@ -274,7 +270,6 @@ const MemoryService = {
     conversationId,
     traceId,
     agentConversationId,
-    agentSessionId,
     endpoint,
   }: MemoryStoreParams) {
     if (!agent)
@@ -291,7 +286,6 @@ const MemoryService = {
       const embedOpts: EmbedOptions = { project };
       if (traceId) embedOpts.traceId = traceId;
       if (agentConversationId) embedOpts.agentConversationId = agentConversationId;
-      if (agentSessionId) embedOpts.agentSessionId = agentSessionId;
       if (endpoint) embedOpts.endpoint = endpoint;
       if (agent) embedOpts.agent = agent;
       if (username) embedOpts.username = username;
@@ -337,8 +331,7 @@ const MemoryService = {
       content,
       embedding,
       conversationId: conversationId || null,
-      agentConversationId: agentConversationId || agentSessionId || null,
-      agentSessionId: agentConversationId || agentSessionId || null,
+      agentConversationId: agentConversationId || null,
       createdAt: now,
       updatedAt: now,
     };
@@ -431,7 +424,6 @@ const MemoryService = {
     limit = 10,
     traceId,
     agentConversationId,
-    agentSessionId,
     endpoint,
     username,
   }: MemorySearchParams) {
@@ -442,7 +434,6 @@ const MemoryService = {
     const embeddingOpts: EmbedOptions = {};
     if (traceId) embeddingOpts.traceId = traceId;
     if (agentConversationId) embeddingOpts.agentConversationId = agentConversationId;
-    if (agentSessionId) embeddingOpts.agentSessionId = agentSessionId;
     if (project) embeddingOpts.project = project;
     if (endpoint) embeddingOpts.endpoint = endpoint;
     if (agent) embeddingOpts.agent = agent;

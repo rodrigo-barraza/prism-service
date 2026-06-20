@@ -190,10 +190,10 @@ export default {
       }),
     );
 
-    const sessionId = context.agentSessionId;
-    if (!sessionId) {
+    const agentConversationId = context.agentConversationId;
+    if (!agentConversationId) {
       return {
-        error: "No conversation — ask_user_question requires an active session",
+        error: "No conversation — ask_user_question requires an active conversation",
       };
     }
 
@@ -223,7 +223,7 @@ export default {
         () => resolve({ answers: null, timedOut: true }),
         300_000,
       );
-      AgenticLoopService._setPendingQuestion(sessionId, {
+      AgenticLoopService._setPendingQuestion(agentConversationId, {
         resolve: (value: QuestionResult) => {
           clearTimeout(timeoutId);
           resolve(value);

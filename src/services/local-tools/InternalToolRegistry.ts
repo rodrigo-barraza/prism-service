@@ -43,7 +43,7 @@ export interface InternalToolSchema {
 }
 
 export interface InternalToolContext {
-  agentSessionId?: string;
+  agentConversationId?: string;
   project?: string;
   username?: string;
   isSubAgent?: boolean;

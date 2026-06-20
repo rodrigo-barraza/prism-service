@@ -70,7 +70,7 @@ async function streamAndCollect(prompt, { maxTokens = 500, timeout = 120000, can
       model: targetModel,
       messages: [{ role: "user", content: prompt }],
       agent: "CODING",
-      agentSessionId: crypto.randomUUID(),
+      agentConversationId: crypto.randomUUID(),
       maxTokens,
       autoApprove: true,
       canSpawnWorkers,

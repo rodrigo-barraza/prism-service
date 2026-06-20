@@ -165,12 +165,12 @@ describe("ToolContext — cleanup", () => {
     expect(mockDeleteOne).toHaveBeenCalledWith({ conversationId: SESSION });
   });
 
-  it("cleanup() decrements activeSessionCount", () => {
-    const before = ToolContext.activeSessionCount;
+  it("cleanup() decrements activeConversationCount", () => {
+    const before = ToolContext.activeConversationCount;
     ToolContext.set(SESSION, "data", "value");
-    expect(ToolContext.activeSessionCount).toBe(before + 1);
+    expect(ToolContext.activeConversationCount).toBe(before + 1);
     ToolContext.cleanup(SESSION);
-    expect(ToolContext.activeSessionCount).toBe(before);
+    expect(ToolContext.activeConversationCount).toBe(before);
   });
 });
 
@@ -292,20 +292,20 @@ describe("ToolContext — ensureLoaded (MongoDB read-through)", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// activeSessionCount
+// activeConversationCount
 // ═══════════════════════════════════════════════════════════════
 
-describe("ToolContext — activeSessionCount", () => {
+describe("ToolContext — activeConversationCount", () => {
   it("tracks multiple sessions", () => {
-    const base = ToolContext.activeSessionCount;
+    const base = ToolContext.activeConversationCount;
     ToolContext.set("session-a", "k", 1);
     ToolContext.set("session-b", "k", 2);
-    expect(ToolContext.activeSessionCount).toBe(base + 2);
+    expect(ToolContext.activeConversationCount).toBe(base + 2);
 
     ToolContext.cleanup("session-a");
-    expect(ToolContext.activeSessionCount).toBe(base + 1);
+    expect(ToolContext.activeConversationCount).toBe(base + 1);
 
     ToolContext.cleanup("session-b");
-    expect(ToolContext.activeSessionCount).toBe(base);
+    expect(ToolContext.activeConversationCount).toBe(base);
   });
 });

@@ -71,7 +71,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       providerName: PROVIDERS.GOOGLE,
       resolvedModel: "gemini-3-flash-preview",
       traceId: "trace-id-123",
-      agentSessionId: "session-id-456",
+      agentConversationId: "session-id-456",
       conversationId: "conv-id-789",
       enabledTools: ["read_file", "write_file", "search_web"],
       emit: vi.fn(),

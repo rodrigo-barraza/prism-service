@@ -40,14 +40,12 @@ export default class AgenticLoopService {
       modelDefinition,
       messages,
       agentConversationId,
-      agentSessionId,
       conversationId,
       parentAgentConversationId,
-      parentAgentSessionId,
     } = context;
 
-    const resolvedAgentConversationId = agentConversationId || (agentSessionId as string) || "";
-    const resolvedParentAgentConversationId = parentAgentConversationId || (parentAgentSessionId as string) || null;
+    const resolvedAgentConversationId = agentConversationId || "";
+    const resolvedParentAgentConversationId = parentAgentConversationId || null;
 
     // Load any persisted tool state from MongoDB (e.g. after server restart or previous turn)
     await ToolContext.ensureLoaded(resolvedAgentConversationId);
@@ -60,7 +58,6 @@ export default class AgenticLoopService {
       username,
       modelDefinition: modelDefinition || undefined,
       agentConversationId: resolvedAgentConversationId,
-      agentSessionId: resolvedAgentConversationId,
       providerName: context.providerName,
       resolvedModel: context.resolvedModel,
     });

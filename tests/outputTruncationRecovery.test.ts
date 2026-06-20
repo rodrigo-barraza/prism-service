@@ -62,7 +62,7 @@ function createMockContext(overrides: Partial<AgenticContext> = {}): AgenticCont
     username: "test-user",
     modelDefinition: null,
     messages: [],
-    agentSessionId: "test-session",
+    agentConversationId: "test-session",
     provider: {
       generateTextStream: vi.fn(),
     },

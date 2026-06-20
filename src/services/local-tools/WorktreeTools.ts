@@ -73,15 +73,15 @@ const enterWorktree = {
     const { resolve } = await import("node:path");
     const { existsSync } = await import("node:fs");
 
-    const sessionId = context.agentSessionId;
-    if (!sessionId) {
+    const agentConversationId = context.agentConversationId;
+    if (!agentConversationId) {
       return {
         error:
-          "No agent session — worktree isolation requires an active session",
+          "No agent conversation — worktree isolation requires an active conversation",
       };
     }
 
-    const worktreeState = ToolOrchestratorService.getWorktreeState(sessionId);
+    const worktreeState = ToolOrchestratorService.getWorktreeState(agentConversationId);
     if (worktreeState) {
       return {
         error: `Already in a worktree (branch: ${worktreeState.branchName}). Call exit_worktree first.`,
@@ -97,7 +97,7 @@ const enterWorktree = {
       ? workspaceRoot
       : workspaceRoot;
 
-    const branchName = `worktree/${sessionId.slice(0, 8)}-${Date.now().toString(36)}`;
+    const branchName = `worktree/${agentConversationId.slice(0, 8)}-${Date.now().toString(36)}`;
 
     // Create worktree via tools-api
     const createResult = (await ToolOrchestratorService._proxyPost(
@@ -111,7 +111,7 @@ const enterWorktree = {
     }
 
     // Store the worktree state
-    ToolOrchestratorService._setWorktree(sessionId, {
+    ToolOrchestratorService._setWorktree(agentConversationId, {
       originalRoot: workspaceRoot,
       worktreePath: createResult.worktreePath!,
       branchName,
@@ -180,9 +180,9 @@ const exitWorktree = {
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
 
-    const sessionId = context.agentSessionId;
-    const worktreeState = ToolOrchestratorService.getWorktreeState(sessionId);
-    if (!sessionId || !worktreeState) {
+    const agentConversationId = context.agentConversationId;
+    const worktreeState = ToolOrchestratorService.getWorktreeState(agentConversationId);
+    if (!agentConversationId || !worktreeState) {
       return {
         error: "Not currently in a worktree. Call enter_worktree first.",
       };
@@ -229,7 +229,7 @@ const exitWorktree = {
       context,
     );
 
-    ToolOrchestratorService._clearWorktree(sessionId);
+    ToolOrchestratorService._clearWorktree(agentConversationId);
 
     logger.info(`[Worktree] exit: ${action} — ${worktreeState.branchName}`);
 

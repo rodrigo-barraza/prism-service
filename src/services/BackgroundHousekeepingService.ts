@@ -38,21 +38,21 @@ const WORKTREE_ROOT = "/tmp/prism-worktrees";
 const REQUEST_LOG_MAX_AGE_DAYS = 90;
 
 /** Stale isGenerating flags left from crashes */
-const STALE_SESSION_CUTOFF_MS = hours(2);
+const STALE_CONVERSATION_CUTOFF_MS = hours(2);
 
 export interface HousekeepingWorktreeResult {
   pruned: string[];
   errors: string[];
 }
 
-export interface HousekeepingSessionResult {
+export interface HousekeepingConversationResult {
   conversationsCleared: number;
-  agentSessionsCleared: number;
+  agentConversationsCleared: number;
 }
 
 export interface HousekeepingResult {
   worktrees?: HousekeepingWorktreeResult | { error: string };
-  staleSessions?: HousekeepingSessionResult | { error: string };
+  staleConversations?: HousekeepingConversationResult | { error: string };
   requestLogs?: { deleted: number } | { error: string };
   minioOrphans?: { removed: number } | { error: string };
   durationMs: number;
@@ -99,19 +99,16 @@ async function pruneOrphanedWorktrees(): Promise<HousekeepingWorktreeResult> {
   return { pruned, errors };
 }
 
-// ─── Stale Session Cleanup ────────────────────────────────────────────────────
-
-/**
- * Clear isGenerating flags that were left dangling by a crash.
- * Also removes sessions that have been in "generating" state for >2h.
- */
-async function clearStaleSessions(): Promise<HousekeepingSessionResult> {
+// ─── Stale Conversation Cleanup ────────────────────────────────────────────────
+// Clear isGenerating flags that were left dangling by a crash.
+// Also removes conversations that have been in "generating" state for >2h.
+async function clearStaleConversations(): Promise<HousekeepingConversationResult> {
   const db = MongoWrapper.getDb(MONGO_DB_NAME);
-  if (!db) return { conversationsCleared: 0, agentSessionsCleared: 0 };
+  if (!db) return { conversationsCleared: 0, agentConversationsCleared: 0 };
 
-  const cutoff = new Date(Date.now() - STALE_SESSION_CUTOFF_MS).toISOString();
+  const cutoff = new Date(Date.now() - STALE_CONVERSATION_CUTOFF_MS).toISOString();
 
-  const [convResult, sessionResult] = await Promise.all([
+  const [convResult, agentConvResult] = await Promise.all([
     db
       .collection(COLLECTIONS.MODEL_CONVERSATIONS)
       .updateMany(
@@ -128,7 +125,7 @@ async function clearStaleSessions(): Promise<HousekeepingSessionResult> {
 
   return {
     conversationsCleared: convResult.modifiedCount,
-    agentSessionsCleared: sessionResult.modifiedCount,
+    agentConversationsCleared: agentConvResult.modifiedCount,
   };
 }
 
@@ -187,11 +184,11 @@ async function pruneMinioOrphans(): Promise<number> {
     const convCursor = db
       .collection(COLLECTIONS.MODEL_CONVERSATIONS)
       .find<{ id: string }>({}, { projection: { id: 1, _id: 0 } });
-    const sessionCursor = db
+    const agentConvCursor = db
       .collection(COLLECTIONS.AGENT_CONVERSATIONS)
       .find<{ id: string }>({}, { projection: { id: 1, _id: 0 } });
     for await (const document of convCursor) validIds.add(document.id);
-    for await (const document of sessionCursor) validIds.add(document.id);
+    for await (const document of agentConvCursor) validIds.add(document.id);
 
     // List MinIO objects with the conversation-scoped prefix pattern
     // Convention: conversation objects are stored as {conversationId}/{filename}
@@ -279,21 +276,21 @@ const BackgroundHousekeepingService = {
       );
     }
 
-    // 2. Clear stale sessions
+    // 2. Clear stale conversations
     try {
-      const sessions = await clearStaleSessions();
-      results.staleSessions = sessions;
+      const conversationsCleanup = await clearStaleConversations();
+      results.staleConversations = conversationsCleanup;
       const total =
-        sessions.conversationsCleared + sessions.agentSessionsCleared;
+        conversationsCleanup.conversationsCleared + conversationsCleanup.agentConversationsCleared;
       if (total > 0) {
         logger.info(
           `[Housekeeping] Cleared ${total} stale isGenerating flag(s)`,
         );
       }
     } catch (error: unknown) {
-      results.staleSessions = { error: getErrorMessage(error) };
+      results.staleConversations = { error: getErrorMessage(error) };
       logger.error(
-        `[Housekeeping] Session cleanup failed: ${getErrorMessage(error)}`,
+        `[Housekeeping] Conversation cleanup failed: ${getErrorMessage(error)}`,
       );
     }
 

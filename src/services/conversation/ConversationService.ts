@@ -71,7 +71,6 @@ const ConversationService: ConversationServiceInterface = {
       }
       if (conversationMeta.parentAgentConversationId) {
         setFields.parentAgentConversationId = conversationMeta.parentAgentConversationId;
-        setFields.parentAgentSessionId = conversationMeta.parentAgentConversationId;
       }
       if (conversationMeta.parentConversationId) {
         setFields.parentConversationId = conversationMeta.parentConversationId;
@@ -100,7 +99,7 @@ const ConversationService: ConversationServiceInterface = {
       isGenerating: true,
       ...(conversationMeta?.synthetic && { synthetic: true }),
       ...(traceId && { traceId }),
-      ...(parentId && { parentAgentConversationId: parentId, parentAgentSessionId: parentId }),
+      ...(parentId && { parentAgentConversationId: parentId }),
       ...(parentConversationId && { parentConversationId }),
       ...(conversationMeta?.workspaceRoot && {
         workspaceRoot: conversationMeta.workspaceRoot,
@@ -255,10 +254,7 @@ const ConversationService: ConversationServiceInterface = {
     const requests = await db
       .collection(COLLECTIONS.REQUESTS)
       .find({
-        $or: [
-          { agentConversationId: { $in: [...allConversationIds] } },
-          { agentSessionId: { $in: [...allConversationIds] } }
-        ],
+        agentConversationId: { $in: [...allConversationIds] },
         project,
         username,
       })
@@ -277,9 +273,7 @@ const ConversationService: ConversationServiceInterface = {
         toolApiNames: 1,
         success: 1,
         agentConversationId: 1,
-        agentSessionId: 1,
         parentAgentConversationId: 1,
-        parentAgentSessionId: 1,
       })
       .toArray();
 
@@ -330,7 +324,7 @@ const ConversationService: ConversationServiceInterface = {
 
     const subAgentRequestCount = requests.filter(
       (reservation) => 
-        (reservation.agentConversationId || reservation.agentSessionId) !== conversationId,
+        reservation.agentConversationId !== conversationId,
     ).length;
 
     const createdAt = (requests as Record<string, unknown>[]).reduce(

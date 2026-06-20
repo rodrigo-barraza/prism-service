@@ -138,7 +138,6 @@ async function runShellValidator(
         username: context.username,
         agent: context.agent || undefined,
         agentConversationId: context.agentConversationId,
-        agentSessionId: context.agentConversationId,
         workspaceRoot,
         signal: context.signal || undefined,
       },

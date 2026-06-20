@@ -308,9 +308,9 @@ describe("MongoDB Aggregation Pipeline Contract", () => {
     const matchCondition = isAgentType
       ? {
           $or: [
-            { agentSessionId: { $in: conversationIds } },
+            { agentConversationId: { $in: conversationIds } },
             { conversationId: { $in: conversationIds } },
-            { parentAgentSessionId: { $in: conversationIds } },
+            { parentAgentConversationId: { $in: conversationIds } },
           ],
         }
       : { conversationId: { $in: conversationIds } };
@@ -329,18 +329,18 @@ describe("MongoDB Aggregation Pipeline Contract", () => {
     const matchCondition: any = isAgentType
       ? {
           $or: [
-            { agentSessionId: { $in: conversationIds } },
+            { agentConversationId: { $in: conversationIds } },
             { conversationId: { $in: conversationIds } },
-            { parentAgentSessionId: { $in: conversationIds } },
+            { parentAgentConversationId: { $in: conversationIds } },
           ],
         }
       : { conversationId: { $in: conversationIds } };
 
     expect(matchCondition).toHaveProperty("$or");
     expect(matchCondition.$or).toHaveLength(3);
-    expect(matchCondition.$or[0]).toEqual({ agentSessionId: { $in: conversationIds } });
+    expect(matchCondition.$or[0]).toEqual({ agentConversationId: { $in: conversationIds } });
     expect(matchCondition.$or[1]).toEqual({ conversationId: { $in: conversationIds } });
-    expect(matchCondition.$or[2]).toEqual({ parentAgentSessionId: { $in: conversationIds } });
+    expect(matchCondition.$or[2]).toEqual({ parentAgentConversationId: { $in: conversationIds } });
   });
 
   it("should produce correct $group _id for model conversations (simple field)", () => {
@@ -361,21 +361,21 @@ describe("MongoDB Aggregation Pipeline Contract", () => {
           $cond: [
             {
               $and: [
-                { $ne: ["$parentAgentSessionId", null] },
-                { $in: ["$parentAgentSessionId", conversationIds] },
+                { $ne: ["$parentAgentConversationId", null] },
+                { $in: ["$parentAgentConversationId", conversationIds] },
               ],
             },
-            "$parentAgentSessionId",
-            { $ifNull: ["$conversationId", "$agentSessionId"] },
+            "$parentAgentConversationId",
+            { $ifNull: ["$conversationId", "$agentConversationId"] },
           ],
         }
       : "$conversationId";
 
     expect(groupId).toHaveProperty("$cond");
     expect(groupId.$cond).toHaveLength(3);
-    // When parentAgentSessionId is present and in our set, group by parent
-    expect(groupId.$cond[1]).toBe("$parentAgentSessionId");
-    // Otherwise fall back to conversationId or agentSessionId
-    expect(groupId.$cond[2]).toEqual({ $ifNull: ["$conversationId", "$agentSessionId"] });
+    // When parentAgentConversationId is present and in our set, group by parent
+    expect(groupId.$cond[1]).toBe("$parentAgentConversationId");
+    // Otherwise fall back to conversationId or agentConversationId
+    expect(groupId.$cond[2]).toEqual({ $ifNull: ["$conversationId", "$agentConversationId"] });
   });
 });

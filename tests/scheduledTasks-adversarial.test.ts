@@ -378,7 +378,7 @@ describe('Scheduled Tasks Flow Adversarial Tests', () => {
       // It succeeds (returns 200) because the service filters out project scoping for unregistered projects!
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.agentSessionId).toBeDefined();
+      expect(response.body.agentConversationId).toBeDefined();
     });
 
     it('should isolate task access and prevent unauthorized cross-tenant operations if project is registered as a workspace', async () => {

@@ -54,7 +54,7 @@ describe("ConversationEmbeddingService & ConversationSearchTool", () => {
     it("should skip if conversationId is missing", async () => {
       await ConversationEmbeddingService.generateAndPersist({
         conversationId: null,
-        agentSessionId: "session-1",
+        agentConversationId: "session-1",
         project: "prism-chat",
         username: "rodrigo",
         agent: "CODING",
@@ -68,7 +68,7 @@ describe("ConversationEmbeddingService & ConversationSearchTool", () => {
     it("should skip if not an agent project", async () => {
       await ConversationEmbeddingService.generateAndPersist({
         conversationId: "conv-1",
-        agentSessionId: "session-1",
+        agentConversationId: "session-1",
         project: "regular-web-app",
         username: "rodrigo",
         agent: "CODING",
@@ -82,7 +82,7 @@ describe("ConversationEmbeddingService & ConversationSearchTool", () => {
     it("should skip if messageCount is below threshold", async () => {
       await ConversationEmbeddingService.generateAndPersist({
         conversationId: "conv-1",
-        agentSessionId: "session-1",
+        agentConversationId: "session-1",
         project: "prism-chat",
         username: "rodrigo",
         agent: "CODING",
@@ -102,7 +102,7 @@ describe("ConversationEmbeddingService & ConversationSearchTool", () => {
 
       await ConversationEmbeddingService.generateAndPersist({
         conversationId: "conv-1",
-        agentSessionId: "session-1",
+        agentConversationId: "session-1",
         project: "prism-chat",
         username: "rodrigo",
         agent: "CODING",
@@ -119,7 +119,7 @@ describe("ConversationEmbeddingService & ConversationSearchTool", () => {
 
       await ConversationEmbeddingService.generateAndPersist({
         conversationId: "conv-1",
-        agentSessionId: "session-1",
+        agentConversationId: "session-1",
         project: "prism-chat",
         username: "rodrigo",
         agent: "CODING",

@@ -385,7 +385,7 @@ export default class OrchestratorService {
     );
 
     // Mark the parent conversation as having sub-agents (persistent flag for the UI).
-    // Documents are keyed by conversationId — never use agentSessionId for document lookups.
+    // Documents are keyed by conversationId — never use agentConversationId for document lookups.
     if (parentConversationId) {
       try {
         const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");

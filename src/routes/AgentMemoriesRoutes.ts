@@ -20,7 +20,7 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { agent, project, username, content, type, title, agentSessionId } =
+      const { agent, project, username, content, type, title, agentConversationId } =
         req.body;
       if (!content) {
         return res.status(400).json({ error: "content is required" });
@@ -33,7 +33,7 @@ router.post(
         content,
         type: type || "project",
         title: title || null,
-        agentSessionId: agentSessionId || null,
+        agentConversationId: agentConversationId || null,
         endpoint: "/agent-memories",
       });
 

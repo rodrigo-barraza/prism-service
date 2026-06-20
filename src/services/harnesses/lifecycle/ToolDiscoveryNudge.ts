@@ -67,7 +67,7 @@ export function injectToolDiscoveryNudge(
     );
 
     if (isLowerTierModel) {
-      const agentConversationId = context.agentConversationId || (context.agentSessionId as string) || "";
+      const agentConversationId = context.agentConversationId || "";
       const toolContextStore = ToolContext.getStore(agentConversationId);
       const currentDynamic =
         (toolContextStore.get("dynamicEnabledTools") as string[]) || [];

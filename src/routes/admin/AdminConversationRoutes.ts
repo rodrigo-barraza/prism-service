@@ -89,7 +89,7 @@ router.get(
         agent && agent !== AGENT_IDS.NONE && agent !== AGENT_IDS.ALL;
 
       const shouldFetchConvs = !isAgentOnly;
-      const shouldFetchSessions = !isDirectOnly;
+      const shouldFetchAgentConversations = !isDirectOnly;
 
       const agentFilter = { ...filter };
       if (isAgentOnly) {
@@ -97,7 +97,7 @@ router.get(
       }
 
       let convs: Document[] = [];
-      let sessions: Document[] = [];
+      let agentConversations: Document[] = [];
 
       const queryPromises: Promise<void>[] = [];
 
@@ -128,7 +128,7 @@ router.get(
         );
       }
 
-      if (shouldFetchSessions) {
+      if (shouldFetchAgentConversations) {
         queryPromises.push(
           req.db
             .collection(COLLECTIONS.AGENT_CONVERSATIONS)
@@ -150,7 +150,7 @@ router.get(
             .limit(skip + limit)
             .toArray()
             .then((result) => {
-              sessions = result;
+              agentConversations = result;
             }),
         );
       }
@@ -158,7 +158,7 @@ router.get(
       await Promise.all(queryPromises);
 
       let totalConvs = 0;
-      let totalSessions = 0;
+      let totalAgentConversations = 0;
       const countPromises: Promise<void>[] = [];
 
       if (shouldFetchConvs) {
@@ -172,13 +172,13 @@ router.get(
         );
       }
 
-      if (shouldFetchSessions) {
+      if (shouldFetchAgentConversations) {
         countPromises.push(
           req.db
             .collection(COLLECTIONS.AGENT_CONVERSATIONS)
             .countDocuments(agentFilter)
             .then((result) => {
-              totalSessions = result;
+              totalAgentConversations = result;
             }),
         );
       }
@@ -187,7 +187,7 @@ router.get(
 
       const merged = [
         ...convs.map((item) => ({ ...item, type: "direct" as const })),
-        ...sessions.map((session) => ({ ...session, type: "agent" as const })),
+        ...agentConversations.map((session) => ({ ...session, type: "agent" as const })),
       ].sort((firstItem, secondItem) => {
         const valueA = String(
           (firstItem as Record<string, unknown>)[sort as string] ?? "",
@@ -205,7 +205,7 @@ router.get(
       const paginatedDocumentIds = paginatedDocuments.map(
         (document) => (document as Document).id,
       );
-      const agentSessionIds = paginatedDocuments
+      const agentConversationIds = paginatedDocuments
         .filter((document) => document.type === "agent")
         .map((document) => (document as Record<string, unknown>).id as string)
         .filter(Boolean);
@@ -215,14 +215,14 @@ router.get(
         .find({
           $or: [
             { conversationId: { $in: paginatedDocumentIds } },
-            { agentSessionId: { $in: agentSessionIds } },
-            { parentAgentSessionId: { $in: agentSessionIds } },
+            { agentConversationId: { $in: agentConversationIds } },
+            { parentAgentConversationId: { $in: agentConversationIds } },
           ],
         })
         .project({
           conversationId: 1,
-          agentSessionId: 1,
-          parentAgentSessionId: 1,
+          agentConversationId: 1,
+          parentAgentConversationId: 1,
           inputTokens: 1,
           outputTokens: 1,
           model: 1,
@@ -238,15 +238,15 @@ router.get(
       for (const requestItem of requests) {
         let targetId = "";
         if (
-          requestItem.parentAgentSessionId &&
-          agentSessionIds.includes(requestItem.parentAgentSessionId)
+          requestItem.parentAgentConversationId &&
+          agentConversationIds.includes(requestItem.parentAgentConversationId)
         ) {
-          targetId = requestItem.parentAgentSessionId;
+          targetId = requestItem.parentAgentConversationId;
         } else if (
-          requestItem.agentSessionId &&
-          agentSessionIds.includes(requestItem.agentSessionId)
+          requestItem.agentConversationId &&
+          agentConversationIds.includes(requestItem.agentConversationId)
         ) {
-          targetId = requestItem.agentSessionId;
+          targetId = requestItem.agentConversationId;
         } else if (requestItem.conversationId) {
           targetId = requestItem.conversationId;
         }
@@ -309,7 +309,7 @@ router.get(
             }
           }
 
-          // Apply cost overlay for agent sessions
+          // Apply cost overlay for agent conversations
           const originalCost = (document.totalCost as number) || 0;
           const totalCost =
             document.type === "agent" && aggregatedCost > 0
@@ -336,7 +336,7 @@ router.get(
 
       res.json({
         data: enrichedDocuments,
-        total: totalConvs + totalSessions,
+        total: totalConvs + totalAgentConversations,
         page: parsePaginationParams(req.query).page,
         limit,
       });

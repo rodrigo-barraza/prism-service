@@ -67,7 +67,6 @@ interface ToolExecutionContext {
   requestId?: string;
   traceId?: string | null;
   agentConversationId?: string | null;
-  agentSessionId?: string | null;
   conversationId?: string | null;
   iteration?: number;
   workspaceRoot?: string | null;
@@ -135,7 +134,7 @@ let initialized = false;
 let isResolvingClientSchemas = false;
 
 /**
- * Active worktree sessions — keyed by agentSessionId.
+ * Active worktree sessions — keyed by agentConversationId.
  * When the main agent calls enter_worktree, its session's workspace root
  * is redirected to the worktree path. All file/git/shell tool calls
  * then operate in the worktree until exit_worktree is called.
@@ -343,8 +342,8 @@ async function executeToolGeneric(
 
     // Worktree path rewriting — redirect file paths to the worktree directory
     // when the session has an active worktree.
-    if (context.agentSessionId && activeWorktrees.has(context.agentSessionId)) {
-      const worktreeState = activeWorktrees.get(context.agentSessionId)!;
+    if (context.agentConversationId && activeWorktrees.has(context.agentConversationId)) {
+      const worktreeState = activeWorktrees.get(context.agentConversationId)!;
       const rewritePath = (provider: unknown): unknown => {
         if (typeof provider !== "string") return provider;
         if (provider.startsWith(worktreeState.originalRoot)) {
@@ -395,8 +394,8 @@ function buildContextHeaders(
   if (context.agent) headers["X-Agent"] = context.agent;
   if (context.requestId) headers["X-Request-Id"] = context.requestId;
   if (context.traceId) headers["X-Trace-Id"] = context.traceId;
-  if (context.agentSessionId)
-    headers["X-Agent-Session-Id"] = context.agentSessionId;
+  if (context.agentConversationId)
+    headers["X-Agent-Conversation-Id"] = context.agentConversationId;
   if (context.conversationId)
     headers["X-Conversation-Id"] = context.conversationId;
   if (context.iteration !== undefined && context.iteration !== null)
@@ -931,15 +930,15 @@ export default class ToolOrchestratorService {
 
 
    */
-  static getEffectiveWorkspaceRoot(agentSessionId: string | null | undefined) {
-    if (agentSessionId && activeWorktrees.has(agentSessionId)) {
-      return activeWorktrees.get(agentSessionId)!.worktreePath;
+  static getEffectiveWorkspaceRoot(agentConversationId: string | null | undefined) {
+    if (agentConversationId && activeWorktrees.has(agentConversationId)) {
+      return activeWorktrees.get(agentConversationId)!.worktreePath;
     }
     return cachedWorkspaceRoots[0] || null;
   }
-  static getWorktreeState(agentSessionId: string | null | undefined) {
-    if (!agentSessionId) return null;
-    return activeWorktrees.get(agentSessionId) || null;
+  static getWorktreeState(agentConversationId: string | null | undefined) {
+    if (!agentConversationId) return null;
+    return activeWorktrees.get(agentConversationId) || null;
   }
 
   static getToolEmoji(toolName: string): string | null {
@@ -1043,7 +1042,7 @@ export default class ToolOrchestratorService {
     if (InternalToolRegistry.has(name)) {
       return InternalToolRegistry.execute(name, args, {
         ...context,
-        agentSessionId: context.agentSessionId || undefined,
+        agentConversationId: context.agentConversationId || undefined,
         project: context.project || undefined,
         username: context.username || undefined,
       });
@@ -1322,8 +1321,7 @@ export default class ToolOrchestratorService {
       agent: context.agent,
       providerName: context._providerName,
       resolvedModel: context._resolvedModel,
-      agentConversationId: context.agentConversationId || context.agentSessionId,
-      agentSessionId: context.agentConversationId || context.agentSessionId,
+      agentConversationId: context.agentConversationId,
       conversationId: context.conversationId,
       traceId: context.traceId,
 
@@ -1709,13 +1707,13 @@ export default class ToolOrchestratorService {
 
   // ── Worktree State Helpers — used by WorktreeTools.js ──────
   /** @internal */ static _setWorktree(
-    sessionId: string,
+    agentConversationId: string,
     state: WorktreeState,
   ) {
-    activeWorktrees.set(sessionId, state);
+    activeWorktrees.set(agentConversationId, state);
   }
-  /** @internal */ static _clearWorktree(sessionId: string) {
-    activeWorktrees.delete(sessionId);
+  /** @internal */ static _clearWorktree(agentConversationId: string) {
+    activeWorktrees.delete(agentConversationId);
   }
   /** @internal */ static async _proxyPost(
     path: string,

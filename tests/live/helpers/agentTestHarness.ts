@@ -139,7 +139,7 @@ interface AgentStreamPayload {
   model: string;
   messages: Array<{ role: string; content: string; toolCalls?: unknown[]; thinking?: string }>;
   agent?: string;
-  agentSessionId?: string;
+  agentConversationId?: string;
   maxTokens?: number;
   autoApprove?: boolean;
   maxIterations?: number;

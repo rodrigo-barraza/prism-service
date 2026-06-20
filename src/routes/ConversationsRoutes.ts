@@ -40,7 +40,7 @@ const CONVERSATION_LIST_PROJECTION: import("mongodb").Document = {
   model: 1,
   modelNames: 1,
   settings: 1,
-  parentAgentSessionId: 1,
+  parentAgentConversationId: 1,
   parentConversationId: 1,
   hasSubAgents: 1,
   subAgents: 1,
@@ -165,9 +165,9 @@ router.get(
           const matchCondition = isAgentType
             ? {
                 $or: [
-                  { agentSessionId: { $in: conversationIds } },
+                  { agentConversationId: { $in: conversationIds } },
                   { conversationId: { $in: conversationIds } },
-                  { parentAgentSessionId: { $in: conversationIds } },
+                  { parentAgentConversationId: { $in: conversationIds } },
                 ],
               }
             : { conversationId: { $in: conversationIds } };
@@ -177,12 +177,12 @@ router.get(
                 $cond: [
                   {
                     $and: [
-                      { $ne: ["$parentAgentSessionId", null] },
-                      { $in: ["$parentAgentSessionId", conversationIds] },
+                      { $ne: ["$parentAgentConversationId", null] },
+                      { $in: ["$parentAgentConversationId", conversationIds] },
                     ],
                   },
-                  "$parentAgentSessionId",
-                  { $ifNull: ["$conversationId", "$agentSessionId"] },
+                  "$parentAgentConversationId",
+                  { $ifNull: ["$conversationId", "$agentConversationId"] },
                 ],
               }
             : "$conversationId";

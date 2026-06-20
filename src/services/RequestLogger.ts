@@ -47,9 +47,7 @@ export interface LogParams {
   conversationId?: string | null;
   traceId?: string | null;
   agentConversationId?: string | null;
-  agentSessionId?: string | null;
   parentAgentConversationId?: string | null;
-  parentAgentSessionId?: string | null;
   toolsUsed?: boolean;
   toolDisplayNames?: string[];
   toolApiNames?: string[];
@@ -176,9 +174,7 @@ const RequestLogger = {
     conversationId = null,
     traceId = null,
     agentConversationId = null,
-    agentSessionId = null,
     parentAgentConversationId = null,
-    parentAgentSessionId = null,
     toolsUsed = false,
     toolDisplayNames = [],
     toolApiNames = [],
@@ -215,8 +211,6 @@ const RequestLogger = {
         logger.error("RequestLogger: MongoDB client not available");
         return;
       }
-      const effectiveAgentConversationId = agentConversationId || agentSessionId || null;
-      const effectiveParentAgentConversationId = parentAgentConversationId || parentAgentSessionId || null;
       const document = {
         requestId,
         timestamp: new Date().toISOString(),
@@ -231,10 +225,8 @@ const RequestLogger = {
         model,
         conversationId,
         traceId,
-        ...(effectiveAgentConversationId && { agentConversationId: effectiveAgentConversationId }),
-        ...(effectiveAgentConversationId && { agentSessionId: effectiveAgentConversationId }),
-        ...(effectiveParentAgentConversationId && { parentAgentConversationId: effectiveParentAgentConversationId }),
-        ...(effectiveParentAgentConversationId && { parentAgentSessionId: effectiveParentAgentConversationId }),
+        ...(agentConversationId && { agentConversationId }),
+        ...(parentAgentConversationId && { parentAgentConversationId }),
         toolsUsed,
         toolDisplayNames,
         toolApiNames,
@@ -293,9 +285,7 @@ const RequestLogger = {
     conversationId = null,
     traceId = null,
     agentConversationId = null,
-    agentSessionId = null,
     parentAgentConversationId = null,
-    parentAgentSessionId = null,
     success = true,
     errorMessage = null,
     // Telemetry
@@ -355,9 +345,7 @@ const RequestLogger = {
       conversationId,
       traceId,
       agentConversationId,
-      agentSessionId,
       parentAgentConversationId,
-      parentAgentSessionId,
       toolsUsed: toolCalls && toolCalls.length > 0,
       toolDisplayNames:
         toolCalls && toolCalls.length > 0

@@ -59,9 +59,9 @@ const enableTools = {
     toolArguments: Record<string, unknown>,
     context: InternalToolContext,
   ) {
-    const sessionId = context.agentSessionId;
-    if (!sessionId) {
-      return { error: "No active agent session ID in context." };
+    const agentConversationId = context.agentConversationId;
+    if (!agentConversationId) {
+      return { error: "No active agent conversation ID in context." };
     }
 
     const agentSettings = await SettingsService.getSection("agents");
@@ -98,7 +98,7 @@ const enableTools = {
       };
     }
 
-    const currentDynamicTools = getCurrentDynamicTools(sessionId);
+    const currentDynamicTools = getCurrentDynamicTools(agentConversationId);
     const mergedToolSet = new Set(currentDynamicTools);
     const newlyActivatedTools: string[] = [];
 
@@ -118,10 +118,10 @@ const enableTools = {
       };
     }
 
-    persistDynamicTools(sessionId, [...mergedToolSet]);
+    persistDynamicTools(agentConversationId, [...mergedToolSet]);
 
     logger.info(
-      `[ToolActivation] enable_tools: session=${sessionId} activated ${newlyActivatedTools.length} tools: [${newlyActivatedTools.join(", ")}] (total: ${mergedToolSet.size})`,
+      `[ToolActivation] enable_tools: conversation=${agentConversationId} activated ${newlyActivatedTools.length} tools: [${newlyActivatedTools.join(", ")}] (total: ${mergedToolSet.size})`,
     );
 
     return {
@@ -140,7 +140,7 @@ const disableTools = {
     name: TOOL_NAMES.DISABLE_TOOLS,
     emoji: ["🔒", "🧰"],
     description:
-      "Dynamically disable tools from this session to reduce token usage and tool interference. " +
+      "Dynamically disable tools from this conversation to reduce token usage and tool interference. " +
       'Accepts exact tool names or domain prefixes (e.g. "domain:Finance"). ' +
       "Core cognitive tools (memory, tasks, planning, orchestration) cannot be disabled.",
     parameters: {
@@ -164,9 +164,9 @@ const disableTools = {
     toolArguments: Record<string, unknown>,
     context: InternalToolContext,
   ) {
-    const sessionId = context.agentSessionId;
-    if (!sessionId) {
-      return { error: "No active agent session ID in context." };
+    const agentConversationId = context.agentConversationId;
+    if (!agentConversationId) {
+      return { error: "No active agent conversation ID in context." };
     }
 
     const agentSettings = await SettingsService.getSection("agents");
@@ -195,7 +195,7 @@ const disableTools = {
       clientSchemas,
     );
 
-    const currentDynamicTools = getCurrentDynamicTools(sessionId);
+    const currentDynamicTools = getCurrentDynamicTools(agentConversationId);
     const mergedToolSet = new Set(currentDynamicTools);
     const removedTools: string[] = [];
     const protectedToolsSkipped: string[] = [];
@@ -220,11 +220,11 @@ const disableTools = {
     }
 
     if (removedTools.length > 0) {
-      persistDynamicTools(sessionId, [...mergedToolSet]);
+      persistDynamicTools(agentConversationId, [...mergedToolSet]);
     }
 
     logger.info(
-      `[ToolActivation] disable_tools: session=${sessionId} removed ${removedTools.length} tools: [${removedTools.join(", ")}] (${protectedToolsSkipped.length} protected, total: ${mergedToolSet.size})`,
+      `[ToolActivation] disable_tools: conversation=${agentConversationId} removed ${removedTools.length} tools: [${removedTools.join(", ")}] (${protectedToolsSkipped.length} protected, total: ${mergedToolSet.size})`,
     );
 
     return {

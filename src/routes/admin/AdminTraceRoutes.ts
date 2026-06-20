@@ -87,11 +87,11 @@ router.get(
             .toArray(),
         ]);
         const convIds = convDocs.map((document) => document.id);
-        const agentSessionIds = agentConvDocs.map((document) => document.id);
+        const agentConversationIds = agentConvDocs.map((document) => document.id);
         match.$or = [
           { conversationId: { $in: convIds } },
-          { agentSessionId: { $in: agentSessionIds } },
-          { parentAgentSessionId: { $in: agentSessionIds } },
+          { agentConversationId: { $in: agentConversationIds } },
+          { parentAgentConversationId: { $in: agentConversationIds } },
         ];
       }
 

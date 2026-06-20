@@ -156,7 +156,7 @@ describe("Background Token Accuracy", () => {
       provider: PROVIDERS.ANTHROPIC,
       model: "claude-haiku-4-5-20251001",
       traceId: null,
-      agentSessionId: "session-1",
+      agentConversationId: "session-1",
       aiMessages: [
         { role: "system", content: "You are a memory extraction agent." },
         { role: "user", content: "Extract memories from this session." },
@@ -438,7 +438,7 @@ describe("Background Token Accuracy", () => {
         provider: PROVIDERS.ANTHROPIC,
         model: "claude-haiku-4-5-20251001",
         traceId: null,
-        agentSessionId: "session-1",
+        agentConversationId: "session-1",
         aiMessages: [
           { role: "system", content: "System prompt..." },
           { role: "user", content: "User message..." },
@@ -479,7 +479,7 @@ describe("Background Token Accuracy", () => {
         provider: PROVIDERS.ANTHROPIC,
         model: "claude-haiku-4-5-20251001",
         traceId: null,
-        agentSessionId: "session-2",
+        agentConversationId: "session-2",
         aiMessages: [
           { role: "system", content: "Consolidation prompt..." },
           { role: "user", content: "Memories to consolidate..." },
@@ -522,7 +522,7 @@ describe("Background Token Accuracy", () => {
         provider: PROVIDERS.ANTHROPIC,
         model: "claude-haiku-4-5-20251001",
         traceId: null,
-        agentSessionId: "session-3",
+        agentConversationId: "session-3",
         aiMessages: messages,
         resultText,
         // No usage provided

@@ -36,7 +36,7 @@ export class SkillMemoryScorer {
         queryText,
         limit: 10,
         traceId: traceId || undefined,
-        agentSessionId: agentConversationId || undefined,
+        agentConversationId: agentConversationId || undefined,
         endpoint: endpoint || "/agent",
         username: _username || undefined,
         guildId: guildId || undefined,

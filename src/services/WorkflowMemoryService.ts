@@ -51,7 +51,6 @@ interface WorkflowStep {
 interface WorkflowDocument {
   conversationId: string;
   agentConversationId: string;
-  agentSessionId: string;
   project: string;
   username: string;
   agent: string;
@@ -165,10 +164,10 @@ const WorkflowMemoryService = {
     context: AgenticContext,
     output: { messages?: ConversationMessage[]; sessionOutcome?: string },
   ): Promise<void> {
-    const { conversationId, agentConversationId, agentSessionId, project, username, agent } =
+    const { conversationId, agentConversationId, project, username, agent } =
       context;
 
-    const resolvedAgentConversationId = agentConversationId || (agentSessionId as string) || "";
+    const resolvedAgentConversationId = agentConversationId || "";
 
     if (!conversationId || !resolvedAgentConversationId) return;
     if (!AgentPersonaRegistry.isAgentProject(project)) return;
@@ -223,14 +222,12 @@ const WorkflowMemoryService = {
       endpoint: "/agent",
       traceId: context.traceId,
       agentConversationId: resolvedAgentConversationId,
-      agentSessionId: resolvedAgentConversationId,
       agent,
     });
 
     const workflowDocument: WorkflowDocument = {
       conversationId,
       agentConversationId: resolvedAgentConversationId,
-      agentSessionId: resolvedAgentConversationId,
       project,
       username,
       agent: agent || "CODING",
@@ -270,7 +267,6 @@ const WorkflowMemoryService = {
     options: {
       traceId?: string | null;
       agentConversationId?: string | null;
-      agentSessionId?: string | null;
       endpoint?: string | null;
       username?: string;
       maximumResults?: number;
@@ -297,8 +293,7 @@ const WorkflowMemoryService = {
       project,
       endpoint: options.endpoint || "/agent",
       traceId: options.traceId,
-      agentConversationId: options.agentConversationId || options.agentSessionId,
-      agentSessionId: options.agentConversationId || options.agentSessionId,
+      agentConversationId: options.agentConversationId,
       agent,
     });
 

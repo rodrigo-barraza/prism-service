@@ -112,7 +112,7 @@ describe("Validation Flow Ordering", () => {
     mockContext = {
       project: "test-project",
       username: "test-user",
-      agentSessionId: "session-flow-test",
+      agentConversationId: "session-flow-test",
       workspaceRoot: "/home/rodrigo/development",
       provider: {} as any,
       providerName: "test-provider",

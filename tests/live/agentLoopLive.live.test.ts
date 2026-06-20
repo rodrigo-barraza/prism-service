@@ -313,7 +313,7 @@ function logResult(label, result) {
 // ═══════════════════════════════════════════════════════════════
 
 let targetModel = null;
-const agentSessionId = crypto.randomUUID();
+const agentConversationId = crypto.randomUUID();
 
 beforeAll(async () => {
   // Check services are running
@@ -337,7 +337,7 @@ beforeAll(async () => {
   console.log("  ║  Agent Loop — LM Studio Integration Tests            ║");
   console.log("  ╠═══════════════════════════════════════════════════════╣");
   console.log(`  ║  Model:  ${targetModel.padEnd(46).slice(0, 46)}║`);
-  console.log(`  ║  Session: ${agentSessionId.slice(0, 8)}…${" ".repeat(41)}║`);
+  console.log(`  ║  Session: ${agentConversationId.slice(0, 8)}…${" ".repeat(41)}║`);
   console.log("  ╚═══════════════════════════════════════════════════════╝\n");
 }, 15_000);
 
@@ -351,7 +351,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
         { role: "user", content: "What is 2 + 2? Answer in one sentence." },
       ],
       agent: "CODING",
-      agentSessionId,
+      agentConversationId,
       maxTokens: 100,
       autoApprove: true,
     });
@@ -390,7 +390,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
         { role: "user", content: "Hello! My name is Rodrigo. What is your name?" },
       ],
       agent: "CODING",
-      agentSessionId: sessionId,
+      agentConversationId: sessionId,
       maxTokens: 150,
       autoApprove: true,
     });
@@ -412,7 +412,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
         { role: "user", content: "What did I just tell you my name was? Answer briefly." },
       ],
       agent: "CODING",
-      agentSessionId: sessionId,
+      agentConversationId: sessionId,
       maxTokens: 100,
       autoApprove: true,
     });
@@ -442,7 +442,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
         { role: "user", content: "Great! Now, what is 10 * 10? Just the number." },
       ],
       agent: "CODING",
-      agentSessionId: sessionId,
+      agentConversationId: sessionId,
       maxTokens: 50,
       autoApprove: true,
     });
@@ -468,7 +468,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
         { role: "user", content: "What files are in the current directory? Use tools to check." },
       ],
       agent: "CODING",
-      agentSessionId: crypto.randomUUID(),
+      agentConversationId: crypto.randomUUID(),
       maxTokens: 500,
       autoApprove: true,
       maxIterations: 3,
@@ -511,7 +511,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
           { role: "user", content: "Write a very long essay about the history of computing." },
         ],
         agent: "CODING",
-        agentSessionId: sessionId,
+        agentConversationId: sessionId,
         maxTokens: 2000,
         autoApprove: true,
       }),
@@ -553,7 +553,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
             { role: "user", content: "Say 'hello' and nothing else." },
           ],
           agent: "CODING",
-          agentSessionId: crypto.randomUUID(),
+          agentConversationId: crypto.randomUUID(),
           maxTokens: 20,
           autoApprove: true,
         });
@@ -605,7 +605,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
           { role: "user", content: `Turn ${i + 1}: What is ${i + 1} + ${i + 1}? Answer with just the number.` },
         ],
         agent: "CODING",
-        agentSessionId: crypto.randomUUID(),
+        agentConversationId: crypto.randomUUID(),
         maxTokens: 30,
         autoApprove: true,
       });
@@ -649,7 +649,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
         { role: "user", content: "What is 5 * 5? Answer with just the number." },
       ],
       agent: "CODING",
-      agentSessionId: crypto.randomUUID(),
+      agentConversationId: crypto.randomUUID(),
       maxTokens: 30,
       autoApprove: true,
     });
@@ -692,7 +692,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
         },
       ],
       agent: "CODING",
-      agentSessionId: sessionId,
+      agentConversationId: sessionId,
       maxTokens: 1000,
       autoApprove: true,
       maxIterations: 10,
@@ -742,7 +742,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
       model: targetModel,
       messages: turn2Messages,
       agent: "CODING",
-      agentSessionId: sessionId,
+      agentConversationId: sessionId,
       maxTokens: 500,
       autoApprove: true,
       maxIterations: 5,
@@ -775,7 +775,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
       model: targetModel,
       messages: turn3Messages,
       agent: "CODING",
-      agentSessionId: sessionId,
+      agentConversationId: sessionId,
       maxTokens: 50,
       autoApprove: true,
       maxIterations: 3,

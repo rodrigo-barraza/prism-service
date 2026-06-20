@@ -378,8 +378,8 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
         options: {
           maxIterations: 1,
         },
-        agentSessionId: "session-thinking-123",
-        parentAgentSessionId: null,
+        agentConversationId: "session-thinking-123",
+        parentAgentConversationId: null,
         traceId: "trace-thinking-123",
         project: "test-thinking-project",
         username: "test-user",
@@ -414,7 +414,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       }
 
       ConversationGenerationTracker.register(
-        mockContext.agentSessionId,
+        mockContext.agentConversationId,
         mockContext.requestId,
         {
           provider: mockContext.providerName,
@@ -484,7 +484,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       });
 
       // Cleanup
-      ConversationGenerationTracker.cleanup(mockContext.agentSessionId);
+      ConversationGenerationTracker.cleanup(mockContext.agentConversationId);
     });
   });
 });
@@ -752,8 +752,8 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
         options: {
           maxIterations: 1,
         },
-        agentSessionId: "session-anthropic-thinking-123",
-        parentAgentSessionId: null,
+        agentConversationId: "session-anthropic-thinking-123",
+        parentAgentConversationId: null,
         traceId: "trace-anthropic-thinking-123",
         project: "test-thinking-project",
         username: "test-user",
@@ -787,7 +787,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       }
 
       ConversationGenerationTracker.register(
-        mockContext.agentSessionId,
+        mockContext.agentConversationId,
         mockContext.requestId,
         {
           provider: mockContext.providerName,
@@ -845,7 +845,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       );
 
       // Cleanup
-      ConversationGenerationTracker.cleanup(mockContext.agentSessionId);
+      ConversationGenerationTracker.cleanup(mockContext.agentConversationId);
     });
   });
 });

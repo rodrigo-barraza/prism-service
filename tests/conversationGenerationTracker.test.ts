@@ -30,7 +30,7 @@ describe("ConversationGenerationTracker — lifecycle", () => {
     expect(ConversationGenerationTracker.totalActiveRequests).toBeGreaterThanOrEqual(1);
   });
 
-  it("should not register with empty agentSessionId", () => {
+  it("should not register with empty agentConversationId", () => {
     ConversationGenerationTracker.register("", "req-empty");
 
     expect(ConversationGenerationTracker.hasActiveRequests("")).toBe(false);
@@ -213,7 +213,7 @@ describe('ConversationGenerationTracker adversarial', () => {
     ConversationGenerationTracker.cleanup('orphan-session');
   });
 
-  it('should silently ignore register with empty agentSessionId', () => {
+  it('should silently ignore register with empty agentConversationId', () => {
     ConversationGenerationTracker.register('', 'req-1');
     expect(ConversationGenerationTracker.totalActiveRequests).toBe(0);
   });

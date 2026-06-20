@@ -72,7 +72,7 @@ async function streamAndCollect(provider, model, prompt, {
     model,
     messages: [{ role: "user", content: prompt }],
     agent,
-    agentSessionId: crypto.randomUUID(),
+    agentConversationId: crypto.randomUUID(),
     maxTokens,
     autoApprove,
     maxIterations,
