@@ -96,8 +96,11 @@ export default class BaseAgenticHarness {
     this.context = context;
     this.state = state;
     this.tools = tools;
-    this.trackerSessionId =
-      context.parentAgentConversationId || context.agentConversationId;
+    this.trackerSessionId = (context.parentAgentConversationId ||
+      context.parentAgentSessionId ||
+      context.agentConversationId ||
+      context.agentSessionId ||
+      "") as string;
   }
 
   /** Execute the agentic loop. Subclasses MUST override. */
@@ -444,13 +447,17 @@ export default class BaseAgenticHarness {
       providerName,
       resolvedModel,
       parentAgentConversationId,
+      parentAgentSessionId,
       agentConversationId,
+      agentSessionId,
     } = this.context;
+    const resolvedParent = parentAgentConversationId || parentAgentSessionId;
+    const resolvedAgent = agentConversationId || agentSessionId;
     ConversationGenerationTracker.register(this.trackerSessionId, passRequestId, {
       provider: providerName,
       model: resolvedModel,
-      source: parentAgentConversationId ? "sub-agent" : "orchestrator",
-      subAgentId: parentAgentConversationId ? agentConversationId : null,
+      source: resolvedParent ? "sub-agent" : "orchestrator",
+      subAgentId: resolvedParent ? (resolvedAgent as string) : null,
     });
   }
 

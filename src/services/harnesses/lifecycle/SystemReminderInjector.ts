@@ -48,7 +48,7 @@ export async function maybeInjectSystemReminder(
   context: AgenticContext,
 ): Promise<void> {
   const { options, emit, provider, signal } = context;
-  const sessionId = context.agentSessionId || "";
+  const agentConversationId = context.agentConversationId || (context.agentSessionId as string) || "";
 
   // Feature gate: disabled when no reminder model is configured
   const reminderModel = options.reminderModel as string | undefined;
@@ -60,7 +60,7 @@ export async function maybeInjectSystemReminder(
   if (currentIteration < MINIMUM_ITERATIONS_BEFORE_FIRST_REMINDER) return;
   if (currentIteration % resolvedInterval !== 0) return;
 
-  let reminderContent = cachedReminderContent.get(sessionId);
+  let reminderContent = cachedReminderContent.get(agentConversationId);
 
   if (!reminderContent) {
     const systemMessage = currentMessages.find(
@@ -81,7 +81,7 @@ export async function maybeInjectSystemReminder(
 
     if (!reminderContent) return;
 
-    cachedReminderContent.set(sessionId, reminderContent);
+    cachedReminderContent.set(agentConversationId, reminderContent);
   }
 
   currentMessages.push({
@@ -110,6 +110,6 @@ export async function maybeInjectSystemReminder(
  * Clean up cached reminder content for a session.
  * Call during session teardown to prevent memory leaks.
  */
-export function cleanupReminderCache(sessionId: string): void {
-  cachedReminderContent.delete(sessionId);
+export function cleanupReminderCache(agentConversationId: string): void {
+  cachedReminderContent.delete(agentConversationId);
 }

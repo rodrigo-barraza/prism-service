@@ -213,6 +213,13 @@ export default class ToolContext {
   }
 
   /**
+   * Get the number of active sessions with state (for diagnostics, backward compatibility alias).
+   */
+  static get activeSessionCount(): number {
+    return this.activeConversationCount;
+  }
+
+  /**
    * Get a snapshot of all state keys for a conversation (for diagnostics).
    * Returns an empty array if no state exists.
    */

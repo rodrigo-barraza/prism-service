@@ -54,6 +54,7 @@ interface BeforePromptHookContext {
   username: string;
   agent?: string | null;
   traceId?: string | null;
+  agentConversationId: string;
   agentSessionId: string;
   agentContext?: unknown;
   enabledTools: string[] | null;
@@ -118,6 +119,7 @@ export async function runTreeOfThoughts(
   const tools = harness["tools"];
   const {
     options,
+    agentConversationId,
     agentSessionId,
     traceId,
     project,
@@ -127,6 +129,8 @@ export async function runTreeOfThoughts(
     emit,
     signal,
   } = context;
+
+  const resolvedAgentConversationId = agentConversationId || (agentSessionId as string) || "";
 
   const searchStrategy: SearchStrategy =
     (options.searchStrategy as SearchStrategy) || "bfs";
@@ -170,7 +174,8 @@ export async function runTreeOfThoughts(
     username,
     agent,
     traceId,
-    agentSessionId,
+    agentConversationId: resolvedAgentConversationId,
+    agentSessionId: resolvedAgentConversationId,
     agentContext: options.agentContext,
     enabledTools: tools.resolvedEnabledTools,
     resolvedToolNames: tools.finalTools.map(
@@ -684,7 +689,7 @@ export async function runTreeOfThoughts(
       state.streamedToolCalls.length > 0 &&
       !signal?.aborted
     ) {
-      state.sessionOutcome = "exhausted";
+      state.conversationOutcome = "exhausted";
       await runExhaustionRecoveryPass(harness, context, state, currentMessages);
     }
 
@@ -696,7 +701,7 @@ export async function runTreeOfThoughts(
         `strategy: ${searchStrategy}`,
     );
 
-    cleanupReminderCache(agentSessionId);
+    cleanupReminderCache(resolvedAgentConversationId);
     await harness["finalize"](currentMessages, hooks);
     return { messages: currentMessages };
   } catch (loopError: unknown) {
@@ -710,7 +715,7 @@ export async function runTreeOfThoughts(
       context,
     );
 
-    state.sessionOutcome = "error";
+    state.conversationOutcome = "error";
 
     try {
       await harness["finalize"](currentMessages, hooks);
@@ -767,9 +772,11 @@ async function generateBranch(
   }
 
   const pass = harness.createPassState(passOptions);
+  const { agentConversationId, agentSessionId } = context;
+  const resolvedAgentConversationId = agentConversationId || (agentSessionId as string) || "";
   const requestIdBase =
     context.requestId ||
-    context.agentSessionId ||
+    resolvedAgentConversationId ||
     crypto.randomUUID();
   const passRequestId = `${requestIdBase}-iter-${state.iterations}-branch-${branchIndex}`;
   pass.requestId = passRequestId;

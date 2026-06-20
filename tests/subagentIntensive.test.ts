@@ -120,6 +120,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       resolvedModel: "gemini-3-flash-preview",
       traceId: "trace-id-abc",
       agentSessionId: "session-id-def",
+      agentConversationId: "session-id-def",
       conversationId: "conv-id-ghi",
       emit: vi.fn(),
     };
@@ -171,7 +172,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
         subAgentId: "agent-123",
         subAgentDescription: "Test Telemetry",
         parentEmit: parentEmitMock,
-        parentSessionId: "parent-session-456",
+        parentConversationId: "parent-session-456",
       });
 
       const emitFn = telemetry.createEmitFunction();

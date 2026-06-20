@@ -109,7 +109,8 @@ export async function manageContextPressure(
       {
         project: context.project || "",
         username: context.username || "",
-        agentSessionId: context.agentSessionId,
+        agentConversationId: context.agentConversationId,
+        agentSessionId: context.agentConversationId,
         traceId: context.traceId || null,
         agent: context.agent || null,
         emit,

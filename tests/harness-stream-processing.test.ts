@@ -73,6 +73,7 @@ describe('BaseAgenticHarness processStreamChunk — adversarial chunks', () => {
       project: 'test',
       username: 'tester',
       agentSessionId: 'session-1',
+      agentConversationId: 'session-1',
       conversationId: 'conv-1',
     };
     const tools: ResolvedTools = {
@@ -435,6 +436,7 @@ describe('BaseAgenticHarness consumeStream — abort and error recovery', () => 
       project: 'test',
       username: 'tester',
       agentSessionId: 'session-1',
+      agentConversationId: 'session-1',
       conversationId: 'conv-1',
     };
     const tools: ResolvedTools = {
@@ -632,6 +634,7 @@ describe('checkAndApplyToolSetChanges — dynamic tool activation doc sync', () 
       project: 'test',
       username: 'tester',
       agentSessionId: sessionId,
+      agentConversationId: sessionId,
       conversationId: 'conv-1',
     };
     const tools: ResolvedTools = {
