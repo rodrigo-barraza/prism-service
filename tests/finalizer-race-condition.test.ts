@@ -15,9 +15,10 @@ import { describe, it, expect } from "vitest";
 import { swapMessageContent, assembleMessagesToAppend as assembleMessagesToAppendReal, sanitizeMessagesForPersistence } from "../src/services/harnesses/lifecycle/Finalizer.ts";
 import { PROMPT_DELIMITERS, PROVIDERS } from "../src/constants.ts";
 import type { MessagePayload, ToolCallPayload } from "../src/services/conversation/types.ts";
-import type { ConversationMessage as BaseConversationMessage } from "../src/services/harnesses/types.ts";
+import type { ConversationMessage } from "../src/services/harnesses/types.ts";
+import type { ChatMessage } from "../src/types/ProviderTypes.ts";
 
-type TestPayload = BaseConversationMessage & Pick<MessagePayload, "rawContent">;
+type TestPayload = ConversationMessage & { rawContent?: string };
 
 type FinalizerInput = Parameters<typeof assembleMessagesToAppendReal>[0];
 
@@ -463,19 +464,14 @@ describe("done event → appendAndFinalize race condition", () => {
     });
 
     it("content-aware guard catches missing user messages", () => {
-      interface SimpleMessage {
-        role: string;
-        content: string;
-      }
-
-      const streamingMessages: SimpleMessage[] = [
+      const streamingMessages: ChatMessage[] = [
         { role: "user", content: "hey whats up" },
         { role: "assistant", content: "Hey Rodrigo!" },
         { role: "user", content: "make a song about the war" },
         { role: "assistant", content: "Creating your song!" },
       ];
 
-      const databaseMessages: SimpleMessage[] = [
+      const databaseMessages: ChatMessage[] = [
         { role: "user", content: "hey whats up" },
         { role: "assistant", content: "Hey Rodrigo!" },
         { role: "assistant", content: "Creating!" },
@@ -495,19 +491,14 @@ describe("done event → appendAndFinalize race condition", () => {
       expect(lastDatabaseUser?.content).toBe("hey whats up");
 
       const contentGuardBlocks =
-        lastStreamingUser?.content !== lastDatabaseUser?.content;
+        (lastStreamingUser?.content as string) !== (lastDatabaseUser?.content as string);
       expect(contentGuardBlocks).toBe(true);
     });
 
     it("improved guard: verify last user message content matches", () => {
-      interface SimpleMessage {
-        role: string;
-        content: string;
-      }
-
       function shouldOverwriteWithDatabaseMessages(
-        streamingMessages: SimpleMessage[],
-        databaseMessages: SimpleMessage[],
+        streamingMessages: ChatMessage[],
+        databaseMessages: ChatMessage[],
       ): boolean {
         if (databaseMessages.length < streamingMessages.length) {
           return false;
@@ -520,9 +511,9 @@ describe("done event → appendAndFinalize race condition", () => {
         if (lastStreamingUser) {
           const databaseUserMessages = databaseMessages
             .filter((message) => message.role === "user")
-            .map((message) => message.content);
+            .map((message) => message.content as string);
 
-          if (!databaseUserMessages.includes(lastStreamingUser.content)) {
+          if (!databaseUserMessages.includes(lastStreamingUser.content as string)) {
             return false;
           }
         }

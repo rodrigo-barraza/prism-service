@@ -32,9 +32,8 @@ vi.mock("../src/utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../../config.ts", () => ({
+vi.mock("../config.ts", () => ({
   PRISM_SERVICE_PORT: 0,
-  GATEWAY_SECRET: "test-secret",
   OPENAI_API_KEY: "fake",
   ANTHROPIC_API_KEY: "fake",
   GOOGLE_API_KEY: "fake",
@@ -44,7 +43,6 @@ vi.mock("../../config.ts", () => ({
   PROVIDER_VLLM: [],
   PROVIDER_OLLAMA: [],
   PROVIDER_LLAMA_CPP: [],
-  OPENAI_COMPATIBLE_BASE_URL: "http://localhost:9999",
   TOOLS_SERVICE_URL: "http://localhost:5590",
   MONGO_URI: "mongodb://test:test@localhost:27017",
   MONGO_DB_NAME: "prism-test",
@@ -86,9 +84,9 @@ vi.mock("../src/services/SettingsService.ts", () => ({
     getCached: vi.fn().mockReturnValue({
       creative: {
         textToSpeechProvider: PROVIDERS.ELEVENLABS,
-      } as Partial<Required<ReturnType<typeof import("../src/services/SettingsService.ts").default.getCached>>["creative"]>,
-    } as any),
-    get: vi.fn().mockResolvedValue({} as any),
+      },
+    } as unknown as import("../src/services/SettingsService.ts").SettingsData),
+    get: vi.fn().mockResolvedValue({} as unknown as import("../src/services/SettingsService.ts").SettingsData),
     getSection: vi.fn().mockResolvedValue({} as any),
   },
 }));

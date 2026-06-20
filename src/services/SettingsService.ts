@@ -10,7 +10,7 @@ import logger from "../utils/logger.ts";
 // Hot path: MemoryService + EmbeddingService read these on every call.
 // Cache is invalidated on update() and lazily populated on first get().
 
-interface SettingsData {
+export interface SettingsData {
   memory: {
     extractionProvider: string;
     extractionModel: string;

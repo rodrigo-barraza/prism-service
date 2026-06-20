@@ -12,7 +12,6 @@ vi.mock("../src/utils/logger.ts", () => ({
 
 vi.mock("../config.ts", () => ({
   MONGO_DB_NAME: "prism-test",
-  GATEWAY_SECRET: "test-secret",
 }));
 
 describe("hasSubAgents Derivation — Defense-in-Depth Tests", () => {

@@ -10,7 +10,6 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("../config.ts", () => ({
   PRISM_SERVICE_PORT: 0,
-  GATEWAY_SECRET: "test",
   OPENAI_API_KEY: "fake",
   ANTHROPIC_API_KEY: "fake",
   GOOGLE_API_KEY: "fake",
@@ -20,7 +19,6 @@ vi.mock("../config.ts", () => ({
   PROVIDER_VLLM: [],
   PROVIDER_OLLAMA: [],
   PROVIDER_LLAMA_CPP: [],
-  OPENAI_COMPATIBLE_BASE_URL: "http://localhost:9999",
   TOOLS_SERVICE_URL: "http://localhost:5590",
   MONGO_URI: "mongodb://test:test@localhost:27017",
   MONGO_DB_NAME: "prism-test",
