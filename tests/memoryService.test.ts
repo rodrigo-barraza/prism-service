@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 import MemoryService, { CODING_MEMORY_TYPES } from "../src/services/MemoryService.ts";
 import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
 import EmbeddingService from "../src/services/EmbeddingService.ts";
@@ -39,7 +40,7 @@ vi.mock("../src/services/EmbeddingService.ts", () => ({
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
     getMemoryModelConfig: vi.fn().mockResolvedValue({
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
       model: "gemini-3-flash-preview",
     }),
   },

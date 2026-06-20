@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 import EmbeddingService from "../src/services/EmbeddingService.ts";
 import SettingsService from "../src/services/SettingsService.ts";
 import RequestLogger from "../src/services/RequestLogger.ts";
@@ -10,7 +11,7 @@ const mockGenerateEmbedding = vi.fn().mockResolvedValue({
 
 vi.mock("../src/providers/index.ts", () => ({
   getProvider: vi.fn().mockImplementation((providerName: string) => {
-    if (providerName === "anthropic") {
+    if (providerName === PROVIDERS.ANTHROPIC) {
       return {}; // Anthropic doesn't support embedding in our test
     }
     return {
@@ -23,7 +24,7 @@ vi.mock("../src/providers/index.ts", () => ({
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
     getMemoryModelConfig: vi.fn().mockResolvedValue({
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
       model: "gemini-embedding-2-preview",
     }),
   },
@@ -44,35 +45,35 @@ describe("EmbeddingService", () => {
     const result = await EmbeddingService.generate("hello world");
     expect(result.embedding).toEqual([0.1, 0.2, 0.3]);
     expect(result.dimensions).toBe(3);
-    expect(result.provider).toBe("google");
+    expect(result.provider).toBe(PROVIDERS.GOOGLE);
     expect(result.model).toBe("gemini-embedding-2-preview");
 
     expect(SettingsService.getMemoryModelConfig).toHaveBeenCalledWith("embedding");
     expect(RequestLogger.log).toHaveBeenCalledTimes(1);
     expect(vi.mocked(RequestLogger.log).mock.calls[0][0]).toMatchObject({
       success: true,
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
       model: "gemini-embedding-2-preview"
     });
   });
 
   it("should respect provider and model overrides in options", async () => {
     const result = await EmbeddingService.generate("hello world", {
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       model: "text-embedding-3-small"
     });
 
-    expect(result.provider).toBe("openai");
+    expect(result.provider).toBe(PROVIDERS.OPENAI);
     expect(result.model).toBe("text-embedding-3-small");
     expect(vi.mocked(RequestLogger.log).mock.calls[0][0]).toMatchObject({
-      provider: "openai",
+      provider: PROVIDERS.OPENAI,
       model: "text-embedding-3-small"
     });
   });
 
   it("should throw ProviderError when provider does not support embeddings", async () => {
     await expect(EmbeddingService.generate("hello world", {
-      provider: "anthropic",
+      provider: PROVIDERS.ANTHROPIC,
       model: "claude-3-opus"
     })).rejects.toThrow("Provider \"anthropic\" does not support embeddings");
 
@@ -94,7 +95,7 @@ describe("EmbeddingService", () => {
     ];
 
     await EmbeddingService.generate(multimodalContent, {
-      provider: "google",
+      provider: PROVIDERS.GOOGLE,
       model: "gemini-embedding-2-preview"
     });
 

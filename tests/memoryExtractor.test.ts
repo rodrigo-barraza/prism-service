@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 import MemoryExtractor from "../src/services/MemoryExtractor.ts";
 import MemoryService from "../src/services/MemoryService.ts";
 import SettingsService from "../src/services/SettingsService.ts";
@@ -23,7 +24,7 @@ vi.mock("../src/services/MemoryService.ts", () => ({
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
     getSection: vi.fn().mockResolvedValue({
-      extractionProvider: "google",
+      extractionProvider: PROVIDERS.GOOGLE,
       extractionModel: "gemini-3-flash-preview",
       embeddingModel: "gemini-embedding-2-preview"
     }),

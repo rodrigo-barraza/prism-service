@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getProvider, listProviders } from "../src/providers/index.ts";
+import { PROVIDERS } from "../src/constants.ts";
 import { convertToolsToGoogle } from "../src/providers/google.ts";
 import {
   normalizeResponsesUsage,
@@ -11,14 +12,14 @@ describe("Provider Helpers and Adapters Suite", () => {
   describe("Provider Registry", () => {
     it("should list all registered static providers", () => {
       const providerList = listProviders();
-      expect(providerList).toContain("openai");
-      expect(providerList).toContain("google");
-      expect(providerList).toContain("anthropic");
-      expect(providerList).toContain("elevenlabs");
+      expect(providerList).toContain(PROVIDERS.OPENAI);
+      expect(providerList).toContain(PROVIDERS.GOOGLE);
+      expect(providerList).toContain(PROVIDERS.ANTHROPIC);
+      expect(providerList).toContain(PROVIDERS.ELEVENLABS);
     });
 
     it("should retrieve a provider by name with tracking wrapped proxy", () => {
-      const providerInstance = getProvider("google");
+      const providerInstance = getProvider(PROVIDERS.GOOGLE);
       expect(providerInstance).toBeDefined();
       expect(typeof providerInstance.generateText).toBe("function");
     });

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 import { runTreeOfThoughts } from "../src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts";
 import BaseAgenticHarness from "../src/services/harnesses/BaseAgenticHarness.ts";
 import { APPROVAL_TIERS } from "../src/services/AutoApprovalEngine.ts";
@@ -39,7 +40,7 @@ describe("TreeOfThoughtsStrategy", () => {
       project: "test-project",
       username: "test-user",
       agent: "CODING",
-      providerName: "google",
+      providerName: PROVIDERS.GOOGLE,
       resolvedModel: "gemini-3.5-flash",
       traceId: "trace-id-123",
       agentConversationId: "session-id-456",

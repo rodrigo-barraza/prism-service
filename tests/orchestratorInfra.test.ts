@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { PROVIDERS } from "../src/constants.ts";
 import { InstanceLoadBalancer } from "../src/services/orchestrator/InstanceLoadBalancer.ts";
 import {
   resolveSiblingInstances,
@@ -13,7 +14,7 @@ import ConversationGenerationTracker from "../src/services/ConversationGeneratio
 const mockGetProvider = vi.fn();
 vi.mock("../src/providers/index.ts", () => ({
   getProvider: (name: string) => mockGetProvider(name),
-  listProviders: () => ["google", "openai", "lm-studio"],
+  listProviders: () => [PROVIDERS.GOOGLE, PROVIDERS.OPENAI, PROVIDERS.LM_STUDIO],
   providers: {},
 }));
 
@@ -28,7 +29,7 @@ vi.mock("../src/utils/ModelResolution.ts", () => ({
 // ── Mock instance-registry ────────────────────────────────────────────
 vi.mock("../src/providers/instance-registry.ts", () => ({
   getInstancesByType: vi.fn().mockReturnValue([]),
-  getInstanceType: vi.fn().mockReturnValue("google"),
+  getInstanceType: vi.fn().mockReturnValue(PROVIDERS.GOOGLE),
 }));
 
 // ── Mock LocalModelQueue ──────────────────────────────────────────────
@@ -79,8 +80,8 @@ describe("Orchestrator Infrastructure Suite", () => {
   // ────────────────────────────────────────────────────────────────────
   describe("InstanceLoadBalancer", () => {
     const mockSiblings = [
-      { id: "instance-1", type: "google", baseUrl: "", concurrency: 2, models: ["model-a"] },
-      { id: "instance-2", type: "google", baseUrl: "", concurrency: 2, models: ["model-a"] },
+      { id: "instance-1", type: PROVIDERS.GOOGLE, baseUrl: "", concurrency: 2, models: ["model-a"] },
+      { id: "instance-2", type: PROVIDERS.GOOGLE, baseUrl: "", concurrency: 2, models: ["model-a"] },
     ] as any[];
 
     it("should select the orchestrator instance first if it has slots", () => {
@@ -234,7 +235,7 @@ describe("Orchestrator Infrastructure Suite", () => {
       vi.mocked(localModelQueueMock.default.isLocal).mockReturnValue(false);
 
       const resolved = await resolveSiblingInstances(
-        { providerName: "google", resolvedModel: "gemini-1.5" },
+        { providerName: PROVIDERS.GOOGLE, resolvedModel: "gemini-1.5" },
         "test-router"
       );
 
@@ -244,9 +245,9 @@ describe("Orchestrator Infrastructure Suite", () => {
       const selection = selectInstanceForMember(
         { description: "task", prompt: "prompt" },
         resolved,
-        { providerName: "google", resolvedModel: "gemini-1.5" }
+        { providerName: PROVIDERS.GOOGLE, resolvedModel: "gemini-1.5" }
       );
-      expect(selection.assignedProvider).toBe("google");
+      expect(selection.assignedProvider).toBe(PROVIDERS.GOOGLE);
       expect(selection.assignedModel).toBe("gemini-1.5");
     });
 
@@ -256,10 +257,10 @@ describe("Orchestrator Infrastructure Suite", () => {
       const modelResolutionMock = await import("../src/utils/ModelResolution.ts");
 
       vi.mocked(localModelQueueMock.default.isLocal).mockReturnValue(true);
-      vi.mocked(instanceRegistryMock.getInstanceType).mockReturnValue("lm-studio");
+      vi.mocked(instanceRegistryMock.getInstanceType).mockReturnValue(PROVIDERS.LM_STUDIO);
       const fakeSiblings = [
-        { id: "lm-1", type: "lm-studio", baseUrl: "", concurrency: 2, models: ["model-x"] },
-        { id: "lm-2", type: "lm-studio", baseUrl: "", concurrency: 2, models: ["model-x"] },
+        { id: "lm-1", type: PROVIDERS.LM_STUDIO, baseUrl: "", concurrency: 2, models: ["model-x"] },
+        { id: "lm-2", type: PROVIDERS.LM_STUDIO, baseUrl: "", concurrency: 2, models: ["model-x"] },
       ] as any[];
       vi.mocked(instanceRegistryMock.getInstancesByType).mockReturnValue(fakeSiblings);
       vi.mocked(modelResolutionMock.resolveModelForInstances).mockResolvedValue({
@@ -268,7 +269,7 @@ describe("Orchestrator Infrastructure Suite", () => {
       });
 
       const resolved = await resolveSiblingInstances(
-        { providerName: "lm-studio", resolvedModel: "model-x" },
+        { providerName: PROVIDERS.LM_STUDIO, resolvedModel: "model-x" },
         "test-router"
       );
 
@@ -279,7 +280,7 @@ describe("Orchestrator Infrastructure Suite", () => {
       const selection = selectInstanceForMember(
         { description: "task", prompt: "prompt" },
         resolved,
-        { providerName: "lm-studio", resolvedModel: "model-x" }
+        { providerName: PROVIDERS.LM_STUDIO, resolvedModel: "model-x" }
       );
       expect(["lm-1", "lm-2"]).toContain(selection.assignedProvider);
     });
