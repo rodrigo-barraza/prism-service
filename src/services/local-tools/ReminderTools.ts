@@ -68,7 +68,7 @@ const setTimer = {
       typeof toolArguments.durationSeconds === "string"
         ? Number(toolArguments.durationSeconds)
         : undefined;
-    const conversationId = context.agentSessionId;
+    const conversationId = context.agentConversationId;
     const project = context.project || DEFAULT_PROJECT;
     const username = context.username || DEFAULT_USERNAME;
 
@@ -142,7 +142,7 @@ const listTimers = {
   domain: DOMAINS.CORE_SCHEDULE.displayName,
 
   async execute(_args: Record<string, unknown>, context: ReminderContext) {
-    const conversationId = context.agentSessionId;
+    const conversationId = context.agentConversationId;
     const project = context.project || DEFAULT_PROJECT;
     const username = context.username || DEFAULT_USERNAME;
 

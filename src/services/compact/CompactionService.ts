@@ -70,7 +70,6 @@ interface CompactionOptions {
   project: string;
   username: string;
   agentConversationId?: string;
-  agentSessionId?: string;
   traceId?: string | null;
   agent?: string | null;
   emit?: EmitFunction | null;
@@ -252,8 +251,7 @@ export default class CompactionService {
         provider: compactionProvider,
         model: compactionModel,
         traceId: options.traceId || null,
-        agentConversationId: options.agentConversationId || options.agentSessionId || null,
-        agentSessionId: options.agentConversationId || options.agentSessionId || null,
+        agentConversationId: options.agentConversationId || null,
         aiMessages: summarizationMessages as Parameters<
           typeof RequestLogger.logBackgroundLlmCall
         >[0]["aiMessages"],

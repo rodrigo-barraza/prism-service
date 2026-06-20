@@ -63,7 +63,7 @@ describe("Topology Routers Test Suite", () => {
       providerName: PROVIDERS.GOOGLE,
       resolvedModel: "gemini-3.5-flash",
       traceId: "trace-id-123",
-      agentSessionId: "session-id-456",
+      agentConversationId: "session-id-456",
       conversationId: "conv-id-789",
       emit: vi.fn(),
     };

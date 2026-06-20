@@ -107,9 +107,9 @@ const discoverAndEnableTools = {
     toolArguments: Record<string, unknown>,
     context: InternalToolContext,
   ) {
-    const sessionId = context.agentSessionId;
-    if (!sessionId) {
-      return { error: "No active agent session ID in context." };
+    const agentConversationId = context.agentConversationId;
+    if (!agentConversationId) {
+      return { error: "No active agent conversation ID in context." };
     }
 
     const query =
@@ -145,7 +145,7 @@ const discoverAndEnableTools = {
       {
         project: context.project,
         username: context.username,
-        agentSessionId: sessionId,
+        agentConversationId: agentConversationId,
         enabledTools: context.enabledTools || [],
       },
     )) as SearchToolsResult; // Trusting the internal service return shape, but asserting safely
@@ -164,7 +164,7 @@ const discoverAndEnableTools = {
     const discoveredToolNames = matches
       .map((matchEntry) => matchEntry.name)
       .filter(Boolean);
-    const currentDynamicTools = getCurrentDynamicTools(sessionId);
+    const currentDynamicTools = getCurrentDynamicTools(agentConversationId);
     const mergedToolSet = new Set(currentDynamicTools);
     const newlyActivatedTools: string[] = [];
 
@@ -176,9 +176,9 @@ const discoverAndEnableTools = {
     }
 
     if (newlyActivatedTools.length > 0) {
-      persistDynamicTools(sessionId, [...mergedToolSet]);
+      persistDynamicTools(agentConversationId, [...mergedToolSet]);
       logger.info(
-        `[DiscoverAndEnable] session=${sessionId} searched "${query}" → auto-enabled ${newlyActivatedTools.length} tools: [${newlyActivatedTools.join(", ")}]`,
+        `[DiscoverAndEnable] conversation=${agentConversationId} searched "${query}" → auto-enabled ${newlyActivatedTools.length} tools: [${newlyActivatedTools.join(", ")}]`,
       );
     }
 

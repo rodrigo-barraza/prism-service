@@ -72,7 +72,7 @@ describe('BaseAgenticHarness processStreamChunk — adversarial chunks', () => {
       providerName: 'test',
       project: 'test',
       username: 'tester',
-      agentSessionId: 'session-1',
+      agentConversationId: 'session-1',
       agentConversationId: 'session-1',
       conversationId: 'conv-1',
     };
@@ -435,7 +435,7 @@ describe('BaseAgenticHarness consumeStream — abort and error recovery', () => 
       providerName: 'test',
       project: 'test',
       username: 'tester',
-      agentSessionId: 'session-1',
+      agentConversationId: 'session-1',
       agentConversationId: 'session-1',
       conversationId: 'conv-1',
     };
@@ -529,7 +529,7 @@ describe('Display segment tracking — interleaved thinking/text/tools', () => {
       providerName: 'test',
       project: 'p',
       username: 'u',
-      agentSessionId: 's1',
+      agentConversationId: 's1',
       conversationId: 'c1',
     };
     const tools: ResolvedTools = { finalTools: [], resolvedEnabledTools: [] };
@@ -566,7 +566,7 @@ describe('Display segment tracking — interleaved thinking/text/tools', () => {
       providerName: 'test',
       project: 'p',
       username: 'u',
-      agentSessionId: 's1',
+      agentConversationId: 's1',
       conversationId: 'c1',
     };
     const tools: ResolvedTools = { finalTools: [], resolvedEnabledTools: [] };
@@ -633,7 +633,7 @@ describe('checkAndApplyToolSetChanges — dynamic tool activation doc sync', () 
       providerName: 'test',
       project: 'test',
       username: 'tester',
-      agentSessionId: sessionId,
+      agentConversationId: sessionId,
       agentConversationId: sessionId,
       conversationId: 'conv-1',
     };

@@ -55,7 +55,6 @@ interface BeforePromptHookContext {
   agent?: string | null;
   traceId?: string | null;
   agentConversationId: string;
-  agentSessionId: string;
   agentContext?: unknown;
   enabledTools: string[] | null;
   resolvedToolNames: string[];
@@ -95,7 +94,6 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
     const {
       options,
       agentConversationId,
-      agentSessionId,
       traceId,
       project,
       username,
@@ -105,7 +103,7 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
       signal,
     } = context;
 
-    const resolvedAgentConversationId = agentConversationId || (agentSessionId as string) || "";
+    const resolvedAgentConversationId = agentConversationId || "";
 
     // ── Resolve max iterations ────────────────────────────────
     const clientMaxIterations = options.maxIterations;
@@ -179,8 +177,7 @@ Use these images to observe the environment, notice changes, animations, or user
             username,
             agent,
             traceId,
-            agentConversationId: resolvedAgentConversationId,
-            agentSessionId: resolvedAgentConversationId,
+            agentConversationId: agentConversationId || "",
             agentContext: options.agentContext,
             enabledTools: this.tools.resolvedEnabledTools,
             resolvedToolNames: this.tools.finalTools.map(

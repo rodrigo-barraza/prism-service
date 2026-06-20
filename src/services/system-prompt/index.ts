@@ -188,7 +188,7 @@ export default class SystemPromptAssembler {
           latestUserMessage.content,
           {
             traceId: context.traceId,
-            agentSessionId: context.agentConversationId,
+            agentConversationId: context.agentConversationId,
             endpoint: context.agentContext?.endpoint || "/agent",
             project: context.project,
             username: context.username,

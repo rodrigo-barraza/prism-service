@@ -369,11 +369,11 @@ describe("Session Cost Reconciliation", () => {
 
       requests = [
         {
-          agentSessionId: "session-123",
+          agentConversationId: "session-123",
           estimatedCost: 2.43,
         },
         {
-          parentAgentSessionId: "session-123",
+          parentAgentConversationId: "session-123",
           estimatedCost: 4.21,
         },
         {
@@ -432,11 +432,11 @@ describe("Session Cost Reconciliation", () => {
       vi.mocked(MongoWrapper.getDb).mockReturnValue(mockDb as any);
     });
 
-    it("should return correct totalCost from requests overlay for GET /admin/agent-sessions", async () => {
+    it("should return correct totalCost from requests overlay for GET /admin/agent-conversations", async () => {
       const request = (await import("supertest")).default;
       const { app } = await import("./setup.ts");
       const apiResponse = await request(app)
-        .get("/admin/agent-sessions")
+        .get("/admin/agent-conversations")
         .set("x-gateway-secret", "test-secret")
         .expect(200);
 

@@ -236,9 +236,9 @@ describe("ConversationTimerService.executeAgenticLoop", () => {
     expect(mockRunAgenticLoop).toHaveBeenCalledTimes(1);
 
     const loopArguments = mockRunAgenticLoop.mock.calls[0][0];
-    // agentSessionId should be a fresh UUID, NOT the conversationId
-    expect(loopArguments.agentSessionId).toBeTruthy();
-    expect(loopArguments.agentSessionId).not.toBe("session-abc-123");
+    // agentConversationId should be a fresh UUID, NOT the conversationId
+    expect(loopArguments.agentConversationId).toBeTruthy();
+    expect(loopArguments.agentConversationId).not.toBe("session-abc-123");
     // conversationId should be the timer's conversationId (document persistence key)
     expect(loopArguments.conversationId).toBe("session-abc-123");
     expect(loopArguments.providerName).toBe(PROVIDERS.GOOGLE);

@@ -147,7 +147,7 @@ export async function processToolResultMedia(
       status: hasError ? "error" : "done",
       agent: context?.agent || null,
       conversationId: context?.conversationId || null,
-      agentSessionId: context?.agentSessionId || null,
+      agentConversationId: context?.agentConversationId || null,
       project: context?.project || null,
       username: context?.username || null,
       provider: context?.providerName || null,

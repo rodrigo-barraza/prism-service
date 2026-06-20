@@ -356,7 +356,7 @@ function startPersistenceLoop(): void {
 
 interface EmotionAnalysisContext {
   traceId?: string | null;
-  agentSessionId?: string | null;
+  agentConversationId?: string | null;
   endpoint?: string | null;
   project?: string | null;
   username?: string | null;
@@ -457,7 +457,7 @@ async function analyzeEmotionFromText(
     provider: providerName,
     model: modelName,
     traceId: requestContext.traceId || null,
-    agentSessionId: requestContext.agentSessionId || null,
+    agentConversationId: requestContext.agentConversationId || null,
     aiMessages,
     resultText: result?.text || null,
     usage: result?.usage || null,

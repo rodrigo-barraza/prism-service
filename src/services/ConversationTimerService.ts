@@ -482,7 +482,6 @@ const ConversationTimerService = {
           }),
         },
         agentConversationId: crypto.randomUUID(),
-        agentSessionId: crypto.randomUUID(),
         conversationId: timer.conversationId,
         userMessage: reminderMessage,
         conversationMeta: {

@@ -220,7 +220,7 @@ describe("ConversationService.appendMessages", () => {
       ).resolves.not.toThrow();
     });
 
-    it("should not conflict when meta includes parentAgentSessionId", async () => {
+    it("should not conflict when meta includes parentAgentConversationId", async () => {
       await createStub();
 
       await expect(
@@ -229,14 +229,14 @@ describe("ConversationService.appendMessages", () => {
           BASE_ARGS.project,
           BASE_ARGS.username,
           makeMessages(2),
-          { title: "Worker task", parentAgentSessionId: "parent-abc", settings: {} },
+          { title: "Worker task", parentAgentConversationId: "parent-abc", settings: {} },
           { collection: COLLECTIONS.AGENT_CONVERSATIONS },
         ),
       ).resolves.not.toThrow();
     });
 
     it("should not conflict when ALL possible overlapping fields are present", async () => {
-      // Worst case: meta supplies title, traceId, settings, parentAgentSessionId,
+      // Worst case: meta supplies title, traceId, settings, parentAgentConversationId,
       // AND systemPrompt — all of which could end up in both operators
       await createStub();
 
@@ -250,7 +250,7 @@ describe("ConversationService.appendMessages", () => {
             title: "Full meta test",
             traceId: "trace-full",
             systemPrompt: "You are helpful",
-            parentAgentSessionId: "parent-xyz",
+            parentAgentConversationId: "parent-xyz",
             settings: { provider: PROVIDERS.ANTHROPIC, model: "claude-4" },
           },
           // Use conversations collection (not agent_sessions) to exercise systemPrompt path

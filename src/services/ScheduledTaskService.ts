@@ -268,13 +268,12 @@ const ScheduledTaskService = {
     {
       username = "system",
       agentConversationId,
-      agentSessionId,
-    }: { username?: string; agentConversationId?: string; agentSessionId?: string } = {},
-  ): Promise<{ agentConversationId: string; agentSessionId: string }> {
+    }: { username?: string; agentConversationId?: string } = {},
+  ): Promise<{ agentConversationId: string }> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
-    const resolvedSessionId = agentSessionId || crypto.randomUUID();
+    const resolvedConversationId = agentConversationId || crypto.randomUUID();
     if (!task.agent) {
       throw new Error(
         `Scheduled task "${task.name}" is missing a required agent identifier`,
@@ -284,7 +283,7 @@ const ScheduledTaskService = {
     const nowISO = new Date().toISOString();
 
     logger.info(
-      `[ScheduledTasks] Executing task "${task.name}" under Session ID: ${resolvedSessionId} (user: ${username})`,
+      `[ScheduledTasks] Executing task "${task.name}" under Conversation ID: ${resolvedConversationId} (user: ${username})`,
     );
 
     // Determine default workspace root path if available
@@ -327,7 +326,7 @@ const ScheduledTaskService = {
     // (the user sidebar queries with ?agent=OMNI etc.). Without it, the
     // conversation only appears in the admin view which doesn't filter by agent.
     await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).insertOne({
-      id: resolvedSessionId,
+      id: resolvedConversationId,
       project: task.project,
       username,
       title: task.name,
@@ -378,9 +377,8 @@ const ScheduledTaskService = {
             disabledTools: task.toolConfig.disabledTools,
           }),
         },
-        agentConversationId: resolvedSessionId,
-        agentSessionId: resolvedSessionId,
-        conversationId: resolvedSessionId,
+        agentConversationId: resolvedConversationId,
+        conversationId: resolvedConversationId,
         userMessage: userTriggerMessage as ConversationMessage,
         conversationMeta: {
           title: task.name,
@@ -411,21 +409,21 @@ const ScheduledTaskService = {
       await db
         .collection(COLLECTIONS.AGENT_CONVERSATIONS)
         .updateOne(
-          { id: resolvedSessionId },
+          { id: resolvedConversationId },
           {
             $set: { isGenerating: false, updatedAt: new Date().toISOString() },
           },
         )
         .catch((cleanupError: unknown) =>
           logger.warn(
-            `[ScheduledTasks] Failed to reset isGenerating for session ${resolvedSessionId}: ${getErrorMessage(cleanupError)}`,
+            `[ScheduledTasks] Failed to reset isGenerating for conversation ${resolvedConversationId}: ${getErrorMessage(cleanupError)}`,
           ),
         );
 
       throw error;
     }
 
-    return { agentConversationId: resolvedSessionId, agentSessionId: resolvedSessionId };
+    return { agentConversationId: resolvedConversationId };
   },
 
   /**
@@ -593,7 +591,7 @@ const ScheduledTaskService = {
     project: string,
     username: string,
     payload?: Record<string, unknown>,
-  ): Promise<{ success: boolean; agentConversationId: string; agentSessionId: string }> {
+  ): Promise<{ success: boolean; agentConversationId: string }> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
@@ -614,20 +612,19 @@ const ScheduledTaskService = {
       throw new Error(`Scheduled Task not found: ${id}`);
     }
 
-    const agentSessionId = crypto.randomUUID();
+    const agentConversationId = crypto.randomUUID();
 
-    // Fire-and-forget background execution with the pre-generated session ID
+    // Fire-and-forget background execution with the pre-generated conversation ID
     this.executeTask({ ...task, id: task.id }, payload, {
       username,
-      agentConversationId: agentSessionId,
-      agentSessionId,
+      agentConversationId,
     }).catch((error: unknown) => {
       logger.error(
         `[ScheduledTasks] Manual trigger failed for task "${task.name}": ${getErrorMessage(error)}`,
       );
     });
 
-    return { success: true, agentConversationId: agentSessionId, agentSessionId };
+    return { success: true, agentConversationId };
   },
 };
 

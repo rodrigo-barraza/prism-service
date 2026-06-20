@@ -86,7 +86,7 @@ export default class BaseAgenticHarness {
   protected context: AgenticContext;
   protected state: AgenticLoopState;
   protected tools: ResolvedTools;
-  protected trackerSessionId: string;
+  protected trackerConversationId: string;
 
   constructor(
     context: AgenticContext,
@@ -96,7 +96,7 @@ export default class BaseAgenticHarness {
     this.context = context;
     this.state = state;
     this.tools = tools;
-    this.trackerSessionId = (context.parentAgentConversationId ||
+    this.trackerConversationId = (context.parentAgentConversationId ||
       context.agentConversationId ||
       "") as string;
   }
@@ -275,7 +275,7 @@ export default class BaseAgenticHarness {
     const { emit } = this.context;
     const state = this.state;
     const stats = ConversationGenerationTracker.getConversationStats(
-      this.trackerSessionId,
+      this.trackerConversationId,
     );
     if (stats.activeRequests > 0 || stats.totalOutputTokens > 0) {
       state.hwmOutputTokens = Math.max(
@@ -449,7 +449,7 @@ export default class BaseAgenticHarness {
     } = this.context;
     const resolvedParent = parentAgentConversationId;
     const resolvedAgent = agentConversationId;
-    ConversationGenerationTracker.register(this.trackerSessionId, passRequestId, {
+    ConversationGenerationTracker.register(this.trackerConversationId, passRequestId, {
       provider: providerName,
       model: resolvedModel,
       source: resolvedParent ? "sub-agent" : "orchestrator",

@@ -341,9 +341,7 @@ export async function finalizeTextGeneration(
       model: resolvedModel,
       conversationId,
       agentConversationId: agentConversationId || null,
-      agentSessionId: agentConversationId || null,
       parentAgentConversationId: parentAgentConversationId || null,
-      parentAgentSessionId: parentAgentConversationId || null,
       traceId: traceId || null,
       success: true,
       usage: usage || undefined,
@@ -455,7 +453,6 @@ export async function finalizeTextGeneration(
 
     if (parentAgentConversationId) {
       finalMeta.parentAgentConversationId = parentAgentConversationId;
-      finalMeta.parentAgentSessionId = parentAgentConversationId;
       finalMeta.isSubAgent = true;
     }
     if (parentConversationId) {

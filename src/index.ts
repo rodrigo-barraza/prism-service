@@ -221,19 +221,19 @@ setupWebSocket(wss);
         db
           .collection(COLLECTIONS.REQUESTS)
           .createIndex({ requestId: 1 }, { unique: true }),
-        // requests — used by $lookup from conversations and session joins
+        // requests — used by $lookup from conversations and agent conversation joins
         db.collection(COLLECTIONS.REQUESTS).createIndex({ conversationId: 1 }),
         db.collection(COLLECTIONS.REQUESTS).createIndex({ traceId: 1 }),
         db.collection(COLLECTIONS.REQUESTS).createIndex({ timestamp: -1 }),
         db
           .collection(COLLECTIONS.REQUESTS)
           .createIndex({ project: 1, timestamp: -1 }),
-        // requests — agent session joins (admin traces, session detail)
-        db.collection(COLLECTIONS.REQUESTS).createIndex({ agentSessionId: 1 }),
-        // requests — parent session hierarchy traversal (7+ query sites use $in on this field)
+        // requests — agent conversation joins (admin traces, conversation detail)
+        db.collection(COLLECTIONS.REQUESTS).createIndex({ agentConversationId: 1 }),
+        // requests — parent agent conversation hierarchy traversal (7+ query sites use $in on this field)
         db
           .collection(COLLECTIONS.REQUESTS)
-          .createIndex({ parentAgentSessionId: 1 }),
+          .createIndex({ parentAgentConversationId: 1 }),
         // requests — per-user stats aggregation
         db
           .collection(COLLECTIONS.REQUESTS)
@@ -272,7 +272,7 @@ setupWebSocket(wss);
           .collection(COLLECTIONS.MODEL_CONVERSATIONS)
           .createIndex({ isGenerating: 1, updatedAt: -1 }),
 
-        // agent_sessions — same indexes as conversations
+        // agent_conversations — same indexes as conversations
         db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .createIndex({ id: 1 }, { unique: true }),
@@ -282,15 +282,15 @@ setupWebSocket(wss);
         db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .createIndex({ project: 1, username: 1, updatedAt: -1 }),
-        // agent_sessions — admin workspace filter
+        // agent_conversations — admin workspace filter
         db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .createIndex({ workspaceRoot: 1 }),
-        // agent_sessions — stale isGenerating cleanup + stats count
+        // agent_conversations — stale isGenerating cleanup + stats count
         db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .createIndex({ isGenerating: 1, updatedAt: -1 }),
-        // agent_sessions — sub-agent parent linkage (tree grouping in UI)
+        // agent_conversations — sub-agent parent linkage (tree grouping in UI)
         db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .createIndex({ parentConversationId: 1 }),
@@ -363,11 +363,11 @@ setupWebSocket(wss);
         db
           .collection(COLLECTIONS.WORKFLOW_MEMORIES)
           .createIndex({ agent: 1, project: 1, createdAt: -1 }),
-        // workflow_memories — uniqueness per session
+        // workflow_memories — uniqueness per agent conversation
         db
           .collection(COLLECTIONS.WORKFLOW_MEMORIES)
           .createIndex(
-            { conversationId: 1, agentSessionId: 1 },
+            { conversationId: 1, agentConversationId: 1 },
             { unique: true },
           ),
       ]);
@@ -389,13 +389,13 @@ setupWebSocket(wss);
           `Cleared ${modifiedCount} stale isGenerating flag(s) in conversations`,
         );
       }
-      // Also clear in agent_sessions
+      // Also clear in agent_conversations
       const { modifiedCount: agentCleared } = await db
         .collection(COLLECTIONS.AGENT_CONVERSATIONS)
         .updateMany({ isGenerating: true }, { $set: { isGenerating: false } });
       if (agentCleared > 0) {
         logger.info(
-          `Cleared ${agentCleared} stale isGenerating flag(s) in agent_sessions`,
+          `Cleared ${agentCleared} stale isGenerating flag(s) in agent_conversations`,
         );
       }
     }

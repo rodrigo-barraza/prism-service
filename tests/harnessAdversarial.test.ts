@@ -203,11 +203,11 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
     }
   });
 
-  it("should reject agentSessionId with path traversal characters", () => {
+  it("should reject agentConversationId with path traversal characters", () => {
     const payload = {
       provider: PROVIDERS.OPENAI,
       messages: [{ role: "user", content: "hi" }],
-      agentSessionId: "../../etc/passwd",
+      agentConversationId: "../../etc/passwd",
     };
     const result = ChatRequestSchema.safeParse(payload);
     // sanitizedString() rejects path traversal patterns
@@ -538,15 +538,15 @@ describe("Flow 4: ToolContext Session Isolation", () => {
     expect(retrieved).toEqual(complexValue);
   });
 
-  it("should report accurate activeSessionCount", () => {
-    const initialCount = ToolContext.activeSessionCount;
+  it("should report accurate activeConversationCount", () => {
+    const initialCount = ToolContext.activeConversationCount;
     ToolContext.set(SESSION_ALPHA, "x", 1);
     ToolContext.set(SESSION_BETA, "y", 2);
-    expect(ToolContext.activeSessionCount).toBe(initialCount + 2);
+    expect(ToolContext.activeConversationCount).toBe(initialCount + 2);
     ToolContext.cleanupInMemory(SESSION_ALPHA);
-    expect(ToolContext.activeSessionCount).toBe(initialCount + 1);
+    expect(ToolContext.activeConversationCount).toBe(initialCount + 1);
     ToolContext.cleanupInMemory(SESSION_BETA);
-    expect(ToolContext.activeSessionCount).toBe(initialCount);
+    expect(ToolContext.activeConversationCount).toBe(initialCount);
   });
 
   it("should list keys correctly for a session", () => {
@@ -1268,7 +1268,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
         reminderInterval: overrides.reminderInterval ?? undefined,
       },
       emit: emitFunction,
-      agentSessionId: (overrides.agentSessionId as string) || "test-session-" + Date.now(),
+      agentConversationId: (overrides.agentConversationId as string) || "test-session-" + Date.now(),
       provider: mockProvider,
       signal: undefined,
       project: "test",
@@ -1296,7 +1296,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
       { role: "user", content: "Hello" },
     ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
 
-    const context = createMockContext({ agentSessionId: "test-session-gated" });
+    const context = createMockContext({ agentConversationId: "test-session-gated" });
     const state = createMockState(8);
 
     await maybeInjectSystemReminder(messages, state, context);
@@ -1313,7 +1313,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
     ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
 
     const context = createMockContext({
-      agentSessionId: "test-session-gated",
+      agentConversationId: "test-session-gated",
       reminderModel: "",
     });
     const state = createMockState(8);
@@ -1340,7 +1340,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
       "- Do not execute destructive commands";
 
     const context = createMockContext({
-      agentSessionId: "test-session-active",
+      agentConversationId: "test-session-active",
       reminderModel: "gemini-3.5-flash",
       reminderProvider: PROVIDERS.GOOGLE,
       extractedBullets,
@@ -1365,7 +1365,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
     ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
 
     const context = createMockContext({
-      agentSessionId: "test-session-active",
+      agentConversationId: "test-session-active",
       reminderModel: "gemini-3.5-flash",
     });
     const state = createMockState(4);
@@ -1384,7 +1384,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
     ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
 
     const context = createMockContext({
-      agentSessionId: "test-session-interval",
+      agentConversationId: "test-session-interval",
       reminderModel: "gemini-3.5-flash",
       reminderInterval: 8,
     });
@@ -1407,7 +1407,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
     ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
 
     const context = createMockContext({
-      agentSessionId: "test-session-interval",
+      agentConversationId: "test-session-interval",
       reminderModel: "gemini-3.5-flash",
       reminderInterval: 8,
       extractedBullets,
@@ -1433,7 +1433,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
     ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
 
     const contextFirst = createMockContext({
-      agentSessionId: sessionId,
+      agentConversationId: sessionId,
       reminderModel: "gemini-3.5-flash",
       extractedBullets,
     });
@@ -1449,7 +1449,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
     ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
 
     const contextSecond = createMockContext({
-      agentSessionId: sessionId,
+      agentConversationId: sessionId,
       reminderModel: "gemini-3.5-flash",
       extractedBullets: "- This should NOT be used because cache hits",
     });
@@ -1476,7 +1476,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
       { role: "system", content: LARGE_SYSTEM_PROMPT },
     ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
     const contextAlpha = createMockContext({
-      agentSessionId: sessionIdAlpha,
+      agentConversationId: sessionIdAlpha,
       reminderModel: "gemini-3.5-flash",
       extractedBullets: "- Alpha must always respond in English language only\n- Alpha must never use profanity\n- Alpha must always cite sources when making claims",
     });
@@ -1488,7 +1488,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
       { role: "system", content: LARGE_SYSTEM_PROMPT },
     ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
     const contextBeta = createMockContext({
-      agentSessionId: sessionIdBeta,
+      agentConversationId: sessionIdBeta,
       reminderModel: "gemini-3.5-flash",
       extractedBullets: "- Beta must prioritize user safety above all else\n- Beta must never execute destructive commands\n- Beta must ask for confirmation before actions",
     });
@@ -1512,7 +1512,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
     ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
 
     const context = createMockContext({
-      agentSessionId: "test-session-active",
+      agentConversationId: "test-session-active",
       reminderModel: "gemini-3.5-flash",
       extractedBullets: "- Should not appear",
     });
@@ -1531,7 +1531,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
     ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
 
     const context = createMockContext({
-      agentSessionId: "test-session-active",
+      agentConversationId: "test-session-active",
       reminderModel: "gemini-3.5-flash",
     });
     const state = createMockState(8);
@@ -1549,7 +1549,7 @@ describe("Flow 11: SystemReminderInjector Feature Gating", () => {
     ] as import("../src/services/harnesses/types.ts").ConversationMessage[];
 
     const context = createMockContext({
-      agentSessionId: "test-session-active",
+      agentConversationId: "test-session-active",
       reminderModel: "gemini-3.5-flash",
       extractedBullets: "",
     });

@@ -119,7 +119,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       providerName: PROVIDERS.GOOGLE,
       resolvedModel: "gemini-3-flash-preview",
       traceId: "trace-id-abc",
-      agentSessionId: "session-id-def",
+      agentConversationId: "session-id-def",
       agentConversationId: "session-id-def",
       conversationId: "conv-id-ghi",
       emit: vi.fn(),

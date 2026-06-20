@@ -55,7 +55,6 @@ interface BeforePromptHookContext {
   agent?: string | null;
   traceId?: string | null;
   agentConversationId: string;
-  agentSessionId: string;
   agentContext?: unknown;
   enabledTools: string[] | null;
   resolvedToolNames: string[];
@@ -120,7 +119,6 @@ export async function runTreeOfThoughts(
   const {
     options,
     agentConversationId,
-    agentSessionId,
     traceId,
     project,
     username,
@@ -130,7 +128,7 @@ export async function runTreeOfThoughts(
     signal,
   } = context;
 
-  const resolvedAgentConversationId = agentConversationId || (agentSessionId as string) || "";
+  const resolvedAgentConversationId = agentConversationId || "";
 
   const searchStrategy: SearchStrategy =
     (options.searchStrategy as SearchStrategy) || "bfs";
@@ -175,7 +173,6 @@ export async function runTreeOfThoughts(
     agent,
     traceId,
     agentConversationId: resolvedAgentConversationId,
-    agentSessionId: resolvedAgentConversationId,
     agentContext: options.agentContext,
     enabledTools: tools.resolvedEnabledTools,
     resolvedToolNames: tools.finalTools.map(
@@ -772,8 +769,8 @@ async function generateBranch(
   }
 
   const pass = harness.createPassState(passOptions);
-  const { agentConversationId, agentSessionId } = context;
-  const resolvedAgentConversationId = agentConversationId || (agentSessionId as string) || "";
+  const { agentConversationId } = context;
+  const resolvedAgentConversationId = agentConversationId || "";
   const requestIdBase =
     context.requestId ||
     resolvedAgentConversationId ||
@@ -844,7 +841,7 @@ async function runPlanningPhase(
 
     const pass = harness.createPassState(planPassOptions);
     const requestIdBase =
-      context.requestId || context.agentSessionId || crypto.randomUUID();
+      context.requestId || context.agentConversationId || crypto.randomUUID();
     const passRequestId = `${requestIdBase}-plan-${planningIteration}`;
     pass.requestId = passRequestId;
     harness.registerTrackerRequest(passRequestId);

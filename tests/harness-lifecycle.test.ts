@@ -417,7 +417,7 @@ describe("ApprovalGate", () => {
   it("should auto-approve when no tools need approval", async () => {
     const toolCalls = [{ name: "read_file", id: "toolCall-1", args: {} }];
     const context = {
-      agentSessionId: "sess-1",
+      agentConversationId: "sess-1",
       emit: vi.fn(),
       options: {},
     };
@@ -437,7 +437,7 @@ describe("ApprovalGate", () => {
   it("should auto-approve when options.autoApprove is true", async () => {
     const toolCalls = [{ name: "write_file", id: "toolCall-1", args: {} }];
     const context = {
-      agentSessionId: "sess-1",
+      agentConversationId: "sess-1",
       emit: vi.fn(),
       options: { autoApprove: true },
     };
@@ -505,7 +505,7 @@ describe("Finalizer", () => {
       const context: any = {
         project: "test-proj",
         username: "rodrigo",
-        agentSessionId: "sess-1",
+        agentConversationId: "sess-1",
         conversationId: "conv-1",
         messages: [{ role: "user", content: "hello" }],
         emit: vi.fn(),
@@ -558,7 +558,7 @@ describe("ExhaustionRecovery", () => {
       provider: mockProvider,
       project: "test-project",
       username: "test-user",
-      agentSessionId: "session-123",
+      agentConversationId: "session-123",
       requestId: "req-123",
     };
     const mockHarness: any = {
@@ -600,7 +600,7 @@ describe("ExhaustionRecovery", () => {
       provider: mockProvider,
       project: "test-project",
       username: "test-user",
-      agentSessionId: "session-123",
+      agentConversationId: "session-123",
     };
     const mockHarness: any = {
       enforceContextWindow: vi.fn().mockImplementation((messages) => messages),
@@ -634,7 +634,7 @@ function createMockAgenticContext(overrides?: Partial<AgenticContext>): AgenticC
   return {
     project: "test-project",
     username: "test-user",
-    agentSessionId: "session-123",
+    agentConversationId: "session-123",
     conversationId: "conv-123",
     traceId: "trace-123",
     providerName: "test-provider",
@@ -690,7 +690,7 @@ describe("ToolExecutor", () => {
       expect.objectContaining({
         project: "test-project",
         username: "test-user",
-        agentSessionId: "session-123",
+        agentConversationId: "session-123",
       })
     );
     expect(results[0].result).toEqual({ success: true, content: "streaming result" });
@@ -709,7 +709,7 @@ describe("ToolExecutor", () => {
       expect.objectContaining({
         project: "test-project",
         username: "test-user",
-        agentSessionId: "session-123",
+        agentConversationId: "session-123",
         enabledTools: ["read_file"],
       })
     );

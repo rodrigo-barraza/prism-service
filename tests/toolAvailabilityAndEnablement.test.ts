@@ -689,7 +689,7 @@ describe("Tool Availability & Enablement", () => {
         agent: "CODING",
         project: "test",
         username: "rodrigo",
-        agentSessionId: testSessionId,
+        agentConversationId: testSessionId,
       });
 
       const toolNames = extractToolNames(finalTools);
@@ -720,7 +720,7 @@ describe("Tool Availability & Enablement", () => {
         agent: "CODING",
         project: "test",
         username: "rodrigo",
-        agentSessionId: testSessionId,
+        agentConversationId: testSessionId,
       });
 
       const toolNames = extractToolNames(finalTools);
@@ -738,7 +738,7 @@ describe("Tool Availability & Enablement", () => {
         agent: "CODING",
         project: "test",
         username: "rodrigo",
-        agentSessionId: testSessionId,
+        agentConversationId: testSessionId,
       });
 
       const toolNames = extractToolNames(finalTools);

@@ -97,7 +97,7 @@ describe("VisionLanguageHarness", () => {
     mockContext = {
       project: "test-project",
       username: "test-user",
-      agentSessionId: "session-123",
+      agentConversationId: "session-123",
       conversationId: "conv-123",
       workspaceRoot: "/home/rodrigo/development",
       provider: mockProvider,

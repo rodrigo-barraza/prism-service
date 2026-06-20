@@ -62,8 +62,8 @@ describe("Reasoning Strategy Routing & Migration Tests", () => {
       options: {
         maxIterations: 1,
       },
-      agentSessionId: "session-123",
-      parentAgentSessionId: null,
+      agentConversationId: "session-123",
+      parentAgentConversationId: null,
       traceId: "trace-123",
       project: "test-project",
       username: "test-user",
@@ -272,8 +272,8 @@ describe("Strategy × Topology Combination Matrix", () => {
       options: {
         maxIterations: 1,
       },
-      agentSessionId: "matrix-session",
-      parentAgentSessionId: null,
+      agentConversationId: "matrix-session",
+      parentAgentConversationId: null,
       traceId: "matrix-trace",
       project: "test-project",
       username: "test-user",

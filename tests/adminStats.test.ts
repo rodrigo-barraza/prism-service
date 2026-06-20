@@ -286,7 +286,7 @@ describe("GET /admin/stats/tools", () => {
         },
         {
           requestId: "req-2",
-          agentSessionId: "session-2",
+          agentConversationId: "session-2",
           project: "project-b",
           agent: "agent-b",
           provider: PROVIDERS.ANTHROPIC,
@@ -340,8 +340,8 @@ describe("GET /admin/stats/tools", () => {
                             if (clause.conversationId && clause.conversationId.$in) {
                               return clause.conversationId.$in.includes(doc.conversationId);
                             }
-                            if (clause.agentSessionId && clause.agentSessionId.$in) {
-                              return clause.agentSessionId.$in.includes(doc.agentSessionId);
+                            if (clause.agentConversationId && clause.agentConversationId.$in) {
+                              return clause.agentConversationId.$in.includes(doc.agentConversationId);
                             }
                             return false;
                           });

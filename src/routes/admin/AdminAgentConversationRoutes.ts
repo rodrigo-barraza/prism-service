@@ -18,7 +18,7 @@ const { REQUESTS: REQUESTS_COLLECTION } = COLLECTIONS;
 conversationStatsRouter.use(requireDb);
 agentConversationRouter.use(requireDb);
 
-// ─── GET /sessions/:id/stats — aggregate stats for an agent conversation ─
+// ─── GET /agent-conversations/:id/stats — aggregate stats for an agent conversation ─
 conversationStatsRouter.get(
   "/:id/stats",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
@@ -32,10 +32,7 @@ conversationStatsRouter.get(
       const requests = await req.db
         .collection(REQUESTS_COLLECTION)
         .find({
-          $or: [
-            { agentConversationId: { $in: [...allConversationIds] } },
-            { agentSessionId: { $in: [...allConversationIds] } }
-          ]
+          agentConversationId: { $in: [...allConversationIds] }
         })
         .project({
           estimatedCost: 1,
@@ -52,9 +49,7 @@ conversationStatsRouter.get(
           toolApiNames: 1,
           success: 1,
           agentConversationId: 1,
-          agentSessionId: 1,
           parentAgentConversationId: 1,
-          parentAgentSessionId: 1,
         })
         .toArray();
 
@@ -100,7 +95,7 @@ conversationStatsRouter.get(
       }
 
       const subAgentRequestCount = requests.filter(
-        (requestItem) => (requestItem.agentConversationId || requestItem.agentSessionId) !== conversationId,
+        (requestItem) => requestItem.agentConversationId !== conversationId,
       ).length;
 
       const createdAt = (requests as Record<string, unknown>[]).reduce(
@@ -130,7 +125,6 @@ conversationStatsRouter.get(
 
       res.json({
         agentConversationId: conversationId,
-        agentSessionId: conversationId,
         requestCount: requests.length,
         subAgentRequestCount,
         totalCost,
@@ -158,7 +152,7 @@ conversationStatsRouter.get(
   }),
 );
 
-// ─── GET /sessions/:id/requests — all requests for a conversation (recursive) ─
+// ─── GET /agent-conversations/:id/requests — all requests for a conversation (recursive) ─
 conversationStatsRouter.get(
   "/:id/requests",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
@@ -172,10 +166,7 @@ conversationStatsRouter.get(
       const requests = await req.db
         .collection(REQUESTS_COLLECTION)
         .find({
-          $or: [
-            { agentConversationId: { $in: [...allConversationIds] } },
-            { agentSessionId: { $in: [...allConversationIds] } }
-          ]
+          agentConversationId: { $in: [...allConversationIds] }
         })
         .project({
           requestId: 1,
@@ -199,9 +190,7 @@ conversationStatsRouter.get(
           toolApiNames: 1,
           modalities: 1,
           agentConversationId: 1,
-          agentSessionId: 1,
           parentAgentConversationId: 1,
-          parentAgentSessionId: 1,
           traceId: 1,
           agent: 1,
         })
@@ -259,7 +248,7 @@ agentConversationRouter.get(
         "updatedAt",
       );
 
-      const [sessionDocuments, totalSessionsCount] = await Promise.all([
+      const [conversationDocuments, totalConversationsCount] = await Promise.all([
         req.db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .find(queryFilter, {
@@ -274,8 +263,8 @@ agentConversationRouter.get(
           .countDocuments(queryFilter),
       ]);
 
-      if (sessionDocuments.length > 0) {
-        const conversationIds = sessionDocuments
+      if (conversationDocuments.length > 0) {
+        const conversationIds = conversationDocuments
           .map((conversation) => (conversation as Record<string, unknown>).id as string)
           .filter(Boolean);
 
@@ -288,10 +277,8 @@ agentConversationRouter.get(
                   $match: {
                     $or: [
                       { agentConversationId: { $in: conversationIds } },
-                      { agentSessionId: { $in: conversationIds } },
                       { conversationId: { $in: conversationIds } },
                       { parentAgentConversationId: { $in: conversationIds } },
-                      { parentAgentSessionId: { $in: conversationIds } },
                     ],
                   },
                 },
@@ -301,12 +288,12 @@ agentConversationRouter.get(
                       $cond: [
                         {
                           $and: [
-                            { $ne: [{ $ifNull: ["$parentAgentConversationId", "$parentAgentSessionId"] }, null] },
-                            { $in: [{ $ifNull: ["$parentAgentConversationId", "$parentAgentSessionId"] }, conversationIds] },
+                            { $ne: ["$parentAgentConversationId", null] },
+                            { $in: ["$parentAgentConversationId", conversationIds] },
                           ],
                         },
-                        { $ifNull: ["$parentAgentConversationId", "$parentAgentSessionId"] },
-                        { $ifNull: ["$conversationId", { $ifNull: ["$agentConversationId", "$agentSessionId"] }] },
+                        "$parentAgentConversationId",
+                        { $ifNull: ["$conversationId", "$agentConversationId"] },
                       ],
                     },
                     totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },
@@ -322,7 +309,7 @@ agentConversationRouter.get(
                   costEntry.totalCost,
                 ]),
               );
-              for (const conversation of sessionDocuments) {
+              for (const conversation of conversationDocuments) {
                 const conversationId = (conversation as Record<string, unknown>)
                   .id as string;
                 const requestLogCost = costMap.get(conversationId);
@@ -347,8 +334,8 @@ agentConversationRouter.get(
       }
 
       res.json({
-        data: sessionDocuments,
-        total: totalSessionsCount,
+        data: conversationDocuments,
+        total: totalConversationsCount,
         page,
         limit,
       });

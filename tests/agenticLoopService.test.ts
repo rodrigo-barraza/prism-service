@@ -187,8 +187,8 @@ describe("AgenticLoopService", () => {
       options: {
         maxIterations: 1,
       },
-      agentSessionId: "session-123",
-      parentAgentSessionId: null,
+      agentConversationId: "session-123",
+      parentAgentConversationId: null,
       traceId: "trace-123",
       project: "test-project",
       username: "test-user",
@@ -399,8 +399,8 @@ describe("AgenticLoopService", () => {
 
   it("should configure session tracking correctly for worker sub-agents", async () => {
     // Set up a worker context
-    mockContext.parentAgentSessionId = "coordinator-123";
-    mockContext.agentSessionId = "worker-456";
+    mockContext.parentAgentConversationId = "coordinator-123";
+    mockContext.agentConversationId = "worker-456";
     mockContext.options.maxIterations = 1;
 
     await AgenticLoopService.runAgenticLoop(mockContext);

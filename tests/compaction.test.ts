@@ -231,7 +231,7 @@ describe("CompactionService", () => {
     const result = await CompactionService.compactConversation(messages, {
       project: "test-proj",
       username: "rodrigo",
-      agentSessionId: "sess-1",
+      agentConversationId: "sess-1",
       emit: mockEmit,
     });
 
@@ -280,7 +280,7 @@ describe("CompactionService", () => {
     const result = await CompactionService.compactConversation(messages, {
       project: "test-proj",
       username: "rodrigo",
-      agentSessionId: "sess-1",
+      agentConversationId: "sess-1",
       emit: mockEmit,
     });
 
@@ -312,7 +312,7 @@ describe("CompactionService", () => {
     const res1 = await CompactionService.compactConversation(messages, {
       project: "p",
       username: "u",
-      agentSessionId: "s",
+      agentConversationId: "s",
     });
     expect(res1).toBeNull();
 
@@ -320,7 +320,7 @@ describe("CompactionService", () => {
     const res2 = await CompactionService.compactConversation(messages, {
       project: "p",
       username: "u",
-      agentSessionId: "s",
+      agentConversationId: "s",
     });
     expect(res2).toBeNull();
 
@@ -328,7 +328,7 @@ describe("CompactionService", () => {
     const res3 = await CompactionService.compactConversation(messages, {
       project: "p",
       username: "u",
-      agentSessionId: "s",
+      agentConversationId: "s",
     });
     expect(res3).toBeNull();
 
@@ -337,7 +337,7 @@ describe("CompactionService", () => {
     const res4 = await CompactionService.compactConversation(messages, {
       project: "p",
       username: "u",
-      agentSessionId: "s",
+      agentConversationId: "s",
     });
     expect(res4).toBeNull();
     expect(MOCK_GENERATE_TEXT).not.toHaveBeenCalled();

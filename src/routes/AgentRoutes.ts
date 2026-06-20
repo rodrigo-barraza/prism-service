@@ -111,7 +111,7 @@ router.post(
 // ─── live vision frame streaming ────────────────────────────
 
 /**
- * POST /agent/session/:conversationId/frame
+ * POST /agent/conversation/:conversationId/frame
  *
  * Body:
  *   { frameDataUrl: string } // base64 JPEG data URL
@@ -119,7 +119,7 @@ router.post(
  * Receives the latest frame for a conversation and adds it to the rolling buffer.
  */
 router.post(
-  "/session/:conversationId/frame",
+  "/conversation/:conversationId/frame",
   asyncHandler(async (request: Request, response: Response) => {
     const { conversationId } = request.params;
     const { frameDataUrl } = request.body;

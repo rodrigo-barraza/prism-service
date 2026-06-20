@@ -62,7 +62,7 @@ export async function runExhaustionRecoveryPass(
     username: context.username,
   };
 
-  const exhaustionRequestId = `${context.requestId || context.agentSessionId}-exhaustion`;
+  const exhaustionRequestId = `${context.requestId || context.agentConversationId}-exhaustion`;
   harness.registerTrackerRequest(exhaustionRequestId);
 
   const exhaustionStream =

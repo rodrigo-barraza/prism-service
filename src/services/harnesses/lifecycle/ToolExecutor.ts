@@ -32,7 +32,6 @@ export async function executeToolBatch(
     username,
     agent,
     agentConversationId,
-    agentSessionId,
     conversationId,
     traceId,
     providerName,
@@ -41,7 +40,7 @@ export async function executeToolBatch(
     emit,
   } = context;
 
-  const resolvedAgentConversationId = agentConversationId || (agentSessionId as string) || "";
+  const resolvedAgentConversationId = agentConversationId || "";
 
   const results = await Promise.all(
     toolCalls.map(async (toolCall) => {
@@ -72,7 +71,6 @@ export async function executeToolBatch(
             agent,
             requestId: context.requestId,
             agentConversationId: resolvedAgentConversationId,
-            agentSessionId: resolvedAgentConversationId,
             conversationId,
             iteration: state.iterations,
             workspaceRoot,
@@ -95,7 +93,6 @@ export async function executeToolBatch(
           agent: agent || null,
           traceId: traceId || null,
           agentConversationId: resolvedAgentConversationId,
-          agentSessionId: resolvedAgentConversationId,
           conversationId,
           clientIp: context.clientIp || null,
           requestId: context.requestId,

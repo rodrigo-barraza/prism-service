@@ -51,13 +51,13 @@ router.get(
           MONGO_DB_NAME,
           COLLECTIONS.AGENT_CONVERSATIONS,
         );
-        const agentSessionDocument = await collection.findOne(
+        const agentConversationDocument = await collection.findOne(
           { id: conversationIdentifier },
           { projection: { subAgents: 1 } },
         );
-        if (agentSessionDocument && agentSessionDocument.subAgents) {
-          if (agentSessionDocument.subAgents.length > 0) {
-            persistedSubAgentsList = agentSessionDocument.subAgents;
+        if (agentConversationDocument && agentConversationDocument.subAgents) {
+          if (agentConversationDocument.subAgents.length > 0) {
+            persistedSubAgentsList = agentConversationDocument.subAgents;
           }
         }
       } catch (error: unknown) {

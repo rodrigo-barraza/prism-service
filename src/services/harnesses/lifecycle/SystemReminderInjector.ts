@@ -48,7 +48,7 @@ export async function maybeInjectSystemReminder(
   context: AgenticContext,
 ): Promise<void> {
   const { options, emit, provider, signal } = context;
-  const agentConversationId = context.agentConversationId || (context.agentSessionId as string) || "";
+  const agentConversationId = context.agentConversationId || "";
 
   // Feature gate: disabled when no reminder model is configured
   const reminderModel = options.reminderModel as string | undefined;
