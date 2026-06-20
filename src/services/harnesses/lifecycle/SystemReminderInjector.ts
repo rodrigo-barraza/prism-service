@@ -77,6 +77,15 @@ export async function maybeInjectSystemReminder(
       provider,
       reminderModel,
       signal || undefined,
+      {
+        project: context.project,
+        username: context.username,
+        agent: context.agent || null,
+        providerName: context.providerName,
+        traceId: context.traceId || null,
+        agentConversationId: context.agentConversationId || null,
+        requestId: context.requestId,
+      },
     ) || undefined;
 
     if (!reminderContent) return;

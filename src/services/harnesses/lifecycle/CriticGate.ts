@@ -1,5 +1,6 @@
 import logger from "../../../utils/logger.ts";
 import { APPROVAL_TIERS } from "../../AutoApprovalEngine.ts";
+import RequestLogger from "../../RequestLogger.ts";
 
 import type { ToolCall, AgenticContext } from "../types.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
@@ -140,6 +141,7 @@ export default class CriticGate {
     };
 
     let responseText = "";
+    const requestStartMs = performance.now();
 
     const stream = provider.generateTextStream(
       criticMessages,
@@ -152,6 +154,31 @@ export default class CriticGate {
         responseText += chunk;
       }
     }
+
+    RequestLogger.logBackgroundLlmCall({
+      requestId: `${context.requestId || context.agentConversationId || "unknown"}-critic`,
+      endpoint: "/agent",
+      operation: "agent:critic-review",
+      project: context.project,
+      username: context.username,
+      agent: context.agent || null,
+      provider: context.providerName,
+      model: activeModel,
+      traceId: context.traceId || null,
+      agentConversationId: context.agentConversationId || null,
+      aiMessages: criticMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
+      resultText: responseText,
+      success: true,
+      errorMessage: null,
+      requestStartMs,
+      extraRequestPayload: {
+        reviewedTool: prompt.includes("Tool:") ? prompt.split("Tool: ")[1]?.split("\n")[0] : null,
+      },
+    }).catch((loggingError: unknown) =>
+      logger.error(
+        `[CriticGate] Failed to log critic review request: ${getErrorMessage(loggingError)}`,
+      ),
+    );
 
     return responseText.trim();
   }
