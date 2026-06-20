@@ -727,8 +727,8 @@ describe("Topology Routers Test Suite", () => {
     });
   });
 
-  describe("1-Based Agent Indexing", () => {
-    it("HierarchicalRouter should pass 1-based agentIndex to all members", async () => {
+  describe("0-Based Agent Indexing", () => {
+    it("HierarchicalRouter should pass 0-based agentIndex to all members", async () => {
       const router = new HierarchicalRouter();
       const members = [
         { description: "Task A", prompt: "Prompt A" },
@@ -739,16 +739,16 @@ describe("Topology Routers Test Suite", () => {
       await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
 
       expect(spawnSubAgentMock).toHaveBeenCalledTimes(3);
-      expect(spawnSubAgentMock.mock.calls[0][0].agentIndex).toBe(1);
-      expect(spawnSubAgentMock.mock.calls[1][0].agentIndex).toBe(2);
-      expect(spawnSubAgentMock.mock.calls[2][0].agentIndex).toBe(3);
+      expect(spawnSubAgentMock.mock.calls[0][0].agentIndex).toBe(0);
+      expect(spawnSubAgentMock.mock.calls[1][0].agentIndex).toBe(1);
+      expect(spawnSubAgentMock.mock.calls[2][0].agentIndex).toBe(2);
 
       for (const call of spawnSubAgentMock.mock.calls) {
         expect(call[0].teamSize).toBe(3);
       }
     });
 
-    it("SequentialRouter should pass 1-based agentIndex to all steps", async () => {
+    it("SequentialRouter should pass 0-based agentIndex to all steps", async () => {
       const router = new SequentialRouter();
       const members = [
         { description: "Step A", prompt: "Do A" },
@@ -758,15 +758,15 @@ describe("Topology Routers Test Suite", () => {
       await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
 
       expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
-      expect(spawnSubAgentMock.mock.calls[0][0].agentIndex).toBe(1);
-      expect(spawnSubAgentMock.mock.calls[1][0].agentIndex).toBe(2);
+      expect(spawnSubAgentMock.mock.calls[0][0].agentIndex).toBe(0);
+      expect(spawnSubAgentMock.mock.calls[1][0].agentIndex).toBe(1);
 
       for (const call of spawnSubAgentMock.mock.calls) {
         expect(call[0].teamSize).toBe(2);
       }
     });
 
-    it("HierarchicalAggregationRouter should pass 1-based agentIndex to all members", async () => {
+    it("HierarchicalAggregationRouter should pass 0-based agentIndex to all members", async () => {
       const router = new HierarchicalAggregationRouter();
       const members = [
         { description: "Task A", prompt: "Prompt A" },
@@ -775,15 +775,15 @@ describe("Topology Routers Test Suite", () => {
 
       await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
 
-      expect(spawnSubAgentMock.mock.calls[0][0].agentIndex).toBe(1);
-      expect(spawnSubAgentMock.mock.calls[1][0].agentIndex).toBe(2);
+      expect(spawnSubAgentMock.mock.calls[0][0].agentIndex).toBe(0);
+      expect(spawnSubAgentMock.mock.calls[1][0].agentIndex).toBe(1);
 
       for (const call of spawnSubAgentMock.mock.calls) {
         expect(call[0].teamSize).toBe(2);
       }
     });
 
-    it("PeerToPeerRouter should pass 1-based agentIndex on initial spawn", async () => {
+    it("PeerToPeerRouter should pass 0-based agentIndex on initial spawn", async () => {
       const router = new PeerToPeerRouter();
       const members = [
         { agent: "Dev", description: "Write Code", prompt: "Code prompt" },
@@ -807,16 +807,16 @@ describe("Topology Routers Test Suite", () => {
 
       await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
 
-      expect(spawnSubAgentMock.mock.calls[0][0].agentIndex).toBe(1);
-      expect(spawnSubAgentMock.mock.calls[1][0].agentIndex).toBe(2);
-      expect(spawnSubAgentMock.mock.calls[2][0].agentIndex).toBe(3);
+      expect(spawnSubAgentMock.mock.calls[0][0].agentIndex).toBe(0);
+      expect(spawnSubAgentMock.mock.calls[1][0].agentIndex).toBe(1);
+      expect(spawnSubAgentMock.mock.calls[2][0].agentIndex).toBe(2);
 
       for (const call of spawnSubAgentMock.mock.calls) {
         expect(call[0].teamSize).toBe(3);
       }
     });
 
-    it("should never pass agentIndex 0 from any router", async () => {
+    it("first member should always receive agentIndex 0 from every router", async () => {
       const allRouters = [
         { router: new HierarchicalRouter(), name: "Hierarchical" },
         { router: new SequentialRouter(), name: "Sequential" },
@@ -830,8 +830,7 @@ describe("Topology Routers Test Suite", () => {
         await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
 
         const passedIndex = spawnSubAgentMock.mock.calls[0][0].agentIndex;
-        expect(passedIndex).toBeGreaterThanOrEqual(1);
-        expect(passedIndex).not.toBe(0);
+        expect(passedIndex).toBe(0);
       }
     });
   });
@@ -984,11 +983,11 @@ describe("Topology Routers Test Suite", () => {
       expect(qaPrompt).toContain("SHARED DISCUSSION BOARD");
     });
 
-    it("should use 1-based fallback speaker names when agent names match agent-N pattern", async () => {
+    it("should use 0-based fallback speaker names when agent names match agent-N pattern", async () => {
       const router = new PeerToPeerRouter();
       const members = [
-        { agent: "agent-0", description: "First", prompt: "First prompt" },
-        { agent: "agent-5", description: "Second", prompt: "Second prompt" },
+        { agent: "agent-5", description: "First", prompt: "First prompt" },
+        { agent: "agent-99", description: "Second", prompt: "Second prompt" },
       ];
 
       spawnSubAgentMock
@@ -1003,14 +1002,13 @@ describe("Topology Routers Test Suite", () => {
 
       await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock);
 
-      // agent-0 should be normalized to agent-1 (1-based)
+      // agent-5 should be normalized to agent-0 (0-based by member position)
       const firstPrompt = spawnSubAgentMock.mock.calls[0][0].prompt;
-      expect(firstPrompt).toContain("Your speaker identity in this discussion is agent-1");
-      expect(firstPrompt).not.toContain("agent-0");
+      expect(firstPrompt).toContain("Your speaker identity in this discussion is agent-0");
 
-      // agent-5 should be normalized to agent-2 (1-based by member position)
+      // agent-99 should be normalized to agent-1 (0-based by member position)
       const secondPrompt = spawnSubAgentMock.mock.calls[1][0].prompt;
-      expect(secondPrompt).toContain("Your speaker identity in this discussion is agent-2");
+      expect(secondPrompt).toContain("Your speaker identity in this discussion is agent-1");
     });
 
     it("should inject speaker identity into continuation prompts with shared discussion", async () => {
