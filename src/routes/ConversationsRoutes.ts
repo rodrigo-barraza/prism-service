@@ -1,5 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
+import { DEFAULT_USERNAME } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response, NextFunction } from "express";
 import { ObjectId, type Document } from "mongodb";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
@@ -92,12 +93,20 @@ router.get(
 
       const { limit, cursor, agent, type = "all", taskId } = parsed.data;
 
+      // Include conversations created under DEFAULT_USERNAME ("anonymous")
+      // as a fallback — handles the migration scenario where conversations
+      // were created before the x-username header was introduced.
+      const usernameFilter =
+        username !== DEFAULT_USERNAME
+          ? { $in: [username, DEFAULT_USERNAME] }
+          : username;
+
       const filter: Record<string, unknown> = {};
       if (taskId) {
         filter.taskId = taskId;
       } else {
         filter.project = project;
-        filter.username = username;
+        filter.username = usernameFilter;
       }
       if (cursor) {
         filter.updatedAt = { $lt: cursor };
@@ -198,7 +207,7 @@ router.get(
                 $match: {
                   ...matchCondition,
                   project,
-                  username,
+                  username: usernameFilter,
                 },
               },
               {
@@ -241,7 +250,7 @@ router.get(
           const parentFieldQuery = {
             parentConversationId: { $in: conversationIds },
             project,
-            username,
+            username: usernameFilter,
           };
           const [agentParents, modelParents] = await Promise.all([
             db
@@ -351,10 +360,15 @@ router.get(
       const { db } = req;
       const conversationId = req.params.id as string;
 
+      const usernameFilter =
+        username !== DEFAULT_USERNAME
+          ? { $in: [username, DEFAULT_USERNAME] }
+          : username;
+
       // Check conversations first
       const chat = await db
         .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
-        .findOne({ id: conversationId, project, username });
+        .findOne({ id: conversationId, project, username: usernameFilter });
 
       if (chat) {
         // Enrich totalCost from the requests collection (source of truth).
@@ -369,7 +383,7 @@ router.get(
               requestErrorCount: number;
             }>([
               {
-                $match: { conversationId, project, username },
+                $match: { conversationId, project, username: usernameFilter },
               },
               {
                 $group: {
@@ -407,7 +421,7 @@ router.get(
       // Check agent conversations next
       const agentChat = await db
         .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-        .findOne({ id: conversationId, project, username });
+        .findOne({ id: conversationId, project, username: usernameFilter });
 
       if (agentChat) {
         const stats = await ConversationService.getConversationStats(
@@ -490,6 +504,10 @@ router.post(
       const username = req.username || "any";
       const { db } = req;
       const conversationId = req.params.id as string;
+      const usernameFilter =
+        username !== DEFAULT_USERNAME
+          ? { $in: [username, DEFAULT_USERNAME] }
+          : username;
 
       const parsed = PostConversationMessagesBodySchema.safeParse(req.body);
       if (!parsed.success) {
@@ -502,12 +520,12 @@ router.post(
       let isAgent = false;
       const directExists = await db
         .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-        .countDocuments({ id: conversationId, project, username });
+        .countDocuments({ id: conversationId, project, username: usernameFilter });
 
       if (directExists === 0) {
         const agentExists = await db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .countDocuments({ id: conversationId, project, username });
+          .countDocuments({ id: conversationId, project, username: usernameFilter });
         if (agentExists > 0) {
           isAgent = true;
         } else {
@@ -544,6 +562,10 @@ router.patch(
       const username = req.username || "any";
       const { db } = req;
       const conversationId = req.params.id as string;
+      const usernameFilter =
+        username !== DEFAULT_USERNAME
+          ? { $in: [username, DEFAULT_USERNAME] }
+          : username;
 
       const parsed = PatchConversationBodySchema.safeParse(req.body);
       if (!parsed.success) {
@@ -558,7 +580,7 @@ router.patch(
       let result = await db
         .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
         .updateOne(
-          { id: conversationId, project, username },
+          { id: conversationId, project, username: usernameFilter },
           {
             $set: setFields as import("mongodb").UpdateFilter<ConversationDocument>,
           },
@@ -567,13 +589,13 @@ router.patch(
       if (result.matchedCount > 0) {
         const conversation = await db
           .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
-          .findOne({ id: conversationId, project, username });
+          .findOne({ id: conversationId, project, username: usernameFilter });
         return res.json({ ...conversation, type: "direct" });
       }
 
       // Try updating agent conversations next
       result = await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).updateOne(
-        { id: conversationId, project, username },
+        { id: conversationId, project, username: usernameFilter },
         {
           $set: setFields as import("mongodb").UpdateFilter<
             import("mongodb").Document
@@ -584,7 +606,7 @@ router.patch(
       if (result.matchedCount > 0) {
         const agentConversation = await db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .findOne({ id: conversationId, project, username });
+          .findOne({ id: conversationId, project, username: usernameFilter });
         return res.json({ ...agentConversation, type: "agent" });
       }
 
@@ -608,11 +630,15 @@ router.delete(
       const username = req.username || "any";
       const { db } = req;
       const conversationId = req.params.id as string;
+      const usernameFilter =
+        username !== DEFAULT_USERNAME
+          ? { $in: [username, DEFAULT_USERNAME] }
+          : username;
 
       // Try deleting from conversations first
       let result = await db
         .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-        .deleteOne({ id: conversationId, project, username });
+        .deleteOne({ id: conversationId, project, username: usernameFilter });
 
       if (result.deletedCount > 0) {
         return res.json({ success: true, id: conversationId, type: "direct" });
@@ -621,7 +647,7 @@ router.delete(
       // Try deleting from agent conversations next
       result = await db
         .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-        .deleteOne({ id: conversationId, project, username });
+        .deleteOne({ id: conversationId, project, username: usernameFilter });
 
       if (result.deletedCount > 0) {
         return res.json({ success: true, id: conversationId, type: "agent" });
