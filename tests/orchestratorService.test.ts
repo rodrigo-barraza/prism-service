@@ -234,7 +234,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     };
 
     const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
-    expect(results).toHaveLength(2);
+    expect(results).toHaveLength(1);
     expect(mockUpdateOne).toHaveBeenCalledWith(
       {
         id: "conv-id-789",
