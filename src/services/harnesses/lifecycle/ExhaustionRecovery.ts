@@ -87,6 +87,7 @@ export async function runExhaustionRecoveryPass(
   // so new chunk types added to the base dispatcher are automatically handled.
   await harness.consumeStream(exhaustionStream, exhaustionPass, emptyToolNames);
 
+  harness.logIteration(exhaustionPass, currentMessages);
   harness.emitGenerationProgress();
   ConversationGenerationTracker.complete(exhaustionRequestId);
 }

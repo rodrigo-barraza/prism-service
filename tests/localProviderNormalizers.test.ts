@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { PROVIDERS } from '../src/constants.ts';
 
 vi.mock('../src/config.ts', () => ({
   TYPES: {
@@ -272,19 +273,19 @@ describe('normalizers', () => {
 
   describe('NORMALIZER_BY_TYPE', () => {
     it('maps lm-studio to normalizeLmStudioModel', () => {
-      expect(NORMALIZER_BY_TYPE['lm-studio']).toBe(normalizeLmStudioModel);
+      expect(NORMALIZER_BY_TYPE[PROVIDERS.LM_STUDIO]).toBe(normalizeLmStudioModel);
     });
 
     it('maps ollama to normalizeOllamaModel', () => {
-      expect(NORMALIZER_BY_TYPE['ollama']).toBe(normalizeOllamaModel);
+      expect(NORMALIZER_BY_TYPE[PROVIDERS.OLLAMA]).toBe(normalizeOllamaModel);
     });
 
     it('maps vllm to normalizeVllmModel', () => {
-      expect(NORMALIZER_BY_TYPE['vllm']).toBe(normalizeVllmModel);
+      expect(NORMALIZER_BY_TYPE[PROVIDERS.VLLM]).toBe(normalizeVllmModel);
     });
 
     it('maps llama-cpp to normalizeOpenAICompatModel', () => {
-      expect(NORMALIZER_BY_TYPE['llama-cpp']).toBe(normalizeOpenAICompatModel);
+      expect(NORMALIZER_BY_TYPE[PROVIDERS.LLAMA_CPP]).toBe(normalizeOpenAICompatModel);
     });
 
     it('has exactly 4 entries', () => {
@@ -294,19 +295,19 @@ describe('normalizers', () => {
 
   describe('HF_ENRICHED_TYPES', () => {
     it('includes vllm', () => {
-      expect(HF_ENRICHED_TYPES.has('vllm')).toBe(true);
+      expect(HF_ENRICHED_TYPES.has(PROVIDERS.VLLM)).toBe(true);
     });
 
     it('includes llama-cpp', () => {
-      expect(HF_ENRICHED_TYPES.has('llama-cpp')).toBe(true);
+      expect(HF_ENRICHED_TYPES.has(PROVIDERS.LLAMA_CPP)).toBe(true);
     });
 
     it('does not include lm-studio', () => {
-      expect(HF_ENRICHED_TYPES.has('lm-studio')).toBe(false);
+      expect(HF_ENRICHED_TYPES.has(PROVIDERS.LM_STUDIO)).toBe(false);
     });
 
     it('does not include ollama', () => {
-      expect(HF_ENRICHED_TYPES.has('ollama')).toBe(false);
+      expect(HF_ENRICHED_TYPES.has(PROVIDERS.OLLAMA)).toBe(false);
     });
   });
 });

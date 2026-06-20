@@ -852,6 +852,7 @@ async function runPlanningPhase(
     await harness.consumeStream(stream, pass, allowedPlanToolNames);
 
     finalizePassTracker(pass, passRequestId);
+    harness.logIteration(pass, currentMessages);
     harness.emitGenerationProgress();
     harness.emitUsageUpdate();
 

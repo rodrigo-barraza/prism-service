@@ -115,7 +115,7 @@ vi.mock('../src/services/SettingsService.ts', () => {
             reminderProvider: 'google',
             reminderModel: 'gemini-3-flash-preview',
             harness: 'standard',
-            topology: 'default',
+            topology: 'hierarchical',
             dynamicToolActivation: true,
         },
         security: {

@@ -12,6 +12,8 @@ import {
 import { getProvider } from "../../../providers/index.ts";
 import logger from "../../../utils/logger.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
+import RequestLogger from "../../RequestLogger.ts";
+import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 const MAXIMUM_SYNTHESIS_CHARACTERS = 120_000;
 
@@ -147,12 +149,42 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
       }
 
       const synthesisStartTime = Date.now();
+      const synthesisRequestStartMs = performance.now();
+      const synthesisMessages = [{ role: "user", content: synthesisPrompt }];
       const synthesisResult = await provider.generateText(
-        [{ role: "user", content: synthesisPrompt }],
+        synthesisMessages,
         resolvedModel,
         { maxTokens: 8192 },
       );
       const synthesisDurationMs = Date.now() - synthesisStartTime;
+
+      RequestLogger.logBackgroundLlmCall({
+        requestId: `${orchestratorContext.conversationId || "unknown"}-synthesis-${teamName}`,
+        endpoint: "/agent",
+        operation: "orchestrator:synthesis",
+        project: orchestratorContext.project || null,
+        username: orchestratorContext.username || "system",
+        agent: null,
+        provider: providerName,
+        model: resolvedModel,
+        traceId: orchestratorContext.traceId || null,
+        agentConversationId: orchestratorContext.agentConversationId || null,
+        aiMessages: synthesisMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
+        resultText: synthesisResult.text || "",
+        usage: synthesisResult.usage || null,
+        success: true,
+        errorMessage: null,
+        requestStartMs: synthesisRequestStartMs,
+        extraRequestPayload: {
+          teamName,
+          memberCount: members.length,
+          successfulCount: successfulResults.length,
+        },
+      }).catch((loggingError: unknown) =>
+        logger.error(
+          `[HierarchicalAggregationRouter] Failed to log synthesis request: ${getErrorMessage(loggingError)}`,
+        ),
+      );
 
       const synthesisSubAgentResult: SubAgentResult = {
         agent_id: `synthesis-${teamName}-${Date.now()}`,

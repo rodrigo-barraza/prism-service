@@ -1,5 +1,6 @@
 import logger from "../../../utils/logger.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
+import RequestLogger from "../../RequestLogger.ts";
 
 import type { LLMProvider } from "../types.ts";
 
@@ -66,6 +67,15 @@ export async function extractReminderViaLLM(
   provider: LLMProvider,
   model: string,
   signal?: AbortSignal,
+  loggingContext?: {
+    project?: string;
+    username?: string;
+    agent?: string | null;
+    providerName?: string;
+    traceId?: string | null;
+    agentConversationId?: string | null;
+    requestId?: string;
+  },
 ): Promise<string | null> {
   try {
     const truncatedSystemPrompt = systemPromptContent.slice(0, 12_000);
@@ -84,6 +94,7 @@ export async function extractReminderViaLLM(
     };
 
     let responseText = "";
+    const requestStartMs = performance.now();
 
     const stream = provider.generateTextStream(
       extractionMessages,
@@ -95,6 +106,30 @@ export async function extractReminderViaLLM(
       if (typeof chunk === "string") {
         responseText += chunk;
       }
+    }
+
+    if (loggingContext) {
+      RequestLogger.logBackgroundLlmCall({
+        requestId: `${loggingContext.requestId || loggingContext.agentConversationId || "unknown"}-system-reminder`,
+        endpoint: "/agent",
+        operation: "agent:system-reminder",
+        project: loggingContext.project || null,
+        username: loggingContext.username || "system",
+        agent: loggingContext.agent || null,
+        provider: loggingContext.providerName || "unknown",
+        model,
+        traceId: loggingContext.traceId || null,
+        agentConversationId: loggingContext.agentConversationId || null,
+        aiMessages: extractionMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
+        resultText: responseText,
+        success: true,
+        errorMessage: null,
+        requestStartMs,
+      }).catch((loggingError: unknown) =>
+        logger.error(
+          `[SystemReminderExtractor] Failed to log extraction request: ${getErrorMessage(loggingError)}`,
+        ),
+      );
     }
 
     const extractedContent = responseText.trim();
