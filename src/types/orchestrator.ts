@@ -108,6 +108,8 @@ export interface OrchestratorSpawnParams {
   agentIndex?: number;
   teamSize?: number;
   orchestratorContext: OrchestratorContext;
+  /** When true, the worktree is kept alive after the agent completes (for stateful session reuse). */
+  preserveWorktree?: boolean;
 }
 
 export interface OrchestratorContext {

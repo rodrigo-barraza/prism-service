@@ -170,6 +170,7 @@ export default class OrchestratorService {
     agentIndex,
     teamSize,
     orchestratorContext,
+    preserveWorktree,
   }: OrchestratorSpawnParams): Promise<SubAgentResult | { error: string }> {
     const {
       project,
@@ -434,6 +435,7 @@ export default class OrchestratorService {
         subAgentState,
         prompt,
         orchestratorContext,
+        preserveWorktree,
       );
     } catch (error: unknown) {
       logger.error(
@@ -865,6 +867,8 @@ export default class OrchestratorService {
       orchestratorContext,
       (assignment: OrchestratorSpawnParams) =>
         OrchestratorService.spawnFromTool(assignment),
+      (agentId: string, prompt: string, context: OrchestratorContext) =>
+        OrchestratorService.continueAgent(agentId, prompt, context),
     );
 
     const agentIds = spawnResults
@@ -969,13 +973,98 @@ export default class OrchestratorService {
   }
 
   /**
+   * Continue an existing sub-agent's session with a follow-up prompt.
+   * Unlike `sendMessage` (fire-and-forget), this method synchronously awaits
+   * the agent's agentic loop completion and returns a `SubAgentResult`.
+   *
+   * Used by `PeerToPeerRouter` for stateful session reuse — the same agent ID,
+   * worktree, and conversation history are preserved across multiple rounds.
+   */
+  static async continueAgent(
+    agentId: string,
+    prompt: string,
+    orchestratorContext: OrchestratorContext,
+  ): Promise<SubAgentResult | { error: string }> {
+    const subAgent = activeSubAgents.get(agentId);
+    if (!subAgent) {
+      return { error: `Sub-agent "${agentId}" not found for continuation` };
+    }
+
+    if (subAgent.status !== "complete" && subAgent.status !== "idle") {
+      return {
+        error: `Sub-agent "${agentId}" is in "${subAgent.status}" state and cannot be continued`,
+      };
+    }
+
+    subAgent.status = "running";
+    subAgent.startedAt = Date.now();
+    subAgent.abortController = createAbortController();
+
+    logger.info(
+      `[Orchestrator] Continuing sub-agent ${agentId} (stateful session reuse)`,
+    );
+
+    if (orchestratorContext.emit) {
+      orchestratorContext.emit({
+        type: "sub_agent_status",
+        subAgentId: agentId,
+        message: "spawned",
+        description: subAgent.description,
+      });
+    }
+
+    try {
+      await OrchestratorService._runSubAgentLoop(
+        subAgent,
+        prompt,
+        orchestratorContext,
+        true,
+      );
+    } catch (error: unknown) {
+      logger.error(
+        `[Orchestrator] Sub-agent ${agentId} continuation error: ${getErrorMessage(error)}`,
+      );
+      subAgent.status = "failed";
+      subAgent.error = getErrorMessage(error);
+      subAgent.durationMs = Date.now() - subAgent.startedAt;
+
+      if (orchestratorContext.emit) {
+        orchestratorContext.emit({
+          type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
+          subAgentId: agentId,
+          message: "failed",
+          error: getErrorMessage(error),
+        });
+      }
+    }
+
+    if (orchestratorContext.emit) {
+      orchestratorContext.emit({
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
+      });
+    }
+
+    const continuationResult = buildSubAgentResult(subAgent);
+    logger.info(
+      `[Orchestrator] Sub-agent ${agentId} continuation result: status=${continuationResult.status} toolUses=${continuationResult.toolUses} durationMs=${continuationResult.durationMs}`,
+    );
+    return continuationResult;
+  }
+
+  /**
    * Run the sub-agent's agentic loop in its isolated worktree.
+   *
+   * @param preserveWorktree When true, the worktree is NOT removed on completion.
+   *   Used by `PeerToPeerRouter` to keep the worktree alive across multiple rounds
+   *   so the agent retains its local file state and conversation history.
    * @private
    */
   static async _runSubAgentLoop(
     subAgent: SubAgentState,
     prompt: string,
     orchestratorContext: OrchestratorContext,
+    preserveWorktree = false,
   ) {
     const { default: AgenticLoopService } =
       await OrchestratorService.getAgenticLoopService();
@@ -1218,7 +1307,10 @@ export default class OrchestratorService {
     subAgent.abortController = null;
     // Remove worktree now that the diff has been collected — prevents orphaned
     // worktrees from accumulating on disk across conversations.
+    // When preserveWorktree is true (P2P mesh turns), the worktree stays alive
+    // so the agent can be continued with its local file state intact.
     if (
+      !preserveWorktree &&
       subAgent.status !== "stopped" &&
       subAgent.isolated &&
       subAgent.worktreePath
