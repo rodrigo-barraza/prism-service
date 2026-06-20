@@ -15,55 +15,76 @@ import { GitWorktreeHelper } from "../GitWorktreeHelper.ts";
 
 const MINIMUM_SUBSTANTIVE_RESPONSE_LENGTH = 80;
 
+const SHARED_BOARD_MARKER = "--- SHARED DISCUSSION BOARD ---";
+const YOUR_TASK_MARKER_PATTERN = /--- YOUR TASK \([^)]+\) ---/;
+
 /**
- * Strip echoed shared discussion board markers from a sub-agent's response
- * before appending it to the shared thread. Sub-agents often echo the
- * `--- SHARED DISCUSSION BOARD ---` prompt structure in their output,
- * which creates nested/duplicated boards on subsequent turns.
+ * Strip echoed shared discussion board content from a sub-agent's response
+ * before appending it to the shared thread.
+ *
+ * Sub-agents frequently echo the entire prompt structure they received —
+ * including board markers, prior agent contributions, YOUR TASK sections,
+ * and speaker identity instructions — before writing their own new content.
+ *
+ * Uses a multi-pass approach:
+ * 1. Remove echoed board preamble (everything up to the last board marker)
+ * 2. Remove orphaned speaker tags (bare `[agent-N]` lines without content)
+ * 3. Strip leading speaker self-tag (the router prepends its own)
+ * 4. Strip "Task Completion Report" boilerplate
+ * 5. Remove echoed prior-agent content with omission notes
+ * 6. Clean residual board/task markers and identity instructions
  */
 function stripEchoedDiscussionMarkers(responseText: string): string {
   let cleanedText = responseText.trim();
 
-  // Remove leading "--- SHARED DISCUSSION BOARD ---" and everything
-  // up to the agent's actual new contribution. Look for the pattern
-  // where the agent echoes the board then starts their own section.
-  if (cleanedText.startsWith("--- SHARED DISCUSSION BOARD ---")) {
-    // Find the last board marker — the agent may have echoed
-    // the entire accumulated thread which itself contains markers
-    const lastMarkerIndex = cleanedText.lastIndexOf(
-      "--- SHARED DISCUSSION BOARD ---",
-    );
-    const afterLastMarker = cleanedText.slice(lastMarkerIndex);
+  // ── Pass 1: Remove echoed board preamble ──────────────────────────────
+  // If the response contains board markers, the agent is echoing prompt
+  // structure. Find the last board marker and take content after it.
+  if (cleanedText.includes(SHARED_BOARD_MARKER)) {
+    const lastBoardMarkerIndex = cleanedText.lastIndexOf(SHARED_BOARD_MARKER);
+    const contentAfterLastMarker = cleanedText
+      .slice(lastBoardMarkerIndex + SHARED_BOARD_MARKER.length)
+      .trim();
 
-    // Look for the agent's own content boundary: either a "---" separator
-    // followed by a speaker tag, or a standalone markdown header
-    const ownContentMatch = afterLastMarker.match(
-      /\n---\s*\n+\s*(?:\[[\w-]+\]:\s|\#{1,4}\s)/,
-    );
-
-    if (ownContentMatch && ownContentMatch.index != null) {
-      const bracketIndex = afterLastMarker.indexOf(
-        "[",
-        ownContentMatch.index,
-      );
-      const headerIndex = afterLastMarker.indexOf(
-        "#",
-        ownContentMatch.index,
-      );
-      const contentStart =
-        bracketIndex >= 0 && (headerIndex < 0 || bracketIndex < headerIndex)
-          ? bracketIndex
-          : headerIndex;
-
-      if (contentStart >= 0) {
-        cleanedText = afterLastMarker.slice(contentStart).trim();
-      }
+    // Check for a YOUR TASK section after the last board marker — if present,
+    // content after it is the echoed member prompt, not the agent's contribution.
+    const yourTaskInTail = YOUR_TASK_MARKER_PATTERN.exec(contentAfterLastMarker);
+    if (yourTaskInTail && yourTaskInTail.index != null) {
+      cleanedText = contentAfterLastMarker.slice(0, yourTaskInTail.index).trim();
+    } else {
+      cleanedText = contentAfterLastMarker;
     }
   }
 
-  // Strip leading speaker self-tag if it matches the pattern [speaker-name]:
-  // since we prepend our own "[speakerName]: " when appending to the thread
+  // ── Pass 2: Remove orphaned speaker tags ──────────────────────────────
+  // Bare lines like `[agent-0]` (without a colon or content) are artifacts
+  // from the agent echoing its own tag structure incorrectly.
+  cleanedText = cleanedText.replace(/^\[[\w-]+\]\s*$/gm, "").trim();
+
+  // ── Pass 3: Strip leading speaker self-tag ────────────────────────────
+  // The router prepends `[speakerName]: ` when appending to the thread,
+  // so remove any self-tag the agent added at the start of its response.
   cleanedText = cleanedText.replace(/^\[[\w-]+\]:\s*/, "").trim();
+
+  // ── Pass 4: Strip "Task Completion Report" boilerplate ────────────────
+  // Agents often append a meta-section summarizing what they did. This is
+  // noise for the shared board — other agents don't need "I have completed…"
+  const taskReportPattern = /\n---\n\*\*Task Completion Report[:\s]*\*\*[\s\S]*$/i;
+  cleanedText = cleanedText.replace(taskReportPattern, "").trim();
+
+  // ── Pass 5: Strip echoed prior-agent content with omission notes ──────
+  // Lines like `[agent-0]: ... (Content omitted for brevity, as per previous turn)`
+  cleanedText = cleanedText
+    .replace(/^\[[\w-]+\]:.*\.\.\.\s*\(Content omitted.*?\)\s*$/gm, "")
+    .trim();
+
+  // ── Pass 6: Clean residual structural markers ─────────────────────────
+  cleanedText = cleanedText
+    .replace(/---\s*SHARED DISCUSSION BOARD\s*---/g, "")
+    .replace(/--- YOUR TASK \([^)]+\) ---/g, "")
+    .replace(/^Your speaker identity in this discussion is [\w-]+\..*$/gm, "")
+    .replace(/^Tag all your contributions with \[[\w-]+\]\.?\s*$/gm, "")
+    .trim();
 
   return cleanedText;
 }

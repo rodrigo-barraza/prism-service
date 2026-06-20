@@ -339,6 +339,10 @@ async function prepareGenerationContext(
   // Agent sessions benefit from deterministic, high-output defaults
   // (e.g., temperature=0, maxTokens=16384, reasoningEffort="high").
   if (agent) {
+    const { default: AgentPersonaRegistry } = await import("../services/AgentPersonaRegistry.ts");
+    if (!AgentPersonaRegistry.has(agent)) {
+      throw new ProviderError("server", `Unknown agent: "${agent}"`, 400);
+    }
     const agentDefaultValues = getAgentDefaults();
     for (const [parameterKey, defaultValue] of Object.entries(
       agentDefaultValues,

@@ -390,7 +390,7 @@ router.post(
       } = req.body;
 
       if (!name || !prompt) {
-        res
+        return res
           .status(400)
           .json({ error: "Missing required fields: name, prompt" });
       }

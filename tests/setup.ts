@@ -161,7 +161,11 @@ vi.mock('../src/services/ConversationService.ts', () => ({
         appendMessages: vi.fn().mockResolvedValue(undefined),
         setGenerating: vi.fn().mockResolvedValue(undefined),
         getSessionStats: vi.fn().mockResolvedValue(null),
+        getConversationStats: vi.fn().mockResolvedValue(null),
     },
+    enrichConversationsWithRequestCosts: vi.fn(),
+    enrichSingleConversationCost: vi.fn(),
+    buildConversationPatchFields: vi.fn().mockImplementation((input: any) => input),
 }));
 
 // ── Mock RequestLogger to avoid DB writes ─────────────────────────────
