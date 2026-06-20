@@ -1,0 +1,2204 @@
+Scanning 118 files for vi.mock calls...
+
+File: tests/agenticLoopService.test.ts:8 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/agenticLoopService.test.ts:19 - Mocks module "../src/services/ToolOrchestratorService.ts"
+vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
+default: {
+ensureSchemas: vi.fn().mockResolvedValue(undefined),
+getToolSchemas: vi.fn().mockReturnValue([
+{ name: "search_web", description: "Search the web" },
+{ name: "read_file", description: "Read a file" },
+{ name: "generate_image", description: "Generate image" },
+{ name: "describe_image", description: "Describe image" },
+]),
+getClientToolSchemas: vi.fn().mockReturnValue([
+{ name: "search_web", domain: "knowledge", labels: ["safe"] },
+{ name: "read_file", domain: "system", labels: ["safe"] },
+]),
+getMCPToolSchemas: vi.fn().mockReturnValue([]),
+executeTool: vi.fn().mockResolvedValue({ success: true, result: "mocked" }),
+
+File: tests/agenticLoopService.test.ts:39 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getDb: vi.fn().mockReturnValue({
+collection: vi.fn().mockReturnValue({
+find: vi.fn().mockReturnValue({
+toArray: vi.fn().mockResolvedValue([]),
+}),
+
+File: tests/agenticLoopService.test.ts:56 - Mocks module "../src/services/FileService.ts"
+vi.mock("../src/services/FileService.ts", () => ({
+default: {
+uploadFile: vi.fn().mockResolvedValue({ ref: "minio-ref" }),
+
+File: tests/agenticLoopService.test.ts:62 - Mocks module "../src/services/RequestLogger.ts"
+vi.mock("../src/services/RequestLogger.ts", () => ({
+default: {
+logChatGeneration: vi.fn().mockResolvedValue(undefined),
+},
+}));
+
+File: tests/agenticLoopService.test.ts:68 - Mocks module "../src/services/local-tools/InternalToolRegistry.ts"
+vi.mock("../src/services/local-tools/InternalToolRegistry.ts", () => ({
+default: {
+getNames: vi.fn().mockReturnValue(new Set()),
+},
+}));
+
+File: tests/agenticLoopService.test.ts:74 - Mocks module "../src/utils/ContextWindowManager.ts"
+vi.mock("../src/utils/ContextWindowManager.ts", () => ({
+default: {
+enforce: vi.fn().mockImplementation((messages) => ({
+truncated: false,
+messages,
+strategy: "none",
+estimatedTokens: 10,
+})),
+
+File: tests/agenticLoopService.test.ts:86 - Mocks module "../src/services/ConversationGenerationTracker.ts"
+vi.mock("../src/services/ConversationGenerationTracker.ts", () => ({
+default: {
+register: vi.fn(),
+update: vi.fn(),
+recordChunkTiming: vi.fn(),
+complete: vi.fn(),
+cleanup: vi.fn(),
+getSessionStats: vi.fn().mockReturnValue({
+activeRequests: 0,
+totalOutputTokens: 10,
+totalInputTokens: 5,
+totalTokens: 15,
+tokPerSec: 20,
+avgTtft: 0.5,
+}),
+
+File: tests/agenticLoopService.test.ts:112 - Mocks module "../src/services/system-prompt/index.ts"
+vi.mock("../src/services/system-prompt/index.ts", () => ({
+default: class {
+constructor() {}
+createHook() {
+return async () => {};
+}
+},
+}));
+
+File: tests/agenticLoopService.test.ts:121 - Mocks module "../src/services/SettingsService.ts"
+vi.mock("../src/services/SettingsService.ts", async () => {
+const { HARNESS_IDS } = await import("../src/constants.ts");
+return {
+default: {
+getCached: vi.fn(),
+get: vi.fn().mockResolvedValue({
+agents: {
+harness: HARNESS_IDS.STANDARD,
+},
+}),
+
+File: tests/agenticLoopService.test.ts:138 - Mocks module "../src/routes/ChatRoutes.ts"
+vi.mock("../src/routes/ChatRoutes.ts", () => ({
+finalizeTextGeneration: vi.fn().mockResolvedValue(undefined),
+}));
+
+File: tests/agenticLoopService.test.ts:142 - Mocks module "../src/services/MemoryExtractor.ts"
+vi.mock("../src/services/MemoryExtractor.ts", () => ({
+default: {
+createHook: vi.fn().mockReturnValue(async () => {}),
+
+File: tests/agenticLoopService.test.ts:148 - Mocks module "../src/services/PlanningModeService.ts"
+vi.mock("../src/services/PlanningModeService.ts", () => ({
+default: {
+injectPlanningInstruction: vi.fn(),
+stripPlanningInstruction: vi.fn(),
+extractSteps: vi.fn().mockReturnValue([]),
+},
+}));
+
+File: tests/agenticLoopState.test.ts:11 - Mocks module "../src/utils/CostCalculator.ts"
+vi.mock("../src/utils/CostCalculator.ts", () => ({
+createUsageAccumulator: () => ({
+inputTokens: 0,
+outputTokens: 0,
+cacheReadInputTokens: 0,
+cacheCreationInputTokens: 0,
+reasoningOutputTokens: 0,
+}),
+
+File: tests/agenticSessionPersistence.test.ts:24 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/agenticSessionPersistence.test.ts:35 - Mocks module "../../config.ts"
+vi.mock("../../config.ts", () => ({
+PRISM_SERVICE_PORT: 0,
+GATEWAY_SECRET: "test-secret",
+OPENAI_API_KEY: "fake",
+ANTHROPIC_API_KEY: "fake",
+GOOGLE_API_KEY: "fake",
+ELEVENLABS_API_KEY: "fake",
+INWORLD_BASIC: "fake",
+PROVIDER_LM_STUDIO: [],
+PROVIDER_VLLM: [],
+PROVIDER_OLLAMA: [],
+PROVIDER_LLAMA_CPP: [],
+OPENAI_COMPATIBLE_BASE_URL: "http://localhost:9999",
+TOOLS_SERVICE_URL: "http://localhost:5590",
+MONGO_URI: "mongodb://test:test@localhost:27017",
+... (truncated)
+
+File: tests/agenticSessionPersistence.test.ts:53 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+createClient: vi.fn().mockResolvedValue(undefined),
+getDb: vi.fn().mockReturnValue(null),
+getCollection: vi.fn().mockReturnValue(null),
+},
+}));
+
+File: tests/agenticSessionPersistence.test.ts:61 - Mocks module "../src/services/FileService.ts"
+vi.mock("../src/services/FileService.ts", () => ({
+default: {
+isExternalStorage: () => false,
+isMinioRef: () => false,
+uploadFile: vi.fn().mockResolvedValue({ ref: "minio://test/ref" }),
+
+File: tests/agenticSessionPersistence.test.ts:69 - Mocks module "../src/services/RequestLogger.ts"
+vi.mock("../src/services/RequestLogger.ts", () => ({
+default: {
+log: vi.fn(),
+logChatGeneration: vi.fn().mockResolvedValue(undefined),
+},
+}));
+
+File: tests/agenticSessionPersistence.test.ts:76 - Mocks module "../src/services/ConversationService.ts"
+vi.mock("../src/services/ConversationService.ts", () => ({
+default: {
+appendMessages: vi.fn().mockResolvedValue(undefined),
+setGenerating: vi.fn().mockResolvedValue(undefined),
+},
+extractFiles: vi.fn().mockImplementation(async (msgs) => msgs),
+}));
+
+File: tests/agenticSessionPersistence.test.ts:84 - Mocks module "../src/services/SettingsService.ts"
+vi.mock("../src/services/SettingsService.ts", () => ({
+default: {
+getCached: vi.fn().mockReturnValue({
+creative: {
+textToSpeechProvider: PROVIDERS.ELEVENLABS,
+} as Partial<Required<ReturnType<typeof import("../src/services/SettingsService.ts").default.getCached>>["creative"]>,
+} as any),
+get: vi.fn().mockResolvedValue({} as any),
+getSection: vi.fn().mockResolvedValue({} as any),
+},
+}));
+
+File: tests/agenticToolResolver.test.ts:106 - Mocks module "../src/services/ToolOrchestratorService.ts"
+vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
+default: {
+ensureSchemas: vi.fn().mockResolvedValue(undefined),
+getToolSchemas: vi.fn(() => [...MOCK_TOOLS_API_SCHEMAS, ...MOCK_ORCHESTRATOR_TOOL_SCHEMAS, ...MOCK_INTERNAL_TOOL_SCHEMAS]),
+getMCPToolSchemas: vi.fn(() => mockMCPToolSchemas),
+getClientToolSchemas: vi.fn(() =>
+MOCK_TOOLS_API_SCHEMAS.map((tool) => ({
+...tool,
+domain: "Workspace",
+labels: ["coding"],
+})),
+
+File: tests/agenticToolResolver.test.ts:123 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getCollection: vi.fn(() => ({
+findOne: vi.fn().mockResolvedValue(null),
+})),
+
+File: tests/agenticToolResolver.test.ts:131 - Mocks module "../../config.ts"
+vi.mock("../../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+TYPES: { IMAGE: "image" },
+}));
+
+File: tests/agenticToolResolver.test.ts:136 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+TYPES: { IMAGE: "image" },
+}));
+
+File: tests/agenticToolResolver.test.ts:162 - Mocks module "../src/services/AgentPersonaRegistry.ts"
+vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
+default: {
+get: vi.fn((agent) => {
+if (agent === "CODING") return mockPersona;
+if (agent === "LUPOS") return mockLuposPersona;
+if (agent === "CUSTOM_AGENT") return mockCustomAgent;
+if (agent === "CUSTOM_AGENT_EMPTY") return mockCustomAgentEmpty;
+if (agent === "WILDCARD_AGENT") return mockWildcardPersona;
+return null;
+}),
+
+File: tests/agenticToolResolver.test.ts:178 - Mocks module "../src/services/local-tools/InternalToolRegistry.ts"
+vi.mock("../src/services/local-tools/InternalToolRegistry.ts", () => ({
+default: {
+getNames: vi.fn(() => new Set(["think", "sleep"])),
+},
+}));
+
+File: tests/agenticToolResolver.test.ts:184 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+},
+}));
+
+File: tests/autoApprovalEngine.test.ts:4 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+},
+}));
+
+File: tests/backgroundCostPropagation.test.ts:53 - Mocks module "../src/config.ts"
+vi.mock("../src/config.ts", () => configMock);
+
+// ── Mock providers ──────────────────────────────────────────────
+const mockGenerateText = vi.fn().mockResolvedValue({
+text: '[]', // Empty extraction result by default
+});
+
+File: tests/backgroundCostPropagation.test.ts:60 - Mocks module "../src/providers/index.ts"
+vi.mock("../src/providers/index.ts", () => ({
+getProvider: () => ({
+generateText: mockGenerateText,
+}),
+
+File: tests/backgroundCostPropagation.test.ts:67 - Mocks module "../src/services/SettingsService.ts"
+vi.mock("../src/services/SettingsService.ts", () => ({
+default: {
+getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
+
+File: tests/backgroundCostPropagation.test.ts:91 - Mocks module "../src/services/RequestLogger.ts"
+vi.mock("../src/services/RequestLogger.ts", () => ({
+default: {
+logBackgroundLlmCall: vi.fn(),
+log: vi.fn(),
+},
+}));
+
+File: tests/backgroundCostPropagation.test.ts:99 - Mocks module "../src/services/MemoryService.ts"
+vi.mock("../src/services/MemoryService.ts", () => ({
+default: {
+store: vi.fn().mockResolvedValue({ id: "mem-1", title: "Test memory" }),
+
+File: tests/backgroundCostPropagation.test.ts:108 - Mocks module "../src/services/MemoryConsolidationService.ts"
+vi.mock("../src/services/MemoryConsolidationService.ts", () => ({
+default: {
+checkAndRun: vi.fn(),
+},
+}));
+
+File: tests/backgroundCostPropagation.test.ts:115 - Mocks module "../src/services/AgentPersonaRegistry.ts"
+vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
+default: {
+get: vi.fn().mockReturnValue({ type: "coding" }),
+
+File: tests/backgroundCostPropagation.test.ts:122 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getDb: vi.fn().mockReturnValue(null), // prevents actual DB calls
+getCollection: vi.fn(),
+},
+}));
+
+File: tests/backgroundCostPropagation.test.ts:130 - Mocks module "../src/services/EmbeddingService.ts"
+vi.mock("../src/services/EmbeddingService.ts", () => ({
+default: {
+embed: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]),
+generate: vi.fn().mockResolvedValue({ embedding: [0.1, 0.2, 0.3], dimensions: 3 }),
+
+File: tests/backgroundCostPropagation.test.ts:138 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/backgroundTokenAccuracy.test.ts:20 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+request: vi.fn(),
+provider: vi.fn(),
+},
+}));
+
+File: tests/backgroundTokenAccuracy.test.ts:30 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+}));
+
+File: tests/backgroundTokenAccuracy.test.ts:36 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getDb: vi.fn().mockReturnValue({
+collection: vi.fn().mockReturnValue({
+insertOne: (...parameters: unknown[]) => mockInsertOne(...parameters),
+}),
+
+File: tests/benchmarkService.test.ts:7 - Mocks module "../src/routes/ChatRoutes.ts"
+vi.mock("../src/routes/ChatRoutes.ts", () => ({
+handleConversation: vi.fn(),
+handleAgent: vi.fn(),
+}));
+
+File: tests/benchmarkService.test.ts:12 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getDb: vi.fn(),
+},
+}));
+
+File: tests/benchmarkService.test.ts:18 - Mocks module "../src/providers/index.ts"
+vi.mock("../src/providers/index.ts", () => ({
+getProvider: vi.fn().mockReturnValue({
+generateTextStream: vi.fn(),
+}),
+
+File: tests/benchmarkService.test.ts:24 - Mocks module "../src/providers/instance-registry.ts"
+vi.mock("../src/providers/instance-registry.ts", () => ({
+isInstance: vi.fn().mockReturnValue(false),
+}));
+
+File: tests/changeStreamService.test.ts:5 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+}));
+
+File: tests/changeStreamService.test.ts:19 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getDb: vi.fn((databaseName: string) => {
+if (databaseName === "prism-test") {
+return mockDatabase;
+}
+return null;
+}),
+
+File: tests/changeStreamService.test.ts:30 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+success: vi.fn(),
+},
+}));
+
+File: tests/compaction.test.ts:5 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/contextWindowManager.test.ts:4 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+},
+}));
+
+File: tests/conversationDerivedUtils.test.ts:12 - Mocks module "../src/services/FileService.ts"
+vi.mock("../src/services/FileService.ts", () => ({
+default: {
+isExternalStorage: () => false,
+isMinioRef: () => false,
+uploadFile: vi.fn().mockResolvedValue({ ref: "minio://test/ref" }),
+
+File: tests/conversationDerivedUtils.test.ts:20 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+},
+}));
+
+File: tests/conversationListCostEnrichment.test.ts:25 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/conversationListCostEnrichment.test.ts:34 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+}));
+
+File: tests/conversationService.test.ts:18 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+}));
+
+File: tests/conversationService.test.ts:23 - Mocks module "../src/services/FileService.ts"
+vi.mock("../src/services/FileService.ts", () => ({
+default: {
+isExternalStorage: () => false,
+isMinioRef: () => false,
+uploadFile: vi.fn().mockResolvedValue({ ref: "minio://test/ref" }),
+
+File: tests/conversationService.test.ts:101 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => {
+const getCollectionFn = vi.fn();
+const getDbFn = vi.fn();
+return {
+default: {
+getDb: getDbFn,
+getCollection: getCollectionFn,
+},
+};
+});
+
+File: tests/conversationSubAgentsEnrichment.test.ts:5 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/conversationSubAgentsEnrichment.test.ts:14 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+GATEWAY_SECRET: "test-secret",
+}));
+
+File: tests/conversationTimerService.test.ts:17 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+getModelByName: vi.fn().mockReturnValue({
+name: "test-model",
+provider: PROVIDERS.GOOGLE,
+contextLength: 128_000,
+}),
+
+File: tests/conversationTimerService.test.ts:27 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+debug: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+success: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/conversationTimerService.test.ts:39 - Mocks module "../src/utils/CleanupRegistry.ts"
+vi.mock("../src/utils/CleanupRegistry.ts", () => ({
+registerCleanup: vi.fn(),
+}));
+
+File: tests/conversationTimerService.test.ts:44 - Mocks module "../src/services/ScheduledTaskService.ts"
+vi.mock("../src/services/ScheduledTaskService.ts", () => ({
+matchCron: vi.fn().mockReturnValue(false),
+}));
+
+File: tests/conversationTimerService.test.ts:52 - Mocks module "../src/services/ConversationService.ts"
+vi.mock("../src/services/ConversationService.ts", () => ({
+default: {
+setGenerating: (...args: unknown[]) => mockSetGenerating(...args),
+appendMessages: (...args: unknown[]) => mockAppendMessages(...args),
+},
+}));
+
+File: tests/conversationTimerService.test.ts:62 - Mocks module "../src/services/AgenticLoopService.ts"
+vi.mock("../src/services/AgenticLoopService.ts", () => ({
+default: {
+runAgenticLoop: (...args: unknown[]) => mockRunAgenticLoop(...args),
+},
+}));
+
+File: tests/conversationTimerService.test.ts:69 - Mocks module "../src/providers/index.ts"
+vi.mock("../src/providers/index.ts", () => ({
+getProvider: vi.fn().mockReturnValue({
+generateText: vi.fn(),
+generateTextStream: vi.fn(),
+}),
+
+File: tests/conversationTimerService.test.ts:87 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getDb: vi.fn().mockReturnValue({
+collection: vi.fn().mockReturnValue({
+findOne: (...args: unknown[]) => mockFindOne(...args),
+updateOne: (...args: unknown[]) => mockUpdateOne(...args),
+updateMany: (...args: unknown[]) => mockUpdateMany(...args),
+findOneAndUpdate: (...args: unknown[]) => mockFindOneAndUpdate(...args),
+find: (...args: unknown[]) => mockFindDocuments(...args),
+insertOne: vi.fn().mockResolvedValue({ insertedId: "test" }),
+
+File: tests/conversationUtilities.test.ts:20 - Mocks module "../src/services/ConversationService.ts"
+vi.mock("../src/services/ConversationService.ts", () => ({
+default: {
+appendMessages: (...args: unknown[]) => mockAppendMessages(...args),
+setGenerating: (...args: unknown[]) => mockSetGenerating(...args),
+},
+}));
+
+File: tests/conversationUtilities.test.ts:27 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+},
+}));
+
+File: tests/customAgents-adversarial.test.ts:8 - Mocks module "../src/utils/logger.ts"
+vi.mock('../src/utils/logger.ts', () => ({
+default: {
+info: vi.fn(),
+debug: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+success: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/customAgents-adversarial.test.ts:19 - Mocks module "../config.ts"
+vi.mock('../config.ts', () => ({
+MONGO_DB_NAME: 'prism-test',
+}));
+
+File: tests/customAgents-adversarial.test.ts:26 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock('../src/wrappers/MongoWrapper.ts', () => ({
+default: {
+getCollection: () => ({
+find: (_query: any) => ({
+sort: () => ({
+toArray: async () => {
+if (simulateDatabaseError) {
+throw new Error('Database query failed');
+}
+return Array.from(databaseStore.values());
+},
+}),
+
+File: tests/fileService.test.ts:5 - Mocks module "../src/wrappers/MinioWrapper.ts"
+vi.mock("../src/wrappers/MinioWrapper.ts", () => ({
+default: {
+isAvailable: vi.fn(),
+upload: vi.fn(),
+stat: vi.fn(),
+get: vi.fn(),
+init: vi.fn(),
+getPublicUrl: vi.fn(),
+remove: vi.fn(),
+listObjects: vi.fn(),
+},
+}));
+
+File: tests/harness-lifecycle.test.ts:30 - Mocks module "../src/services/ToolOrchestratorService.ts"
+vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
+default: {
+executeCustomTool: vi.fn(),
+executeToolStreaming: vi.fn(),
+executeTool: vi.fn(),
+isStreamable: vi.fn().mockReturnValue(false),
+getToolEmoji: vi.fn().mockReturnValue(null),
+getWorkspaceRoot: vi.fn().mockReturnValue("/home/rodrigo/development"),
+getClientToolSchemas: vi.fn().mockReturnValue([]),
+},
+}));
+
+File: tests/harness-lifecycle.test.ts:42 - Mocks module "../src/services/ConversationGenerationTracker.ts"
+vi.mock("../src/services/ConversationGenerationTracker.ts", () => ({
+default: {
+complete: vi.fn(),
+register: vi.fn(),
+update: vi.fn(),
+recordChunkTiming: vi.fn(),
+},
+}));
+
+File: tests/harness-lifecycle.test.ts:471 - Mocks module "../src/services/AgentPersonaRegistry.ts"
+vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
+default: {
+isAgentProject: vi.fn((project: string) =>
+project.startsWith("agent_"),
+),
+},
+}));
+
+File: tests/harness-registry.test.ts:12 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/harness-registry.test.ts:23 - Mocks module "../../config.ts"
+vi.mock("../../config.ts", () => ({
+PRISM_SERVICE_PORT: 0,
+GATEWAY_SECRET: "test-secret",
+OPENAI_API_KEY: "fake",
+ANTHROPIC_API_KEY: "fake",
+GOOGLE_API_KEY: "fake",
+ELEVENLABS_API_KEY: "fake",
+INWORLD_BASIC: "fake",
+PROVIDER_LM_STUDIO: [],
+PROVIDER_VLLM: [],
+PROVIDER_OLLAMA: [],
+PROVIDER_LLAMA_CPP: [],
+OPENAI_COMPATIBLE_BASE_URL: "http://localhost:9999",
+TOOLS_SERVICE_URL: "http://localhost:5590",
+MONGO_URI: "mongodb://test:test@localhost:27017",
+... (truncated)
+
+File: tests/harness-registry.test.ts:41 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+createClient: vi.fn().mockResolvedValue(undefined),
+getDb: vi.fn().mockReturnValue(null),
+getCollection: vi.fn().mockReturnValue(null),
+},
+}));
+
+File: tests/harness-registry.test.ts:49 - Mocks module "../src/services/SettingsService.ts"
+vi.mock("../src/services/SettingsService.ts", async () => {
+const { PROVIDERS } = await import("../src/constants.ts");
+return {
+default: {
+getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
+
+File: tests/harness-registry.test.ts:66 - Mocks module "../src/services/ConversationService.ts"
+vi.mock("../src/services/ConversationService.ts", () => ({
+default: {
+appendMessages: vi.fn().mockResolvedValue(undefined),
+setGenerating: vi.fn().mockResolvedValue(undefined),
+getSessionStats: vi.fn().mockResolvedValue(null),
+},
+}));
+
+File: tests/harness-registry.test.ts:74 - Mocks module "../src/services/RequestLogger.ts"
+vi.mock("../src/services/RequestLogger.ts", () => ({
+default: {
+log: vi.fn(),
+logChatGeneration: vi.fn(),
+logBackgroundLlmCall: vi.fn().mockResolvedValue(undefined),
+},
+}));
+
+File: tests/hasSubAgentsDerivation.test.ts:4 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/hasSubAgentsDerivation.test.ts:13 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+GATEWAY_SECRET: "test-secret",
+}));
+
+File: tests/hfMetadata.test.ts:3 - Mocks module "../src/utils/logger.ts"
+vi.mock('../src/utils/logger.ts', () => ({
+default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+File: tests/hfMetadata.test.ts:7 - Mocks module "@rodrigo-barraza/utilities-library"
+vi.mock('@rodrigo-barraza/utilities-library', () => ({
+formatBytes: vi.fn((bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`),
+}));
+
+File: tests/hfMetadata.test.ts:11 - Mocks module "../src/services/local-provider/nameParsers.ts"
+vi.mock('../src/services/local-provider/nameParsers.ts', () => ({
+formatParams: vi.fn((totalParams: number) => {
+if (!totalParams) return null;
+if (totalParams >= 1_000_000_000) {
+const billions = totalParams / 1_000_000_000;
+return billions % 1 === 0 ? `${billions}B` : `${billions.toFixed(1)}B`;
+}
+if (totalParams >= 1_000_000) return `${(totalParams / 1_000_000).toFixed(0)}M`;
+return `${totalParams}`;
+}),
+
+File: tests/hfMetadata.test.ts:32 - Mocks module "../../config.ts"
+vi.mock('../../config.ts', () => ({
+TYPES,
+}));
+
+File: tests/localModelQueue.test.ts:5 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+},
+}));
+
+File: tests/localModelQueue.test.ts:13 - Mocks module "../src/providers/instance-registry.ts"
+vi.mock("../src/providers/instance-registry.ts", () => ({
+getInstance: vi.fn((instanceId: string) => {
+if (instanceId === "concurrency-five-instance") {
+return { concurrency: 5 };
+}
+if (instanceId === "concurrency-two-instance") {
+return { concurrency: 2 };
+}
+return null;
+}),
+
+File: tests/localProviderCapabilities.test.ts:3 - Mocks module "../src/config.ts"
+vi.mock('../src/config.ts', () => ({
+TYPES: {
+TEXT: 'text',
+IMAGE: 'image',
+AUDIO: 'audio',
+VIDEO: 'video',
+PDF: 'pdf',
+EMBEDDING: 'embedding',
+},
+}));
+
+File: tests/localProviderNormalizers.test.ts:3 - Mocks module "../src/config.ts"
+vi.mock('../src/config.ts', () => ({
+TYPES: {
+TEXT: 'text',
+IMAGE: 'image',
+AUDIO: 'audio',
+VIDEO: 'video',
+PDF: 'pdf',
+EMBEDDING: 'embedding',
+},
+}));
+
+File: tests/localProviderNormalizers.test.ts:14 - Mocks module "@rodrigo-barraza/utilities-library"
+vi.mock('@rodrigo-barraza/utilities-library', () => ({
+formatBytes: (bytes: number) => {
+if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`;
+if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`;
+return `${bytes} B`;
+},
+}));
+
+File: tests/localProviderVramEstimation.test.ts:3 - Mocks module "../src/utils/gguf-arch.ts"
+vi.mock('../src/utils/gguf-arch.ts', () => ({
+resolveArchParams: vi.fn().mockReturnValue({
+layers: 32,
+kvHeads: 8,
+headDim: 128,
+attnRatio: 1.0,
+isKnown: true,
+}),
+
+File: tests/localProviderVramEstimation.test.ts:18 - Mocks module "../src/providers/index.ts"
+vi.mock('../src/providers/index.ts', () => ({
+getProvider: vi.fn().mockReturnValue(null),
+}));
+
+File: tests/loggerContextTags.test.ts:11 - Mocks module "@rodrigo-barraza/utilities-library/node"
+vi.mock('@rodrigo-barraza/utilities-library/node', () => ({
+createLogger: vi.fn(() => mockBaseLogger),
+}));
+
+File: tests/loggerContextTags.test.ts:16 - Mocks module "../src/utils/RequestContext.ts"
+vi.mock('../src/utils/RequestContext.ts', () => ({
+getRequestContext: mockGetRequestContext,
+}));
+
+File: tests/mcpSearchMerge.test.ts:71 - Mocks module "../src/services/MCPClientService.ts"
+vi.mock("../src/services/MCPClientService.ts", () => ({
+default: {
+getToolSchemas: vi.fn(() => mockMCPSchemas),
+isMCPTool: vi.fn((name: string) => name.startsWith("mcp__")),
+},
+}));
+
+File: tests/mcpSearchMerge.test.ts:78 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+},
+}));
+
+File: tests/mcpSearchMerge.test.ts:86 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+TOOLS_SERVICE_URL: "http://localhost:5590",
+MONGO_DB_NAME: "prism-test",
+}));
+
+File: tests/mcpSearchMerge.test.ts:91 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getCollection: vi.fn().mockReturnValue(null),
+},
+}));
+
+File: tests/mcpSearchMerge.test.ts:97 - Mocks module "../src/services/SettingsService.ts"
+vi.mock("../src/services/SettingsService.ts", () => ({
+default: {
+getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
+
+File: tests/mcpSearchMerge.test.ts:105 - Mocks module "../src/services/local-tools/InternalToolRegistry.ts"
+vi.mock("../src/services/local-tools/InternalToolRegistry.ts", () => ({
+default: {
+has: vi.fn(() => false),
+getNames: vi.fn(() => new Set()),
+getClientSchemas: vi.fn(() => []),
+},
+}));
+
+File: tests/mcpSearchMerge.test.ts:113 - Mocks module "../src/services/AgentPersonaRegistry.ts"
+vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
+default: { get: vi.fn(() => null) },
+}));
+
+File: tests/mediaUtilities.test.ts:4 - Mocks module "../src/utils/logger.ts"
+vi.mock('../src/utils/logger.ts', () => ({
+default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+File: tests/memoryBatchBuilder.test.ts:3 - Mocks module "@rodrigo-barraza/utilities-library"
+vi.mock('@rodrigo-barraza/utilities-library', () => ({
+daysSinceIso: (isoDate: string) => {
+const millisecondsPerDay = 1000 * 60 * 60 * 24;
+return Math.floor(
+(Date.now() - new Date(isoDate).getTime()) / millisecondsPerDay,
+);
+},
+}));
+
+File: tests/memoryBatchBuilder.test.ts:12 - Mocks module "../src/utils/CostCalculator.ts"
+vi.mock('../src/utils/CostCalculator.ts', () => ({
+estimateTokens: (text: string) => Math.ceil((text || '').length / 4),
+}));
+
+File: tests/memoryClusterDetection.test.ts:3 - Mocks module "@rodrigo-barraza/utilities-library"
+vi.mock('@rodrigo-barraza/utilities-library', () => ({
+cosineSimilarity: (vectorA: number[], vectorB: number[]) => {
+let dotProduct = 0;
+let magnitudeA = 0;
+let magnitudeB = 0;
+for (let i = 0; i < vectorA.length; i++) {
+dotProduct += vectorA[i] * vectorB[i];
+magnitudeA += vectorA[i] * vectorA[i];
+magnitudeB += vectorB[i] * vectorB[i];
+}
+magnitudeA = Math.sqrt(magnitudeA);
+magnitudeB = Math.sqrt(magnitudeB);
+if (magnitudeA === 0 || magnitudeB === 0) return 0;
+return dotProduct / (magnitudeA * magnitudeB);
+},
+... (truncated)
+
+File: tests/memoryConsolidationPrompts.test.ts:3 - Mocks module "@rodrigo-barraza/utilities-library"
+vi.mock('@rodrigo-barraza/utilities-library', () => ({
+daysSinceIso: (isoDate: string) => {
+const millisecondsPerDay = 1000 * 60 * 60 * 24;
+return Math.floor(
+(Date.now() - new Date(isoDate).getTime()) / millisecondsPerDay,
+);
+},
+}));
+
+File: tests/memoryConversationalPartitioner.test.ts:3 - Mocks module "@rodrigo-barraza/utilities-library"
+vi.mock('@rodrigo-barraza/utilities-library', () => ({
+daysSinceIso: (isoDate: string) => {
+const millisecondsPerDay = 1000 * 60 * 60 * 24;
+return Math.floor(
+(Date.now() - new Date(isoDate).getTime()) / millisecondsPerDay,
+);
+},
+}));
+
+File: tests/minioWrapper.test.ts:15 - Mocks module "@rodrigo-barraza/service-library/minio"
+vi.mock('@rodrigo-barraza/service-library/minio', () => ({
+MinioManager: mockMinioManager,
+}));
+
+File: tests/minioWrapper.test.ts:19 - Mocks module "../src/utils/logger.ts"
+vi.mock('../src/utils/logger.ts', () => ({
+default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+File: tests/mongoWrapper.test.ts:11 - Mocks module "@rodrigo-barraza/service-library/mongo"
+vi.mock('@rodrigo-barraza/service-library/mongo', () => ({
+connectDatabase: mockConnectDatabase,
+getDatabase: mockGetDatabase,
+getCollection: mockGetCollection,
+disconnectDatabase: mockDisconnectDatabase,
+}));
+
+File: tests/mongoWrapper.test.ts:18 - Mocks module "../src/utils/logger.ts"
+vi.mock('../src/utils/logger.ts', () => ({
+default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+File: tests/openaiCompat.test.ts:14 - Mocks module "../src/utils/logger.ts"
+vi.mock('../src/utils/logger.ts', () => ({
+default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+File: tests/orchestratorService.test.ts:8 - Mocks module "node:fs"
+vi.mock("node:fs", async (importOriginal) => {
+const original = await importOriginal<typeof import("node:fs")>();
+return {
+...original,
+existsSync: (path: string) => {
+if (mockExistsSyncResult !== undefined) {
+return mockExistsSyncResult;
+}
+return original.existsSync(path);
+},
+};
+});
+
+File: tests/orchestratorService.test.ts:25 - Mocks module "../src/services/AgenticLoopService.ts"
+vi.mock("../src/services/AgenticLoopService.ts", () => ({
+default: {
+runAgenticLoop: (...args: unknown[]) => mockRunAgenticLoop(...args),
+},
+}));
+
+File: tests/orchestratorService.test.ts:35 - Mocks module "../src/services/orchestrator/GitWorktreeHelper.ts"
+vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
+GitWorktreeHelper: {
+getDefaultWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
+resolveRepositoryPath: vi.fn().mockReturnValue("/workspace"),
+toolsApiPost: vi.fn().mockResolvedValue({}),
+
+File: tests/planningModeService.test.ts:11 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+},
+}));
+
+File: tests/policyEngine.test.ts:4 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+},
+}));
+
+File: tests/providerInstanceRegistry.test.ts:8 - Mocks module "../src/providers/lm-studio.ts"
+vi.mock('../src/providers/lm-studio.ts', () => ({
+createLmStudioProvider: vi.fn((_url: string, _id: string) => mockLmStudioProvider),
+}));
+
+File: tests/providerInstanceRegistry.test.ts:11 - Mocks module "../src/providers/ollama.ts"
+vi.mock('../src/providers/ollama.ts', () => ({
+createOllamaProvider: vi.fn((_url: string, _id: string) => mockOllamaProvider),
+}));
+
+File: tests/providerInstanceRegistry.test.ts:14 - Mocks module "../src/providers/vllm.ts"
+vi.mock('../src/providers/vllm.ts', () => ({
+createVllmProvider: vi.fn((_url: string, _id: string) => mockVllmProvider),
+}));
+
+File: tests/providerInstanceRegistry.test.ts:17 - Mocks module "../src/providers/llama-cpp.ts"
+vi.mock('../src/providers/llama-cpp.ts', () => ({
+createLlamaCppProvider: vi.fn((_url: string, _id: string) => mockLlamaCppProvider),
+}));
+
+File: tests/providerInstanceRegistry.test.ts:20 - Mocks module "../src/utils/logger.ts"
+vi.mock('../src/utils/logger.ts', () => ({
+default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+File: tests/providerInstanceRegistry.test.ts:25 - Mocks module "../config.ts"
+vi.mock('../config.ts', () => ({
+PROVIDER_LM_STUDIO: [
+{ url: 'http://gpu-1:1234', concurrency: 4, nickname: 'Desktop' },
+{ url: 'http://gpu-2:1234', concurrency: 2 },
+],
+PROVIDER_VLLM: [{ url: 'http://vllm-host:8000', concurrency: 8 }],
+PROVIDER_OLLAMA: [],
+PROVIDER_LLAMA_CPP: [],
+}));
+
+File: tests/rateLimitExtraction.test.ts:5 - Mocks module "../src/services/RateLimitStore.ts"
+vi.mock('../src/services/RateLimitStore.ts', () => ({
+default: {
+update: (...args: unknown[]) => mockRateLimitStoreUpdate(...args),
+},
+}));
+
+File: tests/rateLimitExtraction.test.ts:11 - Mocks module "../src/constants.ts"
+vi.mock('../src/constants.ts', () => ({
+PROVIDERS: {
+OPENAI: 'openai',
+ANTHROPIC: 'anthropic',
+GOOGLE: 'google',
+ELEVENLABS: 'elevenlabs',
+INWORLD: 'inworld',
+},
+}));
+
+File: tests/reasoningStrategy.test.ts:13 - Mocks module "../src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts"
+vi.mock("../src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts", () => ({
+runTreeOfThoughts: vi.fn().mockResolvedValue({
+messages: [{ role: "assistant", content: "Mocked ToT result" }],
+}),
+
+File: tests/reasoningStrategy.test.ts:20 - Mocks module "../src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts"
+vi.mock("../src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts", () => ({
+runGraphOfThoughts: vi.fn().mockResolvedValue({
+messages: [{ role: "assistant", content: "Mocked GoT result" }],
+}),
+
+File: tests/scheduledTaskService.test.ts:5 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+getModelByName: vi.fn().mockReturnValue({
+name: "test-model",
+provider: PROVIDERS.GOOGLE,
+contextLength: 128_000,
+}),
+
+File: tests/scheduledTaskService.test.ts:15 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+debug: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+success: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/scheduledTaskService.test.ts:27 - Mocks module "../src/utils/CleanupRegistry.ts"
+vi.mock("../src/utils/CleanupRegistry.ts", () => ({
+registerCleanup: vi.fn(),
+}));
+
+File: tests/scheduledTaskService.test.ts:34 - Mocks module "../src/services/AgenticLoopService.ts"
+vi.mock("../src/services/AgenticLoopService.ts", () => ({
+default: {
+runAgenticLoop: (...args: unknown[]) => mockRunAgenticLoop(...args),
+},
+}));
+
+File: tests/scheduledTaskService.test.ts:41 - Mocks module "../src/providers/index.ts"
+vi.mock("../src/providers/index.ts", () => ({
+getProvider: vi.fn().mockReturnValue({
+generateText: vi.fn(),
+generateTextStream: vi.fn(),
+}),
+
+File: tests/scheduledTaskService.test.ts:58 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getDb: vi.fn().mockReturnValue({
+collection: vi.fn().mockReturnValue({
+findOne: (...args: unknown[]) => mockFindOne(...args),
+insertOne: (...args: unknown[]) => mockInsertOne(...args),
+updateOne: (...args: unknown[]) => mockUpdateOne(...args),
+find: (...args: unknown[]) => mockFindDocuments(...args),
+}),
+
+File: tests/scheduledTasks-adversarial.test.ts:14 - Mocks module "../src/utils/logger.ts"
+vi.mock('../src/utils/logger.ts', () => ({
+default: {
+info: vi.fn(),
+debug: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+success: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/scheduledTasks-adversarial.test.ts:25 - Mocks module "../src/utils/CleanupRegistry.ts"
+vi.mock('../src/utils/CleanupRegistry.ts', () => ({
+registerCleanup: vi.fn(),
+}));
+
+File: tests/scheduledTasks-adversarial.test.ts:30 - Mocks module "../src/services/AgenticLoopService.ts"
+vi.mock('../src/services/AgenticLoopService.ts', () => ({
+default: {
+runAgenticLoop: (...args: unknown[]) => mockRunAgenticLoop(...args),
+},
+}));
+
+File: tests/scheduledTasks-adversarial.test.ts:36 - Mocks module "../src/providers/index.ts"
+vi.mock('../src/providers/index.ts', () => ({
+getProvider: vi.fn().mockReturnValue({
+generateText: vi.fn(),
+generateTextStream: vi.fn(),
+}),
+
+File: tests/scheduledTasks-adversarial.test.ts:43 - Mocks module "../config.ts"
+vi.mock('../config.ts', () => ({
+MONGO_DB_NAME: 'prism-test',
+getModelByName: () => mockModelDefinition,
+}));
+
+File: tests/scheduledTasks-adversarial.test.ts:53 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock('../src/wrappers/MongoWrapper.ts', () => ({
+default: {
+getDb: () => {
+if (simulateDatabaseError) {
+throw new Error('Database connection lost');
+}
+return {
+collection: (_collectionName: string) => ({
+find: (query: any) => {
+const cursor = {
+sort: () => cursor,
+toArray: async () => {
+if (simulateDatabaseError) {
+throw new Error('Query execution failed');
+}
+... (truncated)
+
+File: tests/sessionCostReconciliation.test.ts:20 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/sessionCostReconciliation.test.ts:29 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+}));
+
+File: tests/setup.ts:8 - Mocks module "../config.ts"
+vi.mock('../config.ts', () => ({
+PRISM_SERVICE_PORT: 0,
+GATEWAY_SECRET: 'test-secret',
+OPENAI_API_KEY: 'fake',
+ANTHROPIC_API_KEY: 'fake',
+GOOGLE_API_KEY: 'fake',
+ELEVENLABS_API_KEY: 'fake',
+INWORLD_BASIC: 'fake',
+PROVIDER_LM_STUDIO: [],
+PROVIDER_VLLM: [],
+PROVIDER_OLLAMA: [],
+PROVIDER_LLAMA_CPP: [],
+OPENAI_COMPATIBLE_BASE_URL: 'http://localhost:9999',
+TOOLS_SERVICE_URL: 'http://localhost:5590',
+MONGO_URI: 'mongodb://test:test@localhost:27017/?directConnection=true&replicaSet=rs0&authSource=admin',
+... (truncated)
+
+File: tests/setup.ts:92 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock('../src/wrappers/MongoWrapper.ts', () => ({
+default: {
+createClient: vi.fn().mockResolvedValue(undefined),
+getDb: vi.fn().mockReturnValue(null),
+getCollection: vi.fn().mockReturnValue(null),
+},
+}));
+
+File: tests/setup.ts:101 - Mocks module "../src/services/SettingsService.ts"
+vi.mock('../src/services/SettingsService.ts', () => ({
+default: {
+getCached: vi.fn().mockReturnValue({
+memory: {
+extractionProvider: 'google',
+extractionModel: 'gemini-3-flash-preview',
+consolidationProvider: 'google',
+consolidationModel: 'gemini-3-flash-preview',
+embeddingProvider: 'google',
+embeddingModel: 'gemini-embedding-2-preview',
+},
+agents: {
+subAgentProvider: 'google',
+subAgentModel: 'gemini-3-flash-preview',
+criticProvider: 'google',
+... (truncated)
+
+File: tests/setup.ts:172 - Mocks module "../src/services/ConversationService.ts"
+vi.mock('../src/services/ConversationService.ts', () => ({
+default: {
+appendMessages: vi.fn().mockResolvedValue(undefined),
+setGenerating: vi.fn().mockResolvedValue(undefined),
+getSessionStats: vi.fn().mockResolvedValue(null),
+},
+}));
+
+File: tests/setup.ts:181 - Mocks module "../src/services/RequestLogger.ts"
+vi.mock('../src/services/RequestLogger.ts', () => ({
+default: {
+log: vi.fn(),
+logChatGeneration: vi.fn().mockResolvedValue(undefined),
+logBackgroundLlmCall: vi.fn().mockResolvedValue(undefined),
+},
+}));
+
+File: tests/setup.ts:232 - Mocks module "../src/providers/index.ts"
+vi.mock('../src/providers/index.ts', () => {
+// Re-import at the top of the factory is not allowed, so we inline
+const mockProviderFull = {
+generateText: (...args) => MOCK_GENERATE_TEXT(...args),
+generateTextStream: (...args) => MOCK_GENERATE_TEXT_STREAM(...args),
+generateSpeech: (...args) => MOCK_GENERATE_SPEECH(...args),
+generateSpeechStream: (...args) => MOCK_GENERATE_SPEECH_STREAM(...args),
+generateImage: (...args) => MOCK_GENERATE_IMAGE(...args),
+captionImage: (...args) => MOCK_CAPTION_IMAGE(...args),
+generateEmbedding: (...args) => MOCK_GENERATE_EMBEDDING(...args),
+};
+
+const mockProviderTextOnly = {
+generateText: (...args) => MOCK_GENERATE_TEXT(...args),
+generateTextStream: (...args) => MOCK_GENERATE_TEXT_STREAM(...args),
+... (truncated)
+
+File: tests/somatic/somaticStateService.test.ts:5 - Mocks module "../../src/utils/logger.ts"
+vi.mock("../../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+},
+}));
+
+File: tests/somatic/somaticStateService.test.ts:18 - Mocks module "../../src/wrappers/MongoWrapper.ts"
+vi.mock("../../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getCollection: vi.fn(() => ({
+findOne: mockFindOne,
+updateOne: mockUpdateOne,
+})),
+
+File: tests/somatic/somaticStateService.test.ts:29 - Mocks module "../../../config.ts"
+vi.mock("../../../config.ts", () => ({
+MONGO_DB_NAME: "prism_test",
+}));
+
+File: tests/somatic/somaticStateService.test.ts:35 - Mocks module "../../src/providers/index.ts"
+vi.mock("../../src/providers/index.ts", () => ({
+getProvider: vi.fn(() => ({
+generateText: mockGenerateText,
+})),
+
+File: tests/somatic/somaticStateService.test.ts:41 - Mocks module "../../src/services/SettingsService.ts"
+vi.mock("../../src/services/SettingsService.ts", () => ({
+default: {
+getSomaticModelConfig: vi.fn().mockResolvedValue({
+provider: PROVIDERS.GOOGLE,
+model: "gemini-3.5-flash",
+}),
+
+File: tests/somatic/statFactory.test.ts:3 - Mocks module "../../src/utils/logger.ts"
+vi.mock("../../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+},
+}));
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:6 - Mocks module "../../src/utils/logger.ts"
+vi.mock("../../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+},
+}));
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:16 - Mocks module "../../src/utils/ErrorHelpers.ts"
+vi.mock("../../src/utils/ErrorHelpers.ts", () => ({
+getErrorMessage: (error: unknown) => String(error),
+}));
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:24 - Mocks module "../../src/services/somatic/SomaticStateService.ts"
+vi.mock("../../src/services/somatic/SomaticStateService.ts", () => ({
+default: {
+getSnapshot: (...arguments_: unknown[]) => mockGetSnapshot(...arguments_),
+adaptFromMessage: (...arguments_: unknown[]) => mockAdaptFromMessage(...arguments_),
+renderSystemMessage: (...arguments_: unknown[]) => mockRenderSystemMessage(...arguments_),
+initialize: vi.fn(),
+},
+}));
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:35 - Mocks module "../../src/services/AgentPersonaRegistry.ts"
+vi.mock("../../src/services/AgentPersonaRegistry.ts", () => ({
+default: {
+get: (agentId: string) => mockPersonas.get(agentId) || null,
+},
+}));
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:41 - Mocks module "../../src/services/ToolOrchestratorService.ts"
+vi.mock("../../src/services/ToolOrchestratorService.ts", () => ({
+default: {
+getWorkspaceRoot: () => "/test",
+listToolNames: () => [],
+listToolsForAgent: () => [],
+getToolsGlobalConfig: () => ({}),
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:53 - Mocks module "../../src/services/SettingsService.ts"
+vi.mock("../../src/services/SettingsService.ts", () => ({
+default: {
+getSection: vi.fn().mockResolvedValue({
+topology: HARNESS_IDS.STANDARD,
+dynamicToolActivation: false,
+}),
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:63 - Mocks module "../../src/services/OrchestratorPrompt.ts"
+vi.mock("../../src/services/OrchestratorPrompt.ts", () => ({
+getOrchestratorPromptAddendum: () => "",
+ORCHESTRATOR_ONLY_TOOLS: new Set<string>(),
+}));
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:68 - Mocks module "../../src/utils/resolveToolEntriesToSet.ts"
+vi.mock("../../src/utils/resolveToolEntriesToSet.ts", () => ({
+resolveToolEntriesToSet: () => new Set<string>(),
+}));
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:72 - Mocks module "../../src/utils/resolveLockedOffToolNames.ts"
+vi.mock("../../src/utils/resolveLockedOffToolNames.ts", () => ({
+resolveLockedOffToolNames: () => new Set<string>(),
+}));
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:76 - Mocks module "../../src/services/system-prompt/DirectoryTreeFormatter.ts"
+vi.mock("../../src/services/system-prompt/DirectoryTreeFormatter.ts", () => ({
+DirectoryTreeFormatter: class {
+fetchDirectoryTree() { return Promise.resolve(""); }
+},
+}));
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:82 - Mocks module "../../src/services/system-prompt/ToolDocFormatter.ts"
+vi.mock("../../src/services/system-prompt/ToolDocFormatter.ts", () => ({
+ToolDocFormatter: class {
+buildToolDescriptions() { return ""; }
+},
+}));
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:88 - Mocks module "../../src/services/system-prompt/SkillMemoryScorer.ts"
+vi.mock("../../src/services/system-prompt/SkillMemoryScorer.ts", () => ({
+SkillMemoryScorer: class {
+fetchSkills() { return Promise.resolve({ text: null, skillNames: [] }); }
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:95 - Mocks module "../../../config.ts"
+vi.mock("../../../config.ts", () => ({
+MONGO_DB_NAME: "prism_test",
+}));
+
+File: tests/somatic/systemPromptAssemblerIntegration.test.ts:99 - Mocks module "../../src/wrappers/MongoWrapper.ts"
+vi.mock("../../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getCollection: vi.fn(() => null),
+getDb: vi.fn(() => null),
+},
+}));
+
+File: tests/sseUtilities.test.ts:11 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+PRISM_SERVICE_PORT: 0,
+GATEWAY_SECRET: "test",
+OPENAI_API_KEY: "fake",
+ANTHROPIC_API_KEY: "fake",
+GOOGLE_API_KEY: "fake",
+ELEVENLABS_API_KEY: "fake",
+INWORLD_BASIC: "fake",
+PROVIDER_LM_STUDIO: [],
+PROVIDER_VLLM: [],
+PROVIDER_OLLAMA: [],
+PROVIDER_LLAMA_CPP: [],
+OPENAI_COMPATIBLE_BASE_URL: "http://localhost:9999",
+TOOLS_SERVICE_URL: "http://localhost:5590",
+MONGO_URI: "mongodb://test:test@localhost:27017",
+... (truncated)
+
+File: tests/sseUtilities.test.ts:29 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+createClient: vi.fn(),
+getDb: vi.fn().mockReturnValue(null),
+getCollection: vi.fn().mockReturnValue(null),
+},
+}));
+
+File: tests/sseUtilities.test.ts:37 - Mocks module "../src/services/ConversationService.ts"
+vi.mock("../src/services/ConversationService.ts", () => ({
+default: {
+appendMessages: vi.fn(),
+setGenerating: vi.fn(),
+getSessionStats: vi.fn(),
+},
+}));
+
+File: tests/sseUtilities.test.ts:45 - Mocks module "../src/services/RequestLogger.ts"
+vi.mock("../src/services/RequestLogger.ts", () => ({
+default: { log: vi.fn(), logChatGeneration: vi.fn(), logBackgroundLlmCall: vi.fn() },
+}));
+
+File: tests/sseUtilities.test.ts:49 - Mocks module "../src/services/SettingsService.ts"
+vi.mock("../src/services/SettingsService.ts", () => ({
+default: {
+getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
+
+File: tests/sseUtilities.test.ts:63 - Mocks module "../src/providers/index.ts"
+vi.mock("../src/providers/index.ts", () => ({
+getProvider: vi.fn(),
+listProviders: () => [],
+}));
+
+File: tests/streamChunkDispatcher.test.ts:13 - Mocks module "../src/services/FileService.ts"
+vi.mock("../src/services/FileService.ts", () => ({
+default: {
+isExternalStorage: () => false,
+isMinioRef: () => false,
+uploadFile: vi.fn().mockResolvedValue({ ref: "minio://test/ref" }),
+
+File: tests/streamChunkDispatcher.test.ts:21 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+},
+}));
+
+File: tests/streamingToolPersistence.test.ts:19 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/streamingToolPersistence.test.ts:31 - Mocks module "../../config.ts"
+vi.mock("../../config.ts", () => ({
+TOOLS_SERVICE_URL: "http://localhost:5590",
+MONGO_DB_NAME: "prism-test",
+}));
+
+File: tests/streamingToolPersistence.test.ts:37 - Mocks module "../src/services/MCPClientService.ts"
+vi.mock("../src/services/MCPClientService.ts", () => ({
+default: {
+isMCPTool: vi.fn().mockReturnValue(false),
+getToolSchemas: vi.fn().mockReturnValue([]),
+},
+}));
+
+File: tests/streamingToolPersistence.test.ts:44 - Mocks module "../src/services/local-tools/InternalToolRegistry.ts"
+vi.mock("../src/services/local-tools/InternalToolRegistry.ts", () => ({
+default: {
+has: vi.fn().mockReturnValue(false),
+getSchemas: vi.fn().mockReturnValue([]),
+getClientSchemas: vi.fn().mockReturnValue([]),
+getNames: vi.fn().mockReturnValue(new Set()),
+},
+}));
+
+File: tests/streamingToolPersistence.test.ts:53 - Mocks module "../src/utils/AbortController.ts"
+vi.mock("../src/utils/AbortController.ts", () => ({
+createAbortController: vi.fn().mockReturnValue(new AbortController()),
+}));
+
+File: tests/subagentIntensive.test.ts:27 - Mocks module "../src/services/AgenticLoopService.ts"
+vi.mock("../src/services/AgenticLoopService.ts", () => ({
+default: {
+runAgenticLoop: (...args: unknown[]) => mockRunAgenticLoop(...args),
+},
+}));
+
+File: tests/subagentIntensive.test.ts:45 - Mocks module "../src/services/orchestrator/GitWorktreeHelper.ts"
+vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
+GitWorktreeHelper: {
+getDefaultWorkspaceRoot: () => "/workspace",
+resolveRepositoryPath: () => "/workspace/repo",
+createWorktree: (...args: unknown[]) => mockCreateWorktree(...args),
+removeWorktree: (...args: unknown[]) => mockRemoveWorktree(...args),
+mergeWorktree: (...args: unknown[]) => mockMergeWorktree(...args),
+getWorktreeDiff: (...args: unknown[]) => mockGetWorktreeDiff(...args),
+toolsApiPost: (...args: unknown[]) => mockToolsApiPost(...args),
+cleanupWorktrees: vi.fn().mockResolvedValue({}),
+
+File: tests/subagentIntensive.test.ts:59 - Mocks module "../src/services/SettingsService.ts"
+vi.mock("../src/services/SettingsService.ts", () => ({
+default: {
+getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
+
+File: tests/systemPromptAssembler.test.ts:194 - Mocks module "../src/services/ToolOrchestratorService.ts"
+vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
+default: {
+ensureSchemas: vi.fn().mockResolvedValue(undefined),
+getToolSchemas: vi.fn(() => ALL_AI_SCHEMAS),
+getClientToolSchemas: vi.fn(() => ALL_CLIENT_SCHEMAS),
+getWorkspaceRoot: vi.fn(() => "/home/rodrigo/development"),
+getToolEmoji: vi.fn().mockReturnValue(null),
+isWorkspaceAgentConnected: vi.fn(() => Promise.resolve(mockIsWorkspaceAgentConnected)),
+},
+}));
+
+File: tests/systemPromptAssembler.test.ts:252 - Mocks module "../src/services/AgentPersonaRegistry.ts"
+vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
+default: {
+get: vi.fn((agentId: string) => {
+if (agentId === "CODING") return codingPersona;
+if (agentId === "LUPOS") return luposPersona;
+if (agentId === "OMNI") return omniPersona;
+return null;
+}),
+
+File: tests/systemPromptAssembler.test.ts:265 - Mocks module "../src/services/OrchestratorPrompt.ts"
+vi.mock("../src/services/OrchestratorPrompt.ts", () => ({
+getOrchestratorPromptAddendum: vi.fn(
+() => "## Orchestrator Mode — Multi-Agent Orchestration\n\nMocked coordinator prompt addendum.",
+),
+ORCHESTRATOR_ONLY_TOOLS: [...CORE_ORCHESTRATOR_TOOLS],
+}));
+
+File: tests/systemPromptAssembler.test.ts:296 - Mocks module "../src/services/SettingsService.ts"
+vi.mock("../src/services/SettingsService.ts", () => ({
+default: {
+getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
+
+File: tests/systemPromptAssembler.test.ts:307 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getDb: vi.fn(() => null),
+},
+}));
+
+File: tests/systemPromptAssembler.test.ts:315 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+TOOLS_SERVICE_URL: "https://tools.test.rod.dev",
+MONGO_DB_NAME: "prism-test",
+}));
+
+File: tests/systemPromptAssembler.test.ts:322 - Mocks module "../src/services/EmbeddingService.ts"
+vi.mock("../src/services/EmbeddingService.ts", () => ({
+default: {
+embed: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]),
+},
+}));
+
+File: tests/systemPromptAssembler.test.ts:328 - Mocks module "../src/services/MemoryService.ts"
+vi.mock("../src/services/MemoryService.ts", () => ({
+default: {
+search: vi.fn().mockResolvedValue([]),
+formatForPrompt: vi.fn(() => ""),
+},
+}));
+
+File: tests/systemPromptAssembler.test.ts:337 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+},
+}));
+
+File: tests/systemPromptAssembler.test.ts:349 - Mocks module "../src/constants.ts"
+vi.mock("../src/constants.ts", async (importOriginal) => {
+const actual = await importOriginal<typeof import("../src/constants.ts")>();
+return {
+...actual,
+DIRECTORY_CACHE_TTL_MS: 60_000,
+DIRECTORY_FETCH_TIMEOUT_MS: 5_000,
+};
+});
+
+File: tests/telemetryContext.test.ts:18 - Mocks module "@google/genai"
+vi.mock("@google/genai", async (importOriginal) => {
+const actual = await importOriginal() as Record<string, unknown>;
+return {
+...actual,
+GoogleGenAI: class GoogleGenAI {
+live = {
+connect: async ({ callbacks }: any) => {
+mockLiveSessionCallbacks = callbacks;
+// Eagerly invoke onopen so the connection setup completes
+if (callbacks && typeof callbacks.onopen === "function") {
+setTimeout(() => callbacks.onopen(), 0);
+}
+return mockLiveSessionInstance;
+},
+};
+... (truncated)
+
+File: tests/thinkingMode.test.ts:23 - Mocks module "@anthropic-ai/sdk"
+vi.mock("@anthropic-ai/sdk", () => {
+return {
+default: class {
+constructor() {}
+messages = {
+create: (...args: Parameters<InstanceType<typeof import("@anthropic-ai/sdk").default>["messages"]["create"]>) => {
+const res = (mockMessagesCreate as any)(...args);
+return {
+withResponse: async () => ({
+data: res,
+response: {
+headers: {
+get: (name: string) => {
+if (name === "anthropic-ratelimit-requests-limit") return "1000";
+if (name === "anthropic-ratelimit-requests-remaining") return "999";
+... (truncated)
+
+File: tests/thinkingMode.test.ts:55 - Mocks module "@google/genai"
+vi.mock("@google/genai", () => {
+return {
+GoogleGenAI: class {
+constructor() {}
+models = {
+generateContent: (...args: Parameters<InstanceType<typeof import("@google/genai").GoogleGenAI>["models"]["generateContent"]>) => (mockGenerateContent as any)(...args),
+generateContentStream: (...args: Parameters<InstanceType<typeof import("@google/genai").GoogleGenAI>["models"]["generateContentStream"]>) => (mockGenerateContentStream as any)(...args),
+};
+live = {
+connect: (...args: Parameters<InstanceType<typeof import("@google/genai").GoogleGenAI>["live"]["connect"]>) => (mockConnect as any)(...args),
+};
+},
+Modality: {
+AUDIO: "audio",
+TEXT: "text",
+... (truncated)
+
+File: tests/toolAvailabilityAndEnablement.test.ts:174 - Mocks module "../src/services/ToolOrchestratorService.ts"
+vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
+default: {
+ensureSchemas: vi.fn().mockResolvedValue(undefined),
+getToolSchemas: vi.fn(() => [...MOCK_TOOLS_API_SCHEMAS, ...MOCK_ORCHESTRATOR_SCHEMAS]),
+getMCPToolSchemas: vi.fn(() => []),
+getClientToolSchemas: vi.fn(() => MOCK_CLIENT_SCHEMAS),
+getToolEmoji: vi.fn().mockReturnValue(null),
+getWorkspaceRoot: vi.fn(() => "/home/rodrigo/development"),
+},
+}));
+
+File: tests/toolAvailabilityAndEnablement.test.ts:187 - Mocks module "../src/services/SettingsService.ts"
+vi.mock("../src/services/SettingsService.ts", () => ({
+default: {
+getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
+
+File: tests/toolAvailabilityAndEnablement.test.ts:196 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getCollection: vi.fn(() => ({
+findOne: vi.fn().mockResolvedValue(null),
+})),
+
+File: tests/toolAvailabilityAndEnablement.test.ts:206 - Mocks module "../../config.ts"
+vi.mock("../../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+TYPES: { IMAGE: "image" },
+}));
+
+File: tests/toolAvailabilityAndEnablement.test.ts:211 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+TYPES: { IMAGE: "image" },
+}));
+
+File: tests/toolAvailabilityAndEnablement.test.ts:246 - Mocks module "../src/services/AgentPersonaRegistry.ts"
+vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
+default: {
+get: vi.fn((agentId: string) => {
+if (agentId === "CODING") return wildcardPersona;
+if (agentId === "UNLOCKED_AGENT") return restrictedPersona;
+if (agentId === "DOMAIN_AGENT") return domainPersona;
+if (agentId === "SAFE_AGENT") return blockedToolsPersona;
+return null;
+}),
+
+File: tests/toolAvailabilityAndEnablement.test.ts:260 - Mocks module "../src/services/local-tools/InternalToolRegistry.ts"
+vi.mock("../src/services/local-tools/InternalToolRegistry.ts", () => ({
+default: {
+getNames: vi.fn(() => new Set(["think", "sleep", "enter_plan_mode", "exit_plan_mode"])),
+},
+}));
+
+File: tests/toolAvailabilityAndEnablement.test.ts:268 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+},
+}));
+
+File: tests/toolContext.test.ts:4 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+},
+}));
+
+File: tests/toolContext.test.ts:20 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getCollection: vi.fn().mockReturnValue({
+updateOne: (...args: unknown[]) => mockUpdateOne(...args),
+findOne: (...args: unknown[]) => mockFindOne(...args),
+deleteOne: (...args: unknown[]) => mockDeleteOne(...args),
+}),
+
+File: tests/toolContext.test.ts:30 - Mocks module "../../config.ts"
+vi.mock("../../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+}));
+
+File: tests/toolCountSync.test.ts:110 - Mocks module "../src/services/ToolOrchestratorService.ts"
+vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
+default: {
+ensureSchemas: vi.fn().mockResolvedValue(undefined),
+getToolSchemas: vi.fn(() => [
+...MOCK_TOOLS_API_SCHEMAS.map(({ endpoint, domain, labels, ...schema }) => schema),
+
+File: tests/toolCountSync.test.ts:159 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+getCollection: vi.fn(() => ({
+findOne: vi.fn().mockResolvedValue(null),
+})),
+
+File: tests/toolCountSync.test.ts:167 - Mocks module "../../config.ts"
+vi.mock("../../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+TYPES: { IMAGE: "image" },
+}));
+
+File: tests/toolCountSync.test.ts:172 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+MONGO_DB_NAME: "prism-test",
+TYPES: { IMAGE: "image" },
+}));
+
+File: tests/toolCountSync.test.ts:205 - Mocks module "../src/services/AgentPersonaRegistry.ts"
+vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
+default: {
+get: vi.fn((agentId) => {
+if (agentId === "CODING") return mockCodingPersona;
+if (agentId === "RESTRICTED") return mockRestrictedPersona;
+if (agentId === "LUPOS") return mockLuposPersona;
+if (agentId === "UNLOCKED") return mockUnlockedPersona;
+return null;
+}),
+
+File: tests/toolCountSync.test.ts:217 - Mocks module "../src/services/local-tools/InternalToolRegistry.ts"
+vi.mock("../src/services/local-tools/InternalToolRegistry.ts", () => ({
+default: {
+getNames: vi.fn(() => MOCK_INTERNAL_NAMES),
+},
+}));
+
+File: tests/toolCountSync.test.ts:223 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+},
+}));
+
+File: tests/toolNameUniqueness.test.ts:6 - Mocks module "../src/services/FileService.ts"
+vi.mock("../src/services/FileService.ts", () => ({
+default: {
+extractKey: (imageReference: string) => imageReference.replace("minio://", ""),
+getFile: vi.fn().mockResolvedValue(null),
+},
+}));
+
+File: tests/toolOrchestratorService.test.ts:5 - Mocks module "../src/services/FileService.ts"
+vi.mock("../src/services/FileService.ts", () => {
+return {
+default: {
+extractKey: (imageReference: string) => imageReference.replace("minio://", ""),
+getFile: vi.fn().mockImplementation(async (keyString: string) => {
+if (keyString === "valid-image.png") {
+return {
+stream: (async function* () {
+yield Buffer.from("fake-minio-image-bytes");
+})(),
+
+File: tests/topologyRouters.test.ts:10 - Mocks module "../src/services/orchestrator/GitWorktreeHelper.ts"
+vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
+GitWorktreeHelper: {
+getDefaultWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
+resolveRepositoryPath: vi.fn().mockReturnValue("/workspace"),
+createWorktree: vi.fn().mockResolvedValue({ worktreePath: "/workspace/worktree-1" }),
+
+File: tests/topologyRouters.test.ts:22 - Mocks module "../src/services/SettingsService.ts"
+vi.mock("../src/services/SettingsService.ts", () => ({
+default: {
+getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
+
+File: tests/topologyRouters.test.ts:39 - Mocks module "../src/providers/index.ts"
+vi.mock("../src/providers/index.ts", () => ({
+getProvider: vi.fn().mockImplementation(() => ({
+generateText: mockGenerateText,
+})),
+
+File: tests/validationFlowOrdering.test.ts:22 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/validationFlowOrdering.test.ts:33 - Mocks module "../config.ts"
+vi.mock("../config.ts", () => ({
+PRISM_SERVICE_PORT: 0,
+GATEWAY_SECRET: "test-secret",
+OPENAI_API_KEY: "fake",
+ANTHROPIC_API_KEY: "fake",
+GOOGLE_API_KEY: "fake",
+ELEVENLABS_API_KEY: "fake",
+INWORLD_BASIC: "fake",
+PROVIDER_LM_STUDIO: [],
+PROVIDER_VLLM: [],
+PROVIDER_OLLAMA: [],
+PROVIDER_LLAMA_CPP: [],
+OPENAI_COMPATIBLE_BASE_URL: "http://localhost:9999",
+TOOLS_SERVICE_URL: "http://localhost:5590",
+MONGO_URI: "mongodb://test:test@localhost:27017",
+... (truncated)
+
+File: tests/validationFlowOrdering.test.ts:51 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
+default: {
+createClient: vi.fn().mockResolvedValue(undefined),
+getDb: vi.fn().mockReturnValue(null),
+getCollection: vi.fn().mockReturnValue(null),
+},
+}));
+
+File: tests/validationFlowOrdering.test.ts:59 - Mocks module "../src/services/SettingsService.ts"
+vi.mock("../src/services/SettingsService.ts", () => ({
+default: {
+getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
+
+File: tests/validationFlowOrdering.test.ts:73 - Mocks module "../src/services/ConversationService.ts"
+vi.mock("../src/services/ConversationService.ts", () => ({
+default: {
+appendMessages: vi.fn().mockResolvedValue(undefined),
+setGenerating: vi.fn().mockResolvedValue(undefined),
+},
+}));
+
+File: tests/validationFlowOrdering.test.ts:80 - Mocks module "../src/services/RequestLogger.ts"
+vi.mock("../src/services/RequestLogger.ts", () => ({
+default: {
+log: vi.fn(),
+logChatGeneration: vi.fn(),
+},
+}));
+
+File: tests/validationFlowOrdering.test.ts:87 - Mocks module "../src/services/ToolOrchestratorService.ts"
+vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
+default: {
+executeTool: vi.fn(),
+getWorkspaceRoot: vi.fn().mockReturnValue("/home/rodrigo/development"),
+isStreamable: vi.fn().mockReturnValue(false),
+getToolEmoji: vi.fn().mockReturnValue(null),
+},
+}));
+
+File: tests/visionLanguageHarness.test.ts:6 - Mocks module "../src/utils/logger.ts"
+vi.mock("../src/utils/logger.ts", () => ({
+default: {
+info: vi.fn(),
+warn: vi.fn(),
+error: vi.fn(),
+debug: vi.fn(),
+success: vi.fn(),
+request: vi.fn(),
+},
+}));
+
+File: tests/visionLanguageHarness.test.ts:17 - Mocks module "../src/services/LiveFrameService.ts"
+vi.mock("../src/services/LiveFrameService.ts", () => ({
+default: {
+getFrames: vi.fn(),
+pushFrame: vi.fn(),
+clear: vi.fn(),
+},
+}));
+
+File: tests/visionLanguageHarness.test.ts:25 - Mocks module "../src/services/harnesses/lifecycle/HookInitializer.ts"
+vi.mock("../src/services/harnesses/lifecycle/HookInitializer.ts", () => ({
+createStandardHooks: vi.fn().mockReturnValue({
+hooks: { run: vi.fn().mockResolvedValue(undefined) },
+approvalEngine: {},
+}),
+
+File: tests/visionLanguageHarness.test.ts:32 - Mocks module "../src/services/harnesses/lifecycle/Finalizer.ts"
+vi.mock("../src/services/harnesses/lifecycle/Finalizer.ts", () => ({
+finalizeTextGeneration: vi.fn().mockResolvedValue(undefined),
+}));
+
+File: tests/visionLanguageHarness.test.ts:36 - Mocks module "../src/utils/ContextWindowManager.ts"
+vi.mock("../src/utils/ContextWindowManager.ts", () => ({
+default: {
+enforce: vi.fn().mockImplementation((messages) => ({
+truncated: false,
+messages,
+strategy: "none",
+estimatedTokens: 10,
+})),
+
+File: tests/visionLanguageHarness.test.ts:48 - Mocks module "../src/services/ConversationGenerationTracker.ts"
+vi.mock("../src/services/ConversationGenerationTracker.ts", () => ({
+default: {
+register: vi.fn(),
+update: vi.fn(),
+recordChunkTiming: vi.fn(),
+complete: vi.fn(),
+cleanup: vi.fn(),
+getConversationStats: vi.fn().mockReturnValue({
+activeRequests: 0,
+totalOutputTokens: 10,
+totalInputTokens: 5,
+totalTokens: 15,
+tokPerSec: 20,
+avgTtft: 0.5,
+}),
+
+File: tests/visionLanguageHarness.test.ts:74 - Mocks module "../src/services/RequestLogger.ts"
+vi.mock("../src/services/RequestLogger.ts", () => ({
+default: {
+log: vi.fn().mockResolvedValue(undefined),
+logChatGeneration: vi.fn().mockResolvedValue(undefined),
+},
+}));
+
+File: tests/voiceCatalog.test.ts:3 - Mocks module "../src/config.ts"
+vi.mock('../src/config.ts', () => ({
+VOICES: {
+inworld: [
+{ name: 'Dennis', gender: 'Male', description: 'A warm baritone, friendly' },
+{ name: 'Luna', gender: 'Female', description: 'A bright soprano, energetic' },
+],
+},
+DEFAULT_VOICES: {
+inworld: 'Dennis',
+},
+getDefaultModels: () => ({ inworld: 'inworld-tts-2' }),
+
+File: tests/voiceCatalog.test.ts:20 - Mocks module "../src/constants.ts"
+vi.mock('../src/constants.ts', () => ({
+PROVIDERS: {
+OPENAI: 'openai',
+ANTHROPIC: 'anthropic',
+GOOGLE: 'google',
+ELEVENLABS: 'elevenlabs',
+INWORLD: 'inworld',
+LM_STUDIO: 'lm-studio',
+VLLM: 'vllm',
+OLLAMA: 'ollama',
+LLAMA_CPP: 'llama-cpp',
+},
+}));
+
+File: tests/workflowAssembler.test.ts:13 - Mocks module "../src/config.ts"
+vi.mock("../src/config.ts", () => ({
+getModelByName: vi.fn().mockReturnValue(null),
+}));
+
+File: tests/workflowExecution.test.ts:10 - Mocks module "../src/routes/ChatRoutes.ts"
+vi.mock("../src/routes/ChatRoutes.ts", () => ({
+handleConversation: vi.fn(),
+handleAgent: vi.fn(),
+}));
+
+File: tests/workflowExecution.test.ts:15 - Mocks module "../src/providers/index.ts"
+vi.mock("../src/providers/index.ts", () => ({
+getProvider: vi.fn().mockReturnValue({
+transcribeAudio: vi.fn(),
+generateSpeech: vi.fn(),
+}),
+
+File: tests/workflowExecution.test.ts:22 - Mocks module "../src/services/EmbeddingService.ts"
+vi.mock("../src/services/EmbeddingService.ts", () => ({
+default: {
+generate: vi.fn(),
+},
+}));
+
+File: tests/workflowExecution.test.ts:28 - Mocks module "../src/services/FileService.ts"
+vi.mock("../src/services/FileService.ts", () => ({
+default: {
+uploadFile: vi.fn(),
+getFile: vi.fn(),
+isMinioRef: vi.fn((ref) => typeof ref === "string" && ref.startsWith("minio://")),
+extractKey: vi.fn((ref) => ref.replace("minio://", "")),
+},
+}));
+
+File: tests/workflowExecution.test.ts:37 - Mocks module "../src/wrappers/MinioWrapper.ts"
+vi.mock("../src/wrappers/MinioWrapper.ts", () => ({
+default: {
+getBucketUrl: vi.fn().mockReturnValue("http://localhost:9000/bucket"),
+},
+}));
+
+File: tests/setup.ts:8 - Mocks module "../config.ts"
+vi.mock('../config.ts', () => ({
+PRISM_SERVICE_PORT: 0,
+GATEWAY_SECRET: 'test-secret',
+OPENAI_API_KEY: 'fake',
+ANTHROPIC_API_KEY: 'fake',
+GOOGLE_API_KEY: 'fake',
+ELEVENLABS_API_KEY: 'fake',
+INWORLD_BASIC: 'fake',
+PROVIDER_LM_STUDIO: [],
+PROVIDER_VLLM: [],
+PROVIDER_OLLAMA: [],
+PROVIDER_LLAMA_CPP: [],
+OPENAI_COMPATIBLE_BASE_URL: 'http://localhost:9999',
+TOOLS_SERVICE_URL: 'http://localhost:5590',
+MONGO_URI: 'mongodb://test:test@localhost:27017/?directConnection=true&replicaSet=rs0&authSource=admin',
+... (truncated)
+
+File: tests/setup.ts:92 - Mocks module "../src/wrappers/MongoWrapper.ts"
+vi.mock('../src/wrappers/MongoWrapper.ts', () => ({
+default: {
+createClient: vi.fn().mockResolvedValue(undefined),
+getDb: vi.fn().mockReturnValue(null),
+getCollection: vi.fn().mockReturnValue(null),
+},
+}));
+
+File: tests/setup.ts:101 - Mocks module "../src/services/SettingsService.ts"
+vi.mock('../src/services/SettingsService.ts', () => ({
+default: {
+getCached: vi.fn().mockReturnValue({
+memory: {
+extractionProvider: 'google',
+extractionModel: 'gemini-3-flash-preview',
+consolidationProvider: 'google',
+consolidationModel: 'gemini-3-flash-preview',
+embeddingProvider: 'google',
+embeddingModel: 'gemini-embedding-2-preview',
+},
+agents: {
+subAgentProvider: 'google',
+subAgentModel: 'gemini-3-flash-preview',
+criticProvider: 'google',
+... (truncated)
+
+File: tests/setup.ts:172 - Mocks module "../src/services/ConversationService.ts"
+vi.mock('../src/services/ConversationService.ts', () => ({
+default: {
+appendMessages: vi.fn().mockResolvedValue(undefined),
+setGenerating: vi.fn().mockResolvedValue(undefined),
+getSessionStats: vi.fn().mockResolvedValue(null),
+},
+}));
+
+File: tests/setup.ts:181 - Mocks module "../src/services/RequestLogger.ts"
+vi.mock('../src/services/RequestLogger.ts', () => ({
+default: {
+log: vi.fn(),
+logChatGeneration: vi.fn().mockResolvedValue(undefined),
+logBackgroundLlmCall: vi.fn().mockResolvedValue(undefined),
+},
+}));
+
+File: tests/setup.ts:232 - Mocks module "../src/providers/index.ts"
+vi.mock('../src/providers/index.ts', () => {
+// Re-import at the top of the factory is not allowed, so we inline
+const mockProviderFull = {
+generateText: (...args) => MOCK_GENERATE_TEXT(...args),
+generateTextStream: (...args) => MOCK_GENERATE_TEXT_STREAM(...args),
+generateSpeech: (...args) => MOCK_GENERATE_SPEECH(...args),
+generateSpeechStream: (...args) => MOCK_GENERATE_SPEECH_STREAM(...args),
+generateImage: (...args) => MOCK_GENERATE_IMAGE(...args),
+captionImage: (...args) => MOCK_CAPTION_IMAGE(...args),
+generateEmbedding: (...args) => MOCK_GENERATE_EMBEDDING(...args),
+};
+
+const mockProviderTextOnly = {
+generateText: (...args) => MOCK_GENERATE_TEXT(...args),
+generateTextStream: (...args) => MOCK_GENERATE_TEXT_STREAM(...args),
+... (truncated)
