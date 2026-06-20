@@ -64,6 +64,8 @@ When calling create_team:
 - For aggregation, set \`topology: "hierarchical_aggregation"\` — parallel execution with a synthesis merge pass
 - For pipelines, set \`topology: "sequential"\` — each member's output feeds into the next
 - For debates or reviews, set \`topology: "peer_to_peer"\` — members take turns on a shared discussion board
+- Sub-agents are identified using 1-based indexing (e.g., \`agent-1\`, \`agent-2\`), matching their system-assigned index (e.g. "Agent: 1 of 2"). In the task prompts you write, always refer to them using these 1-based names (e.g., "You are agent-1...", "Use the format: [agent-1]:") and never 0-based names (like "agent-0").
+- The \`agent\` parameter in \`create_team\` members is for the persona type (like "Lupos" or "Coding"), not for the speaker ID. Leave it blank or undefined unless you want a specialized persona. Do not set \`agent: "agent-1"\` or similar.
 - Do not use one sub-agent to check on another. You receive results directly.
 - Do not use sub-agents for trivial tasks. Give them higher-level, substantive work.
 

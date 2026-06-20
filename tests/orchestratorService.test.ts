@@ -469,4 +469,61 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       getCollectionSpy.mockRestore();
     });
   });
+
+  describe("Peer-to-Peer Router Index Normalization", () => {
+    it("should normalize 0-indexed or mismatched agent names (like agent-0) to 1-based speaker names matching member index", async () => {
+      // Clear mock calls
+      mockRunAgenticLoop.mockClear();
+
+      // Mock runAgenticLoop to return mock output for both turns
+      mockRunAgenticLoop
+        .mockResolvedValueOnce({
+          messages: [{ role: "assistant", content: "Agent 1 output" }],
+        })
+        .mockResolvedValueOnce({
+          messages: [{ role: "assistant", content: "Agent 2 output [DONE]" }],
+        });
+
+      const teamArgs = {
+        name: "peer_to_peer_normalization_team",
+        topology: "peer_to_peer",
+        members: [
+          {
+            description: "First Sub-agent",
+            prompt: "Research Pac-Man gameplay mechanics",
+            agent: "agent-0", // Mismatched 0-indexed name
+          },
+          {
+            description: "Second Sub-agent",
+            prompt: "Research Pac-Man historical feats",
+            agent: "agent-1", // Mismatched 0-indexed name
+          },
+        ],
+      };
+
+      const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
+      expect(results).toHaveLength(2);
+
+      // Verify first agent was run and context is correct
+      expect(mockRunAgenticLoop).toHaveBeenCalledTimes(2);
+
+      const firstAgentCallArgs = mockRunAgenticLoop.mock.calls[0][0];
+      const secondAgentCallArgs = mockRunAgenticLoop.mock.calls[1][0];
+
+      // Retrieve prompts passed to sub-agents
+      const firstAgentUserMsg = firstAgentCallArgs.messages[0].content;
+      const secondAgentUserMsg = secondAgentCallArgs.messages[0].content;
+
+      // The first agent should see its task
+      expect(firstAgentUserMsg).toContain("Research Pac-Man gameplay mechanics");
+
+      // The second agent should see the shared discussion history containing [agent-1] (not [agent-0])
+      // and address the second agent as agent-2 in the task section
+      expect(secondAgentUserMsg).toContain("--- SHARED DISCUSSION BOARD ---");
+      expect(secondAgentUserMsg).toContain("[agent-1]: Agent 1 output");
+      expect(secondAgentUserMsg).toContain("--- YOUR TASK (agent-2) ---");
+      expect(secondAgentUserMsg).toContain("Research Pac-Man historical feats");
+    });
+  });
 });
+
