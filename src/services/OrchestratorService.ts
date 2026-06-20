@@ -384,8 +384,9 @@ export default class OrchestratorService {
       `[Orchestrator] Spawned sub-agent ${agentId}: "${description}" → ${subAgentProvider} (model="${subAgentModel}") in ${worktreePath}${subAgentState.isolated ? " (isolated worktree)" : " (shared workspace)"}`,
     );
 
-    // Mark the parent session as having sub-agents (persistent flag for the UI)
-    if (parentAgentSessionId) {
+    // Mark the parent conversation as having sub-agents (persistent flag for the UI).
+    // Documents are keyed by conversationId — never use agentSessionId for document lookups.
+    if (parentConversationId) {
       try {
         const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
         const { COLLECTIONS: collectionNames } =
@@ -399,18 +400,18 @@ export default class OrchestratorService {
 
         if (parentCollection) {
           const hasSubAgentsResult = await parentCollection.updateOne(
-            { id: parentAgentSessionId, project, username },
+            { id: parentConversationId, project, username },
             { $set: { hasSubAgents: true } },
           );
           if (hasSubAgentsResult.matchedCount === 0) {
             logger.warn(
-              `[Orchestrator] hasSubAgents write matched 0 documents for session ${parentAgentSessionId} (project=${project}, username=${username})`,
+              `[Orchestrator] hasSubAgents write matched 0 documents for conversation ${parentConversationId} (project=${project}, username=${username})`,
             );
           }
         }
       } catch (databaseError: unknown) {
         logger.warn(
-          `[Orchestrator] Failed to set hasSubAgents on parent session ${parentAgentSessionId}: ${getErrorMessage(databaseError)}`,
+          `[Orchestrator] Failed to set hasSubAgents on parent conversation ${parentConversationId}: ${getErrorMessage(databaseError)}`,
         );
       }
     }

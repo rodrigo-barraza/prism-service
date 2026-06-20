@@ -6,6 +6,7 @@ export interface ConversationMeta {
   settings?: ConversationSettings;
   traceId?: string | null;
   parentAgentSessionId?: string | null;
+  parentConversationId?: string | null;
   workspaceRoot?: string | null;
   synthetic?: boolean;
   agent?: string | null;
@@ -77,6 +78,7 @@ export interface TransformedConversation {
   synthetic?: boolean;
   traceId?: string | null;
   parentAgentSessionId?: string | null;
+  parentConversationId?: string | null;
   workspaceRoot?: string | null;
   agent?: string | null;
   createdAt: string;

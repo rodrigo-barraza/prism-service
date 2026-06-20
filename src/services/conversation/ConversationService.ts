@@ -72,6 +72,9 @@ const ConversationService: ConversationServiceInterface = {
       if (conversationMeta.parentAgentSessionId) {
         setFields.parentAgentSessionId = conversationMeta.parentAgentSessionId;
       }
+      if (conversationMeta.parentConversationId) {
+        setFields.parentConversationId = conversationMeta.parentConversationId;
+      }
       if (conversationMeta.workspaceRoot) {
         setFields.workspaceRoot = conversationMeta.workspaceRoot;
       }
@@ -81,6 +84,7 @@ const ConversationService: ConversationServiceInterface = {
     const metaSettings = conversationMeta?.settings || {};
     const metaSysPrompt = conversationMeta?.systemPrompt || "";
     const parentId = conversationMeta?.parentAgentSessionId || null;
+    const parentConversationId = conversationMeta?.parentConversationId || null;
 
     const setOnInsertBase: Record<string, unknown> = {
       title: conversationMeta?.title || DEFAULT_CONVERSATION_TITLE,
@@ -96,6 +100,7 @@ const ConversationService: ConversationServiceInterface = {
       ...(conversationMeta?.synthetic && { synthetic: true }),
       ...(traceId && { traceId }),
       ...(parentId && { parentAgentSessionId: parentId }),
+      ...(parentConversationId && { parentConversationId }),
       ...(conversationMeta?.workspaceRoot && {
         workspaceRoot: conversationMeta.workspaceRoot,
       }),
