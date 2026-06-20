@@ -755,9 +755,11 @@ export default class OrchestratorService {
       TOPOLOGIES.HIERARCHICAL_AGGREGATION,
       TOPOLOGIES.SEQUENTIAL,
       TOPOLOGIES.PEER_TO_PEER,
+      TOPOLOGIES.TOURNAMENT,
+      TOPOLOGIES.CRITIC_LOOP,
     ];
     if (!validTopologies.includes(topology)) {
-      const errorMessage = `Invalid topology: "${topology}". Available topologies are: hierarchical, hierarchical_aggregation, sequential, peer_to_peer.`;
+      const errorMessage = `Invalid topology: "${topology}". Available topologies are: hierarchical, hierarchical_aggregation, sequential, peer_to_peer, tournament, critic_loop.`;
       logger.error(`[Orchestrator] createTeam: ${errorMessage}`);
       return [{ error: errorMessage }];
     }
@@ -857,6 +859,14 @@ export default class OrchestratorService {
       const { HierarchicalAggregationRouter } =
         await import("./orchestrator/routers/HierarchicalAggregationRouter.ts");
       router = new HierarchicalAggregationRouter();
+    } else if (topology === TOPOLOGIES.TOURNAMENT) {
+      const { TournamentRouter } =
+        await import("./orchestrator/routers/TournamentRouter.ts");
+      router = new TournamentRouter();
+    } else if (topology === TOPOLOGIES.CRITIC_LOOP) {
+      const { CriticLoopRouter } =
+        await import("./orchestrator/routers/CriticLoopRouter.ts");
+      router = new CriticLoopRouter();
     } else {
       const { HierarchicalRouter } =
         await import("./orchestrator/routers/HierarchicalRouter.ts");
@@ -1123,6 +1133,14 @@ export default class OrchestratorService {
       [TOPOLOGIES.PEER_TO_PEER]: {
         name: "Peer-to-Peer (Mesh / GoT DAG)",
         description: "Turn-based discussion where agents take turns on a shared thread. Each agent reads all prior contributions before responding.",
+      },
+      [TOPOLOGIES.TOURNAMENT]: {
+        name: "Tournament (Best-of-N)",
+        description: "All sub-agents run in parallel, then a judge evaluates and selects the single best result. Compete to produce the highest quality output.",
+      },
+      [TOPOLOGIES.CRITIC_LOOP]: {
+        name: "Critic Loop (Actor-Critic)",
+        description: "Actor produces output, critic evaluates and provides pass/fail feedback. If failed, actor revises. Iterates until critic approves or max rounds reached.",
       },
     };
 
