@@ -68,7 +68,7 @@ export class PeerToPeerRouter implements TopologyRouter {
     for (let turnIndex = 0; turnIndex < maxTurnsCount; turnIndex++) {
       const memberIndex = turnIndex % members.length;
       const member = members[memberIndex];
-      const speakerName = member.agent || `agent-${memberIndex}`;
+      const speakerName = member.agent || `agent-${memberIndex + 1}`;
 
       logger.info(
         `[PeerToPeerRouter] Turn ${turnIndex + 1}/${maxTurnsCount}: Active Speaker is "${speakerName}" (${member.description})`,
