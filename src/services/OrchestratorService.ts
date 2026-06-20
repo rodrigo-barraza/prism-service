@@ -169,6 +169,7 @@ export default class OrchestratorService {
     assignedModel,
     agentIndex,
     teamSize,
+    round,
     orchestratorContext,
     preserveWorktree,
   }: OrchestratorSpawnParams): Promise<SubAgentResult | { error: string }> {
@@ -377,6 +378,7 @@ export default class OrchestratorService {
       enabledTools: subAgentEnabledTools || null,
       agentIndex,
       teamSize,
+      round,
     };
 
     activeSubAgents.set(agentId, subAgentState);
@@ -867,8 +869,8 @@ export default class OrchestratorService {
       orchestratorContext,
       (assignment: OrchestratorSpawnParams) =>
         OrchestratorService.spawnFromTool(assignment),
-      (agentId: string, prompt: string, context: OrchestratorContext) =>
-        OrchestratorService.continueAgent(agentId, prompt, context),
+      (agentId: string, prompt: string, context: OrchestratorContext, round?: number) =>
+        OrchestratorService.continueAgent(agentId, prompt, context, round),
     );
 
     const agentIds = spawnResults
@@ -984,6 +986,7 @@ export default class OrchestratorService {
     agentId: string,
     prompt: string,
     orchestratorContext: OrchestratorContext,
+    round?: number,
   ): Promise<SubAgentResult | { error: string }> {
     const subAgent = activeSubAgents.get(agentId);
     if (!subAgent) {
@@ -994,6 +997,10 @@ export default class OrchestratorService {
       return {
         error: `Sub-agent "${agentId}" is in "${subAgent.status}" state and cannot be continued`,
       };
+    }
+
+    if (round != null) {
+      subAgent.round = round;
     }
 
     subAgent.status = "running";
@@ -1126,7 +1133,12 @@ export default class OrchestratorService {
 
     const agentPositionLine =
       subAgent.agentIndex != null && subAgent.teamSize != null
-        ? `Agent: ${subAgent.agentIndex + 1} of ${subAgent.teamSize}\n`
+        ? `Agent: ${subAgent.agentIndex} of ${subAgent.teamSize}\n`
+        : "";
+
+    const roundLine =
+      subAgent.round != null
+        ? `Round: ${subAgent.round}\n`
         : "";
 
     const subAgentMessages: ConversationMessage[] = [
@@ -1139,6 +1151,7 @@ export default class OrchestratorService {
           `Sub-agent topology name: ${resolvedTopologyMetadata.name}\n` +
           `Sub-agent topology description: ${resolvedTopologyMetadata.description}\n` +
           agentPositionLine +
+          roundLine +
           `\n` +
           workspaceIntroLine +
           (subAgent.files?.length

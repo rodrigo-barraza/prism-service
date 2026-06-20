@@ -18,6 +18,7 @@ export type ContinueSubAgentCallback = (
   agentId: string,
   prompt: string,
   orchestratorContext: OrchestratorContext,
+  round?: number,
 ) => Promise<SubAgentResult | { error: string }>;
 
 export interface TopologyRouter {

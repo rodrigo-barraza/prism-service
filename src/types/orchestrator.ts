@@ -50,6 +50,7 @@ export interface SubAgentState {
   reservationReleased?: boolean;
   agentIndex?: number;
   teamSize?: number;
+  round?: number;
 }
 
 export interface WorktreeDiff {
@@ -107,6 +108,7 @@ export interface OrchestratorSpawnParams {
   assignedModel?: string;
   agentIndex?: number;
   teamSize?: number;
+  round?: number;
   orchestratorContext: OrchestratorContext;
   /** When true, the worktree is kept alive after the agent completes (for stateful session reuse). */
   preserveWorktree?: boolean;

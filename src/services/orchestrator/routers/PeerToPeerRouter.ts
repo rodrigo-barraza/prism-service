@@ -95,15 +95,18 @@ export class PeerToPeerRouter implements TopologyRouter {
       }
       const isFirstTurnForMember = !agentIdsByMemberIndex.has(memberIndex);
 
+      const currentRound = Math.floor(turnIndex / members.length) + 1;
+
       logger.info(
-        `[PeerToPeerRouter] Turn ${turnIndex + 1}/${maxTurnsCount}: Active Speaker is "${speakerName}" (${member.description})${isFirstTurnForMember ? " [initial spawn]" : " [session continuation]"}`,
+        `[PeerToPeerRouter] Turn ${turnIndex + 1}/${maxTurnsCount} (Round ${currentRound}): Active Speaker is "${speakerName}" (${member.description})${isFirstTurnForMember ? " [initial spawn]" : " [session continuation]"}`,
       );
 
-      // Compile shared conversation thread history
+      // Compile shared conversation thread history with explicit speaker identity
+      const speakerIdentityLine = `Your speaker identity in this discussion is ${speakerName}. Tag all your contributions with [${speakerName}].`;
       const promptHistory =
         sharedDiscussion.length > 0
-          ? `--- SHARED DISCUSSION BOARD ---\n${sharedDiscussion.join("\n\n")}\n\n--- YOUR TASK (${speakerName}) ---\n${member.prompt}`
-          : member.prompt;
+          ? `--- SHARED DISCUSSION BOARD ---\n${sharedDiscussion.join("\n\n")}\n\n--- YOUR TASK (${speakerName}) ---\n${speakerIdentityLine}\n\n${member.prompt}`
+          : `${speakerIdentityLine}\n\n${member.prompt}`;
 
       let spawnResult: SubAgentResult | { error: string };
 
@@ -128,8 +131,9 @@ export class PeerToPeerRouter implements TopologyRouter {
           agent: member.agent,
           assignedProvider,
           assignedModel,
-          agentIndex: memberIndex,
+          agentIndex: memberIndex + 1,
           teamSize: members.length,
+          round: currentRound,
           orchestratorContext,
           preserveWorktree: true,
         };
@@ -155,6 +159,7 @@ export class PeerToPeerRouter implements TopologyRouter {
             existingAgentId,
             promptHistory,
             orchestratorContext,
+            currentRound,
           );
         }
       }
