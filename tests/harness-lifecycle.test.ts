@@ -6,6 +6,10 @@
  */
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 // ─── PostExecutionEmitter ─────────────────────────────────────
 import {
@@ -65,8 +69,8 @@ describe("PostExecutionEmitter", () => {
       emitPostExecutionStatus(executedToolCalls, mockEmit);
 
       expect(mockEmit).toHaveBeenCalledWith({
-        type: "status",
-        message: "tasks_updated",
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.TASKS_UPDATED,
       });
     });
 
@@ -76,8 +80,8 @@ describe("PostExecutionEmitter", () => {
       emitPostExecutionStatus(executedToolCalls, mockEmit);
 
       expect(mockEmit).toHaveBeenCalledWith({
-        type: "status",
-        message: "sub_agents_updated",
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
       });
     });
 
@@ -87,8 +91,8 @@ describe("PostExecutionEmitter", () => {
       emitPostExecutionStatus(executedToolCalls, mockEmit);
 
       expect(mockEmit).toHaveBeenCalledWith({
-        type: "status",
-        message: "sub_agents_updated",
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
       });
     });
 
@@ -100,8 +104,8 @@ describe("PostExecutionEmitter", () => {
       emitPostExecutionStatus(executedToolCalls, mockEmit);
 
       expect(mockEmit).toHaveBeenCalledWith({
-        type: "status",
-        message: "memories_updated",
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.MEMORIES_UPDATED,
       });
     });
 
@@ -126,12 +130,12 @@ describe("PostExecutionEmitter", () => {
 
       expect(mockEmit).toHaveBeenCalledTimes(2);
       expect(mockEmit).toHaveBeenCalledWith({
-        type: "status",
-        message: "tasks_updated",
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.TASKS_UPDATED,
       });
       expect(mockEmit).toHaveBeenCalledWith({
-        type: "status",
-        message: "memories_updated",
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.MEMORIES_UPDATED,
       });
     });
   });

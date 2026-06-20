@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { app } from './setup.ts';
 import request from 'supertest';
 import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
-import { COLLECTIONS } from '../src/constants.ts';
+import { COLLECTIONS, PROVIDERS } from '../src/constants.ts';
 import { errorHandler } from '../src/utils/errors.ts';
 import EmbeddingService from '../src/services/EmbeddingService.ts';
 
@@ -100,7 +100,7 @@ describe('Media and Synthesis Routes Integration Tests', () => {
             role: 'assistant',
             timestamp: new Date().toISOString(),
             model: 'google/gemini-2.0-flash',
-            provider: 'google',
+            provider: PROVIDERS.GOOGLE,
             total: 1
           }
         ]),
@@ -117,7 +117,7 @@ describe('Media and Synthesis Routes Integration Tests', () => {
     vi.spyOn(EmbeddingService, 'generate').mockResolvedValue({
       embedding: [0.1, 0.2, 0.3],
       dimensions: 3,
-      provider: 'google',
+      provider: PROVIDERS.GOOGLE,
       model: 'gemini-embedding-2-preview'
     });
   });
@@ -214,7 +214,7 @@ describe('Media and Synthesis Routes Integration Tests', () => {
       const response = await request(app)
         .post('/embed')
         .send({
-          provider: 'google',
+          provider: PROVIDERS.GOOGLE,
           text: 'hello world',
           dimensions: 128
         })
@@ -228,7 +228,7 @@ describe('Media and Synthesis Routes Integration Tests', () => {
       const response = await request(app)
         .post('/embed')
         .send({
-          provider: 'google',
+          provider: PROVIDERS.GOOGLE,
           images: ['data:image/jpeg;base64,123']
         })
         .expect(200);

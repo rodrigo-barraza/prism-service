@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PROVIDERS } from "../src/constants.ts";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import MemoryExtractor from "../src/services/MemoryExtractor.ts";
 import MemoryService from "../src/services/MemoryService.ts";
 import SettingsService from "../src/services/SettingsService.ts";
@@ -14,12 +18,15 @@ vi.mock("../src/providers/index.ts", () => ({
   providers: {},
 }));
 
-vi.mock("../src/services/MemoryService.ts", () => ({
-  default: {
-    store: vi.fn().mockResolvedValue({ id: "mem-uuid-1" }),
-  },
-  CODING_MEMORY_TYPES: ["user", "feedback", "project", "reference"]
-}));
+vi.mock("../src/services/MemoryService.ts", async (importOriginal) => {
+  const actualModule = await importOriginal<typeof import("../src/services/MemoryService.ts")>();
+  return {
+    default: {
+      store: vi.fn().mockResolvedValue({ id: "mem-uuid-1" }),
+    },
+    CODING_MEMORY_TYPES: actualModule.CODING_MEMORY_TYPES,
+  };
+});
 
 vi.mock("../src/services/SettingsService.ts", () => ({
   default: {
@@ -145,7 +152,7 @@ describe("MemoryExtractor", () => {
     // Expecting 2 SSE calls: 1 for extraction usage, 1 for embedding usage
     expect(emitSpy).toHaveBeenCalledTimes(2);
     (expect(emitSpy) as any).toHaveBeenNestedObject({
-      type: "usage_update"
+      type: SERVER_SENT_EVENT_TYPES.USAGE_UPDATE
     });
   });
 
@@ -239,8 +246,8 @@ describe("MemoryExtractor", () => {
     });
 
     expect(emitSpy).toHaveBeenCalledWith(expect.objectContaining({
-      type: "status",
-      message: "memories_updated"
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: STATUS_MESSAGES.MEMORIES_UPDATED
     }));
 
     expect(MemoryConsolidationService.checkAndRun).toHaveBeenCalled();

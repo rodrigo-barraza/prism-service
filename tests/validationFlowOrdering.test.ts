@@ -18,6 +18,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PROVIDERS } from "../src/constants.ts";
+import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 vi.mock("../src/utils/logger.ts", () => ({
   default: {
@@ -226,7 +227,7 @@ describe("Validation Flow Ordering", () => {
 
       expect(planModeState.planModeActive).toBe(true);
       expect(emitSpy).toHaveBeenCalledWith({
-        type: "status",
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: "plan_mode_entered",
       });
     });

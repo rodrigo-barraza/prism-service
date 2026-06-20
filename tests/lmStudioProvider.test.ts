@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { PROVIDERS } from "../src/constants.ts";
+import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { createLmStudioProvider } from "../src/providers/lm-studio.ts";
 
 /**
@@ -189,7 +190,7 @@ async function consumeStream(
     chunks.push(chunk);
     if (typeof chunk === "object" && chunk !== null) {
       const record = chunk as Record<string, unknown>;
-      if (record.type === "status" && typeof record.message === "string") {
+      if (record.type === SERVER_SENT_EVENT_TYPES.STATUS && typeof record.message === "string") {
         statusMessages.push(record.message);
       }
     }
