@@ -66,11 +66,11 @@ describe("Telemetry Context Propagation — Integration Tests", () => {
       .set("Authorization", "Bearer test-secret")
       .set("x-project", "my-project")
       .set("x-username", "test-user")
-      .set("x-agent", "weather-agent")
+      .set("x-agent", "OMNI")
       .send({
         provider: PROVIDERS.GOOGLE,
         model: "gemini-3.5-flash",
-        agent: "weather-agent",
+        agent: "OMNI",
         functionCallingEnabled: true,
         messages: [{ role: "user", content: "What is the weather?" }],
       })
@@ -81,7 +81,7 @@ describe("Telemetry Context Propagation — Integration Tests", () => {
     expect(lastCallContext).toBeDefined();
     expect(lastCallContext.project).toBe("my-project");
     expect(lastCallContext.username).toBe("test-user");
-    expect(lastCallContext.agent).toBe("weather-agent");
+    expect(lastCallContext.agent).toBe("OMNI");
     expect(lastCallContext.requestId).toBeDefined();
     expect(lastCallContext.conversationId).toBeDefined();
     expect(lastCallContext.iteration).toBe(1);
