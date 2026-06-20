@@ -9,6 +9,7 @@
  * chunks to SSE events. Bugs here break the entire streaming pipeline.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 vi.mock("../src/services/FileService.ts", () => ({
   default: {
@@ -300,13 +301,13 @@ describe("dispatchChunk", () => {
     const context = createTestContext();
 
     await dispatchChunk(
-      { type: "status", message: "Generating response...", phase: "generation" },
+      { type: SERVER_SENT_EVENT_TYPES.STATUS, message: "Generating response...", phase: "generation" },
       state,
       context,
     );
 
     expect(context.emittedEvents).toHaveLength(1);
-    expect(context.emittedEvents[0].type).toBe("status");
+    expect(context.emittedEvents[0].type).toBe(SERVER_SENT_EVENT_TYPES.STATUS);
     expect(context.emittedEvents[0].message).toBe("Generating response...");
   });
 
@@ -364,7 +365,7 @@ describe("dispatchChunk", () => {
 
     await dispatchChunk(
       {
-        type: "audio",
+        type: SERVER_SENT_EVENT_TYPES.AUDIO,
         data: "base64audiodata",
         mimeType: "audio/pcm;rate=24000",
       },

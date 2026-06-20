@@ -10,6 +10,7 @@
  *   6. End-to-end recovery flow in ReActHarness
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import {
   isOutputTruncated,
@@ -201,7 +202,7 @@ describe("OutputTruncationRecovery", () => {
 
       expect(mockContext.emit).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "status",
+          type: SERVER_SENT_EVENT_TYPES.STATUS,
           message: "output_truncation_recovery",
           attempt: 2,
           maxAttempts: MAX_OUTPUT_TRUNCATION_RECOVERIES,

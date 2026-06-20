@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import FileService from "../src/services/FileService.ts";
 import MinioWrapper from "../src/wrappers/MinioWrapper.ts";
+import { FILE_CATEGORIES } from "../src/constants.ts";
 
 vi.mock("../src/wrappers/MinioWrapper.ts", () => ({
   default: {
@@ -77,7 +78,7 @@ describe("FileService", () => {
         const dataUrl = `data:${testCase.mimeType};base64,${testCase.base64}`;
         const uploadResult = await FileService.uploadFile(
           dataUrl,
-          "uploads",
+          FILE_CATEGORIES.UPLOADS,
           "test-project",
           "test-user"
         );

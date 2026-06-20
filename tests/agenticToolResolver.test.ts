@@ -9,7 +9,7 @@
 // ────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, TYPES } from "../src/constants.ts";
 
 // ── Mock dependencies ────────────────────────────────────────
 
@@ -130,12 +130,12 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
 
 vi.mock("../../config.ts", () => ({
   MONGO_DB_NAME: "prism-test",
-  TYPES: { IMAGE: "image" },
+  TYPES,
 }));
 
 vi.mock("../config.ts", () => ({
   MONGO_DB_NAME: "prism-test",
-  TYPES: { IMAGE: "image" },
+  TYPES,
 }));
 
 // Mock AgentPersonaRegistry

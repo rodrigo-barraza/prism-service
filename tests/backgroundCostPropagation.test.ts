@@ -16,10 +16,12 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { PROVIDERS, TYPES } from "../src/constants.ts";
+import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-const { CODING_MEMORY_TYPES } = vi.hoisted(() => ({
-  CODING_MEMORY_TYPES: ["user", "feedback", "project", "reference"] as const,
-}));
+const { CODING_MEMORY_TYPES } = await vi.hoisted(async () => {
+  const { CODING_MEMORY_TYPES } = await import("../src/services/MemoryService.ts");
+  return { CODING_MEMORY_TYPES };
+});
 
 // ── Mock config.js ──────────────────────────────────────────────
 const MOCK_TEXT_PRICING = {
@@ -184,7 +186,7 @@ describe("Background Cost Propagation", () => {
 
       // Find the memory:extract usage_update event
       const extractEvent = emittedEvents.find(
-        (e) => e.type === "usage_update" && e.operation === "memory:extract",
+        (e) => e.type === SERVER_SENT_EVENT_TYPES.USAGE_UPDATE && e.operation === "memory:extract",
       );
 
       expect(extractEvent).toBeDefined();
@@ -226,7 +228,7 @@ describe("Background Cost Propagation", () => {
 
       // Find the embed:memory usage_update event
       const embedEvent = emittedEvents.find(
-        (e) => e.type === "usage_update" && e.operation === "embed:memory",
+        (e) => e.type === SERVER_SENT_EVENT_TYPES.USAGE_UPDATE && e.operation === "embed:memory",
       );
 
       expect(embedEvent).toBeDefined();
@@ -259,14 +261,14 @@ describe("Background Cost Propagation", () => {
 
       // memory:extract should still emit (the LLM call happened)
       const extractEvent = emittedEvents.find(
-        (e) => e.type === "usage_update" && e.operation === "memory:extract",
+        (e) => e.type === SERVER_SENT_EVENT_TYPES.USAGE_UPDATE && e.operation === "memory:extract",
       );
       expect(extractEvent).toBeDefined();
       expect(extractEvent.usage.estimatedCost).toBeGreaterThan(0);
 
       // But embed:memory should NOT emit (no memories to embed)
       const embedEvent = emittedEvents.find(
-        (e) => e.type === "usage_update" && e.operation === "embed:memory",
+        (e) => e.type === SERVER_SENT_EVENT_TYPES.USAGE_UPDATE && e.operation === "embed:memory",
       );
       expect(embedEvent).toBeUndefined();
     });
@@ -320,7 +322,7 @@ describe("Background Cost Propagation", () => {
       });
 
       const extractEvent = emittedEvents.find(
-        (e) => e.type === "usage_update" && e.operation === "memory:extract",
+        (e) => e.type === SERVER_SENT_EVENT_TYPES.USAGE_UPDATE && e.operation === "memory:extract",
       );
       expect(extractEvent).toBeDefined();
       // estimatedCost should be null when pricing is unavailable

@@ -13,7 +13,13 @@ vi.mock("../src/services/MemoryService.ts", () => ({
   default: {
     search: vi.fn(),
     formatForPrompt: vi.fn().mockImplementation((memories) =>
-      memories.map((memory: any) => `[Memory] ${memory.content}`).join("\n")
+      memories
+        .map((memory: any) => {
+          const badge = `[${memory.type || "other"}]`;
+          const title = memory.title || (memory.content ? memory.content.substring(0, 60) : "untitled");
+          return `- ${badge} **${title}**: ${memory.content}`;
+        })
+        .join("\n")
     ),
   },
 }));
@@ -109,7 +115,7 @@ describe("SkillMemoryScorer", () => {
   describe("fetchMemories", () => {
     it("should search and format relevant memories correctly", async () => {
       const mockMemories = [
-        { content: "User likes to deploy to staging using task runners." }
+        { type: "user", title: "Deployment preference", content: "User likes to deploy to staging using task runners." }
       ];
       vi.mocked(MemoryService.search).mockResolvedValueOnce(mockMemories as any);
 
@@ -121,7 +127,7 @@ describe("SkillMemoryScorer", () => {
         project: "test-project",
         queryText: "staging deploy",
       }));
-      expect(result).toBe("[Memory] User likes to deploy to staging using task runners.");
+      expect(result).toBe("- [user] **Deployment preference**: User likes to deploy to staging using task runners.");
     });
 
     it("should return empty string if search returns no results", async () => {
