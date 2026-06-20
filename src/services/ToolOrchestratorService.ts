@@ -495,7 +495,7 @@ function getOrchestratorToolSchemas(
   defaultTopology: string = DEFAULT_TOPOLOGY,
 ) {
   const normalizedTopology =
-    defaultTopology === TOPOLOGIES.PEER_TO_PEER || defaultTopology === "p2p"
+    defaultTopology === TOPOLOGIES.PEER_TO_PEER
       ? TOPOLOGIES.PEER_TO_PEER
       : defaultTopology === TOPOLOGIES.SEQUENTIAL
         ? TOPOLOGIES.SEQUENTIAL
