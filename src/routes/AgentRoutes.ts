@@ -1,6 +1,7 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import AgenticLoopService from "../services/AgenticLoopService.ts";
+import AgentSessionRegistry from "../services/AgentSessionRegistry.ts";
 import LiveFrameService from "../services/LiveFrameService.ts";
 import { handleAgent } from "./ChatRoutes.ts";
 import logger from "../utils/logger.ts";
@@ -139,6 +140,44 @@ router.post(
   }),
 );
 
+// ─── explicit session stop ──────────────────────────────────
+
+/**
+ * POST /agent/stop
+ *
+ * Body:
+ *   { conversationId: string }
+ *
+ * Explicitly stops a running agentic session. Used by the client when the
+ * user presses Stop — decoupled from SSE connection lifecycle so mobile
+ * browser disconnections don't abort background processing.
+ */
+router.post(
+  "/stop",
+  asyncHandler(async (req: Request, res: Response) => {
+    const { conversationId } = req.body;
+
+    if (!conversationId) {
+      return res.status(400).json({ error: "Missing conversationId" });
+    }
+
+    const stopped = AgentSessionRegistry.stop(conversationId);
+
+    if (!stopped) {
+      return res.status(404).json({
+        error: "No active session for this conversation",
+        conversationId,
+      });
+    }
+
+    logger.info(
+      `[agent/stop] Explicitly stopped session for conversation ${conversationId}`,
+    );
+
+    res.json({ ok: true, stopped: true });
+  }),
+);
+
 // ─── SSE streaming or JSON fallback ─────────────────────────
 
 /**
@@ -174,7 +213,9 @@ router.post(
     };
 
     if (req.query.stream !== "false") {
-      await handleSseRequest(req, res, params, handleAgent);
+      await handleSseRequest(req, res, params, handleAgent, {
+        persistOnDisconnect: true,
+      });
     } else {
       await handleJsonRequest(req, res, next, params, handleAgent);
     }
