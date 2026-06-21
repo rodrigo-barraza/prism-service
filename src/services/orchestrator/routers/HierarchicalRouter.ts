@@ -11,6 +11,19 @@ import {
 } from "../InstanceResolver.ts";
 import logger from "../../../utils/logger.ts";
 
+/**
+ * Hierarchical Router — Hierarchical Parallel (HP)
+ *
+ * Paper: "Tree of Thoughts: Deliberate Problem Solving
+ * with Large Language Models" (arxiv.org/abs/2305.10601)
+ *
+ * Captures ToT's parallel branching concept (multiple agents
+ * explore simultaneously), but without evaluation, scoring,
+ * backtracking, or structured search. A single-depth fan-out.
+ *
+ * See TopologyRegistry.ts → TOPOLOGY_DEFINITIONS (id: "hierarchical")
+ * for full paper-alignment metadata and config option documentation.
+ */
 export class HierarchicalRouter implements TopologyRouter {
   async execute(
     teamName: string,
