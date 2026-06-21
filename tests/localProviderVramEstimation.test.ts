@@ -19,8 +19,9 @@ vi.mock('../src/providers/index.ts', () => ({
   getProvider: vi.fn().mockReturnValue(null),
 }));
 
-import { estimateVRAM } from '../src/services/local-provider/vramEstimation.ts';
+import { estimateVRAM, estimateVRAMForModel } from '../src/services/local-provider/vramEstimation.ts';
 import { resolveArchParams, estimateMemory } from '../src/utils/gguf-arch.ts';
+import { getProvider } from '../src/providers/index.ts';
 import type { LmStudioRawModel } from '../src/services/local-provider/types.ts';
 
 describe('estimateVRAM', () => {
@@ -172,5 +173,72 @@ describe('estimateVRAM', () => {
         vision: true,
       }),
     );
+  });
+});
+
+describe('estimateVRAMForModel', () => {
+  it('returns null if provider does not exist', async () => {
+    vi.mocked(getProvider).mockReturnValue(null as any);
+    const result = await estimateVRAMForModel('invalid-instance', 'model-key');
+    expect(result).toBeNull();
+  });
+
+  it('returns null if provider does not have listModels method', async () => {
+    vi.mocked(getProvider).mockReturnValue({} as any);
+    const result = await estimateVRAMForModel('instance-1', 'model-key');
+    expect(result).toBeNull();
+  });
+
+  it('returns null if model is not found in the list of models', async () => {
+    const mockProvider = {
+      listModels: vi.fn().mockResolvedValue({
+        data: [
+          { id: 'model-a' },
+          { path: 'model-b' },
+          { key: 'model-c' }
+        ]
+      })
+    };
+    vi.mocked(getProvider).mockReturnValue(mockProvider as any);
+
+    const result = await estimateVRAMForModel('instance-1', 'model-unknown');
+    expect(result).toBeNull();
+  });
+
+  it('returns VRAM estimation if model is matched by id', async () => {
+    const mockModel = {
+      id: 'target-model',
+      size_bytes: 4_000_000_000,
+      architecture: 'llama',
+      quantization: { bits_per_weight: 4 }
+    };
+    const mockProvider = {
+      listModels: vi.fn().mockResolvedValue({
+        data: [mockModel]
+      })
+    };
+    vi.mocked(getProvider).mockReturnValue(mockProvider as any);
+
+    const result = await estimateVRAMForModel('instance-1', 'target-model');
+    expect(result).not.toBeNull();
+    expect(result!.totalLayers).toBe(32);
+  });
+
+  it('returns VRAM estimation matching either path or key', async () => {
+    const mockModelByPath = {
+      path: 'target-path',
+      size_bytes: 4_000_000_000,
+      architecture: 'llama',
+      quantization: { bits_per_weight: 4 }
+    };
+    const mockProvider = {
+      listModels: vi.fn().mockResolvedValue({
+        models: [mockModelByPath] // Testing models field fallback
+      })
+    };
+    vi.mocked(getProvider).mockReturnValue(mockProvider as any);
+
+    const result = await estimateVRAMForModel('instance-1', 'target-path');
+    expect(result).not.toBeNull();
   });
 });
