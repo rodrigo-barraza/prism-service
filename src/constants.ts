@@ -144,6 +144,19 @@ export const FILE_CATEGORIES = {
   PROJECTS: "projects",
 } as const;
 
+// ─── Harness & Thought Structure Identifiers ───────────────
+
+export const HARNESS_IDS = {
+  STANDARD: "standard",
+  TREE_OF_THOUGHT: "tree_of_thought",
+} as const;
+
+export const THOUGHT_STRUCTURES = {
+  CHAIN_OF_THOUGHT: "chain_of_thought",
+  TREE_OF_THOUGHTS: "tree_of_thoughts",
+  GRAPH_OF_THOUGHTS: "graph_of_thoughts",
+} as const;
+
 // ─── Prompt Construction Delimiters ──────────────────────────
 
 export const PROMPT_DELIMITERS = {
