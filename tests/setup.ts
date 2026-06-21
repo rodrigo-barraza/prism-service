@@ -8,6 +8,7 @@ import { vi } from 'vitest';
 vi.mock('../config.ts', () => ({
     PRISM_SERVICE_PORT: 0,
     OPENAI_API_KEY: 'fake',
+    OPENAI_TRANSCRIPTION_MODEL: 'whisper-1',
     ANTHROPIC_API_KEY: 'fake',
     GOOGLE_API_KEY: 'fake',
     ELEVENLABS_API_KEY: 'fake',
