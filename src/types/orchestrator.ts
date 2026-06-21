@@ -102,6 +102,8 @@ export interface SubAgentChildSummary {
   durationMs: number;
   toolUses: number;
   cost: number;
+  result?: string | null;
+  error?: string | null;
   subtreeMetrics?: SubtreeMetrics;
 }
 
