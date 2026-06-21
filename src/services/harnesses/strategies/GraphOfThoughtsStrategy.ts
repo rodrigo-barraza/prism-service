@@ -546,7 +546,8 @@ export async function runGraphOfThoughts(
       }
 
       // ── No tools — final text response ──────────────────────
-      if (synthesizedPass.streamedText || synthesizedPass.streamedThinking.trim()) {
+      // Text present → clean text break. Thinking-only → continuation.
+      if (synthesizedPass.streamedText) {
         const codexResult = handleCodexPlanningResponse(
           synthesizedPass,
           currentMessages,
@@ -563,6 +564,35 @@ export async function runGraphOfThoughts(
         harness.logIteration(synthesizedPass, currentMessages);
         hasCleanTextBreak = true;
         break;
+      }
+
+      if (!synthesizedPass.streamedText && synthesizedPass.streamedThinking.trim()) {
+        logger.warn(
+          `[GraphOfThoughts] Thinking-only response on iteration ${state.iterations} — ` +
+            `thinking=${synthesizedPass.streamedThinking.length}chars, text=0. ` +
+            `Injecting continuation prompt.`,
+        );
+
+        currentMessages.push({
+          role: "assistant",
+          content: "",
+          thinking: synthesizedPass.streamedThinking.trim(),
+          ...(synthesizedPass.thinkingSignature && {
+            thinkingSignature: synthesizedPass.thinkingSignature,
+          }),
+        });
+
+        currentMessages.push({
+          role: "user",
+          content:
+            "[System: Your previous response contained only internal reasoning " +
+            "without producing any visible output. Your thinking has been preserved. " +
+            "Now respond concisely with your actual answer, analysis, or tool calls. " +
+            "Do not repeat your reasoning — act on it.]",
+        });
+
+        harness.logIteration(synthesizedPass, currentMessages);
+        continue;
       }
 
       // ── Empty output — check for truncation recovery ─────────
