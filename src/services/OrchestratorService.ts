@@ -1202,12 +1202,17 @@ export default class OrchestratorService {
     // ── Recursive spawning: depth tracking ──────────────────────────
     // Paper alignment: THREAD (arXiv:2405.17402), RAH (2026), Anthropic production architecture.
     // Computed early because both the system prompt and the tool-stripping logic need these values.
-    const currentRecursionDepth = orchestratorContext.recursionDepth ?? 0;
+    // `orchestratorContext.recursionDepth` is the PARENT's depth. The child
+    // being prepared here runs at `childRecursionDepth = parentDepth + 1`.
+    // The gating check must use the child's depth to prevent an off-by-one
+    // that would allow one extra level of delegation beyond maxRecursionDepth.
+    const parentRecursionDepth = orchestratorContext.recursionDepth ?? 0;
+    const childRecursionDepth = parentRecursionDepth + 1;
     const maxRecursionDepth = Math.min(
       MAXIMUM_RECURSIVE_SPAWNING_DEPTH,
       orchestratorContext.maxRecursionDepth ?? DEFAULT_RECURSIVE_SPAWNING_DEPTH,
     );
-    const canSpawnRecursively = currentRecursionDepth < maxRecursionDepth;
+    const canSpawnRecursively = childRecursionDepth < maxRecursionDepth;
 
     const activeTopology = orchestratorContext.topology || DEFAULT_TOPOLOGY;
 
@@ -1264,14 +1269,14 @@ export default class OrchestratorService {
     // Recursion awareness: tell the sub-agent its spawning capabilities and depth context
     // Paper alignment: RAH (2026) Coordinator vs Worker role assignment,
     // THREAD (arXiv:2405.17402) hierarchical depth communication
-    const remainingDepth = maxRecursionDepth - (currentRecursionDepth + 1);
+    const remainingDepth = maxRecursionDepth - childRecursionDepth;
     let recursionBlock: string;
 
     if (canSpawnRecursively) {
       recursionBlock =
         `\n## Recursive Delegation\n` +
         `You are a **Coordinator** sub-agent with recursive spawning capabilities.\n` +
-        `- Current depth: ${currentRecursionDepth + 1} of ${maxRecursionDepth} (${remainingDepth} level${remainingDepth !== 1 ? "s" : ""} remaining)\n` +
+        `- Current depth: ${childRecursionDepth} of ${maxRecursionDepth} (${remainingDepth} level${remainingDepth !== 1 ? "s" : ""} remaining)\n` +
         `- You have access to \`create_team\` and can spawn your own sub-teams\n` +
         `- Your sub-agents ${remainingDepth > 1 ? "will also be Coordinators who can further delegate" : "will be Workers who cannot delegate further (final depth level)"}\n` +
         `\n` +
@@ -1281,7 +1286,7 @@ export default class OrchestratorService {
     } else if (maxRecursionDepth > 0) {
       recursionBlock =
         `\n## Delegation Status\n` +
-        `You are a **Worker** sub-agent at maximum recursion depth (${currentRecursionDepth + 1}/${maxRecursionDepth}).\n` +
+        `You are a **Worker** sub-agent at maximum recursion depth (${childRecursionDepth}/${maxRecursionDepth}).\n` +
         `- You do NOT have access to \`create_team\` — you cannot spawn sub-agents\n` +
         `- Complete your assigned task directly using your available tools\n` +
         `- Write a clear, complete summary of your work as your final output\n\n`;
@@ -1325,7 +1330,7 @@ export default class OrchestratorService {
       subAgentDescription: subAgent.description,
       parentEmit,
       parentConversationId: orchestratorContext.agentConversationId,
-      recursionDepth: currentRecursionDepth + 1,
+      recursionDepth: childRecursionDepth,
     });
     const subAgentEmit = telemetry.createEmitFunction();
 
@@ -1333,11 +1338,11 @@ export default class OrchestratorService {
     // When recursion depth < max, sub-agents KEEP orchestrator tools (create_team, etc.)
     // and can spawn their own sub-teams. When depth = max, they become Worker agents
     // with orchestrator tools stripped — the existing default behavior.
-    // (currentRecursionDepth, maxRecursionDepth, canSpawnRecursively computed earlier)
+    // (childRecursionDepth, maxRecursionDepth, canSpawnRecursively computed earlier)
 
     if (canSpawnRecursively) {
       logger.info(
-        `[Orchestrator] Recursive spawning enabled for sub-agent ${subAgent.agentId} at depth ${currentRecursionDepth + 1}/${maxRecursionDepth} — orchestrator tools retained`,
+        `[Orchestrator] Recursive spawning enabled for sub-agent ${subAgent.agentId} at depth ${childRecursionDepth}/${maxRecursionDepth} — orchestrator tools retained`,
       );
     }
 
@@ -1412,7 +1417,7 @@ export default class OrchestratorService {
         // Recursive spawning: propagate incremented depth so child create_team
         // calls know they're one level deeper. The ToolExecutor forwards these
         // to ToolOrchestratorService.executeOrchestratorTool → OrchestratorContext.
-        _recursionDepth: currentRecursionDepth + 1,
+        _recursionDepth: childRecursionDepth,
         _maxRecursionDepth: maxRecursionDepth,
       });
     } catch (error: unknown) {
