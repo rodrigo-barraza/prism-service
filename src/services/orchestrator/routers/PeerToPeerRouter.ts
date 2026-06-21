@@ -122,6 +122,14 @@ function isStallResponse(
  * Agent identifiers use 0-based indexing (agent-0, agent-1, ...) to align
  * with LLM-natural naming conventions — LLMs default to 0-based from their
  * code-heavy training data, eliminating identity conflicts.
+ *
+ * Paper alignment:
+ * - Multiple agents       → ✅ Multiple agents with configurable models/prompts
+ * - Multi-round debate    → ✅ Turn-based mesh with shared discussion thread
+ * - Convergence           → ✅ Stall detection terminates early when agents stop contributing
+ * - Symmetric design      → ✅ All agents are equal participants in the mesh
+ * - Stateless agents      → ✅ Extended: stateful session reuse via continueSubAgent
+ * - Worktree merging      → ✅ Extended: agents can edit files and see each other's edits
  */
 export class PeerToPeerRouter implements TopologyRouter {
   async execute(

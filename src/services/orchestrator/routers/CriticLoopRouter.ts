@@ -287,6 +287,14 @@ function detectDegenerationOfThought(
  * Members mapping:
  * - Council mode: members[0] = Actor, members[1+] = Critics
  * - Jury mode: members[0..actorCount-1] = Actors, members[actorCount+] = Critics (or auto-judge)
+ *
+ * Paper alignment:
+ * - Generate (initial output)  → ✅ Actor agent produces initial output
+ * - Feedback (critic)          → ✅ Extended: separate critic agent(s), not same-LLM self-critique
+ * - Refine (incorporate)       → ✅ Actor continues with aggregated critic feedback
+ * - Iterative loop             → ✅ Loops until unanimous PASS or maxRounds
+ * - Single-LLM (paper)        → ✅ Extended to multi-agent: separate actor + critic roles/models
+ * - Council / Jury modes       → ✅ Original extensions beyond paper scope
  */
 export class CriticLoopRouter implements TopologyRouter {
   async execute(
