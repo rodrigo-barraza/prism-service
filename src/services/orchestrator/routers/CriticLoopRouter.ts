@@ -361,6 +361,7 @@ export class CriticLoopRouter implements TopologyRouter {
       agentIndex: 0,
       teamSize: totalTeamSize,
       round: 1,
+      totalRounds: maximumRounds,
       orchestratorContext,
       preserveWorktree: true,
     };
@@ -429,6 +430,7 @@ export class CriticLoopRouter implements TopologyRouter {
             agentIndex: 1 + criticMemberIndex,
             teamSize: totalTeamSize,
             round: roundNumber,
+            totalRounds: maximumRounds,
             orchestratorContext,
           };
 
@@ -618,6 +620,7 @@ export class CriticLoopRouter implements TopologyRouter {
           agentIndex: actorIndex,
           teamSize: actualActorCount,
           round: 1,
+          totalRounds: maximumRounds,
           orchestratorContext,
           preserveWorktree: true,
         };

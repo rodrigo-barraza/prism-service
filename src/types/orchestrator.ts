@@ -51,6 +51,7 @@ export interface SubAgentState {
   agentIndex?: number;
   teamSize?: number;
   round?: number;
+  totalRounds?: number;
 }
 
 export interface WorktreeDiff {
@@ -109,6 +110,7 @@ export interface OrchestratorSpawnParams {
   agentIndex?: number;
   teamSize?: number;
   round?: number;
+  totalRounds?: number;
   orchestratorContext: OrchestratorContext;
   /** When true, the worktree is kept alive after the agent completes (for stateful session reuse). */
   preserveWorktree?: boolean;

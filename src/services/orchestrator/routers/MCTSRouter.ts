@@ -413,6 +413,7 @@ export class MCTSRouter implements TopologyRouter {
           agentIndex: branchIndex,
           teamSize: branchFactor,
           round: iteration,
+          totalRounds: searchIterations,
           orchestratorContext,
         });
       }

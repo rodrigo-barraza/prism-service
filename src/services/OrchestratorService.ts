@@ -170,6 +170,7 @@ export default class OrchestratorService {
     agentIndex,
     teamSize,
     round,
+    totalRounds,
     orchestratorContext,
     preserveWorktree,
   }: OrchestratorSpawnParams): Promise<SubAgentResult | { error: string }> {
@@ -379,6 +380,7 @@ export default class OrchestratorService {
       agentIndex,
       teamSize,
       round,
+      totalRounds,
     };
 
     activeSubAgents.set(agentId, subAgentState);
@@ -1174,7 +1176,7 @@ export default class OrchestratorService {
         : "";
 
     const roundLine =
-      subAgent.round != null
+      subAgent.round != null && (subAgent.totalRounds == null || subAgent.totalRounds > 1)
         ? `Round: ${subAgent.round}\n`
         : "";
 
