@@ -764,19 +764,19 @@ export class CriticLoopRouter implements TopologyRouter {
 
       // Re-evaluate the revised output
       const revisedOutput = extractActorOutputText(revisedResult);
-      const reEvalPrompt = buildJurySelectionPrompt(originalTask, [{
+      const reEvaluationPrompt = buildJurySelectionPrompt(originalTask, [{
         actorIndex: winnerActorIndex,
         description: actorMembers[winnerActorIndex]?.description || `Actor ${winnerActorIndex + 1}`,
         output: revisedOutput,
       }]);
 
       try {
-        const reEvalResponse = await provider.generateText(
-          [{ role: "user", content: reEvalPrompt }],
+        const reEvaluationResponse = await provider.generateText(
+          [{ role: "user", content: reEvaluationPrompt }],
           resolvedModel,
           { maxTokens: 4096 },
         );
-        selection = parseJurySelectionResponse(reEvalResponse.text || "", 1);
+        selection = parseJurySelectionResponse(reEvaluationResponse.text || "", 1);
       } catch {
         logger.warn(`[CriticLoopRouter] Re-evaluation failed in round ${roundNumber}. Returning current results.`);
         return allResults;
