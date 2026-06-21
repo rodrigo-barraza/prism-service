@@ -52,6 +52,7 @@ export interface SubAgentState {
   teamSize?: number;
   round?: number;
   totalRounds?: number;
+  recursionDepth?: number;
 }
 
 export interface WorktreeDiff {
@@ -80,6 +81,28 @@ export interface SubAgentResult {
     files: string[];
   };
   error?: string;
+  recursionDepth?: number;
+  subtreeMetrics?: SubtreeMetrics;
+}
+
+export interface SubtreeMetrics {
+  totalDescendants: number;
+  maxDepthReached: number;
+  aggregatedCost: number;
+  aggregatedDurationMs: number;
+  aggregatedToolUses: number;
+  childResults?: SubAgentChildSummary[];
+}
+
+export interface SubAgentChildSummary {
+  agent_id: string;
+  description: string;
+  status: string;
+  recursionDepth: number;
+  durationMs: number;
+  toolUses: number;
+  cost: number;
+  subtreeMetrics?: SubtreeMetrics;
 }
 
 // ── Instance Selection ──────────────────────────────────────

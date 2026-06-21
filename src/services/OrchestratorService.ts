@@ -425,6 +425,7 @@ export default class OrchestratorService {
       teamSize,
       round,
       totalRounds,
+      recursionDepth: currentRecursionDepth + 1,
     };
 
     activeSubAgents.set(agentId, subAgentState);
@@ -1244,11 +1245,33 @@ export default class OrchestratorService {
         ? `Round: ${subAgent.round}\n`
         : "";
 
-    // Recursion awareness: tell the sub-agent its spawning capabilities
-    // Paper alignment: RAH (2026) Coordinator vs Worker role assignment
-    const recursionLine = canSpawnRecursively
-      ? `Recursion depth: ${currentRecursionDepth + 1}/${maxRecursionDepth} — you CAN use create_team to spawn sub-teams if the task is complex enough to warrant further decomposition\n`
-      : "";
+    // Recursion awareness: tell the sub-agent its spawning capabilities and depth context
+    // Paper alignment: RAH (2026) Coordinator vs Worker role assignment,
+    // THREAD (arXiv:2405.17402) hierarchical depth communication
+    const remainingDepth = maxRecursionDepth - (currentRecursionDepth + 1);
+    let recursionBlock: string;
+
+    if (canSpawnRecursively) {
+      recursionBlock =
+        `\n## Recursive Delegation\n` +
+        `You are a **Coordinator** sub-agent with recursive spawning capabilities.\n` +
+        `- Current depth: ${currentRecursionDepth + 1} of ${maxRecursionDepth} (${remainingDepth} level${remainingDepth !== 1 ? "s" : ""} remaining)\n` +
+        `- You have access to \`create_team\` and can spawn your own sub-teams\n` +
+        `- Your sub-agents ${remainingDepth > 1 ? "will also be Coordinators who can further delegate" : "will be Workers who cannot delegate further (final depth level)"}\n` +
+        `\n` +
+        `**When to delegate:** Only spawn sub-teams when your task is genuinely complex enough to benefit from parallel decomposition — e.g. multiple independent files, separate concerns, or subtasks that can run concurrently.\n` +
+        `**When NOT to delegate:** If your task is focused on a single file, a single concern, or can be completed in a straightforward sequence, handle it directly without spawning.\n` +
+        `**Result reporting:** Your final output MUST synthesize and summarize the results from any sub-agents you spawn. Your parent orchestrator only sees YOUR final output — not your children's raw results.\n\n`;
+    } else if (maxRecursionDepth > 0) {
+      recursionBlock =
+        `\n## Delegation Status\n` +
+        `You are a **Worker** sub-agent at maximum recursion depth (${currentRecursionDepth + 1}/${maxRecursionDepth}).\n` +
+        `- You do NOT have access to \`create_team\` — you cannot spawn sub-agents\n` +
+        `- Complete your assigned task directly using your available tools\n` +
+        `- Write a clear, complete summary of your work as your final output\n\n`;
+    } else {
+      recursionBlock = "";
+    }
 
     const subAgentMessages: ConversationMessage[] = [
       ...(subAgent.messages || []),
@@ -1261,7 +1284,7 @@ export default class OrchestratorService {
           `Sub-agent topology description: ${resolvedTopologyMetadata.description}\n` +
           agentPositionLine +
           roundLine +
-          recursionLine +
+          recursionBlock +
           `\n` +
           workspaceIntroLine +
           (subAgent.files?.length

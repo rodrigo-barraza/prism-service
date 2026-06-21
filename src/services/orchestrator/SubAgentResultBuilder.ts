@@ -1,6 +1,8 @@
 import type {
   SubAgentResult,
   SubAgentState,
+  SubtreeMetrics,
+  SubAgentChildSummary,
 } from "../../types/orchestrator.ts";
 import type { ConversationMessage } from "../harnesses/types.ts";
 
@@ -86,6 +88,15 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
 
   if (subAgent.error) result.error = subAgent.error;
 
+  if (typeof subAgent.recursionDepth === "number") {
+    result.recursionDepth = subAgent.recursionDepth;
+  }
+
+  const subtreeMetrics = extractSubtreeMetrics(subAgent.messages || []);
+  if (subtreeMetrics) {
+    result.subtreeMetrics = subtreeMetrics;
+  }
+
   return result;
 }
 
@@ -119,4 +130,109 @@ export function buildToolCallFallbackSummary(
   }
 
   return `Agent completed ${iterationLabel} with ${agentResult.toolUses} tool call(s) but did not produce a final summary.`;
+}
+
+/**
+ * Scan a sub-agent's conversation for create_team tool results that contain
+ * SubAgentResult payloads. When a child agent spawned grandchildren, those
+ * results appear as tool_result messages in the child's conversation. We
+ * parse these to build aggregated subtree metrics for the parent.
+ *
+ * Paper alignment: THREAD (arXiv:2405.17402) — hierarchical result aggregation.
+ */
+export function extractSubtreeMetrics(
+  messages: ConversationMessage[],
+): SubtreeMetrics | null {
+  const childSummaries: SubAgentChildSummary[] = [];
+
+  for (const message of messages) {
+    if (message.role !== "tool" && message.role !== "tool_result") continue;
+
+    const content = typeof message.content === "string" ? message.content : "";
+    if (!content.includes("agent_id")) continue;
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      continue;
+    }
+
+    const resultsArray: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+
+    for (const entry of resultsArray) {
+      if (
+        typeof entry !== "object" ||
+        entry === null ||
+        !("agent_id" in entry) ||
+        !("status" in entry)
+      ) {
+        continue;
+      }
+
+      const childResult = entry as Record<string, unknown>;
+      const childSummary: SubAgentChildSummary = {
+        agent_id: String(childResult.agent_id),
+        description: String(childResult.description || ""),
+        status: String(childResult.status || "unknown"),
+        recursionDepth:
+          typeof childResult.recursionDepth === "number"
+            ? childResult.recursionDepth
+            : 0,
+        durationMs:
+          typeof childResult.durationMs === "number"
+            ? childResult.durationMs
+            : 0,
+        toolUses:
+          typeof childResult.toolUses === "number" ? childResult.toolUses : 0,
+        cost: 0,
+      };
+
+      if (
+        childResult.subtreeMetrics &&
+        typeof childResult.subtreeMetrics === "object"
+      ) {
+        childSummary.subtreeMetrics =
+          childResult.subtreeMetrics as SubtreeMetrics;
+      }
+
+      childSummaries.push(childSummary);
+    }
+  }
+
+  if (childSummaries.length === 0) return null;
+
+  let totalDescendants = 0;
+  let maxDepthReached = 0;
+  let aggregatedCost = 0;
+  let aggregatedDurationMs = 0;
+  let aggregatedToolUses = 0;
+
+  for (const child of childSummaries) {
+    totalDescendants += 1;
+    aggregatedDurationMs += child.durationMs;
+    aggregatedToolUses += child.toolUses;
+    aggregatedCost += child.cost;
+    maxDepthReached = Math.max(maxDepthReached, child.recursionDepth);
+
+    if (child.subtreeMetrics) {
+      totalDescendants += child.subtreeMetrics.totalDescendants;
+      maxDepthReached = Math.max(
+        maxDepthReached,
+        child.subtreeMetrics.maxDepthReached,
+      );
+      aggregatedCost += child.subtreeMetrics.aggregatedCost;
+      aggregatedDurationMs += child.subtreeMetrics.aggregatedDurationMs;
+      aggregatedToolUses += child.subtreeMetrics.aggregatedToolUses;
+    }
+  }
+
+  return {
+    totalDescendants,
+    maxDepthReached,
+    aggregatedCost,
+    aggregatedDurationMs,
+    aggregatedToolUses,
+    childResults: childSummaries,
+  };
 }
