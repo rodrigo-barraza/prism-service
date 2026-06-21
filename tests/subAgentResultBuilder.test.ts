@@ -53,6 +53,74 @@ describe("getLastAssistantText", () => {
     expect(getLastAssistantText(undefined as unknown as ConversationMessage[])).toBe("");
   });
 
+  it("extracts text from Anthropic-style array content blocks", () => {
+    const messages: ConversationMessage[] = [
+      { role: "user", content: "Analyze this" },
+      {
+        role: "assistant",
+        content: [
+          { type: "thinking", thinking: "Let me reason about this..." },
+          { type: "text", text: "Here is my analysis of the topic." },
+        ] as unknown as string,
+      },
+    ];
+    const result = getLastAssistantText(messages);
+    expect(result).toBe("Here is my analysis of the topic.");
+  });
+
+  it("joins multiple text blocks from array content", () => {
+    const messages: ConversationMessage[] = [
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "First paragraph." },
+          { type: "tool_use", id: "tool-1", name: "search", input: {} },
+          { type: "text", text: "Second paragraph after tool use." },
+        ] as unknown as string,
+      },
+    ];
+    const result = getLastAssistantText(messages);
+    expect(result).toBe("First paragraph.\nSecond paragraph after tool use.");
+  });
+
+  it("skips array content with only non-text blocks (thinking, tool_use)", () => {
+    const messages: ConversationMessage[] = [
+      { role: "assistant", content: "Earlier valid text" },
+      {
+        role: "assistant",
+        content: [
+          { type: "thinking", thinking: "Deep reasoning..." },
+          { type: "tool_use", id: "tool-1", name: "search", input: {} },
+        ] as unknown as string,
+      },
+    ];
+    const result = getLastAssistantText(messages);
+    expect(result).toBe("Earlier valid text");
+  });
+
+  it("prefers string content over array content", () => {
+    const messages: ConversationMessage[] = [
+      {
+        role: "assistant",
+        content: "String content wins",
+      },
+    ];
+    const result = getLastAssistantText(messages);
+    expect(result).toBe("String content wins");
+  });
+
+  it("falls back to textFragments when both string and array content are empty", () => {
+    const messages: ConversationMessage[] = [
+      {
+        role: "assistant",
+        content: "",
+        textFragments: ["Fragment one.", "Fragment two."],
+      },
+    ];
+    const result = getLastAssistantText(messages);
+    expect(result).toBe("Fragment one.\nFragment two.");
+  });
+
   it("finds the finalize-appended message when it is the last one", () => {
     const messages: ConversationMessage[] = [
       { role: "user", content: "Research topic X" },
