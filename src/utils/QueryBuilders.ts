@@ -54,3 +54,26 @@ export function parsePaginationParams(query: {
   const skip = (page - 1) * limit;
   return { skip, limit, page, sortDirection };
 }
+
+/**
+ * Core MongoDB projection fields shared across conversation list endpoints.
+ * Both the user-facing and admin conversation routes must include these fields
+ * to ensure feature parity (sub-agent hierarchy, cost display, etc.).
+ *
+ * Each consumer spreads this base and adds route-specific overrides
+ * (e.g. computed $ifNull expressions or additional metadata fields).
+ */
+export const CONVERSATION_LIST_BASE_PROJECTION: Record<string, 1> = {
+  id: 1,
+  project: 1,
+  username: 1,
+  title: 1,
+  createdAt: 1,
+  updatedAt: 1,
+  modalities: 1,
+  providers: 1,
+  totalCost: 1,
+  agent: 1,
+  parentConversationId: 1,
+  hasSubAgents: 1,
+};

@@ -14,6 +14,7 @@ import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import {
   applyDateRangeFilter,
   parsePaginationParams,
+  CONVERSATION_LIST_BASE_PROJECTION,
 } from "../../utils/QueryBuilders.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
 import {
@@ -107,17 +108,9 @@ router.get(
             .collection(CONVERSATIONS_COLLECTION)
             .find(filter)
             .project({
-              id: 1,
-              project: 1,
-              username: 1,
-              title: 1,
-              createdAt: 1,
-              updatedAt: 1,
-              modalities: 1,
-              providers: 1,
+              ...CONVERSATION_LIST_BASE_PROJECTION,
               messageCount: { $size: { $ifNull: ["$messages", []] } },
               totalCost: { $ifNull: ["$totalCost", 0] },
-              agent: 1,
             })
             .sort({ [sort as string]: sortDir })
             .limit(skip + limit)
@@ -134,17 +127,9 @@ router.get(
             .collection(COLLECTIONS.AGENT_CONVERSATIONS)
             .find(agentFilter)
             .project({
-              id: 1,
-              project: 1,
-              username: 1,
-              title: 1,
-              createdAt: 1,
-              updatedAt: 1,
-              modalities: 1,
-              providers: 1,
+              ...CONVERSATION_LIST_BASE_PROJECTION,
               messageCount: { $size: { $ifNull: ["$messages", []] } },
               totalCost: { $ifNull: ["$totalCost", 0] },
-              agent: 1,
             })
             .sort({ [sort as string]: sortDir })
             .limit(skip + limit)
