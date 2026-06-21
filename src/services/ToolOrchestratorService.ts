@@ -79,6 +79,8 @@ interface ToolExecutionContext {
   _minContextLength?: number;
   enabledTools?: string[];
   _topology?: string;
+  _recursionDepth?: number;
+  _maxRecursionDepth?: number;
   clientIp?: string | null;
   _toolState?: unknown;
 }
@@ -1406,6 +1408,10 @@ export default class ToolOrchestratorService {
 
       // Topology to use for sub-agent coordination
       topology: context._topology || null,
+
+      // Recursive spawning depth tracking — propagated from parent context
+      recursionDepth: context._recursionDepth ?? 0,
+      maxRecursionDepth: context._maxRecursionDepth,
     };
 
     switch (name) {

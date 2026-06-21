@@ -113,6 +113,7 @@ export const ChatRequestSchema = z
     planFirst: z.boolean().nullable().optional(),
     maxIterations: z.number().nullable().optional(),
     maxSubAgentIterations: z.number().nullable().optional(),
+    maxRecursionDepth: z.number().int().min(0).max(3).nullable().optional(),
     agentContext: z.unknown().nullable().optional(),
     workspaceRoot: z.string().nullable().optional(),
     workspaceEnabled: z.boolean().nullable().optional(),

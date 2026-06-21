@@ -109,6 +109,16 @@ export async function executeToolBatch(
             typeof context.options?.topology === "string"
               ? context.options.topology
               : undefined,
+          _recursionDepth:
+            typeof context._recursionDepth === "number"
+              ? context._recursionDepth
+              : undefined,
+          _maxRecursionDepth:
+            typeof context._maxRecursionDepth === "number"
+              ? context._maxRecursionDepth
+              : typeof context.options?.maxRecursionDepth === "number"
+                ? context.options.maxRecursionDepth
+                : undefined,
         },
       );
       const durationMs = Date.now() - startTime;
