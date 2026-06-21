@@ -239,6 +239,7 @@ async function prepareGenerationContext(
     planFirst,
     maxIterations,
     maxSubAgentIterations,
+    maxRecursionDepth,
     agentContext,
     // Multi-workspace: user-selected workspace root path (absolute fs path).
     workspaceRoot,
@@ -297,6 +298,7 @@ async function prepareGenerationContext(
     ...(planFirst != null && { planFirst }),
     ...(maxIterations != null && { maxIterations }),
     ...(maxSubAgentIterations != null && { maxSubAgentIterations }),
+    ...(maxRecursionDepth != null && { maxRecursionDepth }),
     ...(agentContext != null && { agentContext }),
     ...(enableCriticGate != null && { enableCriticGate }),
     ...(criticModel != null && { criticModel }),

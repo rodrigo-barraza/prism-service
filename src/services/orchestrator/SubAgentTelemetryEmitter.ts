@@ -16,6 +16,7 @@ interface SubAgentTelemetryConfig {
   subAgentDescription: string;
   parentEmit: EmitFunction | null | undefined;
   parentConversationId: string | null | undefined;
+  recursionDepth?: number;
 }
 
 function isToolCall(value: unknown): value is ToolCall {
@@ -46,6 +47,7 @@ export class SubAgentTelemetryEmitter {
   private subAgentDescription: string;
   private parentEmit: EmitFunction | null | undefined;
   private parentConversationId: string | null | undefined;
+  private recursionDepth: number;
 
   // Timing
   private firstChunkTime: number | null = null;
@@ -82,6 +84,7 @@ export class SubAgentTelemetryEmitter {
     this.subAgentDescription = config.subAgentDescription;
     this.parentEmit = config.parentEmit;
     this.parentConversationId = config.parentConversationId;
+    this.recursionDepth = config.recursionDepth ?? 0;
   }
 
   /** Build the generation_progress payload for the frontend. */

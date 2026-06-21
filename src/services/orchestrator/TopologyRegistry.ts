@@ -1,3 +1,13 @@
+// ─────────────────────────────────────────────────────────────
+// TopologyRegistry — metadata for all supported multi-agent topologies.
+//
+// NOTE: Recursive sub-agent spawning (sub-agents calling create_team
+// to spawn their own sub-teams) is NOT a topology. It's a cross-cutting
+// capability configurable via `maxRecursionDepth` in agent settings,
+// applicable to any topology listed here. See OrchestratorService for
+// the depth-gated implementation.
+// ─────────────────────────────────────────────────────────────
+
 import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 export interface TopologyAlignmentEntry {

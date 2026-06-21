@@ -12,6 +12,8 @@ import {
   STATUS_MESSAGES,
   DEFAULT_TOPOLOGY,
   TOPOLOGIES,
+  MAXIMUM_RECURSIVE_SPAWNING_DEPTH,
+  DEFAULT_RECURSIVE_SPAWNING_DEPTH,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import localModelQueue from "./LocalModelQueue.ts";
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
@@ -62,6 +64,20 @@ const MAX_SUB_AGENTS = 10;
 
 /** Max iterations per sub-agent agentic loop */
 const MAX_SUB_AGENT_ITERATIONS = 15;
+
+/**
+ * Max total concurrent sub-agents across all recursion depths for a single conversation.
+ * Circuit breaker to prevent exponential agent fan-out from recursive spawning.
+ * Paper reference: Intelligence Entropy (arXiv:2606.18065) — disorder grows exponentially.
+ */
+const MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION = 20;
+
+/**
+ * Scope attenuation factor for maxIterations at each recursion depth hop.
+ * Each level gets (1 - FACTOR) of the parent's iterations.
+ * Paper reference: arXiv:2606.03518 — permissions must shrink at every delegation hop.
+ */
+const RECURSION_SCOPE_ATTENUATION_FACTOR = 0.4;
 
 /**
  * Resolve the user-configured sub-agent provider/model from settings.
@@ -189,15 +205,28 @@ export default class OrchestratorService {
       enabledTools,
     } = orchestratorContext;
 
+    // ── Recursion depth tracking ──────────────────────────────
+    const currentRecursionDepth = orchestratorContext.recursionDepth ?? 0;
+    const maxRecursionDepth = Math.min(
+      MAXIMUM_RECURSIVE_SPAWNING_DEPTH,
+      orchestratorContext.maxRecursionDepth ?? DEFAULT_RECURSIVE_SPAWNING_DEPTH,
+    );
+
     // Resolve max sub-agent iterations: 0 = unlimited (Infinity), positive = clamped 1-100, default = constant
-    const resolvedMaxSubAgentIterations =
+    // Scope attenuation: reduce iterations at each recursion depth hop
+    const baseMaxIterations =
       clientMaxSubAgentIterations === 0
         ? Infinity
         : clientMaxSubAgentIterations
           ? Math.min(100, Math.max(1, clientMaxSubAgentIterations))
           : MAX_SUB_AGENT_ITERATIONS;
 
-    // Check concurrency limit
+    const resolvedMaxSubAgentIterations =
+      currentRecursionDepth > 0 && baseMaxIterations !== Infinity
+        ? Math.max(5, Math.round(baseMaxIterations * (1 - RECURSION_SCOPE_ATTENUATION_FACTOR * currentRecursionDepth)))
+        : baseMaxIterations;
+
+    // Check concurrency limit (global)
     const runningCount = Array.from(activeSubAgents.values()).filter(
       (subAgent) => subAgent.status === "running",
     ).length;
@@ -205,6 +234,21 @@ export default class OrchestratorService {
       return {
         error: `Maximum concurrent sub-agents (${MAX_SUB_AGENTS}) reached. Wait for a sub-agent to complete or stop one.`,
       };
+    }
+
+    // Circuit breaker: cap total agents per conversation across all recursion depths
+    if (parentConversationId) {
+      const conversationAgentCount = Array.from(activeSubAgents.values()).filter(
+        (subAgent) => subAgent.parentConversationId === parentConversationId,
+      ).length;
+      if (conversationAgentCount >= MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION) {
+        logger.warn(
+          `[Orchestrator] Circuit breaker: conversation ${parentConversationId} has ${conversationAgentCount} agents (max ${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}). Recursive spawning blocked.`,
+        );
+        return {
+          error: `Circuit breaker: maximum concurrent agents per conversation (${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}) reached. This limit prevents exponential agent fan-out from recursive spawning.`,
+        };
+      }
     }
 
     // ── Pre-assigned instance (from createTeam batch assignment) ──
@@ -773,6 +817,16 @@ export default class OrchestratorService {
     // correct topology — not the stale conversation-level default.
     orchestratorContext.topology = topology;
 
+    // Resolve recursive spawning depth: prefer context (already set for recursive calls),
+    // fall back to settings, then to the taxonomy default.
+    if (orchestratorContext.maxRecursionDepth == null) {
+      const settingsRecursionDepth = settings?.maxRecursionDepth;
+      orchestratorContext.maxRecursionDepth =
+        typeof settingsRecursionDepth === "number"
+          ? Math.min(MAXIMUM_RECURSIVE_SPAWNING_DEPTH, Math.max(0, settingsRecursionDepth))
+          : DEFAULT_RECURSIVE_SPAWNING_DEPTH;
+    }
+
     if (!teamCreationArguments || !teamCreationArguments.members || !Array.isArray(teamCreationArguments.members)) {
       const errorMessage =
         "Invalid or missing 'members' array in createTeam arguments.";
@@ -1128,6 +1182,16 @@ export default class OrchestratorService {
       ? `Your workspace is: ${subAgent.worktreePath}\n`
       : "";
 
+    // ── Recursive spawning: depth tracking ──────────────────────────
+    // Paper alignment: THREAD (arXiv:2405.17402), RAH (2026), Anthropic production architecture.
+    // Computed early because both the system prompt and the tool-stripping logic need these values.
+    const currentRecursionDepth = orchestratorContext.recursionDepth ?? 0;
+    const maxRecursionDepth = Math.min(
+      MAXIMUM_RECURSIVE_SPAWNING_DEPTH,
+      orchestratorContext.maxRecursionDepth ?? DEFAULT_RECURSIVE_SPAWNING_DEPTH,
+    );
+    const canSpawnRecursively = currentRecursionDepth < maxRecursionDepth;
+
     const activeTopology = orchestratorContext.topology || DEFAULT_TOPOLOGY;
 
     const topologyMetadata: Record<string, { name: string; description: string }> = {
@@ -1180,6 +1244,12 @@ export default class OrchestratorService {
         ? `Round: ${subAgent.round}\n`
         : "";
 
+    // Recursion awareness: tell the sub-agent its spawning capabilities
+    // Paper alignment: RAH (2026) Coordinator vs Worker role assignment
+    const recursionLine = canSpawnRecursively
+      ? `Recursion depth: ${currentRecursionDepth + 1}/${maxRecursionDepth} — you CAN use create_team to spawn sub-teams if the task is complex enough to warrant further decomposition\n`
+      : "";
+
     const subAgentMessages: ConversationMessage[] = [
       ...(subAgent.messages || []),
       {
@@ -1191,6 +1261,7 @@ export default class OrchestratorService {
           `Sub-agent topology description: ${resolvedTopologyMetadata.description}\n` +
           agentPositionLine +
           roundLine +
+          recursionLine +
           `\n` +
           workspaceIntroLine +
           (subAgent.files?.length
@@ -1215,17 +1286,33 @@ export default class OrchestratorService {
       subAgentDescription: subAgent.description,
       parentEmit,
       parentConversationId: orchestratorContext.agentConversationId,
+      recursionDepth: currentRecursionDepth + 1,
     });
     const subAgentEmit = telemetry.createEmitFunction();
 
+    // ── Recursive spawning: conditional orchestrator tool access ──────
+    // When recursion depth < max, sub-agents KEEP orchestrator tools (create_team, etc.)
+    // and can spawn their own sub-teams. When depth = max, they become Worker agents
+    // with orchestrator tools stripped — the existing default behavior.
+    // (currentRecursionDepth, maxRecursionDepth, canSpawnRecursively computed earlier)
+
+    if (canSpawnRecursively) {
+      logger.info(
+        `[Orchestrator] Recursive spawning enabled for sub-agent ${subAgent.agentId} at depth ${currentRecursionDepth + 1}/${maxRecursionDepth} — orchestrator tools retained`,
+      );
+    }
+
     // Build enabled tools list for the sub-agent.
-    // Sub-agents always inherit the same tools that the parent has (minus orchestrator-only tools to avoid infinite nesting).
     let subAgentEnabledTools: string[] | undefined;
     if (subAgent.enabledTools) {
-      const orchestratorToolNames = new Set(ORCHESTRATOR_ONLY_TOOLS);
-      subAgentEnabledTools = subAgent.enabledTools.filter(
-        (name) => !orchestratorToolNames.has(name),
-      );
+      if (canSpawnRecursively) {
+        subAgentEnabledTools = [...subAgent.enabledTools];
+      } else {
+        const orchestratorToolNames = new Set(ORCHESTRATOR_ONLY_TOOLS);
+        subAgentEnabledTools = subAgent.enabledTools.filter(
+          (name) => !orchestratorToolNames.has(name),
+        );
+      }
     }
 
     if (!subAgentEnabledTools) {
@@ -1234,10 +1321,15 @@ export default class OrchestratorService {
         orchestratorContext.topology || settings?.topology || DEFAULT_TOPOLOGY;
       const allToolSchemas =
         ToolOrchestratorService.getToolSchemas(defaultTopology);
-      const orchestratorToolNames = new Set(ORCHESTRATOR_ONLY_TOOLS);
-      subAgentEnabledTools = allToolSchemas
-        .map((toolSchema) => toolSchema.name)
-        .filter((name: string) => !orchestratorToolNames.has(name));
+
+      if (canSpawnRecursively) {
+        subAgentEnabledTools = allToolSchemas.map((toolSchema) => toolSchema.name);
+      } else {
+        const orchestratorToolNames = new Set(ORCHESTRATOR_ONLY_TOOLS);
+        subAgentEnabledTools = allToolSchemas
+          .map((toolSchema) => toolSchema.name)
+          .filter((name: string) => !orchestratorToolNames.has(name));
+      }
     }
 
     const subAgentProviderInstance = getProvider(subAgent.providerName);
@@ -1278,6 +1370,11 @@ export default class OrchestratorService {
         requestStart: performance.now(),
         emit: subAgentEmit,
         signal: subAgent.abortController?.signal,
+        // Recursive spawning: propagate incremented depth so child create_team
+        // calls know they're one level deeper. The ToolExecutor forwards these
+        // to ToolOrchestratorService.executeOrchestratorTool → OrchestratorContext.
+        _recursionDepth: currentRecursionDepth + 1,
+        _maxRecursionDepth: maxRecursionDepth,
       });
     } catch (error: unknown) {
       if (

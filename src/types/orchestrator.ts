@@ -114,6 +114,8 @@ export interface OrchestratorSpawnParams {
   orchestratorContext: OrchestratorContext;
   /** When true, the worktree is kept alive after the agent completes (for stateful session reuse). */
   preserveWorktree?: boolean;
+  /** Current recursion depth inherited from parent context. Incremented at each spawning hop. */
+  recursionDepth?: number;
 }
 
 export interface OrchestratorContext {
@@ -131,6 +133,10 @@ export interface OrchestratorContext {
   topology?: string;
   emit?: EmitFunction;
   enabledTools?: string[] | null;
+  /** Current recursion depth. 0 = top-level orchestrator. */
+  recursionDepth?: number;
+  /** Maximum allowed recursion depth for this session. 0 = sub-agents cannot spawn (default). */
+  maxRecursionDepth?: number;
   [key: string]: unknown;
 }
 
