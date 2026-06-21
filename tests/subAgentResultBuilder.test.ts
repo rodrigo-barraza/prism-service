@@ -307,6 +307,7 @@ describe("extractSubtreeMetrics", () => {
           agent_id: "agent-child-1",
           description: "child agent",
           status: "completed",
+          result: "Found 3 relevant documents.",
           recursionDepth: 1,
           durationMs: 1200,
           toolUses: 5,
@@ -322,6 +323,8 @@ describe("extractSubtreeMetrics", () => {
     expect(metrics!.aggregatedToolUses).toBe(5);
     expect(metrics!.childResults).toHaveLength(1);
     expect(metrics!.childResults![0].agent_id).toBe("agent-child-1");
+    expect(metrics!.childResults![0].result).toBe("Found 3 relevant documents.");
+    expect(metrics!.childResults![0].error).toBeUndefined();
   });
 
   it("should parse an array of SubAgentResults and aggregate metrics", () => {
@@ -334,6 +337,7 @@ describe("extractSubtreeMetrics", () => {
             agent_id: "agent-child-1",
             description: "child 1",
             status: "completed",
+            result: "Analysis complete.",
             recursionDepth: 1,
             durationMs: 1000,
             toolUses: 3,
@@ -342,6 +346,7 @@ describe("extractSubtreeMetrics", () => {
             agent_id: "agent-child-2",
             description: "child 2",
             status: "failed",
+            error: "Model timeout after 30s",
             recursionDepth: 1,
             durationMs: 2000,
             toolUses: 4,
@@ -357,6 +362,10 @@ describe("extractSubtreeMetrics", () => {
     expect(metrics!.aggregatedDurationMs).toBe(3000);
     expect(metrics!.aggregatedToolUses).toBe(7);
     expect(metrics!.childResults).toHaveLength(2);
+    expect(metrics!.childResults![0].result).toBe("Analysis complete.");
+    expect(metrics!.childResults![0].error).toBeUndefined();
+    expect(metrics!.childResults![1].result).toBeNull();
+    expect(metrics!.childResults![1].error).toBe("Model timeout after 30s");
   });
 
   it("should aggregate nested subtree metrics from grandchildren recursively", () => {
@@ -412,6 +421,88 @@ describe("extractSubtreeMetrics", () => {
     expect(metrics!.totalDescendants).toBe(1);
     expect(metrics!.childResults![0].agent_id).toBe("agent-valid");
     expect(metrics!.childResults![0].durationMs).toBe(0); // fallback
+    expect(metrics!.childResults![0].result).toBeNull();
+  });
+
+  it("should truncate result text exceeding 2000 characters", () => {
+    const { extractSubtreeMetrics } = require("../src/services/orchestrator/SubAgentResultBuilder.ts");
+    const longResult = "A".repeat(3000);
+    const messages: ConversationMessage[] = [
+      {
+        role: "tool",
+        content: JSON.stringify({
+          agent_id: "agent-verbose",
+          description: "verbose agent",
+          status: "completed",
+          result: longResult,
+          recursionDepth: 1,
+          durationMs: 5000,
+          toolUses: 8,
+        }),
+      },
+    ];
+
+    const metrics = extractSubtreeMetrics(messages);
+    expect(metrics).not.toBeNull();
+    expect(metrics!.childResults![0].result!.length).toBe(2001); // 2000 + ellipsis
+    expect(metrics!.childResults![0].result!.endsWith("…")).toBe(true);
+  });
+
+  it("should set result to null when result field is empty or whitespace", () => {
+    const { extractSubtreeMetrics } = require("../src/services/orchestrator/SubAgentResultBuilder.ts");
+    const messages: ConversationMessage[] = [
+      {
+        role: "tool",
+        content: JSON.stringify([
+          {
+            agent_id: "agent-empty",
+            description: "empty result agent",
+            status: "completed",
+            result: "   ",
+            recursionDepth: 1,
+            durationMs: 100,
+            toolUses: 0,
+          },
+          {
+            agent_id: "agent-missing",
+            description: "missing result agent",
+            status: "completed",
+            recursionDepth: 1,
+            durationMs: 200,
+            toolUses: 1,
+          },
+        ]),
+      },
+    ];
+
+    const metrics = extractSubtreeMetrics(messages);
+    expect(metrics).not.toBeNull();
+    expect(metrics!.childResults![0].result).toBeNull();
+    expect(metrics!.childResults![1].result).toBeNull();
+  });
+
+  it("should propagate both result and error when both are present on a child", () => {
+    const { extractSubtreeMetrics } = require("../src/services/orchestrator/SubAgentResultBuilder.ts");
+    const messages: ConversationMessage[] = [
+      {
+        role: "tool",
+        content: JSON.stringify({
+          agent_id: "agent-partial",
+          description: "partial failure agent",
+          status: "completed",
+          result: "Partial findings before crash.",
+          error: "Sub-agent produced no output after 12.5s (0 tool calls, 1 iteration).",
+          recursionDepth: 1,
+          durationMs: 12500,
+          toolUses: 0,
+        }),
+      },
+    ];
+
+    const metrics = extractSubtreeMetrics(messages);
+    expect(metrics).not.toBeNull();
+    expect(metrics!.childResults![0].result).toBe("Partial findings before crash.");
+    expect(metrics!.childResults![0].error).toBe("Sub-agent produced no output after 12.5s (0 tool calls, 1 iteration).");
   });
 });
 

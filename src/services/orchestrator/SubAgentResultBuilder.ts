@@ -303,6 +303,21 @@ export function extractSubtreeMetrics(
         cost: 0,
       };
 
+      const MAX_RESULT_LENGTH_FOR_PROPAGATION = 2000;
+      if (typeof childResult.result === "string" && childResult.result.trim()) {
+        const trimmedResult = childResult.result.trim();
+        childSummary.result =
+          trimmedResult.length > MAX_RESULT_LENGTH_FOR_PROPAGATION
+            ? trimmedResult.slice(0, MAX_RESULT_LENGTH_FOR_PROPAGATION) + "…"
+            : trimmedResult;
+      } else {
+        childSummary.result = null;
+      }
+
+      if (typeof childResult.error === "string" && childResult.error.trim()) {
+        childSummary.error = childResult.error.trim();
+      }
+
       if (
         childResult.subtreeMetrics &&
         typeof childResult.subtreeMetrics === "object"
