@@ -574,7 +574,7 @@ describe("TopologyConfig Test Suite", () => {
       const firstMessage = messages?.[0];
       const decompositionPrompt = firstMessage?.content;
       expect(typeof decompositionPrompt).toBe("string");
-      expect(decompositionPrompt).toContain("10 or fewer independent subtasks");
+      expect(decompositionPrompt).toContain("10 or fewer subtasks");
     });
   });
 

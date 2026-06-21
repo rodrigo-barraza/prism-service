@@ -233,8 +233,11 @@ export class TournamentRouter implements TopologyRouter {
         diff: { additions: 0, deletions: 0, files: [] },
       };
 
+      const inputTokens = selectionResult.usage?.inputTokens ?? 0;
+      const outputTokens = selectionResult.usage?.outputTokens ?? 0;
+
       logger.info(
-        `[TournamentRouter] Judge selection complete in ${selectionDurationMs}ms (${selectionResult.usage.inputTokens} input, ${selectionResult.usage.outputTokens} output tokens)`,
+        `[TournamentRouter] Judge selection complete in ${selectionDurationMs}ms (${inputTokens} input, ${outputTokens} output tokens)`,
       );
 
       return [...memberResults, judgeSubAgentResult];
