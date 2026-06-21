@@ -13,3 +13,4 @@ dist/
 
 # Scratch test scripts
 tests/scratch/
+coverage/
