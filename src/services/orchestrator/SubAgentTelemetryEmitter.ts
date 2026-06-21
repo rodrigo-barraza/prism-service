@@ -278,6 +278,18 @@ export class SubAgentTelemetryEmitter {
         if (this.parentEmit) {
           this.parentEmit(event);
         }
+      } else if (
+        event.type === "sub_agent_status" ||
+        event.type === "sub_agent_tool_execution" ||
+        event.type === "sub_agent_tool_output"
+      ) {
+        // Recursive forwarding: when a depth-N sub-agent spawns depth-(N+1)
+        // grandchildren, their telemetry emitters produce sub_agent_* events.
+        // Forward them directly — they are already namespaced with the
+        // grandchild's subAgentId and contain all needed metadata.
+        if (this.parentEmit) {
+          this.parentEmit(event);
+        }
       }
     };
   }

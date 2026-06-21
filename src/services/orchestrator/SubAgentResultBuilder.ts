@@ -23,6 +23,23 @@ export function getLastAssistantText(messages: ConversationMessage[]): string {
       typeof message.content === "string" ? message.content : ""
     ).trim();
     if (text) return text;
+    // Array content blocks (Anthropic format): content is an array of
+    // {type: "text", text: "..."} blocks, potentially interleaved with
+    // tool_use and thinking blocks. Extract only the text blocks.
+    if (Array.isArray(message.content)) {
+      const textBlocks = (message.content as Array<Record<string, unknown>>)
+        .filter(
+          (block) =>
+            typeof block === "object" &&
+            block !== null &&
+            block.type === "text" &&
+            typeof block.text === "string",
+        )
+        .map((block) => block.text as string)
+        .join("\n")
+        .trim();
+      if (textBlocks) return textBlocks;
+    }
     // Fallback: harnesses store segmented output in textFragments when content
     // is split across interleaved tool-call turns. Join them as a last resort.
     if (Array.isArray(message.textFragments) && message.textFragments.length > 0) {
