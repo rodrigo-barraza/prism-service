@@ -16,6 +16,8 @@ import RequestLogger from "../../RequestLogger.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 const MAXIMUM_SYNTHESIS_CHARACTERS = 120_000;
+const DEFAULT_LAYER_COUNT = 1;
+const MAXIMUM_LAYER_COUNT = 3;
 
 function truncateResultOutput(output: string, maximumCharacters: number): string {
   if (output.length <= maximumCharacters) return output;
@@ -26,6 +28,8 @@ function truncateResultOutput(output: string, maximumCharacters: number): string
 function buildSynthesisPrompt(
   teamName: string,
   memberResults: (SubAgentResult | { error: string })[],
+  layerIndex?: number,
+  totalLayers?: number,
 ): string {
   const characterBudgetPerMember = Math.floor(MAXIMUM_SYNTHESIS_CHARACTERS / Math.max(memberResults.length, 1));
 
@@ -43,8 +47,12 @@ function buildSynthesisPrompt(
     ].join("\n");
   });
 
+  const layerContext = layerIndex !== undefined && totalLayers !== undefined && totalLayers > 1
+    ? `\nThis is synthesis layer ${layerIndex + 1} of ${totalLayers}.\n`
+    : "";
+
   return [
-    `You are a synthesis agent for the team "${teamName}".`,
+    `You are a synthesis agent for the team "${teamName}".${layerContext}`,
     `${memberResults.length} sub-agents have completed their work. Your job is to merge their outputs into a single, unified result.`,
     "",
     "## Sub-Agent Results",
@@ -61,21 +69,70 @@ function buildSynthesisPrompt(
   ].join("\n");
 }
 
+function buildLayerContextPrefix(previousLayerSynthesis: string): string {
+  return [
+    "## Previous Layer Output (Auxiliary Context)",
+    "",
+    "The following is the synthesized output from a previous layer of agents working on this task.",
+    "Use this as additional context to inform and improve your response.",
+    "",
+    previousLayerSynthesis,
+    "",
+    "---",
+    "",
+  ].join("\n");
+}
+
+function checkModelDiversity(
+  assignments: OrchestratorSpawnParams[],
+): void {
+  if (assignments.length <= 1) return;
+
+  const uniqueModelIdentifiers = new Set(
+    assignments.map(
+      (assignment) => `${assignment.assignedProvider}:${assignment.assignedModel}`,
+    ),
+  );
+
+  if (uniqueModelIdentifiers.size === 1) {
+    logger.warn(
+      `[HierarchicalAggregationRouter] All ${assignments.length} proposers resolved to the same model ` +
+      `(${assignments[0].assignedProvider}/${assignments[0].assignedModel}). ` +
+      `MoA paper (Wang et al., 2024) shows diverse models significantly outperform single-proposer configurations. ` +
+      `Consider assigning different models to team members for better synthesis quality.`,
+    );
+  }
+}
+
 /**
  * Hierarchical Aggregation Router — Mixture-of-Agents Synthesis (MoA)
  *
  * Based on: "Mixture-of-Agents Enhances Large Language Model Capabilities"
  * (arxiv.org/abs/2406.04692)
  *
- * Implements a two-phase parallel-then-synthesize flow:
+ * Implements a multi-layer parallel-then-synthesize flow:
  * 1. **Fan-out:** All members execute the task independently in parallel
  * 2. **Synthesize:** An LLM aggregator merges all outputs into a single unified
  *    result — identifying agreements, resolving conflicts, and combining
  *    complementary information
+ * 3. **Layer stacking:** Steps 1-2 repeat for each layer. Each subsequent layer's
+ *    members receive the previous layer's synthesis as auxiliary context,
+ *    progressively refining quality through iterative collaboration.
  *
  * Key differences from Tournament:
  * - Aggregation SYNTHESIZES all outputs; Tournament SELECTS one winner
  * - The synthesis pass produces new merged content, not a verbatim copy
+ *
+ * TopologyConfig:
+ * - layerCount (number, default: 1, max: 3) — Number of MoA layers.
+ *   The paper uses 2-3 layers; the first layer provides the largest quality boost.
+ *
+ * Paper alignment:
+ * - Layered architecture      → ✅ Multi-layer stacking via layerCount config
+ * - Proposer/Aggregator roles → ✅ Members are proposers, synthesis LLM is the aggregator
+ * - Collaborativeness         → ✅ Aggregator sees all proposer outputs as auxiliary information
+ * - Model diversity           → ✅ Warning when all proposers share same model (single-proposer)
+ * - Iterative refinement      → ✅ Each layer's synthesis feeds into next layer as context
  */
 export class HierarchicalAggregationRouter implements TopologyRouter {
   async execute(
@@ -86,150 +143,188 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
       assignment: OrchestratorSpawnParams,
     ) => Promise<SubAgentResult | { error: string }>,
     _continueSubAgent?: ContinueSubAgentCallback,
-    _topologyConfig?: TopologyConfig,
+    topologyConfig?: TopologyConfig,
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
+    const layerCount = Math.min(
+      Math.max(1, Number(topologyConfig?.layerCount) || DEFAULT_LAYER_COUNT),
+      MAXIMUM_LAYER_COUNT,
+    );
+
     logger.info(
-      `[HierarchicalAggregationRouter] createTeam: batch assignment of ${members.length} sub-agent(s) with synthesis pass...`,
+      `[HierarchicalAggregationRouter] Starting MoA for team "${teamName}" ` +
+      `(${members.length} proposers, ${layerCount} layer${layerCount > 1 ? "s" : ""})...`,
     );
 
-    // ── Phase 1: Parallel execution (identical to HierarchicalRouter) ────
+    let previousLayerSynthesis: string | null = null;
+    let allLayerResults: (SubAgentResult | { error: string })[] = [];
 
-    const resolvedSiblings = await resolveSiblingInstances(
-      { providerName, resolvedModel },
-      "HierarchicalAggregationRouter",
-    );
+    for (let layerIndex = 0; layerIndex < layerCount; layerIndex++) {
+      const isFirstLayer = layerIndex === 0;
+      const layerLabel = layerCount > 1 ? ` [Layer ${layerIndex + 1}/${layerCount}]` : "";
 
-    const assignments: OrchestratorSpawnParams[] = [];
+      // ── Phase 1: Parallel execution (proposer fan-out) ────────────────
 
-    for (let memberIndex = 0; memberIndex < members.length; memberIndex++) {
-      const member = members[memberIndex];
-      const { assignedProvider, assignedModel } = selectInstanceForMember(
-        member,
-        resolvedSiblings,
+      const resolvedSiblings = await resolveSiblingInstances(
         { providerName, resolvedModel },
+        "HierarchicalAggregationRouter",
       );
 
-      assignments.push({
-        description: member.description,
-        prompt: member.prompt,
-        files: member.files,
-        model: member.model,
-        agent: member.agent,
-        assignedProvider,
-        assignedModel,
-        agentIndex: memberIndex,
-        teamSize: members.length,
-        orchestratorContext,
-      });
-    }
+      const assignments: OrchestratorSpawnParams[] = [];
 
-    const spawnPromises = assignments.map((assignment) =>
-      spawnSubAgent(assignment),
-    );
-    const memberResults = await Promise.all(spawnPromises);
-
-
-    // ── Phase 2: Synthesis pass (MoA aggregation) ────────────────────
-
-    const successfulResults = memberResults.filter(
-      (result) => !("error" in result) && result.status === "completed",
-    );
-
-    if (successfulResults.length === 0) {
-      logger.warn(
-        `[HierarchicalAggregationRouter] All ${memberResults.length} sub-agents failed — skipping synthesis pass`,
-      );
-      return memberResults;
-    }
-
-    if (successfulResults.length === 1) {
-      logger.info(
-        `[HierarchicalAggregationRouter] Only 1 sub-agent succeeded — skipping synthesis pass`,
-      );
-      return memberResults;
-    }
-
-    logger.info(
-      `[HierarchicalAggregationRouter] Running synthesis pass over ${successfulResults.length} successful sub-agent results...`,
-    );
-
-    try {
-      const synthesisPrompt = buildSynthesisPrompt(teamName, memberResults);
-      const provider = getProvider(providerName);
-
-      if (!provider) {
-        logger.error(
-          `[HierarchicalAggregationRouter] Provider "${providerName}" not found for synthesis pass`,
+      for (let memberIndex = 0; memberIndex < members.length; memberIndex++) {
+        const member = members[memberIndex];
+        const { assignedProvider, assignedModel } = selectInstanceForMember(
+          member,
+          resolvedSiblings,
+          { providerName, resolvedModel },
         );
-        return memberResults;
+
+        const memberPrompt = previousLayerSynthesis
+          ? buildLayerContextPrefix(previousLayerSynthesis) + member.prompt
+          : member.prompt;
+
+        assignments.push({
+          description: `${member.description}${layerLabel}`,
+          prompt: memberPrompt,
+          files: member.files,
+          model: member.model,
+          agent: member.agent,
+          assignedProvider,
+          assignedModel,
+          agentIndex: memberIndex,
+          teamSize: members.length,
+          round: layerIndex + 1,
+          orchestratorContext,
+        });
       }
 
-      const synthesisStartTime = Date.now();
-      const synthesisRequestStartMs = performance.now();
-      const synthesisMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [{ role: "user", content: synthesisPrompt }];
-      const synthesisResult = await provider.generateText(
-        synthesisMessages,
-        resolvedModel,
-        { maxTokens: 8192 },
-      );
-      const synthesisDurationMs = Date.now() - synthesisStartTime;
-
-      RequestLogger.logBackgroundLlmCall({
-        requestId: `${orchestratorContext.conversationId || "unknown"}-synthesis-${teamName}`,
-        endpoint: "/agent",
-        operation: "orchestrator:synthesis",
-        project: orchestratorContext.project || null,
-        username: orchestratorContext.username || "system",
-        agent: null,
-        provider: providerName,
-        model: resolvedModel,
-        traceId: orchestratorContext.traceId || null,
-        agentConversationId: orchestratorContext.agentConversationId || null,
-        aiMessages: synthesisMessages,
-        resultText: synthesisResult.text || "",
-        usage: synthesisResult.usage || null,
-        success: true,
-        errorMessage: null,
-        requestStartMs: synthesisRequestStartMs,
-        extraRequestPayload: {
-          teamName,
-          memberCount: members.length,
-          successfulCount: successfulResults.length,
-        },
-      }).catch((loggingError: unknown) =>
-        logger.error(
-          `[HierarchicalAggregationRouter] Failed to log synthesis request: ${getErrorMessage(loggingError)}`,
-        ),
-      );
-
-      const synthesisSubAgentResult: SubAgentResult = {
-        agent_id: `synthesis-${teamName}-${Date.now()}`,
-        description: `Synthesis pass for team "${teamName}"`,
-        status: "completed",
-        summary: `Aggregated ${successfulResults.length} sub-agent results into a unified synthesis`,
-        result: synthesisResult.text,
-        toolUses: 0,
-        iterations: 1,
-        durationMs: synthesisDurationMs,
-        messages: [],
-        diff: { additions: 0, deletions: 0, files: [] },
-      };
+      if (isFirstLayer) {
+        checkModelDiversity(assignments);
+      }
 
       logger.info(
-        `[HierarchicalAggregationRouter] Synthesis pass complete in ${synthesisDurationMs}ms (${synthesisResult.usage.inputTokens} input, ${synthesisResult.usage.outputTokens} output tokens)`,
+        `[HierarchicalAggregationRouter]${layerLabel} Spawning ${assignments.length} proposers in parallel...`,
       );
 
-      return [...memberResults, synthesisSubAgentResult];
-    } catch (synthesisError: unknown) {
-      const errorMessage =
-        synthesisError instanceof Error
-          ? synthesisError.message
-          : String(synthesisError);
-      logger.error(
-        `[HierarchicalAggregationRouter] Synthesis pass failed: ${errorMessage}`,
+      const spawnPromises = assignments.map((assignment) =>
+        spawnSubAgent(assignment),
       );
-      return memberResults;
+      const memberResults = await Promise.all(spawnPromises);
+      allLayerResults = isFirstLayer ? memberResults : [...allLayerResults, ...memberResults];
+
+      // ── Phase 2: Synthesis pass (aggregator) ──────────────────────────
+
+      const successfulResults = memberResults.filter(
+        (result) => !("error" in result) && result.status === "completed",
+      );
+
+      if (successfulResults.length === 0) {
+        logger.warn(
+          `[HierarchicalAggregationRouter]${layerLabel} All ${memberResults.length} proposers failed — aborting layer`,
+        );
+        break;
+      }
+
+      if (successfulResults.length === 1 && layerCount === 1) {
+        logger.info(
+          `[HierarchicalAggregationRouter]${layerLabel} Only 1 proposer succeeded — skipping synthesis`,
+        );
+        return allLayerResults;
+      }
+
+      logger.info(
+        `[HierarchicalAggregationRouter]${layerLabel} Running synthesis over ${successfulResults.length} successful proposer results...`,
+      );
+
+      try {
+        const synthesisPrompt = buildSynthesisPrompt(
+          teamName,
+          memberResults,
+          layerIndex,
+          layerCount,
+        );
+        const provider = getProvider(providerName);
+
+        if (!provider) {
+          logger.error(
+            `[HierarchicalAggregationRouter]${layerLabel} Provider "${providerName}" not found for synthesis`,
+          );
+          break;
+        }
+
+        const synthesisStartTime = Date.now();
+        const synthesisRequestStartMs = performance.now();
+        const synthesisMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [{ role: "user", content: synthesisPrompt }];
+        const synthesisResult = await provider.generateText(
+          synthesisMessages,
+          resolvedModel,
+          { maxTokens: 8192 },
+        );
+        const synthesisDurationMs = Date.now() - synthesisStartTime;
+
+        RequestLogger.logBackgroundLlmCall({
+          requestId: `${orchestratorContext.conversationId || "unknown"}-synthesis-L${layerIndex + 1}-${teamName}`,
+          endpoint: "/agent",
+          operation: "orchestrator:synthesis",
+          project: orchestratorContext.project || null,
+          username: orchestratorContext.username || "system",
+          agent: null,
+          provider: providerName,
+          model: resolvedModel,
+          traceId: orchestratorContext.traceId || null,
+          agentConversationId: orchestratorContext.agentConversationId || null,
+          aiMessages: synthesisMessages,
+          resultText: synthesisResult.text || "",
+          usage: synthesisResult.usage || null,
+          success: true,
+          errorMessage: null,
+          requestStartMs: synthesisRequestStartMs,
+          extraRequestPayload: {
+            teamName,
+            layer: layerIndex + 1,
+            totalLayers: layerCount,
+            memberCount: members.length,
+            successfulCount: successfulResults.length,
+          },
+        }).catch((loggingError: unknown) =>
+          logger.error(
+            `[HierarchicalAggregationRouter]${layerLabel} Failed to log synthesis request: ${getErrorMessage(loggingError)}`,
+          ),
+        );
+
+        const synthesisSubAgentResult: SubAgentResult = {
+          agent_id: `synthesis-L${layerIndex + 1}-${teamName}-${Date.now()}`,
+          description: `Synthesis pass for team "${teamName}"${layerLabel}`,
+          status: "completed",
+          summary: `Aggregated ${successfulResults.length} proposer results into a unified synthesis${layerLabel}`,
+          result: synthesisResult.text,
+          toolUses: 0,
+          iterations: 1,
+          durationMs: synthesisDurationMs,
+          messages: [],
+          diff: { additions: 0, deletions: 0, files: [] },
+        };
+
+        logger.info(
+          `[HierarchicalAggregationRouter]${layerLabel} Synthesis complete in ${synthesisDurationMs}ms ` +
+          `(${synthesisResult.usage.inputTokens} input, ${synthesisResult.usage.outputTokens} output tokens)`,
+        );
+
+        previousLayerSynthesis = synthesisResult.text || null;
+        allLayerResults.push(synthesisSubAgentResult);
+      } catch (synthesisError: unknown) {
+        const errorMessage =
+          synthesisError instanceof Error
+            ? synthesisError.message
+            : String(synthesisError);
+        logger.error(
+          `[HierarchicalAggregationRouter]${layerLabel} Synthesis failed: ${errorMessage}`,
+        );
+        break;
+      }
     }
+
+    return allLayerResults;
   }
 }

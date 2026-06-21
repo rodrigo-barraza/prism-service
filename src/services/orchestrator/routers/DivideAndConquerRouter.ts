@@ -21,6 +21,7 @@ const MAXIMUM_SYNTHESIS_CHARACTERS = 120_000;
 interface DecomposedSubtask {
   description: string;
   prompt: string;
+  dependsOn?: number[];
 }
 
 function truncateResultOutput(output: string, maximumCharacters: number): string {
@@ -38,7 +39,7 @@ function buildDecompositionPrompt(
 
   return [
     `You are a task decomposition planner.`,
-    `Your job is to break down a complex task into independent subtasks that can be executed in parallel by separate sub-agents.`,
+    `Your job is to break down a complex task into subtasks that can be executed by separate sub-agents.`,
     "",
     "## Original Task",
     "",
@@ -46,11 +47,13 @@ function buildDecompositionPrompt(
     "",
     "## Instructions",
     "",
-    `1. Analyze the task and identify ${maximumSubtasks} or fewer independent subtasks.`,
-    "2. Each subtask must be self-contained — a sub-agent should be able to execute it without knowing about other subtasks.",
+    `1. Analyze the task and identify ${maximumSubtasks} or fewer subtasks.`,
+    "2. Each subtask should be as self-contained as possible.",
     "3. Subtasks should NOT overlap in scope — avoid two subtasks modifying the same files.",
     "4. Each subtask must include specific file paths, function names, and exact instructions.",
     "5. Do NOT include meta-tasks like 'review' or 'verify' — focus on implementation work.",
+    "6. If a subtask depends on the output of another subtask (e.g., 'write tests' depends on 'implement feature'),",
+    '   specify `dependsOn` as an array of 0-based subtask indices. Independent subtasks should omit this field.',
     "",
     "## Output Format",
     "",
@@ -58,10 +61,15 @@ function buildDecompositionPrompt(
     "",
     "```json",
     "[",
-    "  {",
-    `    "description": "Brief 1-line description of the subtask",`,
-    `    "prompt": "Detailed, self-contained instructions for the sub-agent. Include file paths, function names, and specific changes."`,
-    "  }",
+    '  {',
+    `    "description": "Define TypeScript interfaces for the feature",`,
+    `    "prompt": "Create the type definitions in src/types/..."`,
+    '  },',
+    '  {',
+    `    "description": "Implement the service using the types",`,
+    `    "prompt": "Implement the service in src/services/...",`,
+    `    "dependsOn": [0]`,
+    '  }',
     "]",
     "```",
   ].join("\n");
@@ -90,7 +98,13 @@ function parseDecompositionResponse(responseText: string, maximumSubtaskCount: n
           typeof subtask.prompt === "string" &&
           subtask.prompt.trim().length > 0,
       )
-      .slice(0, maximumSubtaskCount);
+      .slice(0, maximumSubtaskCount)
+      .map((subtask) => ({
+        ...subtask,
+        dependsOn: Array.isArray(subtask.dependsOn)
+          ? subtask.dependsOn.filter((index: unknown): index is number => typeof index === "number" && index >= 0)
+          : undefined,
+      }));
   } catch (parseError: unknown) {
     logger.error(
       `[DivideAndConquerRouter] Failed to parse decomposition JSON: ${getErrorMessage(parseError)}`,
@@ -171,6 +185,108 @@ function buildSynthesisPrompt(
 }
 
 /**
+ * Groups subtasks into execution tiers based on their dependency graph.
+ * Tier 0 contains subtasks with no dependencies. Tier 1 contains subtasks
+ * whose dependencies are all in Tier 0, and so on.
+ * Falls back to a single tier (all parallel) if no dependencies exist.
+ */
+function buildExecutionTiers(subtasks: DecomposedSubtask[]): number[][] {
+  const hasDependencies = subtasks.some(
+    (subtask) => subtask.dependsOn && subtask.dependsOn.length > 0,
+  );
+
+  if (!hasDependencies) {
+    return [subtasks.map((_, subtaskIndex) => subtaskIndex)];
+  }
+
+  const assignedTier = new Array<number>(subtasks.length).fill(-1);
+  const maximumIterations = subtasks.length;
+
+  for (let iteration = 0; iteration < maximumIterations; iteration++) {
+    let madeProgress = false;
+
+    for (let subtaskIndex = 0; subtaskIndex < subtasks.length; subtaskIndex++) {
+      if (assignedTier[subtaskIndex] >= 0) continue;
+
+      const dependencies = subtasks[subtaskIndex].dependsOn || [];
+      const validDependencies = dependencies.filter(
+        (dependencyIndex) => dependencyIndex >= 0 && dependencyIndex < subtasks.length && dependencyIndex !== subtaskIndex,
+      );
+
+      if (validDependencies.length === 0) {
+        assignedTier[subtaskIndex] = 0;
+        madeProgress = true;
+        continue;
+      }
+
+      const allDependenciesResolved = validDependencies.every(
+        (dependencyIndex) => assignedTier[dependencyIndex] >= 0,
+      );
+
+      if (allDependenciesResolved) {
+        const maximumDependencyTier = Math.max(
+          ...validDependencies.map((dependencyIndex) => assignedTier[dependencyIndex]),
+        );
+        assignedTier[subtaskIndex] = maximumDependencyTier + 1;
+        madeProgress = true;
+      }
+    }
+
+    if (!madeProgress) break;
+  }
+
+  // Assign any unresolved (cyclic) subtasks to the final tier
+  const maximumResolvedTier = Math.max(0, ...assignedTier.filter((tier) => tier >= 0));
+  for (let subtaskIndex = 0; subtaskIndex < subtasks.length; subtaskIndex++) {
+    if (assignedTier[subtaskIndex] < 0) {
+      logger.warn(
+        `[DivideAndConquerRouter] Subtask ${subtaskIndex} has cyclic dependencies — assigning to final tier`,
+      );
+      assignedTier[subtaskIndex] = maximumResolvedTier + 1;
+    }
+  }
+
+  const tierCount = Math.max(...assignedTier) + 1;
+  const tiers: number[][] = Array.from({ length: tierCount }, () => []);
+  for (let subtaskIndex = 0; subtaskIndex < subtasks.length; subtaskIndex++) {
+    tiers[assignedTier[subtaskIndex]].push(subtaskIndex);
+  }
+
+  return tiers;
+}
+
+function buildDependencyContextPrefix(
+  completedResults: Map<number, SubAgentResult | { error: string }>,
+  dependencyIndices: number[],
+  subtaskDescriptions: string[],
+): string {
+  const dependencyOutputs = dependencyIndices
+    .filter((dependencyIndex) => completedResults.has(dependencyIndex))
+    .map((dependencyIndex) => {
+      const dependencyResult = completedResults.get(dependencyIndex)!;
+      const dependencyDescription = subtaskDescriptions[dependencyIndex] || `Subtask #${dependencyIndex + 1}`;
+      if ("error" in dependencyResult) {
+        return `### ${dependencyDescription}\n**Status:** Error — ${dependencyResult.error}`;
+      }
+      const outputText = dependencyResult.result || dependencyResult.summary || "(no output)";
+      return `### ${dependencyDescription}\n${outputText}`;
+    });
+
+  if (dependencyOutputs.length === 0) return "";
+
+  return [
+    "## Prerequisite Subtask Outputs",
+    "",
+    "The following subtasks have already been completed. Use their outputs as context for your work.",
+    "",
+    dependencyOutputs.join("\n\n---\n\n"),
+    "",
+    "---",
+    "",
+  ].join("\n");
+}
+
+/**
  * Divide & Conquer Router — Recursive Decomposition with Dependencies (RDD)
  *
  * Based on: "Recursive Decomposition with Dependencies for Generic
@@ -187,6 +303,13 @@ function buildSynthesisPrompt(
  * - The planner may generate fewer or more subtasks than members provided
  *
  * This is compositionally: Sequential(Planner) → Hierarchical(subtasks) → Aggregation(synthesis)
+ *
+ * Paper alignment:
+ * - Recursive decomposition → ✅ LLM planner decomposes into subtasks
+ * - Dependency DAG          → ✅ Planner outputs dependsOn indices; topological sort groups into tiers
+ * - Sub-task execution      → ✅ Each subtask dispatched to a sub-agent (tier-parallel)
+ * - Recomposition           → ✅ Synthesis pass merges subtask results
+ * - Recursive depth         → ⚠️ Not implemented: single-level decomposition only
  */
 export class DivideAndConquerRouter implements TopologyRouter {
   async execute(
@@ -282,10 +405,14 @@ export class DivideAndConquerRouter implements TopologyRouter {
       subtasks = [{ description: members[0].description, prompt: originalTask }];
     }
 
-    // ── Phase 2: Parallel Subtask Execution ─────────────────────────────
+    // ── Phase 2: Tier-Based Subtask Execution (Dependency-Aware) ─────────
+
+    const executionTiers = buildExecutionTiers(subtasks);
+    const tierCount = executionTiers.length;
+    const subtaskDescriptions = subtasks.map((subtask) => subtask.description);
 
     logger.info(
-      `[DivideAndConquerRouter] Phase 2: Executing ${subtasks.length} subtask(s) in parallel...`,
+      `[DivideAndConquerRouter] Phase 2: Executing ${subtasks.length} subtask(s) across ${tierCount} tier(s)...`,
     );
 
     const resolvedSiblings = await resolveSiblingInstances(
@@ -294,34 +421,60 @@ export class DivideAndConquerRouter implements TopologyRouter {
     );
 
     const referenceMember = members[0];
+    const subtaskResults: (SubAgentResult | { error: string })[] = new Array(subtasks.length);
+    const completedResults = new Map<number, SubAgentResult | { error: string }>();
 
-    const subtaskAssignments: OrchestratorSpawnParams[] = subtasks.map(
-      (subtask, subtaskIndex) => {
+    for (let tierIndex = 0; tierIndex < tierCount; tierIndex++) {
+      const tierSubtaskIndices = executionTiers[tierIndex];
+
+      if (tierCount > 1) {
+        logger.info(
+          `[DivideAndConquerRouter] Tier ${tierIndex + 1}/${tierCount}: Executing ${tierSubtaskIndices.length} subtask(s) in parallel...`,
+        );
+      }
+
+      const tierAssignments: { subtaskIndex: number; assignment: OrchestratorSpawnParams }[] = [];
+
+      for (const subtaskIndex of tierSubtaskIndices) {
+        const subtask = subtasks[subtaskIndex];
         const { assignedProvider, assignedModel } = selectInstanceForMember(
           referenceMember,
           resolvedSiblings,
           { providerName, resolvedModel },
         );
 
-        return {
-          description: subtask.description,
-          prompt: subtask.prompt,
-          files: referenceMember.files,
-          model: referenceMember.model,
-          agent: referenceMember.agent,
-          assignedProvider,
-          assignedModel,
-          agentIndex: subtaskIndex,
-          teamSize: subtasks.length,
-          orchestratorContext,
-        };
-      },
-    );
+        const dependencyContext = subtask.dependsOn && subtask.dependsOn.length > 0
+          ? buildDependencyContextPrefix(completedResults, subtask.dependsOn, subtaskDescriptions)
+          : "";
 
-    const subtaskPromises = subtaskAssignments.map((assignment) =>
-      spawnSubAgent(assignment),
-    );
-    const subtaskResults = await Promise.all(subtaskPromises);
+        tierAssignments.push({
+          subtaskIndex,
+          assignment: {
+            description: subtask.description,
+            prompt: dependencyContext + subtask.prompt,
+            files: referenceMember.files,
+            model: referenceMember.model,
+            agent: referenceMember.agent,
+            assignedProvider,
+            assignedModel,
+            agentIndex: subtaskIndex,
+            teamSize: subtasks.length,
+            orchestratorContext,
+          },
+        });
+      }
+
+      const tierPromises = tierAssignments.map(({ assignment }) =>
+        spawnSubAgent(assignment),
+      );
+      const tierResults = await Promise.all(tierPromises);
+
+      for (let resultOffset = 0; resultOffset < tierAssignments.length; resultOffset++) {
+        const originalIndex = tierAssignments[resultOffset].subtaskIndex;
+        subtaskResults[originalIndex] = tierResults[resultOffset];
+        completedResults.set(originalIndex, tierResults[resultOffset]);
+      }
+    }
 
     // ── Phase 3: Synthesis ──────────────────────────────────────────────
 

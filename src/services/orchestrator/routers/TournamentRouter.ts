@@ -87,6 +87,13 @@ function buildSelectionPrompt(
  * Key differences from Hierarchical Aggregation:
  * - Tournament SELECTS one winner; Aggregation SYNTHESIZES all outputs
  * - The judge must reproduce the winning output exactly
+ *
+ * Paper alignment:
+ * - Repeated sampling    → ✅ Fan-out N sub-agents in parallel
+ * - Verification         → ⚠️ Different: paper uses automatic verifiers (unit tests, proofs);
+ *                              we use an LLM judge (closer to reward model approach)
+ * - Coverage scaling     → N/A: theoretical finding, not an implementation feature
+ * - Selection            → ✅ Judge selects best result verbatim
  */
 export class TournamentRouter implements TopologyRouter {
   async execute(
