@@ -9,7 +9,7 @@
  * completeness), selects best, and backtracks with reflexion
  * on validation failure. Supports BFS/DFS search strategies.
  *
- * See ReasoningStrategyRegistry.ts → REASONING_STRATEGY_DEFINITIONS
+ * See ThoughtStructureRegistry.ts → THOUGHT_STRUCTURE_DEFINITIONS
  * (id: "tree_of_thoughts") for full paper-alignment metadata.
  */
 import type BaseAgenticHarness from "../BaseAgenticHarness.ts";
@@ -122,7 +122,7 @@ const BRANCH_STRATEGY_DESCRIPTORS = [
 ];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  Public API — called by ReActHarness when reasoningStrategy === "tree_of_thoughts"
+//  Public API — called by ReActHarness when thoughtStructure === "tree_of_thoughts"
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export async function runTreeOfThoughts(

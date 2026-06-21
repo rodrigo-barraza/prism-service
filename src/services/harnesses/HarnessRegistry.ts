@@ -11,7 +11,7 @@ import type { ConversationMessage } from "./types.ts";
  *   3. Import and register it here
  *
  * Note: Tree of Thoughts is not a separate harness — it's a reasoning
- * strategy within ReActHarness (options.reasoningStrategy = "tree_of_thoughts").
+ * strategy within ReActHarness (options.thoughtStructure = "tree_of_thoughts").
  */
 
 interface HarnessConstructor {

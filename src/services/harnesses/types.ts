@@ -174,7 +174,7 @@ export interface AgenticOptions {
   /** Search strategy for TreeOfThought: "bfs" (parallel exploration, default) or "dfs" (depth-first with pruning). */
   searchStrategy?: string;
   /** Reasoning strategy for the agentic loop: "chain_of_thought" (default single-pass) or "tree_of_thoughts" (parallel branching with scoring). */
-  reasoningStrategy?: string;
+  thoughtStructure?: string;
   /** Enable sandbox execution with git-based rollback for destructive tools. */
   enableSandbox?: boolean;
   /** Skip CriticGate review for this session. */
