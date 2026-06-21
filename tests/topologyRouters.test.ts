@@ -47,6 +47,7 @@ import { HierarchicalRouter } from "../src/services/orchestrator/routers/Hierarc
 import { HierarchicalAggregationRouter } from "../src/services/orchestrator/routers/HierarchicalAggregationRouter.ts";
 import { SequentialRouter } from "../src/services/orchestrator/routers/SequentialRouter.ts";
 import { PeerToPeerRouter } from "../src/services/orchestrator/routers/PeerToPeerRouter.ts";
+import { TournamentRouter } from "../src/services/orchestrator/routers/TournamentRouter.ts";
 import { GitWorktreeHelper } from "../src/services/orchestrator/GitWorktreeHelper.ts";
 
 describe("Topology Routers Test Suite", () => {
@@ -821,6 +822,7 @@ describe("Topology Routers Test Suite", () => {
         { router: new HierarchicalRouter(), name: "Hierarchical" },
         { router: new SequentialRouter(), name: "Sequential" },
         { router: new HierarchicalAggregationRouter(), name: "HierarchicalAggregation" },
+        { router: new TournamentRouter(), name: "Tournament" },
       ];
 
       for (const { router, name } of allRouters) {
@@ -1041,6 +1043,106 @@ describe("Topology Routers Test Suite", () => {
       expect(devContinuePrompt).toContain("YOUR TASK (Dev)");
       expect(devContinuePrompt).toContain("Your speaker identity in this discussion is Dev");
       expect(devContinuePrompt).toContain("Build feature X");
+    });
+  });
+
+  describe("TournamentRouter", () => {
+    it("should execute all members concurrently and invoke judge selection when multiple succeed", async () => {
+      const router = new TournamentRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+      ];
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "**Winner:** Sub-Agent #1\n**Justification:** Task A was superior.\n\n**Selected Output:**\nCompleted task: Task A",
+        usage: { inputTokens: 200, outputTokens: 80 },
+      });
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      // Should return original results plus the judge's result
+      expect(results).toHaveLength(3);
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
+
+      // Verify the judge LLM was called via getProvider().generateText
+      expect(mockGenerateText).toHaveBeenCalledOnce();
+      const selectionPrompt = mockGenerateText.mock.calls[0][0][0].content;
+      expect(selectionPrompt).toContain('You are a judge for the team "test-team"');
+      expect(selectionPrompt).toContain("Completed task: Task A");
+      expect(selectionPrompt).toContain("Completed task: Task B");
+
+      // Verify final judge sub-agent result in output array
+      const judgeResult = results[2] as SubAgentResult;
+      expect(judgeResult.agent_id).toContain("tournament-judge-test-team");
+      expect(judgeResult.status).toBe("completed");
+      expect(judgeResult.result).toContain("**Winner:** Sub-Agent #1");
+    });
+
+    it("should auto-select winner and skip judge selection if only one sub-agent succeeds", async () => {
+      const router = new TournamentRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+      ];
+
+      // Spawn first successfully, second with error
+      spawnSubAgentMock
+        .mockResolvedValueOnce({
+          agent_id: "agent-a",
+          description: "Task A",
+          status: "completed",
+          result: "Success A",
+          summary: "Done A",
+          toolUses: 1,
+          durationMs: 50,
+          iterations: 1,
+          messages: [],
+        })
+        .mockResolvedValueOnce({ error: "Failed B" });
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(results).toHaveLength(2);
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
+      // Judge LLM generateText should not be called
+      expect(mockGenerateText).not.toHaveBeenCalled();
+      expect(results[0]).not.toHaveProperty("error");
+      expect(results[1]).toHaveProperty("error");
+    });
+
+    it("should skip judge selection if all sub-agents fail", async () => {
+      const router = new TournamentRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+      ];
+
+      spawnSubAgentMock.mockResolvedValue({ error: "Fatal Error" });
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      expect(results).toHaveLength(2);
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
+      expect(mockGenerateText).not.toHaveBeenCalled();
+    });
+
+    it("should handle judge selection errors gracefully and return original sub-agent results", async () => {
+      const router = new TournamentRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+      ];
+
+      // Force LLM call to reject/throw
+      mockGenerateText.mockRejectedValueOnce(new Error("Judge LLM timeout"));
+
+      const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
+
+      // Should fallback to returning only the original results without the judge result
+      expect(results).toHaveLength(2);
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
+      expect(mockGenerateText).toHaveBeenCalledOnce();
     });
   });
 });
