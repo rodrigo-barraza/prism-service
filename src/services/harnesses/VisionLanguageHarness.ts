@@ -515,7 +515,11 @@ Use these images to observe the environment, notice changes, animations, or user
         }
 
         // ── No tools — check if we should break ─────────────────
-        if (pass.streamedText || pass.streamedThinking.trim()) {
+        // Text present (with or without thinking) → clean text break.
+        // Thinking-only (no text, no tools) → the model exhausted its
+        // output budget on thinking tokens before producing a response.
+        // Inject a continuation prompt asking it to respond concisely.
+        if (pass.streamedText) {
           if (state.planModeActive) {
             currentMessages.push({
               role: "assistant",
@@ -548,6 +552,35 @@ Use these images to observe the environment, notice changes, animations, or user
           this.logIteration(pass, currentMessages);
           hasCleanTextBreak = true;
           break;
+        }
+
+        if (!pass.streamedText && pass.streamedThinking.trim()) {
+          logger.warn(
+            `[VisionLanguageHarness] Thinking-only response on iteration ${state.iterations} — ` +
+              `thinking=${pass.streamedThinking.length}chars, text=0. ` +
+              `Injecting continuation prompt to elicit text response.`,
+          );
+
+          currentMessages.push({
+            role: "assistant",
+            content: "",
+            thinking: pass.streamedThinking.trim(),
+            ...(pass.thinkingSignature && {
+              thinkingSignature: pass.thinkingSignature,
+            }),
+          });
+
+          currentMessages.push({
+            role: "user",
+            content:
+              "[System: Your previous response contained only internal reasoning " +
+              "without producing any visible output. Your thinking has been preserved. " +
+              "Now respond concisely with your actual answer, analysis, or tool calls. " +
+              "Do not repeat your reasoning — act on it.]",
+          });
+
+          this.logIteration(pass, currentMessages);
+          continue;
         }
 
         // ── Empty output — check for truncation recovery ─────────

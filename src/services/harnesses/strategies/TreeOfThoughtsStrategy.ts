@@ -854,7 +854,8 @@ export async function runTreeOfThoughts(
       }
 
       // ── No tools — final text response ──────────────────────
-      if (selectedPass.streamedText || selectedPass.streamedThinking.trim()) {
+      // Text present → clean text break. Thinking-only → continuation.
+      if (selectedPass.streamedText) {
         const codexResult = handleCodexPlanningResponse(
           selectedPass,
           currentMessages,
@@ -871,6 +872,35 @@ export async function runTreeOfThoughts(
         harness.logIteration(selectedPass, currentMessages);
         hasCleanTextBreak = true;
         break;
+      }
+
+      if (!selectedPass.streamedText && selectedPass.streamedThinking.trim()) {
+        logger.warn(
+          `[TreeOfThoughts] Thinking-only response on iteration ${state.iterations} — ` +
+            `thinking=${selectedPass.streamedThinking.length}chars, text=0. ` +
+            `Injecting continuation prompt.`,
+        );
+
+        currentMessages.push({
+          role: "assistant",
+          content: "",
+          thinking: selectedPass.streamedThinking.trim(),
+          ...(selectedPass.thinkingSignature && {
+            thinkingSignature: selectedPass.thinkingSignature,
+          }),
+        });
+
+        currentMessages.push({
+          role: "user",
+          content:
+            "[System: Your previous response contained only internal reasoning " +
+            "without producing any visible output. Your thinking has been preserved. " +
+            "Now respond concisely with your actual answer, analysis, or tool calls. " +
+            "Do not repeat your reasoning — act on it.]",
+        });
+
+        harness.logIteration(selectedPass, currentMessages);
+        continue;
       }
 
       // ── Empty output — check for truncation recovery ─────────
