@@ -33,15 +33,14 @@ function buildSelectionPrompt(
     if ("error" in result) {
       return `### Sub-Agent #${resultIndex + 1}\n**Status:** Error\n**Error:** ${result.error}`;
     }
-    const subAgentResult = result as SubAgentResult;
-    const outputText = subAgentResult.result
-      ? truncateResultOutput(subAgentResult.result, characterBudgetPerMember)
-      : (buildToolCallFallbackSummary(subAgentResult) || subAgentResult.summary);
+    const outputText = result.result
+      ? truncateResultOutput(result.result, characterBudgetPerMember)
+      : (buildToolCallFallbackSummary(result) || result.summary);
     return [
-      `### Sub-Agent #${resultIndex + 1}: ${subAgentResult.description || "unnamed"}`,
-      `**Status:** ${subAgentResult.status}`,
-      `**Tool Uses:** ${subAgentResult.toolUses}`,
-      `**Duration:** ${subAgentResult.durationMs}ms`,
+      `### Sub-Agent #${resultIndex + 1}: ${result.description || "unnamed"}`,
+      `**Status:** ${result.status}`,
+      `**Tool Uses:** ${result.toolUses}`,
+      `**Duration:** ${result.durationMs}ms`,
       `**Output:**\n${outputText}`,
     ].join("\n");
   });
@@ -163,7 +162,7 @@ export class TournamentRouter implements TopologyRouter {
 
       const selectionStartTime = Date.now();
       const selectionRequestStartMs = performance.now();
-      const selectionMessages = [{ role: "user", content: selectionPrompt }];
+      const selectionMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [{ role: "user", content: selectionPrompt }];
       const selectionResult = await provider.generateText(
         selectionMessages,
         resolvedModel,
@@ -182,7 +181,7 @@ export class TournamentRouter implements TopologyRouter {
         model: resolvedModel,
         traceId: orchestratorContext.traceId || null,
         agentConversationId: orchestratorContext.agentConversationId || null,
-        aiMessages: selectionMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
+        aiMessages: selectionMessages,
         resultText: selectionResult.text || "",
         usage: selectionResult.usage || null,
         success: true,

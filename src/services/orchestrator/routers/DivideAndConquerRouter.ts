@@ -84,9 +84,11 @@ function parseDecompositionResponse(responseText: string, maximumSubtaskCount: n
         (subtask: unknown): subtask is DecomposedSubtask =>
           typeof subtask === "object" &&
           subtask !== null &&
-          typeof (subtask as DecomposedSubtask).description === "string" &&
-          typeof (subtask as DecomposedSubtask).prompt === "string" &&
-          (subtask as DecomposedSubtask).prompt.trim().length > 0,
+          "description" in subtask &&
+          "prompt" in subtask &&
+          typeof subtask.description === "string" &&
+          typeof subtask.prompt === "string" &&
+          subtask.prompt.trim().length > 0,
       )
       .slice(0, maximumSubtaskCount);
   } catch (parseError: unknown) {
@@ -105,8 +107,10 @@ function parseDecompositionResponse(responseText: string, maximumSubtaskCount: n
               (subtask: unknown): subtask is DecomposedSubtask =>
                 typeof subtask === "object" &&
                 subtask !== null &&
-                typeof (subtask as DecomposedSubtask).description === "string" &&
-                typeof (subtask as DecomposedSubtask).prompt === "string",
+                "description" in subtask &&
+                "prompt" in subtask &&
+                typeof subtask.description === "string" &&
+                typeof subtask.prompt === "string",
             )
             .slice(0, maximumSubtaskCount);
         }
@@ -133,13 +137,12 @@ function buildSynthesisPrompt(
     if ("error" in result) {
       return `### Subtask: ${subtaskDescription}\n**Status:** Error\n**Error:** ${result.error}`;
     }
-    const subAgentResult = result as SubAgentResult;
-    const outputText = subAgentResult.result
-      ? truncateResultOutput(subAgentResult.result, characterBudgetPerResult)
-      : (buildToolCallFallbackSummary(subAgentResult) || subAgentResult.summary);
+    const outputText = result.result
+      ? truncateResultOutput(result.result, characterBudgetPerResult)
+      : (buildToolCallFallbackSummary(result) || result.summary);
     return [
       `### Subtask: ${subtaskDescription}`,
-      `**Status:** ${subAgentResult.status}`,
+      `**Status:** ${result.status}`,
       `**Output:**\n${outputText}`,
     ].join("\n");
   });
@@ -220,7 +223,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
 
     try {
       const decompositionStartMs = performance.now();
-      const decompositionMessages = [{ role: "user", content: decompositionPrompt }];
+      const decompositionMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [{ role: "user", content: decompositionPrompt }];
       const decompositionResult = await provider.generateText(
         decompositionMessages,
         resolvedModel,
@@ -239,7 +242,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
         model: resolvedModel,
         traceId: orchestratorContext.traceId || null,
         agentConversationId: orchestratorContext.agentConversationId || null,
-        aiMessages: decompositionMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
+        aiMessages: decompositionMessages,
         resultText: decompositionResult.text || "",
         usage: decompositionResult.usage || null,
         success: true,
@@ -345,7 +348,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
       );
 
       const synthesisStartMs = performance.now();
-      const synthesisMessages = [{ role: "user", content: synthesisPrompt }];
+      const synthesisMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [{ role: "user", content: synthesisPrompt }];
       const synthesisResult = await provider.generateText(
         synthesisMessages,
         resolvedModel,
@@ -364,7 +367,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
         model: resolvedModel,
         traceId: orchestratorContext.traceId || null,
         agentConversationId: orchestratorContext.agentConversationId || null,
-        aiMessages: synthesisMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
+        aiMessages: synthesisMessages,
         resultText: synthesisResult.text || "",
         usage: synthesisResult.usage || null,
         success: true,

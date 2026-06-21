@@ -33,13 +33,12 @@ function buildSynthesisPrompt(
     if ("error" in result) {
       return `### Sub-Agent #${resultIndex + 1}\n**Status:** Error\n**Error:** ${result.error}`;
     }
-    const subAgentResult = result as SubAgentResult;
-    const outputText = subAgentResult.result
-      ? truncateResultOutput(subAgentResult.result, characterBudgetPerMember)
-      : (buildToolCallFallbackSummary(subAgentResult) || subAgentResult.summary);
+    const outputText = result.result
+      ? truncateResultOutput(result.result, characterBudgetPerMember)
+      : (buildToolCallFallbackSummary(result) || result.summary);
     return [
-      `### Sub-Agent #${resultIndex + 1}: ${subAgentResult.description || "unnamed"}`,
-      `**Status:** ${subAgentResult.status}`,
+      `### Sub-Agent #${resultIndex + 1}: ${result.description || "unnamed"}`,
+      `**Status:** ${result.status}`,
       `**Output:**\n${outputText}`,
     ].join("\n");
   });
@@ -152,7 +151,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
 
       const synthesisStartTime = Date.now();
       const synthesisRequestStartMs = performance.now();
-      const synthesisMessages = [{ role: "user", content: synthesisPrompt }];
+      const synthesisMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [{ role: "user", content: synthesisPrompt }];
       const synthesisResult = await provider.generateText(
         synthesisMessages,
         resolvedModel,
@@ -171,7 +170,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
         model: resolvedModel,
         traceId: orchestratorContext.traceId || null,
         agentConversationId: orchestratorContext.agentConversationId || null,
-        aiMessages: synthesisMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
+        aiMessages: synthesisMessages,
         resultText: synthesisResult.text || "",
         usage: synthesisResult.usage || null,
         success: true,
