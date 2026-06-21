@@ -62,6 +62,7 @@ import benchmarkRouter from "./routes/BenchmarkRoutes.ts";
 import synthesisRouter from "./routes/SynthesisRoutes.ts";
 import vramBenchmarksRouter from "./routes/VramBenchmarksRoutes.ts";
 import orchestratorRouter from "./routes/OrchestratorRoutes.ts";
+import topologyRouter from "./routes/TopologyRoutes.ts";
 import settingsRouter from "./routes/SettingsRoutes.ts";
 import customAgentsRouter from "./routes/CustomAgentsRoutes.ts";
 import workspacesRouter from "./routes/WorkspacesRoutes.ts";
@@ -129,6 +130,7 @@ const ENDPOINTS = {
     "/synthesis",
     "/vram-benchmarks",
     "/orchestrator",
+    "/topologies",
     "/settings",
     "/custom-agents",
     "/workspaces",
@@ -191,6 +193,7 @@ app.use("/benchmark", benchmarkRouter);
 app.use("/synthesis", synthesisRouter);
 app.use("/vram-benchmarks", vramBenchmarksRouter);
 app.use("/orchestrator", orchestratorRouter);
+app.use("/topologies", topologyRouter);
 app.use("/settings", settingsRouter);
 app.use("/custom-agents", customAgentsRouter);
 app.use("/workspaces", workspacesRouter);
