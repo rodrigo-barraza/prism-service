@@ -64,6 +64,8 @@ describe("TreeOfThoughtsStrategy", () => {
       selectedBranchScores: [],
       originalMessageCount: 1,
       planModeActive: false,
+      planModeText: "",
+      frontierCandidates: [],
       toolErrorCounts: new Map(),
       streamedToolCalls: [],
     };
@@ -124,5 +126,80 @@ describe("TreeOfThoughtsStrategy", () => {
     const result = await runTreeOfThoughts(mockHarnessInstance as any);
     expect(result.messages.length).toBe(1); // Unchanged
     expect(mockAgenticLoopState.iterations).toBe(1);
+  });
+
+  it("should run sequential sibling exploration in DFS mode and accept sibling immediately if above threshold", async () => {
+    mockAgenticContext.options.searchStrategy = "dfs";
+    mockAgenticContext.options.branchCount = 3;
+    mockAgenticContext.options.valueThreshold = 8.0;
+
+    const treeOfThoughtsResult = await runTreeOfThoughts(mockHarnessInstance as any);
+
+    expect(treeOfThoughtsResult).toBeDefined();
+    expect(mockAgenticLoopState.branchesExplored).toBe(1); // Accepted first sibling immediately (score 10 >= 8.0)
+    expect(mockAgenticLoopState.branchesBacktracked).toBe(0);
+  });
+
+  it("should run sequential sibling exploration in DFS mode, backtrack, and fall back to best sibling if none exceed threshold", async () => {
+    mockAgenticContext.options.searchStrategy = "dfs";
+    mockAgenticContext.options.branchCount = 2;
+    mockAgenticContext.options.valueThreshold = 12.0; // All siblings get 10, so both will be pruned (10 < 12.0)
+
+    const treeOfThoughtsResult = await runTreeOfThoughts(mockHarnessInstance as any);
+
+    expect(treeOfThoughtsResult).toBeDefined();
+    expect(mockAgenticLoopState.branchesExplored).toBe(2); // Explored both siblings
+    expect(mockAgenticLoopState.branchesBacktracked).toBe(2); // Pruned both siblings
+  });
+
+  it("should handle planning mode, block unauthorized tool calls, and exit plan mode successfully when auto-approved", async () => {
+    mockAgenticLoopState.planModeActive = true;
+    mockAgenticContext.options.autoApprove = true;
+    mockAgenticContext.options.maxIterations = 1;
+    mockAgenticContext.options.branchCount = 2;
+
+    let passStateCreationCount = 0;
+    mockHarnessInstance.createPassState = vi.fn().mockImplementation((options) => {
+      passStateCreationCount++;
+      if (passStateCreationCount === 1) {
+        return {
+          streamedText: "Let's read some files first.",
+          finalStreamedText: "Let's read some files first.",
+          streamedThinking: "",
+          thinkingSignature: "",
+          pendingToolCalls: [{ id: "call-1", name: "read_file", args: {} }],
+          streamedImages: [],
+          start: Date.now(),
+          firstTokenTime: null,
+          generationEnd: null,
+          outputCharacters: 0,
+          usage: { inputTokens: 10, outputTokens: 5, cacheReadInputTokens: 0 },
+          options,
+          requestId: "req-plan-1",
+        };
+      } else {
+        return {
+          streamedText: "Exiting planning mode now.",
+          finalStreamedText: "Exiting planning mode now.",
+          streamedThinking: "",
+          thinkingSignature: "",
+          pendingToolCalls: [{ id: "call-2", name: "exit_plan_mode", args: {} }],
+          streamedImages: [],
+          start: Date.now(),
+          firstTokenTime: null,
+          generationEnd: null,
+          outputCharacters: 0,
+          usage: { inputTokens: 10, outputTokens: 5, cacheReadInputTokens: 0 },
+          options,
+          requestId: "req-plan-2",
+        };
+      }
+    });
+
+    const treeOfThoughtsResult = await runTreeOfThoughts(mockHarnessInstance as any);
+
+    expect(treeOfThoughtsResult).toBeDefined();
+    expect(mockAgenticLoopState.planModeActive).toBe(false); // Successfully exited plan mode
+    expect(passStateCreationCount).toBe(4); // 2 for planning, 2 for parallel BFS branches in main loop iteration
   });
 });

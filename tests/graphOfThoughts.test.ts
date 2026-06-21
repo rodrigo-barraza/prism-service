@@ -65,6 +65,8 @@ describe("GraphOfThoughtsStrategy", () => {
       selectedBranchScores: [],
       originalMessageCount: 1,
       planModeActive: false,
+      planModeText: "",
+      frontierCandidates: [],
       toolErrorCounts: new Map(),
       streamedToolCalls: [],
     };
@@ -126,5 +128,89 @@ describe("GraphOfThoughtsStrategy", () => {
     const result = await runGraphOfThoughts(mockHarnessInstance as any);
     expect(result.messages.length).toBe(1);
     expect(mockAgenticLoopState.iterations).toBe(1);
+  });
+
+  it("should successfully run graph of thoughts when branchCount is 1, skipping synthesis pass", async () => {
+    mockAgenticContext.options.branchCount = 1;
+
+    const graphOfThoughtsResult = await runGraphOfThoughts(mockHarnessInstance as any);
+
+    expect(graphOfThoughtsResult).toBeDefined();
+    expect(mockAgenticLoopState.branchesExplored).toBe(1);
+    expect(mockAgenticLoopState.iterations).toBe(1);
+  });
+
+  it("should handle planning mode, block unauthorized tool calls, and exit plan mode successfully when auto-approved", async () => {
+    mockAgenticLoopState.planModeActive = true;
+    mockAgenticContext.options.autoApprove = true;
+    mockAgenticContext.options.maxIterations = 1;
+    mockAgenticContext.options.branchCount = 2;
+
+    let passStateCreationCount = 0;
+    mockHarnessInstance.createPassState = vi.fn().mockImplementation((options) => {
+      passStateCreationCount++;
+      if (passStateCreationCount === 1) {
+        return {
+          streamedText: "Let's read some files first.",
+          finalStreamedText: "Let's read some files first.",
+          streamedThinking: "",
+          thinkingSignature: "",
+          pendingToolCalls: [{ id: "call-1", name: "read_file", args: {} }],
+          streamedImages: [],
+          start: Date.now(),
+          firstTokenTime: null,
+          generationEnd: null,
+          outputCharacters: 0,
+          usage: { inputTokens: 10, outputTokens: 5, cacheReadInputTokens: 0 },
+          options,
+          requestId: "req-plan-1",
+        };
+      } else if (passStateCreationCount === 2) {
+        return {
+          streamedText: "Exiting planning mode now.",
+          finalStreamedText: "Exiting planning mode now.",
+          streamedThinking: "",
+          thinkingSignature: "",
+          pendingToolCalls: [{ id: "call-2", name: "exit_plan_mode", args: {} }],
+          streamedImages: [],
+          start: Date.now(),
+          firstTokenTime: null,
+          generationEnd: null,
+          outputCharacters: 0,
+          usage: { inputTokens: 10, outputTokens: 5, cacheReadInputTokens: 0 },
+          options,
+          requestId: "req-plan-2",
+        };
+      } else {
+        return {
+          streamedText: "Branch output.",
+          finalStreamedText: "Branch output.",
+          streamedThinking: "",
+          thinkingSignature: "",
+          pendingToolCalls: [],
+          streamedImages: [],
+          start: Date.now(),
+          firstTokenTime: null,
+          generationEnd: null,
+          outputCharacters: 0,
+          usage: { inputTokens: 10, outputTokens: 5, cacheReadInputTokens: 0 },
+          options,
+          requestId: "req-branch",
+        };
+      }
+    });
+
+    const graphOfThoughtsResult = await runGraphOfThoughts(mockHarnessInstance as any);
+
+    expect(graphOfThoughtsResult).toBeDefined();
+    expect(mockAgenticLoopState.planModeActive).toBe(false); // Exited plan mode
+    // passStateCreationCount should be: 2 for planning, 2 for parallel BFS branches, 1 for synthesis pass = 5
+    expect(passStateCreationCount).toBe(5);
+  });
+
+  it("should catch and propagate loop execution errors", async () => {
+    mockHarnessInstance.consumeStream = vi.fn().mockRejectedValue(new Error("Mock network timeout"));
+
+    await expect(runGraphOfThoughts(mockHarnessInstance as any)).rejects.toThrow("Mock network timeout");
   });
 });

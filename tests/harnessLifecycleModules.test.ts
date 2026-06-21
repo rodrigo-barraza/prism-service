@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PROVIDERS } from "../src/constants.ts";
 import { APPROVAL_TIERS } from "../src/services/AutoApprovalEngine.ts";
 import CriticGate from "../src/services/harnesses/lifecycle/CriticGate.ts";
+import { pendingApprovals } from "../src/services/ApprovalRegistry.ts";
 import { checkAndWaitForApproval } from "../src/services/harnesses/lifecycle/ApprovalGate.ts";
 import { manageContextPressure } from "../src/services/harnesses/lifecycle/ContextPressureManager.ts";
 import { checkCostBudget } from "../src/services/harnesses/lifecycle/CostBudgetEnforcer.ts";
@@ -281,6 +282,120 @@ describe("Harness Lifecycle Modules", () => {
         mockApprovalEngine,
       );
       expect(approvalResult.isApproved).toBe(true);
+    });
+
+    it("should emit approval_required events and wait for user approval resolution", async () => {
+      vi.mocked(mockApprovalEngine.checkBatch).mockReturnValue({
+        needsApproval: [{ name: "danger_tool", id: "1", _approval: { tier: APPROVAL_TIERS.DANGER, tierLabel: "DANGER" } }],
+        approved: [],
+      } as any);
+
+      const promise = checkAndWaitForApproval(
+        [{ name: "danger_tool", id: "1" }] as any,
+        mockAgenticContext as any,
+        mockApprovalEngine,
+      );
+
+      await vi.waitFor(() => {
+        expect(pendingApprovals.has("conv-123")).toBe(true);
+      });
+
+      const pendingApproval = pendingApprovals.get("conv-123");
+      expect(pendingApproval).toBeDefined();
+      expect(pendingApproval?.type).toBe("tool");
+
+      (pendingApproval as any)?.resolve({ isApproved: true, shouldApproveAll: false });
+
+      const result = await promise;
+      expect(result.isApproved).toBe(true);
+      expect(result.shouldApproveAll).toBe(false);
+      expect(mockAgenticContext.emit).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "approval_required" })
+      );
+    });
+
+    it("should handle timeout when user does not respond in time", async () => {
+      vi.useFakeTimers();
+
+      vi.mocked(mockApprovalEngine.checkBatch).mockReturnValue({
+        needsApproval: [{ name: "danger_tool", id: "1", _approval: { tier: APPROVAL_TIERS.DANGER, tierLabel: "DANGER" } }],
+        approved: [],
+      } as any);
+
+      const promise = checkAndWaitForApproval(
+        [{ name: "danger_tool", id: "1" }] as any,
+        mockAgenticContext as any,
+        mockApprovalEngine,
+      );
+
+      await vi.waitFor(() => {
+        expect(pendingApprovals.has("conv-123")).toBe(true);
+      });
+
+      vi.advanceTimersByTime(120_000);
+
+      const result = await promise;
+      expect(result.isApproved).toBe(false);
+      expect(pendingApprovals.has("conv-123")).toBe(false);
+
+      vi.useRealTimers();
+    });
+
+    it("should reject previous approval if superseded by a new approval request", async () => {
+      vi.mocked(mockApprovalEngine.checkBatch).mockReturnValue({
+        needsApproval: [{ name: "danger_tool", id: "1", _approval: { tier: APPROVAL_TIERS.DANGER, tierLabel: "DANGER" } }],
+        approved: [],
+      } as any);
+
+      const promise1 = checkAndWaitForApproval(
+        [{ name: "danger_tool", id: "1" }] as any,
+        mockAgenticContext as any,
+        mockApprovalEngine,
+      );
+
+      await vi.waitFor(() => {
+        expect(pendingApprovals.has("conv-123")).toBe(true);
+      });
+
+      const promise2 = checkAndWaitForApproval(
+        [{ name: "danger_tool", id: "1" }] as any,
+        mockAgenticContext as any,
+        mockApprovalEngine,
+      );
+
+      await vi.waitFor(() => {
+        expect(pendingApprovals.has("conv-123")).toBe(true);
+      });
+
+      const result1 = await promise1;
+      expect(result1.isApproved).toBe(false);
+
+      (pendingApprovals.get("conv-123") as any)?.resolve({ isApproved: true, shouldApproveAll: false });
+      const result2 = await promise2;
+      expect(result2.isApproved).toBe(true);
+    });
+
+    it("should return shouldApproveAll=true when user selects approve all option", async () => {
+      vi.mocked(mockApprovalEngine.checkBatch).mockReturnValue({
+        needsApproval: [{ name: "danger_tool", id: "1", _approval: { tier: APPROVAL_TIERS.DANGER, tierLabel: "DANGER" } }],
+        approved: [],
+      } as any);
+
+      const promise = checkAndWaitForApproval(
+        [{ name: "danger_tool", id: "1" }] as any,
+        mockAgenticContext as any,
+        mockApprovalEngine,
+      );
+
+      await vi.waitFor(() => {
+        expect(pendingApprovals.has("conv-123")).toBe(true);
+      });
+
+      (pendingApprovals.get("conv-123") as any)?.resolve({ isApproved: true, shouldApproveAll: true });
+
+      const result = await promise;
+      expect(result.isApproved).toBe(true);
+      expect(result.shouldApproveAll).toBe(true);
     });
   });
 
