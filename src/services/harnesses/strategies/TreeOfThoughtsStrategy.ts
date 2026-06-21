@@ -1,5 +1,5 @@
 /**
- * Tree of Thoughts (ToT) Reasoning Strategy
+ * Tree of Thoughts (ToT) Thought Structure
  *
  * Paper: "Tree of Thoughts: Deliberate Problem Solving
  * with Large Language Models" (arxiv.org/abs/2305.10601)

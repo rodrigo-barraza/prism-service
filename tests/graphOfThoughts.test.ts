@@ -108,7 +108,7 @@ describe("GraphOfThoughtsStrategy", () => {
     };
   });
 
-  it("should successfully run graph of thoughts reasoning strategy with synthesis pass", async () => {
+  it("should successfully run graph of thoughts thought structure with synthesis pass", async () => {
     const result = await runGraphOfThoughts(mockHarnessInstance as any);
 
     expect(result).toBeDefined();

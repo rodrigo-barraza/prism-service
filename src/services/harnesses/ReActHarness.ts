@@ -86,7 +86,7 @@ const MAX_TOOL_ITERATIONS = 25;
 const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
 
 /**
- * ReActHarness — Reason→Act→Observe tool-use loop with pluggable reasoning strategies.
+ * ReActHarness — Reason→Act→Observe tool-use loop with pluggable thought structures.
  *
  * Papers:
  *   - "ReAct: Synergizing Reasoning and Acting in Language Models"
@@ -99,7 +99,7 @@ const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
  * CoT prompting, it relies on the model's native reasoning rather than
  * injecting few-shot exemplar chains.
  *
- * Reasoning strategies (dispatched at run()):
+ * Thought structures (dispatched at run()):
  *   - Chain of Thought (default): single-pass sequential reasoning per iteration
  *   - Tree of Thoughts: parallel branching, multi-criteria scoring, reflexion backtracking
  *   - Graph of Thoughts: parallel branching, scoring, synthesis/aggregation
@@ -134,13 +134,13 @@ export default class ReActHarness extends BaseAgenticHarness {
     const resolvedStructure = this.context.options.thoughtStructure;
     if (resolvedStructure === THOUGHT_STRUCTURES.TREE_OF_THOUGHTS) {
       logger.info(
-        `[ReActHarness] Delegating to Tree of Thoughts reasoning strategy`,
+        `[ReActHarness] Delegating to Tree of Thoughts thought structure`,
       );
       return runTreeOfThoughts(this);
     }
     if (resolvedStructure === THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS) {
       logger.info(
-        `[ReActHarness] Delegating to Graph of Thoughts reasoning strategy`,
+        `[ReActHarness] Delegating to Graph of Thoughts thought structure`,
       );
       return runGraphOfThoughts(this);
     }

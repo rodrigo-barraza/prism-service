@@ -2516,7 +2516,7 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
 // ═══════════════════════════════════════════════════════════════
 // Suite 18: Strategy × Topology Live Combination Matrix
 //
-// Reasoning strategy controls the main agent's inner loop:
+// Thought structure controls the main agent's inner loop:
 //   - chain_of_thought: single-pass sequential ReAct
 //   - tree_of_thoughts: N parallel branches → score → pick winner
 //   - graph_of_thoughts: N parallel branches → score → synthesize merge
