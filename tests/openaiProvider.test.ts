@@ -20,7 +20,14 @@ vi.mock("openai", () => {
       chat = {
         completions: {
           create: (...args: any[]) => {
-            mockChatCreate(...args);
+            const mockResult = mockChatCreate(...args);
+            if (mockResult) return mockResult;
+            const options = args[1];
+            if (options?.signal?.aborted) {
+              const abortError = new Error("The user aborted a request.");
+              abortError.name = "AbortError";
+              throw abortError;
+            }
             const isStream = args[0]?.stream;
             if (isStream) {
               const asyncGenerator = async function* () {
@@ -138,6 +145,12 @@ vi.mock("openai", () => {
       responses = {
         create: (...args: any[]) => {
           mockResponsesCreate(...args);
+          const options = args[1];
+          if (options?.signal?.aborted) {
+            const abortError = new Error("The user aborted a request.");
+            abortError.name = "AbortError";
+            throw abortError;
+          }
           const isStream = args[0]?.stream;
           if (isStream) {
             const asyncGenerator = async function* () {
@@ -267,7 +280,8 @@ vi.mock("openai", () => {
         },
         transcriptions: {
           create: (...args: any[]) => {
-            mockTranscriptionsCreate(...args);
+            const mockedValue = mockTranscriptionsCreate(...args);
+            if (mockedValue) return mockedValue;
             return {
               text: "transcribed audio text",
               usage: {
@@ -282,7 +296,8 @@ vi.mock("openai", () => {
 
       images = {
         generate: (...args: any[]) => {
-          mockImagesGenerate(...args);
+          const mockedValue = mockImagesGenerate(...args);
+          if (mockedValue) return mockedValue;
           return {
             data: [
               {
@@ -517,11 +532,15 @@ describe("OpenAI Provider Adapter", () => {
         reasoningOutputTokens: 40,
       });
       expect(result?.toolCalls).toHaveLength(1);
-      expect(result?.toolCalls?.[0]).toEqual({
+      expect((result as any).toolCalls[0]).toEqual({
         id: "call_1",
         responsesItemId: "fc_1",
         name: "get_user",
         args: { id: 42 },
+        reasoningItem: {
+          id: "reasoning_item_1",
+          summary: [{ type: "text", text: "Reasoned content" }],
+        },
       });
     });
 
@@ -672,6 +691,36 @@ describe("OpenAI Provider Adapter", () => {
       expect(mockImagesEdit).toHaveBeenCalled();
       expect(result?.imageData).toBe("edited-image-base64");
     });
+
+    it("handles custom object format for editing images", async () => {
+      const result = await openaiProvider.generateImage(
+        "Add a party hat",
+        [{ imageData: "iVBORw0KGgoAAAANSUhEUgAAAAUA", mimeType: "image/png" }],
+      );
+      expect(result?.imageData).toBe("edited-image-base64");
+    });
+
+    it("throws error on invalid image string format", async () => {
+      await expect(
+        openaiProvider.generateImage("edit", ["not-a-data-url"])
+      ).rejects.toThrow("Invalid image data format");
+    });
+
+    it("throws error on invalid image object structure", async () => {
+      await expect(
+        openaiProvider.generateImage("edit", [{ invalid: true } as any])
+      ).rejects.toThrow("Invalid image data format");
+    });
+
+    it("throws error when no image data is received from OpenAI", async () => {
+      mockImagesGenerate.mockImplementationOnce(() => ({
+        data: [],
+      }));
+
+      await expect(
+        openaiProvider.generateImage("A cute cat")
+      ).rejects.toThrow("No image data received from OpenAI");
+    });
   });
 
   describe("captionImage", () => {
@@ -685,6 +734,18 @@ describe("OpenAI Provider Adapter", () => {
       const payload = mockChatCreate.mock.calls[0][0];
       expect(payload.messages[0].content).toHaveLength(2);
       expect(result?.text).toBe("OpenAI Chat completions response");
+    });
+
+    it("includes system instruction when systemPrompt is passed", async () => {
+      const result = await openaiProvider.captionImage(
+        ["http://example.com/img.jpg"],
+        "Describe",
+        "gpt-5.5",
+        "A system prompt"
+      );
+      expect(mockChatCreate).toHaveBeenCalled();
+      const payload = mockChatCreate.mock.calls[0][0];
+      expect(payload.messages[0]).toEqual({ role: "system", content: "A system prompt" });
     });
   });
 
@@ -713,5 +774,293 @@ describe("OpenAI Provider Adapter", () => {
         outputTokens: 25,
       });
     });
+
+    it("parses transcription usage type duration", async () => {
+      mockTranscriptionsCreate.mockImplementationOnce(() => ({
+        text: "duration transcription",
+        usage: {
+          type: "duration",
+          seconds: 120,
+        },
+      }));
+
+      const result = await openaiProvider.transcribeAudio(
+        Buffer.from("fake-audio"),
+        "audio/wav",
+        "whisper-1",
+      );
+
+      expect(result?.usage).toEqual({
+        durationSeconds: 120,
+      });
+    });
+  });
+
+  describe("Error Pathways & abort handling", () => {
+    it("throws ProviderError on generateText failure", async () => {
+      mockChatCreate.mockImplementationOnce(() => {
+        const error = new Error("API Connection Error");
+        (error as any).status = 502;
+        throw error;
+      });
+
+      await expect(
+        openaiProvider.generateText([{ role: "user", content: "Hello" }], "gpt-4o")
+      ).rejects.toThrow("API Connection Error");
+    });
+
+    it("throws ProviderError on generateSpeech failure", async () => {
+      mockSpeechCreate.mockImplementationOnce(() => {
+        throw new Error("Speech generation failed");
+      });
+
+      await expect(
+        openaiProvider.generateSpeech("Hello", "alloy")
+      ).rejects.toThrow("Speech generation failed");
+    });
+
+    it("throws ProviderError on generateImage failure", async () => {
+      mockImagesGenerate.mockImplementationOnce(() => {
+        throw new Error("DALL-E error");
+      });
+
+      await expect(
+        openaiProvider.generateImage("Cat")
+      ).rejects.toThrow("DALL-E error");
+    });
+
+    it("throws ProviderError on captionImage failure", async () => {
+      mockChatCreate.mockImplementationOnce(() => {
+        throw new Error("Captioning failed");
+      });
+
+      await expect(
+        openaiProvider.captionImage(["http://example.com/img.jpg"])
+      ).rejects.toThrow("Captioning failed");
+    });
+
+    it("throws ProviderError on generateEmbedding failure", async () => {
+      mockEmbeddingsCreate.mockImplementationOnce(() => {
+        throw new Error("Embedding failed");
+      });
+
+      await expect(
+        openaiProvider.generateEmbedding("Text")
+      ).rejects.toThrow("Embedding failed");
+    });
+
+    it("throws ProviderError on transcribeAudio failure", async () => {
+      mockTranscriptionsCreate.mockImplementationOnce(() => {
+        throw new Error("Whisper failed");
+      });
+
+      await expect(
+        openaiProvider.transcribeAudio(Buffer.from(""), "audio/wav")
+      ).rejects.toThrow("Whisper failed");
+    });
+
+    it("handles chat completion stream retry on 400 status error", async () => {
+      const mockCompletionsError = new Error("Unsupported parameter: 'temperature'");
+      (mockCompletionsError as any).status = 400;
+
+      mockChatCreate.mockImplementationOnce(() => {
+        throw mockCompletionsError;
+      });
+
+      const messages: OpenAIMessage[] = [{ role: "user", content: "Retry stream" }];
+      const stream = openaiProvider.generateTextStream(messages, "gpt-4o", {
+        temperature: 0.8,
+      });
+
+      const chunks: any[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      expect(mockChatCreate).toHaveBeenCalledTimes(2);
+      expect(chunks).toContain("Hello");
+    });
+
+    it("handles aborted signal in generateTextStream chat completions", async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const messages: OpenAIMessage[] = [{ role: "user", content: "Abort stream" }];
+      const stream = openaiProvider.generateTextStream(messages, "gpt-4o", {
+        signal: controller.signal,
+      });
+
+      const chunks: any[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toHaveLength(0);
+    });
+
+    it("propagates 400 error in generateTextStream if parameter stripping does not match any unsupported parameters", async () => {
+      const badRequestError = new Error("Invalid request parameter structure");
+      (badRequestError as any).status = 400;
+      mockChatCreate.mockImplementationOnce(() => {
+        throw badRequestError;
+      });
+
+      const messages: OpenAIMessage[] = [{ role: "user", content: "stream error trigger" }];
+      const stream = openaiProvider.generateTextStream(messages, "gpt-4o");
+
+      await expect(async () => {
+        for await (const chunk of stream) {
+          // pull
+        }
+      }).rejects.toThrow("Invalid request parameter structure");
+    });
+
+    it("yields stopReason stopReason: 'length' when finish_reason is length", async () => {
+      const asyncGenerator = async function* () {
+        yield {
+          choices: [
+            {
+              delta: { content: "truncated response" },
+              finish_reason: "length",
+            },
+          ],
+        };
+      };
+
+      const mockStream = {
+        [Symbol.asyncIterator]: () => asyncGenerator(),
+      };
+
+      mockChatCreate.mockReturnValueOnce({
+        ...mockStream,
+        withResponse: async () => ({
+          data: mockStream,
+          response: {
+            headers: {
+              get: () => null,
+            },
+          },
+        }),
+      });
+
+      const messages: OpenAIMessage[] = [{ role: "user", content: "stream length stop" }];
+      const stream = openaiProvider.generateTextStream(messages, "gpt-4o");
+
+      const chunks: any[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toContain("truncated response");
+      expect(chunks).toContainEqual({ type: "stopReason", stopReason: "length" });
+    });
+
+    it("yields default zero usage block if stream terminates without usage info", async () => {
+      const asyncGenerator = async function* () {
+        yield {
+          choices: [{ delta: { content: "some text" } }],
+        };
+      };
+
+      const mockStream = {
+        [Symbol.asyncIterator]: () => asyncGenerator(),
+      };
+
+      mockChatCreate.mockReturnValueOnce({
+        ...mockStream,
+        withResponse: async () => ({
+          data: mockStream,
+          response: {
+            headers: {
+              get: () => null,
+            },
+          },
+        }),
+      });
+
+      const messages: OpenAIMessage[] = [{ role: "user", content: "stream no usage" }];
+      const stream = openaiProvider.generateTextStream(messages, "gpt-4o");
+
+      const chunks: any[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toContain("some text");
+      expect(chunks).toContainEqual({ type: "usage", usage: { inputTokens: 0, outputTokens: 0 } });
+    });
+
+    it("submits and formats custom tools in generateTextStream options", async () => {
+      const messages: OpenAIMessage[] = [{ role: "user", content: "stream tools test" }];
+      const tools = [
+        {
+          name: "get_weather",
+          description: "Get weather details",
+          parameters: { type: "object", properties: {} },
+        },
+      ];
+
+      const stream = openaiProvider.generateTextStream(messages, "gpt-4o", {
+        tools,
+      });
+
+      const chunks: any[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      expect(mockChatCreate).toHaveBeenCalled();
+      const payload = mockChatCreate.mock.calls[0][0];
+      expect(payload.tools).toBeDefined();
+      expect(payload.tools).toHaveLength(1);
+      expect(payload.tools[0].function.name).toBe("get_weather");
+    });
+
+    it("sets response_format and web_search tool in generateTextStream payload when options are specified", async () => {
+      const messages: OpenAIMessage[] = [{ role: "user", content: "stream options test" }];
+      const stream = openaiProvider.generateTextStream(messages, "gpt-4o", {
+        responseFormat: "json_object",
+        webSearch: true,
+      });
+
+      const chunks: any[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      expect(mockChatCreate).toHaveBeenCalled();
+      const payload = mockChatCreate.mock.calls[0][0];
+      expect(payload.response_format).toEqual({ type: "json_object" });
+      expect(payload.tools).toContainEqual({ type: "web_search" });
+    });
+  });
+
+  describe("prepareOpenAIMessages multimodal inputs", () => {
+    it("converts multimodal message structures properly", async () => {
+      const messages: OpenAIMessage[] = [
+        {
+          role: "user",
+          content: "Multimodal user",
+          images: [
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA",
+            "data:application/pdf;base64,JVBERi0xLjQK",
+            "data:text/plain;base64,SGVsbG8=",
+            "data:application/zip;base64,UEsDBB",
+            "http://example.com/image.png",
+            "http://example.com/file.zip",
+            "minio://bucket/image.png",
+          ],
+        },
+      ];
+
+      await openaiProvider.generateText(messages, "gpt-4o");
+
+      expect(mockChatCreate).toHaveBeenCalled();
+      const payload = mockChatCreate.mock.calls[0][0];
+      const userMessage = payload.messages[0];
+      expect(userMessage.role).toBe("user");
+      expect(userMessage.content).toHaveLength(7); // 6 valid parts + 1 content text
+    });
   });
 });
+
