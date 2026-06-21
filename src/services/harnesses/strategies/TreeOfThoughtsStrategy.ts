@@ -4,10 +4,22 @@
  * Paper: "Tree of Thoughts: Deliberate Problem Solving
  * with Large Language Models" (arxiv.org/abs/2305.10601)
  *
- * Generates N parallel branches per iteration, scores each
- * via multi-criteria LLM judge (correctness, risk, efficiency,
- * completeness), selects best, and backtracks with reflexion
- * on validation failure. Supports BFS/DFS search strategies.
+ * Two search strategies, both with value-threshold pruning:
+ *
+ *   BFS (Algorithm 1): Generate N branches in parallel, score,
+ *   retain top-b as frontier. Execute the best; on validation
+ *   failure, fall back to the next frontier candidate before
+ *   re-branching.
+ *
+ *   DFS (Algorithm 2): Explore siblings sequentially — generate
+ *   one branch, score it, accept if above threshold. If below,
+ *   try the next sibling. Accept best available after exhausting
+ *   the sibling budget.
+ *
+ * Proactive backtracking: If all branches score below the value
+ * threshold (default 5.0), the iteration is discarded and a
+ * reflexion prompt is injected before re-branching — matching
+ * the paper's state evaluator V(s) pruning.
  *
  * See ThoughtStructureRegistry.ts → THOUGHT_STRUCTURE_DEFINITIONS
  * (id: "tree_of_thoughts") for full paper-alignment metadata.
@@ -88,6 +100,9 @@ const MAX_TOOL_ITERATIONS = 25;
 const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
 const DEFAULT_BRANCH_COUNT = 3;
 const MAX_BACKTRACK_ATTEMPTS_PER_ITERATION = 2;
+const DEFAULT_VALUE_THRESHOLD = 5.0;
+const MAX_PROACTIVE_BACKTRACKS = 3;
+const DEFAULT_BFS_BEAM_WIDTH = 2;
 
 interface ScoredBranch {
   branchIndex: number;
@@ -151,6 +166,8 @@ export async function runTreeOfThoughts(
     Math.max(1, options.branchCount || DEFAULT_BRANCH_COUNT),
     5,
   );
+  const valueThreshold = options.valueThreshold ?? DEFAULT_VALUE_THRESHOLD;
+  const bfsBeamWidth = Math.min(DEFAULT_BFS_BEAM_WIDTH, initialBranchCount);
 
   const clientMaxIterations = options.maxIterations;
   const resolvedMaxIterations =
@@ -234,7 +251,7 @@ export async function runTreeOfThoughts(
 
       const adaptiveBranchCount =
         searchStrategy === "dfs"
-          ? 1
+          ? initialBranchCount
           : state.iterations === 1
             ? initialBranchCount
             : Math.max(1, Math.ceil(initialBranchCount * 0.6));
@@ -279,57 +296,148 @@ export async function runTreeOfThoughts(
         tools.finalTools.length,
       );
 
-      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      //  PHASE 1: Generate candidate branches
-      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-      emit({
-        type: SERVER_SENT_EVENT_TYPES.STATUS,
-        message: STATUS_MESSAGES.BRANCHING_STARTED,
-        branchCount: adaptiveBranchCount,
-        iteration: state.iterations,
-        searchStrategy,
-      });
-
       const allowedToolNames = new Set(
         tools.finalTools.map((tool: ToolSchema) => tool.name),
       );
 
-      const branchResults = await Promise.all(
-        Array.from({ length: adaptiveBranchCount }, (_, branchIndex) =>
-          generateBranch(
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      //  PHASE 1+2: Generate, score, and select — strategy-aware
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      let scoredBranches: ScoredBranch[];
+      let selectedBranch: ScoredBranch;
+
+      if (searchStrategy === "dfs") {
+        // ── True DFS: sequential sibling exploration (Paper Algorithm 2) ──
+        // Generate one branch at a time, score it, accept if above
+        // threshold. Try up to `initialBranchCount` siblings before
+        // accepting the best available.
+        emit({
+          type: SERVER_SENT_EVENT_TYPES.STATUS,
+          message: STATUS_MESSAGES.BRANCHING_STARTED,
+          branchCount: adaptiveBranchCount,
+          iteration: state.iterations,
+          searchStrategy,
+        });
+
+        let acceptedBranch: ScoredBranch | null = null;
+        const exploredSiblings: ScoredBranch[] = [];
+
+        for (let siblingAttempt = 0; siblingAttempt < adaptiveBranchCount; siblingAttempt++) {
+          if (signal?.aborted) break;
+
+          const branch = await generateBranch(
             harness,
-            branchIndex,
+            siblingAttempt,
             adaptiveBranchCount,
             currentMessages,
             passOptions,
             allowedToolNames,
             failedApproachDescriptions,
+          );
+          state.branchesExplored++;
+
+          const [scoredSibling] = await scoreBranchesMultiCriteria(
+            harness,
+            [branch],
+            currentMessages,
+          );
+          exploredSiblings.push(scoredSibling);
+
+          if (scoredSibling.score >= valueThreshold) {
+            acceptedBranch = scoredSibling;
+            logger.info(
+              `[TreeOfThoughts/DFS] Sibling ${siblingAttempt + 1}/${adaptiveBranchCount} accepted ` +
+                `(score: ${scoredSibling.score.toFixed(1)} >= threshold: ${valueThreshold})`,
+            );
+            break;
+          }
+
+          state.branchesBacktracked++;
+          failedApproachDescriptions.push(
+            (scoredSibling.text || scoredSibling.thinking || "").slice(0, 300),
+          );
+
+          emit({
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
+            message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
+            branchIndex: scoredSibling.branchIndex,
+            reason: "dfs_sibling_pruned",
+            score: scoredSibling.score,
+            threshold: valueThreshold,
+            siblingAttempt: siblingAttempt + 1,
+            maxSiblings: adaptiveBranchCount,
+          });
+
+          logger.info(
+            `[TreeOfThoughts/DFS] Sibling ${siblingAttempt + 1}/${adaptiveBranchCount} pruned ` +
+              `(score: ${scoredSibling.score.toFixed(1)} < threshold: ${valueThreshold})`,
+          );
+        }
+
+        if (!acceptedBranch) {
+          exploredSiblings.sort((branchA, branchB) => branchB.score - branchA.score);
+          acceptedBranch = exploredSiblings[0];
+          logger.info(
+            `[TreeOfThoughts/DFS] No sibling above threshold — accepting best available ` +
+              `(score: ${acceptedBranch.score.toFixed(1)})`,
+          );
+        }
+
+        scoredBranches = exploredSiblings.sort((branchA, branchB) => branchB.score - branchA.score);
+        selectedBranch = acceptedBranch;
+      } else {
+        // ── BFS: parallel generation + frontier retention (Paper Algorithm 1) ──
+        emit({
+          type: SERVER_SENT_EVENT_TYPES.STATUS,
+          message: STATUS_MESSAGES.BRANCHING_STARTED,
+          branchCount: adaptiveBranchCount,
+          iteration: state.iterations,
+          searchStrategy,
+        });
+
+        const branchResults = await Promise.all(
+          Array.from({ length: adaptiveBranchCount }, (_, branchIndex) =>
+            generateBranch(
+              harness,
+              branchIndex,
+              adaptiveBranchCount,
+              currentMessages,
+              passOptions,
+              allowedToolNames,
+              failedApproachDescriptions,
+            ),
           ),
-        ),
-      );
+        );
 
-      if (signal?.aborted) break;
+        if (signal?.aborted) break;
 
-      state.branchesExplored += adaptiveBranchCount;
+        state.branchesExplored += adaptiveBranchCount;
 
-      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      //  PHASE 2: Multi-criteria score and rank branches
-      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        scoredBranches = await scoreBranchesMultiCriteria(
+          harness,
+          branchResults,
+          currentMessages,
+        );
 
-      const scoredBranches = await scoreBranchesMultiCriteria(
-        harness,
-        branchResults,
-        currentMessages,
-      );
+        scoredBranches.sort(
+          (branchA, branchB) => branchB.score - branchA.score,
+        );
 
-      scoredBranches.sort(
-        (branchA, branchB) => branchB.score - branchA.score,
-      );
+        selectedBranch = scoredBranches[0];
 
-      const selectedBranch = scoredBranches[0];
+        // ── Retain top-b candidates as frontier (Paper Algorithm 1: "b best states") ──
+        state.frontierCandidates = scoredBranches
+          .slice(1, bfsBeamWidth)
+          .map((branch) => ({
+            pass: branch.pass,
+            score: branch.score,
+            branchIndex: branch.branchIndex,
+            criteriaScores: branch.criteriaScores,
+          }));
+      }
+
       state.selectedBranchScores.push(selectedBranch.score);
-
       state.finalStreamedText = selectedBranch.pass.finalStreamedText;
       state.streamedThinking = selectedBranch.pass.streamedThinking;
 
@@ -340,6 +448,8 @@ export async function runTreeOfThoughts(
         score: selectedBranch.score,
         branchCount: adaptiveBranchCount,
         criteriaScores: selectedBranch.criteriaScores,
+        searchStrategy,
+        frontierSize: state.frontierCandidates.length,
         scores: scoredBranches.map((branch) => ({
           index: branch.branchIndex,
           score: branch.score,
@@ -353,6 +463,54 @@ export async function runTreeOfThoughts(
           `risk: ${selectedBranch.criteriaScores.risk}, efficiency: ${selectedBranch.criteriaScores.efficiency}, ` +
           `completeness: ${selectedBranch.criteriaScores.completeness})`,
       );
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      //  PHASE 2.5: Proactive value-threshold pruning (Paper §2.1)
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      if (
+        selectedBranch.score < valueThreshold &&
+        state.iterations > 1 &&
+        state.proactiveBacktracks < MAX_PROACTIVE_BACKTRACKS
+      ) {
+        state.proactiveBacktracks++;
+        state.branchesBacktracked++;
+
+        const failedSummary = (selectedBranch.text || selectedBranch.thinking || "").slice(0, 300).trim();
+        if (failedSummary) failedApproachDescriptions.push(failedSummary);
+
+        emit({
+          type: SERVER_SENT_EVENT_TYPES.STATUS,
+          message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
+          branchIndex: selectedBranch.branchIndex,
+          reason: "proactive_value_threshold",
+          bestScore: selectedBranch.score,
+          threshold: valueThreshold,
+          proactiveBacktracks: state.proactiveBacktracks,
+          maxProactiveBacktracks: MAX_PROACTIVE_BACKTRACKS,
+        });
+
+        logger.info(
+          `[TreeOfThoughts] Proactive backtrack — best score ${selectedBranch.score.toFixed(1)} ` +
+            `< threshold ${valueThreshold}. Re-branching (${state.proactiveBacktracks}/${MAX_PROACTIVE_BACKTRACKS}).`,
+        );
+
+        currentMessages.push({
+          role: "system",
+          content:
+            `[PROACTIVE BACKTRACK — ALL ${scoredBranches.length} BRANCHES SCORED BELOW THRESHOLD ` +
+            `(best: ${selectedBranch.score.toFixed(1)}/${valueThreshold})]` +
+            `\n\nAll candidate approaches scored poorly on the multi-criteria evaluation. ` +
+            `The current trajectory appears unpromising.\n\n` +
+            `Before retrying, reconsider the problem from a higher level:\n` +
+            `1. Is the current approach fundamentally flawed?\n` +
+            `2. What alternative strategy would be more robust?\n` +
+            `3. Are there simpler, safer paths to the same goal?\n\n` +
+            `Take a DIFFERENT approach on the next attempt.`,
+        });
+
+        continue;
+      }
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       //  PHASE 3: Execute selected branch with backtracking
@@ -475,6 +633,66 @@ export async function runTreeOfThoughts(
           }
 
           const backtrackAttemptsThisIteration = state.branchesBacktracked;
+
+          // ── BFS frontier fallback (Paper Algorithm 1: try next-best state) ──
+          // Before re-branching from scratch, try the next frontier candidate
+          // that was already scored but not executed.
+          if (
+            searchStrategy === "bfs" &&
+            state.frontierCandidates.length > 0 &&
+            sandboxCheckpointReference
+          ) {
+            const fallbackCandidate = state.frontierCandidates.shift()!;
+
+            currentMessages = preExecutionSnapshot;
+            restoreSandboxCheckpoint(workspaceRoot, sandboxCheckpointReference, emit);
+
+            emit({
+              type: SERVER_SENT_EVENT_TYPES.STATUS,
+              message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
+              branchIndex: selectedBranch.branchIndex,
+              validationErrors: validationFeedback.length,
+              restoredCheckpoint: true,
+              reason: "frontier_fallback",
+              fallbackBranchIndex: fallbackCandidate.branchIndex,
+              fallbackScore: fallbackCandidate.score,
+            });
+
+            logger.info(
+              `[TreeOfThoughts/BFS] Branch ${selectedBranch.branchIndex + 1} failed validation. ` +
+                `Falling back to frontier candidate ${fallbackCandidate.branchIndex + 1} ` +
+                `(score: ${fallbackCandidate.score.toFixed(1)}).`,
+            );
+
+            currentMessages.push({
+              role: "system",
+              content:
+                `[FRONTIER FALLBACK — BRANCH ${selectedBranch.branchIndex + 1} FAILED VALIDATION]\n\n` +
+                `The previous approach produced ${validationFeedback.length} validation error(s):\n\n` +
+                `${errorBlock}\n\n` +
+                `Switching to the next-best pre-scored alternative approach. ` +
+                `Avoid the same mistakes — the previous branch's errors are listed above.`,
+            });
+
+            // Re-enter the main execution path with the fallback candidate's pass
+            // by replacing the selected branch and re-executing the tool phase
+            // on the next iteration with the fallback's tool calls.
+            harness.logIteration(selectedPass, currentMessages);
+
+            // Inject the fallback branch's reasoning as context for the next iteration
+            if (fallbackCandidate.pass.streamedText) {
+              currentMessages.push({
+                role: "assistant",
+                content: fallbackCandidate.pass.streamedText,
+                ...(fallbackCandidate.pass.streamedThinking.trim() && {
+                  thinking: fallbackCandidate.pass.streamedThinking.trim(),
+                }),
+              });
+            }
+
+            continue;
+          }
+
           const shouldRestoreCheckpoint =
             backtrackAttemptsThisIteration <=
               MAX_BACKTRACK_ATTEMPTS_PER_ITERATION &&
@@ -710,7 +928,7 @@ export async function runTreeOfThoughts(
     logger.info(
       `[TreeOfThoughts] Session complete: ${state.iterations} iterations, ` +
         `${state.branchesExplored} branches explored, ` +
-        `${state.branchesBacktracked} backtracked, ` +
+        `${state.branchesBacktracked} backtracked (${state.proactiveBacktracks} proactive), ` +
         `strategy: ${searchStrategy}`,
     );
 
