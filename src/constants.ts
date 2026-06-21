@@ -148,7 +148,6 @@ export const FILE_CATEGORIES = {
 
 export const HARNESS_IDS = {
   STANDARD: "standard",
-  TREE_OF_THOUGHT: "tree_of_thought",
 } as const;
 
 export const THOUGHT_STRUCTURES = {

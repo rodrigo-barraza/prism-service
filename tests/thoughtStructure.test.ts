@@ -100,17 +100,6 @@ describe("Thought Structure Routing & Migration Tests", () => {
       expect(runTreeOfThoughts).toHaveBeenCalled();
     });
 
-    it("should migrate legacy HARNESS_IDS.TREE_OF_THOUGHT harness to HARNESS_IDS.STANDARD harness + THOUGHT_STRUCTURES.TREE_OF_THOUGHTS strategy", async () => {
-      mockContext.options.harness = HARNESS_IDS.TREE_OF_THOUGHT;
-      mockContext.options.thoughtStructure = undefined;
-
-      await AgenticLoopService.runAgenticLoop(mockContext);
-
-      expect(mockContext.options.harness).toBe(HARNESS_IDS.STANDARD);
-      expect(mockContext.options.thoughtStructure).toBe(THOUGHT_STRUCTURES.TREE_OF_THOUGHTS);
-      expect(runTreeOfThoughts).toHaveBeenCalled();
-    });
-
     it("should dispatch to GoT when thoughtStructure is graph_of_thoughts", async () => {
       mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS;
       mockContext.options.harness = HARNESS_IDS.STANDARD;

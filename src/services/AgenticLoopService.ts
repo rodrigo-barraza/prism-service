@@ -117,16 +117,6 @@ export default class AgenticLoopService {
       }
     }
 
-    // Migration: legacy "tree_of_thought" harness → standard harness + tree_of_thoughts strategy
-    if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
-      const legacyHarnessId = harnessId;
-      harnessId = "standard";
-      thoughtStructure = "tree_of_thoughts";
-      logger.info(
-        `[AgenticLoop] Migrated legacy harness "${legacyHarnessId}" → harness "standard" + thoughtStructure "tree_of_thoughts"`,
-      );
-    }
-
     options.harness = harnessId;
     options.topology = topologyId;
     options.thoughtStructure = thoughtStructure;

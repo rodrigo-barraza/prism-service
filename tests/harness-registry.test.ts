@@ -122,14 +122,14 @@ describe("HarnessRegistry", () => {
   });
 
   it("should fall back to HARNESS_IDS.STANDARD when requesting the legacy HARNESS_IDS.TREE_OF_THOUGHT harness id", () => {
-    const harnessClass = HarnessRegistry.get(HARNESS_IDS.TREE_OF_THOUGHT);
+    const harnessClass = HarnessRegistry.get("tree_of_thought");
     expect(harnessClass).toBeDefined();
     expect(harnessClass!.id).toBe(HARNESS_IDS.STANDARD);
   });
 
   it("should not include tree_of_thought inside the list of available harnesses", () => {
     const harnessList = HarnessRegistry.list();
-    const treeOfThoughtHarnessEntry = harnessList.find((entry) => entry.id === HARNESS_IDS.TREE_OF_THOUGHT);
+    const treeOfThoughtHarnessEntry = harnessList.find((entry) => entry.id === "tree_of_thought");
     expect(treeOfThoughtHarnessEntry).toBeUndefined();
   });
 });
