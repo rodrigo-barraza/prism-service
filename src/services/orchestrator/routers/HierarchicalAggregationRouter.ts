@@ -107,32 +107,11 @@ function checkModelDiversity(
 /**
  * Hierarchical Aggregation Router — Mixture-of-Agents Synthesis (MoA)
  *
- * Based on: "Mixture-of-Agents Enhances Large Language Model Capabilities"
+ * Paper: "Mixture-of-Agents Enhances Large Language Model Capabilities"
  * (arxiv.org/abs/2406.04692)
  *
- * Implements a multi-layer parallel-then-synthesize flow:
- * 1. **Fan-out:** All members execute the task independently in parallel
- * 2. **Synthesize:** An LLM aggregator merges all outputs into a single unified
- *    result — identifying agreements, resolving conflicts, and combining
- *    complementary information
- * 3. **Layer stacking:** Steps 1-2 repeat for each layer. Each subsequent layer's
- *    members receive the previous layer's synthesis as auxiliary context,
- *    progressively refining quality through iterative collaboration.
- *
- * Key differences from Tournament:
- * - Aggregation SYNTHESIZES all outputs; Tournament SELECTS one winner
- * - The synthesis pass produces new merged content, not a verbatim copy
- *
- * TopologyConfig:
- * - layerCount (number, default: 1, max: 3) — Number of MoA layers.
- *   The paper uses 2-3 layers; the first layer provides the largest quality boost.
- *
- * Paper alignment:
- * - Layered architecture      → ✅ Multi-layer stacking via layerCount config
- * - Proposer/Aggregator roles → ✅ Members are proposers, synthesis LLM is the aggregator
- * - Collaborativeness         → ✅ Aggregator sees all proposer outputs as auxiliary information
- * - Model diversity           → ✅ Warning when all proposers share same model (single-proposer)
- * - Iterative refinement      → ✅ Each layer's synthesis feeds into next layer as context
+ * See TopologyRegistry.ts → TOPOLOGY_DEFINITIONS (id: "hierarchical-aggregation")
+ * for full paper-alignment metadata and config option documentation.
  */
 export class HierarchicalAggregationRouter implements TopologyRouter {
   async execute(

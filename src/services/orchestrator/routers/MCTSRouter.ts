@@ -215,31 +215,11 @@ function buildRefinementPrompt(
 /**
  * MCTS-Guided Search Router — Monte Carlo Tree Search (LATS)
  *
- * Based on: "Language Agent Tree Search Unifies Reasoning Acting and
+ * Paper: "Language Agent Tree Search Unifies Reasoning Acting and
  * Planning in Language Models" (arxiv.org/abs/2310.04406)
  *
- * Implements an iterative expand-evaluate-select-refine loop:
- *
- * 1. **Expand:** Spawn N sub-agents in parallel with the task (or refinement prompt)
- * 2. **Evaluate:** An LLM judge scores all N results on correctness/completeness/quality
- * 3. **Select:** Pick the highest-scoring branch
- * 4. **Backpropagate:** Feed the winner's output + evaluator feedback into the next depth
- * 5. **Repeat** until the evaluator marks the solution as complete or max depth reached
- *
- * Key differences from Tournament:
- * - Tournament is single-depth (expand once → judge once)
- * - MCTS is multi-depth (expand → evaluate → refine → expand → evaluate → ...)
- * - Each depth level builds on the previous winner's output
- * - The evaluator provides actionable feedback, not just a selection
- *
- * Paper alignment:
- * - Selection (UCB1)       → ✅ UCT formula with configurable exploration weight
- * - Expansion              → ✅ Spawns branchFactor sub-agents in parallel
- * - Evaluation             → ✅ LLM judge scores branches (correctness/completeness/quality)
- * - Simulation (rollout)   → ⚠️ Not implemented: evaluates immediately after expansion
- * - Backpropagation        → ✅ Running-average V(s) update along parent chain
- * - Reflection             → ✅ Evaluator feedback fed into next depth's refinement prompt
- * - Tree structure         → ⚠️ Linear depth chain, not a branching tree with UCT traversal
+ * See TopologyRegistry.ts → TOPOLOGY_DEFINITIONS (id: "mcts")
+ * for full paper-alignment metadata and config option documentation.
  */
 export class MCTSRouter implements TopologyRouter {
   async execute(

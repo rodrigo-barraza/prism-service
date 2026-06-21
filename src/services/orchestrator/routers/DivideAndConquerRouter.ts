@@ -17,6 +17,9 @@ import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 const MAXIMUM_SUBTASKS = 6;
 const MAXIMUM_SYNTHESIS_CHARACTERS = 120_000;
+const DEFAULT_MAXIMUM_RECURSION_DEPTH = 1;
+const MAXIMUM_ALLOWED_RECURSION_DEPTH = 3;
+const DEFAULT_RECURSION_COMPLEXITY_THRESHOLD = 300;
 
 interface DecomposedSubtask {
   description: string;
@@ -289,27 +292,11 @@ function buildDependencyContextPrefix(
 /**
  * Divide & Conquer Router — Recursive Decomposition with Dependencies (RDD)
  *
- * Based on: "Recursive Decomposition with Dependencies for Generic
+ * Paper: "Recursive Decomposition with Dependencies for Generic
  * Divide-and-Conquer Reasoning" (arxiv.org/abs/2505.02576)
  *
- * Implements a three-phase planner-execute-synthesize flow:
- * 1. **Decompose:** An LLM planner breaks the task into independent subtasks
- * 2. **Execute:** Each subtask is dispatched to a sub-agent in parallel
- * 3. **Synthesize:** A final pass merges all subtask results
- *
- * Members mapping:
- * - members[0].prompt is used as the original task for decomposition
- * - All members share the same model/provider configuration
- * - The planner may generate fewer or more subtasks than members provided
- *
- * This is compositionally: Sequential(Planner) → Hierarchical(subtasks) → Aggregation(synthesis)
- *
- * Paper alignment:
- * - Recursive decomposition → ✅ LLM planner decomposes into subtasks
- * - Dependency DAG          → ✅ Planner outputs dependsOn indices; topological sort groups into tiers
- * - Sub-task execution      → ✅ Each subtask dispatched to a sub-agent (tier-parallel)
- * - Recomposition           → ✅ Synthesis pass merges subtask results
- * - Recursive depth         → ⚠️ Not implemented: single-level decomposition only
+ * See TopologyRegistry.ts → TOPOLOGY_DEFINITIONS (id: "divide-and-conquer")
+ * for full paper-alignment metadata and config option documentation.
  */
 export class DivideAndConquerRouter implements TopologyRouter {
   async execute(
@@ -330,6 +317,14 @@ export class DivideAndConquerRouter implements TopologyRouter {
     }
     const originalTask = members.map((member) => member.prompt).join("\n\n");
     const configuredMaxSubtasks = Math.max(1, Number(topologyConfig?.maxSubtasks) || MAXIMUM_SUBTASKS);
+    const maximumRecursionDepth = Math.min(
+      MAXIMUM_ALLOWED_RECURSION_DEPTH,
+      Math.max(1, Number(topologyConfig?.maxRecursionDepth) || DEFAULT_MAXIMUM_RECURSION_DEPTH),
+    );
+    const recursionComplexityThreshold = Math.max(
+      50,
+      Number(topologyConfig?.recursionComplexityThreshold) || DEFAULT_RECURSION_COMPLEXITY_THRESHOLD,
+    );
 
     logger.info(
       `[DivideAndConquerRouter] Starting divide-and-conquer for team "${teamName}" (${members.length} member(s))...`,
@@ -468,7 +463,18 @@ export class DivideAndConquerRouter implements TopologyRouter {
       }
 
       const tierPromises = tierAssignments.map(({ assignment }) =>
-        spawnSubAgent(assignment),
+        this.executeSubtaskWithRecursion(
+          assignment,
+          spawnSubAgent,
+          provider,
+          orchestratorContext,
+          referenceMember,
+          resolvedSiblings,
+          configuredMaxSubtasks,
+          maximumRecursionDepth,
+          recursionComplexityThreshold,
+          1,
+        ),
       );
       const tierResults = await Promise.all(tierPromises);
 
@@ -572,6 +578,182 @@ export class DivideAndConquerRouter implements TopologyRouter {
         `[DivideAndConquerRouter] Synthesis failed: ${getErrorMessage(synthesisError)}`,
       );
       return subtaskResults;
+    }
+  }
+
+  private async executeSubtaskWithRecursion(
+    assignment: OrchestratorSpawnParams,
+    spawnSubAgent: (assignment: OrchestratorSpawnParams) => Promise<SubAgentResult | { error: string }>,
+    provider: ReturnType<typeof getProvider>,
+    orchestratorContext: OrchestratorContext,
+    referenceMember: TeamMember,
+    resolvedSiblings: Awaited<ReturnType<typeof resolveSiblingInstances>>,
+    configuredMaxSubtasks: number,
+    maximumRecursionDepth: number,
+    recursionComplexityThreshold: number,
+    currentDepth: number,
+  ): Promise<SubAgentResult | { error: string }> {
+    const promptLength = assignment.prompt.length;
+    const shouldRecurse = currentDepth < maximumRecursionDepth
+      && promptLength > recursionComplexityThreshold;
+
+    if (!shouldRecurse) {
+      return spawnSubAgent(assignment);
+    }
+
+    logger.info(
+      `[DivideAndConquerRouter] Recursive decomposition at depth ${currentDepth}/${maximumRecursionDepth} for subtask "${assignment.description}" (${promptLength} chars)`,
+    );
+
+    if (!provider) {
+      logger.warn(`[DivideAndConquerRouter] No provider for recursive decomposition — falling back to direct execution`);
+      return spawnSubAgent(assignment);
+    }
+
+    try {
+      const recursiveDecompositionPrompt = buildDecompositionPrompt(
+        assignment.prompt,
+        2,
+        Math.min(configuredMaxSubtasks, 4),
+      );
+
+      const recursiveDecompositionMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [
+        { role: "user", content: recursiveDecompositionPrompt },
+      ];
+      const recursiveDecompositionResult = await provider.generateText(
+        recursiveDecompositionMessages,
+        orchestratorContext.resolvedModel,
+        { maxTokens: 4096 },
+      );
+
+      const recursiveSubtasks = parseDecompositionResponse(
+        recursiveDecompositionResult.text || "",
+        Math.min(configuredMaxSubtasks, 4),
+      );
+
+      if (recursiveSubtasks.length <= 1) {
+        logger.info(
+          `[DivideAndConquerRouter] Recursive decomposition at depth ${currentDepth} yielded ${recursiveSubtasks.length} subtask(s) — executing directly`,
+        );
+        return spawnSubAgent(assignment);
+      }
+
+      logger.info(
+        `[DivideAndConquerRouter] Recursive depth ${currentDepth}: decomposed into ${recursiveSubtasks.length} sub-subtasks`,
+      );
+
+      const recursiveTiers = buildExecutionTiers(recursiveSubtasks);
+      const recursiveResults: (SubAgentResult | { error: string })[] = Array.from(
+        { length: recursiveSubtasks.length },
+        () => ({ error: "not executed" }),
+      );
+      const recursiveCompletedResults = new Map<number, SubAgentResult | { error: string }>();
+      const recursiveSubtaskDescriptions = recursiveSubtasks.map((subtask) => subtask.description);
+
+      for (const recursiveTierIndices of recursiveTiers) {
+        const recursiveTierPromises = recursiveTierIndices.map((subtaskIndex) => {
+          const subtask = recursiveSubtasks[subtaskIndex];
+          const { assignedProvider, assignedModel } = selectInstanceForMember(
+            referenceMember,
+            resolvedSiblings,
+            { providerName: orchestratorContext.providerName, resolvedModel: orchestratorContext.resolvedModel },
+          );
+
+          const dependencyContext = subtask.dependsOn && subtask.dependsOn.length > 0
+            ? buildDependencyContextPrefix(recursiveCompletedResults, subtask.dependsOn, recursiveSubtaskDescriptions)
+            : "";
+
+          const recursiveAssignment: OrchestratorSpawnParams = {
+            description: subtask.description,
+            prompt: dependencyContext + subtask.prompt,
+            files: referenceMember.files,
+            model: referenceMember.model,
+            agent: referenceMember.agent,
+            assignedProvider,
+            assignedModel,
+            agentIndex: subtaskIndex,
+            teamSize: recursiveSubtasks.length,
+            orchestratorContext,
+          };
+
+          return this.executeSubtaskWithRecursion(
+            recursiveAssignment,
+            spawnSubAgent,
+            provider,
+            orchestratorContext,
+            referenceMember,
+            resolvedSiblings,
+            configuredMaxSubtasks,
+            maximumRecursionDepth,
+            recursionComplexityThreshold,
+            currentDepth + 1,
+          );
+        });
+
+        const recursiveTierResults = await Promise.all(recursiveTierPromises);
+
+        for (let resultOffset = 0; resultOffset < recursiveTierIndices.length; resultOffset++) {
+          const originalIndex = recursiveTierIndices[resultOffset];
+          recursiveResults[originalIndex] = recursiveTierResults[resultOffset];
+          recursiveCompletedResults.set(originalIndex, recursiveTierResults[resultOffset]);
+        }
+      }
+
+      const recursiveSuccessfulResults = recursiveResults.filter(
+        (result) => !("error" in result) && result.status === "completed",
+      );
+
+      if (recursiveSuccessfulResults.length === 0) {
+        logger.warn(
+          `[DivideAndConquerRouter] All recursive sub-subtasks failed at depth ${currentDepth} — falling back to direct execution`,
+        );
+        return spawnSubAgent(assignment);
+      }
+
+      if (recursiveSuccessfulResults.length === 1 && recursiveSubtasks.length === 1) {
+        return recursiveResults[0];
+      }
+
+      const recursiveSynthesisPrompt = buildSynthesisPrompt(
+        assignment.prompt,
+        recursiveResults,
+        recursiveSubtaskDescriptions,
+      );
+
+      const recursiveSynthesisStartMs = performance.now();
+      const recursiveSynthesisMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [
+        { role: "user", content: recursiveSynthesisPrompt },
+      ];
+      const recursiveSynthesisResult = await provider.generateText(
+        recursiveSynthesisMessages,
+        orchestratorContext.resolvedModel,
+        { maxTokens: 8192 },
+      );
+      const recursiveSynthesisDurationMs = Math.round(performance.now() - recursiveSynthesisStartMs);
+
+      const recursiveSynthesizedResult: SubAgentResult = {
+        agent_id: `recursive-synthesis-depth${currentDepth}-${Date.now()}`,
+        description: `Recursive synthesis at depth ${currentDepth} for "${assignment.description}"`,
+        status: "completed",
+        summary: `Recursively decomposed into ${recursiveSubtasks.length} sub-subtasks at depth ${currentDepth}, synthesized ${recursiveSuccessfulResults.length} results`,
+        result: recursiveSynthesisResult.text,
+        toolUses: 0,
+        iterations: 1,
+        durationMs: recursiveSynthesisDurationMs,
+        messages: [],
+        diff: { additions: 0, deletions: 0, files: [] },
+      };
+
+      logger.info(
+        `[DivideAndConquerRouter] Recursive synthesis at depth ${currentDepth} complete in ${recursiveSynthesisDurationMs}ms`,
+      );
+
+      return recursiveSynthesizedResult;
+    } catch (recursionError: unknown) {
+      logger.warn(
+        `[DivideAndConquerRouter] Recursive decomposition failed at depth ${currentDepth}: ${getErrorMessage(recursionError)} — falling back to direct execution`,
+      );
+      return spawnSubAgent(assignment);
     }
   }
 }
