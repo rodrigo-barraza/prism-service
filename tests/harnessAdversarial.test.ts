@@ -19,7 +19,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { HARNESS_IDS, PROVIDERS, REASONING_STRATEGIES } from "../src/constants.ts";
+import { HARNESS_IDS, PROVIDERS, THOUGHT_STRUCTURES } from "../src/constants.ts";
 import { ChatRequestSchema } from "../src/types/schemas.ts";
 import AgenticLoopState from "../src/services/AgenticLoopState.ts";
 import ToolContext from "../src/services/ToolContext.ts";
@@ -822,76 +822,76 @@ describe("Flow 6: maxIterations Resolution Logic", () => {
 
 describe("Flow 7: Legacy Harness Migration Logic", () => {
 
-  // Extracted from AgenticLoopService.runAgenticLoop() lines 110-117:
-  // if (harnessId === HARNESS_IDS.TREE_OF_THOUGHT || harnessId === HARNESS_IDS.TREE_OF_THOUGHT) {
-  //   harnessId = HARNESS_IDS.STANDARD;
-  //   reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
+  // Extracted from AgenticLoopService.runAgenticLoop() lines 120-128:
+  // if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
+  //   harnessId = "standard";
+  //   thoughtStructure = "tree_of_thoughts";
   // }
 
   it("should migrate tree_of_thought harness to standard + tree_of_thoughts", () => {
-    let harnessId: string = HARNESS_IDS.TREE_OF_THOUGHT;
-    let reasoningStrategy: string = REASONING_STRATEGIES.CHAIN_OF_THOUGHT;
+    let harnessId: string = "tree_of_thought";
+    let thoughtStructure: string = THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT;
 
-    if (harnessId === HARNESS_IDS.TREE_OF_THOUGHT || harnessId === HARNESS_IDS.TREE_OF_THOUGHT) {
+    if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
       harnessId = HARNESS_IDS.STANDARD;
-      reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
+      thoughtStructure = THOUGHT_STRUCTURES.TREE_OF_THOUGHTS;
     }
 
     expect(harnessId).toBe(HARNESS_IDS.STANDARD);
-    expect(reasoningStrategy).toBe(REASONING_STRATEGIES.TREE_OF_THOUGHTS);
+    expect(thoughtStructure).toBe(THOUGHT_STRUCTURES.TREE_OF_THOUGHTS);
   });
 
   it("should migrate tree-of-thought (kebab) harness to standard + tree_of_thoughts", () => {
-    let harnessId: string = HARNESS_IDS.TREE_OF_THOUGHT;
-    let reasoningStrategy: string = REASONING_STRATEGIES.CHAIN_OF_THOUGHT;
+    let harnessId: string = "tree-of-thought";
+    let thoughtStructure: string = THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT;
 
-    if (harnessId === HARNESS_IDS.TREE_OF_THOUGHT || harnessId === HARNESS_IDS.TREE_OF_THOUGHT) {
+    if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
       harnessId = HARNESS_IDS.STANDARD;
-      reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
+      thoughtStructure = THOUGHT_STRUCTURES.TREE_OF_THOUGHTS;
     }
 
     expect(harnessId).toBe(HARNESS_IDS.STANDARD);
-    expect(reasoningStrategy).toBe(REASONING_STRATEGIES.TREE_OF_THOUGHTS);
+    expect(thoughtStructure).toBe(THOUGHT_STRUCTURES.TREE_OF_THOUGHTS);
   });
 
   it("should NOT migrate tree_of_thoughts (plural) — that's a strategy, not a harness", () => {
-    let harnessId: string = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
-    let reasoningStrategy: string = REASONING_STRATEGIES.CHAIN_OF_THOUGHT;
+    let harnessId: string = THOUGHT_STRUCTURES.TREE_OF_THOUGHTS;
+    let thoughtStructure: string = THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT;
 
-    if (harnessId === HARNESS_IDS.TREE_OF_THOUGHT || harnessId === HARNESS_IDS.TREE_OF_THOUGHT) {
+    if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
       harnessId = HARNESS_IDS.STANDARD;
-      reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
+      thoughtStructure = THOUGHT_STRUCTURES.TREE_OF_THOUGHTS;
     }
 
-    // Should remain unchanged — REASONING_STRATEGIES.TREE_OF_THOUGHTS (plural) is NOT a legacy harness
-    expect(harnessId).toBe(REASONING_STRATEGIES.TREE_OF_THOUGHTS);
-    expect(reasoningStrategy).toBe(REASONING_STRATEGIES.CHAIN_OF_THOUGHT);
+    // Should remain unchanged — THOUGHT_STRUCTURES.TREE_OF_THOUGHTS (plural) is NOT a legacy harness
+    expect(harnessId).toBe(THOUGHT_STRUCTURES.TREE_OF_THOUGHTS);
+    expect(thoughtStructure).toBe(THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT);
   });
 
   it("should not migrate standard harness", () => {
     let harnessId: string = HARNESS_IDS.STANDARD;
-    let reasoningStrategy: string = REASONING_STRATEGIES.CHAIN_OF_THOUGHT;
+    let thoughtStructure: string = THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT;
 
-    if (harnessId === HARNESS_IDS.TREE_OF_THOUGHT || harnessId === HARNESS_IDS.TREE_OF_THOUGHT) {
+    if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
       harnessId = HARNESS_IDS.STANDARD;
-      reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
+      thoughtStructure = THOUGHT_STRUCTURES.TREE_OF_THOUGHTS;
     }
 
     expect(harnessId).toBe(HARNESS_IDS.STANDARD);
-    expect(reasoningStrategy).toBe(REASONING_STRATEGIES.CHAIN_OF_THOUGHT);
+    expect(thoughtStructure).toBe(THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT);
   });
 
   it("should not migrate vision-language harness", () => {
     let harnessId: string = "vision-language";
-    let reasoningStrategy: string = REASONING_STRATEGIES.CHAIN_OF_THOUGHT;
+    let thoughtStructure: string = THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT;
 
-    if (harnessId === HARNESS_IDS.TREE_OF_THOUGHT || harnessId === HARNESS_IDS.TREE_OF_THOUGHT) {
+    if (harnessId === "tree_of_thought" || harnessId === "tree-of-thought") {
       harnessId = HARNESS_IDS.STANDARD;
-      reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
+      thoughtStructure = THOUGHT_STRUCTURES.TREE_OF_THOUGHTS;
     }
 
     expect(harnessId).toBe("vision-language");
-    expect(reasoningStrategy).toBe(REASONING_STRATEGIES.CHAIN_OF_THOUGHT);
+    expect(thoughtStructure).toBe(THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT);
   });
 });
 
