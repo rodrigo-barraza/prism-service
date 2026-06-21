@@ -121,6 +121,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       traceId: "trace-id-abc",
       agentConversationId: "session-id-def",
       conversationId: "conv-id-ghi",
+      maxRecursionDepth: 2,
       emit: vi.fn(),
     };
   });

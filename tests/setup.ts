@@ -118,6 +118,7 @@ vi.mock('../src/services/SettingsService.ts', () => {
             harness: 'standard',
             topology: 'hierarchical',
             dynamicToolActivation: true,
+            maxRecursionDepth: 2,
         },
         security: {
             allowEnvFiles: false,

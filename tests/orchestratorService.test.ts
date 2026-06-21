@@ -74,6 +74,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       agentConversationId: "session-id-456",
       conversationId: "conv-id-789",
       enabledTools: ["read_file", "write_file", "search_web"],
+      maxRecursionDepth: 2,
       emit: vi.fn(),
     };
   });
