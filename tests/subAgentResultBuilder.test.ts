@@ -217,3 +217,133 @@ describe("buildToolCallFallbackSummary", () => {
     expect(fallback).not.toContain("1 iterations");
   });
 });
+
+describe("extractSubtreeMetrics", () => {
+  it("should return null when message history has no tool results containing agent_id", () => {
+    const messages: ConversationMessage[] = [
+      { role: "user", content: "hello" },
+      { role: "assistant", content: "hi" },
+      { role: "tool", content: "some random tool result" },
+    ];
+    const { extractSubtreeMetrics } = require("../src/services/orchestrator/SubAgentResultBuilder.ts");
+    const result = extractSubtreeMetrics(messages);
+    expect(result).toBeNull();
+  });
+
+  it("should parse a single SubAgentResult object (non-array) from a tool result", () => {
+    const { extractSubtreeMetrics } = require("../src/services/orchestrator/SubAgentResultBuilder.ts");
+    const messages: ConversationMessage[] = [
+      {
+        role: "tool_result",
+        content: JSON.stringify({
+          agent_id: "agent-child-1",
+          description: "child agent",
+          status: "completed",
+          recursionDepth: 1,
+          durationMs: 1200,
+          toolUses: 5,
+        }),
+      },
+    ];
+
+    const metrics = extractSubtreeMetrics(messages);
+    expect(metrics).not.toBeNull();
+    expect(metrics!.totalDescendants).toBe(1);
+    expect(metrics!.maxDepthReached).toBe(1);
+    expect(metrics!.aggregatedDurationMs).toBe(1200);
+    expect(metrics!.aggregatedToolUses).toBe(5);
+    expect(metrics!.childResults).toHaveLength(1);
+    expect(metrics!.childResults![0].agent_id).toBe("agent-child-1");
+  });
+
+  it("should parse an array of SubAgentResults and aggregate metrics", () => {
+    const { extractSubtreeMetrics } = require("../src/services/orchestrator/SubAgentResultBuilder.ts");
+    const messages: ConversationMessage[] = [
+      {
+        role: "tool",
+        content: JSON.stringify([
+          {
+            agent_id: "agent-child-1",
+            description: "child 1",
+            status: "completed",
+            recursionDepth: 1,
+            durationMs: 1000,
+            toolUses: 3,
+          },
+          {
+            agent_id: "agent-child-2",
+            description: "child 2",
+            status: "failed",
+            recursionDepth: 1,
+            durationMs: 2000,
+            toolUses: 4,
+          },
+        ]),
+      },
+    ];
+
+    const metrics = extractSubtreeMetrics(messages);
+    expect(metrics).not.toBeNull();
+    expect(metrics!.totalDescendants).toBe(2);
+    expect(metrics!.maxDepthReached).toBe(1);
+    expect(metrics!.aggregatedDurationMs).toBe(3000);
+    expect(metrics!.aggregatedToolUses).toBe(7);
+    expect(metrics!.childResults).toHaveLength(2);
+  });
+
+  it("should aggregate nested subtree metrics from grandchildren recursively", () => {
+    const { extractSubtreeMetrics } = require("../src/services/orchestrator/SubAgentResultBuilder.ts");
+    const messages: ConversationMessage[] = [
+      {
+        role: "tool",
+        content: JSON.stringify([
+          {
+            agent_id: "agent-child-1",
+            description: "child 1",
+            status: "completed",
+            recursionDepth: 1,
+            durationMs: 1000,
+            toolUses: 3,
+            subtreeMetrics: {
+              totalDescendants: 2,
+              maxDepthReached: 2,
+              aggregatedCost: 0.05,
+              aggregatedDurationMs: 4000,
+              aggregatedToolUses: 10,
+            },
+          },
+        ]),
+      },
+    ];
+
+    const metrics = extractSubtreeMetrics(messages);
+    expect(metrics).not.toBeNull();
+    expect(metrics!.totalDescendants).toBe(3); // 1 child + 2 nested descendants
+    expect(metrics!.maxDepthReached).toBe(2);
+    expect(metrics!.aggregatedDurationMs).toBe(5000); // 1000 + 4000
+    expect(metrics!.aggregatedToolUses).toBe(13); // 3 + 10
+  });
+
+  it("should skip malformed JSON or JSON without agent_id and handle errors gracefully", () => {
+    const { extractSubtreeMetrics } = require("../src/services/orchestrator/SubAgentResultBuilder.ts");
+    const messages: ConversationMessage[] = [
+      { role: "tool", content: "{invalid json" },
+      { role: "tool", content: JSON.stringify({ name: "not an agent" }) }, // no agent_id
+      {
+        role: "tool",
+        content: JSON.stringify({
+          agent_id: "agent-valid",
+          status: "completed",
+          durationMs: "invalid-duration", // string instead of number
+        }),
+      },
+    ];
+
+    const metrics = extractSubtreeMetrics(messages);
+    expect(metrics).not.toBeNull();
+    expect(metrics!.totalDescendants).toBe(1);
+    expect(metrics!.childResults![0].agent_id).toBe("agent-valid");
+    expect(metrics!.childResults![0].durationMs).toBe(0); // fallback
+  });
+});
+

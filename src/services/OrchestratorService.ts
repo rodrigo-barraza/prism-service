@@ -164,6 +164,21 @@ export default class OrchestratorService {
     }
     return this.agenticLoopServicePromise;
   }
+  private static getRootConversationId(conversationId: string): string {
+    let currentId = conversationId;
+    while (currentId) {
+      const parentAgent = Array.from(activeSubAgents.values()).find(
+        (subAgent) => subAgent.subAgentConversationId === currentId,
+      );
+      if (parentAgent && parentAgent.parentConversationId) {
+        currentId = parentAgent.parentConversationId;
+      } else {
+        break;
+      }
+    }
+    return currentId;
+  }
+
   // ══════════════════════════════════════════════════════════
   // Chat-Triggered Tools (team_create / send_message / stop_agent)
   // ══════════════════════════════════════════════════════════
@@ -238,12 +253,13 @@ export default class OrchestratorService {
 
     // Circuit breaker: cap total agents per conversation across all recursion depths
     if (parentConversationId) {
+      const rootConversationId = OrchestratorService.getRootConversationId(parentConversationId);
       const conversationAgentCount = Array.from(activeSubAgents.values()).filter(
-        (subAgent) => subAgent.parentConversationId === parentConversationId,
+        (subAgent) => OrchestratorService.getRootConversationId(subAgent.parentConversationId || "") === rootConversationId,
       ).length;
       if (conversationAgentCount >= MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION) {
         logger.warn(
-          `[Orchestrator] Circuit breaker: conversation ${parentConversationId} has ${conversationAgentCount} agents (max ${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}). Recursive spawning blocked.`,
+          `[Orchestrator] Circuit breaker: conversation ${rootConversationId} has reached total agent ceiling of ${conversationAgentCount} (max ${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}). Recursive spawning blocked.`,
         );
         return {
           error: `Circuit breaker: maximum concurrent agents per conversation (${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}) reached. This limit prevents exponential agent fan-out from recursive spawning.`,
