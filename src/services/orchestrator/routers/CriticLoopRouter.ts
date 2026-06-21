@@ -260,6 +260,9 @@ function detectDegenerationOfThought(
 /**
  * Critic Loop Router — Actor-Critic Iterative Refinement (MAR)
  *
+ * Based on: "Self-Refine: Iterative Refinement with Self-Feedback"
+ * (arxiv.org/abs/2303.17651)
+ *
  * Supports two modes via topologyConfig.actorCount:
  *
  * ## Council of Judges (actorCount=1, default)

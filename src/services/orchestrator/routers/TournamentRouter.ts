@@ -73,6 +73,21 @@ function buildSelectionPrompt(
   ].join("\n");
 }
 
+/**
+ * Tournament Router — Best-of-N Selection with Judge Pass (BoN)
+ *
+ * Based on: "Large Language Monkeys: Scaling Inference Compute
+ * with Repeated Sampling" (arxiv.org/abs/2407.21787)
+ *
+ * Implements a two-phase parallel-then-judge flow:
+ * 1. **Fan-out:** All members execute the task independently in parallel
+ * 2. **Judge:** An LLM evaluator reviews all outputs and selects the single
+ *    best result verbatim — no synthesis or merging
+ *
+ * Key differences from Hierarchical Aggregation:
+ * - Tournament SELECTS one winner; Aggregation SYNTHESIZES all outputs
+ * - The judge must reproduce the winning output exactly
+ */
 export class TournamentRouter implements TopologyRouter {
   async execute(
     teamName: string,

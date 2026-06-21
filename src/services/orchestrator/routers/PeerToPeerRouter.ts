@@ -106,7 +106,10 @@ function isStallResponse(
 }
 
 /**
- * Peer-to-Peer (Mesh) Router — Stateful Session Reuse
+ * Peer-to-Peer (Mesh) Router — Multi-Agent Debate (MAD)
+ *
+ * Based on: "Improving Factuality and Reasoning in Language Models
+ * through Multiagent Debate" (arxiv.org/abs/2305.14325)
  *
  * Implements a turn-based conversational mesh where agents take turns on a
  * shared discussion thread. Unlike stateless spawn-per-turn, this router:

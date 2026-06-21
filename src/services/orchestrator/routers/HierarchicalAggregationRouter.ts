@@ -61,6 +61,22 @@ function buildSynthesisPrompt(
   ].join("\n");
 }
 
+/**
+ * Hierarchical Aggregation Router — Mixture-of-Agents Synthesis (MoA)
+ *
+ * Based on: "Mixture-of-Agents Enhances Large Language Model Capabilities"
+ * (arxiv.org/abs/2406.04692)
+ *
+ * Implements a two-phase parallel-then-synthesize flow:
+ * 1. **Fan-out:** All members execute the task independently in parallel
+ * 2. **Synthesize:** An LLM aggregator merges all outputs into a single unified
+ *    result — identifying agreements, resolving conflicts, and combining
+ *    complementary information
+ *
+ * Key differences from Tournament:
+ * - Aggregation SYNTHESIZES all outputs; Tournament SELECTS one winner
+ * - The synthesis pass produces new merged content, not a verbatim copy
+ */
 export class HierarchicalAggregationRouter implements TopologyRouter {
   async execute(
     teamName: string,

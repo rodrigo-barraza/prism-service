@@ -177,6 +177,9 @@ function buildRefinementPrompt(
 /**
  * MCTS-Guided Search Router — Monte Carlo Tree Search (LATS)
  *
+ * Based on: "Language Agent Tree Search Unifies Reasoning Acting and
+ * Planning in Language Models" (arxiv.org/abs/2310.04406)
+ *
  * Implements an iterative expand-evaluate-select-refine loop:
  *
  * 1. **Expand:** Spawn N sub-agents in parallel with the task (or refinement prompt)
