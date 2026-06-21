@@ -174,6 +174,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
           agentIndex: memberIndex,
           teamSize: members.length,
           round: layerIndex + 1,
+          totalRounds: layerCount,
           orchestratorContext,
         });
       }

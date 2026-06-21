@@ -167,6 +167,7 @@ export class PeerToPeerRouter implements TopologyRouter {
     const maxTurnsCount = configuredMaxRounds > 0
       ? Math.min(configuredMaxRounds * members.length, 20)
       : Math.max(members.length, Math.min(10, members.length * 2));
+    const totalRoundsCount = Math.ceil(maxTurnsCount / members.length);
 
     for (let turnIndex = 0; turnIndex < maxTurnsCount; turnIndex++) {
       const memberIndex = turnIndex % members.length;
@@ -213,6 +214,7 @@ export class PeerToPeerRouter implements TopologyRouter {
           agentIndex: memberIndex,
           teamSize: members.length,
           round: currentRound,
+          totalRounds: totalRoundsCount,
           orchestratorContext,
           preserveWorktree: true,
         };
