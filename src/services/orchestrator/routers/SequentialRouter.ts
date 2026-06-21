@@ -13,6 +13,19 @@ import {
 import logger from "../../../utils/logger.ts";
 import { GitWorktreeHelper } from "../GitWorktreeHelper.ts";
 
+/**
+ * Sequential Router — Serial Pipeline (SP)
+ *
+ * Paper: "Chain-of-Thought Prompting Elicits Reasoning in
+ * Large Language Models" (arxiv.org/abs/2201.11903)
+ *
+ * Inspired by CoT's step-by-step decomposition, but extended
+ * from single-prompt reasoning to multi-agent orchestration.
+ * Each sub-agent receives accumulated prior outputs as context.
+ *
+ * See TopologyRegistry.ts → TOPOLOGY_DEFINITIONS (id: "sequential")
+ * for full paper-alignment metadata and config option documentation.
+ */
 export class SequentialRouter implements TopologyRouter {
   async execute(
     teamName: string,
