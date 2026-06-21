@@ -28,7 +28,7 @@ import ConversationGenerationTracker from "../src/services/ConversationGeneratio
 import BaseAgenticHarness from "../src/services/harnesses/BaseAgenticHarness.ts";
 import AgentHooks from "../src/services/AgentHooks.ts";
 import AutoApprovalEngine from "../src/services/AutoApprovalEngine.ts";
-import { COLLECTIONS } from "../src/constants.ts";
+import { COLLECTIONS, TYPES } from "../src/constants.ts";
 import SystemPromptAssembler from "../src/services/system-prompt/index.ts";
 
 vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
@@ -222,7 +222,7 @@ describe("PostExecutionEmitter", () => {
 
       expect(mockEmit).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "image",
+          type: TYPES.IMAGE,
           data: "base64data",
           mimeType: "image/png",
           minioRef: "minio://images/gen.png",

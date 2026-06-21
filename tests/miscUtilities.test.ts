@@ -15,10 +15,10 @@ vi.mock('../src/utils/logger.ts', () => ({
 describe('ProviderError', () => {
   it('should set all properties from constructor arguments', () => {
     const originalError = new Error('upstream failure');
-    const providerError = new ProviderError('anthropic', 'Rate limited', 429, originalError);
+    const providerError = new ProviderError(PROVIDERS.ANTHROPIC, 'Rate limited', 429, originalError);
 
     expect(providerError.name).toBe('ProviderError');
-    expect(providerError.provider).toBe('anthropic');
+    expect(providerError.provider).toBe(PROVIDERS.ANTHROPIC);
     expect(providerError.message).toBe('Rate limited');
     expect(providerError.statusCode).toBe(429);
     expect(providerError.originalError).toBe(originalError);
@@ -26,7 +26,7 @@ describe('ProviderError', () => {
   });
 
   it('should apply default statusCode of 500 when omitted', () => {
-    const providerError = new ProviderError('google', 'Something broke');
+    const providerError = new ProviderError(PROVIDERS.GOOGLE, 'Something broke');
 
     expect(providerError.statusCode).toBe(500);
     expect(providerError.originalError).toBeNull();
@@ -34,19 +34,19 @@ describe('ProviderError', () => {
 
   it('should extract errorType from originalError.type when present', () => {
     const sdkError = { type: 'rate_limit_error', message: 'Too many requests' };
-    const providerError = new ProviderError('anthropic', 'Rate limited', 429, sdkError);
+    const providerError = new ProviderError(PROVIDERS.ANTHROPIC, 'Rate limited', 429, sdkError);
 
     expect(providerError.errorType).toBe('rate_limit_error');
   });
 
   it('should set errorType to null when originalError has no type field', () => {
-    const providerError = new ProviderError('openai', 'Timeout', 504, { code: 'ECONNRESET' });
+    const providerError = new ProviderError(PROVIDERS.OPENAI, 'Timeout', 504, { code: 'ECONNRESET' });
 
     expect(providerError.errorType).toBeNull();
   });
 
   it('should be an instance of Error', () => {
-    const providerError = new ProviderError('google', 'Failure');
+    const providerError = new ProviderError(PROVIDERS.GOOGLE, 'Failure');
 
     expect(providerError).toBeInstanceOf(Error);
     expect(providerError).toBeInstanceOf(ProviderError);
@@ -54,12 +54,12 @@ describe('ProviderError', () => {
 
   describe('toJSON', () => {
     it('should serialize to a plain error object with core fields', () => {
-      const providerError = new ProviderError('openai', 'Bad request', 400);
+      const providerError = new ProviderError(PROVIDERS.OPENAI, 'Bad request', 400);
       const serialized = providerError.toJSON();
 
       expect(serialized).toEqual({
         error: true,
-        provider: 'openai',
+        provider: PROVIDERS.OPENAI,
         message: 'Bad request',
         statusCode: 400,
       });
@@ -67,7 +67,7 @@ describe('ProviderError', () => {
 
     it('should include errorType in JSON when present', () => {
       const providerError = new ProviderError(
-        'anthropic',
+        PROVIDERS.ANTHROPIC,
         'Rate limited',
         429,
         { type: 'rate_limit_error' },
@@ -76,7 +76,7 @@ describe('ProviderError', () => {
 
       expect(serialized).toEqual({
         error: true,
-        provider: 'anthropic',
+        provider: PROVIDERS.ANTHROPIC,
         message: 'Rate limited',
         statusCode: 429,
         errorType: 'rate_limit_error',
@@ -84,7 +84,7 @@ describe('ProviderError', () => {
     });
 
     it('should omit errorType from JSON when null', () => {
-      const providerError = new ProviderError('google', 'Failure', 500);
+      const providerError = new ProviderError(PROVIDERS.GOOGLE, 'Failure', 500);
       const serialized = providerError.toJSON();
 
       expect(serialized).not.toHaveProperty('errorType');
@@ -107,7 +107,7 @@ describe('errorHandler middleware', () => {
   });
 
   it('should handle ProviderError with correct status and serialized body', () => {
-    const providerError = new ProviderError('anthropic', 'Rate limited', 429);
+    const providerError = new ProviderError(PROVIDERS.ANTHROPIC, 'Rate limited', 429);
 
     errorHandler(
       providerError,
@@ -120,7 +120,7 @@ describe('errorHandler middleware', () => {
     expect(mockResponse.json).toHaveBeenCalledWith(
       expect.objectContaining({
         error: true,
-        provider: 'anthropic',
+        provider: PROVIDERS.ANTHROPIC,
         message: 'Rate limited',
         statusCode: 429,
       }),
@@ -294,23 +294,23 @@ describe('resolveLockedOffToolNames', () => {
     vi.mocked(SettingsService.getSection).mockImplementation(async (section: any) => {
       if (section === 'memory') {
         return {
-          extractionProvider: 'google',
+          extractionProvider: PROVIDERS.GOOGLE,
           extractionModel: 'gemini-3-flash',
-          consolidationProvider: 'google',
+          consolidationProvider: PROVIDERS.GOOGLE,
           consolidationModel: 'gemini-3-flash',
-          embeddingProvider: 'google',
+          embeddingProvider: PROVIDERS.GOOGLE,
           embeddingModel: 'text-embedding-004',
         };
       }
       if (section === 'creative') {
         return {
-          imageProvider: 'google',
+          imageProvider: PROVIDERS.GOOGLE,
           imageModel: 'imagen-4',
-          visionProvider: 'google',
+          visionProvider: PROVIDERS.GOOGLE,
           visionModel: 'gemini-3-flash',
-          textToSpeechProvider: 'google',
+          textToSpeechProvider: PROVIDERS.GOOGLE,
           textToSpeechModel: 'tts-1',
-          speechToTextProvider: 'google',
+          speechToTextProvider: PROVIDERS.GOOGLE,
           speechToTextModel: 'whisper-1',
         };
       }
@@ -553,6 +553,7 @@ import {
   EMOTION_CLASSIFICATION_PROMPT,
   type PrimaryEmotion,
 } from '../src/services/somatic/SomaticConstants.ts';
+import { PROVIDERS } from "../src/constants";
 
 describe('SomaticConstants', () => {
   describe('PRIMARY_EMOTIONS', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, TYPES } from "../src/constants.ts";
 import {
   app,
   MOCK_GENERATE_TEXT_STREAM,
@@ -63,7 +63,7 @@ describe("POST /chat (image-to-text / vision)", () => {
       })
       .expect(200);
 
-    expect(res.body).toHaveProperty("text", "A photo of a cat");
+    expect(res.body).toHaveProperty(TYPES.TEXT, "A photo of a cat");
     expect(res.body).toHaveProperty("provider", PROVIDERS.GOOGLE);
     expect(res.body).toHaveProperty("usage");
     expect(res.body.usage).toHaveProperty("inputTokens", 100);

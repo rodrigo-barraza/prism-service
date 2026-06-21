@@ -19,7 +19,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { HARNESS_IDS, PROVIDERS, THOUGHT_STRUCTURES } from "../src/constants.ts";
+import { HARNESS_IDS, PROVIDERS, THOUGHT_STRUCTURES, TYPES } from "../src/constants.ts";
 import { ChatRequestSchema } from "../src/types/schemas.ts";
 import AgenticLoopState from "../src/services/AgenticLoopState.ts";
 import ToolContext from "../src/services/ToolContext.ts";
@@ -254,7 +254,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
       messages: [{
         role: "user",
         content: [
-          { type: "text", text: "a".repeat(10_000) },
+          { type: TYPES.TEXT, text: "a".repeat(10_000) },
           { type: "image_url", image_url: { url: "data:image/png;base64," + "A".repeat(10_000) } },
         ],
       }],
@@ -877,7 +877,7 @@ describe("Flow 8: Schema Edge Cases — Adversarial Payloads", () => {
       messages: [{
         role: "user",
         content: [
-          { type: "text", text: "describe this image" },
+          { type: TYPES.TEXT, text: "describe this image" },
           { type: "image_url", image_url: { url: "https://example.com/img.png" } },
         ],
       }],

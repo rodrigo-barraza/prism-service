@@ -68,7 +68,7 @@ vi.mock("../src/services/ConversationService.ts", () => ({
   default: {
     appendMessages: vi.fn().mockResolvedValue(undefined),
     setGenerating: vi.fn().mockResolvedValue(undefined),
-    getSessionStats: vi.fn().mockResolvedValue(null),
+    getConversationStats: vi.fn().mockResolvedValue(null),
   },
 }));
 

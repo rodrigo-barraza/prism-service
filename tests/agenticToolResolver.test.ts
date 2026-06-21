@@ -536,7 +536,7 @@ describe("AgenticToolResolver — native thinking collision", () => {
       agent: undefined,
       project: "coding",
       username: "anonymous",
-      modelDefinition: { outputTypes: ["text"] },
+      modelDefinition: { outputTypes: [TYPES.TEXT] },
     });
 
     const toolNames = finalTools.map((tool) => tool.name);

@@ -10,6 +10,7 @@ import {
   SESSIONS_BETWEEN_RUNS,
   DAILY_MAX_CONSOLIDATIONS
 } from '../src/services/memory/ConsolidationTracker.ts';
+import { COLLECTIONS } from "../src/constants";
 
 describe('Memory Consolidation Tracker Unit Tests', () => {
   let mockRuns: Array<{ project: string; sessionsSinceLastRun: number; lastConsolidatedAt?: string }> = [];
@@ -32,7 +33,7 @@ describe('Memory Consolidation Tracker Unit Tests', () => {
 
     const mockDb = {
       collection: vi.fn().mockImplementation((collectionName: string) => {
-        if (collectionName === 'memory_consolidation_runs') {
+        if (collectionName === COLLECTIONS.MEMORY_CONSOLIDATION_RUNS) {
           return {
             findOne: vi.fn().mockImplementation(async (query: { project: string }) => {
               return mockRuns.find((run) => run.project === query.project) || null;
@@ -64,7 +65,7 @@ describe('Memory Consolidation Tracker Unit Tests', () => {
           };
         }
 
-        if (collectionName === 'memory_consolidation_history') {
+        if (collectionName === COLLECTIONS.MEMORY_CONSOLIDATION_HISTORY) {
           return {
             insertOne: vi.fn().mockImplementation(async (document: any) => {
               mockHistory.push(document);

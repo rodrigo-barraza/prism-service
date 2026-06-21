@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import FileService from "../src/services/FileService.ts";
 import MinioWrapper from "../src/wrappers/MinioWrapper.ts";
-import { FILE_CATEGORIES } from "../src/constants.ts";
+import { FILE_CATEGORIES, TYPES } from "../src/constants.ts";
 
 vi.mock("../src/wrappers/MinioWrapper.ts", () => ({
   default: {
@@ -70,7 +70,7 @@ describe("FileService", () => {
         {
           mimeType: "application/pdf",
           base64: "JVBERi0xLjQKJ...",
-          expectedExtension: "pdf",
+          expectedExtension: TYPES.PDF,
         },
       ];
 

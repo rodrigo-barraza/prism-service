@@ -23,6 +23,15 @@ export function getLastAssistantText(messages: ConversationMessage[]): string {
       typeof message.content === "string" ? message.content : ""
     ).trim();
     if (text) return text;
+    // Fallback: harnesses store segmented output in textFragments when content
+    // is split across interleaved tool-call turns. Join them as a last resort.
+    if (Array.isArray(message.textFragments) && message.textFragments.length > 0) {
+      const joined = message.textFragments
+        .filter((fragment): fragment is string => typeof fragment === "string")
+        .join("\n")
+        .trim();
+      if (joined) return joined;
+    }
   }
   return "";
 }
@@ -37,12 +46,6 @@ export function estimateTokens(characterCount: number): number {
 
 export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
   const status = subAgent.status === "complete" ? "completed" : subAgent.status;
-  const summary =
-    status === "completed"
-      ? `Agent "${subAgent.description}" completed`
-      : status === "failed"
-        ? `Agent "${subAgent.description}" failed: ${subAgent.error || "Unknown error"}`
-        : `Agent "${subAgent.description}" was stopped`;
 
   // subAgent.output is set during _runSubAgentLoop from getLastAssistantText()
   // on the live messages array, then falls back to telemetry.output (streamed
@@ -51,6 +54,22 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
   const lastText =
     (subAgent.output || "").trim() ||
     getLastAssistantText(subAgent.messages || []);
+
+  const toolCallCount = subAgent.toolCalls?.length || 0;
+  const iterationCount = subAgent.iterations || 0;
+  const hasResult = !!lastText;
+
+  // Build a diagnostic summary that explains WHY there's no result when applicable,
+  // rather than the unhelpful "Agent X completed" boilerplate that gives no signal.
+  const summary = buildDiagnosticSummary(
+    status,
+    subAgent.description,
+    subAgent.error || null,
+    hasResult,
+    toolCallCount,
+    iterationCount,
+    subAgent.durationMs || 0,
+  );
 
   // Aggregate tool call names into { name: count } for frontend badge display
   const toolNames: Record<string, number> = {};
@@ -67,9 +86,9 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
     status,
     summary,
     result: lastText || null,
-    toolUses: subAgent.toolCalls?.length || 0,
+    toolUses: toolCallCount,
     toolNames: Object.keys(toolNames).length > 0 ? toolNames : undefined,
-    iterations: subAgent.iterations || 0,
+    iterations: iterationCount,
     durationMs: subAgent.durationMs || 0,
     // Include full conversation for frontend MessageList rendering.
     // Strip system messages — they're large and not useful for display.
@@ -86,7 +105,14 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
     };
   }
 
-  if (subAgent.error) result.error = subAgent.error;
+  // Populate error for both explicit failures AND silent empty-result completions.
+  // This ensures the orchestrator LLM receives a machine-readable diagnostic
+  // explaining why the sub-agent produced no output — enabling informed retry decisions.
+  if (subAgent.error) {
+    result.error = subAgent.error;
+  } else if (status === "completed" && !hasResult) {
+    result.error = buildEmptyResultDiagnostic(toolCallCount, iterationCount, subAgent.durationMs || 0);
+  }
 
   if (typeof subAgent.recursionDepth === "number") {
     result.recursionDepth = subAgent.recursionDepth;
@@ -98,6 +124,78 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
   }
 
   return result;
+}
+
+function buildDiagnosticSummary(
+  status: string,
+  description: string,
+  error: string | null,
+  hasResult: boolean,
+  toolCallCount: number,
+  iterationCount: number,
+  durationMs: number,
+): string {
+  if (status === "failed") {
+    return `Agent "${description}" failed: ${error || "Unknown error"}`;
+  }
+  if (status === "stopped") {
+    return `Agent "${description}" was stopped`;
+  }
+  if (status === "completed" && hasResult) {
+    return `Agent "${description}" completed successfully`;
+  }
+  // Completed but no result — build an informative diagnostic
+  if (status === "completed" && !hasResult) {
+    const durationSeconds = (durationMs / 1000).toFixed(1);
+    if (toolCallCount === 0 && iterationCount <= 1) {
+      return (
+        `Agent "${description}" completed but produced no output ` +
+        `(0 tool calls, ${iterationCount} iteration, ${durationSeconds}s). ` +
+        `The model likely failed to engage with the task — ` +
+        `verify the prompt is self-contained and tools are enabled.`
+      );
+    }
+    if (toolCallCount > 0) {
+      return (
+        `Agent "${description}" completed ${iterationCount} iteration(s) ` +
+        `with ${toolCallCount} tool call(s) in ${durationSeconds}s, ` +
+        `but did not produce a final text summary. ` +
+        `The model may have ended on a tool_use turn without a follow-up response.`
+      );
+    }
+    return (
+      `Agent "${description}" completed ${iterationCount} iteration(s) ` +
+      `in ${durationSeconds}s but produced no output.`
+    );
+  }
+  return `Agent "${description}" — status: ${status}`;
+}
+
+function buildEmptyResultDiagnostic(
+  toolCallCount: number,
+  iterationCount: number,
+  durationMs: number,
+): string {
+  const durationSeconds = (durationMs / 1000).toFixed(1);
+  if (toolCallCount === 0 && iterationCount <= 1) {
+    return (
+      `Sub-agent produced no output after ${durationSeconds}s ` +
+      `(0 tool calls, ${iterationCount} iteration). ` +
+      `Probable causes: model did not engage with the task, ` +
+      `prompt was not self-contained, or required tools were not enabled.`
+    );
+  }
+  if (toolCallCount > 0) {
+    return (
+      `Sub-agent executed ${toolCallCount} tool call(s) over ${iterationCount} iteration(s) ` +
+      `(${durationSeconds}s) but did not produce a final text response. ` +
+      `The model likely ended on a tool_use turn without generating a summary.`
+    );
+  }
+  return (
+    `Sub-agent ran ${iterationCount} iteration(s) (${durationSeconds}s) ` +
+    `but produced no text output.`
+  );
 }
 
 /**

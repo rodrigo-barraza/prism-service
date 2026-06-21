@@ -4,7 +4,7 @@ import googleProvider from "../src/providers/google.ts";
 import anthropicProvider from "../src/providers/anthropic.ts";
 import AgenticLoopState from "../src/services/AgenticLoopState.ts";
 import { MODELS } from "../src/config.ts";
-import { HARNESS_IDS, PROVIDERS } from "../src/constants.ts";
+import { HARNESS_IDS, PROVIDERS, TYPES } from "../src/constants.ts";
 import {
   extractThinkTags,
   ThinkTagParser,
@@ -499,7 +499,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
   describe("Anthropic Provider Config Builder", () => {
     it("configures thinking and adjusts max_tokens/temperature when thinking is enabled", async () => {
       mockMessagesCreate.mockReturnValueOnce({
-        content: [{ type: "text", text: "Finished" }],
+        content: [{ type: TYPES.TEXT, text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
       } as any);
 
@@ -526,7 +526,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
 
     it("parses thinkingBudget as integer and maps effort levels correctly", async () => {
       mockMessagesCreate.mockReturnValueOnce({
-        content: [{ type: "text", text: "Finished" }],
+        content: [{ type: TYPES.TEXT, text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
       } as any);
 
@@ -541,7 +541,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
 
       // Verify effort levels map correctly
       mockMessagesCreate.mockReturnValueOnce({
-        content: [{ type: "text", text: "Finished" }],
+        content: [{ type: TYPES.TEXT, text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
       } as any);
       await anthropicProvider.generateText(messages, MODELS.SONNET_46.name, {
@@ -554,7 +554,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
 
     it("does not configure thinking if thinkingEnabled is false", async () => {
       mockMessagesCreate.mockReturnValueOnce({
-        content: [{ type: "text", text: "Finished" }],
+        content: [{ type: TYPES.TEXT, text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
       } as any);
 
@@ -570,7 +570,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
 
       // Verify topP works when temperature is undefined
       mockMessagesCreate.mockReturnValueOnce({
-        content: [{ type: "text", text: "Finished" }],
+        content: [{ type: TYPES.TEXT, text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
       } as any);
       await anthropicProvider.generateText(messages, MODELS.SONNET_46.name, {
@@ -583,7 +583,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
 
     it("configures all standard parameters correctly", async () => {
       mockMessagesCreate.mockReturnValueOnce({
-        content: [{ type: "text", text: "Finished" }],
+        content: [{ type: TYPES.TEXT, text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
       } as any);
 
@@ -609,7 +609,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
 
     it("omits top_k for adaptive thinking models (like Fable 5) to prevent deprecated parameter errors", async () => {
       mockMessagesCreate.mockReturnValueOnce({
-        content: [{ type: "text", text: "Finished" }],
+        content: [{ type: TYPES.TEXT, text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
       } as any);
 
@@ -625,7 +625,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
 
     it("defaults to adaptive thinking for adaptive thinking models (like Fable 5) when thinkingEnabled is undefined", async () => {
       mockMessagesCreate.mockReturnValueOnce({
-        content: [{ type: "text", text: "Finished" }],
+        content: [{ type: TYPES.TEXT, text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
       } as any);
 
@@ -643,7 +643,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
 
     it("does not configure thinking for adaptive thinking models (like Fable 5) when thinkingEnabled is explicitly false", async () => {
       mockMessagesCreate.mockReturnValueOnce({
-        content: [{ type: "text", text: "Finished" }],
+        content: [{ type: TYPES.TEXT, text: "Finished" }],
         usage: { input_tokens: 10, output_tokens: 5 },
       } as any);
 
@@ -690,7 +690,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
           };
           yield {
             type: "content_block_start",
-            content_block: { type: "text" }
+            content_block: { type: TYPES.TEXT }
           };
           yield {
             type: "content_block_delta",
@@ -890,7 +890,7 @@ describe('ThinkTagParser adversarial', () => {
       const raw = '<THINK>uppercase thinking</THINK> text';
       const result = extractThinkTags(raw);
       expect(result.thinking).toBe('uppercase thinking');
-      expect(result.text).toBe('text');
+      expect(result.text).toBe(TYPES.TEXT);
     });
 
     it('should handle think tags spanning multiple lines', () => {
@@ -913,7 +913,7 @@ describe('ThinkTagParser adversarial', () => {
       const parser = new ThinkTagParser();
       const chunks1 = parser.feed('<thi');
       // Should buffer the partial tag, not emit it yet
-      const textContent1 = chunks1.filter((chunk) => chunk.type === 'text').map((chunk) => chunk.content).join('');
+      const textContent1 = chunks1.filter((chunk) => chunk.type === TYPES.TEXT).map((chunk) => chunk.content).join('');
       expect(textContent1).not.toContain('<thi');
 
       const chunks2 = parser.feed('nk>hello');
@@ -926,7 +926,7 @@ describe('ThinkTagParser adversarial', () => {
       parser.feed('<think>content');
       parser.feed('</th');
       const chunks3 = parser.feed('ink>after');
-      const afterTextContent = chunks3.filter((chunk) => chunk.type === 'text').map((chunk) => chunk.content).join('');
+      const afterTextContent = chunks3.filter((chunk) => chunk.type === TYPES.TEXT).map((chunk) => chunk.content).join('');
       expect(afterTextContent).toContain('after');
     });
 
@@ -937,7 +937,7 @@ describe('ThinkTagParser adversarial', () => {
         allResults = allResults.concat(parser.feed(`<think>t${index}</think>x${index}`));
       }
       const thinkCount = allResults.filter((result) => result.type === 'thinking').length;
-      const textCount = allResults.filter((result) => result.type === 'text').length;
+      const textCount = allResults.filter((result) => result.type === TYPES.TEXT).length;
       expect(thinkCount).toBe(100);
       expect(textCount).toBe(100);
     });
@@ -958,7 +958,7 @@ describe('ThinkTagParser adversarial', () => {
       const parser = new ThinkTagParser();
       const feedResult = parser.feed('regular text');
       // feed() eagerly emits text when no partial tag is pending
-      const textChunks = feedResult.filter((chunk) => chunk.type === 'text');
+      const textChunks = feedResult.filter((chunk) => chunk.type === TYPES.TEXT);
       expect(textChunks.length).toBe(1);
       expect(textChunks[0].content).toBe('regular text');
       // flush() returns empty because feed() already emitted

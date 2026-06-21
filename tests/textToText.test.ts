@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, TYPES } from "../src/constants.ts";
 import {
   app,
   MOCK_GENERATE_TEXT_STREAM,
@@ -59,7 +59,7 @@ describe("POST /chat (text-to-text)", () => {
       })
       .expect(200);
 
-    expect(res.body).toHaveProperty("text", "Hello from mock");
+    expect(res.body).toHaveProperty(TYPES.TEXT, "Hello from mock");
     expect(res.body).toHaveProperty("provider", PROVIDERS.OPENAI);
     expect(res.body).toHaveProperty("usage");
     expect(res.body.usage).toHaveProperty("inputTokens", 10);

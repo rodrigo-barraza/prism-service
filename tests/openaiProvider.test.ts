@@ -5,6 +5,7 @@ import openaiProvider, {
   prepareResponsesInput,
 } from "../src/providers/openai.ts";
 import { OpenAIMessage } from "../src/providers/openai.ts";
+import { PROVIDERS, TYPES } from "../src/constants";
 
 const mockChatCreate = vi.fn();
 const mockResponsesCreate = vi.fn();
@@ -498,7 +499,7 @@ describe("OpenAI Provider Adapter", () => {
         reasoningOutputTokens: 25,
       });
       expect(result?.rateLimits).toEqual({
-        provider: "openai",
+        provider: PROVIDERS.OPENAI,
         requests: {
           limit: 1000,
           remaining: 999,
@@ -539,7 +540,7 @@ describe("OpenAI Provider Adapter", () => {
         args: { id: 42 },
         reasoningItem: {
           id: "reasoning_item_1",
-          summary: [{ type: "text", text: "Reasoned content" }],
+          summary: [{ type: TYPES.TEXT, text: "Reasoned content" }],
         },
       });
     });

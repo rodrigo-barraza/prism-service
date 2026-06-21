@@ -15,6 +15,7 @@ import {
 } from "../src/utils/FunctionCallingUtilities.ts";
 // ── Types ──────────────────────────────────────────────────────
 import type { ChatMessage as TestMessage } from "../src/types/admin.ts";
+import { TYPES } from "../src/constants";
 
 // ═══════════════════════════════════════════════════════════════
 describe("truncateToolResult", () => {
@@ -372,7 +373,7 @@ describe('FunctionCallingUtilities adversarial', () => {
 
     it('should handle assistant message with empty toolCalls array', () => {
       const messages = [
-        { role: 'assistant', content: 'text', toolCalls: [] },
+        { role: 'assistant', content: TYPES.TEXT, toolCalls: [] },
       ] as any;
       const result = expandMessagesForFunctionCall(messages);
       // Empty toolCalls = no expansion needed, but content is valid

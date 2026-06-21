@@ -14,7 +14,7 @@
  *      duplicate content for multi-iteration agentic turns
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, TYPES } from "../src/constants.ts";
 
 // ═══════════════════════════════════════════════════════════════
 // Part 1: finalizeTextGeneration segment attachment logic
@@ -164,9 +164,9 @@ describe("finalizeTextGeneration — segment deduplication", () => {
     ];
 
     const segments = [
-      { type: "text", fragmentIndex: 0 },
+      { type: TYPES.TEXT, fragmentIndex: 0 },
       { type: "tools", toolIds: ["toolCall-1"] },
-      { type: "text", fragmentIndex: 1 },
+      { type: TYPES.TEXT, fragmentIndex: 1 },
     ];
     const fragments = ["I'll run npm install for you.", "✅ npm install completed successfully."];
 
@@ -231,7 +231,7 @@ describe("finalizeTextGeneration — segment deduplication", () => {
 
     const segments = [
       { type: "thinking", fragmentIndex: 0 },
-      { type: "text", fragmentIndex: 0 },
+      { type: TYPES.TEXT, fragmentIndex: 0 },
     ];
     const textFragments = ["A closure is a function that captures variables from its outer scope."];
     const thinkingFragments = ["Let me explain closures clearly."];
@@ -264,7 +264,7 @@ describe("finalizeTextGeneration — segment deduplication", () => {
       { role: "assistant", content: "Hi there!" },
     ];
 
-    const segments = [{ type: "text", fragmentIndex: 0 }];
+    const segments = [{ type: TYPES.TEXT, fragmentIndex: 0 }];
     const textFragments = ["How can I help you?"];
 
     const context = makeCtx();
@@ -332,13 +332,13 @@ describe("finalizeTextGeneration — segment deduplication", () => {
     ];
 
     const fullSegments = [
-      { type: "text", fragmentIndex: 0 },
+      { type: TYPES.TEXT, fragmentIndex: 0 },
       { type: "tools", toolIds: ["toolCall-1"] },
-      { type: "text", fragmentIndex: 1 },
+      { type: TYPES.TEXT, fragmentIndex: 1 },
       { type: "tools", toolIds: ["toolCall-2"] },
-      { type: "text", fragmentIndex: 2 },
+      { type: TYPES.TEXT, fragmentIndex: 2 },
       { type: "tools", toolIds: ["toolCall-3"] },
-      { type: "text", fragmentIndex: 3 },
+      { type: TYPES.TEXT, fragmentIndex: 3 },
     ];
 
     const context = makeCtx();
@@ -447,7 +447,7 @@ describe("message persistence contract for TerminalRenderer", () => {
         provider: "test-provider",
         contentSegments: [
           { type: "thinking", fragmentIndex: 0 },
-          { type: "text", fragmentIndex: 0 },
+          { type: TYPES.TEXT, fragmentIndex: 0 },
         ],
         textFragments: ["2+2 equals 4."],
         thinkingFragments: ["Simple arithmetic."],

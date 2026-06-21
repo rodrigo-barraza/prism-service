@@ -9,6 +9,7 @@ import {
   getUrlType,
   inferMimeFromUrl,
 } from "../src/utils/media.ts";
+import { TYPES } from "../src/constants";
 
 vi.mock("../src/utils/logger.ts", () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -88,7 +89,7 @@ describe("Media Utilities — Adversarial Test Suite", () => {
 
       const massiveUrl = "https://example.com/" + "a".repeat(50000) + ".png";
       const resultWithMassiveUrl = inferMimeFromUrl(massiveUrl);
-      expect(resultWithMassiveUrl).toBe("image");
+      expect(resultWithMassiveUrl).toBe(TYPES.IMAGE);
     });
   });
 

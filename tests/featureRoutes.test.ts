@@ -16,6 +16,7 @@ import agentMemoriesRouter from '../src/routes/AgentMemoriesRoutes.ts';
 import rulesRouter from '../src/routes/RulesRoutes.ts';
 import memoryRouter from '../src/routes/MemoryRoutes.ts';
 import customAgentsRouter from '../src/routes/CustomAgentsRoutes.ts';
+import { COLLECTIONS, PROVIDERS } from "../src/constants";
 
 // Mount all routers
 app.use('/config-test', configRouter);
@@ -331,7 +332,7 @@ describe('Feature Routes Integration Tests', () => {
         .get('/workspaces-test/full')
         .expect(200);
 
-      expect(response.body).toHaveProperty('workspaces');
+      expect(response.body).toHaveProperty(COLLECTIONS.WORKSPACES);
     });
 
     it('PUT /workspaces-test', async () => {
@@ -538,7 +539,7 @@ describe('Feature Routes Integration Tests', () => {
         .send({
           name: 'test-task',
           prompt: 'run prompt',
-          provider: 'anthropic',
+          provider: PROVIDERS.ANTHROPIC,
           model: 'claude-3-5-sonnet',
           scheduleType: 'cron',
           cronExpression: '0 0 * * *',
@@ -738,7 +739,7 @@ describe('Feature Routes Integration Tests', () => {
           participants: ['user-1'],
         })
         .expect(200);
-      expect(extractResponse.body).toHaveProperty('memories');
+      expect(extractResponse.body).toHaveProperty(COLLECTIONS.MEMORIES);
 
       // Search
       const searchResponse = await request(app)
@@ -748,7 +749,7 @@ describe('Feature Routes Integration Tests', () => {
           queryText: 'query',
         })
         .expect(200);
-      expect(searchResponse.body).toHaveProperty('memories');
+      expect(searchResponse.body).toHaveProperty(COLLECTIONS.MEMORIES);
 
       // List
       const listResponse = await request(app)

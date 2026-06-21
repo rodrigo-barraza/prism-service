@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { PROVIDERS } from "../src/constants";
 
 const mockLmStudioProvider = { name: 'lm-studio-mock' };
 const mockOllamaProvider = { name: 'ollama-mock' };
@@ -54,10 +55,10 @@ beforeEach(async () => {
 describe('Provider Instance Registry', () => {
   describe('registerType (auto-registration from config)', () => {
     it('registers the first instance using the base type name as ID', () => {
-      const entry = getInstance('lm-studio');
+      const entry = getInstance(PROVIDERS.LM_STUDIO);
       expect(entry).not.toBeNull();
-      expect(entry!.id).toBe('lm-studio');
-      expect(entry!.type).toBe('lm-studio');
+      expect(entry!.id).toBe(PROVIDERS.LM_STUDIO);
+      expect(entry!.type).toBe(PROVIDERS.LM_STUDIO);
       expect(entry!.instanceNumber).toBe(1);
       expect(entry!.baseUrl).toBe('http://gpu-1:1234');
     });
@@ -71,7 +72,7 @@ describe('Provider Instance Registry', () => {
     });
 
     it('preserves nickname when provided', () => {
-      const firstEntry = getInstance('lm-studio');
+      const firstEntry = getInstance(PROVIDERS.LM_STUDIO);
       expect(firstEntry!.nickname).toBe('Desktop');
     });
 
@@ -81,31 +82,31 @@ describe('Provider Instance Registry', () => {
     });
 
     it('clamps concurrency to at least 1', () => {
-      const entry = getInstance('lm-studio');
+      const entry = getInstance(PROVIDERS.LM_STUDIO);
       expect(entry!.concurrency).toBe(4);
       const secondEntry = getInstance('lm-studio-2');
       expect(secondEntry!.concurrency).toBe(2);
     });
 
     it('registers vllm instances from config', () => {
-      const entry = getInstance('vllm');
+      const entry = getInstance(PROVIDERS.VLLM);
       expect(entry).not.toBeNull();
       expect(entry!.concurrency).toBe(8);
     });
 
     it('does not register entries for empty provider arrays', () => {
-      const ollamaInstances = getInstancesByType('ollama');
+      const ollamaInstances = getInstancesByType(PROVIDERS.OLLAMA);
       expect(ollamaInstances).toHaveLength(0);
-      const llamaCppInstances = getInstancesByType('llama-cpp');
+      const llamaCppInstances = getInstancesByType(PROVIDERS.LLAMA_CPP);
       expect(llamaCppInstances).toHaveLength(0);
     });
   });
 
   describe('getInstance', () => {
     it('returns the registered entry for a known ID', () => {
-      const entry = getInstance('lm-studio');
+      const entry = getInstance(PROVIDERS.LM_STUDIO);
       expect(entry).not.toBeNull();
-      expect(entry!.type).toBe('lm-studio');
+      expect(entry!.type).toBe(PROVIDERS.LM_STUDIO);
     });
 
     it('returns null for an unknown ID', () => {
@@ -116,7 +117,7 @@ describe('Provider Instance Registry', () => {
 
   describe('getInstanceProvider', () => {
     it('returns the provider object for a known ID', () => {
-      const provider = getInstanceProvider('lm-studio');
+      const provider = getInstanceProvider(PROVIDERS.LM_STUDIO);
       expect(provider).toBe(mockLmStudioProvider);
     });
 
@@ -128,13 +129,13 @@ describe('Provider Instance Registry', () => {
 
   describe('isInstance', () => {
     it('returns true for a registered instance ID', () => {
-      expect(isInstance('lm-studio')).toBe(true);
+      expect(isInstance(PROVIDERS.LM_STUDIO)).toBe(true);
       expect(isInstance('lm-studio-2')).toBe(true);
-      expect(isInstance('vllm')).toBe(true);
+      expect(isInstance(PROVIDERS.VLLM)).toBe(true);
     });
 
     it('returns false for a base provider name that has no instances', () => {
-      expect(isInstance('ollama')).toBe(false);
+      expect(isInstance(PROVIDERS.OLLAMA)).toBe(false);
     });
 
     it('returns false for a completely unknown name', () => {
@@ -159,28 +160,28 @@ describe('Provider Instance Registry', () => {
   describe('listInstanceTypes', () => {
     it('returns unique type names', () => {
       const types = listInstanceTypes();
-      expect(types).toContain('lm-studio');
-      expect(types).toContain('vllm');
+      expect(types).toContain(PROVIDERS.LM_STUDIO);
+      expect(types).toContain(PROVIDERS.VLLM);
       expect(new Set(types).size).toBe(types.length);
     });
 
     it('does not include types with zero instances', () => {
       const types = listInstanceTypes();
-      expect(types).not.toContain('ollama');
-      expect(types).not.toContain('llama-cpp');
+      expect(types).not.toContain(PROVIDERS.OLLAMA);
+      expect(types).not.toContain(PROVIDERS.LLAMA_CPP);
     });
   });
 
   describe('getInstancesByType', () => {
     it('returns all instances for a given type', () => {
-      const lmStudioInstances = getInstancesByType('lm-studio');
+      const lmStudioInstances = getInstancesByType(PROVIDERS.LM_STUDIO);
       expect(lmStudioInstances).toHaveLength(2);
-      expect(lmStudioInstances[0].id).toBe('lm-studio');
+      expect(lmStudioInstances[0].id).toBe(PROVIDERS.LM_STUDIO);
       expect(lmStudioInstances[1].id).toBe('lm-studio-2');
     });
 
     it('returns an empty array for a type with no instances', () => {
-      expect(getInstancesByType('ollama')).toHaveLength(0);
+      expect(getInstancesByType(PROVIDERS.OLLAMA)).toHaveLength(0);
     });
 
     it('returns an empty array for a completely unknown type', () => {
@@ -190,11 +191,11 @@ describe('Provider Instance Registry', () => {
 
   describe('getInstanceType', () => {
     it('resolves numbered instance ID to its base type', () => {
-      expect(getInstanceType('lm-studio-2')).toBe('lm-studio');
+      expect(getInstanceType('lm-studio-2')).toBe(PROVIDERS.LM_STUDIO);
     });
 
     it('resolves base instance ID to its type', () => {
-      expect(getInstanceType('lm-studio')).toBe('lm-studio');
+      expect(getInstanceType(PROVIDERS.LM_STUDIO)).toBe(PROVIDERS.LM_STUDIO);
     });
 
     it('returns null for unknown IDs', () => {

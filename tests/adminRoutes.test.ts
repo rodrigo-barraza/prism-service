@@ -4,6 +4,7 @@ import adminRouter from '../src/routes/AdminRoutes.ts';
 import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
 import * as providersModule from '../src/providers/index.ts';
 import request from 'supertest';
+import { PROVIDERS, COLLECTIONS } from "../src/constants";
 
 // Mount the admin router
 app.use('/admin', adminRouter);
@@ -62,7 +63,7 @@ describe('Admin Routes Integration Tests', () => {
     vi.spyOn(MongoWrapper, 'getDb').mockReturnValue(mockDb as any);
 
     vi.spyOn(providersModule, 'getProvider').mockImplementation((providerName) => {
-      if (providerName === 'lm-studio') {
+      if (providerName === PROVIDERS.LM_STUDIO) {
         return {
           listModels: vi.fn().mockResolvedValue({
             data: [
@@ -108,7 +109,7 @@ describe('Admin Routes Integration Tests', () => {
         .expect(200);
 
       expect(response.body).toHaveProperty('conversations');
-      expect(response.body).toHaveProperty('workflows');
+      expect(response.body).toHaveProperty(COLLECTIONS.WORKFLOWS);
       expect(response.body).toHaveProperty('traces');
     });
   });
@@ -192,7 +193,7 @@ describe('Admin Routes Integration Tests', () => {
         .get('/admin/agent-conversations/mock-id-123/requests')
         .expect(200);
 
-      expect(response.body).toHaveProperty('requests');
+      expect(response.body).toHaveProperty(COLLECTIONS.REQUESTS);
     });
 
     it('returns single agent conversation detail', async () => {

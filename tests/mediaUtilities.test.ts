@@ -8,6 +8,7 @@ import {
   compressImageForSizeLimit,
   extractVideoFrames,
 } from '../src/utils/media.ts';
+import { TYPES } from "../src/constants";
 
 vi.mock('../src/utils/logger.ts', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -103,34 +104,34 @@ describe('getUrlType', () => {
 
 describe('inferMimeFromUrl', () => {
   it('returns "image" for image file extensions', () => {
-    expect(inferMimeFromUrl('https://example.com/photo.jpg')).toBe('image');
-    expect(inferMimeFromUrl('https://example.com/photo.jpeg')).toBe('image');
-    expect(inferMimeFromUrl('https://example.com/photo.png')).toBe('image');
-    expect(inferMimeFromUrl('https://example.com/photo.gif')).toBe('image');
-    expect(inferMimeFromUrl('https://example.com/photo.webp')).toBe('image');
-    expect(inferMimeFromUrl('https://example.com/photo.bmp')).toBe('image');
-    expect(inferMimeFromUrl('https://example.com/photo.svg')).toBe('image');
-    expect(inferMimeFromUrl('https://example.com/photo.avif')).toBe('image');
+    expect(inferMimeFromUrl('https://example.com/photo.jpg')).toBe(TYPES.IMAGE);
+    expect(inferMimeFromUrl('https://example.com/photo.jpeg')).toBe(TYPES.IMAGE);
+    expect(inferMimeFromUrl('https://example.com/photo.png')).toBe(TYPES.IMAGE);
+    expect(inferMimeFromUrl('https://example.com/photo.gif')).toBe(TYPES.IMAGE);
+    expect(inferMimeFromUrl('https://example.com/photo.webp')).toBe(TYPES.IMAGE);
+    expect(inferMimeFromUrl('https://example.com/photo.bmp')).toBe(TYPES.IMAGE);
+    expect(inferMimeFromUrl('https://example.com/photo.svg')).toBe(TYPES.IMAGE);
+    expect(inferMimeFromUrl('https://example.com/photo.avif')).toBe(TYPES.IMAGE);
   });
 
   it('returns "image" with case-insensitive extension matching', () => {
-    expect(inferMimeFromUrl('https://example.com/PHOTO.JPG')).toBe('image');
-    expect(inferMimeFromUrl('https://example.com/image.PNG')).toBe('image');
+    expect(inferMimeFromUrl('https://example.com/PHOTO.JPG')).toBe(TYPES.IMAGE);
+    expect(inferMimeFromUrl('https://example.com/image.PNG')).toBe(TYPES.IMAGE);
   });
 
   it('returns "pdf" for PDF files', () => {
-    expect(inferMimeFromUrl('https://example.com/document.pdf')).toBe('pdf');
+    expect(inferMimeFromUrl('https://example.com/document.pdf')).toBe(TYPES.PDF);
   });
 
   it('returns "text" for text-based file extensions', () => {
-    expect(inferMimeFromUrl('https://example.com/readme.txt')).toBe('text');
-    expect(inferMimeFromUrl('https://example.com/readme.md')).toBe('text');
-    expect(inferMimeFromUrl('https://example.com/data.csv')).toBe('text');
-    expect(inferMimeFromUrl('https://example.com/data.json')).toBe('text');
-    expect(inferMimeFromUrl('https://example.com/page.html')).toBe('text');
-    expect(inferMimeFromUrl('https://example.com/style.css')).toBe('text');
-    expect(inferMimeFromUrl('https://example.com/script.js')).toBe('text');
-    expect(inferMimeFromUrl('https://example.com/module.ts')).toBe('text');
+    expect(inferMimeFromUrl('https://example.com/readme.txt')).toBe(TYPES.TEXT);
+    expect(inferMimeFromUrl('https://example.com/readme.md')).toBe(TYPES.TEXT);
+    expect(inferMimeFromUrl('https://example.com/data.csv')).toBe(TYPES.TEXT);
+    expect(inferMimeFromUrl('https://example.com/data.json')).toBe(TYPES.TEXT);
+    expect(inferMimeFromUrl('https://example.com/page.html')).toBe(TYPES.TEXT);
+    expect(inferMimeFromUrl('https://example.com/style.css')).toBe(TYPES.TEXT);
+    expect(inferMimeFromUrl('https://example.com/script.js')).toBe(TYPES.TEXT);
+    expect(inferMimeFromUrl('https://example.com/module.ts')).toBe(TYPES.TEXT);
   });
 
   it('returns "any" for URLs without recognized extensions', () => {
@@ -157,7 +158,7 @@ describe('inferMimeFromUrl', () => {
   });
 
   it('correctly identifies extensions on URLs with hash fragments', () => {
-    expect(inferMimeFromUrl('https://example.com/readme.md#section-1')).toBe('text');
+    expect(inferMimeFromUrl('https://example.com/readme.md#section-1')).toBe(TYPES.TEXT);
   });
 });
 

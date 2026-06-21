@@ -3,6 +3,7 @@ import WorkflowMemoryService from "../src/services/WorkflowMemoryService.ts";
 import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
 import EmbeddingService from "../src/services/EmbeddingService.ts";
 import type { AgenticContext, ConversationMessage } from "../src/services/harnesses/types.ts";
+import { PROVIDERS } from "../src/constants";
 
 vi.mock("../src/wrappers/MongoWrapper.ts", () => {
   const mockGetDb = vi.fn();
@@ -42,7 +43,7 @@ describe("Workflow Memory Service — Adversarial Test Suite", () => {
     provider: {
       generateTextStream: vi.fn(),
     },
-    providerName: "google",
+    providerName: PROVIDERS.GOOGLE,
     resolvedModel: "gemini-3.5-flash",
     emit: vi.fn(),
   };

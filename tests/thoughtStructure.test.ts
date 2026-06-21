@@ -1,6 +1,6 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { HARNESS_IDS, THOUGHT_STRUCTURES } from "../src/constants.ts";
+import { HARNESS_IDS, THOUGHT_STRUCTURES, TYPES } from "../src/constants.ts";
 import AgenticLoopService from "../src/services/AgenticLoopService.ts";
 import ReActHarness from "../src/services/harnesses/ReActHarness.ts";
 import { runTreeOfThoughts } from "../src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts";
@@ -54,8 +54,8 @@ describe("Thought Structure Routing & Migration Tests", () => {
       resolvedModel: "test-model",
       modelDefinition: {
         maxInputTokens: 10000,
-        inputTypes: ["text"],
-        outputTypes: ["text"],
+        inputTypes: [TYPES.TEXT],
+        outputTypes: [TYPES.TEXT],
       },
       messages: [{ role: "user", content: "Hi" }],
       options: {
@@ -252,8 +252,8 @@ describe("ThoughtStructure × Topology Combination Matrix", () => {
       resolvedModel: "test-model",
       modelDefinition: {
         maxInputTokens: 10000,
-        inputTypes: ["text"],
-        outputTypes: ["text"],
+        inputTypes: [TYPES.TEXT],
+        outputTypes: [TYPES.TEXT],
       },
       messages: [{ role: "user", content: "Matrix test" }],
       options: {

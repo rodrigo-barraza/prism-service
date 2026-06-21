@@ -10,6 +10,7 @@ import {
   MEDIA_STRATEGIES,
 } from '../src/utils/openai-compat.ts';
 import type { InputMessage } from '../src/utils/openai-compat.ts';
+import { TYPES } from "../src/constants";
 
 vi.mock('../src/utils/logger.ts', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -272,7 +273,7 @@ describe('prepareOpenAICompatMessages', () => {
     const contentParts = prepared[0].content as Array<{ type: string }>;
     expect(Array.isArray(contentParts)).toBe(true);
     expect(contentParts.some(part => part.type === 'image_url')).toBe(true);
-    expect(contentParts.some(part => part.type === 'text')).toBe(true);
+    expect(contentParts.some(part => part.type === TYPES.TEXT)).toBe(true);
   });
 
   it('handles FULL_MULTIMODAL strategy for video attachments', () => {
@@ -303,7 +304,7 @@ describe('prepareOpenAICompatMessages', () => {
     });
     const contentParts = prepared[0].content as Array<{ type: string; text?: string }>;
     const videoFallback = contentParts.find(
-      part => part.type === 'text' && part.text?.includes('video input not supported'),
+      part => part.type === TYPES.TEXT && part.text?.includes('video input not supported'),
     );
     expect(videoFallback).toBeDefined();
   });
@@ -336,7 +337,7 @@ describe('prepareOpenAICompatMessages', () => {
     });
     const contentParts = prepared[0].content as Array<{ type: string; text?: string }>;
     const pdfFallback = contentParts.find(
-      part => part.type === 'text' && part.text?.includes('PDF'),
+      part => part.type === TYPES.TEXT && part.text?.includes('PDF'),
     );
     expect(pdfFallback).toBeDefined();
   });

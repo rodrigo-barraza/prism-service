@@ -12,6 +12,7 @@ vi.mock('../src/config.ts', () => ({
 }));
 
 import { matchesAny, detectCapabilities } from '../src/services/local-provider/detectCapabilities.ts';
+import { TYPES, MODEL_TYPES } from "../src/constants";
 
 describe('detectCapabilities', () => {
   describe('matchesAny', () => {
@@ -46,7 +47,7 @@ describe('detectCapabilities', () => {
     it('detects vision capability for llava model', () => {
       const result = detectCapabilities('llava-v1.6-7b');
       expect(result.vision).toBe(true);
-      expect(result.inputTypes).toContain('image');
+      expect(result.inputTypes).toContain(TYPES.IMAGE);
     });
 
     it('detects function calling for deepseek-v3', () => {
@@ -58,13 +59,13 @@ describe('detectCapabilities', () => {
     it('detects video capability for qwen2.5-vl', () => {
       const result = detectCapabilities('qwen2.5-vl-7b');
       expect(result.video).toBe(true);
-      expect(result.inputTypes).toContain('video');
+      expect(result.inputTypes).toContain(TYPES.VIDEO);
     });
 
     it('detects audio capability for whisper model', () => {
       const result = detectCapabilities('whisper-large-v3');
       expect(result.audio).toBe(true);
-      expect(result.inputTypes).toContain('audio');
+      expect(result.inputTypes).toContain(MODEL_TYPES.AUDIO);
     });
 
     it('returns no special capabilities for plain LLM', () => {
@@ -75,7 +76,7 @@ describe('detectCapabilities', () => {
       expect(result.video).toBe(false);
       expect(result.audio).toBe(false);
       expect(result.tools).toEqual([]);
-      expect(result.inputTypes).toEqual(['text']);
+      expect(result.inputTypes).toEqual([TYPES.TEXT]);
     });
 
     it('respects provider metadata reasoning override', () => {
@@ -99,7 +100,7 @@ describe('detectCapabilities', () => {
         capabilities: { vision: true },
       });
       expect(result.vision).toBe(true);
-      expect(result.inputTypes).toContain('image');
+      expect(result.inputTypes).toContain(TYPES.IMAGE);
     });
 
     it('handles null model key gracefully', () => {
@@ -107,18 +108,18 @@ describe('detectCapabilities', () => {
       expect(result.thinking).toBe(false);
       expect(result.functionCalling).toBe(false);
       expect(result.vision).toBe(false);
-      expect(result.inputTypes).toEqual(['text']);
+      expect(result.inputTypes).toEqual([TYPES.TEXT]);
     });
 
     it('handles undefined model key gracefully', () => {
       const result = detectCapabilities(undefined);
       expect(result.thinking).toBe(false);
-      expect(result.inputTypes).toEqual(['text']);
+      expect(result.inputTypes).toEqual([TYPES.TEXT]);
     });
 
     it('always includes text as output type', () => {
       const result = detectCapabilities('qwen3-8b');
-      expect(result.outputTypes).toEqual(['text']);
+      expect(result.outputTypes).toEqual([TYPES.TEXT]);
     });
 
     it('detects both thinking and function calling for qwen3', () => {

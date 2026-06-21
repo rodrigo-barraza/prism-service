@@ -2,6 +2,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import './setup.ts';
 import anthropicProvider from '../src/providers/anthropic.ts';
 import { ChatMessage } from '../src/types/ProviderTypes.ts';
+import { TYPES } from "../src/constants";
 
 const mockMessagesCreate = vi.fn();
 const mockMessagesStream = vi.fn();
@@ -162,7 +163,7 @@ describe('Anthropic Provider Adapter', () => {
     expect(payload.messages).toHaveLength(3);
     expect(payload.messages[1].role).toBe('assistant');
     expect(payload.messages[1].content).toEqual([
-      { type: 'text', text: 'Thinking...' },
+      { type: TYPES.TEXT, text: 'Thinking...' },
       { type: 'tool_use', id: 'call-1', name: 'my_tool', input: { arg1: 'val1' } },
     ]);
     expect(payload.messages[2].role).toBe('user');
@@ -189,14 +190,14 @@ describe('Anthropic Provider Adapter', () => {
     expect(payload.messages).toHaveLength(2);
     expect(payload.messages[0].content).toEqual([
       {
-        type: 'image',
+        type: TYPES.IMAGE,
         source: {
           type: 'base64',
           media_type: 'image/png',
           data: 'iVBORw0KGgoAAAANSUhEUgAAAAUA'
         }
       },
-      { type: 'text', text: 'Look at this' }
+      { type: TYPES.TEXT, text: 'Look at this' }
     ]);
     // Assistant message trailing spaces are trimmed
     expect(payload.messages[1].content).toBe('Sure!');

@@ -12,8 +12,8 @@ vi.mock("../src/utils/logger.ts", () => ({
 }));
 
 const mockInstances = [
-  { id: "lm-studio-1", type: "lm-studio", instanceNumber: 1, concurrency: 2 },
-  { id: "ollama-1", type: "ollama", instanceNumber: 1, concurrency: 4 },
+  { id: "lm-studio-1", type: PROVIDERS.LM_STUDIO, instanceNumber: 1, concurrency: 2 },
+  { id: "ollama-1", type: PROVIDERS.OLLAMA, instanceNumber: 1, concurrency: 4 },
 ];
 
 vi.mock("../src/providers/instance-registry.ts", () => ({
@@ -74,6 +74,7 @@ vi.mock("@rodrigo-barraza/utilities-library", () => ({
 }));
 
 import LocalProviderGateway from "../src/services/local-provider/index.ts";
+import { PROVIDERS, TYPES, MODEL_TYPES } from "../src/constants";
 
 describe("LocalProviderGateway Unit Tests", () => {
   beforeEach(() => {
@@ -83,39 +84,39 @@ describe("LocalProviderGateway Unit Tests", () => {
 
   describe("Provider Classification", () => {
     it("should correctly identify local providers", () => {
-      expect(LocalProviderGateway.isLocal("lm-studio")).toBe(true);
+      expect(LocalProviderGateway.isLocal(PROVIDERS.LM_STUDIO)).toBe(true);
       expect(LocalProviderGateway.isLocal("lm-studio-1")).toBe(true);
-      expect(LocalProviderGateway.isLocal("openai")).toBe(false);
+      expect(LocalProviderGateway.isLocal(PROVIDERS.OPENAI)).toBe(false);
       expect(LocalProviderGateway.isLocal("")).toBe(false);
       expect(LocalProviderGateway.isLocal(null)).toBe(false);
     });
 
     it("should correctly identify native MCP providers", () => {
-      expect(LocalProviderGateway.isNativeMCP("lm-studio")).toBe(true);
-      expect(LocalProviderGateway.isNativeMCP("ollama")).toBe(true);
-      expect(LocalProviderGateway.isNativeMCP("openai")).toBe(false);
+      expect(LocalProviderGateway.isNativeMCP(PROVIDERS.LM_STUDIO)).toBe(true);
+      expect(LocalProviderGateway.isNativeMCP(PROVIDERS.OLLAMA)).toBe(true);
+      expect(LocalProviderGateway.isNativeMCP(PROVIDERS.OPENAI)).toBe(false);
       expect(LocalProviderGateway.isNativeMCP("")).toBe(false);
       expect(LocalProviderGateway.isNativeMCP(null)).toBe(false);
     });
 
     it("should correctly determine defaultsThinkingEnabled", () => {
-      expect(LocalProviderGateway.defaultsThinkingEnabled("lm-studio")).toBe(true);
-      expect(LocalProviderGateway.defaultsThinkingEnabled("openai")).toBe(false);
+      expect(LocalProviderGateway.defaultsThinkingEnabled(PROVIDERS.LM_STUDIO)).toBe(true);
+      expect(LocalProviderGateway.defaultsThinkingEnabled(PROVIDERS.OPENAI)).toBe(false);
       expect(LocalProviderGateway.defaultsThinkingEnabled("")).toBe(false);
       expect(LocalProviderGateway.defaultsThinkingEnabled(null)).toBe(false);
     });
 
     it("should determine supportsModelManagement", () => {
-      expect(LocalProviderGateway.supportsModelManagement("lm-studio")).toBe(true);
-      expect(LocalProviderGateway.supportsModelManagement("ollama")).toBe(false);
+      expect(LocalProviderGateway.supportsModelManagement(PROVIDERS.LM_STUDIO)).toBe(true);
+      expect(LocalProviderGateway.supportsModelManagement(PROVIDERS.OLLAMA)).toBe(false);
       expect(LocalProviderGateway.supportsModelManagement("")).toBe(false);
       expect(LocalProviderGateway.supportsModelManagement(null)).toBe(false);
     });
 
     it("should resolve the correct provider type", () => {
-      expect(LocalProviderGateway.getProviderType("lm-studio-1")).toBe("lm-studio");
-      expect(LocalProviderGateway.getProviderType("ollama")).toBe("ollama");
-      expect(LocalProviderGateway.getProviderType("openai")).toBeNull();
+      expect(LocalProviderGateway.getProviderType("lm-studio-1")).toBe(PROVIDERS.LM_STUDIO);
+      expect(LocalProviderGateway.getProviderType(PROVIDERS.OLLAMA)).toBe(PROVIDERS.OLLAMA);
+      expect(LocalProviderGateway.getProviderType(PROVIDERS.OPENAI)).toBeNull();
       expect(LocalProviderGateway.getProviderType("")).toBeNull();
       expect(LocalProviderGateway.getProviderType(null)).toBeNull();
     });
@@ -129,14 +130,14 @@ describe("LocalProviderGateway Unit Tests", () => {
     });
 
     it("should get instances by type", () => {
-      const instances = LocalProviderGateway.getInstancesByType("lm-studio");
+      const instances = LocalProviderGateway.getInstancesByType(PROVIDERS.LM_STUDIO);
       expect(instances).toHaveLength(1);
       expect(instances[0].id).toBe("lm-studio-1");
     });
 
     it("should get registered types", () => {
       const types = LocalProviderGateway.getRegisteredTypes();
-      expect(types).toEqual(["lm-studio", "ollama"]);
+      expect(types).toEqual([PROVIDERS.LM_STUDIO, PROVIDERS.OLLAMA]);
     });
 
     it("should get concurrency capacity", () => {
@@ -153,7 +154,7 @@ describe("LocalProviderGateway Unit Tests", () => {
       expect(modelsMap).toHaveProperty("lm-studio-1");
       expect(modelsMap).toHaveProperty("ollama-1");
       expect(modelsMap["lm-studio-1"]).toHaveLength(2);
-      expect(modelsMap["lm-studio-1"][0].providerType).toBe("lm-studio");
+      expect(modelsMap["lm-studio-1"][0].providerType).toBe(PROVIDERS.LM_STUDIO);
     });
 
     it("should discover models for a specific instance", async () => {
@@ -195,8 +196,8 @@ describe("LocalProviderGateway Unit Tests", () => {
         thinking: true,
         vision: true,
         tools: ["Tool Calling"],
-        inputTypes: ["text", "video", "audio"],
-        modelType: "conversation",
+        inputTypes: [TYPES.TEXT, TYPES.VIDEO, MODEL_TYPES.AUDIO],
+        modelType: MODEL_TYPES.CONVERSATION,
       };
 
       expect(LocalProviderGateway._matchesFilter(testModel, { thinking: true })).toBe(true);
@@ -205,7 +206,7 @@ describe("LocalProviderGateway Unit Tests", () => {
       expect(LocalProviderGateway._matchesFilter(testModel, { video: true })).toBe(true);
       expect(LocalProviderGateway._matchesFilter(testModel, { audio: true })).toBe(true);
       expect(LocalProviderGateway._matchesFilter(testModel, { loaded: true })).toBe(true);
-      expect(LocalProviderGateway._matchesFilter(testModel, { modelType: "conversation" })).toBe(true);
+      expect(LocalProviderGateway._matchesFilter(testModel, { modelType: MODEL_TYPES.CONVERSATION })).toBe(true);
 
       // Mismatch cases
       expect(LocalProviderGateway._matchesFilter(testModel, { thinking: false })).toBe(true);
@@ -214,7 +215,7 @@ describe("LocalProviderGateway Unit Tests", () => {
       expect(LocalProviderGateway._matchesFilter({ ...testModel, tools: [] }, { functionCalling: true })).toBe(false);
       expect(LocalProviderGateway._matchesFilter({ ...testModel, inputTypes: [] }, { video: true })).toBe(false);
       expect(LocalProviderGateway._matchesFilter({ ...testModel, inputTypes: [] }, { audio: true })).toBe(false);
-      expect(LocalProviderGateway._matchesFilter({ ...testModel, modelType: "embed" }, { modelType: "conversation" })).toBe(false);
+      expect(LocalProviderGateway._matchesFilter({ ...testModel, modelType: MODEL_TYPES.EMBED }, { modelType: MODEL_TYPES.CONVERSATION })).toBe(false);
       expect(LocalProviderGateway._matchesFilter({ ...testModel, loaded: false }, { loaded: true })).toBe(false);
       expect(LocalProviderGateway._matchesFilter({ ...testModel, loaded: true }, { loaded: false })).toBe(false);
       expect(LocalProviderGateway._matchesFilter(testModel, { query: "not-matching" })).toBe(false);

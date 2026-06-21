@@ -5,7 +5,7 @@ import { app } from './setup.ts';
 import workflowsRouter from '../src/routes/WorkflowsRoutes.ts';
 import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
 import WorkflowExecutionService from '../src/services/WorkflowExecutionService.ts';
-import { COLLECTIONS } from '../src/constants.ts';
+import { COLLECTIONS, TYPES } from '../src/constants.ts';
 
 // Mount the workflows router
 app.use('/workflows', workflowsRouter);
@@ -123,8 +123,8 @@ describe('WorkflowsRoutes Integration', () => {
         name: 'Test Workflow',
         source: 'prism-client',
         nodes: [
-          { id: 'node-1', nodeType: 'input', outputTypes: ['text'], content: 'hello' },
-          { id: 'node-2', nodeType: 'viewer', inputTypes: ['text'], receivedOutputs: { text: 'hello' } },
+          { id: 'node-1', nodeType: 'input', outputTypes: [TYPES.TEXT], content: 'hello' },
+          { id: 'node-2', nodeType: 'viewer', inputTypes: [TYPES.TEXT], receivedOutputs: { text: 'hello' } },
         ],
         edges: [],
         totalCost: 0,
@@ -189,7 +189,7 @@ describe('WorkflowsRoutes Integration', () => {
     it('should create new workflow with pre-built graph', async () => {
       const newWorkflow = {
         name: 'New Workflow',
-        nodes: [{ id: 'node-1', nodeType: 'input', outputTypes: ['text'] }],
+        nodes: [{ id: 'node-1', nodeType: 'input', outputTypes: [TYPES.TEXT] }],
         edges: [],
         conversationIds: ['conv-1', 'conv-2'],
       };
@@ -213,7 +213,7 @@ describe('WorkflowsRoutes Integration', () => {
     it('should update workflow nodes, edges and metadata', async () => {
       const updateData = {
         name: 'Updated Name',
-        nodes: [{ id: 'node-3', nodeType: 'viewer', inputTypes: ['text'] }],
+        nodes: [{ id: 'node-3', nodeType: 'viewer', inputTypes: [TYPES.TEXT] }],
         edges: [],
       };
 

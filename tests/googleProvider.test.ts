@@ -4,6 +4,7 @@ import googleProvider, { convertToolsToGoogle } from "../src/providers/google.ts
 import { ConversationMessage } from "../src/providers/google.ts";
 import { ProviderError } from "../src/utils/errors.ts";
 import { Readable } from "stream";
+import { MODEL_TYPES } from "../src/constants";
 
 const mockGenerateContent = vi.fn();
 const mockGenerateContentStream = vi.fn();
@@ -612,7 +613,7 @@ describe("Google Provider Adapter", () => {
       const yieldedChunks = await pullPromise;
       expect(yieldedChunks).toContain("audio text output");
       expect(yieldedChunks).toContainEqual({ type: "thinking", content: "Let me think" });
-      expect(yieldedChunks).toContainEqual({ type: "audio", data: "base64audio", mimeType: "audio/pcm" });
+      expect(yieldedChunks).toContainEqual({ type: MODEL_TYPES.AUDIO, data: "base64audio", mimeType: "audio/pcm" });
       expect(yieldedChunks).toContainEqual({
         type: "usage",
         usage: { inputTokens: 120, outputTokens: 50 },
