@@ -114,7 +114,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
     const memberResults = await Promise.all(spawnPromises);
 
 
-    // ── Phase 2: Synthesis pass (GoT aggregation) ────────────────────
+    // ── Phase 2: Synthesis pass (MoA aggregation) ────────────────────
 
     const successfulResults = memberResults.filter(
       (result) => !("error" in result) && result.status === "completed",
