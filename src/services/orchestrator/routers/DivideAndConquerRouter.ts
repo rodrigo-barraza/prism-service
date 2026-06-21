@@ -171,7 +171,10 @@ function buildSynthesisPrompt(
 }
 
 /**
- * Divide & Conquer Router — Recursive Task Decomposition (ToT)
+ * Divide & Conquer Router — Recursive Decomposition with Dependencies (RDD)
+ *
+ * Based on: "Recursive Decomposition with Dependencies for Generic
+ * Divide-and-Conquer Reasoning" (arxiv.org/abs/2505.02576)
  *
  * Implements a three-phase planner-execute-synthesize flow:
  * 1. **Decompose:** An LLM planner breaks the task into independent subtasks
