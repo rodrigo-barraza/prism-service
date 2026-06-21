@@ -1,3 +1,16 @@
+/**
+ * Graph of Thoughts (GoT) Reasoning Strategy
+ *
+ * Paper: "Graph of Thoughts: Solving Elaborate Problems
+ * with Large Language Models" (arxiv.org/abs/2308.09687)
+ *
+ * Generates N parallel branches, scores each, then synthesizes
+ * the best aspects of ALL branches into a unified response
+ * (aggregation > selection). Core differentiator from ToT.
+ *
+ * See ReasoningStrategyRegistry.ts → REASONING_STRATEGY_DEFINITIONS
+ * (id: "graph_of_thoughts") for full paper-alignment metadata.
+ */
 import type BaseAgenticHarness from "../BaseAgenticHarness.ts";
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type {
