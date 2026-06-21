@@ -1,3 +1,17 @@
+/**
+ * Tree of Thoughts (ToT) Reasoning Strategy
+ *
+ * Paper: "Tree of Thoughts: Deliberate Problem Solving
+ * with Large Language Models" (arxiv.org/abs/2305.10601)
+ *
+ * Generates N parallel branches per iteration, scores each
+ * via multi-criteria LLM judge (correctness, risk, efficiency,
+ * completeness), selects best, and backtracks with reflexion
+ * on validation failure. Supports BFS/DFS search strategies.
+ *
+ * See ReasoningStrategyRegistry.ts → REASONING_STRATEGY_DEFINITIONS
+ * (id: "tree_of_thoughts") for full paper-alignment metadata.
+ */
 import type BaseAgenticHarness from "../BaseAgenticHarness.ts";
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type {

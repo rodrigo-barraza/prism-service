@@ -88,11 +88,24 @@ const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
 /**
  * ReActHarness — Reason→Act→Observe tool-use loop with pluggable reasoning strategies.
  *
- * Based on the ReAct pattern (Yao et al., 2022).
+ * Papers:
+ *   - "ReAct: Synergizing Reasoning and Acting in Language Models"
+ *     (arxiv.org/abs/2210.03629) — Yao et al., 2022
+ *   - "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models"
+ *     (arxiv.org/abs/2201.11903) — Wei et al., 2022
  *
- * Reasoning strategies:
+ * The default path (Chain of Thought strategy) implements a standard ReAct
+ * loop: single-pass sequential reasoning per iteration. While named after
+ * CoT prompting, it relies on the model's native reasoning rather than
+ * injecting few-shot exemplar chains.
+ *
+ * Reasoning strategies (dispatched at run()):
  *   - Chain of Thought (default): single-pass sequential reasoning per iteration
  *   - Tree of Thoughts: parallel branching, multi-criteria scoring, reflexion backtracking
+ *   - Graph of Thoughts: parallel branching, scoring, synthesis/aggregation
+ *
+ * See ReasoningStrategyRegistry.ts → REASONING_STRATEGY_DEFINITIONS
+ * for full paper-alignment metadata and config option documentation.
  *
  * Control flow (Chain of Thought):
  *   1. Stream LLM response (Reason)

@@ -20,13 +20,17 @@ const DEFAULT_BRANCH_FACTOR = 3;
 const MAXIMUM_EVALUATION_CHARACTERS = 100_000;
 const DEFAULT_EXPLORATION_WEIGHT = 1.41;
 
-interface TreeNode {
+interface MCTSTreeNode {
+  nodeIndex: number;
   depth: number;
   branchIndex: number;
   result: SubAgentResult;
   score: number;
   visitCount: number;
   parentNodeIndex: number | null;
+  childNodeIndices: number[];
+  isExpanded: boolean;
+  evaluationFeedback: string;
 }
 
 function truncateResultOutput(output: string, maximumCharacters: number): string {
@@ -71,6 +75,7 @@ function buildEvaluationPrompt(
     "- **Verification** (0.2 weight) — Did the agent verify its work?",
     "",
     "Also determine if the BEST candidate is a complete solution (no further iterations needed).",
+    "Provide per-branch feedback explaining each branch's strengths and weaknesses.",
     "",
     "Respond with ONLY a JSON object. No markdown fences, no explanations outside the JSON.",
     "",
@@ -79,7 +84,8 @@ function buildEvaluationPrompt(
     `  "scores": [0.85, 0.72, 0.91],`,
     `  "bestBranchIndex": 2,`,
     `  "isComplete": false,`,
-    `  "feedback": "Branch 3 has the strongest approach but needs error handling for edge cases."`,
+    `  "feedback": "Overall assessment of the candidate pool.",`,
+    `  "branchFeedback": ["Branch 1 strengths/weaknesses...", "Branch 2 strengths/weaknesses...", "Branch 3 strengths/weaknesses..."]`,
     "}",
     "```",
   ].join("\n");
@@ -90,56 +96,62 @@ interface EvaluationResult {
   bestBranchIndex: number;
   isComplete: boolean;
   feedback: string;
+  branchFeedback: string[];
 }
 
 function parseEvaluationResponse(responseText: string, branchCount: number): EvaluationResult {
   let cleanedResponse = responseText.trim();
   cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
 
-  try {
-    const parsed = JSON.parse(cleanedResponse);
+  const defaultResult: EvaluationResult = {
+    scores: new Array(branchCount).fill(0.5),
+    bestBranchIndex: 0,
+    isComplete: false,
+    feedback: "",
+    branchFeedback: new Array(branchCount).fill(""),
+  };
+
+  function extractFromParsed(parsed: Record<string, unknown>): EvaluationResult {
     const scores = Array.isArray(parsed.scores)
-      ? parsed.scores.map((score: unknown) => Math.max(0, Math.min(1, Number(score) || 0)))
+      ? (parsed.scores as unknown[]).map((score: unknown) => Math.max(0, Math.min(1, Number(score) || 0)))
       : new Array(branchCount).fill(0.5);
 
     const bestBranchIndex = typeof parsed.bestBranchIndex === "number"
       ? Math.max(0, Math.min(branchCount - 1, parsed.bestBranchIndex))
       : scores.indexOf(Math.max(...scores));
 
+    const branchFeedback = Array.isArray(parsed.branchFeedback)
+      ? (parsed.branchFeedback as unknown[]).map((feedbackItem: unknown) =>
+        typeof feedbackItem === "string" ? feedbackItem : "",
+      )
+      : new Array(branchCount).fill(typeof parsed.feedback === "string" ? parsed.feedback : "");
+
     return {
       scores,
       bestBranchIndex,
       isComplete: Boolean(parsed.isComplete),
       feedback: typeof parsed.feedback === "string" ? parsed.feedback : "",
+      branchFeedback,
     };
-  } catch {
-    logger.warn("[MCTSRouter] Failed to parse evaluation JSON — using uniform scores");
+  }
 
-    // Attempt JSON extraction from mixed content
+  try {
+    const parsed = JSON.parse(cleanedResponse) as Record<string, unknown>;
+    return extractFromParsed(parsed);
+  } catch {
+    logger.warn("[MCTSRouter] Failed to parse evaluation JSON — attempting extraction");
+
     const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
-        const extracted = JSON.parse(jsonMatch[0]);
-        return {
-          scores: Array.isArray(extracted.scores)
-            ? extracted.scores.map((score: unknown) => Number(score) || 0.5)
-            : new Array(branchCount).fill(0.5),
-          bestBranchIndex: typeof extracted.bestBranchIndex === "number"
-            ? extracted.bestBranchIndex : 0,
-          isComplete: Boolean(extracted.isComplete),
-          feedback: typeof extracted.feedback === "string" ? extracted.feedback : "",
-        };
+        const extracted = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+        return extractFromParsed(extracted);
       } catch {
         // Fallback exhausted
       }
     }
 
-    return {
-      scores: new Array(branchCount).fill(0.5),
-      bestBranchIndex: 0,
-      isComplete: false,
-      feedback: "",
-    };
+    return defaultResult;
   }
 }
 
@@ -165,18 +177,70 @@ function computeUpperConfidenceBound(
  * score with a running average: V(s) = (V_old * (N-1) + reward) / N
  */
 function backpropagateScores(
-  allTreeNodes: TreeNode[],
+  allTreeNodes: MCTSTreeNode[],
   leafNodeIndex: number,
   reward: number,
 ): void {
   let currentIndex: number | null = leafNodeIndex;
 
   while (currentIndex !== null && currentIndex >= 0 && currentIndex < allTreeNodes.length) {
-    const currentNode: TreeNode = allTreeNodes[currentIndex];
+    const currentNode: MCTSTreeNode = allTreeNodes[currentIndex];
     currentNode.visitCount += 1;
     currentNode.score = (currentNode.score * (currentNode.visitCount - 1) + reward) / currentNode.visitCount;
     currentIndex = currentNode.parentNodeIndex;
   }
+}
+
+/**
+ * UCB1-guided tree traversal from root children to the most promising
+ * unexpanded leaf. At each level, selects the child with the highest
+ * UCB score and descends. If the selected node is unexpanded and within
+ * depth limits, it is returned. If fully expanded, descends into its
+ * children. Falls back to siblings when a subtree is exhausted.
+ */
+function selectNodeToExpand(
+  allTreeNodes: MCTSTreeNode[],
+  candidateIndices: number[],
+  explorationWeight: number,
+  maximumDepth: number,
+): number | null {
+  if (candidateIndices.length === 0) return null;
+
+  const totalSiblingVisits = candidateIndices.reduce(
+    (sum, nodeIndex) => sum + allTreeNodes[nodeIndex].visitCount, 0,
+  );
+
+  const rankedCandidates = [...candidateIndices]
+    .map((nodeIndex) => ({
+      nodeIndex,
+      ucbScore: computeUpperConfidenceBound(
+        allTreeNodes[nodeIndex].score,
+        allTreeNodes[nodeIndex].visitCount,
+        Math.max(totalSiblingVisits, 1),
+        explorationWeight,
+      ),
+    }))
+    .sort((candidateA, candidateB) => candidateB.ucbScore - candidateA.ucbScore);
+
+  for (const candidate of rankedCandidates) {
+    const node = allTreeNodes[candidate.nodeIndex];
+
+    if (!node.isExpanded && node.depth < maximumDepth) {
+      return candidate.nodeIndex;
+    }
+
+    if (node.isExpanded && node.childNodeIndices.length > 0) {
+      const descendantResult = selectNodeToExpand(
+        allTreeNodes,
+        node.childNodeIndices,
+        explorationWeight,
+        maximumDepth,
+      );
+      if (descendantResult !== null) return descendantResult;
+    }
+  }
+
+  return null;
 }
 
 function buildRefinementPrompt(
@@ -212,11 +276,23 @@ function buildRefinementPrompt(
   ].join("\n");
 }
 
+function extractNodeOutput(result: SubAgentResult): string {
+  return result.result
+    || buildToolCallFallbackSummary(result)
+    || result.summary;
+}
+
 /**
  * MCTS-Guided Search Router — Monte Carlo Tree Search (LATS)
  *
  * Paper: "Language Agent Tree Search Unifies Reasoning Acting and
  * Planning in Language Models" (arxiv.org/abs/2310.04406)
+ *
+ * Implements true MCTS with UCB1-guided node selection, parallel branch
+ * expansion, LLM evaluation, and backpropagation. Unlike a linear depth
+ * chain, this maintains a full tree where UCB1 decides which node to
+ * expand — allowing re-visitation of previously unexplored siblings
+ * when the current best path plateaus.
  *
  * See TopologyRegistry.ts → TOPOLOGY_DEFINITIONS (id: "mcts")
  * for full paper-alignment metadata and config option documentation.
@@ -240,9 +316,11 @@ export class MCTSRouter implements TopologyRouter {
     );
     const maximumDepth = Math.max(1, Number(topologyConfig?.maxDepth) || DEFAULT_MAXIMUM_DEPTH);
     const explorationWeight = Math.max(0, Number(topologyConfig?.explorationWeight) || DEFAULT_EXPLORATION_WEIGHT);
+    const searchIterations = Math.max(1, Number(topologyConfig?.searchIterations) || maximumDepth);
 
     logger.info(
-      `[MCTSRouter] Starting MCTS search for team "${teamName}" (branch factor: ${branchFactor}, max depth: ${maximumDepth})...`,
+      `[MCTSRouter] Starting MCTS search for team "${teamName}" ` +
+      `(branch factor: ${branchFactor}, max depth: ${maximumDepth}, iterations: ${searchIterations})...`,
     );
 
     const provider = getProvider(providerName);
@@ -252,18 +330,62 @@ export class MCTSRouter implements TopologyRouter {
       return [{ error: errorMessage }];
     }
 
-    const allTreeNodes: TreeNode[] = [];
+    const allTreeNodes: MCTSTreeNode[] = [];
     const allResults: (SubAgentResult | { error: string })[] = [];
-    let currentPrompt = originalTask;
-    let bestResultSoFar: SubAgentResult | null = null;
-    let selectedParentNodeIndex: number | null = null;
+    const rootChildIndices: number[] = [];
 
-    for (let depthLevel = 1; depthLevel <= maximumDepth; depthLevel++) {
-      logger.info(
-        `[MCTSRouter] Depth ${depthLevel}/${maximumDepth}: Expanding ${branchFactor} branches...`,
-      );
+    // ════════════════════════════════════════════════════════════════════
+    // MCTS ITERATION LOOP
+    // Each iteration: SELECT → EXPAND → EVALUATE → BACKPROPAGATE
+    // ════════════════════════════════════════════════════════════════════
 
-      // ── EXPAND: Spawn N sub-agents in parallel ────────────────────────
+    for (let iteration = 1; iteration <= searchIterations; iteration++) {
+      let nodeToExpand: MCTSTreeNode | null = null;
+      let expansionPrompt: string;
+      let expansionDepth: number;
+
+      if (iteration === 1) {
+        // First iteration: expand root with the original task
+        expansionPrompt = originalTask;
+        expansionDepth = 1;
+        logger.info(
+          `[MCTSRouter] Iteration ${iteration}/${searchIterations}: Root expansion → ${branchFactor} branches at depth 1`,
+        );
+      } else {
+        // ── SELECT: UCB1-guided walk to find the most promising leaf ────
+        const selectedIndex = selectNodeToExpand(
+          allTreeNodes,
+          rootChildIndices,
+          explorationWeight,
+          maximumDepth,
+        );
+
+        if (selectedIndex === null) {
+          logger.info(
+            `[MCTSRouter] Iteration ${iteration}: No expandable nodes remaining — tree fully explored. Terminating.`,
+          );
+          break;
+        }
+
+        nodeToExpand = allTreeNodes[selectedIndex];
+        expansionDepth = nodeToExpand.depth + 1;
+
+        const nodeOutput = extractNodeOutput(nodeToExpand.result);
+        expansionPrompt = buildRefinementPrompt(
+          originalTask,
+          nodeOutput,
+          nodeToExpand.evaluationFeedback,
+          nodeToExpand.depth,
+          maximumDepth,
+        );
+
+        logger.info(
+          `[MCTSRouter] Iteration ${iteration}/${searchIterations}: UCB1 selected node ${selectedIndex} ` +
+          `(depth ${nodeToExpand.depth}, score: ${nodeToExpand.score.toFixed(2)}) → expanding to depth ${expansionDepth}`,
+        );
+      }
+
+      // ── EXPAND: Spawn B sub-agents in parallel ──────────────────────
 
       const resolvedSiblings = await resolveSiblingInstances(
         { providerName, resolvedModel },
@@ -281,8 +403,8 @@ export class MCTSRouter implements TopologyRouter {
         );
 
         branchAssignments.push({
-          description: `${referenceMember.description} (Depth ${depthLevel}, Branch ${branchIndex + 1})`,
-          prompt: currentPrompt,
+          description: `${referenceMember.description} (Iter ${iteration}, Depth ${expansionDepth}, Branch ${branchIndex + 1})`,
+          prompt: expansionPrompt,
           files: referenceMember.files,
           model: referenceMember.model,
           agent: referenceMember.agent,
@@ -290,7 +412,7 @@ export class MCTSRouter implements TopologyRouter {
           assignedModel,
           agentIndex: branchIndex,
           teamSize: branchFactor,
-          round: depthLevel,
+          round: iteration,
           orchestratorContext,
         });
       }
@@ -301,7 +423,6 @@ export class MCTSRouter implements TopologyRouter {
       const branchResults = await Promise.all(branchPromises);
       allResults.push(...branchResults);
 
-      // Collect successful results for evaluation
       const successfulBranches: { branchIndex: number; result: SubAgentResult }[] = [];
       for (let branchIndex = 0; branchIndex < branchResults.length; branchIndex++) {
         const branchResult = branchResults[branchIndex];
@@ -312,28 +433,31 @@ export class MCTSRouter implements TopologyRouter {
 
       if (successfulBranches.length === 0) {
         logger.warn(
-          `[MCTSRouter] All ${branchFactor} branches failed at depth ${depthLevel} — aborting search`,
+          `[MCTSRouter] All ${branchFactor} branches failed at iteration ${iteration} — ` +
+          `${iteration === 1 ? "aborting search" : "marking node as expanded (dead end)"}`,
         );
-        break;
+        if (nodeToExpand) {
+          nodeToExpand.isExpanded = true;
+        }
+        if (iteration === 1) break;
+        continue;
       }
 
-      // ── EVALUATE: Score each successful branch ────────────────────────
+      // ── EVALUATE: Score each successful branch ──────────────────────
 
       logger.info(
-        `[MCTSRouter] Depth ${depthLevel}: Evaluating ${successfulBranches.length} successful branch(es)...`,
+        `[MCTSRouter] Iteration ${iteration}: Evaluating ${successfulBranches.length} successful branch(es)...`,
       );
 
       const candidateOutputs = successfulBranches.map((branch) => ({
         branchIndex: branch.branchIndex,
-        output: branch.result.result
-          || buildToolCallFallbackSummary(branch.result)
-          || branch.result.summary,
+        output: extractNodeOutput(branch.result),
       }));
 
       const evaluationPrompt = buildEvaluationPrompt(
         originalTask,
         candidateOutputs,
-        depthLevel,
+        expansionDepth,
         maximumDepth,
       );
 
@@ -349,7 +473,7 @@ export class MCTSRouter implements TopologyRouter {
         );
 
         RequestLogger.logBackgroundLlmCall({
-          requestId: `${orchestratorContext.conversationId || "unknown"}-mcts-eval-d${depthLevel}-${teamName}`,
+          requestId: `${orchestratorContext.conversationId || "unknown"}-mcts-eval-i${iteration}-${teamName}`,
           endpoint: "/agent",
           operation: "orchestrator:mcts-evaluate",
           project: orchestratorContext.project || null,
@@ -367,8 +491,10 @@ export class MCTSRouter implements TopologyRouter {
           requestStartMs: evaluationStartMs,
           extraRequestPayload: {
             teamName,
-            depth: depthLevel,
+            iteration,
+            depth: expansionDepth,
             branchCount: successfulBranches.length,
+            expandedNodeIndex: nodeToExpand?.nodeIndex ?? "root",
           },
         }).catch((loggingError: unknown) =>
           logger.error(
@@ -382,120 +508,101 @@ export class MCTSRouter implements TopologyRouter {
         );
       } catch (evaluationError: unknown) {
         logger.error(
-          `[MCTSRouter] Evaluation failed at depth ${depthLevel}: ${getErrorMessage(evaluationError)}`,
+          `[MCTSRouter] Evaluation failed at iteration ${iteration}: ${getErrorMessage(evaluationError)}`,
         );
-        // Default to first successful branch
         evaluationResult = {
           scores: new Array(successfulBranches.length).fill(0.5),
           bestBranchIndex: 0,
           isComplete: false,
           feedback: "",
+          branchFeedback: new Array(successfulBranches.length).fill(""),
         };
       }
 
-      // Record tree nodes before selection
-      const parentIndex = selectedParentNodeIndex;
+      // ── Record tree nodes and BACKPROPAGATE ─────────────────────────
+
+      const parentIndex = nodeToExpand?.nodeIndex ?? null;
+      const newChildIndices: number[] = [];
 
       for (let branchOffset = 0; branchOffset < successfulBranches.length; branchOffset++) {
         const branch = successfulBranches[branchOffset];
         const nodeIndex = allTreeNodes.length;
+
+        const perBranchFeedback = evaluationResult.branchFeedback[branchOffset]
+          || evaluationResult.feedback
+          || "";
+
         allTreeNodes.push({
-          depth: depthLevel,
+          nodeIndex,
+          depth: expansionDepth,
           branchIndex: branch.branchIndex,
           result: branch.result,
           score: evaluationResult.scores[branchOffset] ?? 0.5,
-          visitCount: 1,
+          visitCount: 0,
           parentNodeIndex: parentIndex,
+          childNodeIndices: [],
+          isExpanded: false,
+          evaluationFeedback: perBranchFeedback,
         });
 
-        // ── BACKPROPAGATE: Update ancestor scores with running average ────
-        backpropagateScores(
-          allTreeNodes,
-          nodeIndex,
-          evaluationResult.scores[branchOffset] ?? 0.5,
-        );
+        newChildIndices.push(nodeIndex);
+        backpropagateScores(allTreeNodes, nodeIndex, evaluationResult.scores[branchOffset] ?? 0.5);
       }
 
-      // ── SELECT via UCB1: Pick best branch considering exploration ──────
-
-      const totalParentVisits = successfulBranches.length;
-      let bestUcbScore = -Infinity;
-      let selectedBranchByUcb = 0;
-
-      for (let branchOffset = 0; branchOffset < successfulBranches.length; branchOffset++) {
-        const branchScore = evaluationResult.scores[branchOffset] ?? 0.5;
-        const nodeIndex = allTreeNodes.length - successfulBranches.length + branchOffset;
-        const nodeVisitCount = allTreeNodes[nodeIndex]?.visitCount ?? 1;
-        const ucbScore = computeUpperConfidenceBound(
-          branchScore,
-          nodeVisitCount,
-          totalParentVisits,
-          explorationWeight,
-        );
-
-        if (ucbScore > bestUcbScore) {
-          bestUcbScore = ucbScore;
-          selectedBranchByUcb = branchOffset;
-        }
+      // Link children to parent (or register as root children)
+      if (nodeToExpand) {
+        nodeToExpand.isExpanded = true;
+        nodeToExpand.childNodeIndices = newChildIndices;
+      } else {
+        rootChildIndices.push(...newChildIndices);
       }
 
-      const selectedBranch = successfulBranches[selectedBranchByUcb];
-      bestResultSoFar = selectedBranch.result;
-      selectedParentNodeIndex = allTreeNodes.length - successfulBranches.length + selectedBranchByUcb;
+      // ── Log selection info ──────────────────────────────────────────
 
-      const selectedScore = evaluationResult.scores[selectedBranchByUcb] ?? 0.5;
+      const bestBranch = successfulBranches[evaluationResult.bestBranchIndex] ?? successfulBranches[0];
+      const bestScore = evaluationResult.scores[evaluationResult.bestBranchIndex] ?? 0.5;
+
       logger.info(
-        `[MCTSRouter] Depth ${depthLevel}: Selected Branch ${selectedBranch.branchIndex + 1} ` +
-        `(score: ${selectedScore.toFixed(2)}, UCB: ${bestUcbScore.toFixed(3)})` +
+        `[MCTSRouter] Iteration ${iteration}: Best branch ${bestBranch.branchIndex + 1} ` +
+        `(score: ${bestScore.toFixed(2)})` +
         `${evaluationResult.isComplete ? " — COMPLETE" : ""}`,
       );
 
-      // ── BACKPROPAGATE: Check if solution is complete ──────────────────
-
       if (evaluationResult.isComplete) {
         logger.info(
-          `[MCTSRouter] Evaluator marked solution as complete at depth ${depthLevel}. Terminating search.`,
+          `[MCTSRouter] Evaluator marked solution as complete at iteration ${iteration}. Terminating search.`,
         );
         break;
       }
-
-      if (depthLevel >= maximumDepth) {
-        logger.info(
-          `[MCTSRouter] Maximum depth (${maximumDepth}) reached. Returning best result.`,
-        );
-        break;
-      }
-
-      // ── Prepare next depth: Refinement prompt seeded with winner ──────
-
-      const bestOutput = selectedBranch.result.result
-        || buildToolCallFallbackSummary(selectedBranch.result)
-        || selectedBranch.result.summary;
-
-      currentPrompt = buildRefinementPrompt(
-        originalTask,
-        bestOutput,
-        evaluationResult.feedback,
-        depthLevel,
-        maximumDepth,
-      );
     }
 
-    // Build a summary result with the full search history
-    if (bestResultSoFar && allTreeNodes.length > 0) {
+    // ════════════════════════════════════════════════════════════════════
+    // BUILD FINAL RESULT — select highest-scoring node across the tree
+    // ════════════════════════════════════════════════════════════════════
+
+    if (allTreeNodes.length > 0) {
+      const bestOverallNode = allTreeNodes.reduce((bestNode, currentNode) =>
+        currentNode.score > bestNode.score ? currentNode : bestNode,
+      );
+
+      const treeDepthReached = Math.max(...allTreeNodes.map((node) => node.depth));
+      const expandedNodeCount = allTreeNodes.filter((node) => node.isExpanded).length;
+
       const searchSummary: SubAgentResult = {
         agent_id: `mcts-search-${teamName}-${Date.now()}`,
         description: `MCTS search summary for team "${teamName}"`,
         status: "completed",
-        summary: `MCTS search explored ${allTreeNodes.length} nodes across ${Math.max(...allTreeNodes.map((node) => node.depth))} depth levels`,
-        result: bestResultSoFar.result,
+        summary:
+          `MCTS search explored ${allTreeNodes.length} nodes across ${treeDepthReached} depth levels ` +
+          `(${expandedNodeCount} expanded). Best node: depth ${bestOverallNode.depth}, score ${bestOverallNode.score.toFixed(3)}`,
+        result: bestOverallNode.result.result,
         toolUses: 0,
         iterations: allTreeNodes.length,
         durationMs: allResults
           .filter((result): result is SubAgentResult => !("error" in result))
           .reduce((total, result) => total + (result.durationMs || 0), 0),
         messages: [],
-        diff: bestResultSoFar.diff,
+        diff: bestOverallNode.result.diff,
       };
 
       allResults.push(searchSummary);
