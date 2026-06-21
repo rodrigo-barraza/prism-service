@@ -30,6 +30,80 @@ interface VerificationOutcome {
   commandResults: { command: string; isPassing: boolean; output: string }[];
 }
 
+function parseVerificationResponse(
+  responseText: string,
+  commands: string[],
+): { command: string; isPassing: boolean; output: string }[] {
+  let cleanedResponse = responseText.trim();
+  cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+
+  try {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(cleanedResponse);
+    } catch {
+      const arrayMatch = cleanedResponse.match(/\[[\s\S]*\]/);
+      if (arrayMatch) {
+        parsed = JSON.parse(arrayMatch[0]);
+      }
+    }
+
+    if (Array.isArray(parsed)) {
+      const resultsMap = new Map<string, { pass: boolean; output: string }>();
+      for (const item of parsed) {
+        if (item && typeof item === "object" && "command" in item) {
+          const cmd = String((item as Record<string, unknown>).command).trim().toLowerCase();
+          const pass = "pass" in item ? Boolean((item as Record<string, unknown>).pass) : false;
+          const out = "output" in item ? String((item as Record<string, unknown>).output) : "";
+          resultsMap.set(cmd, { pass, output: out });
+        }
+      }
+
+      // Check if all requested commands are in the parsed results
+      const allFound = commands.every((cmd) => resultsMap.has(cmd.trim().toLowerCase()));
+      if (allFound) {
+        return commands.map((cmd) => {
+          const entry = resultsMap.get(cmd.trim().toLowerCase())!;
+          return {
+            command: cmd,
+            isPassing: entry.pass,
+            output: entry.output,
+          };
+        });
+      }
+    }
+  } catch (error) {
+    logger.warn(`[TournamentRouter] Failed to parse verification JSON: ${getErrorMessage(error)}. Falling back to heuristic parsing.`);
+  }
+
+  // Fallback heuristic parsing (line-by-line)
+  const lines = responseText.split("\n");
+  return commands.map((command) => {
+    const lowerCommand = command.toLowerCase();
+    
+    // Find a line that contains the command
+    const matchingLine = lines.find((line) => line.toLowerCase().includes(lowerCommand));
+    let isPassing = false;
+
+    if (matchingLine) {
+      const lowerLine = matchingLine.toLowerCase();
+      const hasPass = lowerLine.includes("pass") || lowerLine.includes("ok") || lowerLine.includes("success") || lowerLine.includes("true");
+      const hasFail = lowerLine.includes("fail") || lowerLine.includes("error") || lowerLine.includes("false");
+      isPassing = hasPass && !hasFail;
+    } else {
+      const lowerOutput = responseText.toLowerCase();
+      isPassing = lowerOutput.includes("pass") && !lowerOutput.includes("fail");
+    }
+
+    return {
+      command,
+      isPassing,
+      output: responseText.slice(0, 500),
+    };
+  });
+}
+
+
 function buildSelectionPrompt(
   teamName: string,
   memberResults: (SubAgentResult | { error: string })[],
@@ -239,18 +313,10 @@ export class TournamentRouter implements TopologyRouter {
             return;
           }
 
-          const commandResults = verificationCommands.map((command) => {
-            const verificationOutput = verificationResult.result || "";
-            const commandPassed = verificationOutput.toLowerCase().includes("pass") &&
-              !verificationOutput.toLowerCase().includes(`${command}`) ||
-              verificationOutput.toLowerCase().includes(`"pass": true`) ||
-              verificationOutput.toLowerCase().includes(`"pass":true`);
-            return {
-              command,
-              isPassing: commandPassed,
-              output: verificationOutput.slice(0, 500),
-            };
-          });
+          const commandResults = parseVerificationResponse(
+            verificationResult.result || "",
+            verificationCommands,
+          );
 
           verificationOutcomes!.set(resultIndex, {
             candidateIndex: resultIndex,
