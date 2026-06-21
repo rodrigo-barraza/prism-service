@@ -197,6 +197,11 @@ export class DivideAndConquerRouter implements TopologyRouter {
     topologyConfig?: TopologyConfig,
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
+    if (members.length === 0) {
+      const errorMessage = "No members provided for Divide & Conquer execution";
+      logger.error(`[DivideAndConquerRouter] ${errorMessage}`);
+      return [{ error: errorMessage }];
+    }
     const originalTask = members.map((member) => member.prompt).join("\n\n");
     const configuredMaxSubtasks = Math.max(1, Number(topologyConfig?.maxSubtasks) || MAXIMUM_SUBTASKS);
 

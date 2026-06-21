@@ -57,30 +57,37 @@ export async function compressImageForSizeLimit(
   mediaType: string,
   maxBytes: number = ANTHROPIC_IMAGE_MAX_BYTES,
 ) {
-  // Step 0: enforce pixel dimension limits first (avoids sending oversized pixels)
-  const dimensionResult = await constrainImageDimensions(base64Data, mediaType);
-  base64Data = dimensionResult.data;
-  mediaType = dimensionResult.mediaType;
+  try {
+    // Step 0: enforce pixel dimension limits first (avoids sending oversized pixels)
+    const dimensionResult = await constrainImageDimensions(base64Data, mediaType);
+    base64Data = dimensionResult.data;
+    mediaType = dimensionResult.mediaType;
 
-  // Anthropic measures the base64 STRING length, not decoded binary size
-  const rawBytes = base64Data.length;
-  if (rawBytes <= maxBytes) {
+    // Anthropic measures the base64 STRING length, not decoded binary size
+    const rawBytes = base64Data.length;
+    if (rawBytes <= maxBytes) {
+      return { data: base64Data, mediaType };
+    }
+
+    const sizeMB = (rawBytes / 1024 / 1024).toFixed(2);
+    const limitMB = (maxBytes / 1024 / 1024).toFixed(0);
+    logger.info(
+      `[media] Image exceeds ${limitMB} MB limit (${sizeMB} MB, ${mediaType}). Compressing...`,
+    );
+
+    // GIFs → ffmpeg (preserves animation)
+    if (mediaType === "image/gif") {
+      return await compressGifWithFfmpeg(base64Data, maxBytes);
+    }
+
+    // Everything else → sharp (converts to JPEG)
+    return await compressWithSharp(base64Data, maxBytes);
+  } catch (error: unknown) {
+    logger.warn(
+      `[media] Image compression failed (${error instanceof Error ? getErrorMessage(error) : String(error)}), returning original data`,
+    );
     return { data: base64Data, mediaType };
   }
-
-  const sizeMB = (rawBytes / 1024 / 1024).toFixed(2);
-  const limitMB = (maxBytes / 1024 / 1024).toFixed(0);
-  logger.info(
-    `[media] Image exceeds ${limitMB} MB limit (${sizeMB} MB, ${mediaType}). Compressing...`,
-  );
-
-  // GIFs → ffmpeg (preserves animation)
-  if (mediaType === "image/gif") {
-    return compressGifWithFfmpeg(base64Data, maxBytes);
-  }
-
-  // Everything else → sharp (converts to JPEG)
-  return compressWithSharp(base64Data, maxBytes);
 }
 
 /**
@@ -271,6 +278,11 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
       data: fallbackB64,
       mediaType: "image/gif",
     };
+  } catch (error: unknown) {
+    logger.warn(
+      `[media] ffmpeg GIF compression failed (${error instanceof Error ? getErrorMessage(error) : String(error)}), falling back to static JPEG via sharp`,
+    );
+    return compressWithSharp(base64Data, maxBytes);
   } finally {
     if (temporaryDirectory) {
       rm(temporaryDirectory, { recursive: true, force: true }).catch(() => {});
