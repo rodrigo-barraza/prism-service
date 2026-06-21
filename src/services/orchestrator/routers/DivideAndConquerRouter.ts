@@ -421,7 +421,10 @@ export class DivideAndConquerRouter implements TopologyRouter {
     );
 
     const referenceMember = members[0];
-    const subtaskResults: (SubAgentResult | { error: string })[] = new Array(subtasks.length);
+    const subtaskResults: (SubAgentResult | { error: string })[] = Array.from(
+      { length: subtasks.length },
+      () => ({ error: "not executed" }),
+    );
     const completedResults = new Map<number, SubAgentResult | { error: string }>();
 
     for (let tierIndex = 0; tierIndex < tierCount; tierIndex++) {

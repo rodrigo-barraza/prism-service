@@ -294,10 +294,10 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
         );
 
         const synthesisSubAgentResult: SubAgentResult = {
-          agent_id: `synthesis-L${layerIndex + 1}-${teamName}-${Date.now()}`,
+          agent_id: `synthesis-${teamName}-L${layerIndex + 1}-${Date.now()}`,
           description: `Synthesis pass for team "${teamName}"${layerLabel}`,
           status: "completed",
-          summary: `Aggregated ${successfulResults.length} proposer results into a unified synthesis${layerLabel}`,
+          summary: `Aggregated ${successfulResults.length} sub-agent results into a unified synthesis${layerLabel}`,
           result: synthesisResult.text,
           toolUses: 0,
           iterations: 1,
@@ -306,9 +306,12 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
           diff: { additions: 0, deletions: 0, files: [] },
         };
 
+        const inputTokens = synthesisResult.usage?.inputTokens ?? 0;
+        const outputTokens = synthesisResult.usage?.outputTokens ?? 0;
+
         logger.info(
           `[HierarchicalAggregationRouter]${layerLabel} Synthesis complete in ${synthesisDurationMs}ms ` +
-          `(${synthesisResult.usage.inputTokens} input, ${synthesisResult.usage.outputTokens} output tokens)`,
+          `(${inputTokens} input, ${outputTokens} output tokens)`,
         );
 
         previousLayerSynthesis = synthesisResult.text || null;

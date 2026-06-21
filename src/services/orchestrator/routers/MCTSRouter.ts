@@ -276,6 +276,7 @@ export class MCTSRouter implements TopologyRouter {
     const allResults: (SubAgentResult | { error: string })[] = [];
     let currentPrompt = originalTask;
     let bestResultSoFar: SubAgentResult | null = null;
+    let selectedParentNodeIndex: number | null = null;
 
     for (let depthLevel = 1; depthLevel <= maximumDepth; depthLevel++) {
       logger.info(
@@ -413,13 +414,7 @@ export class MCTSRouter implements TopologyRouter {
       }
 
       // Record tree nodes before selection
-      const parentIndex = depthLevel > 1
-        ? allTreeNodes.findIndex(
-            (existingNode) => existingNode.depth === depthLevel - 1 && existingNode.score === Math.max(
-              ...allTreeNodes.filter((filterNode) => filterNode.depth === depthLevel - 1).map((filterNode) => filterNode.score),
-            ),
-          )
-        : null;
+      const parentIndex = selectedParentNodeIndex;
 
       for (let branchOffset = 0; branchOffset < successfulBranches.length; branchOffset++) {
         const branch = successfulBranches[branchOffset];
@@ -466,6 +461,7 @@ export class MCTSRouter implements TopologyRouter {
 
       const selectedBranch = successfulBranches[selectedBranchByUcb];
       bestResultSoFar = selectedBranch.result;
+      selectedParentNodeIndex = allTreeNodes.length - successfulBranches.length + selectedBranchByUcb;
 
       const selectedScore = evaluationResult.scores[selectedBranchByUcb] ?? 0.5;
       logger.info(
