@@ -88,21 +88,29 @@ const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
 /**
  * ReActHarness — Reason→Act→Observe tool-use loop with pluggable thought structures.
  *
+ * Two orthogonal axes govern agent reasoning:
+ *   1. Execution pattern (this harness): ReAct — interleaved reasoning and acting
+ *   2. Reasoning shape (thought structure): CoT / ToT / GoT — how thoughts connect
+ *
  * Papers:
+ *   Execution pattern:
  *   - "ReAct: Synergizing Reasoning and Acting in Language Models"
  *     (arxiv.org/abs/2210.03629) — Yao et al., 2022
- *   - "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models"
- *     (arxiv.org/abs/2201.11903) — Wei et al., 2022
  *
- * The default path (Chain of Thought strategy) implements a standard ReAct
- * loop: single-pass sequential reasoning per iteration. While named after
- * CoT prompting, it relies on the model's native reasoning rather than
- * injecting few-shot exemplar chains.
+ *   Reasoning shapes:
+ *   - "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models"
+ *     (arxiv.org/abs/2201.11903) — Wei et al., 2022  [CoT — linear chain]
+ *   - "Tree of Thoughts: Deliberate Problem Solving with Large Language Models"
+ *     (arxiv.org/abs/2305.10601) — Yao et al., 2023  [ToT — branching tree]
+ *   - "Graph of Thoughts: Solving Elaborate Problems with Large Language Models"
+ *     (arxiv.org/abs/2308.09687) — Besta et al., 2023  [GoT — merging graph]
+ *   - "Reflexion: Language Agents with Verbal Reinforcement Learning"
+ *     (arxiv.org/abs/2303.11366) — Shinn et al., 2023  [backtracking self-correction in ToT]
  *
  * Thought structures (dispatched at run()):
- *   - Chain of Thought (default): single-pass sequential reasoning per iteration
- *   - Tree of Thoughts: parallel branching, multi-criteria scoring, reflexion backtracking
- *   - Graph of Thoughts: parallel branching, scoring, synthesis/aggregation
+ *   - Chain of Thought (default): linear chain — one reasoning step per iteration
+ *   - Tree of Thoughts: branching tree — parallel branches, score, select best
+ *   - Graph of Thoughts: merging graph — parallel branches, score, synthesize all
  *
  * See ThoughtStructureRegistry.ts → THOUGHT_STRUCTURE_DEFINITIONS
  * for full paper-alignment metadata and config option documentation.
