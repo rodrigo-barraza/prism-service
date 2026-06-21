@@ -3359,13 +3359,13 @@ describe("Message Array Construction", () => {
       expect(somaticMessage).toBeDefined();
 
       // Platform and somatic should appear before the user message
-      const platformIdx = newTurnMessages.indexOf(platformMessage!);
-      const somaticIdx = newTurnMessages.indexOf(somaticMessage!);
-      const userIdx = newTurnMessages.findIndex(
+      const platformIndex = newTurnMessages.indexOf(platformMessage!);
+      const somaticIndex = newTurnMessages.indexOf(somaticMessage!);
+      const userIndex = newTurnMessages.findIndex(
         (message) => message.role === "user",
       );
-      expect(platformIdx).toBeLessThan(somaticIdx);
-      expect(somaticIdx).toBeLessThan(userIdx);
+      expect(platformIndex).toBeLessThan(somaticIndex);
+      expect(somaticIndex).toBeLessThan(userIndex);
 
       // Verify tool-update messages come later (after tool calls)
       const toolUpdateIndices = newTurnMessages.reduce(
@@ -3384,7 +3384,7 @@ describe("Message Array Construction", () => {
 
       // Tool updates should come after the user message (they're mid-conversation injections)
       for (const toolUpdateIndex of toolUpdateIndices) {
-        expect(toolUpdateIndex).toBeGreaterThan(userIdx);
+        expect(toolUpdateIndex).toBeGreaterThan(userIndex);
       }
     });
   });

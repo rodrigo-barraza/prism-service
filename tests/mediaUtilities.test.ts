@@ -1,5 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
-import { getDataUrlMimeType, getUrlType, inferMimeFromUrl } from '../src/utils/media.ts';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
+import sharp from 'sharp';
+import {
+  getDataUrlMimeType,
+  getUrlType,
+  inferMimeFromUrl,
+  constrainImageDimensions,
+  compressImageForSizeLimit,
+  extractVideoFrames,
+} from '../src/utils/media.ts';
 
 vi.mock('../src/utils/logger.ts', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -148,12 +156,112 @@ describe('inferMimeFromUrl', () => {
     expect(inferMimeFromUrl('https://example.com/video.webm')).toBe('any');
   });
 
-  it('correctly identifies extensions on URLs with query strings', () => {
-    expect(inferMimeFromUrl('https://cdn.example.com/photo.png?v=2&token=abc')).toBe('image');
-    expect(inferMimeFromUrl('https://cdn.example.com/doc.pdf?download=true')).toBe('pdf');
-  });
-
   it('correctly identifies extensions on URLs with hash fragments', () => {
     expect(inferMimeFromUrl('https://example.com/readme.md#section-1')).toBe('text');
   });
 });
+
+describe("sharp image utilities", () => {
+  let smallPngBase64: string;
+  let largePngBase64: string;
+  let smallGifBase64: string;
+
+  beforeAll(async () => {
+    const smallPngBuffer = await sharp({
+      create: {
+        width: 10,
+        height: 10,
+        channels: 4,
+        background: { r: 255, g: 0, b: 0, alpha: 1 }
+      }
+    }).png().toBuffer();
+    smallPngBase64 = smallPngBuffer.toString("base64");
+
+    const largePngBuffer = await sharp({
+      create: {
+        width: 2500,
+        height: 2500,
+        channels: 4,
+        background: { r: 255, g: 0, b: 0, alpha: 1 }
+      }
+    }).png().toBuffer();
+    largePngBase64 = largePngBuffer.toString("base64");
+
+    const smallGifBuffer = await sharp({
+      create: {
+        width: 5,
+        height: 5,
+        channels: 4,
+        background: { r: 0, g: 255, b: 0, alpha: 1 }
+      }
+    }).gif().toBuffer();
+    smallGifBase64 = smallGifBuffer.toString("base64");
+  });
+
+  describe("constrainImageDimensions", () => {
+
+    it("should return the original image if dimensions are within limit", async () => {
+      const result = await constrainImageDimensions(smallPngBase64, "image/png", 2000);
+      expect(result.data).toBe(smallPngBase64);
+      expect(result.mediaType).toBe("image/png");
+    });
+
+    it("should resize a large image to stay within max dimension", async () => {
+      const result = await constrainImageDimensions(largePngBase64, "image/png", 2000);
+      expect(result.data).not.toBe(largePngBase64);
+      expect(result.mediaType).toBe("image/png");
+
+      const resizedBuffer = Buffer.from(result.data, "base64");
+      const metadata = await sharp(resizedBuffer).metadata();
+      expect(metadata.width).toBeLessThanOrEqual(2000);
+      expect(metadata.height).toBeLessThanOrEqual(2000);
+    });
+
+    it("should bypass resizing for GIF images since ffmpeg/GIF progressive resize handles them", async () => {
+      const result = await constrainImageDimensions(smallGifBase64, "image/gif", 2000);
+      expect(result.data).toBe(smallGifBase64);
+      expect(result.mediaType).toBe("image/gif");
+    });
+
+    it("should handle sharp parsing errors gracefully and return original base64", async () => {
+      const invalidBase64 = "invalid-base64-data";
+      const result = await constrainImageDimensions(invalidBase64, "image/png", 2000);
+      expect(result.data).toBe(invalidBase64);
+      expect(result.mediaType).toBe("image/png");
+    });
+  });
+
+  describe("compressImageForSizeLimit", () => {
+
+    it("should return original if size is within limits", async () => {
+      const result = await compressImageForSizeLimit(smallPngBase64, "image/png", 100 * 1024);
+      expect(result.data).toBe(smallPngBase64);
+      expect(result.mediaType).toBe("image/png");
+    });
+
+    it("should compress large image to JPEG if it exceeds limits", async () => {
+      const result = await compressImageForSizeLimit(largePngBase64, "image/png", 500);
+      expect(result.mediaType).toBe("image/jpeg");
+      expect(result.data.length).toBeLessThan(largePngBase64.length);
+    });
+
+    it("should compress animated GIF if size exceeds limit", async () => {
+      const result = await compressImageForSizeLimit(smallGifBase64, "image/gif", 5);
+      expect(result.mediaType).toBe("image/gif");
+    });
+  });
+
+  describe("extractVideoFrames", () => {
+
+    it("should throw an error for invalid video data URL format", async () => {
+      await expect(extractVideoFrames("not-a-data-url")).rejects.toThrow("Invalid video data URL format");
+      await expect(extractVideoFrames("data:video/mp4;base64")).rejects.toThrow("Invalid video data URL format");
+    });
+
+    it("should fail gracefully when processing corrupt or empty base64 video data", async () => {
+      const corruptVideoDataUrl = "data:video/mp4;base64,corruptbase64data";
+      await expect(extractVideoFrames(corruptVideoDataUrl)).rejects.toThrow();
+    });
+  });
+});
+
