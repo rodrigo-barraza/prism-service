@@ -5,6 +5,7 @@ import logger from "./logger.ts";
 import { Request, Response, NextFunction } from "express";
 import { SseEvent } from "../types/SseTypes.ts";
 import type { ChatRequest } from "../types/schemas.ts";
+import AgentSessionRegistry from "../services/AgentSessionRegistry.ts";
 
 // ─── shared by /chat and /agent routes ──────────────────────
 
@@ -23,14 +24,14 @@ export function initSseResponse(res: Response) {
  * Create an SSE emit callback that writes events to the response.
  * Strips heavy base64 data from image events when minioRef is available.
  */
-export function createSseEmitter(res: Response, signal: AbortSignal) {
+export function createSseEmitter(res: Response, connectionSignal: AbortSignal) {
   // Disable Nagle's algorithm for minimal SSE latency.
   // Without this, small SSE events can sit in the TCP buffer when
   // the server blocks on await (e.g. plan approval promise).
   if (res.socket) res.socket.setNoDelay(true);
 
   return (event: SseEvent) => {
-    if (!signal.aborted) {
+    if (!connectionSignal.aborted && !res.destroyed && !res.writableEnded) {
       if (event.type === "image" && event.minioRef && event.data) {
         const { data: _stripped, ...lightweight } = event;
         res.write(`data: ${JSON.stringify(lightweight)}\n\n`);
@@ -142,9 +143,32 @@ export function buildJsonResponseFromEvents(
   };
 }
 
+
+/**
+ * Options for SSE request handling.
+ *
+ * `persistOnDisconnect` — When true (used by /agent), the handler keeps
+ * running after the SSE connection drops. The handler's `signal` is only
+ * aborted by an explicit POST /agent/stop call. When false (default,
+ * used by /chat), the handler aborts immediately on client disconnect
+ * (legacy behavior).
+ */
+export interface SseRequestOptions {
+  persistOnDisconnect?: boolean;
+}
+
 /**
  * Handle a full SSE streaming request lifecycle.
- * Sets up SSE headers, AbortController, runs the handler, and closes.
+ * Sets up SSE headers, AbortController(s), runs the handler, and closes.
+ *
+ * Two-signal architecture:
+ *   - connectionController — fires when the SSE socket closes (client
+ *     disconnect, mobile screen lock, network drop). Guards `emit()` writes.
+ *   - stopController — fires only on explicit user stop (POST /agent/stop).
+ *     Passed to the handler as `context.signal` for loop-control checks.
+ *
+ * When `persistOnDisconnect` is false (default), connection close also
+ * aborts the stop controller (legacy behavior for non-agentic routes).
  */
 export async function handleSseRequest(
   req: Request,
@@ -155,7 +179,10 @@ export async function handleSseRequest(
     onEvent: (event: SseEvent) => void,
     context: { signal: AbortSignal },
   ) => Promise<void> = handleConversation,
+  options: SseRequestOptions = {},
 ) {
+  const { persistOnDisconnect = false } = options;
+
   initSseResponse(res);
 
   // Disable socket-level timeouts for long-lived SSE streams.
@@ -167,7 +194,23 @@ export async function handleSseRequest(
   }
 
   const connectionStartTime = Date.now();
-  const controller = createAbortController();
+  const connectionController = createAbortController();
+
+  // For persistent sessions (/agent), register a separate stop controller
+  // in the session registry so POST /agent/stop can abort it explicitly.
+  // For non-persistent sessions (/chat), reuse the connection controller
+  // as the stop signal (legacy behavior: disconnect = abort).
+  const conversationId = (params as Record<string, unknown>).conversationId as string | undefined;
+  let stopController: AbortController;
+
+  if (persistOnDisconnect && conversationId) {
+    stopController = AgentSessionRegistry.register(conversationId);
+  } else {
+    stopController = persistOnDisconnect
+      ? createAbortController()
+      : connectionController;
+  }
+
   res.on("close", () => {
     const durationSeconds = ((Date.now() - connectionStartTime) / 1000).toFixed(
       1,
@@ -175,16 +218,31 @@ export async function handleSseRequest(
     logger.warn(
       `[SSE] Connection closed after ${durationSeconds}s — ` +
         `writableFinished=${res.writableFinished}, destroyed=${res.destroyed}, ` +
-        `socket.destroyed=${req.socket?.destroyed}`,
+        `socket.destroyed=${req.socket?.destroyed}, ` +
+        `persistOnDisconnect=${persistOnDisconnect}`,
     );
-    if (!res.writableFinished) controller.abort();
+    if (!res.writableFinished) {
+      connectionController.abort();
+
+      // Legacy behavior: when NOT persisting, also abort the handler
+      if (!persistOnDisconnect && stopController !== connectionController) {
+        stopController.abort();
+      }
+    }
   });
 
-  await handler(params, createSseEmitter(res, controller.signal), {
-    signal: controller.signal,
-  });
+  try {
+    await handler(params, createSseEmitter(res, connectionController.signal), {
+      signal: stopController.signal,
+    });
+  } finally {
+    // Cleanup session registry entry
+    if (persistOnDisconnect && conversationId) {
+      AgentSessionRegistry.cleanup(conversationId);
+    }
+  }
 
-  if (!controller.signal.aborted) res.end();
+  if (!connectionController.signal.aborted) res.end();
 }
 
 /**
