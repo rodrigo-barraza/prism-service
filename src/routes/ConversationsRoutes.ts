@@ -19,31 +19,21 @@ import {
   PostConversationMessagesBodySchema,
   PatchConversationBodySchema,
 } from "../types/index.ts";
+import { CONVERSATION_LIST_BASE_PROJECTION } from "../utils/QueryBuilders.ts";
 
 const router = express.Router();
 router.use(requireDb);
 
 const CONVERSATION_LIST_PROJECTION: import("mongodb").Document = {
-  id: 1,
-  project: 1,
-  username: 1,
-  title: 1,
-  createdAt: 1,
-  updatedAt: 1,
-  modalities: 1,
-  providers: 1,
-  totalCost: 1,
+  ...CONVERSATION_LIST_BASE_PROJECTION,
   isGenerating: 1,
   traceId: 1,
   synthetic: 1,
-  agent: 1,
   systemPrompt: 1,
   model: 1,
   modelNames: 1,
   settings: 1,
   parentAgentConversationId: 1,
-  parentConversationId: 1,
-  hasSubAgents: 1,
   subAgents: 1,
 };
 

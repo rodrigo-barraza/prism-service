@@ -413,13 +413,37 @@ export function createLmStudioProvider(
       options: ProviderOptions = {},
     ): Promise<GenerateTextResult> {
       const baseUrl = getBaseUrl();
+      let isRequestActive = false;
       logger.provider(
         "LM Studio",
         `generateText model=${model} baseUrl=${baseUrl}`,
       );
       try {
+        if (options.signal?.aborted) {
+          throw new DOMException("The user aborted a request.", "AbortError");
+        }
         // Expand video attachments to image frames (ffmpeg) before message prep
         await expandVideoToFrames(messages);
+
+        // Ensure the model is loaded with appropriate batch and context size
+        const loadOpts: ProviderOptions = {
+          eval_batch_size: options.evalBatchSize || LM_STUDIO_EVAL_BATCH_SIZE,
+        };
+        if (options.minContextLength) {
+          loadOpts.context_length = options.minContextLength;
+        }
+
+        await this.ensureModelLoaded(model, loadOpts, options.signal);
+
+        // Track active request count to prevent auto-unloads
+        const activeCount = _activeRequestsCount.get(model) || 0;
+        _activeRequestsCount.set(model, activeCount + 1);
+        isRequestActive = true;
+
+        if (options.signal?.aborted) {
+          throw new DOMException("The user aborted a request.", "AbortError");
+        }
+
         const prepared = prepareOpenAICompatMessages(messages, {
           mediaStrategy: MEDIA_STRATEGIES.IMAGES_ONLY,
         });
@@ -443,10 +467,11 @@ export function createLmStudioProvider(
         const response = await fetchOpenAICompat(
           `${baseUrl}/v1/chat/completions`,
           payload,
+          { signal: options.signal },
         );
         const data = (await response.json()) as OpenAICompletionResponse;
         const { text, thinking, usage, toolCalls } =
-          processNonStreamingResponse(data);
+          processNonStreamingResponse(data, options);
         const result: GenerateTextResult = {
           text,
           usage: {
@@ -475,6 +500,15 @@ export function createLmStudioProvider(
           500,
           error,
         );
+      } finally {
+        if (isRequestActive) {
+          const activeCount = _activeRequestsCount.get(model) || 0;
+          if (activeCount <= 1) {
+            _activeRequestsCount.delete(model);
+          } else {
+            _activeRequestsCount.set(model, activeCount - 1);
+          }
+        }
       }
     },
     // ── Streaming Text Generation (SSE) ──────────────────────

@@ -1395,6 +1395,7 @@ export default class ToolOrchestratorService {
       agentConversationId: context.agentConversationId,
       conversationId: context.conversationId,
       traceId: context.traceId,
+      workspaceRoot: context.workspaceRoot || null,
 
       // Pass the parent's emit so sub-agents can forward live events
       emit: context._emit || null,
