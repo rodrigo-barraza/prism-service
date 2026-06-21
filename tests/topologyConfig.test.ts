@@ -5,6 +5,9 @@ import type {
   SubAgentResult,
   OrchestratorSpawnParams,
 } from "../src/types/orchestrator.ts";
+import type { ChatMessage, ProviderOptions } from "../src/types/ProviderTypes.ts";
+import type { GenerateTextResult } from "../src/types/provider.ts";
+import type { ContinueSubAgentCallback } from "../src/services/orchestrator/TopologyRouter.ts";
 
 // Mock GitWorktreeHelper
 vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
@@ -31,7 +34,7 @@ vi.mock("../src/services/SettingsService.ts", () => ({
 }));
 
 // Mock getProvider
-const mockGenerateText = vi.fn().mockResolvedValue({
+const mockGenerateText = vi.fn<(messages: ChatMessage[], model?: string, options?: ProviderOptions) => Promise<GenerateTextResult>>().mockResolvedValue({
   text: "Synthesized results summary.",
   usage: { inputTokens: 100, outputTokens: 50 },
 });
@@ -58,7 +61,7 @@ import { PeerToPeerRouter } from "../src/services/orchestrator/routers/PeerToPee
 describe("TopologyConfig Test Suite", () => {
   let orchestratorContext: OrchestratorContext;
   let spawnSubAgentMock: Mock<(assignment: OrchestratorSpawnParams) => Promise<SubAgentResult | { error: string }>>;
-  let continueSubAgentMock: Mock;
+  let continueSubAgentMock: Mock<ContinueSubAgentCallback>;
 
   const createMockResult = (description: string, result: string, agentId?: string): SubAgentResult => ({
     agent_id: agentId || `agent-mock-${Math.random().toString(36).slice(2, 6)}`,
@@ -549,7 +552,7 @@ describe("TopologyConfig Test Suite", () => {
       }));
 
       // Capture the decomposition prompt
-      mockGenerateText.mockImplementation(async (messages: unknown[]) => {
+      mockGenerateText.mockImplementation(async (messages: ChatMessage[]) => {
         return {
           text: JSON.stringify([
             { description: "Subtask 1", prompt: "Do part 1" },
@@ -567,7 +570,10 @@ describe("TopologyConfig Test Suite", () => {
 
       // The decomposition prompt should contain "10 or fewer"
       expect(mockGenerateText).toHaveBeenCalled();
-      const decompositionPrompt = (mockGenerateText.mock.calls[0][0] as Array<{ content: string }>)[0].content;
+      const messages = mockGenerateText.mock.calls[0]?.[0];
+      const firstMessage = messages?.[0];
+      const decompositionPrompt = firstMessage?.content;
+      expect(typeof decompositionPrompt).toBe("string");
       expect(decompositionPrompt).toContain("10 or fewer independent subtasks");
     });
   });
@@ -631,7 +637,7 @@ describe("TopologyConfig Test Suite", () => {
       await criticRouter.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
-        { maxRounds: "invalid" as unknown as number },
+        { maxRounds: "invalid" },
       );
 
       // Should fall back to default 3 rounds — actor + 3 critics + 2 continues

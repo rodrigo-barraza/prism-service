@@ -309,7 +309,7 @@ export class MCTSRouter implements TopologyRouter {
 
       try {
         const evaluationStartMs = performance.now();
-        const evaluationMessages = [{ role: "user", content: evaluationPrompt }];
+        const evaluationMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [{ role: "user", content: evaluationPrompt }];
         const evaluationResponse = await provider.generateText(
           evaluationMessages,
           resolvedModel,
@@ -327,7 +327,7 @@ export class MCTSRouter implements TopologyRouter {
           model: resolvedModel,
           traceId: orchestratorContext.traceId || null,
           agentConversationId: orchestratorContext.agentConversationId || null,
-          aiMessages: evaluationMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
+          aiMessages: evaluationMessages,
           resultText: evaluationResponse.text || "",
           usage: evaluationResponse.usage || null,
           success: true,

@@ -410,7 +410,10 @@ export class CriticLoopRouter implements TopologyRouter {
     // ── Critic evaluation rounds ────────────────────────────────────────
 
     for (let roundNumber = 1; roundNumber <= maximumRounds; roundNumber++) {
-      const actorOutputText = extractActorOutputText(actorResult as SubAgentResult);
+      if ("error" in actorResult) {
+        break;
+      }
+      const actorOutputText = extractActorOutputText(actorResult);
 
       logger.info(
         `[CriticLoopRouter] Round ${roundNumber}/${maximumRounds}: Spawning ${criticCount} critic(s) in parallel...`,
