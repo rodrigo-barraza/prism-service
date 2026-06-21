@@ -151,7 +151,7 @@ interface AgentStreamPayload {
   disabledTools?: string[];
   topology?: string;
   branchCount?: number;
-  reasoningStrategy?: string;
+  thoughtStructure?: string;
   reminderModel?: string;
   reminderProvider?: string;
   reminderInterval?: number;

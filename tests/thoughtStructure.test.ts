@@ -1,8 +1,7 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { HARNESS_IDS, REASONING_STRATEGIES } from "../src/constants.ts";
+import { HARNESS_IDS, THOUGHT_STRUCTURES } from "../src/constants.ts";
 import AgenticLoopService from "../src/services/AgenticLoopService.ts";
-import HarnessRegistry from "../src/services/harnesses/HarnessRegistry.ts";
 import ReActHarness from "../src/services/harnesses/ReActHarness.ts";
 import { runTreeOfThoughts } from "../src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts";
 import { runGraphOfThoughts } from "../src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts";
@@ -31,7 +30,7 @@ const mockProvider = {
   }),
 };
 
-describe("Reasoning Strategy Routing & Migration Tests", () => {
+describe("Thought Structure Routing & Migration Tests", () => {
   let mockContext: any;
 
   beforeEach(() => {
@@ -39,7 +38,7 @@ describe("Reasoning Strategy Routing & Migration Tests", () => {
     // Configure default SettingsService mock responses
     vi.mocked(SettingsService.getSection).mockResolvedValue({
       harness: HARNESS_IDS.STANDARD,
-      reasoningStrategy: REASONING_STRATEGIES.CHAIN_OF_THOUGHT,
+      thoughtStructure: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
     });
     vi.mocked(SettingsService.getCached).mockReturnValue({
       agents: {
@@ -75,74 +74,74 @@ describe("Reasoning Strategy Routing & Migration Tests", () => {
   });
 
   describe("AgenticLoopService Settings & Migration Resolution", () => {
-    it("should use reasoningStrategy from options if explicitly provided", async () => {
-      mockContext.options.reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
+    it("should use thoughtStructure from options if explicitly provided", async () => {
+      mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.TREE_OF_THOUGHTS;
       mockContext.options.harness = HARNESS_IDS.STANDARD;
 
       await AgenticLoopService.runAgenticLoop(mockContext);
 
-      expect(mockContext.options.reasoningStrategy).toBe(REASONING_STRATEGIES.TREE_OF_THOUGHTS);
+      expect(mockContext.options.thoughtStructure).toBe(THOUGHT_STRUCTURES.TREE_OF_THOUGHTS);
       expect(runTreeOfThoughts).toHaveBeenCalled();
     });
 
-    it("should resolve reasoningStrategy from SettingsService if missing in options", async () => {
+    it("should resolve thoughtStructure from SettingsService if missing in options", async () => {
       // Mock SettingsService to return tree_of_thoughts
       vi.mocked(SettingsService.getSection).mockResolvedValue({
         harness: HARNESS_IDS.STANDARD,
-        reasoningStrategy: REASONING_STRATEGIES.TREE_OF_THOUGHTS,
+        thoughtStructure: THOUGHT_STRUCTURES.TREE_OF_THOUGHTS,
       });
 
-      mockContext.options.reasoningStrategy = undefined;
+      mockContext.options.thoughtStructure = undefined;
       mockContext.options.harness = HARNESS_IDS.STANDARD;
 
       await AgenticLoopService.runAgenticLoop(mockContext);
 
-      expect(mockContext.options.reasoningStrategy).toBe(REASONING_STRATEGIES.TREE_OF_THOUGHTS);
+      expect(mockContext.options.thoughtStructure).toBe(THOUGHT_STRUCTURES.TREE_OF_THOUGHTS);
       expect(runTreeOfThoughts).toHaveBeenCalled();
     });
 
-    it("should migrate legacy HARNESS_IDS.TREE_OF_THOUGHT harness to HARNESS_IDS.STANDARD harness + REASONING_STRATEGIES.TREE_OF_THOUGHTS strategy", async () => {
+    it("should migrate legacy HARNESS_IDS.TREE_OF_THOUGHT harness to HARNESS_IDS.STANDARD harness + THOUGHT_STRUCTURES.TREE_OF_THOUGHTS strategy", async () => {
       mockContext.options.harness = HARNESS_IDS.TREE_OF_THOUGHT;
-      mockContext.options.reasoningStrategy = undefined;
+      mockContext.options.thoughtStructure = undefined;
 
       await AgenticLoopService.runAgenticLoop(mockContext);
 
       expect(mockContext.options.harness).toBe(HARNESS_IDS.STANDARD);
-      expect(mockContext.options.reasoningStrategy).toBe(REASONING_STRATEGIES.TREE_OF_THOUGHTS);
+      expect(mockContext.options.thoughtStructure).toBe(THOUGHT_STRUCTURES.TREE_OF_THOUGHTS);
       expect(runTreeOfThoughts).toHaveBeenCalled();
     });
 
-    it("should dispatch to GoT when reasoningStrategy is graph_of_thoughts", async () => {
-      mockContext.options.reasoningStrategy = REASONING_STRATEGIES.GRAPH_OF_THOUGHTS;
+    it("should dispatch to GoT when thoughtStructure is graph_of_thoughts", async () => {
+      mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS;
       mockContext.options.harness = HARNESS_IDS.STANDARD;
 
       await AgenticLoopService.runAgenticLoop(mockContext);
 
-      expect(mockContext.options.reasoningStrategy).toBe(REASONING_STRATEGIES.GRAPH_OF_THOUGHTS);
+      expect(mockContext.options.thoughtStructure).toBe(THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS);
       expect(runGraphOfThoughts).toHaveBeenCalled();
       expect(runTreeOfThoughts).not.toHaveBeenCalled();
     });
 
-    it("should resolve GoT from SettingsService when options omit reasoningStrategy", async () => {
+    it("should resolve GoT from SettingsService when options omit thoughtStructure", async () => {
       vi.mocked(SettingsService.getSection).mockResolvedValue({
         harness: HARNESS_IDS.STANDARD,
-        reasoningStrategy: REASONING_STRATEGIES.GRAPH_OF_THOUGHTS,
+        thoughtStructure: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS,
       });
 
-      mockContext.options.reasoningStrategy = undefined;
+      mockContext.options.thoughtStructure = undefined;
       mockContext.options.harness = HARNESS_IDS.STANDARD;
 
       await AgenticLoopService.runAgenticLoop(mockContext);
 
-      expect(mockContext.options.reasoningStrategy).toBe(REASONING_STRATEGIES.GRAPH_OF_THOUGHTS);
+      expect(mockContext.options.thoughtStructure).toBe(THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS);
       expect(runGraphOfThoughts).toHaveBeenCalled();
     });
   });
 
-  describe("ReActHarness Strategy Dispatch", () => {
-    it("should dispatch to runTreeOfThoughts when strategy is tree_of_thoughts", async () => {
+  describe("ReActHarness ThoughtStructure Dispatch", () => {
+    it("should dispatch to runTreeOfThoughts when thoughtStructure is tree_of_thoughts", async () => {
       mockContext.options.harness = HARNESS_IDS.STANDARD;
-      mockContext.options.reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
+      mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.TREE_OF_THOUGHTS;
 
       const harness = new ReActHarness(mockContext, {} as any, {
         finalTools: [],
@@ -154,9 +153,9 @@ describe("Reasoning Strategy Routing & Migration Tests", () => {
       expect(result.messages[0].content).toBe("Mocked ToT result");
     });
 
-    it("should dispatch to runGraphOfThoughts when strategy is graph_of_thoughts", async () => {
+    it("should dispatch to runGraphOfThoughts when thoughtStructure is graph_of_thoughts", async () => {
       mockContext.options.harness = HARNESS_IDS.STANDARD;
-      mockContext.options.reasoningStrategy = REASONING_STRATEGIES.GRAPH_OF_THOUGHTS;
+      mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS;
 
       const harness = new ReActHarness(mockContext, {} as any, {
         finalTools: [],
@@ -169,9 +168,9 @@ describe("Reasoning Strategy Routing & Migration Tests", () => {
       expect(result.messages[0].content).toBe("Mocked GoT result");
     });
 
-    it("should run the standard CoT loop when strategy is chain_of_thought", async () => {
+    it("should run the standard CoT loop when thoughtStructure is chain_of_thought", async () => {
       mockContext.options.harness = HARNESS_IDS.STANDARD;
-      mockContext.options.reasoningStrategy = REASONING_STRATEGIES.CHAIN_OF_THOUGHT;
+      mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT;
 
       const state = new AgenticLoopState({
         originalMessageCount: 1,
@@ -189,9 +188,9 @@ describe("Reasoning Strategy Routing & Migration Tests", () => {
       expect(mockContext.provider.generateTextStream).toHaveBeenCalled();
     });
 
-    it("should NOT dispatch to any strategy for undefined reasoningStrategy (falls through to CoT loop)", async () => {
+    it("should NOT dispatch to any strategy for undefined thoughtStructure (falls through to CoT loop)", async () => {
       mockContext.options.harness = HARNESS_IDS.STANDARD;
-      mockContext.options.reasoningStrategy = undefined;
+      mockContext.options.thoughtStructure = undefined;
 
       const state = new AgenticLoopState({
         originalMessageCount: 1,
@@ -211,7 +210,6 @@ describe("Reasoning Strategy Routing & Migration Tests", () => {
   });
 });
 
-
 // ═══════════════════════════════════════════════════════════════
 // Strategy × Topology Full Combination Matrix
 //
@@ -223,10 +221,10 @@ describe("Reasoning Strategy Routing & Migration Tests", () => {
 // AgenticLoopService, ensuring both options are persisted on the context.
 // ═══════════════════════════════════════════════════════════════
 
-const STRATEGY_ENTRIES = [
-  { key: "CHAIN_OF_THOUGHT", value: REASONING_STRATEGIES.CHAIN_OF_THOUGHT },
-  { key: "TREE_OF_THOUGHTS", value: REASONING_STRATEGIES.TREE_OF_THOUGHTS },
-  { key: "GRAPH_OF_THOUGHTS", value: REASONING_STRATEGIES.GRAPH_OF_THOUGHTS },
+const THOUGHT_STRUCTURE_ENTRIES = [
+  { key: "CHAIN_OF_THOUGHT", value: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT },
+  { key: "TREE_OF_THOUGHTS", value: THOUGHT_STRUCTURES.TREE_OF_THOUGHTS },
+  { key: "GRAPH_OF_THOUGHTS", value: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS },
 ] as const;
 
 const TOPOLOGY_ENTRIES = [
@@ -236,14 +234,14 @@ const TOPOLOGY_ENTRIES = [
   { key: "peer_to_peer", value: "peer_to_peer" },
 ] as const;
 
-describe("Strategy × Topology Combination Matrix", () => {
+describe("ThoughtStructure × Topology Combination Matrix", () => {
   let mockContext: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(SettingsService.getSection).mockResolvedValue({
       harness: HARNESS_IDS.STANDARD,
-      reasoningStrategy: REASONING_STRATEGIES.CHAIN_OF_THOUGHT,
+      thoughtStructure: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
       topology: "hierarchical",
     });
     vi.mocked(SettingsService.getCached).mockReturnValue({
@@ -284,23 +282,23 @@ describe("Strategy × Topology Combination Matrix", () => {
     };
   });
 
-  for (const strategy of STRATEGY_ENTRIES) {
+  for (const thoughtStructureEntry of THOUGHT_STRUCTURE_ENTRIES) {
     for (const topology of TOPOLOGY_ENTRIES) {
-      it(`should resolve ${strategy.key} + ${topology.key} and persist both on options`, async () => {
+      it(`should resolve ${thoughtStructureEntry.key} + ${topology.key} and persist both on options`, async () => {
         mockContext.options.harness = HARNESS_IDS.STANDARD;
-        mockContext.options.reasoningStrategy = strategy.value;
+        mockContext.options.thoughtStructure = thoughtStructureEntry.value;
         mockContext.options.topology = topology.value;
 
         await AgenticLoopService.runAgenticLoop(mockContext);
 
-        expect(mockContext.options.reasoningStrategy).toBe(strategy.value);
+        expect(mockContext.options.thoughtStructure).toBe(thoughtStructureEntry.value);
         expect(mockContext.options.topology).toBe(topology.value);
         expect(mockContext.options.harness).toBe(HARNESS_IDS.STANDARD);
 
-        if (strategy.value === REASONING_STRATEGIES.TREE_OF_THOUGHTS) {
+        if (thoughtStructureEntry.value === THOUGHT_STRUCTURES.TREE_OF_THOUGHTS) {
           expect(runTreeOfThoughts).toHaveBeenCalled();
           expect(runGraphOfThoughts).not.toHaveBeenCalled();
-        } else if (strategy.value === REASONING_STRATEGIES.GRAPH_OF_THOUGHTS) {
+        } else if (thoughtStructureEntry.value === THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS) {
           expect(runGraphOfThoughts).toHaveBeenCalled();
           expect(runTreeOfThoughts).not.toHaveBeenCalled();
         } else {
@@ -311,39 +309,39 @@ describe("Strategy × Topology Combination Matrix", () => {
     }
   }
 
-  it("should fall back to SettingsService defaults when neither strategy nor topology is provided", async () => {
+  it("should fall back to SettingsService defaults when neither thoughtStructure nor topology is provided", async () => {
     vi.mocked(SettingsService.getSection).mockResolvedValue({
       harness: HARNESS_IDS.STANDARD,
-      reasoningStrategy: REASONING_STRATEGIES.GRAPH_OF_THOUGHTS,
+      thoughtStructure: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS,
       topology: "peer_to_peer",
     });
 
     mockContext.options.harness = undefined;
-    mockContext.options.reasoningStrategy = undefined;
+    mockContext.options.thoughtStructure = undefined;
     mockContext.options.topology = undefined;
 
     await AgenticLoopService.runAgenticLoop(mockContext);
 
-    expect(mockContext.options.reasoningStrategy).toBe(REASONING_STRATEGIES.GRAPH_OF_THOUGHTS);
+    expect(mockContext.options.thoughtStructure).toBe(THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS);
     expect(mockContext.options.topology).toBe("peer_to_peer");
     expect(mockContext.options.harness).toBe(HARNESS_IDS.STANDARD);
     expect(runGraphOfThoughts).toHaveBeenCalled();
   });
 
-  it("should prefer explicit options over SettingsService defaults for both strategy and topology", async () => {
+  it("should prefer explicit options over SettingsService defaults for both thoughtStructure and topology", async () => {
     vi.mocked(SettingsService.getSection).mockResolvedValue({
       harness: HARNESS_IDS.STANDARD,
-      reasoningStrategy: REASONING_STRATEGIES.CHAIN_OF_THOUGHT,
+      thoughtStructure: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
       topology: "hierarchical",
     });
 
     mockContext.options.harness = HARNESS_IDS.STANDARD;
-    mockContext.options.reasoningStrategy = REASONING_STRATEGIES.TREE_OF_THOUGHTS;
+    mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.TREE_OF_THOUGHTS;
     mockContext.options.topology = "sequential";
 
     await AgenticLoopService.runAgenticLoop(mockContext);
 
-    expect(mockContext.options.reasoningStrategy).toBe(REASONING_STRATEGIES.TREE_OF_THOUGHTS);
+    expect(mockContext.options.thoughtStructure).toBe(THOUGHT_STRUCTURES.TREE_OF_THOUGHTS);
     expect(mockContext.options.topology).toBe("sequential");
     expect(runTreeOfThoughts).toHaveBeenCalled();
   });
