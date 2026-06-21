@@ -1142,7 +1142,7 @@ export default class OrchestratorService {
         description: "Sub-agents run one at a time in order, each receiving the previous agent's output as context before starting.",
       },
       [TOPOLOGIES.PEER_TO_PEER]: {
-        name: "Peer-to-Peer (Mesh / GoT DAG)",
+        name: "Peer-to-Peer (Mesh / MAD)",
         description: "Turn-based discussion where agents take turns on a shared thread. Each agent reads all prior contributions before responding.",
       },
       [TOPOLOGIES.TOURNAMENT]: {
@@ -1154,7 +1154,7 @@ export default class OrchestratorService {
         description: "Actor produces output, critic evaluates and provides pass/fail feedback. If failed, actor revises. Iterates until critic approves or max rounds reached.",
       },
       [TOPOLOGIES.DIVIDE_AND_CONQUER]: {
-        name: "Divide & Conquer (ToT)",
+        name: "Divide & Conquer (GoT)",
         description: "A planner decomposes the task into independent subtasks, each dispatched to a sub-agent in parallel, then synthesized into a unified result.",
       },
       [TOPOLOGIES.MCTS]: {
