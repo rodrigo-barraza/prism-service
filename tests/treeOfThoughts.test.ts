@@ -107,7 +107,7 @@ describe("TreeOfThoughtsStrategy", () => {
     };
   });
 
-  it("should successfully run tree of thoughts reasoning strategy and choose highest scored branch", async () => {
+  it("should successfully run tree of thoughts thought structure and choose highest scored branch", async () => {
     const result = await runTreeOfThoughts(mockHarnessInstance as any);
 
     expect(result).toBeDefined();

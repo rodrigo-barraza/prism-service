@@ -1,5 +1,5 @@
 /**
- * Graph of Thoughts (GoT) Reasoning Strategy
+ * Graph of Thoughts (GoT) Thought Structure
  *
  * Paper: "Graph of Thoughts: Solving Elaborate Problems
  * with Large Language Models" (arxiv.org/abs/2308.09687)
