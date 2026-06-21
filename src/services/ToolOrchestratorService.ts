@@ -576,7 +576,9 @@ function getOrchestratorToolSchemas(
         `${divideAndConquerDesc} decomposes the task into subtasks and executes in parallel then synthesizes, ` +
         `${mctsDesc} runs Monte Carlo Tree Search guided parallel expansions and iterations. ` +
         "For a single task, provide one member. For parallel work, provide up to 10 members. " +
-        "Returns results from all members when execution completes.",
+        "Returns results from all members when execution completes. " +
+        "When recursive spawning is enabled, sub-agents may themselves call create_team to further decompose complex subtasks. " +
+        "Results include subtreeMetrics with descendant counts, aggregated costs, and child summaries for full tree visibility.",
       parameters: {
         type: "object",
         properties: {
