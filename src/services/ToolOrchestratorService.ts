@@ -520,6 +520,18 @@ function getOrchestratorToolSchemas(
   const peerToPeerLabel = isPeerToPeer
     ? `${TOPOLOGIES.PEER_TO_PEER} (default)`
     : TOPOLOGIES.PEER_TO_PEER;
+  const tournamentLabel = defaultTopology === TOPOLOGIES.TOURNAMENT
+    ? `${TOPOLOGIES.TOURNAMENT} (default)`
+    : TOPOLOGIES.TOURNAMENT;
+  const criticLoopLabel = defaultTopology === TOPOLOGIES.CRITIC_LOOP
+    ? `${TOPOLOGIES.CRITIC_LOOP} (default)`
+    : TOPOLOGIES.CRITIC_LOOP;
+  const divideAndConquerLabel = defaultTopology === TOPOLOGIES.DIVIDE_AND_CONQUER
+    ? `${TOPOLOGIES.DIVIDE_AND_CONQUER} (default)`
+    : TOPOLOGIES.DIVIDE_AND_CONQUER;
+  const mctsLabel = defaultTopology === TOPOLOGIES.MCTS
+    ? `${TOPOLOGIES.MCTS} (default)`
+    : TOPOLOGIES.MCTS;
 
   const hierarchicalDesc = isHierarchical
     ? "'hierarchical' (default)"
@@ -533,6 +545,18 @@ function getOrchestratorToolSchemas(
   const peerToPeerDesc = isPeerToPeer
     ? "'peer_to_peer' (default)"
     : "'peer_to_peer'";
+  const tournamentDesc = defaultTopology === TOPOLOGIES.TOURNAMENT
+    ? "'tournament' (default)"
+    : "'tournament'";
+  const criticLoopDesc = defaultTopology === TOPOLOGIES.CRITIC_LOOP
+    ? "'critic_loop' (default)"
+    : "'critic_loop'";
+  const divideAndConquerDesc = defaultTopology === TOPOLOGIES.DIVIDE_AND_CONQUER
+    ? "'divide_and_conquer' (default)"
+    : "'divide_and_conquer'";
+  const mctsDesc = defaultTopology === TOPOLOGIES.MCTS
+    ? "'mcts' (default)"
+    : "'mcts'";
 
   return [
     {
@@ -544,7 +568,11 @@ function getOrchestratorToolSchemas(
         `Execution mode depends on topology: ${hierarchicalDesc} runs all members in parallel, ` +
         `${hierarchicalAggregationDesc} runs all members in parallel then merges results via a synthesis pass, ` +
         `${sequentialDesc} runs members one-at-a-time passing each result to the next, ` +
-        `${peerToPeerDesc} runs a turn-based discussion where members take turns seeing a shared thread. ` +
+        `${peerToPeerDesc} runs a turn-based discussion where members take turns seeing a shared thread, ` +
+        `${tournamentDesc} runs all members in parallel then has a judge select the best result, ` +
+        `${criticLoopDesc} runs actor-critic refinement loop (either Council of Judges or Jury mode), ` +
+        `${divideAndConquerDesc} decomposes the task into subtasks and executes in parallel then synthesizes, ` +
+        `${mctsDesc} runs Monte Carlo Tree Search guided parallel expansions and iterations. ` +
         "For a single task, provide one member. For parallel work, provide up to 10 members. " +
         "Returns results from all members when execution completes.",
       parameters: {
@@ -562,13 +590,52 @@ function getOrchestratorToolSchemas(
               TOPOLOGIES.HIERARCHICAL_AGGREGATION,
               TOPOLOGIES.SEQUENTIAL,
               TOPOLOGIES.PEER_TO_PEER,
+              TOPOLOGIES.TOURNAMENT,
+              TOPOLOGIES.CRITIC_LOOP,
+              TOPOLOGIES.DIVIDE_AND_CONQUER,
+              TOPOLOGIES.MCTS,
             ],
             description:
               `Optional: execution topology. '${hierarchicalLabel}' — all members run in parallel. ` +
               `'${hierarchicalAggregationLabel}' — all members run in parallel, then a synthesis pass merges their outputs into a unified result. ` +
               `'${sequentialLabel}' — members run one-at-a-time, each receiving the previous member's output. ` +
               `'${peerToPeerLabel}' — turn-based discussion where members take turns on a shared thread. ` +
+              `'${tournamentLabel}' — N actors run in parallel, judge selects best. ` +
+              `'${criticLoopLabel}' — Actor-Critic refinement. Council of Judges (1 actor + N critics) or Jury mode (N actors + judge -> critic loop on winner). Config via topologyConfig: actorCount, maxRounds. ` +
+              `'${divideAndConquerLabel}' — Task decomposition into subtasks -> parallel execution -> synthesis. Config: maxSubtasks. ` +
+              `'${mctsLabel}' — Monte Carlo Tree Search. Config: branchFactor, maxDepth. ` +
               "Omit to use the system default.",
+          },
+          topologyConfig: {
+            type: "object",
+            description:
+              "Optional topology configuration options depending on the topology type. " +
+              "For 'critic_loop': { actorCount: number, maxRounds: number }. " +
+              "For 'peer_to_peer': { maxRounds: number }. " +
+              "For 'mcts': { branchFactor: number, maxDepth: number }. " +
+              "For 'divide_and_conquer': { maxSubtasks: number }.",
+            properties: {
+              actorCount: {
+                type: "integer",
+                description: "Number of competing actors (for critic_loop Jury mode). Defaults to 1.",
+              },
+              maxRounds: {
+                type: "integer",
+                description: "Maximum evaluation/revision rounds or turns. Defaults to 3 for critic_loop, calculated based on members count for peer_to_peer.",
+              },
+              branchFactor: {
+                type: "integer",
+                description: "MCTS branch factor (number of expanded branches in parallel per depth level). Defaults to 3.",
+              },
+              maxDepth: {
+                type: "integer",
+                description: "MCTS max search depth. Defaults to 3.",
+              },
+              maxSubtasks: {
+                type: "integer",
+                description: "Divide and conquer maximum subtasks to decompose. Defaults to 6.",
+              },
+            },
           },
           members: {
             type: "array",
