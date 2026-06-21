@@ -4,7 +4,7 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
-import type { TopologyRouter } from "../TopologyRouter.ts";
+import type { TopologyRouter, ContinueSubAgentCallback, TopologyConfig } from "../TopologyRouter.ts";
 import {
   resolveSiblingInstances,
   selectInstanceForMember,
@@ -70,6 +70,8 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
     spawnSubAgent: (
       assignment: OrchestratorSpawnParams,
     ) => Promise<SubAgentResult | { error: string }>,
+    _continueSubAgent?: ContinueSubAgentCallback,
+    _topologyConfig?: TopologyConfig,
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
     logger.info(

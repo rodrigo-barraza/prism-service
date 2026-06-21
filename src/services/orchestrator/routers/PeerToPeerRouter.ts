@@ -4,7 +4,7 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
-import type { TopologyRouter, ContinueSubAgentCallback } from "../TopologyRouter.ts";
+import type { TopologyRouter, ContinueSubAgentCallback, TopologyConfig } from "../TopologyRouter.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import {
   resolveSiblingInstances,
@@ -129,6 +129,7 @@ export class PeerToPeerRouter implements TopologyRouter {
       assignment: OrchestratorSpawnParams,
     ) => Promise<SubAgentResult | { error: string }>,
     continueSubAgent?: ContinueSubAgentCallback,
+    topologyConfig?: TopologyConfig,
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
     logger.info(
@@ -167,11 +168,11 @@ export class PeerToPeerRouter implements TopologyRouter {
     let consecutiveStallCount = 0;
     const maximumConsecutiveStalls = 3;
 
-    // Ensure every member gets at least 1 turn, with up to 2 rounds, capped at 10
-    const maxTurnsCount = Math.max(
-      members.length,
-      Math.min(10, members.length * 2),
-    );
+    // Compute max turns from topologyConfig.maxRounds or default (2 rounds, capped at 10)
+    const configuredMaxRounds = Number(topologyConfig?.maxRounds) || 0;
+    const maxTurnsCount = configuredMaxRounds > 0
+      ? Math.min(configuredMaxRounds * members.length, 20)
+      : Math.max(members.length, Math.min(10, members.length * 2));
 
     for (let turnIndex = 0; turnIndex < maxTurnsCount; turnIndex++) {
       const memberIndex = turnIndex % members.length;

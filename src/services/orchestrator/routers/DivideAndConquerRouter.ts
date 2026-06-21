@@ -4,7 +4,7 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
-import type { TopologyRouter } from "../TopologyRouter.ts";
+import type { TopologyRouter, ContinueSubAgentCallback, TopologyConfig } from "../TopologyRouter.ts";
 import {
   resolveSiblingInstances,
   selectInstanceForMember,
@@ -32,8 +32,9 @@ function truncateResultOutput(output: string, maximumCharacters: number): string
 function buildDecompositionPrompt(
   originalTask: string,
   memberCount: number,
+  maximumSubtaskCount: number = MAXIMUM_SUBTASKS,
 ): string {
-  const maximumSubtasks = Math.min(MAXIMUM_SUBTASKS, Math.max(memberCount, 3));
+  const maximumSubtasks = Math.min(maximumSubtaskCount, Math.max(memberCount, 3));
 
   return [
     `You are a task decomposition planner.`,
@@ -66,7 +67,7 @@ function buildDecompositionPrompt(
   ].join("\n");
 }
 
-function parseDecompositionResponse(responseText: string): DecomposedSubtask[] {
+function parseDecompositionResponse(responseText: string, maximumSubtaskCount: number = MAXIMUM_SUBTASKS): DecomposedSubtask[] {
   // Strip markdown code fences if present
   let cleanedResponse = responseText.trim();
   cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
@@ -87,7 +88,7 @@ function parseDecompositionResponse(responseText: string): DecomposedSubtask[] {
           typeof (subtask as DecomposedSubtask).prompt === "string" &&
           (subtask as DecomposedSubtask).prompt.trim().length > 0,
       )
-      .slice(0, MAXIMUM_SUBTASKS);
+      .slice(0, maximumSubtaskCount);
   } catch (parseError: unknown) {
     logger.error(
       `[DivideAndConquerRouter] Failed to parse decomposition JSON: ${getErrorMessage(parseError)}`,
@@ -107,7 +108,7 @@ function parseDecompositionResponse(responseText: string): DecomposedSubtask[] {
                 typeof (subtask as DecomposedSubtask).description === "string" &&
                 typeof (subtask as DecomposedSubtask).prompt === "string",
             )
-            .slice(0, MAXIMUM_SUBTASKS);
+            .slice(0, maximumSubtaskCount);
         }
       } catch {
         // Fallback exhausted
@@ -189,9 +190,12 @@ export class DivideAndConquerRouter implements TopologyRouter {
     spawnSubAgent: (
       assignment: OrchestratorSpawnParams,
     ) => Promise<SubAgentResult | { error: string }>,
+    _continueSubAgent?: ContinueSubAgentCallback,
+    topologyConfig?: TopologyConfig,
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
     const originalTask = members.map((member) => member.prompt).join("\n\n");
+    const configuredMaxSubtasks = Math.max(1, Number(topologyConfig?.maxSubtasks) || MAXIMUM_SUBTASKS);
 
     logger.info(
       `[DivideAndConquerRouter] Starting divide-and-conquer for team "${teamName}" (${members.length} member(s))...`,
@@ -203,7 +207,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
       `[DivideAndConquerRouter] Phase 1: Decomposing task into subtasks...`,
     );
 
-    const decompositionPrompt = buildDecompositionPrompt(originalTask, members.length);
+    const decompositionPrompt = buildDecompositionPrompt(originalTask, members.length, configuredMaxSubtasks);
     const provider = getProvider(providerName);
 
     if (!provider) {
@@ -248,7 +252,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
         ),
       );
 
-      subtasks = parseDecompositionResponse(decompositionResult.text || "");
+      subtasks = parseDecompositionResponse(decompositionResult.text || "", configuredMaxSubtasks);
 
       logger.info(
         `[DivideAndConquerRouter] Decomposed into ${subtasks.length} subtask(s) in ${decompositionDurationMs}ms`,
