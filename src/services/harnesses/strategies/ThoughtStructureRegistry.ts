@@ -1,19 +1,19 @@
-import { REASONING_STRATEGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { THOUGHT_STRUCTURES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-export interface ReasoningStrategyAlignmentEntry {
+export interface ThoughtStructureAlignmentEntry {
   component: string;
   status: "aligned" | "simplified" | "extended";
   detail: string;
 }
 
-export interface ReasoningStrategyConfigOption {
+export interface ThoughtStructureConfigOption {
   name: string;
   type: "number" | "string" | "boolean";
   defaultValue: string;
   description: string;
 }
 
-export interface ReasoningStrategyDefinition {
+export interface ThoughtStructureDefinition {
   id: string;
   displayName: string;
   abbreviation: string;
@@ -25,18 +25,18 @@ export interface ReasoningStrategyDefinition {
   implementationFile: string;
   categoryLabel: string;
   phases: string[];
-  configOptions: ReasoningStrategyConfigOption[];
-  alignment: ReasoningStrategyAlignmentEntry[];
+  configOptions: ThoughtStructureConfigOption[];
+  alignment: ThoughtStructureAlignmentEntry[];
   flowDescription: string;
 }
 
-export const REASONING_STRATEGY_DEFINITIONS: ReasoningStrategyDefinition[] = [
+export const THOUGHT_STRUCTURE_DEFINITIONS: ThoughtStructureDefinition[] = [
   {
-    id: REASONING_STRATEGIES.CHAIN_OF_THOUGHT,
+    id: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
     displayName: "Chain of Thought",
     abbreviation: "CoT",
     description:
-      "Single-pass sequential reasoning per iteration. The agent reasons, selects tool calls, observes results, and iterates — one step at a time. This is the default and most efficient strategy, implemented as the standard ReAct (Reason→Act→Observe) loop. While named after Chain-of-Thought prompting, the implementation operates as a standard agentic tool-use loop rather than injecting few-shot reasoning exemplars into the prompt.",
+      "Single-pass sequential reasoning per iteration. The agent reasons, selects tool calls, observes results, and iterates — one step at a time. This is the default and most efficient thought structure, implemented as the standard ReAct (Reason→Act→Observe) loop. While named after Chain-of-Thought prompting, the implementation operates as a standard agentic tool-use loop rather than injecting few-shot reasoning exemplars into the prompt.",
     paperTitle: "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
     paperAuthors: "Wei et al.",
     paperYear: 2022,
@@ -54,7 +54,7 @@ export const REASONING_STRATEGY_DEFINITIONS: ReasoningStrategyDefinition[] = [
     flowDescription: "[Reason] → [Act] → [Observe] → repeat",
   },
   {
-    id: REASONING_STRATEGIES.TREE_OF_THOUGHTS,
+    id: THOUGHT_STRUCTURES.TREE_OF_THOUGHTS,
     displayName: "Tree of Thoughts",
     abbreviation: "ToT",
     description:
@@ -92,7 +92,7 @@ export const REASONING_STRATEGY_DEFINITIONS: ReasoningStrategyDefinition[] = [
     flowDescription: "[B₁ B₂ B₃] → [Score] → [Best] → [Execute] → [Validate / Backtrack]",
   },
   {
-    id: REASONING_STRATEGIES.GRAPH_OF_THOUGHTS,
+    id: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS,
     displayName: "Graph of Thoughts",
     abbreviation: "GoT",
     description:
@@ -124,6 +124,6 @@ export const REASONING_STRATEGY_DEFINITIONS: ReasoningStrategyDefinition[] = [
   },
 ];
 
-export function getReasoningStrategyById(strategyId: string): ReasoningStrategyDefinition | undefined {
-  return REASONING_STRATEGY_DEFINITIONS.find((definition) => definition.id === strategyId);
+export function getThoughtStructureById(structureId: string): ThoughtStructureDefinition | undefined {
+  return THOUGHT_STRUCTURE_DEFINITIONS.find((definition) => definition.id === structureId);
 }

@@ -8,7 +8,7 @@
  * the best aspects of ALL branches into a unified response
  * (aggregation > selection). Core differentiator from ToT.
  *
- * See ReasoningStrategyRegistry.ts → REASONING_STRATEGY_DEFINITIONS
+ * See ThoughtStructureRegistry.ts → THOUGHT_STRUCTURE_DEFINITIONS
  * (id: "graph_of_thoughts") for full paper-alignment metadata.
  */
 import type BaseAgenticHarness from "../BaseAgenticHarness.ts";
@@ -118,7 +118,7 @@ const BRANCH_STRATEGY_DESCRIPTORS = [
 ];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  Public API — called by ReActHarness when reasoningStrategy === "graph_of_thoughts"
+//  Public API — called by ReActHarness when thoughtStructure === "graph_of_thoughts"
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export async function runGraphOfThoughts(

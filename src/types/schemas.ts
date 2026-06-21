@@ -74,7 +74,7 @@ export const ChatRequestSchema = z
     agent: z.string().nullable().optional().default(null),
     harness: sanitizedString().nullable().optional(),
     topology: z.string().nullable().optional(),
-    reasoningStrategy: z.string().nullable().optional(),
+    thoughtStructure: z.string().nullable().optional(),
 
     // Generation options — flat at top-level
     tools: z.array(ToolSchemaSchema).nullable().optional(),

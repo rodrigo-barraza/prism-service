@@ -63,7 +63,7 @@ import synthesisRouter from "./routes/SynthesisRoutes.ts";
 import vramBenchmarksRouter from "./routes/VramBenchmarksRoutes.ts";
 import orchestratorRouter from "./routes/OrchestratorRoutes.ts";
 import topologyRouter from "./routes/TopologyRoutes.ts";
-import reasoningStrategyRouter from "./routes/ReasoningStrategyRoutes.ts";
+import thoughtStructureRouter from "./routes/ThoughtStructureRoutes.ts";
 import settingsRouter from "./routes/SettingsRoutes.ts";
 import customAgentsRouter from "./routes/CustomAgentsRoutes.ts";
 import workspacesRouter from "./routes/WorkspacesRoutes.ts";
@@ -132,7 +132,7 @@ const ENDPOINTS = {
     "/vram-benchmarks",
     "/orchestrator",
     "/topologies",
-    "/reasoning-strategies",
+    "/thought-structures",
     "/settings",
     "/custom-agents",
     "/workspaces",
@@ -196,7 +196,7 @@ app.use("/synthesis", synthesisRouter);
 app.use("/vram-benchmarks", vramBenchmarksRouter);
 app.use("/orchestrator", orchestratorRouter);
 app.use("/topologies", topologyRouter);
-app.use("/reasoning-strategies", reasoningStrategyRouter);
+app.use("/thought-structures", thoughtStructureRouter);
 app.use("/settings", settingsRouter);
 app.use("/custom-agents", customAgentsRouter);
 app.use("/workspaces", workspacesRouter);

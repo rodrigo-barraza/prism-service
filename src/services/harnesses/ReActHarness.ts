@@ -6,7 +6,7 @@ import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
   TOOL_NAMES,
-  REASONING_STRATEGIES,
+  THOUGHT_STRUCTURES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
@@ -104,7 +104,7 @@ const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
  *   - Tree of Thoughts: parallel branching, multi-criteria scoring, reflexion backtracking
  *   - Graph of Thoughts: parallel branching, scoring, synthesis/aggregation
  *
- * See ReasoningStrategyRegistry.ts → REASONING_STRATEGY_DEFINITIONS
+ * See ThoughtStructureRegistry.ts → THOUGHT_STRUCTURE_DEFINITIONS
  * for full paper-alignment metadata and config option documentation.
  *
  * Control flow (Chain of Thought):
@@ -131,14 +131,14 @@ export default class ReActHarness extends BaseAgenticHarness {
 
   async run(): Promise<{ messages: ConversationMessage[] }> {
     // ── Strategy dispatch ──────────────────────────────────
-    const resolvedStrategy = this.context.options.reasoningStrategy;
-    if (resolvedStrategy === REASONING_STRATEGIES.TREE_OF_THOUGHTS) {
+    const resolvedStructure = this.context.options.thoughtStructure;
+    if (resolvedStructure === THOUGHT_STRUCTURES.TREE_OF_THOUGHTS) {
       logger.info(
         `[ReActHarness] Delegating to Tree of Thoughts reasoning strategy`,
       );
       return runTreeOfThoughts(this);
     }
-    if (resolvedStrategy === REASONING_STRATEGIES.GRAPH_OF_THOUGHTS) {
+    if (resolvedStructure === THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS) {
       logger.info(
         `[ReActHarness] Delegating to Graph of Thoughts reasoning strategy`,
       );
