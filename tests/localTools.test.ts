@@ -102,7 +102,7 @@ const mockSkillPrepare = vi.fn().mockResolvedValue({
   name: "test_skill",
   skillId: "test_skill_id",
   prompt: "Do something with {{var}}",
-  config: { model: "google" },
+  config: { model: PROVIDERS.GOOGLE },
 });
 const mockSkillList = vi.fn().mockResolvedValue([{ name: "test_skill" }]);
 const mockSkillDelete = vi.fn().mockResolvedValue({ success: true });
@@ -150,6 +150,7 @@ vi.mock("../src/types/GlobalToolOrchestratorRegistry.ts", () => ({
 }));
 
 import InternalToolRegistry from "../src/services/local-tools/InternalToolRegistry.ts";
+import { PROVIDERS } from "../src/constants";
 
 describe("Local Tools Unit Tests Suite", () => {
   beforeEach(() => {

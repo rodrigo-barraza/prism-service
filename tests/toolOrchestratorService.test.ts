@@ -1,6 +1,7 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
+import { TYPES, MODEL_TYPES } from "../src/constants";
 
 vi.mock("../src/services/FileService.ts", () => {
   return {
@@ -73,11 +74,11 @@ describe("ToolOrchestratorService", () => {
 
       const generateImageSchema = clientSchemas.find((tool) => tool.name === "generate_image") as any;
       expect(generateImageSchema).toBeDefined();
-      expect(generateImageSchema?.inputModalities).toEqual(["image"]);
+      expect(generateImageSchema?.inputModalities).toEqual([TYPES.IMAGE]);
 
       const transcribeAudioSchema = clientSchemas.find((tool) => tool.name === "transcribe_audio") as any;
       expect(transcribeAudioSchema).toBeDefined();
-      expect(transcribeAudioSchema?.inputModalities).toEqual(["audio"]);
+      expect(transcribeAudioSchema?.inputModalities).toEqual([MODEL_TYPES.AUDIO]);
 
       const getWeatherSchema = clientSchemas.find((tool) => tool.name === "get_weather") as any;
       expect(getWeatherSchema).toBeDefined();

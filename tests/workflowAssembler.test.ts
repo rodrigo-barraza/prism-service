@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import type { WorkflowStep } from "../src/types/workflow.ts";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, TYPES } from "../src/constants.ts";
 
 vi.mock("../src/config.ts", () => ({
   getModelByName: vi.fn().mockReturnValue(null),
@@ -79,7 +79,7 @@ describe("assembleGraph — single step", () => {
         output: "Here's the image",
         outputImageRef: "minio://images/gen.png",
         model: "gpt-image-1.5",
-        outputType: "image",
+        outputType: TYPES.IMAGE,
       },
     ];
 

@@ -21,6 +21,7 @@ import filesRouter from '../src/routes/FilesRoutes.ts';
 import statsRouter from '../src/routes/StatsRoutes.ts';
 import settingsRouter from '../src/routes/SettingsRoutes.ts';
 import ollamaRouter from '../src/routes/OllamaRoutes.ts';
+import { PROVIDERS, COLLECTIONS } from "../src/constants";
 
 // Mount routers on app
 app.use('/benchmark', benchmarkRouter);
@@ -125,7 +126,7 @@ describe('Infrastructure Routes Integration Tests', () => {
                 createdAt: new Date().toISOString(),
                 system: { hostname: 'localhost' },
                 contextLength: 4096,
-                provider: 'openai',
+                provider: PROVIDERS.OPENAI,
                 subAgents: [{ agentId: 'sub-1', status: 'running' }]
               }
             ]),
@@ -145,7 +146,7 @@ describe('Infrastructure Routes Integration Tests', () => {
           aggregate: vi.fn().mockReturnValue({
             toArray: vi.fn().mockResolvedValue([
               {
-                _id: { model: 'gpt-4o', provider: 'openai' },
+                _id: { model: 'gpt-4o', provider: PROVIDERS.OPENAI },
                 totalRequests: 5,
                 totalInputTokens: 100,
                 totalOutputTokens: 50,
@@ -221,7 +222,7 @@ describe('Infrastructure Routes Integration Tests', () => {
         .set('x-username', 'test-user')
         .expect(200);
 
-      expect(response.body).toHaveProperty('benchmarks');
+      expect(response.body).toHaveProperty(COLLECTIONS.BENCHMARKS);
       expect(response.body).toHaveProperty('count');
     });
 
@@ -458,7 +459,7 @@ describe('Infrastructure Routes Integration Tests', () => {
     it('POST /conversation - triggers completion', async () => {
       const response = await request(app)
         .post('/conversation?stream=false')
-        .send({ provider: 'openai', model: 'gpt-4o', messages: [] })
+        .send({ provider: PROVIDERS.OPENAI, model: 'gpt-4o', messages: [] })
         .expect(200);
 
       expect(response.body).toBeDefined();

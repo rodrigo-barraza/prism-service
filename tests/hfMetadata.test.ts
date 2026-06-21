@@ -20,13 +20,15 @@ vi.mock('../src/services/local-provider/nameParsers.ts', () => ({
   }),
 }));
 
+import { TYPES as CONST_TYPES, MODEL_TYPES } from "../src/constants";
+
 const TYPES = {
-  TEXT: 'text',
-  IMAGE: 'image',
-  AUDIO: 'audio',
-  VIDEO: 'video',
-  PDF: 'pdf',
-  EMBEDDING: 'embedding',
+  TEXT: CONST_TYPES.TEXT,
+  IMAGE: CONST_TYPES.IMAGE,
+  AUDIO: MODEL_TYPES.AUDIO,
+  VIDEO: CONST_TYPES.VIDEO,
+  PDF: CONST_TYPES.PDF,
+  EMBEDDING: CONST_TYPES.EMBEDDING,
 };
 
 vi.mock('../../config.ts', () => ({
@@ -39,7 +41,7 @@ function createBaseModelEntry(overrides: Partial<ModelEntry> = {}): ModelEntry {
   return {
     name: 'test-model',
     label: 'Test Model',
-    modelType: 'conversation',
+    modelType: MODEL_TYPES.CONVERSATION,
     inputTypes: [TYPES.TEXT],
     outputTypes: [TYPES.TEXT],
     supportsSystemPrompt: true,
@@ -194,7 +196,7 @@ describe('enrichWithHuggingFace', () => {
       json: async () => ({
         config: {},
         pipeline_tag: 'video-text-to-text',
-        tags: ['video'],
+        tags: [TYPES.VIDEO],
         author: 'test',
         safetensors: {},
       }),
@@ -211,7 +213,7 @@ describe('enrichWithHuggingFace', () => {
       json: async () => ({
         config: {},
         pipeline_tag: 'audio-text-to-text',
-        tags: ['audio'],
+        tags: [MODEL_TYPES.AUDIO],
         author: 'test',
         safetensors: {},
       }),

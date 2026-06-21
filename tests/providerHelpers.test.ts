@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getProvider, listProviders } from "../src/providers/index.ts";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, TYPES } from "../src/constants.ts";
 import { convertToolsToGoogle } from "../src/providers/google.ts";
 import {
   normalizeResponsesUsage,
@@ -134,7 +134,7 @@ describe("Provider Helpers and Adapters Suite", () => {
                 args: { city: "San Francisco" },
                 reasoningItem: {
                   id: "reason-1",
-                  summary: [{ type: "text", text: "Reasoning about weather tool call." }],
+                  summary: [{ type: TYPES.TEXT, text: "Reasoning about weather tool call." }],
                 },
               },
             ],

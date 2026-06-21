@@ -12,7 +12,7 @@
 import { describe, it, expect } from "vitest";
 import request from "supertest";
 import { app } from "./setup.ts";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, MODEL_TYPES, TYPES } from "../src/constants.ts";
 
 // ═══════════════════════════════════════════════════════════════
 // Pattern detection — verify the extracted constants work correctly
@@ -65,7 +65,7 @@ describe("Config route — pattern constant detection", () => {
 
     const allModels = Object.values(res.body.textToText.models).flat() as any[];
     const thinkingModels = allModels.filter(
-      (m: any) => m.thinking === true && m.modelType === "conversation"
+      (m: any) => m.thinking === true && m.modelType === MODEL_TYPES.CONVERSATION
     );
 
     expect(thinkingModels.length).toBeGreaterThan(0);
@@ -102,7 +102,7 @@ describe("Config route — pattern constant detection", () => {
 
     const allModels = Object.values(res.body.textToText.models).flat() as any[];
     const visionModels = allModels.filter(
-      (m) => m.vision === true || m.inputTypes?.includes("image"),
+      (m) => m.vision === true || m.inputTypes?.includes(TYPES.IMAGE),
     );
 
     // Should have some vision models
@@ -110,7 +110,7 @@ describe("Config route — pattern constant detection", () => {
 
     // Vision models should have 'image' in inputTypes
     for (const model of visionModels) {
-      expect(model.inputTypes).toContain("image");
+      expect(model.inputTypes).toContain(TYPES.IMAGE);
     }
   });
 });

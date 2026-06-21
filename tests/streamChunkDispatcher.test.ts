@@ -10,6 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { TYPES, MODEL_TYPES } from "../src/constants";
 
 vi.mock("../src/services/FileService.ts", () => ({
   default: {
@@ -530,7 +531,7 @@ describe('StreamChunkDispatcher adversarial', () => {
 
   it('should handle image chunk with no data — MinIO upload skipped', async () => {
     await dispatchChunk(
-      { type: 'image', data: undefined, mimeType: 'image/png' },
+      { type: TYPES.IMAGE, data: undefined, mimeType: 'image/png' },
       streamState,
       streamContext,
     );
@@ -540,7 +541,7 @@ describe('StreamChunkDispatcher adversarial', () => {
 
   it('should handle audio chunk and extract sample rate from mimeType', async () => {
     await dispatchChunk(
-      { type: 'audio', data: 'base64audio', mimeType: 'audio/pcm;rate=48000' },
+      { type: MODEL_TYPES.AUDIO, data: 'base64audio', mimeType: 'audio/pcm;rate=48000' },
       streamState,
       streamContext,
     );

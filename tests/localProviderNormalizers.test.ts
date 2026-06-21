@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { PROVIDERS } from '../src/constants.ts';
+import { PROVIDERS, MODEL_TYPES, TYPES } from '../src/constants.ts';
 
 vi.mock('../src/config.ts', () => ({
   TYPES: {
@@ -53,7 +53,7 @@ describe('normalizers', () => {
 
       expect(entry.name).toBe('Qwen/qwen3-8b');
       expect(entry.label).toBe('Qwen3 8B (Q4_K_M)');
-      expect(entry.modelType).toBe('conversation');
+      expect(entry.modelType).toBe(MODEL_TYPES.CONVERSATION);
       expect(entry.supportsSystemPrompt).toBe(true);
       expect(entry.streaming).toBe(true);
       expect(entry.contextLength).toBe(32768);
@@ -72,13 +72,13 @@ describe('normalizers', () => {
     it('normalizes an embedding model correctly', () => {
       const raw: LmStudioRawModel = {
         key: 'nomic-embed-text-v1.5',
-        type: 'embedding',
+        type: TYPES.EMBEDDING,
       };
       const entry = normalizeLmStudioModel(raw);
 
-      expect(entry.modelType).toBe('embed');
-      expect(entry.inputTypes).toEqual(['text']);
-      expect(entry.outputTypes).toEqual(['embedding']);
+      expect(entry.modelType).toBe(MODEL_TYPES.EMBED);
+      expect(entry.inputTypes).toEqual([TYPES.TEXT]);
+      expect(entry.outputTypes).toEqual([TYPES.EMBEDDING]);
       expect(entry.supportsSystemPrompt).toBe(false);
       expect(entry.streaming).toBe(false);
       expect(entry.defaultTemperature).toBeUndefined();
@@ -94,7 +94,7 @@ describe('normalizers', () => {
 
       expect(entry.name).toBe('some-plain-model');
       expect(entry.label).toBe('some-plain-model');
-      expect(entry.modelType).toBe('conversation');
+      expect(entry.modelType).toBe(MODEL_TYPES.CONVERSATION);
       expect(entry.defaultTemperature).toBe(0.7);
       expect(entry.contextLength).toBeUndefined();
       expect(entry.loaded).toBeUndefined();
@@ -107,7 +107,7 @@ describe('normalizers', () => {
       const entry = normalizeLmStudioModel(raw);
 
       expect(entry.vision).toBe(true);
-      expect(entry.inputTypes).toContain('image');
+      expect(entry.inputTypes).toContain(TYPES.IMAGE);
     });
   });
 
@@ -126,7 +126,7 @@ describe('normalizers', () => {
 
       expect(entry.name).toBe('qwen3:8b');
       expect(entry.label).toBe('qwen3:8b');
-      expect(entry.modelType).toBe('conversation');
+      expect(entry.modelType).toBe(MODEL_TYPES.CONVERSATION);
       expect(entry.params).toBe('8B');
       expect(entry.architecture).toBe('qwen3');
       expect(entry.size).toBe('4.7 GB');

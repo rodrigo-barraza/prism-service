@@ -4,6 +4,7 @@ import { Readable } from 'node:stream';
 import { app, MOCK_GENERATE_SPEECH } from './setup.ts';
 import audioRouter from '../src/routes/AudioRoutes.ts';
 import { getProvider } from '../src/providers/index.ts';
+import { PROVIDERS } from "../src/constants";
 
 // Mount /audio-to-text local route (since setup.ts only mounts /text-to-audio)
 app.use('/audio-to-text', audioRouter);
@@ -36,7 +37,7 @@ describe('AudioRoutes Integration', () => {
         .set('x-project', 'test-project')
         .set('x-username', 'testuser')
         .send({
-          provider: 'google',
+          provider: PROVIDERS.GOOGLE,
           text: 'Hello, this is a test synthesis',
           voice: 'en-US-Standard-A',
         })
@@ -53,7 +54,7 @@ describe('AudioRoutes Integration', () => {
         .set('x-project', 'test-project')
         .set('x-username', 'testuser')
         .send({
-          provider: 'google',
+          provider: PROVIDERS.GOOGLE,
           text: 'Hello, this is a test data URL synthesis',
           voice: 'en-US-Standard-A',
         })
@@ -83,7 +84,7 @@ describe('AudioRoutes Integration', () => {
         .set('x-project', 'test-project')
         .set('x-username', 'testuser')
         .send({
-          provider: 'google',
+          provider: PROVIDERS.GOOGLE,
         })
         .expect(400);
 
@@ -97,7 +98,7 @@ describe('AudioRoutes Integration', () => {
         .set('x-project', 'test-project')
         .set('x-username', 'testuser')
         .send({
-          provider: 'anthropic',
+          provider: PROVIDERS.ANTHROPIC,
           text: 'Unsupported tts',
         })
         .expect(400);
@@ -108,7 +109,7 @@ describe('AudioRoutes Integration', () => {
 
   describe('POST /audio-to-text (Speech Transcription - STT)', () => {
     beforeEach(() => {
-      const openaiProvider = getProvider('openai');
+      const openaiProvider = getProvider(PROVIDERS.OPENAI);
       (openaiProvider as any).transcribeAudio = vi.fn().mockResolvedValue({
         text: 'Transcribed text output',
         usage: { inputTokens: 120, outputTokens: 0 },
@@ -121,7 +122,7 @@ describe('AudioRoutes Integration', () => {
         .set('x-project', 'test-project')
         .set('x-username', 'testuser')
         .send({
-          provider: 'openai',
+          provider: PROVIDERS.OPENAI,
           audio: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAAHAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
           model: 'whisper-1',
         })
@@ -152,7 +153,7 @@ describe('AudioRoutes Integration', () => {
         .set('x-project', 'test-project')
         .set('x-username', 'testuser')
         .send({
-          provider: 'openai',
+          provider: PROVIDERS.OPENAI,
         })
         .expect(400);
 
@@ -166,7 +167,7 @@ describe('AudioRoutes Integration', () => {
         .set('x-project', 'test-project')
         .set('x-username', 'testuser')
         .send({
-          provider: 'elevenlabs',
+          provider: PROVIDERS.ELEVENLABS,
           audio: 'base64audio',
         })
         .expect(400);

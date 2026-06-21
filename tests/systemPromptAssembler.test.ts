@@ -16,7 +16,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TOOL_NAMES, CORE_ORCHESTRATOR_TOOLS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { PROMPT_DELIMITERS, PROVIDERS } from "../src/constants.ts";
+import { PROMPT_DELIMITERS, PROVIDERS, MODEL_TYPES } from "../src/constants.ts";
 
 // ── Mock tool schemas (simulates tools-api + coordinator tools) ────────
 
@@ -116,8 +116,8 @@ const MOCK_TOOLS_API_SCHEMAS = [
     description: "Convert text to speech audio",
     parameters: { type: "object", properties: {} },
     domain: "Audio",
-    domainKey: "audio",
-    labels: ["audio"],
+    domainKey: MODEL_TYPES.AUDIO,
+    labels: [MODEL_TYPES.AUDIO],
     endpoint: { method: "POST", path: "/audio/tts" },
   },
   {
@@ -125,8 +125,8 @@ const MOCK_TOOLS_API_SCHEMAS = [
     description: "Transcribe audio to text",
     parameters: { type: "object", properties: {} },
     domain: "Audio",
-    domainKey: "audio",
-    labels: ["audio"],
+    domainKey: MODEL_TYPES.AUDIO,
+    labels: [MODEL_TYPES.AUDIO],
     endpoint: { method: "POST", path: "/audio/stt" },
   },
 ];

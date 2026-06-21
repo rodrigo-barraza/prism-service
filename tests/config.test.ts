@@ -47,7 +47,7 @@ describe('GET /config', () => {
     expect(res.body).toHaveProperty('textToSpeech');
     expect(res.body).toHaveProperty('textToImage');
     expect(res.body).toHaveProperty('imageToText');
-    expect(res.body).toHaveProperty('embedding');
+    expect(res.body).toHaveProperty(TYPES.EMBEDDING);
   });
 
   it('textToText has models and defaults', async () => {

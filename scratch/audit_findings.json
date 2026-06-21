@@ -1,0 +1,3026 @@
+[
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/adminRoutes.test.ts",
+    "lineRange": "65",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/adminRoutes.test.ts",
+    "lineRange": "111",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → COLLECTIONS.WORKFLOWS",
+    "description": "Hardcoded magic string \"workflows\" duplicates production constant 'COLLECTIONS.WORKFLOWS'.",
+    "fix": "Import { COLLECTIONS } from '../src/constants.ts' and replace \"workflows\" with COLLECTIONS.WORKFLOWS."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/adminRoutes.test.ts",
+    "lineRange": "195",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → COLLECTIONS.REQUESTS",
+    "description": "Hardcoded magic string \"requests\" duplicates production constant 'COLLECTIONS.REQUESTS'.",
+    "fix": "Import { COLLECTIONS } from '../src/constants.ts' and replace \"requests\" with COLLECTIONS.REQUESTS."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "31",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "32",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "33",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "63",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "88",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "89",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "90",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "91",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "98",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "99",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "109",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "120",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "139",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "202",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticLoopState.test.ts",
+    "lineRange": "211",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticSessionPersistence.test.ts",
+    "lineRange": "167",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticSessionPersistence.test.ts",
+    "lineRange": "169",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticSessionPersistence.test.ts",
+    "lineRange": "234",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticSessionPersistence.test.ts",
+    "lineRange": "267",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticSessionPersistence.test.ts",
+    "lineRange": "335",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticSessionPersistence.test.ts",
+    "lineRange": "337",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticSessionPersistence.test.ts",
+    "lineRange": "339",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticSessionPersistence.test.ts",
+    "lineRange": "341",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/agenticSessionPersistence.test.ts",
+    "lineRange": "450",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/anthropicProvider.test.ts",
+    "lineRange": "16",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/anthropicProvider.test.ts",
+    "lineRange": "64",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/anthropicProvider.test.ts",
+    "lineRange": "165",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/anthropicProvider.test.ts",
+    "lineRange": "192",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/anthropicProvider.test.ts",
+    "lineRange": "199",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/audioRoutes.test.ts",
+    "lineRange": "39",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/audioRoutes.test.ts",
+    "lineRange": "56",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/audioRoutes.test.ts",
+    "lineRange": "86",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/audioRoutes.test.ts",
+    "lineRange": "100",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/audioRoutes.test.ts",
+    "lineRange": "111",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/audioRoutes.test.ts",
+    "lineRange": "124",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/audioRoutes.test.ts",
+    "lineRange": "155",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/audioRoutes.test.ts",
+    "lineRange": "169",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ELEVENLABS",
+    "description": "Hardcoded magic string \"elevenlabs\" duplicates production constant 'PROVIDERS.ELEVENLABS'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"elevenlabs\" with PROVIDERS.ELEVENLABS."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/configUtils.test.ts",
+    "lineRange": "68",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.CONVERSATION",
+    "description": "Hardcoded magic string \"conversation\" duplicates production constant 'MODEL_TYPES.CONVERSATION'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"conversation\" with MODEL_TYPES.CONVERSATION."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/configUtils.test.ts",
+    "lineRange": "105",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/configUtils.test.ts",
+    "lineRange": "113",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/consolidationTracker.test.ts",
+    "lineRange": "35",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → COLLECTIONS.MEMORY_CONSOLIDATION_RUNS",
+    "description": "Hardcoded magic string \"memory_consolidation_runs\" duplicates production constant 'COLLECTIONS.MEMORY_CONSOLIDATION_RUNS'.",
+    "fix": "Import { COLLECTIONS } from '../src/constants.ts' and replace \"memory_consolidation_runs\" with COLLECTIONS.MEMORY_CONSOLIDATION_RUNS."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/consolidationTracker.test.ts",
+    "lineRange": "67",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → COLLECTIONS.MEMORY_CONSOLIDATION_HISTORY",
+    "description": "Hardcoded magic string \"memory_consolidation_history\" duplicates production constant 'COLLECTIONS.MEMORY_CONSOLIDATION_HISTORY'.",
+    "fix": "Import { COLLECTIONS } from '../src/constants.ts' and replace \"memory_consolidation_history\" with COLLECTIONS.MEMORY_CONSOLIDATION_HISTORY."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/conversationEmbedding.test.ts",
+    "lineRange": "118",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.EMBED",
+    "description": "Hardcoded magic string \"embed\" duplicates production constant 'MODEL_TYPES.EMBED'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"embed\" with MODEL_TYPES.EMBED."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/conversationEmbedding.test.ts",
+    "lineRange": "164",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.EMBED",
+    "description": "Hardcoded magic string \"embed\" duplicates production constant 'MODEL_TYPES.EMBED'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"embed\" with MODEL_TYPES.EMBED."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/embeddingService.test.ts",
+    "lineRange": "51",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.EMBEDDING",
+    "description": "Hardcoded magic string \"embedding\" duplicates production constant 'TYPES.EMBEDDING'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"embedding\" with TYPES.EMBEDDING."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/featureRoutes.test.ts",
+    "lineRange": "334",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → COLLECTIONS.WORKSPACES",
+    "description": "Hardcoded magic string \"workspaces\" duplicates production constant 'COLLECTIONS.WORKSPACES'.",
+    "fix": "Import { COLLECTIONS } from '../src/constants.ts' and replace \"workspaces\" with COLLECTIONS.WORKSPACES."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/featureRoutes.test.ts",
+    "lineRange": "541",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/featureRoutes.test.ts",
+    "lineRange": "741",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → COLLECTIONS.MEMORIES",
+    "description": "Hardcoded magic string \"memories\" duplicates production constant 'COLLECTIONS.MEMORIES'.",
+    "fix": "Import { COLLECTIONS } from '../src/constants.ts' and replace \"memories\" with COLLECTIONS.MEMORIES."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/featureRoutes.test.ts",
+    "lineRange": "751",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → COLLECTIONS.MEMORIES",
+    "description": "Hardcoded magic string \"memories\" duplicates production constant 'COLLECTIONS.MEMORIES'.",
+    "fix": "Import { COLLECTIONS } from '../src/constants.ts' and replace \"memories\" with COLLECTIONS.MEMORIES."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/fileService.test.ts",
+    "lineRange": "73",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.PDF",
+    "description": "Hardcoded magic string \"pdf\" duplicates production constant 'TYPES.PDF'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"pdf\" with TYPES.PDF."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/finalizer-race-condition.test.ts",
+    "lineRange": "25",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/functionCallingUtilities.test.ts",
+    "lineRange": "375",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/googleProvider.test.ts",
+    "lineRange": "615",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-lifecycle.test.ts",
+    "lineRange": "225",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-stream-processing.test.ts",
+    "lineRange": "125",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-stream-processing.test.ts",
+    "lineRange": "375",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-stream-processing.test.ts",
+    "lineRange": "391",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-stream-processing.test.ts",
+    "lineRange": "547",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harness-stream-processing.test.ts",
+    "lineRange": "549",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "lineRange": "257",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "lineRange": "308",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "lineRange": "322",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "lineRange": "333",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "lineRange": "346",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "lineRange": "348",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "lineRange": "349",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "lineRange": "357",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessAdversarial.test.ts",
+    "lineRange": "880",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessHelpers.test.ts",
+    "lineRange": "73",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessHelpers.test.ts",
+    "lineRange": "158",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessHelpers.test.ts",
+    "lineRange": "341",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessHelpers.test.ts",
+    "lineRange": "597",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessHelpers.test.ts",
+    "lineRange": "739",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessHelpers.test.ts",
+    "lineRange": "764",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessHelpers.test.ts",
+    "lineRange": "766",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/hfMetadata.test.ts",
+    "lineRange": "24",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/hfMetadata.test.ts",
+    "lineRange": "25",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/hfMetadata.test.ts",
+    "lineRange": "26",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/hfMetadata.test.ts",
+    "lineRange": "27",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.VIDEO",
+    "description": "Hardcoded magic string \"video\" duplicates production constant 'TYPES.VIDEO'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"video\" with TYPES.VIDEO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/hfMetadata.test.ts",
+    "lineRange": "28",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.PDF",
+    "description": "Hardcoded magic string \"pdf\" duplicates production constant 'TYPES.PDF'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"pdf\" with TYPES.PDF."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/hfMetadata.test.ts",
+    "lineRange": "29",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.EMBEDDING",
+    "description": "Hardcoded magic string \"embedding\" duplicates production constant 'TYPES.EMBEDDING'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"embedding\" with TYPES.EMBEDDING."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/hfMetadata.test.ts",
+    "lineRange": "42",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.CONVERSATION",
+    "description": "Hardcoded magic string \"conversation\" duplicates production constant 'MODEL_TYPES.CONVERSATION'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"conversation\" with MODEL_TYPES.CONVERSATION."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/hfMetadata.test.ts",
+    "lineRange": "197",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.VIDEO",
+    "description": "Hardcoded magic string \"video\" duplicates production constant 'TYPES.VIDEO'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"video\" with TYPES.VIDEO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/hfMetadata.test.ts",
+    "lineRange": "214",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/imageToText.test.ts",
+    "lineRange": "66",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/infrastructureRoutes.test.ts",
+    "lineRange": "48",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/infrastructureRoutes.test.ts",
+    "lineRange": "49",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/infrastructureRoutes.test.ts",
+    "lineRange": "128",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/infrastructureRoutes.test.ts",
+    "lineRange": "148",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/infrastructureRoutes.test.ts",
+    "lineRange": "224",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → COLLECTIONS.BENCHMARKS",
+    "description": "Hardcoded magic string \"benchmarks\" duplicates production constant 'COLLECTIONS.BENCHMARKS'.",
+    "fix": "Import { COLLECTIONS } from '../src/constants.ts' and replace \"benchmarks\" with COLLECTIONS.BENCHMARKS."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/infrastructureRoutes.test.ts",
+    "lineRange": "461",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "5",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "6",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "7",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "8",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.VIDEO",
+    "description": "Hardcoded magic string \"video\" duplicates production constant 'TYPES.VIDEO'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"video\" with TYPES.VIDEO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "9",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.PDF",
+    "description": "Hardcoded magic string \"pdf\" duplicates production constant 'TYPES.PDF'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"pdf\" with TYPES.PDF."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "10",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.EMBEDDING",
+    "description": "Hardcoded magic string \"embedding\" duplicates production constant 'TYPES.EMBEDDING'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"embedding\" with TYPES.EMBEDDING."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "49",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "61",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.VIDEO",
+    "description": "Hardcoded magic string \"video\" duplicates production constant 'TYPES.VIDEO'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"video\" with TYPES.VIDEO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "67",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "78",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "102",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "110",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "116",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderCapabilities.test.ts",
+    "lineRange": "121",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "15",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "16",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OLLAMA",
+    "description": "Hardcoded magic string \"ollama\" duplicates production constant 'PROVIDERS.OLLAMA'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"ollama\" with PROVIDERS.OLLAMA."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "34",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "34",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OLLAMA",
+    "description": "Hardcoded magic string \"ollama\" duplicates production constant 'PROVIDERS.OLLAMA'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"ollama\" with PROVIDERS.OLLAMA."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "86",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "88",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "94",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "95",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OLLAMA",
+    "description": "Hardcoded magic string \"ollama\" duplicates production constant 'PROVIDERS.OLLAMA'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"ollama\" with PROVIDERS.OLLAMA."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "96",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "102",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "103",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "109",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "110",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OLLAMA",
+    "description": "Hardcoded magic string \"ollama\" duplicates production constant 'PROVIDERS.OLLAMA'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"ollama\" with PROVIDERS.OLLAMA."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "116",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "117",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OLLAMA",
+    "description": "Hardcoded magic string \"ollama\" duplicates production constant 'PROVIDERS.OLLAMA'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"ollama\" with PROVIDERS.OLLAMA."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "117",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OLLAMA",
+    "description": "Hardcoded magic string \"ollama\" duplicates production constant 'PROVIDERS.OLLAMA'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"ollama\" with PROVIDERS.OLLAMA."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "118",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "132",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "139",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "139",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OLLAMA",
+    "description": "Hardcoded magic string \"ollama\" duplicates production constant 'PROVIDERS.OLLAMA'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"ollama\" with PROVIDERS.OLLAMA."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "145",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "156",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "198",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "198",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.VIDEO",
+    "description": "Hardcoded magic string \"video\" duplicates production constant 'TYPES.VIDEO'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"video\" with TYPES.VIDEO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "198",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "199",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.CONVERSATION",
+    "description": "Hardcoded magic string \"conversation\" duplicates production constant 'MODEL_TYPES.CONVERSATION'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"conversation\" with MODEL_TYPES.CONVERSATION."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "208",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.CONVERSATION",
+    "description": "Hardcoded magic string \"conversation\" duplicates production constant 'MODEL_TYPES.CONVERSATION'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"conversation\" with MODEL_TYPES.CONVERSATION."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "217",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.EMBED",
+    "description": "Hardcoded magic string \"embed\" duplicates production constant 'MODEL_TYPES.EMBED'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"embed\" with MODEL_TYPES.EMBED."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineRange": "217",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.CONVERSATION",
+    "description": "Hardcoded magic string \"conversation\" duplicates production constant 'MODEL_TYPES.CONVERSATION'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"conversation\" with MODEL_TYPES.CONVERSATION."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "6",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "7",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "8",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "9",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.VIDEO",
+    "description": "Hardcoded magic string \"video\" duplicates production constant 'TYPES.VIDEO'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"video\" with TYPES.VIDEO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "10",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.PDF",
+    "description": "Hardcoded magic string \"pdf\" duplicates production constant 'TYPES.PDF'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"pdf\" with TYPES.PDF."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "11",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.EMBEDDING",
+    "description": "Hardcoded magic string \"embedding\" duplicates production constant 'TYPES.EMBEDDING'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"embedding\" with TYPES.EMBEDDING."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "56",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.CONVERSATION",
+    "description": "Hardcoded magic string \"conversation\" duplicates production constant 'MODEL_TYPES.CONVERSATION'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"conversation\" with MODEL_TYPES.CONVERSATION."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "75",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.EMBEDDING",
+    "description": "Hardcoded magic string \"embedding\" duplicates production constant 'TYPES.EMBEDDING'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"embedding\" with TYPES.EMBEDDING."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "79",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.EMBED",
+    "description": "Hardcoded magic string \"embed\" duplicates production constant 'MODEL_TYPES.EMBED'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"embed\" with MODEL_TYPES.EMBED."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "80",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "81",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.EMBEDDING",
+    "description": "Hardcoded magic string \"embedding\" duplicates production constant 'TYPES.EMBEDDING'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"embedding\" with TYPES.EMBEDDING."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "97",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.CONVERSATION",
+    "description": "Hardcoded magic string \"conversation\" duplicates production constant 'MODEL_TYPES.CONVERSATION'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"conversation\" with MODEL_TYPES.CONVERSATION."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "110",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderNormalizers.test.ts",
+    "lineRange": "129",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.CONVERSATION",
+    "description": "Hardcoded magic string \"conversation\" duplicates production constant 'MODEL_TYPES.CONVERSATION'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"conversation\" with MODEL_TYPES.CONVERSATION."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localTools.test.ts",
+    "lineRange": "105",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineRange": "35",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineRange": "48",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineRange": "59",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineRange": "71",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineRange": "83",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineRange": "95",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.VLLM",
+    "description": "Hardcoded magic string \"vllm\" duplicates production constant 'PROVIDERS.VLLM'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"vllm\" with PROVIDERS.VLLM."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/loggerContextTags.test.ts",
+    "lineRange": "106",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.VLLM",
+    "description": "Hardcoded magic string \"vllm\" duplicates production constant 'PROVIDERS.VLLM'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"vllm\" with PROVIDERS.VLLM."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mcpClientService.test.ts",
+    "lineRange": "159",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mcpClientService.test.ts",
+    "lineRange": "173",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mcpClientService.test.ts",
+    "lineRange": "183",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mcpClientService.test.ts",
+    "lineRange": "195",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaSynthesisRoutes.test.ts",
+    "lineRange": "95",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaSynthesisRoutes.test.ts",
+    "lineRange": "223",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.EMBEDDING",
+    "description": "Hardcoded magic string \"embedding\" duplicates production constant 'TYPES.EMBEDDING'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"embedding\" with TYPES.EMBEDDING."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaSynthesisRoutes.test.ts",
+    "lineRange": "236",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.EMBEDDING",
+    "description": "Hardcoded magic string \"embedding\" duplicates production constant 'TYPES.EMBEDDING'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"embedding\" with TYPES.EMBEDDING."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities-adversarial.test.ts",
+    "lineRange": "91",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "106",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "107",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "108",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "109",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "110",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "111",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "112",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "113",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "117",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "118",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "122",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.PDF",
+    "description": "Hardcoded magic string \"pdf\" duplicates production constant 'TYPES.PDF'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"pdf\" with TYPES.PDF."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "126",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "127",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "128",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "129",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "130",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "131",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "132",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "133",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/mediaUtilities.test.ts",
+    "lineRange": "160",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "18",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "21",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "29",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "37",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "43",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "49",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "57",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "62",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "70",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "79",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "87",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "110",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "123",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "297",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "299",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "301",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "307",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "309",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "311",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/miscUtilities.test.ts",
+    "lineRange": "313",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/modalityToEmbedding.test.ts",
+    "lineRange": "45",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.EMBEDDING",
+    "description": "Hardcoded magic string \"embedding\" duplicates production constant 'TYPES.EMBEDDING'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"embedding\" with TYPES.EMBEDDING."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/modalityToEmbedding.test.ts",
+    "lineRange": "60",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.EMBEDDING",
+    "description": "Hardcoded magic string \"embedding\" duplicates production constant 'TYPES.EMBEDDING'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"embedding\" with TYPES.EMBEDDING."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/modalityToEmbedding.test.ts",
+    "lineRange": "74",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.EMBEDDING",
+    "description": "Hardcoded magic string \"embedding\" duplicates production constant 'TYPES.EMBEDDING'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"embedding\" with TYPES.EMBEDDING."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/openaiCompat.test.ts",
+    "lineRange": "275",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/openaiCompat.test.ts",
+    "lineRange": "306",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/openaiCompat.test.ts",
+    "lineRange": "339",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/openaiProvider.test.ts",
+    "lineRange": "17",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/openaiProvider.test.ts",
+    "lineRange": "230",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/openaiProvider.test.ts",
+    "lineRange": "236",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/openaiProvider.test.ts",
+    "lineRange": "501",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/openaiProvider.test.ts",
+    "lineRange": "542",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerHelpers.test.ts",
+    "lineRange": "137",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "57",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "59",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "60",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "74",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "84",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "91",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.VLLM",
+    "description": "Hardcoded magic string \"vllm\" duplicates production constant 'PROVIDERS.VLLM'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"vllm\" with PROVIDERS.VLLM."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "97",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OLLAMA",
+    "description": "Hardcoded magic string \"ollama\" duplicates production constant 'PROVIDERS.OLLAMA'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"ollama\" with PROVIDERS.OLLAMA."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "99",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LLAMA_CPP",
+    "description": "Hardcoded magic string \"llama-cpp\" duplicates production constant 'PROVIDERS.LLAMA_CPP'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"llama-cpp\" with PROVIDERS.LLAMA_CPP."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "106",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "108",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "119",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "131",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "133",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.VLLM",
+    "description": "Hardcoded magic string \"vllm\" duplicates production constant 'PROVIDERS.VLLM'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"vllm\" with PROVIDERS.VLLM."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "137",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OLLAMA",
+    "description": "Hardcoded magic string \"ollama\" duplicates production constant 'PROVIDERS.OLLAMA'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"ollama\" with PROVIDERS.OLLAMA."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "162",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "163",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.VLLM",
+    "description": "Hardcoded magic string \"vllm\" duplicates production constant 'PROVIDERS.VLLM'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"vllm\" with PROVIDERS.VLLM."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "169",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OLLAMA",
+    "description": "Hardcoded magic string \"ollama\" duplicates production constant 'PROVIDERS.OLLAMA'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"ollama\" with PROVIDERS.OLLAMA."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "170",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LLAMA_CPP",
+    "description": "Hardcoded magic string \"llama-cpp\" duplicates production constant 'PROVIDERS.LLAMA_CPP'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"llama-cpp\" with PROVIDERS.LLAMA_CPP."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "176",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "178",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "183",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OLLAMA",
+    "description": "Hardcoded magic string \"ollama\" duplicates production constant 'PROVIDERS.OLLAMA'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"ollama\" with PROVIDERS.OLLAMA."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "193",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "197",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/providerInstanceRegistry.test.ts",
+    "lineRange": "197",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.LM_STUDIO",
+    "description": "Hardcoded magic string \"lm-studio\" duplicates production constant 'PROVIDERS.LM_STUDIO'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"lm-studio\" with PROVIDERS.LM_STUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/settingsService.test.ts",
+    "lineRange": "64",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/settingsService.test.ts",
+    "lineRange": "73",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/settingsService.test.ts",
+    "lineRange": "83",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/settingsService.test.ts",
+    "lineRange": "85",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/settingsService.test.ts",
+    "lineRange": "121",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/settingsService.test.ts",
+    "lineRange": "123",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/settingsService.test.ts",
+    "lineRange": "132",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/settingsService.test.ts",
+    "lineRange": "133",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/settingsService.test.ts",
+    "lineRange": "155",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/settingsService.test.ts",
+    "lineRange": "162",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.OPENAI",
+    "description": "Hardcoded magic string \"openai\" duplicates production constant 'PROVIDERS.OPENAI'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"openai\" with PROVIDERS.OPENAI."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/settingsService.test.ts",
+    "lineRange": "178",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/settingsService.test.ts",
+    "lineRange": "185",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/settingsService.test.ts",
+    "lineRange": "215",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/sseUtilities.test.ts",
+    "lineRange": "156",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/sseUtilities.test.ts",
+    "lineRange": "367",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/streamChunkDispatcher.test.ts",
+    "lineRange": "533",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/streamChunkDispatcher.test.ts",
+    "lineRange": "543",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/systemPromptAssembler.test.ts",
+    "lineRange": "119",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/systemPromptAssembler.test.ts",
+    "lineRange": "120",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/systemPromptAssembler.test.ts",
+    "lineRange": "128",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/systemPromptAssembler.test.ts",
+    "lineRange": "129",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/textToImage.test.ts",
+    "lineRange": "60",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/textToImage.test.ts",
+    "lineRange": "176",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/textToText.test.ts",
+    "lineRange": "62",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "68",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "69",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "502",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "529",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "544",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "557",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "573",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "586",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "612",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "628",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "646",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "693",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "893",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "916",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "929",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "940",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkingMode.test.ts",
+    "lineRange": "961",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkTagParser.test.ts",
+    "lineRange": "60",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkTagParser.test.ts",
+    "lineRange": "62",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkTagParser.test.ts",
+    "lineRange": "72",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkTagParser.test.ts",
+    "lineRange": "82",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkTagParser.test.ts",
+    "lineRange": "92",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkTagParser.test.ts",
+    "lineRange": "94",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkTagParser.test.ts",
+    "lineRange": "108",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkTagParser.test.ts",
+    "lineRange": "116",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thinkTagParser.test.ts",
+    "lineRange": "128",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thoughtStructure.test.ts",
+    "lineRange": "57",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thoughtStructure.test.ts",
+    "lineRange": "58",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thoughtStructure.test.ts",
+    "lineRange": "255",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/thoughtStructure.test.ts",
+    "lineRange": "256",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/toolAvailabilityAndEnablement.test.ts",
+    "lineRange": "208",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/toolAvailabilityAndEnablement.test.ts",
+    "lineRange": "213",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/toolAvailabilityAndEnablement.test.ts",
+    "lineRange": "842",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/toolAvailabilityAndEnablement.test.ts",
+    "lineRange": "856",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/toolCountSync.test.ts",
+    "lineRange": "169",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/toolCountSync.test.ts",
+    "lineRange": "174",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/toolOrchestratorService.test.ts",
+    "lineRange": "76",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/toolOrchestratorService.test.ts",
+    "lineRange": "80",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineRange": "15",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineRange": "16",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → MODEL_TYPES.AUDIO",
+    "description": "Hardcoded magic string \"audio\" duplicates production constant 'MODEL_TYPES.AUDIO'.",
+    "fix": "Import { MODEL_TYPES } from '../src/constants.ts' and replace \"audio\" with MODEL_TYPES.AUDIO."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowAssembler.test.ts",
+    "lineRange": "82",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.IMAGE",
+    "description": "Hardcoded magic string \"image\" duplicates production constant 'TYPES.IMAGE'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"image\" with TYPES.IMAGE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "56",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "56",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "57",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "57",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "68",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "69",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "73",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "73",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "74",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "74",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "107",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "108",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "111",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "111",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "139",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "140",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "143",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowExecution.test.ts",
+    "lineRange": "143",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowMemoryService-adversarial.test.ts",
+    "lineRange": "45",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowMemoryService.test.ts",
+    "lineRange": "98",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowsRoutes.test.ts",
+    "lineRange": "126",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowsRoutes.test.ts",
+    "lineRange": "127",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowsRoutes.test.ts",
+    "lineRange": "192",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/workflowsRoutes.test.ts",
+    "lineRange": "216",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → TYPES.TEXT",
+    "description": "Hardcoded magic string \"text\" duplicates production constant 'TYPES.TEXT'.",
+    "fix": "Import { TYPES } from '../src/constants.ts' and replace \"text\" with TYPES.TEXT."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/scratch/mid-conv-system-message.ts",
+    "lineRange": "96",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/scratch/mid-conv-system-message.ts",
+    "lineRange": "104",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.ANTHROPIC",
+    "description": "Hardcoded magic string \"anthropic\" duplicates production constant 'PROVIDERS.ANTHROPIC'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"anthropic\" with PROVIDERS.ANTHROPIC."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/scratch/mid-conv-system-message.ts",
+    "lineRange": "177",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/scratch/mid-conv-system-message.ts",
+    "lineRange": "185",
+    "severity": "🟡",
+    "sourceOfTruth": "src/constants.ts → PROVIDERS.GOOGLE",
+    "description": "Hardcoded magic string \"google\" duplicates production constant 'PROVIDERS.GOOGLE'.",
+    "fix": "Import { PROVIDERS } from '../src/constants.ts' and replace \"google\" with PROVIDERS.GOOGLE."
+  }
+]

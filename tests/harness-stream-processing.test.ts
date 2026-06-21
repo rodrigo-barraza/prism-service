@@ -122,7 +122,7 @@ describe('BaseAgenticHarness processStreamChunk — adversarial chunks', () => {
     (context as any).signal = controller.signal;
 
     const pass = createMockPassState();
-    const result = harness.processStreamChunk('text', pass, new Set());
+    const result = harness.processStreamChunk(TYPES.TEXT, pass, new Set());
     expect(result.action).toBe('break');
   });
 
@@ -372,7 +372,7 @@ describe('Anthropic provider prepareMessages edge cases (via generateTextStream)
       {
         role: 'assistant',
         content: [
-          { type: 'text', text: 'Let me search for that.' },
+          { type: TYPES.TEXT, text: 'Let me search for that.' },
           { type: 'tool_use', id: 'tc-orphan', name: 'search', input: {} },
         ],
       },
@@ -388,7 +388,7 @@ describe('Anthropic provider prepareMessages edge cases (via generateTextStream)
     // After stripping:
     const stripped = assistantContent.filter((block: any) => block.type !== 'tool_use');
     expect(stripped.length).toBe(1);
-    expect(stripped[0].type).toBe('text');
+    expect(stripped[0].type).toBe(TYPES.TEXT);
   });
 
   it('should handle tool_result deduplication — same tool_use_id appears twice', () => {
@@ -544,9 +544,9 @@ describe('Display segment tracking — interleaved thinking/text/tools', () => {
     // Should produce 4 segments in order: thinking, text, thinking, text
     expect(state.displaySegments.length).toBe(4);
     expect(state.displaySegments[0].type).toBe('thinking');
-    expect(state.displaySegments[1].type).toBe('text');
+    expect(state.displaySegments[1].type).toBe(TYPES.TEXT);
     expect(state.displaySegments[2].type).toBe('thinking');
-    expect(state.displaySegments[3].type).toBe('text');
+    expect(state.displaySegments[3].type).toBe(TYPES.TEXT);
 
     // Fragments should be properly indexed
     expect(state.displayThinkingFragments.length).toBe(2);
@@ -611,6 +611,7 @@ describe('AgenticLoopState concurrent operations — idempotency', () => {
 // ────────────────────────────────────────────────────────────────
 
 import ToolContext from '../src/services/ToolContext.ts';
+import { TYPES } from "../src/constants";
 
 describe('checkAndApplyToolSetChanges — dynamic tool activation doc sync', () => {
   let BaseAgenticHarness: any;

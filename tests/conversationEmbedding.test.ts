@@ -4,7 +4,7 @@ import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
 import ConversationEmbeddingService from "../src/services/ConversationEmbeddingService.ts";
 import EmbeddingService from "../src/services/EmbeddingService.ts";
 import searchConversations from "../src/services/local-tools/ConversationSearchTool.ts";
-import { COLLECTIONS } from "../src/constants.ts";
+import { COLLECTIONS, MODEL_TYPES } from "../src/constants.ts";
 
 describe("ConversationEmbeddingService & ConversationSearchTool", () => {
   let mockUpdateOne: any;
@@ -115,7 +115,7 @@ describe("ConversationEmbeddingService & ConversationSearchTool", () => {
     });
 
     it("should embed and persist when cooldown passed or null", async () => {
-      const embedSpy = vi.spyOn(EmbeddingService, "embed").mockResolvedValue([0.5, 0.6, 0.7]);
+      const embedSpy = vi.spyOn(EmbeddingService, MODEL_TYPES.EMBED).mockResolvedValue([0.5, 0.6, 0.7]);
 
       await ConversationEmbeddingService.generateAndPersist({
         conversationId: "conv-1",
@@ -161,7 +161,7 @@ describe("ConversationEmbeddingService & ConversationSearchTool", () => {
 
   describe("ConversationSearchTool", () => {
     it("should execute search and return matches sorted by similarity", async () => {
-      const embedSpy = vi.spyOn(EmbeddingService, "embed").mockResolvedValue([0.1, 0.2, 0.3]);
+      const embedSpy = vi.spyOn(EmbeddingService, MODEL_TYPES.EMBED).mockResolvedValue([0.1, 0.2, 0.3]);
       
       mockFind.mockReturnValueOnce({
         sort: vi.fn().mockReturnThis(),

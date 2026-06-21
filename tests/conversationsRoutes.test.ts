@@ -95,7 +95,7 @@ describe('ConversationsRoutes Integration', () => {
           aggregate: () => createMockQuery([]),
         };
       }
-      if (name === 'workflows') {
+      if (name === COLLECTIONS.WORKFLOWS) {
         return {
           find: () => createMockQuery([]),
         };

@@ -12,7 +12,7 @@ vi.mock('../src/wrappers/MongoWrapper.ts', () => {
 
 import SettingsService from '../src/services/SettingsService.ts';
 import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
-import { COLLECTIONS } from '../src/constants.ts';
+import { COLLECTIONS, PROVIDERS } from '../src/constants.ts';
 
 describe('SettingsService Unit Tests', () => {
   let mockSettingsDoc: any = null;
@@ -61,7 +61,7 @@ describe('SettingsService Unit Tests', () => {
     it('should return defaults if no settings document exists in the database', async () => {
       const settings = await SettingsService.get();
       expect(settings.security.allowEnvFiles).toBe(false);
-      expect(settings.creative?.imageProvider).toBe('google');
+      expect(settings.creative?.imageProvider).toBe(PROVIDERS.GOOGLE);
       expect(settings.memory.extractionProvider).toBe('');
     });
 
@@ -70,7 +70,7 @@ describe('SettingsService Unit Tests', () => {
         _key: 'global',
         data: {
           memory: {
-            extractionProvider: 'openai',
+            extractionProvider: PROVIDERS.OPENAI,
             extractionModel: 'gpt-4',
           },
           security: {
@@ -80,9 +80,9 @@ describe('SettingsService Unit Tests', () => {
       };
 
       const settings = await SettingsService.get();
-      expect(settings.memory.extractionProvider).toBe('openai');
+      expect(settings.memory.extractionProvider).toBe(PROVIDERS.OPENAI);
       expect(settings.memory.extractionModel).toBe('gpt-4');
-      expect(settings.creative?.imageProvider).toBe('google');
+      expect(settings.creative?.imageProvider).toBe(PROVIDERS.GOOGLE);
       expect(settings.security.allowEnvFiles).toBe(true);
 
       const findOneSpy = vi.spyOn(mockDbCollection, 'findOne');
@@ -118,9 +118,9 @@ describe('SettingsService Unit Tests', () => {
           allowEnvFiles: true,
         },
         memory: {
-          extractionProvider: 'anthropic',
+          extractionProvider: PROVIDERS.ANTHROPIC,
           extractionModel: 'claude-3',
-          consolidationProvider: 'google',
+          consolidationProvider: PROVIDERS.GOOGLE,
           consolidationModel: 'gemini-3.5-flash',
           embeddingProvider: 'cohere',
           embeddingModel: 'embed-english-v3.0',
@@ -129,8 +129,8 @@ describe('SettingsService Unit Tests', () => {
 
       const updatedSettings = await SettingsService.update(updateData);
       expect(updatedSettings.security.allowEnvFiles).toBe(true);
-      expect(updatedSettings.memory.extractionProvider).toBe('anthropic');
-      expect(updatedSettings.creative?.imageProvider).toBe('google');
+      expect(updatedSettings.memory.extractionProvider).toBe(PROVIDERS.ANTHROPIC);
+      expect(updatedSettings.creative?.imageProvider).toBe(PROVIDERS.GOOGLE);
 
       expect(updateOneCalls).toHaveLength(1);
       expect(updateOneCalls[0].query).toEqual({ _key: 'global' });
@@ -152,14 +152,14 @@ describe('SettingsService Unit Tests', () => {
         _key: 'global',
         data: {
           memory: {
-            extractionProvider: 'openai',
+            extractionProvider: PROVIDERS.OPENAI,
             extractionModel: 'gpt-4o',
           },
         },
       };
 
       const config = await SettingsService.getMemoryModelConfig('extraction');
-      expect(config).toEqual({ provider: 'openai', model: 'gpt-4o' });
+      expect(config).toEqual({ provider: PROVIDERS.OPENAI, model: 'gpt-4o' });
     });
 
     it('should throw an error if configuration is incomplete', async () => {
@@ -175,14 +175,14 @@ describe('SettingsService Unit Tests', () => {
         _key: 'global',
         data: {
           somatic: {
-            emotionProvider: 'google',
+            emotionProvider: PROVIDERS.GOOGLE,
             emotionModel: 'gemini-1.5-flash',
           },
         },
       };
 
       const config = await SettingsService.getSomaticModelConfig();
-      expect(config).toEqual({ provider: 'google', model: 'gemini-1.5-flash' });
+      expect(config).toEqual({ provider: PROVIDERS.GOOGLE, model: 'gemini-1.5-flash' });
     });
 
     it('should return null if emotion configuration is not fully present', async () => {
@@ -212,7 +212,7 @@ describe('SettingsService Unit Tests', () => {
     it('should return defaults via getDefaults', () => {
       const defaults = SettingsService.getDefaults();
       expect(defaults.security.allowEnvFiles).toBe(false);
-      expect(defaults.creative?.imageProvider).toBe('google');
+      expect(defaults.creative?.imageProvider).toBe(PROVIDERS.GOOGLE);
     });
   });
 });

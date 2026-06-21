@@ -51,6 +51,7 @@ vi.mock('../src/services/RequestLogger.ts', () => ({
 }));
 
 import RequestLogger from '../src/services/RequestLogger.ts';
+import { PROVIDERS, TYPES, MODEL_TYPES } from "../src/constants";
 
 class TestHarness extends BaseAgenticHarness {
   public getContext() { return this.context; }
@@ -70,7 +71,7 @@ function createMockContext(overrides?: Partial<AgenticContext>): AgenticContext 
     username: 'test-user',
     agentConversationId: 'agent-conv-123',
     conversationId: 'conv-456',
-    providerName: 'google',
+    providerName: PROVIDERS.GOOGLE,
     resolvedModel: 'gemini-3-flash',
     emit: vi.fn(),
     signal: null,
@@ -155,7 +156,7 @@ describe('BaseAgenticHarness Helper Methods', () => {
       const allowedTools = new Set(['read_file']);
 
       const result = harness.processStreamChunk(
-        { type: 'text', content: 'hello' },
+        { type: TYPES.TEXT, content: 'hello' },
         passState,
         allowedTools,
       );
@@ -338,7 +339,7 @@ describe('BaseAgenticHarness Helper Methods', () => {
       const allowedTools = new Set<string>();
 
       const result = harness.processStreamChunk(
-        { type: 'audio', data: 'base64audio', mimeType: 'audio/pcm;rate=24000' },
+        { type: MODEL_TYPES.AUDIO, data: 'base64audio', mimeType: 'audio/pcm;rate=24000' },
         passState,
         allowedTools,
       );
@@ -594,7 +595,7 @@ describe('BaseAgenticHarness Helper Methods', () => {
         'agent-conv-123',
         'pass-req-1',
         expect.objectContaining({
-          provider: 'google',
+          provider: PROVIDERS.GOOGLE,
           model: 'gemini-3-flash',
           source: 'orchestrator',
         }),
@@ -736,7 +737,7 @@ describe('BaseAgenticHarness Helper Methods', () => {
         expect.objectContaining({
           endpoint: '/agent',
           operation: 'agent:iteration',
-          provider: 'google',
+          provider: PROVIDERS.GOOGLE,
           model: 'gemini-3-flash',
           project: 'test-project',
           username: 'test-user',
@@ -761,9 +762,9 @@ describe('BaseAgenticHarness Helper Methods', () => {
       const state = harness.getState();
       expect(state.displaySegments).toHaveLength(4);
       expect(state.displaySegments[0].type).toBe('thinking');
-      expect(state.displaySegments[1].type).toBe('text');
+      expect(state.displaySegments[1].type).toBe(TYPES.TEXT);
       expect(state.displaySegments[2].type).toBe('thinking');
-      expect(state.displaySegments[3].type).toBe('text');
+      expect(state.displaySegments[3].type).toBe(TYPES.TEXT);
 
       expect(state.displayThinkingFragments).toHaveLength(2);
       expect(state.displayTextFragments).toHaveLength(2);

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { PROVIDERS } from "../src/constants";
 
 const mockBaseLogger = {
   info: vi.fn(),
@@ -32,7 +33,7 @@ beforeEach(async () => {
 
 describe('logger.provider', () => {
   it('logs with provider name and action when no request context', () => {
-    logger.provider('lm-studio', 'Model loaded');
+    logger.provider(PROVIDERS.LM_STUDIO, 'Model loaded');
     expect(mockBaseLogger.info).toHaveBeenCalledOnce();
     const logMessage = mockBaseLogger.info.mock.calls[0][0];
     expect(logMessage).toContain('[lm-studio]');
@@ -45,7 +46,7 @@ describe('logger.provider', () => {
       username: 'rodrigo',
       clientIp: null,
     });
-    logger.provider('openai', 'Request sent');
+    logger.provider(PROVIDERS.OPENAI, 'Request sent');
     const logMessage = mockBaseLogger.info.mock.calls[0][0];
     expect(logMessage).toContain('[prism/rodrigo]');
   });
@@ -56,7 +57,7 @@ describe('logger.provider', () => {
       username: 'any',
       clientIp: null,
     });
-    logger.provider('openai', 'Request sent');
+    logger.provider(PROVIDERS.OPENAI, 'Request sent');
     const logMessage = mockBaseLogger.info.mock.calls[0][0];
     expect(logMessage).toContain('[prism]');
     expect(logMessage).not.toContain('/any');
@@ -68,7 +69,7 @@ describe('logger.provider', () => {
       username: 'rodrigo',
       clientIp: null,
     });
-    logger.provider('anthropic', 'Streaming');
+    logger.provider(PROVIDERS.ANTHROPIC, 'Streaming');
     const logMessage = mockBaseLogger.info.mock.calls[0][0];
     expect(logMessage).toContain('[rodrigo]');
     expect(logMessage).not.toContain('any/');
@@ -80,7 +81,7 @@ describe('logger.provider', () => {
       username: 'any',
       clientIp: null,
     });
-    logger.provider('google', 'Embedding');
+    logger.provider(PROVIDERS.GOOGLE, 'Embedding');
     const logMessage = mockBaseLogger.info.mock.calls[0][0];
     expect(logMessage).not.toContain('[any]');
     expect(logMessage).toBe('[google] Embedding');
@@ -92,7 +93,7 @@ describe('logger.provider', () => {
       username: 'rodrigo',
       clientIp: '192.168.1.1',
     });
-    logger.provider('vllm', 'Inference');
+    logger.provider(PROVIDERS.VLLM, 'Inference');
     const logMessage = mockBaseLogger.info.mock.calls[0][0];
     expect(logMessage).toContain('(192.168.1.1)');
   });
@@ -103,7 +104,7 @@ describe('logger.provider', () => {
       username: 'rodrigo',
       clientIp: null,
     });
-    logger.provider('vllm', 'Inference');
+    logger.provider(PROVIDERS.VLLM, 'Inference');
     const logMessage = mockBaseLogger.info.mock.calls[0][0];
     expect(logMessage).not.toContain('(');
   });

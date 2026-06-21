@@ -36,7 +36,7 @@ vi.mock("../src/services/ConversationService.ts", () => ({
   default: {
     appendMessages: vi.fn(),
     setGenerating: vi.fn(),
-    getSessionStats: vi.fn(),
+    getConversationStats: vi.fn(),
   },
 }));
 
@@ -55,7 +55,7 @@ vi.mock("../src/services/SettingsService.ts", () => ({
   },
 }));
 
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, TYPES, MODEL_TYPES } from "../src/constants.ts";
 
 
 vi.mock("../src/providers/index.ts", () => ({
@@ -153,7 +153,7 @@ describe("buildJsonResponseFromEvents", () => {
   it("should collect images from image events", () => {
     const events: TestEvent[] = [
       {
-        type: "image",
+        type: TYPES.IMAGE,
         data: "base64data",
         mimeType: "image/png",
         minioRef: "minio://images/1.png",
@@ -364,7 +364,7 @@ describe("buildJsonResponseFromEvents", () => {
   it("should collect audio events and extract audioRef from done event", () => {
     const events: TestEvent[] = [
       {
-        type: "audio",
+        type: MODEL_TYPES.AUDIO,
         data: "audioBase64",
         mimeType: "audio/wav",
         minioRef: "minio://audio/1.wav",
