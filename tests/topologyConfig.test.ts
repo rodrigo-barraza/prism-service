@@ -688,4 +688,337 @@ describe("TopologyConfig Test Suite", () => {
       expect(continueSubAgentMock).not.toHaveBeenCalled();
     });
   });
+
+  // ── DivideAndConquerRouter: Recursive Decomposition ───────────────────
+
+  describe("DivideAndConquerRouter — Recursive Decomposition", () => {
+    it("should NOT trigger recursive decomposition when maxRecursionDepth=1 (default)", async () => {
+      const router = new DivideAndConquerRouter();
+      const members = [
+        { description: "Implement feature", prompt: "Build the complete user authentication module" },
+      ];
+
+      mockGenerateText
+        .mockResolvedValueOnce({
+          text: JSON.stringify([
+            { description: "Subtask 1", prompt: "Create auth types" },
+            { description: "Subtask 2", prompt: "Implement auth service" },
+          ]),
+          usage: { inputTokens: 100, outputTokens: 50 },
+        })
+        .mockResolvedValueOnce({
+          text: "Synthesized auth module output.",
+          usage: { inputTokens: 200, outputTokens: 100 },
+        });
+
+      await router.execute(
+        "test-team", members, orchestratorContext,
+        spawnSubAgentMock, continueSubAgentMock,
+        { maxRecursionDepth: 1 },
+      );
+
+      // 1 decomposition LLM call + 1 synthesis call = 2 generateText calls
+      // No recursive decomposition — subtasks go straight to spawnSubAgent
+      expect(mockGenerateText).toHaveBeenCalledTimes(2);
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("should trigger recursive decomposition when maxRecursionDepth=2 and prompt exceeds threshold", async () => {
+      const router = new DivideAndConquerRouter();
+      const longPrompt = "A".repeat(400);
+      const members = [
+        { description: "Complex task", prompt: longPrompt },
+      ];
+
+      let generateTextCallCount = 0;
+      mockGenerateText.mockImplementation(async () => {
+        generateTextCallCount++;
+        if (generateTextCallCount === 1) {
+          // Top-level decomposition — produces 2 subtasks with long prompts
+          return {
+            text: JSON.stringify([
+              { description: "Sub A", prompt: "B".repeat(350) },
+              { description: "Sub B", prompt: "C".repeat(350) },
+            ]),
+            usage: { inputTokens: 100, outputTokens: 50 },
+          };
+        }
+        if (generateTextCallCount <= 3) {
+          // Recursive decompositions for Sub A and Sub B
+          return {
+            text: JSON.stringify([
+              { description: "Sub-sub 1", prompt: "Leaf task 1" },
+              { description: "Sub-sub 2", prompt: "Leaf task 2" },
+            ]),
+            usage: { inputTokens: 50, outputTokens: 30 },
+          };
+        }
+        // All synthesis calls
+        return {
+          text: "Synthesized result.",
+          usage: { inputTokens: 100, outputTokens: 50 },
+        };
+      });
+
+      await router.execute(
+        "test-team", members, orchestratorContext,
+        spawnSubAgentMock, continueSubAgentMock,
+        { maxRecursionDepth: 2, recursionComplexityThreshold: 300 },
+      );
+
+      // Recursive decomposition should have triggered for both subtasks
+      // Top-level decomposition (1) + 2 recursive decompositions + synthesis calls
+      expect(generateTextCallCount).toBeGreaterThanOrEqual(4);
+      // Leaf subtasks should have been spawned
+      expect(spawnSubAgentMock.mock.calls.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it("should cap recursion at maxRecursionDepth=3 regardless of config", async () => {
+      const router = new DivideAndConquerRouter();
+      const members = [
+        { description: "Deep task", prompt: "D".repeat(500) },
+      ];
+
+      let decompositionCallCount = 0;
+      mockGenerateText.mockImplementation(async () => {
+        decompositionCallCount++;
+        // Always produce 2 subtasks with long prompts (would trigger infinite recursion without cap)
+        if (decompositionCallCount <= 10) {
+          return {
+            text: JSON.stringify([
+              { description: `Level ${decompositionCallCount} A`, prompt: "E".repeat(400) },
+              { description: `Level ${decompositionCallCount} B`, prompt: "F".repeat(400) },
+            ]),
+            usage: { inputTokens: 50, outputTokens: 30 },
+          };
+        }
+        return {
+          text: "Final synthesis.",
+          usage: { inputTokens: 50, outputTokens: 30 },
+        };
+      });
+
+      await router.execute(
+        "test-team", members, orchestratorContext,
+        spawnSubAgentMock, continueSubAgentMock,
+        { maxRecursionDepth: 99, recursionComplexityThreshold: 100 },
+      );
+
+      // maxRecursionDepth is clamped to MAXIMUM_ALLOWED_RECURSION_DEPTH (3)
+      // So recursion should stop at depth 3 — not infinite
+      // The total spawn calls should be bounded
+      expect(spawnSubAgentMock.mock.calls.length).toBeLessThanOrEqual(50);
+    });
+
+    it("should fall back to direct execution when recursive decomposition fails", async () => {
+      const router = new DivideAndConquerRouter();
+      const members = [
+        { description: "Fail task", prompt: "G".repeat(400) },
+      ];
+
+      let callIndex = 0;
+      mockGenerateText.mockImplementation(async () => {
+        callIndex++;
+        if (callIndex === 1) {
+          // Top-level decomposition succeeds
+          return {
+            text: JSON.stringify([
+              { description: "Subtask 1", prompt: "H".repeat(350) },
+            ]),
+            usage: { inputTokens: 50, outputTokens: 30 },
+          };
+        }
+        if (callIndex === 2) {
+          // Recursive decomposition throws
+          throw new Error("Provider rate limit exceeded");
+        }
+        return {
+          text: "Synthesis.",
+          usage: { inputTokens: 50, outputTokens: 30 },
+        };
+      });
+
+      const results = await router.execute(
+        "test-team", members, orchestratorContext,
+        spawnSubAgentMock, continueSubAgentMock,
+        { maxRecursionDepth: 2, recursionComplexityThreshold: 300 },
+      );
+
+      // Should not crash — falls back to direct spawnSubAgent
+      expect(spawnSubAgentMock).toHaveBeenCalled();
+      const hasError = results.some((result) => "error" in result && result.error !== "not executed");
+      expect(hasError).toBe(false);
+    });
+
+    it("should skip recursion when prompt is below complexity threshold", async () => {
+      const router = new DivideAndConquerRouter();
+      const members = [
+        { description: "Simple task", prompt: "Short prompt" },
+      ];
+
+      mockGenerateText
+        .mockResolvedValueOnce({
+          text: JSON.stringify([
+            { description: "Subtask 1", prompt: "Brief 1" },
+            { description: "Subtask 2", prompt: "Brief 2" },
+          ]),
+          usage: { inputTokens: 50, outputTokens: 30 },
+        })
+        .mockResolvedValueOnce({
+          text: "Synthesized.",
+          usage: { inputTokens: 50, outputTokens: 30 },
+        });
+
+      await router.execute(
+        "test-team", members, orchestratorContext,
+        spawnSubAgentMock, continueSubAgentMock,
+        { maxRecursionDepth: 3, recursionComplexityThreshold: 300 },
+      );
+
+      // No recursive decomposition — prompts are too short
+      // 1 decomposition + 1 synthesis = 2 LLM calls
+      expect(mockGenerateText).toHaveBeenCalledTimes(2);
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ── TournamentRouter: Automated Verification ──────────────────────────
+
+  describe("TournamentRouter — Automated Verification", () => {
+    it("should run verification phase when enableVerification=true", async () => {
+      const { TournamentRouter } = await import("../src/services/orchestrator/routers/TournamentRouter.ts");
+      const router = new TournamentRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+      ];
+
+      let spawnCallCount = 0;
+      spawnSubAgentMock.mockImplementation(async (assignment: OrchestratorSpawnParams) => {
+        spawnCallCount++;
+        if (assignment.description.startsWith("Verification")) {
+          return createMockResult(assignment.description, '"pass": true', `verifier-${spawnCallCount}`);
+        }
+        return createMockResult(
+          assignment.description || "",
+          `Completed: ${assignment.description}`,
+          `worker-${spawnCallCount}`,
+        );
+      });
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "**Winner:** Sub-Agent #1\n**Justification:** Task A was better.",
+        usage: { inputTokens: 200, outputTokens: 80 },
+      });
+
+      const results = await router.execute(
+        "test-team", members, orchestratorContext,
+        spawnSubAgentMock, continueSubAgentMock,
+        { enableVerification: true },
+      );
+
+      // 2 workers + 2 verifiers + judge = 5 total spawn calls (but judge is generateText)
+      expect(spawnSubAgentMock.mock.calls.length).toBeGreaterThanOrEqual(4);
+
+      // Judge prompt should contain verification markers
+      expect(mockGenerateText).toHaveBeenCalled();
+      const judgePrompt = mockGenerateText.mock.calls[0][0][0].content;
+      expect(judgePrompt).toContain("Verification");
+    });
+
+    it("should NOT run verification when enableVerification=false (default)", async () => {
+      const { TournamentRouter } = await import("../src/services/orchestrator/routers/TournamentRouter.ts");
+      const router = new TournamentRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+      ];
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "**Winner:** Sub-Agent #1",
+        usage: { inputTokens: 200, outputTokens: 80 },
+      });
+
+      await router.execute(
+        "test-team", members, orchestratorContext,
+        spawnSubAgentMock, continueSubAgentMock,
+      );
+
+      // 2 workers only — no verification spawns
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("should handle verification errors gracefully and mark candidates as unverified", async () => {
+      const { TournamentRouter } = await import("../src/services/orchestrator/routers/TournamentRouter.ts");
+      const router = new TournamentRouter();
+      const members = [
+        { description: "Task A", prompt: "Prompt A" },
+        { description: "Task B", prompt: "Prompt B" },
+      ];
+
+      let spawnCallCount = 0;
+      spawnSubAgentMock.mockImplementation(async (assignment: OrchestratorSpawnParams) => {
+        spawnCallCount++;
+        if (assignment.description.startsWith("Verification")) {
+          return { error: "Verification timed out" };
+        }
+        return createMockResult(
+          assignment.description || "",
+          `Completed: ${assignment.description}`,
+          `worker-${spawnCallCount}`,
+        );
+      });
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "**Winner:** Sub-Agent #1",
+        usage: { inputTokens: 200, outputTokens: 80 },
+      });
+
+      const results = await router.execute(
+        "test-team", members, orchestratorContext,
+        spawnSubAgentMock, continueSubAgentMock,
+        { enableVerification: true },
+      );
+
+      // Should not crash even with verification failures
+      expect(results.length).toBeGreaterThanOrEqual(2);
+      expect(mockGenerateText).toHaveBeenCalled();
+    });
+
+    it("should skip verification for candidates without file changes", async () => {
+      const { TournamentRouter } = await import("../src/services/orchestrator/routers/TournamentRouter.ts");
+      const router = new TournamentRouter();
+      const members = [
+        { description: "Research A", prompt: "Research prompt A" },
+        { description: "Research B", prompt: "Research prompt B" },
+      ];
+
+      spawnSubAgentMock.mockImplementation(async (assignment: OrchestratorSpawnParams) => ({
+        agent_id: `agent-${Math.random().toString(36).slice(2, 6)}`,
+        description: assignment.description || "",
+        status: "completed" as const,
+        result: `Result for ${assignment.description}`,
+        summary: "Done",
+        toolUses: 0,
+        durationMs: 50,
+        iterations: 1,
+        messages: [],
+        // No diff — research task
+      }));
+
+      mockGenerateText.mockResolvedValueOnce({
+        text: "**Winner:** Sub-Agent #1",
+        usage: { inputTokens: 200, outputTokens: 80 },
+      });
+
+      await router.execute(
+        "test-team", members, orchestratorContext,
+        spawnSubAgentMock, continueSubAgentMock,
+        { enableVerification: true },
+      );
+
+      // Only 2 worker spawns — verification skipped (no file changes)
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
+    });
+  });
 });

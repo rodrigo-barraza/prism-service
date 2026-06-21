@@ -108,28 +108,11 @@ function isStallResponse(
 /**
  * Peer-to-Peer (Mesh) Router — Multi-Agent Debate (MAD)
  *
- * Based on: "Improving Factuality and Reasoning in Language Models
+ * Paper: "Improving Factuality and Reasoning in Language Models
  * through Multiagent Debate" (arxiv.org/abs/2305.14325)
  *
- * Implements a turn-based conversational mesh where agents take turns on a
- * shared discussion thread. Unlike stateless spawn-per-turn, this router:
- *
- * 1. Spawns each agent ONCE on their first turn (with `preserveWorktree: true`)
- * 2. Continues the SAME agent instance on subsequent turns via `continueSubAgent`
- * 3. Preserves agent state: conversation history, worktree edits, CLI state
- * 4. Merges worktree changes between turns so agents see each other's file edits
- *
- * Agent identifiers use 0-based indexing (agent-0, agent-1, ...) to align
- * with LLM-natural naming conventions — LLMs default to 0-based from their
- * code-heavy training data, eliminating identity conflicts.
- *
- * Paper alignment:
- * - Multiple agents       → ✅ Multiple agents with configurable models/prompts
- * - Multi-round debate    → ✅ Turn-based mesh with shared discussion thread
- * - Convergence           → ✅ Stall detection terminates early when agents stop contributing
- * - Symmetric design      → ✅ All agents are equal participants in the mesh
- * - Stateless agents      → ✅ Extended: stateful session reuse via continueSubAgent
- * - Worktree merging      → ✅ Extended: agents can edit files and see each other's edits
+ * See TopologyRegistry.ts → TOPOLOGY_DEFINITIONS (id: "peer-to-peer")
+ * for full paper-alignment metadata and config option documentation.
  */
 export class PeerToPeerRouter implements TopologyRouter {
   async execute(

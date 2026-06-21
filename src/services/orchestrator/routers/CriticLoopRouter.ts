@@ -260,41 +260,11 @@ function detectDegenerationOfThought(
 /**
  * Critic Loop Router — Actor-Critic Iterative Refinement (MAR)
  *
- * Based on: "Self-Refine: Iterative Refinement with Self-Feedback"
+ * Paper: "Self-Refine: Iterative Refinement with Self-Feedback"
  * (arxiv.org/abs/2303.17651)
  *
- * Supports two modes via topologyConfig.actorCount:
- *
- * ## Council of Judges (actorCount=1, default)
- * 1. Actor spawns and executes the task (preserveWorktree: true)
- * 2. All critics spawn IN PARALLEL and evaluate the Actor's output independently
- * 3. Unanimous consensus required — ALL critics must PASS for the loop to terminate
- * 4. If any critic FAILs: all FAIL feedback is aggregated into a single revision prompt
- * 5. Actor continues with aggregated feedback via continueSubAgent
- * 6. Repeat until unanimous PASS or maximum rounds reached
- *
- * ## Jury (actorCount>1)
- * 1. N actors spawn IN PARALLEL, each producing a competing solution
- * 2. A judge evaluates all outputs, selects the best, and provides feedback
- * 3. If FAIL: the winning actor continues with the judge's feedback
- * 4. Repeat until PASS or maximum rounds reached
- * (Tournament phase → Critic Loop on the winner)
- *
- * TopologyConfig:
- * - actorCount (number, default: 1) — Number of competing actors. >1 enables Jury mode.
- * - maxRounds (number, default: 3) — Maximum evaluation/revision rounds.
- *
- * Members mapping:
- * - Council mode: members[0] = Actor, members[1+] = Critics
- * - Jury mode: members[0..actorCount-1] = Actors, members[actorCount+] = Critics (or auto-judge)
- *
- * Paper alignment:
- * - Generate (initial output)  → ✅ Actor agent produces initial output
- * - Feedback (critic)          → ✅ Extended: separate critic agent(s), not same-LLM self-critique
- * - Refine (incorporate)       → ✅ Actor continues with aggregated critic feedback
- * - Iterative loop             → ✅ Loops until unanimous PASS or maxRounds
- * - Single-LLM (paper)        → ✅ Extended to multi-agent: separate actor + critic roles/models
- * - Council / Jury modes       → ✅ Original extensions beyond paper scope
+ * See TopologyRegistry.ts → TOPOLOGY_DEFINITIONS (id: "critic-loop")
+ * for full paper-alignment metadata and config option documentation.
  */
 export class CriticLoopRouter implements TopologyRouter {
   async execute(

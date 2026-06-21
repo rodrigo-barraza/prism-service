@@ -16,6 +16,7 @@ import RequestLogger from "../../RequestLogger.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 const MAXIMUM_EVALUATION_CHARACTERS = 120_000;
+const DEFAULT_VERIFICATION_COMMANDS = ["tsc --noEmit", "npm test"];
 
 function truncateResultOutput(output: string, maximumCharacters: number): string {
   if (output.length <= maximumCharacters) return output;
@@ -23,9 +24,16 @@ function truncateResultOutput(output: string, maximumCharacters: number): string
   return `${truncatedOutput}\n\n[... truncated — output exceeded ${maximumCharacters.toLocaleString()} character budget]`;
 }
 
+interface VerificationOutcome {
+  candidateIndex: number;
+  isPassing: boolean;
+  commandResults: { command: string; isPassing: boolean; output: string }[];
+}
+
 function buildSelectionPrompt(
   teamName: string,
   memberResults: (SubAgentResult | { error: string })[],
+  verificationOutcomes?: Map<number, VerificationOutcome>,
 ): string {
   const characterBudgetPerMember = Math.floor(MAXIMUM_EVALUATION_CHARACTERS / Math.max(memberResults.length, 1));
 
@@ -41,6 +49,12 @@ function buildSelectionPrompt(
       `**Status:** ${result.status}`,
       `**Tool Uses:** ${result.toolUses}`,
       `**Duration:** ${result.durationMs}ms`,
+      ...(verificationOutcomes?.has(resultIndex) ? [
+        `**Verification:**`,
+        ...verificationOutcomes.get(resultIndex)!.commandResults.map((commandResult) =>
+          `  ${commandResult.isPassing ? "✅" : "❌"} \`${commandResult.command}\`: ${commandResult.isPassing ? "PASS" : `FAIL — ${commandResult.output.slice(0, 500)}`}`,
+        ),
+      ] : []),
       `**Output:**\n${outputText}`,
     ].join("\n");
   });
@@ -76,24 +90,11 @@ function buildSelectionPrompt(
 /**
  * Tournament Router — Best-of-N Selection with Judge Pass (BoN)
  *
- * Based on: "Large Language Monkeys: Scaling Inference Compute
+ * Paper: "Large Language Monkeys: Scaling Inference Compute
  * with Repeated Sampling" (arxiv.org/abs/2407.21787)
  *
- * Implements a two-phase parallel-then-judge flow:
- * 1. **Fan-out:** All members execute the task independently in parallel
- * 2. **Judge:** An LLM evaluator reviews all outputs and selects the single
- *    best result verbatim — no synthesis or merging
- *
- * Key differences from Hierarchical Aggregation:
- * - Tournament SELECTS one winner; Aggregation SYNTHESIZES all outputs
- * - The judge must reproduce the winning output exactly
- *
- * Paper alignment:
- * - Repeated sampling    → ✅ Fan-out N sub-agents in parallel
- * - Verification         → ⚠️ Different: paper uses automatic verifiers (unit tests, proofs);
- *                              we use an LLM judge (closer to reward model approach)
- * - Coverage scaling     → N/A: theoretical finding, not an implementation feature
- * - Selection            → ✅ Judge selects best result verbatim
+ * See TopologyRegistry.ts → TOPOLOGY_DEFINITIONS (id: "tournament")
+ * for full paper-alignment metadata and config option documentation.
  */
 export class TournamentRouter implements TopologyRouter {
   async execute(
@@ -104,11 +105,16 @@ export class TournamentRouter implements TopologyRouter {
       assignment: OrchestratorSpawnParams,
     ) => Promise<SubAgentResult | { error: string }>,
     _continueSubAgent?: ContinueSubAgentCallback,
-    _topologyConfig?: TopologyConfig,
+    topologyConfig?: TopologyConfig,
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
+    const isVerificationEnabled = topologyConfig?.enableVerification === true;
+    const verificationCommands: string[] = Array.isArray(topologyConfig?.verificationCommands)
+      ? (topologyConfig.verificationCommands as string[]).filter((command) => typeof command === "string")
+      : DEFAULT_VERIFICATION_COMMANDS;
+
     logger.info(
-      `[TournamentRouter] createTeam: tournament selection of ${members.length} sub-agent(s)...`,
+      `[TournamentRouter] createTeam: tournament selection of ${members.length} sub-agent(s)${isVerificationEnabled ? " (verification enabled)" : ""}...`,
     );
 
     // ── Phase 1: Parallel execution (identical to HierarchicalRouter) ────
@@ -167,12 +173,116 @@ export class TournamentRouter implements TopologyRouter {
       return memberResults;
     }
 
+    // ── Phase 1.5: Automated Verification (optional) ──────────────────────
+
+    let verificationOutcomes: Map<number, VerificationOutcome> | undefined;
+
+    if (isVerificationEnabled && verificationCommands.length > 0) {
+      logger.info(
+        `[TournamentRouter] Running automated verification (${verificationCommands.length} command(s)) on ${successfulResults.length} candidates...`,
+      );
+
+      verificationOutcomes = new Map();
+
+      const verificationPromises = memberResults.map(async (result, resultIndex) => {
+        if ("error" in result || result.status !== "completed") return;
+
+        const hasFileChanges = result.diff && (result.diff.additions > 0 || result.diff.deletions > 0);
+        if (!hasFileChanges) {
+          verificationOutcomes!.set(resultIndex, {
+            candidateIndex: resultIndex,
+            isPassing: true,
+            commandResults: [{ command: "(no file changes)", isPassing: true, output: "Skipped — no file modifications" }],
+          });
+          return;
+        }
+
+        const verificationPrompt = [
+          `You are a verification agent. Run the following commands and report PASS or FAIL for each:`,
+          "",
+          ...verificationCommands.map((command, commandIndex) => `${commandIndex + 1}. \`${command}\``),
+          "",
+          "Report your results as a JSON array:",
+          '```json',
+          JSON.stringify(verificationCommands.map((command) => ({ command, pass: true, output: "" })), null, 2),
+          '```',
+          "",
+          "Set pass=false and include the error output if a command fails.",
+        ].join("\n");
+
+        try {
+          const { assignedProvider, assignedModel } = selectInstanceForMember(
+            members[0],
+            resolvedSiblings,
+            { providerName, resolvedModel },
+          );
+
+          const verificationResult = await spawnSubAgent({
+            description: `Verification for candidate #${resultIndex + 1}`,
+            prompt: verificationPrompt,
+            files: members[0].files,
+            model: members[0].model,
+            agent: members[0].agent,
+            assignedProvider,
+            assignedModel,
+            agentIndex: resultIndex,
+            teamSize: members.length,
+            orchestratorContext,
+          });
+
+          if ("error" in verificationResult) {
+            verificationOutcomes!.set(resultIndex, {
+              candidateIndex: resultIndex,
+              isPassing: false,
+              commandResults: [{ command: "verification", isPassing: false, output: (verificationResult as { error: string }).error }],
+            });
+            return;
+          }
+
+          const commandResults = verificationCommands.map((command) => {
+            const verificationOutput = verificationResult.result || "";
+            const commandPassed = verificationOutput.toLowerCase().includes("pass") &&
+              !verificationOutput.toLowerCase().includes(`${command}`) ||
+              verificationOutput.toLowerCase().includes(`"pass": true`) ||
+              verificationOutput.toLowerCase().includes(`"pass":true`);
+            return {
+              command,
+              isPassing: commandPassed,
+              output: verificationOutput.slice(0, 500),
+            };
+          });
+
+          verificationOutcomes!.set(resultIndex, {
+            candidateIndex: resultIndex,
+            isPassing: commandResults.every((commandResult) => commandResult.isPassing),
+            commandResults,
+          });
+        } catch (verificationError: unknown) {
+          verificationOutcomes!.set(resultIndex, {
+            candidateIndex: resultIndex,
+            isPassing: false,
+            commandResults: [{ command: "verification", isPassing: false, output: getErrorMessage(verificationError) }],
+          });
+        }
+      });
+
+      await Promise.all(verificationPromises);
+
+      const passingCandidateCount = Array.from(verificationOutcomes.values()).filter(
+        (outcome) => outcome.isPassing,
+      ).length;
+
+      logger.info(
+        `[TournamentRouter] Verification complete: ${passingCandidateCount}/${verificationOutcomes.size} candidates passed`,
+      );
+    }
+
     logger.info(
       `[TournamentRouter] Running judge selection over ${successfulResults.length} successful sub-agent results...`,
     );
 
     try {
-      const selectionPrompt = buildSelectionPrompt(teamName, memberResults);
+      const selectionPrompt = buildSelectionPrompt(teamName, memberResults, verificationOutcomes);
       const provider = getProvider(providerName);
 
       if (!provider) {
