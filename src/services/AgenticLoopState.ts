@@ -4,7 +4,15 @@ import type {
   DisplaySegment,
   ToolCall,
   AgenticLoopStateInit,
+  PassState,
 } from "./harnesses/types.ts";
+
+interface CriteriaScores {
+  correctness: number;
+  risk: number;
+  efficiency: number;
+  completeness: number;
+}
 
 /**
  * AgenticLoopState — encapsulates all mutable accumulated state
@@ -73,7 +81,9 @@ export default class AgenticLoopState {
   // ── Branch tracking (TreeOfThought) ─────────────────────
   branchesExplored: number;
   branchesBacktracked: number;
+  proactiveBacktracks: number;
   selectedBranchScores: number[];
+  frontierCandidates: Array<{ pass: PassState; score: number; branchIndex: number; criteriaScores: CriteriaScores }>;
 
   // ── High-water marks ────────────────────────────────────
   // Token counts emitted to the frontend must be monotonically
@@ -127,7 +137,9 @@ export default class AgenticLoopState {
 
     this.branchesExplored = 0;
     this.branchesBacktracked = 0;
+    this.proactiveBacktracks = 0;
     this.selectedBranchScores = [];
+    this.frontierCandidates = [];
 
     this.hwmOutputTokens = 0;
     this.hwmInputTokens = 0;
