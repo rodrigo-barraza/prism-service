@@ -4,7 +4,7 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
-import type { TopologyRouter } from "../TopologyRouter.ts";
+import type { TopologyRouter, ContinueSubAgentCallback, TopologyConfig } from "../TopologyRouter.ts";
 import {
   resolveSiblingInstances,
   selectInstanceForMember,
@@ -199,11 +199,16 @@ export class MCTSRouter implements TopologyRouter {
     spawnSubAgent: (
       assignment: OrchestratorSpawnParams,
     ) => Promise<SubAgentResult | { error: string }>,
+    _continueSubAgent?: ContinueSubAgentCallback,
+    topologyConfig?: TopologyConfig,
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
     const originalTask = members[0]?.prompt || "";
-    const branchFactor = Math.min(DEFAULT_BRANCH_FACTOR, Math.max(members.length, 2));
-    const maximumDepth = DEFAULT_MAXIMUM_DEPTH;
+    const branchFactor = Math.min(
+      Math.max(1, Number(topologyConfig?.branchFactor) || DEFAULT_BRANCH_FACTOR),
+      Math.max(members.length, 2),
+    );
+    const maximumDepth = Math.max(1, Number(topologyConfig?.maxDepth) || DEFAULT_MAXIMUM_DEPTH);
 
     logger.info(
       `[MCTSRouter] Starting MCTS search for team "${teamName}" (branch factor: ${branchFactor}, max depth: ${maximumDepth})...`,

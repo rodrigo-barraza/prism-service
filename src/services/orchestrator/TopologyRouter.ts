@@ -8,6 +8,8 @@ import type { TopologyType } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 export type { TopologyType };
 
+export type TopologyConfig = Record<string, number | string | boolean>;
+
 /**
  * Callback to continue an existing sub-agent's session with a follow-up prompt.
  * Used by turn-based routers (PeerToPeerRouter) to reuse the same agent instance,
@@ -30,5 +32,7 @@ export interface TopologyRouter {
       assignment: OrchestratorSpawnParams,
     ) => Promise<SubAgentResult | { error: string }>,
     continueSubAgent?: ContinueSubAgentCallback,
+    topologyConfig?: TopologyConfig,
   ): Promise<(SubAgentResult | { error: string })[]>;
 }
+

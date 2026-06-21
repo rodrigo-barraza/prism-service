@@ -4,7 +4,7 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
-import type { TopologyRouter, ContinueSubAgentCallback } from "../TopologyRouter.ts";
+import type { TopologyRouter, ContinueSubAgentCallback, TopologyConfig } from "../TopologyRouter.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import {
   resolveSiblingInstances,
@@ -13,6 +13,7 @@ import {
 import logger from "../../../utils/logger.ts";
 
 const DEFAULT_MAXIMUM_ROUNDS = 3;
+const DEFAULT_ACTOR_COUNT = 1;
 const PASS_VERDICT_PATTERN = /\bPASS\b/i;
 const FAIL_VERDICT_PATTERN = /\bFAIL\b/i;
 
@@ -65,6 +66,84 @@ function buildCriticPrompt(
   ].join("\n");
 }
 
+function buildJurySelectionPrompt(
+  originalTask: string,
+  actorOutputs: { actorIndex: number; description: string; output: string }[],
+): string {
+  const actorSections = actorOutputs.map((actor) =>
+    `### Actor ${actor.actorIndex + 1}: ${actor.description}\n${actor.output}`,
+  );
+
+  return [
+    `You are a judge evaluating multiple competing solutions to the same task.`,
+    "",
+    "## Original Task",
+    "",
+    originalTask,
+    "",
+    "## Competing Solutions",
+    "",
+    actorSections.join("\n\n---\n\n"),
+    "",
+    "## Instructions",
+    "",
+    `Evaluate all ${actorOutputs.length} solutions and select the BEST one.`,
+    "Score each on: correctness, completeness, code quality, and verification.",
+    "",
+    "Respond with ONLY a JSON object. No markdown fences, no explanations outside the JSON.",
+    "",
+    "```json",
+    "{",
+    `  "bestActorIndex": 0,`,
+    `  "verdict": "FAIL",`,
+    `  "feedback": "Actor 1 has the strongest approach but needs error handling for edge cases."`,
+    "}",
+    "```",
+    "",
+    "- `bestActorIndex`: 0-based index of the best actor",
+    "- `verdict`: PASS if the best solution is complete, FAIL if it needs refinement",
+    "- `feedback`: If FAIL, specific actionable feedback for improvement. If PASS, brief explanation.",
+  ].join("\n");
+}
+
+interface JurySelectionResult {
+  bestActorIndex: number;
+  verdict: "PASS" | "FAIL";
+  feedback: string;
+}
+
+function parseJurySelectionResponse(responseText: string, actorCount: number): JurySelectionResult {
+  let cleanedResponse = responseText.trim();
+  cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+
+  try {
+    const parsed = JSON.parse(cleanedResponse);
+    return {
+      bestActorIndex: Math.max(0, Math.min(actorCount - 1, Number(parsed.bestActorIndex) || 0)),
+      verdict: PASS_VERDICT_PATTERN.test(String(parsed.verdict)) ? "PASS" : "FAIL",
+      feedback: typeof parsed.feedback === "string" ? parsed.feedback : "",
+    };
+  } catch {
+    // Attempt to extract JSON from mixed content
+    const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const extracted = JSON.parse(jsonMatch[0]);
+        return {
+          bestActorIndex: Math.max(0, Math.min(actorCount - 1, Number(extracted.bestActorIndex) || 0)),
+          verdict: PASS_VERDICT_PATTERN.test(String(extracted.verdict)) ? "PASS" : "FAIL",
+          feedback: typeof extracted.feedback === "string" ? extracted.feedback : "",
+        };
+      } catch {
+        // Fallback exhausted
+      }
+    }
+
+    logger.warn("[CriticLoopRouter] Failed to parse jury selection JSON — defaulting to actor 0");
+    return { bestActorIndex: 0, verdict: "FAIL", feedback: responseText };
+  }
+}
+
 function buildActorRevisionPrompt(
   criticVerdicts: CriticVerdict[],
   roundNumber: number,
@@ -99,6 +178,28 @@ function buildActorRevisionPrompt(
     "3. Do NOT regress on areas that passed — critics who passed will review again.",
     "4. Verify your corrections (run tests, typecheck, etc.).",
     "5. Commit and report what you changed.",
+    "",
+    "Focus on fixing the identified issues — do not restart from scratch unless the feedback requires it.",
+  ].join("\n");
+}
+
+function buildJuryRevisionPrompt(
+  feedback: string,
+  roundNumber: number,
+): string {
+  return [
+    `Your previous work was selected as the best among competing actors, but it needs revision (round ${roundNumber}).`,
+    "",
+    "## Judge's Feedback",
+    "",
+    feedback,
+    "",
+    "## Instructions",
+    "",
+    "1. Address ALL issues raised by the judge.",
+    "2. Make the specific changes requested.",
+    "3. Verify your corrections (run tests, typecheck, etc.).",
+    "4. Commit and report what you changed.",
     "",
     "Focus on fixing the identified issues — do not restart from scratch unless the feedback requires it.",
   ].join("\n");
@@ -159,7 +260,9 @@ function detectDegenerationOfThought(
 /**
  * Critic Loop Router — Actor-Critic Iterative Refinement (MAR)
  *
- * Implements a stateful Actor→Critics feedback loop with multi-critic panel support:
+ * Supports two modes via topologyConfig.actorCount:
+ *
+ * ## Council of Judges (actorCount=1, default)
  * 1. Actor spawns and executes the task (preserveWorktree: true)
  * 2. All critics spawn IN PARALLEL and evaluate the Actor's output independently
  * 3. Unanimous consensus required — ALL critics must PASS for the loop to terminate
@@ -167,18 +270,20 @@ function detectDegenerationOfThought(
  * 5. Actor continues with aggregated feedback via continueSubAgent
  * 6. Repeat until unanimous PASS or maximum rounds reached
  *
- * Includes Degeneration-of-Thought (DoT) protection: if the aggregated critic
- * feedback is >80% similar to the previous round, the loop force-terminates
- * to avoid infinite cycles (per MAR research findings).
+ * ## Jury (actorCount>1)
+ * 1. N actors spawn IN PARALLEL, each producing a competing solution
+ * 2. A judge evaluates all outputs, selects the best, and provides feedback
+ * 3. If FAIL: the winning actor continues with the judge's feedback
+ * 4. Repeat until PASS or maximum rounds reached
+ * (Tournament phase → Critic Loop on the winner)
+ *
+ * TopologyConfig:
+ * - actorCount (number, default: 1) — Number of competing actors. >1 enables Jury mode.
+ * - maxRounds (number, default: 3) — Maximum evaluation/revision rounds.
  *
  * Members mapping:
- * - members[0] = Actor (required)
- * - members[1] = First critic (optional — auto-generated if missing)
- * - members[2+] = Additional critics forming a panel (Council of Judges)
- *
- * Each critic can be specialized via its description/prompt fields:
- * - Fact-checker, logic auditor, style critic, security reviewer, etc.
- * - Fresh critic instances spawned each round (no session reuse)
+ * - Council mode: members[0] = Actor, members[1+] = Critics
+ * - Jury mode: members[0..actorCount-1] = Actors, members[actorCount+] = Critics (or auto-judge)
  */
 export class CriticLoopRouter implements TopologyRouter {
   async execute(
@@ -189,8 +294,11 @@ export class CriticLoopRouter implements TopologyRouter {
       assignment: OrchestratorSpawnParams,
     ) => Promise<SubAgentResult | { error: string }>,
     continueSubAgent?: ContinueSubAgentCallback,
+    topologyConfig?: TopologyConfig,
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
+    const actorCount = Math.max(1, Number(topologyConfig?.actorCount) || DEFAULT_ACTOR_COUNT);
+    const maximumRounds = Math.max(1, Number(topologyConfig?.maxRounds) || DEFAULT_MAXIMUM_ROUNDS);
 
     if (members.length === 0) {
       const errorMessage = "Critic Loop topology requires at least 1 member (the actor).";
@@ -198,6 +306,34 @@ export class CriticLoopRouter implements TopologyRouter {
       return [{ error: errorMessage }];
     }
 
+    // Route to Jury mode when actorCount > 1
+    if (actorCount > 1) {
+      return this.executeJuryMode(
+        teamName, members, orchestratorContext,
+        spawnSubAgent, continueSubAgent,
+        actorCount, maximumRounds,
+      );
+    }
+
+    // Default: Council of Judges mode (1 actor + N critics)
+    return this.executeCouncilMode(
+      teamName, members, orchestratorContext,
+      spawnSubAgent, continueSubAgent,
+      maximumRounds,
+    );
+  }
+
+  // ── Council of Judges Mode (1 Actor + N Critics) ──────────────────────
+
+  private async executeCouncilMode(
+    teamName: string,
+    members: TeamMember[],
+    orchestratorContext: OrchestratorContext,
+    spawnSubAgent: (assignment: OrchestratorSpawnParams) => Promise<SubAgentResult | { error: string }>,
+    continueSubAgent?: ContinueSubAgentCallback,
+    maximumRounds = DEFAULT_MAXIMUM_ROUNDS,
+  ): Promise<(SubAgentResult | { error: string })[]> {
+    const { providerName, resolvedModel } = orchestratorContext;
     const actorMember = members[0];
 
     // Build critic panel: members[1..N] or auto-generate a single generic critic
@@ -211,13 +347,12 @@ export class CriticLoopRouter implements TopologyRouter {
 
     const criticCount = criticMembers.length;
     const totalTeamSize = 1 + criticCount;
-    const maximumRounds = DEFAULT_MAXIMUM_ROUNDS;
     const allResults: (SubAgentResult | { error: string })[] = [];
     let previousAggregatedFeedback: string | null = null;
     let actorAgentId: string | null = null;
 
     logger.info(
-      `[CriticLoopRouter] Starting Actor-Critic loop for team "${teamName}" (${criticCount} critic(s), max ${maximumRounds} rounds)...`,
+      `[CriticLoopRouter] Council mode: team "${teamName}" (${criticCount} critic(s), max ${maximumRounds} rounds)...`,
     );
 
     // ── Round 1: Initial Actor spawn ────────────────────────────────────
@@ -330,7 +465,6 @@ export class CriticLoopRouter implements TopologyRouter {
           logger.error(
             `[CriticLoopRouter] Critic "${criticMember.description}" failed in round ${roundNumber}: ${criticResult.error}`,
           );
-          // Treat errored critics as FAIL with the error as feedback
           verdicts.push({
             criticIndex: criticResultIndex,
             criticDescription: criticMember.description,
@@ -448,6 +582,218 @@ export class CriticLoopRouter implements TopologyRouter {
       }
     }
 
+    return allResults;
+  }
+
+  // ── Jury Mode (N Actors + Judge → Critic Loop on winner) ─────────────
+
+  private async executeJuryMode(
+    teamName: string,
+    members: TeamMember[],
+    orchestratorContext: OrchestratorContext,
+    spawnSubAgent: (assignment: OrchestratorSpawnParams) => Promise<SubAgentResult | { error: string }>,
+    continueSubAgent?: ContinueSubAgentCallback,
+    actorCount = 2,
+    maximumRounds = DEFAULT_MAXIMUM_ROUNDS,
+  ): Promise<(SubAgentResult | { error: string })[]> {
+    const { providerName, resolvedModel } = orchestratorContext;
+    const allResults: (SubAgentResult | { error: string })[] = [];
+
+    // Split members: first actorCount are actors, rest are unused in Jury mode
+    // (the judge is auto-generated like Tournament)
+    const actorMembers = members.slice(0, actorCount);
+    const actualActorCount = actorMembers.length;
+
+    logger.info(
+      `[CriticLoopRouter] Jury mode: team "${teamName}" (${actualActorCount} actor(s), max ${maximumRounds} rounds)...`,
+    );
+
+    // ── Phase 1: Spawn competing actors in parallel (Tournament phase) ──
+
+    const resolvedSiblings = await resolveSiblingInstances(
+      { providerName, resolvedModel },
+      "CriticLoopRouter:Jury",
+    );
+
+    const actorAssignments: OrchestratorSpawnParams[] = actorMembers.map(
+      (actorMember, actorIndex) => {
+        const { assignedProvider, assignedModel } = selectInstanceForMember(
+          actorMember,
+          resolvedSiblings,
+          { providerName, resolvedModel },
+        );
+
+        return {
+          description: `${actorMember.description} (Actor ${actorIndex + 1}/${actualActorCount})`,
+          prompt: actorMember.prompt,
+          files: actorMember.files,
+          model: actorMember.model,
+          agent: actorMember.agent,
+          assignedProvider,
+          assignedModel,
+          agentIndex: actorIndex,
+          teamSize: actualActorCount,
+          round: 1,
+          orchestratorContext,
+          preserveWorktree: true,
+        };
+      },
+    );
+
+    logger.info(
+      `[CriticLoopRouter] Jury Phase 1: Spawning ${actualActorCount} competing actors in parallel...`,
+    );
+
+    const actorResults = await Promise.all(
+      actorAssignments.map((assignment) => spawnSubAgent(assignment)),
+    );
+    allResults.push(...actorResults);
+
+    // Collect successful actor outputs for judging
+    const successfulActors: { actorIndex: number; result: SubAgentResult }[] = [];
+    for (let actorIndex = 0; actorIndex < actorResults.length; actorIndex++) {
+      const actorResult = actorResults[actorIndex];
+      if (!("error" in actorResult) && actorResult.status === "completed") {
+        successfulActors.push({ actorIndex, result: actorResult });
+      }
+    }
+
+    if (successfulActors.length === 0) {
+      logger.error(`[CriticLoopRouter] All ${actualActorCount} actors failed in Jury mode. Aborting.`);
+      return allResults;
+    }
+
+    // ── Phase 2: Judge selects best + provides feedback ──────────────────
+
+    const { getProvider } = await import("../../../providers/index.ts");
+    const provider = getProvider(providerName);
+
+    if (!provider) {
+      logger.error(`[CriticLoopRouter] Provider "${providerName}" not found for jury selection`);
+      return allResults;
+    }
+
+    const originalTask = actorMembers[0]?.prompt || "";
+    let previousFeedback: string | null = null;
+
+    const actorOutputs = successfulActors.map((actor) => ({
+      actorIndex: actor.actorIndex,
+      description: actorMembers[actor.actorIndex]?.description || `Actor ${actor.actorIndex + 1}`,
+      output: extractActorOutputText(actor.result),
+    }));
+
+    // First round: judge all competing actors
+    const juryPrompt = buildJurySelectionPrompt(originalTask, actorOutputs);
+    const juryMessages = [{ role: "user", content: juryPrompt }];
+
+    let juryResponse;
+    try {
+      juryResponse = await provider.generateText(juryMessages, resolvedModel, { maxTokens: 4096 });
+    } catch (juryError: unknown) {
+      logger.error(`[CriticLoopRouter] Jury selection failed: ${String(juryError)}`);
+      return allResults;
+    }
+
+    let selection = parseJurySelectionResponse(juryResponse.text || "", successfulActors.length);
+    const winnerActorIndex = successfulActors[selection.bestActorIndex]?.actorIndex ?? 0;
+    let winnerResult = successfulActors[selection.bestActorIndex]?.result;
+
+    if (!winnerResult) {
+      logger.error(`[CriticLoopRouter] Jury selected invalid actor index. Aborting.`);
+      return allResults;
+    }
+
+    logger.info(
+      `[CriticLoopRouter] Jury selected Actor ${winnerActorIndex + 1} — verdict: ${selection.verdict}`,
+    );
+
+    if (selection.verdict === "PASS") {
+      logger.info(`[CriticLoopRouter] Jury PASSED Actor ${winnerActorIndex + 1}. Done.`);
+      return allResults;
+    }
+
+    // ── Phase 3: Iterative refinement on the winner ─────────────────────
+
+    const winnerAgentId = winnerResult.agent_id;
+
+    if (!continueSubAgent) {
+      logger.error(
+        `[CriticLoopRouter] continueSubAgent callback not provided — cannot refine winner in Jury mode.`,
+      );
+      return allResults;
+    }
+
+    for (let roundNumber = 2; roundNumber <= maximumRounds; roundNumber++) {
+      // DoT detection
+      if (detectDegenerationOfThought(previousFeedback, selection.feedback)) {
+        logger.warn(
+          `[CriticLoopRouter] Degeneration-of-Thought detected in Jury mode. Force-terminating.`,
+        );
+        return allResults;
+      }
+      previousFeedback = selection.feedback;
+
+      const revisionPrompt = buildJuryRevisionPrompt(selection.feedback, roundNumber);
+
+      logger.info(
+        `[CriticLoopRouter] Jury Round ${roundNumber}: Continuing winner (Actor ${winnerActorIndex + 1}) with judge feedback...`,
+      );
+
+      const revisedResult = await continueSubAgent(
+        winnerAgentId,
+        revisionPrompt,
+        orchestratorContext,
+        roundNumber,
+      );
+      allResults.push(revisedResult);
+
+      if ("error" in revisedResult) {
+        logger.error(`[CriticLoopRouter] Winner revision failed in round ${roundNumber}: ${revisedResult.error}`);
+        return allResults;
+      }
+
+      if (revisedResult.status !== "completed") {
+        logger.warn(`[CriticLoopRouter] Winner did not complete revision in round ${roundNumber}.`);
+        return allResults;
+      }
+
+      winnerResult = revisedResult;
+
+      // Re-evaluate the revised output
+      const revisedOutput = extractActorOutputText(revisedResult);
+      const reEvalPrompt = buildJurySelectionPrompt(originalTask, [{
+        actorIndex: winnerActorIndex,
+        description: actorMembers[winnerActorIndex]?.description || `Actor ${winnerActorIndex + 1}`,
+        output: revisedOutput,
+      }]);
+
+      try {
+        const reEvalResponse = await provider.generateText(
+          [{ role: "user", content: reEvalPrompt }],
+          resolvedModel,
+          { maxTokens: 4096 },
+        );
+        selection = parseJurySelectionResponse(reEvalResponse.text || "", 1);
+      } catch {
+        logger.warn(`[CriticLoopRouter] Re-evaluation failed in round ${roundNumber}. Returning current results.`);
+        return allResults;
+      }
+
+      logger.info(
+        `[CriticLoopRouter] Jury Round ${roundNumber}: Re-evaluation verdict: ${selection.verdict}`,
+      );
+
+      if (selection.verdict === "PASS") {
+        logger.info(
+          `[CriticLoopRouter] Jury PASSED revised output in round ${roundNumber}. Done.`,
+        );
+        return allResults;
+      }
+    }
+
+    logger.warn(
+      `[CriticLoopRouter] Maximum rounds (${maximumRounds}) reached in Jury mode. Returning best effort.`,
+    );
     return allResults;
   }
 }

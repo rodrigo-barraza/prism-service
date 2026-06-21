@@ -737,7 +737,7 @@ export default class OrchestratorService {
   }
 
   static async createTeam(
-    teamCreationArguments: { name: string; members: TeamMember[]; topology?: string },
+    teamCreationArguments: { name: string; members: TeamMember[]; topology?: string; topologyConfig?: Record<string, number | string | boolean> },
     orchestratorContext: OrchestratorContext,
   ): Promise<(SubAgentResult | { error: string })[]> {
     // Warm up/preload AgenticLoopService to avoid ESM concurrent dynamic import race conditions in Vitest
@@ -891,6 +891,7 @@ export default class OrchestratorService {
         OrchestratorService.spawnFromTool(assignment),
       (agentId: string, prompt: string, context: OrchestratorContext, round?: number) =>
         OrchestratorService.continueAgent(agentId, prompt, context, round),
+      teamCreationArguments.topologyConfig,
     );
 
     const agentIds = spawnResults
