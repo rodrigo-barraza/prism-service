@@ -227,6 +227,13 @@ export default class OrchestratorService {
       orchestratorContext.maxRecursionDepth ?? DEFAULT_RECURSIVE_SPAWNING_DEPTH,
     );
 
+    // Depth 0 = sub-agent spawning disabled entirely
+    if (maxRecursionDepth === 0) {
+      return {
+        error: "Sub-agent spawning is disabled (recursion depth is set to 0).",
+      };
+    }
+
     // Resolve max sub-agent iterations: 0 = unlimited (Infinity), positive = clamped 1-100, default = constant
     // Scope attenuation: reduce iterations at each recursion depth hop
     const baseMaxIterations =
@@ -842,6 +849,16 @@ export default class OrchestratorService {
         typeof settingsRecursionDepth === "number"
           ? Math.min(MAXIMUM_RECURSIVE_SPAWNING_DEPTH, Math.max(0, settingsRecursionDepth))
           : DEFAULT_RECURSIVE_SPAWNING_DEPTH;
+    }
+
+    // Depth 0 = sub-agent spawning disabled entirely
+    if (orchestratorContext.maxRecursionDepth === 0) {
+      logger.info(
+        `[Orchestrator] createTeam: sub-agent spawning disabled (maxRecursionDepth = 0)`,
+      );
+      return [{
+        error: "Sub-agent spawning is disabled (recursion depth is set to 0). Complete the task directly without delegating to sub-agents.",
+      }];
     }
 
     if (!teamCreationArguments || !teamCreationArguments.members || !Array.isArray(teamCreationArguments.members)) {
