@@ -23,19 +23,19 @@ export function getLastAssistantText(messages: ConversationMessage[]): string {
       typeof message.content === "string" ? message.content : ""
     ).trim();
     if (text) return text;
-    // Array content blocks (Anthropic format): content is an array of
-    // {type: "text", text: "..."} blocks, potentially interleaved with
-    // tool_use and thinking blocks. Extract only the text blocks.
+    // Extract text blocks from Anthropic structured array format, ignoring thinking and tool_use blocks.
     if (Array.isArray(message.content)) {
-      const textBlocks = (message.content as Array<Record<string, unknown>>)
+      const textBlocks = message.content
         .filter(
-          (block) =>
+          (block): block is { type: "text"; text: string } =>
             typeof block === "object" &&
             block !== null &&
+            "type" in block &&
             block.type === "text" &&
+            "text" in block &&
             typeof block.text === "string",
         )
-        .map((block) => block.text as string)
+        .map((block) => block.text)
         .join("\n")
         .trim();
       if (textBlocks) return textBlocks;
@@ -88,7 +88,7 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
     subAgent.durationMs || 0,
   );
 
-  // Aggregate tool call names into { name: count } for frontend badge display
+  // Construct a mapped tool usage count for frontend badge rendering.
   const toolNames: Record<string, number> = {};
   if (subAgent.toolCalls?.length) {
     for (const toolCall of subAgent.toolCalls) {
@@ -247,6 +247,32 @@ export function buildToolCallFallbackSummary(
   return `Agent completed ${iterationLabel} with ${agentResult.toolUses} tool call(s) but did not produce a final summary.`;
 }
 
+interface SerializedSubAgentResult {
+  agent_id: string | number;
+  status: string;
+  description?: string;
+  recursionDepth?: number;
+  durationMs?: number;
+  toolUses?: number;
+  result?: string | null;
+  error?: string | null;
+  subtreeMetrics?: SubtreeMetrics;
+}
+
+function isSerializedSubAgentResult(
+  value: unknown,
+): value is SerializedSubAgentResult {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  const hasAgentId =
+    typeof candidate['agent_id'] === "string" ||
+    typeof candidate['agent_id'] === "number";
+  const hasStatus = typeof candidate['status'] === "string";
+  return hasAgentId && hasStatus;
+}
+
 /**
  * Scan a sub-agent's conversation for create_team tool results that contain
  * SubAgentResult payloads. When a child agent spawned grandchildren, those
@@ -276,36 +302,23 @@ export function extractSubtreeMetrics(
     const resultsArray: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
 
     for (const entry of resultsArray) {
-      if (
-        typeof entry !== "object" ||
-        entry === null ||
-        !("agent_id" in entry) ||
-        !("status" in entry)
-      ) {
+      if (!isSerializedSubAgentResult(entry)) {
         continue;
       }
 
-      const childResult = entry as Record<string, unknown>;
       const childSummary: SubAgentChildSummary = {
-        agent_id: String(childResult.agent_id),
-        description: String(childResult.description || ""),
-        status: String(childResult.status || "unknown"),
-        recursionDepth:
-          typeof childResult.recursionDepth === "number"
-            ? childResult.recursionDepth
-            : 0,
-        durationMs:
-          typeof childResult.durationMs === "number"
-            ? childResult.durationMs
-            : 0,
-        toolUses:
-          typeof childResult.toolUses === "number" ? childResult.toolUses : 0,
+        agent_id: String(entry.agent_id),
+        description: entry.description || "",
+        status: entry.status,
+        recursionDepth: entry.recursionDepth || 0,
+        durationMs: entry.durationMs || 0,
+        toolUses: entry.toolUses || 0,
         cost: 0,
       };
 
       const MAX_RESULT_LENGTH_FOR_PROPAGATION = 2000;
-      if (typeof childResult.result === "string" && childResult.result.trim()) {
-        const trimmedResult = childResult.result.trim();
+      if (typeof entry.result === "string" && entry.result.trim()) {
+        const trimmedResult = entry.result.trim();
         childSummary.result =
           trimmedResult.length > MAX_RESULT_LENGTH_FOR_PROPAGATION
             ? trimmedResult.slice(0, MAX_RESULT_LENGTH_FOR_PROPAGATION) + "…"
@@ -314,16 +327,12 @@ export function extractSubtreeMetrics(
         childSummary.result = null;
       }
 
-      if (typeof childResult.error === "string" && childResult.error.trim()) {
-        childSummary.error = childResult.error.trim();
+      if (typeof entry.error === "string" && entry.error.trim()) {
+        childSummary.error = entry.error.trim();
       }
 
-      if (
-        childResult.subtreeMetrics &&
-        typeof childResult.subtreeMetrics === "object"
-      ) {
-        childSummary.subtreeMetrics =
-          childResult.subtreeMetrics as SubtreeMetrics;
+      if (entry.subtreeMetrics) {
+        childSummary.subtreeMetrics = entry.subtreeMetrics;
       }
 
       childSummaries.push(childSummary);

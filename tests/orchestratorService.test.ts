@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import "./setup.ts";
 import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
 import { COLLECTIONS, PROVIDERS } from "../src/constants.ts";
+import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 let mockExistsSyncResult: boolean | undefined = undefined;
 
@@ -225,7 +226,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
     const teamArgs = {
       name: "topology_override_team",
-      topology: "peer_to_peer",
+      topology: TOPOLOGIES.PEER_TO_PEER,
       members: [
         {
           description: "Sub-agent 1",
@@ -244,7 +245,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       },
       expect.objectContaining({
         $set: expect.objectContaining({
-          "settings.agents.topology": "peer_to_peer",
+          "settings.agents.topology": TOPOLOGIES.PEER_TO_PEER,
         }),
       })
     );
@@ -485,7 +486,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
       const teamArgs = {
         name: "peer_to_peer_0based_team",
-        topology: "peer_to_peer",
+        topology: TOPOLOGIES.PEER_TO_PEER,
         members: [
           {
             description: "First Sub-agent",

@@ -1,6 +1,7 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { HARNESS_IDS, THOUGHT_STRUCTURES, TYPES } from "../src/constants.ts";
+import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import AgenticLoopService from "../src/services/AgenticLoopService.ts";
 import ReActHarness from "../src/services/harnesses/ReActHarness.ts";
 import { runTreeOfThoughts } from "../src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts";
@@ -216,12 +217,9 @@ const THOUGHT_STRUCTURE_ENTRIES = [
   { key: "GRAPH_OF_THOUGHTS", value: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS },
 ] as const;
 
-const TOPOLOGY_ENTRIES = [
-  { key: "sequential", value: "sequential" },
-  { key: "hierarchical", value: "hierarchical" },
-  { key: "hierarchical_aggregation", value: "hierarchical_aggregation" },
-  { key: "peer_to_peer", value: "peer_to_peer" },
-] as const;
+const TOPOLOGY_ENTRIES = Object.entries(TOPOLOGIES).map(
+  ([key, value]) => ({ key, value }),
+);
 
 describe("ThoughtStructure × Topology Combination Matrix", () => {
   let mockContext: any;
@@ -231,12 +229,12 @@ describe("ThoughtStructure × Topology Combination Matrix", () => {
     vi.mocked(SettingsService.getSection).mockResolvedValue({
       harness: HARNESS_IDS.STANDARD,
       thoughtStructure: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
-      topology: "hierarchical",
+      topology: TOPOLOGIES.HIERARCHICAL,
     });
     vi.mocked(SettingsService.getCached).mockReturnValue({
       agents: {
         harness: HARNESS_IDS.STANDARD,
-        topology: "hierarchical",
+        topology: TOPOLOGIES.HIERARCHICAL,
         dynamicToolActivation: true,
       },
     } as any);
@@ -302,7 +300,7 @@ describe("ThoughtStructure × Topology Combination Matrix", () => {
     vi.mocked(SettingsService.getSection).mockResolvedValue({
       harness: HARNESS_IDS.STANDARD,
       thoughtStructure: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS,
-      topology: "peer_to_peer",
+      topology: TOPOLOGIES.PEER_TO_PEER,
     });
 
     mockContext.options.harness = undefined;
@@ -312,7 +310,7 @@ describe("ThoughtStructure × Topology Combination Matrix", () => {
     await AgenticLoopService.runAgenticLoop(mockContext);
 
     expect(mockContext.options.thoughtStructure).toBe(THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS);
-    expect(mockContext.options.topology).toBe("peer_to_peer");
+    expect(mockContext.options.topology).toBe(TOPOLOGIES.PEER_TO_PEER);
     expect(mockContext.options.harness).toBe(HARNESS_IDS.STANDARD);
     expect(runGraphOfThoughts).toHaveBeenCalled();
   });
@@ -321,17 +319,17 @@ describe("ThoughtStructure × Topology Combination Matrix", () => {
     vi.mocked(SettingsService.getSection).mockResolvedValue({
       harness: HARNESS_IDS.STANDARD,
       thoughtStructure: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
-      topology: "hierarchical",
+      topology: TOPOLOGIES.HIERARCHICAL,
     });
 
     mockContext.options.harness = HARNESS_IDS.STANDARD;
     mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.TREE_OF_THOUGHTS;
-    mockContext.options.topology = "sequential";
+    mockContext.options.topology = TOPOLOGIES.SEQUENTIAL;
 
     await AgenticLoopService.runAgenticLoop(mockContext);
 
     expect(mockContext.options.thoughtStructure).toBe(THOUGHT_STRUCTURES.TREE_OF_THOUGHTS);
-    expect(mockContext.options.topology).toBe("sequential");
+    expect(mockContext.options.topology).toBe(TOPOLOGIES.SEQUENTIAL);
     expect(runTreeOfThoughts).toHaveBeenCalled();
   });
 });

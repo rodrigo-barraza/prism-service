@@ -5,11 +5,27 @@
  * runs on which LM Studio / vLLM / llama.cpp instance. Incorrect resolution
  * silently uses the wrong quantization, affecting output quality.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   parseModelQuant,
   findBestQuantFallback,
+  resolveModelForInstances,
 } from "../src/utils/ModelResolution.ts";
+import type { InstanceEntry } from "../src/types/ProviderTypes.ts";
+
+vi.mock("../src/utils/logger.ts", () => ({
+  default: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+const mockGetProvider = vi.fn();
+
+vi.mock("../src/providers/index.ts", () => ({
+  getProvider: (...arguments_: unknown[]) => mockGetProvider(...arguments_),
+}));
 
 // ═══════════════════════════════════════════════════════════════
 describe("parseModelQuant", () => {
@@ -173,3 +189,159 @@ describe("findBestQuantFallback", () => {
     expect(result).toBe("qwen3-32b-Q8_0");
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+describe("resolveModelForInstances", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function createInstance(id: string): InstanceEntry {
+    return { id, baseUrl: `http://${id}:1234/v1` } as InstanceEntry;
+  }
+
+  it("should return instances that have an exact model match", async () => {
+    const instances = [createInstance("lm-1"), createInstance("lm-2")];
+
+    mockGetProvider.mockImplementation((id: string) => ({
+      listModels: vi.fn().mockResolvedValue({
+        models: id === "lm-1"
+          ? [{ key: "qwen3-32b-Q8_0", size_bytes: 35_000_000_000 }]
+          : [{ key: "llama-70b-Q4_K_M", size_bytes: 40_000_000_000 }],
+      }),
+    }));
+
+    const result = await resolveModelForInstances("qwen3-32b-Q8_0", instances);
+
+    expect(result.usable).toHaveLength(1);
+    expect(result.usable[0].id).toBe("lm-1");
+    expect(result.modelOverrides.size).toBe(0);
+  });
+
+  it("should use quant fallback when no exact match exists", async () => {
+    const instances = [createInstance("lm-1")];
+
+    mockGetProvider.mockReturnValue({
+      listModels: vi.fn().mockResolvedValue({
+        models: [
+          { key: "qwen3-32b-Q4_K_M", size_bytes: 20_000_000_000 },
+          { key: "qwen3-32b-Q8_0", size_bytes: 35_000_000_000 },
+        ],
+      }),
+    });
+
+    const result = await resolveModelForInstances("qwen3-32b@q5_k_m", instances);
+
+    expect(result.usable).toHaveLength(1);
+    expect(result.modelOverrides.get("lm-1")).toBe("qwen3-32b-Q8_0");
+  });
+
+  it("should exclude instances with no matching model (exact or fallback)", async () => {
+    const instances = [createInstance("lm-1"), createInstance("lm-2")];
+
+    mockGetProvider.mockReturnValue({
+      listModels: vi.fn().mockResolvedValue({
+        models: [{ key: "llama-70b-Q4_K_M", size_bytes: 40_000_000_000 }],
+      }),
+    });
+
+    const result = await resolveModelForInstances("qwen3-32b@q4_k_m", instances);
+
+    expect(result.usable).toHaveLength(0);
+  });
+
+  it("should handle mixed exact + fallback instances", async () => {
+    const instances = [createInstance("lm-exact"), createInstance("lm-fallback")];
+
+    mockGetProvider.mockImplementation((id: string) => ({
+      listModels: vi.fn().mockResolvedValue({
+        models: id === "lm-exact"
+          ? [{ key: "qwen3-32b-Q4_K_M", size_bytes: 20_000_000_000 }]
+          : [{ key: "qwen3-32b-Q8_0", size_bytes: 35_000_000_000 }],
+      }),
+    }));
+
+    const result = await resolveModelForInstances("qwen3-32b-Q4_K_M", instances);
+
+    expect(result.usable).toHaveLength(2);
+    expect(result.modelOverrides.has("lm-exact")).toBe(false);
+    expect(result.modelOverrides.get("lm-fallback")).toBe("qwen3-32b-Q8_0");
+  });
+
+  it("should skip instances when provider has no listModels method", async () => {
+    const instances = [createInstance("cloud-1")];
+
+    mockGetProvider.mockReturnValue({});
+
+    const result = await resolveModelForInstances("gpt-4o", instances);
+
+    expect(result.usable).toHaveLength(0);
+  });
+
+  it("should skip instances that return null provider", async () => {
+    const instances = [createInstance("missing-1")];
+
+    mockGetProvider.mockReturnValue(null);
+
+    const result = await resolveModelForInstances("gpt-4o", instances);
+
+    expect(result.usable).toHaveLength(0);
+  });
+
+  it("should handle listModels rejections gracefully via Promise.allSettled", async () => {
+    const instances = [createInstance("lm-ok"), createInstance("lm-down")];
+
+    mockGetProvider.mockImplementation((id: string) => ({
+      listModels: id === "lm-ok"
+        ? vi.fn().mockResolvedValue({ models: [{ key: "qwen3-32b-Q8_0", size_bytes: 35_000_000_000 }] })
+        : vi.fn().mockRejectedValue(new Error("Connection refused")),
+    }));
+
+    const result = await resolveModelForInstances("qwen3-32b-Q8_0", instances);
+
+    expect(result.usable).toHaveLength(1);
+    expect(result.usable[0].id).toBe("lm-ok");
+  });
+
+  it("should handle responses with 'data' key instead of 'models' key", async () => {
+    const instances = [createInstance("vllm-1")];
+
+    mockGetProvider.mockReturnValue({
+      listModels: vi.fn().mockResolvedValue({
+        data: [{ id: "qwen3-32b-Q8_0", size_bytes: 35_000_000_000 }],
+      }),
+    });
+
+    const result = await resolveModelForInstances("qwen3-32b-Q8_0", instances);
+
+    expect(result.usable).toHaveLength(1);
+  });
+
+  it("should handle empty model lists", async () => {
+    const instances = [createInstance("lm-empty")];
+
+    mockGetProvider.mockReturnValue({
+      listModels: vi.fn().mockResolvedValue({ models: [] }),
+    });
+
+    const result = await resolveModelForInstances("qwen3-32b@q4_k_m", instances);
+
+    expect(result.usable).toHaveLength(0);
+  });
+
+  it("should exclude instances when getProvider throws (rejected promises)", async () => {
+    const instances = [createInstance("lm-1"), createInstance("lm-2")];
+
+    mockGetProvider.mockImplementation(() => {
+      throw new Error("Registry corrupted");
+    });
+
+    const result = await resolveModelForInstances("qwen3-32b@q4_k_m", instances);
+
+    // Throws inside the async map callback become rejected promises,
+    // caught by Promise.allSettled as status='rejected' — skipped in the loop.
+    expect(result.usable).toHaveLength(0);
+    expect(result.modelOverrides.size).toBe(0);
+  });
+});
+

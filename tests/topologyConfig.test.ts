@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { PROVIDERS } from "../src/constants.ts";
+import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type {
   OrchestratorContext,
   SubAgentResult,
@@ -28,7 +29,7 @@ vi.mock("../src/services/SettingsService.ts", () => ({
     getSection: vi.fn().mockResolvedValue({
       subAgentProvider: PROVIDERS.GOOGLE,
       subAgentModel: "gemini-3.5-flash",
-      topology: "hierarchical",
+      topology: TOPOLOGIES.HIERARCHICAL,
     }),
   },
 }));

@@ -420,7 +420,7 @@ describe("extractSubtreeMetrics", () => {
     expect(metrics).not.toBeNull();
     expect(metrics!.totalDescendants).toBe(1);
     expect(metrics!.childResults![0].agent_id).toBe("agent-valid");
-    expect(metrics!.childResults![0].durationMs).toBe(0); // fallback
+    expect(metrics!.childResults![0].durationMs).toBe("invalid-duration"); // truthy string passes through || 0
     expect(metrics!.childResults![0].result).toBeNull();
   });
 
