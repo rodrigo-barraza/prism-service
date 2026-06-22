@@ -440,16 +440,19 @@ async function prepareGenerationContext(
           `[chat] Model "${resolvedModel}" not available on any ${providerName} instance — falling back to first`,
         );
       }
-      // ── Multi-instance load balancing ──────────────────────────
+      // ── Multi-instance load balancing (least-connections) ────────
       if (siblings.length > 1) {
-        // Least-busy: pick the instance with the most available slots
+        // Least-connections: pick the instance with the lowest total
+        // in-flight work (active + pending queue depth). This ensures
+        // the faster device drains its queue and picks up new work
+        // sooner, rather than piling up behind a slower device.
         let bestId = providerName;
-        let bestAvailable = -Infinity;
+        let lowestInflight = Infinity;
         for (const inst of siblings) {
           const queueState = localModelQueue._getQueue(inst.id);
-          const available = inst.concurrency - queueState.activeCount;
-          if (available > bestAvailable) {
-            bestAvailable = available;
+          const inflight = queueState.totalInflight;
+          if (inflight < lowestInflight) {
+            lowestInflight = inflight;
             bestId = inst.id;
           }
         }
@@ -461,7 +464,7 @@ async function prepareGenerationContext(
           }
           logger.info(
             `[chat] ⚖️ Load balance: ${providerName} → ${bestId} ` +
-              `(model="${resolvedModel}", ${siblings.map((sibling) => `${sibling.id}:${sibling.concurrency - localModelQueue._getQueue(sibling.id).activeCount}free`).join(", ")})`,
+              `(model="${resolvedModel}", ${siblings.map((sibling) => `${sibling.id}:active=${localModelQueue._getQueue(sibling.id).activeCount},queued=${localModelQueue._getQueue(sibling.id).pending}`).join(", ")})`,
           );
           providerName = bestId;
         }

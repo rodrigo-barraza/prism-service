@@ -102,7 +102,7 @@ describe("Orchestrator Infrastructure Suite", () => {
       expect(InstanceLoadBalancer.getReservations().get("instance-1")).toBe(1);
     });
 
-    it("should pack to other instances (fill-first) when orchestrator is busy", () => {
+    it("should select the instance with more availability (least-connections) when orchestrator is busy", () => {
       const activeSubAgents = new Map([
         [
           "agent-1",
@@ -138,7 +138,7 @@ describe("Orchestrator Infrastructure Suite", () => {
       expect(InstanceLoadBalancer.getReservations().get("instance-2")).toBe(1);
     });
 
-    it("should use least-loaded overflow if all instances are full", () => {
+    it("should use least-connections overflow when all instances are full, preferring orchestrator on tie", () => {
       const activeSubAgents = new Map([
         [
           "agent-1",
@@ -177,6 +177,7 @@ describe("Orchestrator Infrastructure Suite", () => {
         resolvedModel: "model-a",
       } as any);
 
+      // Both at capacity (2/2 each) — tie-break favors orchestrator instance
       const result = InstanceLoadBalancer.selectAndReserveInstance(
         mockSiblings,
         "instance-1",
@@ -188,6 +189,36 @@ describe("Orchestrator Infrastructure Suite", () => {
       expect(result).not.toBeNull();
       expect(result?.provider).toBe("instance-1");
       expect(InstanceLoadBalancer.getReservations().get("instance-1")).toBe(1);
+    });
+
+    it("should prefer the less-loaded instance even when orchestrator has slots", () => {
+      // instance-1 (orchestrator) has 1 active, instance-2 has 0 active
+      // Both have concurrency=2, so instance-2 has more availability
+      const activeSubAgents = new Map([
+        [
+          "agent-1",
+          {
+            agentId: "agent-1",
+            providerName: "instance-1",
+            status: "running",
+            resolvedModel: "model-a",
+          } as any,
+        ],
+      ]);
+      const instanceModelOverrides = new Map();
+
+      const result = InstanceLoadBalancer.selectAndReserveInstance(
+        mockSiblings,
+        "instance-1",
+        instanceModelOverrides,
+        "model-a",
+        activeSubAgents
+      );
+
+      expect(result).not.toBeNull();
+      // instance-2 has 2 free slots vs instance-1's 1 free slot
+      expect(result?.provider).toBe("instance-2");
+      expect(InstanceLoadBalancer.getReservations().get("instance-2")).toBe(1);
     });
 
     it("should apply model overrides if specified", () => {

@@ -64,6 +64,9 @@ class InstanceQueue {
   get totalProcessed(): number {
     return this._totalProcessed;
   }
+  get totalInflight(): number {
+    return this._activeCount + this._queue.length;
+  }
 }
 
 class LocalModelQueue {
