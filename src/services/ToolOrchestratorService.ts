@@ -26,6 +26,7 @@ import {
   injectVoiceCatalog,
   TTS_VOICE_CATALOG_PLACEHOLDER,
 } from "../utils/VoiceCatalog.ts";
+import { Bm25ToolIndex } from "../utils/Bm25ToolScorer.ts";
 import type { OrchestratorContext, TeamMember } from "../types/orchestrator.ts";
 
 // ────────────────────────────────────────────────────────────
@@ -1485,8 +1486,8 @@ export default class ToolOrchestratorService {
     const mcpSchemas = MCPClientService.getToolSchemas();
     if (mcpSchemas.length === 0) return toolsApiResult;
 
-    const queryTextLowercase =
-      typeof args.query === "string" ? args.query.toLowerCase().trim() : "";
+    const queryText =
+      typeof args.query === "string" ? args.query.trim() : "";
     const domainFilter =
       typeof args.domain === "string" ? args.domain.toLowerCase() : null;
     const limit =
@@ -1494,7 +1495,7 @@ export default class ToolOrchestratorService {
         ? Math.min(Math.max(1, args.limit), 50)
         : 20;
 
-    if (!queryTextLowercase && !domainFilter) return toolsApiResult;
+    if (!queryText && !domainFilter) return toolsApiResult;
 
     // Filter MCP schemas by domain when a domain filter is specified
     let candidateSchemas = mcpSchemas;
@@ -1509,41 +1510,11 @@ export default class ToolOrchestratorService {
       });
     }
 
-    // Score matches using same heuristics as AgenticToolSearchService
-    const scoredMatches = candidateSchemas
-      .map((schema) => {
-        if (!queryTextLowercase) return { schema, score: 1 };
+    // Score matches using BM25 over name + description + parameter names
+    const searchIndex = new Bm25ToolIndex(candidateSchemas);
+    const indexResults = searchIndex.search(queryText, limit);
 
-        const originalNameLowercase = (
-          schema._mcpOriginalName || ""
-        ).toLowerCase();
-        const namespacedNameLowercase = schema.name.toLowerCase();
-        const descriptionLowercase = (schema.description || "").toLowerCase();
-
-        let score = 0;
-        if (originalNameLowercase === queryTextLowercase) score += 100;
-        else if (originalNameLowercase.includes(queryTextLowercase))
-          score += 50;
-        if (namespacedNameLowercase.includes(queryTextLowercase)) score += 30;
-        if (descriptionLowercase.includes(queryTextLowercase)) score += 20;
-
-        const queryWords = queryTextLowercase.split(/\s+/);
-        for (const word of queryWords) {
-          if (word.length < 2) continue;
-          if (
-            originalNameLowercase.includes(word) ||
-            namespacedNameLowercase.includes(word)
-          )
-            score += 10;
-          if (descriptionLowercase.includes(word)) score += 5;
-        }
-
-        return { schema, score };
-      })
-      .filter((matchEntry) => matchEntry.score > 0)
-      .sort((firstMatch, secondMatch) => secondMatch.score - firstMatch.score);
-
-    if (scoredMatches.length === 0) return toolsApiResult;
+    if (indexResults.length === 0) return toolsApiResult;
 
     // Build enabled set for isEnabled annotation (mirrors AgenticToolSearchService)
     const enabledToolsArray = context.enabledTools;
@@ -1555,15 +1526,15 @@ export default class ToolOrchestratorService {
       ? new Set(enabledToolsArray)
       : null;
 
-    const mcpMatches = scoredMatches.map((matchEntry) => ({
-      name: matchEntry.schema.name,
-      description: matchEntry.schema.description,
+    const mcpMatches = indexResults.map((matchEntry) => ({
+      name: matchEntry.document.name,
+      description: matchEntry.document.description,
       domain:
-        matchEntry.schema.domain ||
-        `Model Context Protocol: ${matchEntry.schema._mcpServer}`,
-      parameters: matchEntry.schema.parameters || null,
+        matchEntry.document.domain ||
+        `Model Context Protocol: ${(matchEntry.document as unknown as Record<string, unknown>)._mcpServer}`,
+      parameters: matchEntry.document.parameters || null,
       ...(enabledToolsSet && {
-        isEnabled: enabledToolsSet.has(matchEntry.schema.name),
+        isEnabled: enabledToolsSet.has(matchEntry.document.name),
       }),
     }));
 
@@ -1584,7 +1555,7 @@ export default class ToolOrchestratorService {
     return {
       ...toolsApiResult,
       matches: mergedMatches,
-      total: existingTotal + scoredMatches.length,
+      total: existingTotal + indexResults.length,
       ...(hasDisabledMcpMatches &&
         !toolsApiResult.action_required &&
         !toolsApiResult.actionRequired && {
