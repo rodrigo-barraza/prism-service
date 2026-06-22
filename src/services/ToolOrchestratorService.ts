@@ -26,7 +26,7 @@ import {
   injectVoiceCatalog,
   TTS_VOICE_CATALOG_PLACEHOLDER,
 } from "../utils/VoiceCatalog.ts";
-import { Bm25ToolIndex } from "../utils/Bm25ToolScorer.ts";
+import { Bm25ToolIndex } from "@rodrigo-barraza/utilities-library/search";
 import type { OrchestratorContext, TeamMember } from "../types/orchestrator.ts";
 
 // ────────────────────────────────────────────────────────────
